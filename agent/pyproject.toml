@@ -1,0 +1,22 @@
+ [project]
+ name = "agent"
+ version = "0.1.0"
+ description = "Agentic RAG."
+ requires-python = ">=3.8"
+
+ dependencies = [
+   "pytest",
+   "pytest-repeat",
+   "aiohttp",
+   "asyncio",
+   "pytest-asyncio",
+   "redis"
+ ]
+
+ [tool.setuptools]
+ package-dir = {"" = "."}
+ packages = ["app", "tests"]
+
+ [tool.pytest.ini_options]
+ log_cli = true
+ log_cli_level = "INFO"

@@ -1,0 +1,69 @@
+name: "euglena"
+services:
+  inference:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    volumes:
+      - ./inference/models:/models
+    environment:
+      - LLAMA_ARG_MODEL=/models/Phi-3-mini-4k-instruct-q4.gguf
+      - LLAMA_ARG_N_GPU_LAYERS=999
+      - LLAMA_ARG_PORT=8000
+      - LLAMA_ARG_HOST=0.0.0.0
+      - LLAMA_API=true
+    ports:
+      - "8000:8000"
+    entrypoint: ["/app/llama-server"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+
+  cache:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 180 1 --loglevel warning
+
+
+  agent:
+    profiles: ["main"]
+    build:
+      context: agent
+      dockerfile: .dockerfile
+    volumes:
+      - ./shared:/agent/shared
+      - ./agent/app:/agent/app
+      - ./agent/tests:/agent/tests
+    depends_on:
+      - inference
+      - cache
+    command: ["python", "app/main.py"]
+    env_file:
+      - .env
+      - keys.env
+
+  agent-test:
+    profiles: ["test"]
+    build:
+      context: agent
+      dockerfile: .dockerfile
+    volumes:
+      - ./shared:/agent/shared
+      - ./agent/app:/agent/app
+      - ./agent/tests:/agent/tests
+    depends_on:
+      - inference
+      - cache
+    command: [ "pytest", "-v", "tests" ]
+    env_file:
+      - .env
+      - keys.env
+
+volumes:
+  redis_data:
