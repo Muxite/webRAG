@@ -1,101 +1,154 @@
 from typing import Optional, List, Dict, Any
 
+
 class PromptBuilder:
     """
-    Construct an OpenAI formatted JSON prompt for one LLM call.
-    The agent should maintain the following memory:
-      - short_term (a small summary of recent actions)
-      - notes (freeform non-deterministic notes)
-      - long_term (tagged string dumps pulled from cache)
+    Construct a JSON prompt for one LLM call in a tick-based RAG agent.
+
+    The agent maintains the following memory components:
+      - short_term: recent tick summaries (enumerated)
+      - notes: persistent freeform scratchpad text passed from tick to tick
+      - long_term: retrieved RAG chunks from a vector database (semantic cache)
     """
 
     SYSTEM_INSTRUCTIONS = (
-        "You are an autonomous agent. You work in ticks, info from previous ticks can be passed to the current tick."
-        "On each tick, you receive:\n"
-        "- MANDATE: Your immutable primary directive from the user. This is your end goal.\n"
-        "- HISTORY: An enumerated list of your actions on this branch. A new line is added every tick.\n"
-        "- NOTE MEMORY: free-form notes you have been carrying. Passed from tick to tick. Store future plans here.\n"
-        "- RETRIEVED CONTEXT: Facts or data retrieved from a cache."
-        " These are the result of last tick's action.\n"
-        "- OBSERVATIONS: new input / page / HTML content for this tick.\n\n"
-        "You MUST output valid JSON with exactly these top-level keys:\n"
-        "* log "
-        "* history_update: A very short summary of what will happen this tick. This will be appended.\n"
-        "* note_update: Your new note memory, important info for next tick to know.\n"
-        "* cache_update: dict - new long-term facts or data to store persistently (shared across agents)."
-        "Very useful for preliminary research after getting the mandate. Use a tag that is easy to search for."
-        "Ex: {tree definition: a tree is a...}\n"
-        "* next_action: Your next action. \n"
-        "No extra keys. Do not include commentary or explanation outside the JSON."
+        "You are an autonomous agent reasoning in discrete ticks, where each tick is one step of thought or action. "
+        "You persist memory between ticks through NOTES and cached data.\n\n"
+
+        "INPUT STRUCTURE:\n"
+        "- MANDATE: Your immutable directive or mission.\n"
+        "- SHORT TERM MEMORY: Summary of recent actions in this reasoning branch.\n"
+        "- NOTES: Your personal scratchpad for reasoning, include hypotheses, plans, partial results, or reminders. "
+        "Everything written here will be passed unchanged into the next tick, so organize it usefully.\n"
+        "- RETRIEVED CONTEXT: Information fetched from your vector database based on the previous tick’s 'data' request.\n"
+        "- OBSERVATIONS: New external input, such as user text or HTML, from this tick.\n\n"
+
+        "SYSTEM RULES:\n"
+        "- If you need specific knowledge, list it in the 'data' field as a short, comma-separated set of topics "
+        "(ex: 'fish, ocean ecosystem').\n"
+        "- The system will retrieve relevant semantic chunks and include them in 'RETRIEVED CONTEXT' on the next tick.\n"
+        "- Summarize observations and facts/data in the 'cache_update'. Use the format {topic : summary} for as many "
+        "important pieces of info as you would like. These will later be accessible by the 'data' field. \n\n"
+        "OUTPUT FORMAT:\n"
+        "You must output *valid JSON* with exactly these top-level keys:\n"
+        "* history_update: one-sentence summary of this tick’s action\n"
+        "* note_update: updated notes or reasoning to persist into the next tick\n"
+        "* cache_update: dictionary of long-term facts or definitions to store persistently\n"
+        "* next_action: description of your next goal or operation\n"
+        "* data: comma-separated topics to retrieve for the next tick\n\n"
+        "Do not include any commentary or keys outside this JSON."
     )
+
     def __init__(
         self,
         mandate: Optional[str] = None,
-        short_term_summary: Optional[str] = None,
+        short_term_summary: Optional[List[str]] = None,
         notes: Optional[str] = None,
-        retrieved_long_term: Optional[str] = None,
-        observations: Optional[str] = None
+        retrieved_long_term: Optional[List[str]] = None,
+        observations: Optional[str] = None,
     ):
         """
-        :param mandate: The immutable primary directive from the user, representing the agent's end goal.
-
-        :param short_term_summary: A concise summary of recent actions in this branch, providing context for the current tick.
-
-        :param notes: Free-form notes carried from previous ticks, useful for storing future plans and considerations.
-
-        :param retrieved_long_term: Facts or data retrieved from the long-term cache, providing persistent knowledge relevant to the task.
-
-        :param observations: New input, page, or HTML content for this tick, offering fresh data for processing.
-
-        Initializes the agent's internal state with the provided parameters, setting up the context for
-        decision-making and action in the current tick.
+        Initializes the agent's context for one tick.
         """
+        self._mandate = mandate or ""
+        self._short_term_summary = short_term_summary or []
+        self._notes = notes or ""
+        self._retrieved_long_term = retrieved_long_term or []
+        self._observations = observations or ""
 
-        self.mandate = mandate or ""
-        self.short_term_summary = short_term_summary or ""
-        self.notes = notes or ""
-        self.retrieved_long_term = retrieved_long_term or ""
-        self.observations = observations or ""
+    def set_mandate(self, text: str):
+        """Set the agent's mandate."""
+        self._mandate = text.strip()
 
+    def add_history_entry(self, summary: str):
+        """Add a single summary entry to the short-term memory."""
+        self._short_term_summary.append(summary.strip())
+
+    def update_notes(self, new_notes: str):
+        """Replace or append to the freeform note scratchpad."""
+        self._notes = new_notes.strip()
+
+    def add_retrieved_context(self, chunk: str):
+        """Add a single RAG chunk retrieved from the vector database."""
+        self._retrieved_long_term.append(chunk.strip())
+
+    def update_observations(self, new_obs: str):
+        """Replace or append to the observation text."""
+        self._observations = new_obs.strip()
+
+
+    def _format_section(self, title: str, content: str) -> str:
+        """
+        Format a section of the user message.
+        :param str title: Section title.
+        :param str content: Section content.
+        :return str: Formatted section.
+        """
+        return f"{title}:\n{content.strip()}"
 
     def _build_user_message(self) -> str:
-        """Assemble the content of the user message."""
+        """
+        Assemble the full user message with easily readable, distinct sections.
+        :return str: The contents of the user message.
+        """
         parts: List[str] = []
 
-        if self.mandate:
-            parts.append("MANDATE:\n" + self.mandate.strip())
+        if self._mandate:
+            parts.append(self._format_section("MANDATE", self._mandate))
 
-        if self.short_term_summary:
-            parts.append("SHORT TERM MEMORY (recent history):\n" + self.short_term_summary.strip())
+        if self._short_term_summary:
+            joined_history = "\n".join(
+                f"{i + 1}. {entry}" for i, entry in enumerate(self._short_term_summary)
+            )
+            parts.append(self._format_section("SHORT TERM MEMORY (recent history)", joined_history))
 
-        if self.notes:
-            parts.append("NOTES:\n" + self.notes.strip())
+        if self._notes.strip():
+            parts.append(self._format_section("NOTES", self._notes))
 
-        if self.retrieved_long_term:
-            parts.append("RETRIEVED LONG-TERM CONTEXT:\n" + self.retrieved_long_term.strip())
+        if self._retrieved_long_term:
+            joined_chunks = "\n".join(
+                f"[{i + 1}] {chunk}" for i, chunk in enumerate(self._retrieved_long_term)
+            )
+            parts.append(self._format_section("RETRIEVED LONG-TERM CONTEXT", joined_chunks))
 
-        if self.observations:
-            parts.append("OBSERVATIONS:\n" + self.observations.strip())
+        if self._observations.strip():
+            parts.append(self._format_section("OBSERVATIONS", self._observations))
 
         return "\n\n".join(parts)
 
+
     def build_messages(self) -> List[Dict[str, str]]:
         """
-        Returns the list of messages to send to OpenAI (or compatible) model.
+        Returns a message list compatible with OpenAI-style chat completions.
+        :return list: List of dicts, each with "role" and "content" keys.
         """
-        system_msg = {"role": "system", "content": self.SYSTEM_INSTRUCTIONS}
-        user_msg = {"role": "user", "content": self._build_user_message()}
-        return [system_msg, user_msg]
+        return [
+            {"role": "system", "content": self.SYSTEM_INSTRUCTIONS},
+            {"role": "user", "content": self._build_user_message()},
+        ]
 
     def build_payload(self) -> Dict[str, Any]:
         """
-        Build the full payload dict (model, messages, plus optional llm_kwargs
-        such as temperature, max_tokens, etc.).
+        Build the final dict payload for API call.
+        :return dict: OpenAI-compatible JSON payload.
         """
         return {
             "model": "llama",
             "messages": self.build_messages(),
             "temperature": 0.4,
             "max_tokens": 3200,
-            "response_format": {"type": "json_object"}
+            "response_format": {"type": "json_object"},
+        }
+
+    def get_summary(self) -> Dict[str, Any]:
+        """
+        Return current memory state for debugging or display.
+        :return dict: Memory state.
+        """
+        return {
+            "mandate": self._mandate,
+            "short_term_summary": self._short_term_summary,
+            "notes": self._notes,
+            "retrieved_long_term": self._retrieved_long_term,
+            "observations": self._observations,
         }
