@@ -1,33 +1,36 @@
 import pytest
-from app.tick_output import TickOutput
+from app.tick_output import TickOutput, ActionType
+
 
 def test_basic():
     o = TickOutput({
         "history_update": "a",
         "note_update": "b",
         "cache_update": {"x": "y", "z": "w"},
-        "next_action": " go ",
-        "data": "fish, car, bread"
+        "next_action": " search, best cars",
+        "data": "fish, car, bread",
+        "deliverable": "https://www.link.com/"
     })
-    assert o.show_next_action() == "go"
+    assert o.show_next_action() == (ActionType.SEARCH, "best cars")
     assert o.show_requested_data_topics() == ["fish", "car", "bread"]
+    assert o.deliverable() == "https://www.link.com/"
     assert len(o.to_vector_records()) == 2
 
 
 def test_empty():
     o = TickOutput({})
-    assert o.show_next_action() is None
+    assert o.show_next_action() == (ActionType.THINK, None)
     assert o.show_requested_data_topics() == []
     assert o.to_vector_records() == []
 
 
 def test_whitespace_and_summary():
     o = TickOutput({
-        "next_action": " run ",
+        "next_action": " eggs ",
         "data": " a ,  b , , c ",
         "cache_update": {"good": "ok", "bad": " "}
     })
-    assert o.show_next_action() == "run"
+    assert o.show_next_action() == (ActionType.THINK, None)
     assert o.show_requested_data_topics() == ["a", "b", "c"]
     v = o.to_vector_records()
     assert v == [{"tag": "good", "content": "ok"}]

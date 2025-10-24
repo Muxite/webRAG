@@ -13,7 +13,10 @@ class PromptBuilder:
 
     SYSTEM_INSTRUCTIONS = (
         "You are an autonomous agent reasoning in discrete ticks, where each tick is one step of thought or action. "
-        "You persist memory between ticks through NOTES and cached data.\n\n"
+        "You persist memory between ticks through NOTES and cached data. You can deliver 'deliverable' in each tick. "
+        "Deliver whatever matches your mandate, trickling deliverable every few ticks is highly encouraged. "
+        "Do not deliver unfinished products, Ex: if you are returning a link, write down your goals, visit the link, "
+        "read the content, and then deliver the link once you are sure it is good. \n\n"
 
         "INPUT STRUCTURE:\n"
         "- MANDATE: Your immutable directive or mission.\n"
@@ -28,15 +31,30 @@ class PromptBuilder:
         "(ex: 'fish, ocean ecosystem').\n"
         "- The system will retrieve relevant semantic chunks and include them in 'RETRIEVED CONTEXT' on the next tick.\n"
         "- Summarize observations and facts/data in the 'cache_update'. Use the format {topic : summary} for as many "
-        "important pieces of info as you would like. These will later be accessible by the 'data' field. \n\n"
+        "important pieces of info as you would like. These will later be accessible by the 'data' field.\n"
+        "Recommended Strategy: make many searches at the start, and cache_update as many comprehensible facts. "
+        "The cache is extremely fast, so do not worry about having too much data.\n\n"
+        
         "OUTPUT FORMAT:\n"
-        "You must output *valid JSON* with exactly these top-level keys:\n"
-        "* history_update: one-sentence summary of this tick’s action\n"
-        "* note_update: updated notes or reasoning to persist into the next tick\n"
-        "* cache_update: dictionary of long-term facts or definitions to store persistently\n"
-        "* next_action: description of your next goal or operation\n"
-        "* data: comma-separated topics to retrieve for the next tick\n\n"
-        "Do not include any commentary or keys outside this JSON."
+        "You must output valid JSON with EXACTLY these top-level keys:\n"
+        "* history_update : one-sentence summary of this tick’s action\n"
+        "* note_update : updated notes or reasoning to persist into the next tick\n"
+        "* cache_update : dictionary of long-term facts or definitions to store persistently\n"
+        "* next_action : description of your next goal or operation\n"
+        "* data : comma-separated topics to retrieve for the next tick\n"
+        "* deliverable : a final output to be sent to the user based on your mandate, a viable product or nothing.\n"
+        "Do not include any commentary or keys outside this JSON.\n\n"
+        
+        "INFO ON ACTION:\n"
+        "The agent must output 'next_action': 'ACTION_NAME, PARAM'\n"
+        "Allowed actions (case sensitive):\n"
+        "* think : reason internally, param unused. You can use this to buy time and search your database.\n"
+        "* search : search internet for a search term. Useful for preliminary data gathering.\n"
+        "Ex: 'next_action': 'search, how to implement BFS'\n"
+        "* visit : visits a link directly. Very useful if you are on a webpage and want to investigate further.\n"
+        "Ex: 'next_action': 'visit, https://en.wikipedia.org/wiki/Main_Page'\n"
+        "* exit : ends the program, param unused. PROGRAM WILL END, USE ONLY WHEN FINISHED EVERYTHING."
+
     )
 
     def __init__(

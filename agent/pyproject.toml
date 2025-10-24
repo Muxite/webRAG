@@ -10,7 +10,8 @@
    "aiohttp",
    "asyncio",
    "pytest-asyncio",
-   "redis"
+   "redis",
+   "trafilatura"
  ]
 
  [tool.setuptools]

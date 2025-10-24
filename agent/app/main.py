@@ -1,6 +1,6 @@
-from app.reader import Reader
+from app.agent import Agent
 import asyncio
 
 if __name__ == "__main__":
-    reader = Reader()
-    asyncio.run(reader.run_worker())
+    agent = Agent()
+    asyncio.run(agent.run_worker())
