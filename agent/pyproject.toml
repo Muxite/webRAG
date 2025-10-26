@@ -11,7 +11,8 @@
    "asyncio",
    "pytest-asyncio",
    "redis",
-   "trafilatura"
+   "trafilatura",
+   "chromadb",
  ]
 
  [tool.setuptools]

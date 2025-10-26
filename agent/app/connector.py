@@ -3,17 +3,27 @@ import logging
 import aiohttp
 from typing import Optional, Dict, Any
 from redis.asyncio import Redis
+import chromadb
+from chromadb.config import Settings
 import asyncio
 from shared.retry import Retry
 import math
 import random
 
+# TODO, add circuit breaker pattern failure resolution, ensure Connector always returns something meaningful
+# TODO, add intelligent HealthChecks embedded in all service-calling methods, check if X seconds since last successful call
+# TODO: detect failed calls and return viable messages with differentiation so they are usable
+
 class Connector:
     """
-    Class that manages connections to external services. Those are:
+    Class that manages connections to external services. Handles retry logic, jittering
+    Services will return None if they fail.
+
+    Those are:
     1. Redis connection (async)
     2. aiohttp session
-    3. LLM client or inference connection
+    3. LLM client
+    4. ChromaDB client
     """
 
     def __init__(self, worker_type: str):
@@ -24,9 +34,12 @@ class Connector:
         self.default_timeout = int(os.environ.get("DEFAULT_TIMEOUT", "10"))
         self.cold_start_time = float(os.environ.get("COLD_START_SECONDS", "90"))
         self.jitter_seconds = float(os.environ.get("JITTER_SECONDS", "0.1"))
+
+        self.redis: Optional[Redis] = None
         if not self.redis_url:
             self.logger.warning(f"No Redis URL set")
 
+        self.chroma = None
         self.chroma_url = os.environ.get("CHROMA_URL")
         if not self.chroma_url:
             self.logger.warning("No Chroma URL set")
@@ -37,7 +50,7 @@ class Connector:
             self.logger.warning(f"No LLM URL set")
         self.llm_api_ready = False
 
-        self.redis: Optional[Redis] = None
+
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def init_redis(self) -> bool:
@@ -98,35 +111,25 @@ class Connector:
         if self.chroma_api_ready:
             return True
 
-        await self.init_http_session()
+        try:
+            self.chroma = chromadb.HttpClient(
+                host=self.chroma_url.replace("http://", "")
+                .replace("https://", "").split(":")[0],
+                port=int(self.chroma_url.split(":")[-1]) if ":" in self.chroma_url.split("//")[-1] else 8000,
+                settings=Settings(
+                    anonymized_telemetry=False
+                )
+            )
 
-        heartbeat_paths = ["/api/v2/heartbeat", "/api/v1/heartbeat"]
-        last_status = None
-        last_error = None
+            self.chroma.heartbeat()
+            self.logger.info("ChromaDB OPERATIONAL")
+            self.chroma_api_ready = True
+            return True
 
-        for path in heartbeat_paths:
-            url = f"{self.chroma_url}{path}"
-            try:
-                async with self.session.get(url, timeout=self.default_timeout) as resp:
-                    last_status = resp.status
-                    if resp.status == 200:
-                        self.logger.info(f"ChromaDB OPERATIONAL via {path}")
-                        self.chroma_api_ready = True
-                        return True
-                    else:
-                        self.logger.warning(f"Chroma heartbeat {path} returned status {resp.status}")
-            except (asyncio.TimeoutError, aiohttp.ClientError) as e:
-                last_error = e
-                self.logger.warning(f"Chroma heartbeat {path} error: {e}")
-            except Exception as e:
-                last_error = e
-                self.logger.error(f"Chroma heartbeat {path} unexpected error: {e}")
-
-        if last_error:
-            self.logger.warning(f"ChromaDB connection failed: {last_error}")
-        elif last_status is not None:
-            self.logger.warning(f"ChromaDB heartbeat failed with status {last_status}")
-        return False
+        except Exception as e:
+            self.logger.warning(f"ChromaDB connection failed: {e}")
+            self.chroma_api_ready = False
+            return False
 
     async def init_llm(self) -> bool:
         """
@@ -168,7 +171,7 @@ class Connector:
         self.llm_api_ready = True
         return True
 
-    async def post_json(self, url, payload, retries=6, **kwargs):
+    async def post_json(self, url, payload, retries=6, **kwargs) -> Optional[Dict[str, Any]]:
         await self.init_http_session()
         for attempt in range(1, retries + 1):
             try:
@@ -186,15 +189,97 @@ class Connector:
             except (asyncio.TimeoutError, aiohttp.ClientError) as e:
                 self.logger.warning(f"POST {url} failed attempt {attempt}/{retries}: {e}")
             wait_secs = min(60, 2 ** attempt)
-            self.logger.info(f"Retrying LLM POST after {wait_secs}s...")
+            self.logger.info(f"Retrying POST after {wait_secs}s...")
             await asyncio.sleep(wait_secs)
         self.logger.error(f"POST {url} failed after {retries} attempts")
         return None
 
+    async def create_or_get_collection(self, collection: str, metadata: dict = None) -> bool:
+        """
+        Create a ChromaDB collection or get it if it already exists.
+        :param collection: ChromaDB collection name
+        :param metadata: Optional metadata for the collection
+        :return: True if successful, False otherwise
+        """
+        if not self.chroma_api_ready:
+            self.logger.warning("ChromaDB not ready.")
+            return False
+
+        try:
+            self.chroma.get_or_create_collection(
+                name=collection,
+                metadata=metadata
+            )
+            self.logger.info(f"Collection '{collection}' ready")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to create/get collection '{collection}': {e}")
+            return False
+
+    async def add_to_chroma(self,
+                            collection: str,
+                            ids: list[str],
+                            metadatas: list[dict],
+                            documents: list[str]) -> bool:
+        """
+        Add documents or embeddings to a ChromaDB collection.
+        :param collection: ChromaDB collection name
+        :param ids: List of document IDs
+        :param metadatas: List of metadata dictionaries
+        :param documents: List of documents
+        :return: True if successful, False otherwise
+        """
+        if not self.chroma_api_ready:
+            self.logger.warning("ChromaDB not ready.")
+            return False
+
+        try:
+            coll = self.chroma.get_collection(name=collection)
+
+            coll.add(
+                ids=ids,
+                metadatas=metadatas,
+                documents=documents
+            )
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to add to collection '{collection}': {e}")
+            return False
+
+    async def query_chroma(self, collection: str, query_texts: list[str], n_results: int = 5) -> Optional[dict]:
+        """
+        Query a ChromaDB collection for nearest neighbors.
+        :param collection: ChromaDB collection name
+        :param query_texts: List of query texts
+        :param n_results: Number of results to return
+        :return: Dictionary of results
+        """
+        if not self.chroma_api_ready:
+            self.logger.warning("ChromaDB not ready.")
+            return None
+
+        try:
+            coll = self.chroma.get_collection(name=collection)
+
+            results = coll.query(
+                query_texts=query_texts,
+                n_results=n_results
+            )
+
+            return results
+
+        except Exception as e:
+            self.logger.error(f"ChromaDB query failed for collection {collection}: {e}")
+            return None
+
     async def query_llm(self, payload) -> Optional[str]:
         """
         Send a chat completion request to the LLM API.
-        :param payload: JSON payload for the chat completion request
+        :param payload: the full JSON payload for the chat completion request.
+            model, messages, temperature, max_tokens,...
         :return: Response text or None if request failed or response is malformed.
         """
         if not self.llm_api_ready or not self.llm_url:
@@ -211,60 +296,6 @@ class Connector:
         except (KeyError, IndexError):
             self.logger.warning(f"Unexpected LLM response structure: {result}")
             return None
-
-    async def query_chroma(self, collection: str, query_texts: list[str], n_results: int = 5) -> Optional[dict]:
-        """
-        Query a ChromaDB collection for nearest neighbors.
-        :param collection: ChromaDB collection name
-        :param query_texts: List of query texts
-        :param n_results: Number of results to return
-        :return: Dictionary of results
-        """
-        if not self.chroma_api_ready:
-            self.logger.warning("ChromaDB not ready.")
-            return None
-
-        url = f"{self.chroma_url}/api/v2/collections/{collection}/query"
-        payload = {
-            "query_texts": query_texts,
-            "n_results": n_results
-        }
-
-        result = await self.post_json(url, payload, retries=3)
-        if not result:
-            self.logger.error(f"ChromaDB query failed for collection {collection}")
-            return None
-        return result
-
-    async def add_to_chroma(self,
-                            collection: str,
-                            ids: list[str],
-                            embeddings: list[list[float]],
-                            metadatas: list[dict],
-                            documents: list[str]) -> bool:
-        """
-        Add documents or embeddings to a ChromaDB collection.
-        :param collection: ChromaDB collection name
-        :param ids: List of document IDs
-        :param embeddings: List of embeddings
-        :param metadatas: List of metadata dictionaries
-        :param documents: List of documents
-        :return: True if successful, False otherwise
-        """
-        if not self.chroma_api_ready:
-            self.logger.warning("ChromaDB not ready.")
-            return False
-
-        url = f"{self.chroma_url}/api/v2/collections/{collection}/add"
-        payload = {
-            "ids": ids,
-            "embeddings": embeddings,
-            "metadatas": metadatas,
-            "documents": documents
-        }
-
-        result = await self.post_json(url, payload, retries=3)
-        return bool(result)
 
     async def await_all_connections_ready(self) -> bool:
         """
