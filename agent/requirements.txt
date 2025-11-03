@@ -4,4 +4,3 @@ aiohttp
 asyncio
 pytest-asyncio
 redis
-trafilatura

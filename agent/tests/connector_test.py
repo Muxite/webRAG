@@ -110,3 +110,12 @@ async def test_llm_query(connector):
     assert llm_response is not None, "LLM query failed"
     assert isinstance(llm_response, str)
     assert len(llm_response.strip()) > 0
+
+
+@pytest.mark.asyncio
+async def test_query_search(connector):
+    """Test search query returns valid response."""
+    query = "How many fish are there?"
+    search_result = await connector.query_search(query)
+    assert search_result is not None, "Search query failed"
+    assert isinstance(search_result, list)

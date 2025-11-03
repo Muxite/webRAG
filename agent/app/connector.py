@@ -1,12 +1,13 @@
 import os
 import logging
 import aiohttp
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from redis.asyncio import Redis
 import chromadb
 from chromadb.config import Settings
 import asyncio
 from shared.retry import Retry
+from shared.request_result import RequestResult
 import math
 import random
 
@@ -26,12 +27,40 @@ class Connector:
     4. ChromaDB client
     """
 
+    HTTP_STATUS_CODES = {
+        200: "OK - Request succeeded",
+        201: "Created - Resource created successfully",
+        202: "Accepted - Request accepted for processing",
+        204: "No Content - Success but no content to return",
+
+        301: "Moved Permanently - Resource permanently moved",
+        302: "Found - Resource temporarily moved",
+        304: "Not Modified - Cached version still valid",
+
+        400: "Bad Request - Invalid syntax or parameters",
+        401: "Unauthorized - Authentication required or failed",
+        403: "Forbidden - Server refuses to authorize request",
+        404: "Not Found - Resource doesn't exist",
+        405: "Method Not Allowed - HTTP method not supported",
+        408: "Request Timeout - Server timed out waiting for request",
+        409: "Conflict - Request conflicts with current state",
+        422: "Unprocessable Entity - Semantic errors in request",
+        429: "Too Many Requests - Rate limit exceeded",
+
+        500: "Internal Server Error - Generic server error",
+        502: "Bad Gateway - Invalid response from upstream server",
+        503: "Service Unavailable - Server temporarily unavailable",
+        504: "Gateway Timeout - Upstream server timed out",
+    }
+
+    PERMANENT_ERROR_CODES = {401, 403, 404, 405, 422, 500, 502, 503, 504}
+
     def __init__(self, worker_type: str):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.worker_type = worker_type
         self.redis_url = os.environ.get("REDIS_URL")
         self.redis_ready = False
-        self.default_timeout = int(os.environ.get("DEFAULT_TIMEOUT", "10"))
+        self.default_timeout = int(os.environ.get("DEFAULT_TIMEOUT", "2"))
         self.cold_start_time = float(os.environ.get("COLD_START_SECONDS", "90"))
         self.jitter_seconds = float(os.environ.get("JITTER_SECONDS", "0.1"))
 
@@ -171,28 +200,109 @@ class Connector:
         self.llm_api_ready = True
         return True
 
-    async def post_json(self, url, payload, retries=6, **kwargs) -> Optional[Dict[str, Any]]:
+    async def request(
+            self,
+            method: str,
+            url: str,
+            retries: int = 4,
+            **kwargs
+    ):
+        """
+        Generic request with exponential backoff retry logic.
+
+        :param method: HTTP method (POST or GET)
+        :param url: Target URL
+        :param retries: Maximum retry attempts
+        :param kwargs: Additional arguments for session.request()
+        :return: RequestResult object containing the status and data (could be an error message)
+        """
         await self.init_http_session()
+
+        kwargs.pop('retries', None)
+        last_exc = None
+        last_status = None
+
         for attempt in range(1, retries + 1):
             try:
-                async with self.session.post(
-                        url, json=payload, timeout=self.default_timeout, **kwargs
+
+                async with self.session.request(
+                        method=method,
+                        url=url,
+                        timeout=self.default_timeout,
+                        **kwargs
                 ) as resp:
-                    text = await resp.text()
+                    await resp.read()
+                    last_status = resp.status
+                    if resp.status in Connector.PERMANENT_ERROR_CODES:
+                        return RequestResult(
+                            status=resp.status,
+                            error=True,
+                            data=Connector.HTTP_STATUS_CODES[resp.status]
+                        )
+
                     if resp.status == 200:
-                        return await resp.json()
-                    else:
-                        self.logger.warning(f"POST {url} failed with {resp.status}: {text}")
-                    if resp.status in (401, 403, 404):
-                        self.logger.error(f"POST {url}: permanent error {resp.status}, aborting retries")
-                        return None
+                        return RequestResult(
+                            status=resp.status,
+                            error=False,
+                            data=resp
+                        )
+
             except (asyncio.TimeoutError, aiohttp.ClientError) as e:
-                self.logger.warning(f"POST {url} failed attempt {attempt}/{retries}: {e}")
-            wait_secs = min(60, 2 ** attempt)
-            self.logger.info(f"Retrying POST after {wait_secs}s...")
-            await asyncio.sleep(wait_secs)
-        self.logger.error(f"POST {url} failed after {retries} attempts")
-        return None
+                last_exc = e
+                self.logger.warning(f"{method} {url} attempt {attempt}/{retries}: {e}")
+
+            if attempt < retries:
+                wait_secs = min(60, self.default_timeout * 2 ** attempt)
+                await asyncio.sleep(wait_secs)
+
+        return RequestResult(
+            status=last_status,
+            error=True,
+            data=f"Request failed after {retries} attempts: {last_exc}"
+        )
+
+    async def query_search(self, query: str, count: int = 10) -> Optional[List[Dict[str, str]]]:
+        """
+        Send a search request to the configured Search API endpoint.
+        :param query: Search query string
+        :param count: Number of results to return (default 10)
+        :return: List of search results or None if request failed or bad response
+        """
+        search_api_key = os.environ.get("SEARCH_API_KEY")
+        if not search_api_key:
+            self.logger.warning("Search API key not set.")
+            return None
+
+        url = "https://api.search.brave.com/res/v1/web/search"
+        headers = {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "X-Subscription-Token": search_api_key
+        }
+        params = {
+            "q": query,
+            "count": count
+        }
+
+        result = await self.request("GET", url, retries=3, headers=headers, params=params)
+
+        if result.error:
+            self.logger.error(f"Search API query failed with {result.status}, {result.data}")
+            return None
+
+        try:
+            web_results = (await result.data.json())["web"]["results"]
+            return [
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "description": item.get("description", "")
+                }
+                for item in web_results
+            ]
+        except (KeyError, TypeError, IndexError):
+            self.logger.warning(f"Unexpected Search API response structure: {result}")
+            return None
 
     async def create_or_get_collection(self, collection: str, metadata: dict = None) -> bool:
         """
@@ -249,7 +359,7 @@ class Connector:
             self.logger.error(f"Failed to add to collection '{collection}': {e}")
             return False
 
-    async def query_chroma(self, collection: str, query_texts: list[str], n_results: int = 5) -> Optional[dict]:
+    async def query_chroma(self, collection: str, query_texts: list[str], n_results: int = 3) -> Optional[dict]:
         """
         Query a ChromaDB collection for nearest neighbors.
         :param collection: ChromaDB collection name
@@ -278,6 +388,7 @@ class Connector:
     async def query_llm(self, payload) -> Optional[str]:
         """
         Send a chat completion request to the LLM API.
+        :requires: self.llm_api_ready
         :param payload: the full JSON payload for the chat completion request.
             model, messages, temperature, max_tokens,...
         :return: Response text or None if request failed or response is malformed.
@@ -286,13 +397,14 @@ class Connector:
             self.logger.warning("LLM not ready or URL missing.")
             return None
 
-        result = await self.post_json(self.llm_url, payload, retries=3)
-        if not result:
-            self.logger.error("LLM query failed.")
+        result = await self.request("POST", self.llm_url, retries=3, json=payload)
+        if result.error:
+            self.logger.error(f"LLM query failed with {result.status}, {result.data}")
             return None
 
         try:
-            return result["choices"][0]["message"]["content"]
+            json = (await result.data.json())["choices"][0]["message"]["content"]
+            return json
         except (KeyError, IndexError):
             self.logger.warning(f"Unexpected LLM response structure: {result}")
             return None

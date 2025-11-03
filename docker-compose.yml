@@ -53,6 +53,7 @@ services:
     depends_on:
       - inference
       - cache
+      - chroma
     command: ["python", "app/main.py"]
     env_file:
       - .env
@@ -70,6 +71,7 @@ services:
     depends_on:
       - inference
       - cache
+      - chroma
     command: [ "pytest", "-v", "tests" ]
     env_file:
       - .env
