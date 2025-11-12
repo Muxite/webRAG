@@ -7,3 +7,4 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -e .
 ENV PYTHONPATH=/agent:/agent/shared
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2').save('/app/model')"

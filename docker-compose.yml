@@ -27,7 +27,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_data:/cache_retrieved
     command: redis-server --save 180 1 --loglevel warning
 
   chroma:
@@ -36,7 +36,7 @@ services:
     ports:
       - "8001:8001"
     volumes:
-      - ./chroma:/chroma-data
+      - ./chroma:/chroma-cache_retrieved
     environment:
       - IS_PERSISTENT=TRUE
       - PERSIST_DIRECTORY=/chroma-data
@@ -51,7 +51,6 @@ services:
       - ./agent/app:/agent/app
       - ./agent/tests:/agent/tests
     depends_on:
-      - inference
       - cache
       - chroma
     command: ["python", "app/main.py"]
@@ -72,7 +71,7 @@ services:
       - inference
       - cache
       - chroma
-    command: [ "pytest", "-v", "tests" ]
+    command: [ "pytest", "-vv", "tests" ]
     env_file:
       - .env
       - keys.env
