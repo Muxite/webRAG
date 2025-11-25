@@ -26,6 +26,7 @@ async def test_llm_query(connector: ConnectorLLM):
     assert isinstance(llm_response, str)
     assert "pong" in llm_response.lower(), "LLM response did not contain 'pong'"
 
+@pytest.mark.skipif(os.environ.get("LITE") == "true", reason="Expensive test.")
 @pytest.mark.asyncio
 async def test_llm_latency_writing_curve(connector):
     word_counts = [25, 50, 100, 200, 200, 400]
@@ -71,7 +72,7 @@ async def test_llm_latency_writing_curve(connector):
             f"elapsed seconds: {elapsed:.3f}, words per second: {words_per_sec:.2f}"
         )
 
-
+@pytest.mark.skipif(os.environ.get("LITE") == "true", reason="Expensive test.")
 @pytest.mark.asyncio
 async def test_llm_latency_reading_curve(connector):
     script_dir = os.path.dirname(__file__)

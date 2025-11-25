@@ -16,8 +16,6 @@ async def chroma(connector_config):
 @pytest.mark.asyncio
 async def test_chroma_embedding_function_basic(chroma):
     collection = "test_embed_collection"
-    assert await chroma.create_or_get_collection(collection)
-
     docs = ["Cats purr.", "Dogs bark."]
     ids = ["1", "2"]
     metadatas = [{"animal": "cat"}, {"animal": "dog"}]
@@ -32,5 +30,5 @@ async def test_chroma_embedding_function_basic(chroma):
     result = await chroma.query_chroma(collection, ["Which animal makes a purring sound?"], n_results=2)
     assert result is not None, "Chroma query returned None."
     assert "documents" in result
-    returned_texts = result["documents"][0]
+    returned_texts: list = result["documents"][0]
     assert any("cat" in doc.lower() or "purr" in doc.lower() for doc in returned_texts), f"Expected cat chunk, got: {returned_texts}"

@@ -2,9 +2,11 @@ import pytest
 import asyncio
 import logging
 from app.agent import Agent
+import os
 
 logging.basicConfig(level=logging.INFO)
 
+@pytest.mark.skipif(os.environ.get("LITE") == "true", reason="Expensive test.")
 @pytest.mark.asyncio
 async def test_agent_find_panda_diet():
     """
@@ -12,7 +14,7 @@ async def test_agent_find_panda_diet():
     Utilizes searching, visiting, thinking.
     """
     mandate = "Find out what pandas eat, but give a source."
-    async with Agent(mandate=mandate, max_ticks=10) as agent:
+    async with Agent(mandate=mandate, max_ticks=5) as agent:
         output = await agent.run()
         result = output['deliverables']
         logging.info(f"Agent deliverables: {result}")

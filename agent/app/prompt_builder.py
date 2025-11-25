@@ -1,6 +1,22 @@
 from typing import Optional, List, Dict, Any
 
 
+def build_payload(messages: list, json_mode: bool) -> Dict[str, Any]:
+    """
+    Constructs the final JSON payload for the API call, can be switched for different LLM APIs.
+    Model specific parameters like temperature, tokens, and response_format.
+    """
+    payload = {
+        "messages": messages,
+        "temperature": 0.5,
+        "max_tokens": 4096,
+    }
+
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+    return payload
+
+
 class PromptBuilder:
     """
     Construct a JSON prompt for one LLM call in a tick-based RAG agent.
@@ -20,18 +36,20 @@ class PromptBuilder:
 
         "INPUT STRUCTURE:\n"
         "- MANDATE: Your immutable directive or mission.\n"
-        "- SHORT TERM MEMORY: Summary of recent actions in this reasoning branch.\n"
+        "- SHORT TERM MEMORY: Summary of recent actions in this reasoning branch. BE DESCRIPTIVE\n"
         "- NOTES: Your personal scratchpad for reasoning, include hypotheses, plans, partial results, or reminders. "
+        "100 words is appropriate."
         "Everything written here will be passed unchanged into the next tick, so organize it usefully.\n"
-        "- RETRIEVED CONTEXT: Information fetched from your vector database based on the previous tick’s 'data' request.\n"
+        "- RETRIEVED CONTEXT: Information fetched from your vector database based on the previous tick’s 'cache_retrieved' request.\n"
         "- OBSERVATIONS: New external input, such as user text or HTML, from this tick.\n\n"
 
         "SYSTEM RULES:\n"
-        "- If you need specific knowledge, list it in the 'data' field as a short, comma-separated set of topics "
+        "- If you need specific knowledge, list it in the 'cache_retrieved' field as a short, comma-separated set of topics "
         "(ex: 'fish, ocean ecosystem').\n"
-        "- The system will retrieve relevant semantic chunks and include them in 'RETRIEVED CONTEXT' on the next tick.\n"
-        "- Summarize observations and facts/data in the 'cache_update'. Use the format {topic : summary} for as many "
-        "important pieces of info as you would like. These will later be accessible by the 'data' field.\n"
+        "- The system will retrieve relevant semantic chunks and include them in 'cache_retrieved' on the next tick.\n"
+        "Each paragraph should summarize one complete idea or piece of information."
+        "Write as many paragraphs as you find informative and relevant. Each paragraph will be "
+        "separately stored for future retrieval. These will later be accessible by the 'cache_retrieved' field.\n"
         "Recommended Strategy: make many searches at the start, and cache_update as many comprehensible facts. "
         "The cache is extremely fast, so do not worry about having too much data.\n\n"
         
@@ -39,9 +57,16 @@ class PromptBuilder:
         "You must output valid JSON with EXACTLY these top-level keys:\n"
         "* history_update : one-sentence summary of this tick’s action\n"
         "* note_update : updated notes or reasoning to persist into the next tick\n"
-        "* cache_update : dictionary of long-term facts or definitions to store persistently\n"
-        "* next_action : description of your next goal or operation\n"
-        "* data : comma-separated topics to retrieve for the next tick\n"
+         "* cache_update : (list of dicts) data to store in semantic database.\n"
+        "  Format: [\n"
+        "    {'document': 'DOCUMENT_TEXT', 'metadata': {'KEY1': 'VALUE1', 'KEY2': 'VALUE2'}},\n"
+        "    {'document': 'DOCUMENT_TEXT', 'metadata': {'KEY1': 'VALUE1', 'KEY2': 'VALUE2'}}\n"
+        "  ]\n"
+        "  - Each entry must have 'document' (25-50 word summary) and 'metadata'\n"
+        "  - Metadata values MUST be scalars (strings, numbers, booleans). Do NOT use lists or nested dicts.\n"
+        "  - Use comma-separated strings for multi-value fields (ex: 'topics': 'AI, robotics, machine learning').\n"
+        "* next_action : the next action you will take\n"
+        "* cache_retrieve : list of sentences to query and retrieve from storage\n"
         "* deliverable : a final output to be sent to the user based on your mandate, a viable product or nothing.\n"
         "Do not include any commentary or keys outside this JSON.\n\n"
         
@@ -145,19 +170,6 @@ class PromptBuilder:
             {"role": "user", "content": self._build_user_message()},
         ]
 
-    def build_payload(self) -> Dict[str, Any]:
-        """
-        Build the final dict payload for API call.
-        :return dict: OpenAI-compatible JSON payload.
-        """
-        return {
-            "model": "llama",
-            "messages": self.build_messages(),
-            "temperature": 0.4,
-            "max_tokens": 3200,
-            "response_format": {"type": "json_object"},
-        }
-
     def get_summary(self) -> Dict[str, Any]:
         """
         Return current memory state for debugging or display.
@@ -168,5 +180,6 @@ class PromptBuilder:
             "short_term_summary": self._short_term_summary,
             "notes": self._notes,
             "retrieved_long_term": self._retrieved_long_term,
-            "observations": self._observations,
+            "observations": self._observations[:1024],
         }
+
