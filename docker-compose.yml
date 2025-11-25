@@ -53,7 +53,26 @@ services:
     depends_on:
       - cache
       - chroma
-    command: ["python", "app/main.py"]
+    command: [ "python", "app/main.py" ]
+    env_file:
+      - .env
+      - keys.env
+
+  agent-cli:
+    profiles: ["cli"]
+    build:
+      context: agent
+      dockerfile: .dockerfile
+    volumes:
+      - ./shared:/agent/shared
+      - ./agent/app:/agent/app
+      - ./agent/tests:/agent/tests
+    stdin_open: true
+    tty: true
+    depends_on:
+      - cache
+      - chroma
+    command: ["python", "app/basic_cli.py"]
     env_file:
       - .env
       - keys.env
@@ -68,7 +87,6 @@ services:
       - ./agent/app:/agent/app
       - ./agent/tests:/agent/tests
     depends_on:
-      - inference
       - cache
       - chroma
     command: [ "pytest", "-vv", "tests" ]
