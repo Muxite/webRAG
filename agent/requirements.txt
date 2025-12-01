@@ -1,0 +1,11 @@
+aiohttp
+redis
+beautifulsoup4
+chromadb
+urllib3
+openai
+sentence-transformers
+aio-pika
+pytest
+pytest-asyncio
+pytest-repeat

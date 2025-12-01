@@ -1,0 +1,6 @@
+agent/test/
+agent/__pycache__/
+shared/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache

@@ -16,6 +16,8 @@ class ConnectorConfig:
         self.default_timeout = int(os.environ.get("DEFAULT_TIMEOUT", "5"))
         self.jitter_seconds = float(os.environ.get("JITTER_SECONDS", "0.5"))
 
+        self.input_queue = os.environ.get("AGENT_INPUT_QUEUE", "agent.mandates")
+        self.status_queue = os.environ.get("AGENT_STATUS_QUEUE", "agent.status")
         if not self.redis_url:
             self.logger.warning("No Redis URL set")
         if not self.chroma_url:

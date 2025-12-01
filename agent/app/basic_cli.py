@@ -1,6 +1,7 @@
 import asyncio
 from app.agent import Agent
 import logging
+from shared.pretty_log import pretty_log_print
 
 logging.basicConfig(level=logging.INFO)
 
@@ -24,10 +25,9 @@ async def main():
 
         print(f"\nExecuting mandate: {mandate}\n")
         try:
-            async with Agent(mandate=mandate, max_ticks=20) as agent:
+            async with Agent(mandate=mandate, max_ticks=40) as agent:
                 output = await agent.run()
-                logging.info(f"Agent deliverables: {output['deliverables']}")
-                logging.info(f"Agent history: {output['history']}")
+                logging.info(pretty_log_print(output))
         except Exception as e:
             logging.error(f"Error during agent execution: {e}")
 
