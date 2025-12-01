@@ -1,3 +1,4 @@
+import uuid
 from typing import Optional, Dict, List, Any
 from enum import IntEnum
 import hashlib
@@ -11,6 +12,11 @@ class ActionType(IntEnum):
 
 
 def _to_str(x: Any) -> str:
+    """
+    Turns data into string and "" if None
+    :param x: Any datatype
+    :return: String
+    """
     return "" if x is None else str(x).strip()
 
 
@@ -59,7 +65,7 @@ class TickOutput:
         self._deliverable: str = str(merged.get("deliverable", ""))
 
         self.cache_update = self._parse_cache_update(merged.get("cache_update", []))
-        self.cache_retrieved: List[str] = merged.get("cache_retrieve", [])
+        self.cache_retrieve: List[str] = merged.get("cache_retrieve", [])
         self.next_action = self._parse_next_action()
         self._validate_fields()
 
@@ -107,7 +113,7 @@ class TickOutput:
         """
         :return List: List of topic strings requested by the agent for the next tick.
         """
-        return self.cache_retrieved
+        return self.cache_retrieve
 
     def show_history(self) -> Optional[str]:
         """
@@ -133,7 +139,8 @@ class TickOutput:
             if not (doc and metadata):
                 self.corrections.append(f"Invalid cache_update entry: {entry}")
                 continue
-            hashid = hashlib.sha256(f"{doc}{metadata}".encode()).hexdigest()
+            hashid = str(uuid.uuid5(uuid.NAMESPACE_OID, f"{doc}{metadata}"))
+
             records.append({
                 "documents": doc,
                 "metadatas": metadata,
@@ -165,5 +172,5 @@ class TickOutput:
             "notes": self.note_update,
             "next_action": self.next_action,
             "cache_update": self.cache_update,
-            "cache_retrieved": self.cache_retrieved,
+            "cache_retrieve": self.cache_retrieve,
         }

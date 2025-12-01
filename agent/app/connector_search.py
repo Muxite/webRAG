@@ -1,9 +1,8 @@
 from app.connector_http import ConnectorHttp
-from app.connector_config import ConnectorConfig
-from shared.request_result import RequestResult
+from shared.connector_config import ConnectorConfig
 from typing import Optional, Dict, List
 import os
-import json
+
 
 class ConnectorSearch(ConnectorHttp):
     """Manage an searching api session for a connector."""
@@ -53,7 +52,6 @@ class ConnectorSearch(ConnectorHttp):
         :param count: Number of results to return (default 10)
         :return: List of search results or None if request failed or bad response
         """
-        search_api_key = os.environ.get("SEARCH_API_KEY")
         if not await self.init_search_api():
             self.logger.warning("Setup failed.")
             return None
@@ -62,7 +60,7 @@ class ConnectorSearch(ConnectorHttp):
         headers = {
             "Accept": "application/json",
             "Accept-Encoding": "gzip",
-            "X-Subscription-Token": search_api_key
+            "X-Subscription-Token": self.search_api_key
         }
         params = {
             "q": query,

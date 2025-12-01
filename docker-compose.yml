@@ -1,5 +1,15 @@
 name: "euglena"
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: euglena_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
   inference:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     volumes:
@@ -21,15 +31,6 @@ services:
               count: all
               capabilities: [gpu]
 
-
-  cache:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/cache_retrieved
-    command: redis-server --save 180 1 --loglevel warning
-
   chroma:
     image: chromadb/chroma:latest
     container_name: chroma_db
@@ -44,15 +45,11 @@ services:
   agent:
     profiles: ["main"]
     build:
-      context: agent
-      dockerfile: .dockerfile
-    volumes:
-      - ./shared:/agent/shared
-      - ./agent/app:/agent/app
-      - ./agent/tests:/agent/tests
+      context: .
+      dockerfile: agent/.dockerfile
     depends_on:
-      - cache
       - chroma
+      - rabbitmq
     command: [ "python", "app/main.py" ]
     env_file:
       - .env
@@ -61,16 +58,11 @@ services:
   agent-cli:
     profiles: ["cli"]
     build:
-      context: agent
-      dockerfile: .dockerfile
-    volumes:
-      - ./shared:/agent/shared
-      - ./agent/app:/agent/app
-      - ./agent/tests:/agent/tests
+      context: .
+      dockerfile: agent/.dockerfile
     stdin_open: true
     tty: true
     depends_on:
-      - cache
       - chroma
     command: ["python", "app/basic_cli.py"]
     env_file:
@@ -80,19 +72,36 @@ services:
   agent-test:
     profiles: ["test"]
     build:
-      context: agent
-      dockerfile: .dockerfile
-    volumes:
-      - ./shared:/agent/shared
-      - ./agent/app:/agent/app
-      - ./agent/tests:/agent/tests
+      context: .
+      dockerfile: agent/.dockerfile
     depends_on:
-      - cache
       - chroma
+      - rabbitmq
     command: [ "pytest", "-vv", "tests" ]
     env_file:
       - .env
       - keys.env
+
+  gateway:
+    profiles: ["main"]
+    build:
+      context: .
+      dockerfile: gateway/.dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - rabbitmq
+      - cache
+    command: ["python", "-m", "app.main"]
+
+  cache:
+    image: redis:7-alpine
+    container_name: euglena_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
 
 volumes:
   redis_data:

@@ -4,7 +4,7 @@ import random
 from typing import Optional
 import aiohttp
 from shared.request_result import RequestResult
-from app.connector_config import ConnectorConfig
+from shared.connector_config import ConnectorConfig
 
 class ConnectorHttp:
     """Manage a single HTTP session for a connector."""

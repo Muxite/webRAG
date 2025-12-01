@@ -2,8 +2,7 @@ import logging
 from typing import Optional, List, Dict, Any
 import chromadb
 from chromadb.config import Settings
-from app.connector_config import ConnectorConfig
-from app.local_embedding_function import LocalEmbeddingFunction
+from shared.connector_config import ConnectorConfig
 from shared.retry import Retry
 
 
@@ -107,7 +106,7 @@ class ConnectorChroma:
         try:
             coll = await self.get_or_create_collection(collection)
             sanitized_metadatas = [self._sanitize_metadata(m) for m in metadatas]
-            await coll.add(
+            coll.add(
                 ids=ids,
                 metadatas=sanitized_metadatas,
                 documents=documents,

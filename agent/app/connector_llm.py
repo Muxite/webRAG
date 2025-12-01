@@ -1,9 +1,7 @@
 import logging
-from app.connector_config import ConnectorConfig
-from typing import Optional, Any, Dict
+from shared.connector_config import ConnectorConfig
+from typing import Optional
 from openai import AsyncOpenAI, APIError, APIStatusError
-
-from app.prompt_builder import PromptBuilder, build_payload
 
 
 class ConnectorLLM:

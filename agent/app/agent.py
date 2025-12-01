@@ -1,10 +1,11 @@
 import logging
 import json
-from typing import Optional, Dict, List
-from app.connector_config import ConnectorConfig
+from typing import Dict, List, Any
+from shared.connector_config import ConnectorConfig
 from app.connector_llm import ConnectorLLM
 from app.connector_search import ConnectorSearch
 from app.connector_http import ConnectorHttp
+from app.final_output_builder import FinalOutputBuilder
 from app.tick_output import TickOutput, ActionType
 from app.prompt_builder import PromptBuilder
 from app.prompt_builder import build_payload
@@ -31,7 +32,8 @@ class Agent:
         self.current_tick = 0
 
         self.history: List[str] = []
-        self.notes: str = ""
+        # Store notes as a list; the latest appended note is used for regular ticks
+        self.notes: List[str] = []
         self.deliverables: List[str] = []
         self.pending_data_topics: List[str] = []
         self.retrieved_context: List[str] = []
@@ -81,7 +83,8 @@ class Agent:
             prompt_builder = PromptBuilder(
                 mandate=self.mandate,
                 short_term_summary=self.history,
-                notes=self.notes,
+                # In regular operation, only the latest note is provided to the LLM
+                notes=(self.notes[-1] if self.notes else ""),
                 retrieved_long_term=self.retrieved_context,
                 observations=self.observations
             )
@@ -124,12 +127,8 @@ class Agent:
                 break
 
         await self.http_connector.__aexit__(None, None, None)
-        return {
-            "success": True,
-            "ticks_completed": self.current_tick,
-            "deliverables": self.deliverables,
-            "history": self.history
-        }
+        final_output: Dict[Any, Any] = await self._final_output()
+        return final_output
 
     def _apply_tick_output(self, tick_output: TickOutput):
         """
@@ -139,7 +138,8 @@ class Agent:
         if tick_output.show_history():
             self.history.append(f"[Tick {self.current_tick}] {tick_output.show_history()}")
         if tick_output.show_notes():
-            self.notes = tick_output.show_notes()
+            # Append new note to the list; latest note will be used in next tick
+            self.notes.append(tick_output.show_notes())
         if tick_output.deliverable().strip():
             self.deliverables.append(tick_output.deliverable())
 
@@ -226,6 +226,47 @@ class Agent:
             for doc_list in results["documents"]:
                 all_docs.extend(doc_list)
         return all_docs
+
+    async def _final_output(self) -> Dict[Any, Any]:
+        """
+        Generate final output that combines accumulated deliverables and notes into a final answer to the users mandate.
+        keys: final_deliverable, action_summary, success
+        :return: Dictionary with final deliverable and action summary.
+        """
+        final_prompt_builder = FinalOutputBuilder(
+            mandate=self.mandate,
+            history=self.history,
+            notes=self.notes,
+            deliverables=self.deliverables,
+            retrieved_context=self.retrieved_context
+        )
+        final_prompt = build_payload(final_prompt_builder.build_messages(), True)
+        self.logger.info("=== GENERATING FINAL OUTPUT ===")
+
+        llm_response = await self.llm_connector.query_llm(final_prompt)
+        if llm_response is None:
+            self.logger.error("Final output LLM query failed")
+            return {
+                "final_deliverable": "",
+                "action_summary": "",
+                "success": False
+            }
+
+        try:
+            final_output = json.loads(llm_response)
+            self.logger.info("Final output generated successfully")
+            return {
+                "final_deliverable": final_output.get("deliverable", ""),
+                "action_summary": final_output.get("summary", ""),
+                "success": True
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to parse final output: {e}")
+            return {
+                "final_deliverable": "",
+                "action_summary": "",
+                "success": False
+            }
 
     async def __aenter__(self):
         await self.search_connector.__aenter__()
