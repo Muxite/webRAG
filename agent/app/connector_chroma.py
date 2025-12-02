@@ -16,7 +16,7 @@ class ConnectorChroma:
     def __init__(self, connector_config: ConnectorConfig):
         self.config = connector_config
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.chroma = None
+        self._chroma = None
         self.chroma_api_ready = False
 
     async def _try_init_chroma(self) -> bool:
@@ -36,14 +36,14 @@ class ConnectorChroma:
             host = parts[0]
             port = int(parts[1]) if len(parts) > 1 and parts[1] else 8000
 
-            self.chroma = chromadb.HttpClient(
+            self._chroma = chromadb.HttpClient(
                 host=host,
                 port=port,
                 ssl=False,
                 settings=Settings(anonymized_telemetry=False),
             )
 
-            self.chroma.heartbeat()
+            self._chroma.heartbeat()
             self.logger.info("ChromaDB OPERATIONAL")
             self.chroma_api_ready = True
             return True
@@ -81,7 +81,7 @@ class ConnectorChroma:
             self.logger.warning("ChromaDB not ready.")
             return None
         try:
-            coll = self.chroma.get_or_create_collection(
+            coll = self._chroma.get_or_create_collection(
                 name=collection,
             )
             self.logger.info(f"Collection '{collection}' ready (cached in map)")
@@ -135,7 +135,8 @@ class ConnectorChroma:
             self.logger.error(f"ChromaDB query failed for collection {collection}: {e}")
             return None
 
-    def _sanitize_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+    @staticmethod
+    def _sanitize_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
         Ensure all metadata values are ChromaDB compatible types.
         """

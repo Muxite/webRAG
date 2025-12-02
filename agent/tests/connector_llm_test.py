@@ -1,7 +1,7 @@
 import pytest_asyncio
 import pytest
 from app.connector_llm import ConnectorLLM
-from app.connector_config import ConnectorConfig
+from shared.connector_config import ConnectorConfig
 from app.prompt_builder import PromptBuilder, build_payload
 import os
 import time

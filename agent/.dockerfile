@@ -10,4 +10,4 @@ COPY shared /app/shared
 RUN pip install --no-cache-dir /app/shared
 COPY agent /app/agent
 WORKDIR /app/agent
-ENV PYTHONPATH=/app/agent
+ENV PYTHONPATH=/app/agent:/app
