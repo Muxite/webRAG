@@ -1,7 +1,7 @@
 import pytest_asyncio
 import pytest
 from app.connector_search import ConnectorSearch
-from app.connector_config import ConnectorConfig
+from shared.connector_config import ConnectorConfig
 
 @pytest_asyncio.fixture
 def connector_config():

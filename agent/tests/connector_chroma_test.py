@@ -1,6 +1,6 @@
 import pytest_asyncio
 import pytest
-from app.connector_config import ConnectorConfig
+from shared.connector_config import ConnectorConfig
 from app.connector_chroma import ConnectorChroma
 
 @pytest_asyncio.fixture

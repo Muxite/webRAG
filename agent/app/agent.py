@@ -26,34 +26,33 @@ class Agent:
         """
         Initialize the agent with a mandate and tick limit.
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.mandate = mandate
-        self.max_ticks = max_ticks
-        self.current_tick = 0
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self._mandate = mandate
+        self._max_ticks = max_ticks
+        self._current_tick = 0
 
-        self.history: List[str] = []
-        # Store notes as a list; the latest appended note is used for regular ticks
-        self.notes: List[str] = []
-        self.deliverables: List[str] = []
-        self.pending_data_topics: List[str] = []
-        self.retrieved_context: List[str] = []
-        self.observations: str = ""
+        self._history: List[str] = []
+        self._notes: List[str] = []
+        self._deliverables: List[str] = []
+        self._pending_data_topics: List[str] = []
+        self._retrieved_context: List[str] = []
+        self._observations: str = ""
 
-        self.config = ConnectorConfig()
-        self.llm_connector = ConnectorLLM(self.config)
-        self.search_connector = ConnectorSearch(self.config)
-        self.http_connector = ConnectorHttp(self.config)
-        self.chroma_connector = ConnectorChroma(self.config)
+        self._config = ConnectorConfig()
+        self._connector_llm = ConnectorLLM(self._config)
+        self._connector_search = ConnectorSearch(self._config)
+        self._connector_http = ConnectorHttp(self._config)
+        self._connector_chroma = ConnectorChroma(self._config)
 
-        self.collection_name = "agent_memory"
+        self._collection_name = "agent_memory"
 
     async def initialize(self) -> bool:
         """Initialize all connectors and setup dependencies."""
-        self.logger.info("Initializing agent connectors...")
+        self._logger.info("Initializing agent connectors...")
 
-        search_ready = await self.search_connector.init_search_api()
-        chroma_ready = await self.chroma_connector.init_chroma()
-        llm_ready = self.llm_connector.llm_api_ready
+        search_ready = await self._connector_search.init_search_api()
+        chroma_ready = await self._connector_chroma.init_chroma()
+        llm_ready = self._connector_llm.llm_api_ready
 
         return all([llm_ready, search_ready, chroma_ready])
 
@@ -72,37 +71,37 @@ class Agent:
         if not await self.initialize():
             return {"success": False, "error": "Initialization failed", "deliverables": []}
 
-        self.logger.info(f"Agent started: {self.mandate}\n")
+        self._logger.info(f"Agent started: {self.mandate}\n")
 
 
         while self.current_tick < self.max_ticks:
             await asyncio.sleep(1)
             self.current_tick += 1
-            self.logger.info(f"=== TICK {self.current_tick}/{self.max_ticks} ===")
+            self._logger.info(f"=== TICK {self.current_tick}/{self.max_ticks} ===")
 
             prompt_builder = PromptBuilder(
                 mandate=self.mandate,
                 short_term_summary=self.history,
-                # In regular operation, only the latest note is provided to the LLM
+
                 notes=(self.notes[-1] if self.notes else ""),
                 retrieved_long_term=self.retrieved_context,
                 observations=self.observations
             )
             prompt = build_payload(prompt_builder.build_messages(), True)
-            pretty_log(prompt_builder.get_summary(), logger=self.logger, indents=1)
+            pretty_log(prompt_builder.get_summary(), logger=self._logger, indents=1)
 
-            llm_response = await self.llm_connector.query_llm(prompt)
+            llm_response = await self._connector_llm.query_llm(prompt)
             if llm_response is None:
-                self.logger.error("LLM query failed, terminating.")
-                self.logger.info(prompt)
+                self._logger.error("LLM query failed, terminating.")
+                self._logger.info(prompt)
                 continue
             try:
                 tick_output = TickOutput(json.loads(llm_response))
-                pretty_log(tick_output.get_summary(), logger=self.logger, indents=1)
+                pretty_log(tick_output.get_summary(), logger=self._logger, indents=1)
             except Exception as e:
-                self.logger.error(f"Failed to parse LLM output: {e}")
-                self.logger.debug(llm_response)
-                self.logger.debug(prompt)
+                self._logger.error(f"Failed to parse LLM output: {e}")
+                self._logger.debug(llm_response)
+                self._logger.debug(prompt)
                 continue
 
             self.observations = ""
@@ -110,9 +109,9 @@ class Agent:
             await self._do_action(tick_output)
             chroma_topics = tick_output.show_requested_data_topics()
             if chroma_topics:
-                self.logger.info(f"ChromaDB: Retrieving context for topics: {chroma_topics}")
+                self._logger.info(f"ChromaDB: Retrieving context for topics: {chroma_topics}")
                 self.retrieved_context = await self._retrieve_chroma(chroma_topics)
-                self.logger.info(f"ChromaDB: Retrieved context: {self.retrieved_context}")
+                self._logger.info(f"ChromaDB: Retrieved context: {self.retrieved_context}")
             else:
                 self.retrieved_context = []
 
@@ -123,10 +122,10 @@ class Agent:
             )
 
             if tick_output.show_next_action()[0] == ActionType.EXIT:
-                self.logger.info("Agent exit action received, stopping.")
+                self._logger.info("Agent exit action received, stopping.")
                 break
 
-        await self.http_connector.__aexit__(None, None, None)
+        await self._connector_http.__aexit__(None, None, None)
         final_output: Dict[Any, Any] = await self._final_output()
         return final_output
 
@@ -138,7 +137,6 @@ class Agent:
         if tick_output.show_history():
             self.history.append(f"[Tick {self.current_tick}] {tick_output.show_history()}")
         if tick_output.show_notes():
-            # Append new note to the list; latest note will be used in next tick
             self.notes.append(tick_output.show_notes())
         if tick_output.deliverable().strip():
             self.deliverables.append(tick_output.deliverable())
@@ -146,16 +144,16 @@ class Agent:
     async def _do_action(self, tick_output: TickOutput):
         action, param = tick_output.show_next_action()
         if action == ActionType.SEARCH:
-            self.logger.info(f"Searching for '{param}'...")
+            self._logger.info(f"Searching for '{param}'...")
             await self._perform_web_search(param)
         elif action == ActionType.VISIT:
-            self.logger.info(f"Visiting '{param}'...")
+            self._logger.info(f"Visiting '{param}'...")
             await self._perform_visit(param)
         elif action == ActionType.THINK:
-            self.logger.info("Agent is thinking...")
+            self._logger.info("Agent is thinking...")
             pass
         elif action == ActionType.EXIT:
-            self.logger.info("Agent exit action received, stopping.")
+            self._logger.info("Agent exit action received, stopping.")
             pass
 
     async def _perform_web_search(self, query: str, count: int = 10):
@@ -164,7 +162,7 @@ class Agent:
         :param query: Topic/question to search for.
         :param count: Number of search results to include.
         """
-        search_results = await self.search_connector.query_search(query, count=count)
+        search_results = await self._connector_search.query_search(query, count=count)
         if not search_results:
             result = "[Search API unavailable or failed]"
         else:
@@ -181,11 +179,11 @@ class Agent:
         """
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            self.logger.error(f"Invalid URL provided: '{url}'")
+            self._logger.error(f"Invalid URL provided: '{url}'")
             self.observations += f"\n[Could not fetch URL: Invalid URL] {url}\n"
             return
 
-        result = await self.http_connector.request("GET", url, retries=3)
+        result = await self._connector_http.request("GET", url, retries=3)
         if result.error:
             self.observations += f"\n[Could not fetch URL: {result.status}] {url}\n"
             return
@@ -198,15 +196,15 @@ class Agent:
             cleaned = clean_operation(text_body)
             summary = cleaned if cleaned else "[No main content found]"
         except Exception as e:
-            self.logger.warning(f"Failed to extract body from {url}: {e}")
+            self._logger.warning(f"Failed to extract body from {url}: {e}")
             summary = "[No main content found]"
 
         self.observations += f"\nVisited {url}:\n{summary}\n"
 
     async def _store_chroma(self, ids: List[str], metadatas: List[Dict], documents: List[str]):
-        if not self.chroma_connector.chroma_api_ready or not documents:
+        if not self._connector_chroma.chroma_api_ready or not documents:
             return
-        await self.chroma_connector.add_to_chroma(
+        await self._connector_chroma.add_to_chroma(
             collection=self.collection_name,
             ids=ids,
             metadatas=metadatas,
@@ -214,9 +212,14 @@ class Agent:
         )
 
     async def _retrieve_chroma(self, topics: List[str]) -> List[str]:
-        if not self.chroma_connector.chroma_api_ready or not topics:
+        """
+        Accesses ChromaDB to retrieve documents for a list of topics.
+        :param topics: List of sentences or ideas to search for.
+        :return: List of documents (str) that match the topics.
+        """
+        if not self._connector_chroma.chroma_api_ready or not topics:
             return []
-        results = await self.chroma_connector.query_chroma(
+        results = await self._connector_chroma.query_chroma(
             collection=self.collection_name,
             query_texts=topics,
             n_results=3,
@@ -241,11 +244,11 @@ class Agent:
             retrieved_context=self.retrieved_context
         )
         final_prompt = build_payload(final_prompt_builder.build_messages(), True)
-        self.logger.info("=== GENERATING FINAL OUTPUT ===")
+        self._logger.info("=== GENERATING FINAL OUTPUT ===")
 
-        llm_response = await self.llm_connector.query_llm(final_prompt)
+        llm_response = await self._connector_llm.query_llm(final_prompt)
         if llm_response is None:
-            self.logger.error("Final output LLM query failed")
+            self._logger.error("Final output LLM query failed")
             return {
                 "final_deliverable": "",
                 "action_summary": "",
@@ -254,14 +257,14 @@ class Agent:
 
         try:
             final_output = json.loads(llm_response)
-            self.logger.info("Final output generated successfully")
+            self._logger.info("Final output generated successfully")
             return {
                 "final_deliverable": final_output.get("deliverable", ""),
                 "action_summary": final_output.get("summary", ""),
                 "success": True
             }
         except Exception as e:
-            self.logger.error(f"Failed to parse final output: {e}")
+            self._logger.error(f"Failed to parse final output: {e}")
             return {
                 "final_deliverable": "",
                 "action_summary": "",
@@ -269,10 +272,102 @@ class Agent:
             }
 
     async def __aenter__(self):
-        await self.search_connector.__aenter__()
-        await self.http_connector.__aenter__()
+        await self._connector_search.__aenter__()
+        await self._connector_http.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.search_connector.__aexit__(exc_type, exc_val, exc_tb)
-        await self.http_connector.__aexit__(exc_type, exc_val, exc_tb)
+        await self._connector_search.__aexit__(exc_type, exc_val, exc_tb)
+        await self._connector_http.__aexit__(exc_type, exc_val, exc_tb)
+        
+    # -----------------------
+    # Properties (public API)
+    # -----------------------
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self._logger
+
+    @property
+    def config(self) -> ConnectorConfig:
+        return self._config
+
+    @property
+    def mandate(self) -> str:
+        return self._mandate
+
+    @mandate.setter
+    def mandate(self, value: str) -> None:
+        self._mandate = value
+
+    @property
+    def max_ticks(self) -> int:
+        return self._max_ticks
+
+    @max_ticks.setter
+    def max_ticks(self, value: int) -> None:
+        self._max_ticks = int(value)
+
+    @property
+    def current_tick(self) -> int:
+        return self._current_tick
+
+    @current_tick.setter
+    def current_tick(self, value: int) -> None:
+        self._current_tick = int(value)
+
+    @property
+    def history(self) -> List[str]:
+        return self._history
+
+    @history.setter
+    def history(self, value: List[str]) -> None:
+        self._history = value
+
+    @property
+    def notes(self) -> List[str]:
+        return self._notes
+
+    @notes.setter
+    def notes(self, value: List[str]) -> None:
+        self._notes = value
+
+    @property
+    def deliverables(self) -> List[str]:
+        return self._deliverables
+
+    @deliverables.setter
+    def deliverables(self, value: List[str]) -> None:
+        self._deliverables = value
+
+    @property
+    def pending_data_topics(self) -> List[str]:
+        return self._pending_data_topics
+
+    @pending_data_topics.setter
+    def pending_data_topics(self, value: List[str]) -> None:
+        self._pending_data_topics = value
+
+    @property
+    def retrieved_context(self) -> List[str]:
+        return self._retrieved_context
+
+    @retrieved_context.setter
+    def retrieved_context(self, value: List[str]) -> None:
+        self._retrieved_context = value
+
+    @property
+    def observations(self) -> str:
+        return self._observations
+
+    @observations.setter
+    def observations(self, value: str) -> None:
+        self._observations = value
+
+    @property
+    def collection_name(self) -> str:
+        return self._collection_name
+
+    @collection_name.setter
+    def collection_name(self, value: str) -> None:
+        self._collection_name = value
