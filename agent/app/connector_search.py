@@ -1,4 +1,4 @@
-from app.connector_http import ConnectorHttp
+from agent.app.connector_http import ConnectorHttp
 from shared.connector_config import ConnectorConfig
 from typing import Optional, Dict, List
 import os

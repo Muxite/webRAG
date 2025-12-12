@@ -173,6 +173,84 @@ class PromptBuilder:
             {"role": "user", "content": self._build_user_message()},
         ]
 
+    # === Observation formatting helpers ===
+    @staticmethod
+    def build_web_search_observation(query: str, search_results: Optional[List[Dict[str, str]]]) -> str:
+        """
+        Build the observation string for a web search.
+        If results are None or empty, returns an appropriate failure message.
+        """
+        if not search_results:
+            result_str = "[Search API unavailable or failed]"
+        else:
+            result_str = "\n".join(
+                f"- {item.get('url', '')} ({item.get('url', '')})\n{item.get('description', '')}"
+                for item in search_results
+            )
+        return f"\nWeb search for '{query}':\n{result_str}\n"
+
+    @staticmethod
+    def build_invalid_url_observation(url: str) -> str:
+        return f"\n[Could not fetch URL: Invalid URL] {url}\n"
+
+    @staticmethod
+    def build_visit_error_observation(url: str, status: Optional[int]) -> str:
+        status_text = status if status is not None else "Unknown"
+        return f"\n[Could not fetch URL: {status_text}] {url}\n"
+
+    @staticmethod
+    def build_visit_observation(url: str, summary: str) -> str:
+        return f"\nVisited {url}:\n{summary}\n"
+
+    # === Final output (synthesis) message builder ===
+    FINAL_SYSTEM_INSTRUCTIONS = (
+        "You are a synthesis agent that has run a project following the user's mandate "
+        "for a number of ticks. Given the mandate, execution history, notes, deliverables, "
+        "and retrieved context, generate a comprehensive final deliverable and concise action summary."
+        "Your answer should be at least 50 words per tick. If you have 20 ticks, write about 1000 words."
+        " Return JSON with keys: 'deliverable' and 'summary'."
+    )
+
+    @classmethod
+    def build_final_messages(
+        cls,
+        mandate: str,
+        history: List[str],
+        notes: List[str],
+        deliverables: List[Any],
+        retrieved_context: List[Any],
+    ) -> List[Dict[str, str]]:
+        """
+        Build a message list for producing the final output. Mirrors FinalOutputBuilder.
+        """
+        import json as _json
+
+        def _format_section(title: str, content: str) -> str:
+            sep = "=" * len(title)
+            return f"{title}\n{sep}\n{content}"
+
+        parts: List[str] = []
+        if mandate:
+            parts.append(_format_section("MANDATE", mandate))
+        if history:
+            joined_history = "\n".join(f"{i + 1}. {entry}" for i, entry in enumerate(history))
+            parts.append(_format_section("EXECUTION HISTORY", joined_history))
+        if notes:
+            joined_notes = "\n".join(f"{i + 1}. {entry}" for i, entry in enumerate(notes))
+            parts.append(_format_section("NOTES", joined_notes))
+        if deliverables:
+            formatted_deliverables = _json.dumps(deliverables, indent=2)
+            parts.append(_format_section("DELIVERABLES", formatted_deliverables))
+        if retrieved_context:
+            joined_context = "\n".join(f"[{i + 1}] {chunk}" for i, chunk in enumerate(retrieved_context))
+            parts.append(_format_section("RETRIEVED CONTEXT", joined_context))
+
+        user_message = "\n\n".join(parts)
+        return [
+            {"role": "system", "content": cls.FINAL_SYSTEM_INSTRUCTIONS},
+            {"role": "user", "content": user_message},
+        ]
+
     def get_summary(self) -> Dict[str, Any]:
         """
         Return current memory state for debugging or display.

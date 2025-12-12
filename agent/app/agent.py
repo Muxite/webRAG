@@ -2,18 +2,18 @@ import logging
 import json
 from typing import Dict, List, Any
 from shared.connector_config import ConnectorConfig
-from app.connector_llm import ConnectorLLM
-from app.connector_search import ConnectorSearch
-from app.connector_http import ConnectorHttp
-from app.final_output_builder import FinalOutputBuilder
-from app.tick_output import TickOutput, ActionType
-from app.prompt_builder import PromptBuilder
-from app.prompt_builder import build_payload
-from app.observation import clean_operation
-from app.connector_chroma import ConnectorChroma
+from agent.app.connector_llm import ConnectorLLM
+from agent.app.connector_search import ConnectorSearch
+from agent.app.connector_http import ConnectorHttp
+from agent.app.tick_output import TickOutput, ActionType
+from agent.app.prompt_builder import PromptBuilder
+from agent.app.prompt_builder import build_payload
+from agent.app.observation import clean_operation
+from agent.app.connector_chroma import ConnectorChroma
 from shared.pretty_log import pretty_log
 from urllib.parse import urlparse
 import asyncio
+from shared.models import FinalResult
 
 
 class Agent:
@@ -27,32 +27,32 @@ class Agent:
         Initialize the agent with a mandate and tick limit.
         """
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._mandate = mandate
-        self._max_ticks = max_ticks
-        self._current_tick = 0
+        self.mandate = mandate
+        self.max_ticks = max_ticks
+        self.current_tick = 0
 
-        self._history: List[str] = []
-        self._notes: List[str] = []
-        self._deliverables: List[str] = []
-        self._pending_data_topics: List[str] = []
-        self._retrieved_context: List[str] = []
-        self._observations: str = ""
+        self.history: List[str] = []
+        self.notes: List[str] = []
+        self.deliverables: List[str] = []
+        self.pending_data_topics: List[str] = []
+        self.retrieved_context: List[str] = []
+        self.observations: str = ""
 
-        self._config = ConnectorConfig()
-        self._connector_llm = ConnectorLLM(self._config)
-        self._connector_search = ConnectorSearch(self._config)
-        self._connector_http = ConnectorHttp(self._config)
-        self._connector_chroma = ConnectorChroma(self._config)
+        self.config = ConnectorConfig()
+        self.connector_llm = ConnectorLLM(self.config)
+        self.connector_search = ConnectorSearch(self.config)
+        self.connector_http = ConnectorHttp(self.config)
+        self.connector_chroma = ConnectorChroma(self.config)
 
-        self._collection_name = "agent_memory"
+        self.collection_name = "agent_memory"
 
     async def initialize(self) -> bool:
         """Initialize all connectors and setup dependencies."""
         self._logger.info("Initializing agent connectors...")
 
-        search_ready = await self._connector_search.init_search_api()
-        chroma_ready = await self._connector_chroma.init_chroma()
-        llm_ready = self._connector_llm.llm_api_ready
+        search_ready = await self.connector_search.init_search_api()
+        chroma_ready = await self.connector_chroma.init_chroma()
+        llm_ready = self.connector_llm.llm_api_ready
 
         return all([llm_ready, search_ready, chroma_ready])
 
@@ -90,11 +90,11 @@ class Agent:
             prompt = build_payload(prompt_builder.build_messages(), True)
             pretty_log(prompt_builder.get_summary(), logger=self._logger, indents=1)
 
-            llm_response = await self._connector_llm.query_llm(prompt)
+            llm_response = await self.connector_llm.query_llm(prompt)
             if llm_response is None:
-                self._logger.error("LLM query failed, terminating.")
-                self._logger.info(prompt)
-                continue
+                self._logger.error("LLM query failed after retries; breaking to final output.")
+                self._logger.debug(prompt)
+                break
             try:
                 tick_output = TickOutput(json.loads(llm_response))
                 pretty_log(tick_output.get_summary(), logger=self._logger, indents=1)
@@ -125,14 +125,16 @@ class Agent:
                 self._logger.info("Agent exit action received, stopping.")
                 break
 
-        await self._connector_http.__aexit__(None, None, None)
-        final_output: Dict[Any, Any] = await self._final_output()
-        return final_output
+        final_output: FinalResult = await self._final_output()
+        try:
+            return final_output.model_dump()
+        except Exception:
+            return final_output.dict()
 
     def _apply_tick_output(self, tick_output: TickOutput):
         """
         Update local memory fields based on tick output.
-        :param tick_output:
+        :param tick_output: TickOutput object containing agent's current state.
         """
         if tick_output.show_history():
             self.history.append(f"[Tick {self.current_tick}] {tick_output.show_history()}")
@@ -142,6 +144,10 @@ class Agent:
             self.deliverables.append(tick_output.deliverable())
 
     async def _do_action(self, tick_output: TickOutput):
+        """
+        Perform the action specified by the tick output.
+        :param tick_output:
+        """
         action, param = tick_output.show_next_action()
         if action == ActionType.SEARCH:
             self._logger.info(f"Searching for '{param}'...")
@@ -162,15 +168,9 @@ class Agent:
         :param query: Topic/question to search for.
         :param count: Number of search results to include.
         """
-        search_results = await self._connector_search.query_search(query, count=count)
-        if not search_results:
-            result = "[Search API unavailable or failed]"
-        else:
-            result = "\n".join(
-                f"- {item.get('url', '')} ({item.get('url', '')})\n{item.get('description', '')}"
-                for item in search_results
-            )
-        self.observations += f"\nWeb search for '{query}':\n{result}\n"
+        search_results = await self.connector_search.query_search(query, count=count)
+        obs = PromptBuilder.build_web_search_observation(query, search_results)
+        self.observations += obs
 
     async def _perform_visit(self, url: str):
         """
@@ -180,12 +180,12 @@ class Agent:
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             self._logger.error(f"Invalid URL provided: '{url}'")
-            self.observations += f"\n[Could not fetch URL: Invalid URL] {url}\n"
+            self.observations += PromptBuilder.build_invalid_url_observation(url)
             return
 
-        result = await self._connector_http.request("GET", url, retries=3)
+        result = await self.connector_http.request("GET", url, retries=3)
         if result.error:
-            self.observations += f"\n[Could not fetch URL: {result.status}] {url}\n"
+            self.observations += PromptBuilder.build_visit_error_observation(url, result.status)
             return
         resp = result.data
         try:
@@ -199,12 +199,12 @@ class Agent:
             self._logger.warning(f"Failed to extract body from {url}: {e}")
             summary = "[No main content found]"
 
-        self.observations += f"\nVisited {url}:\n{summary}\n"
+        self.observations += PromptBuilder.build_visit_observation(url, summary)
 
     async def _store_chroma(self, ids: List[str], metadatas: List[Dict], documents: List[str]):
-        if not self._connector_chroma.chroma_api_ready or not documents:
+        if not self.connector_chroma.chroma_api_ready or not documents:
             return
-        await self._connector_chroma.add_to_chroma(
+        await self.connector_chroma.add_to_chroma(
             collection=self.collection_name,
             ids=ids,
             metadatas=metadatas,
@@ -217,9 +217,9 @@ class Agent:
         :param topics: List of sentences or ideas to search for.
         :return: List of documents (str) that match the topics.
         """
-        if not self._connector_chroma.chroma_api_ready or not topics:
+        if not self.connector_chroma.chroma_api_ready or not topics:
             return []
-        results = await self._connector_chroma.query_chroma(
+        results = await self.connector_chroma.query_chroma(
             collection=self.collection_name,
             query_texts=topics,
             n_results=3,
@@ -230,144 +230,60 @@ class Agent:
                 all_docs.extend(doc_list)
         return all_docs
 
-    async def _final_output(self) -> Dict[Any, Any]:
+    async def _final_output(self) -> FinalResult:
         """
         Generate final output that combines accumulated deliverables and notes into a final answer to the users mandate.
         keys: final_deliverable, action_summary, success
         :return: Dictionary with final deliverable and action summary.
         """
-        final_prompt_builder = FinalOutputBuilder(
+        final_messages = PromptBuilder.build_final_messages(
             mandate=self.mandate,
             history=self.history,
             notes=self.notes,
             deliverables=self.deliverables,
-            retrieved_context=self.retrieved_context
+            retrieved_context=self.retrieved_context,
         )
-        final_prompt = build_payload(final_prompt_builder.build_messages(), True)
+        final_prompt = build_payload(final_messages, True)
         self._logger.info("=== GENERATING FINAL OUTPUT ===")
 
-        llm_response = await self._connector_llm.query_llm(final_prompt)
+        llm_response = await self.connector_llm.query_llm(final_prompt)
         if llm_response is None:
-            self._logger.error("Final output LLM query failed")
-            return {
-                "final_deliverable": "",
-                "action_summary": "",
-                "success": False
-            }
+            self._logger.error("Final output LLM query failed.")
+
+            deliverable_text = "\n\n".join(d for d in self.deliverables if d.strip())
+            if not deliverable_text:
+                deliverable_text = (
+                    "We could not complete the full mandate due to unavailable LLM service. "
+                )
+            return FinalResult(
+                final_deliverable=deliverable_text,
+                action_summary="",
+                success=False,
+            )
 
         try:
             final_output = json.loads(llm_response)
             self._logger.info("Final output generated successfully")
-            return {
-                "final_deliverable": final_output.get("deliverable", ""),
-                "action_summary": final_output.get("summary", ""),
-                "success": True
-            }
+            return FinalResult(
+                final_deliverable=final_output.get("deliverable", ""),
+                action_summary=final_output.get("summary", ""),
+                success=True,
+            )
         except Exception as e:
             self._logger.error(f"Failed to parse final output: {e}")
-            return {
-                "final_deliverable": "",
-                "action_summary": "",
-                "success": False
-            }
+            return FinalResult(
+                final_deliverable="",
+                action_summary="",
+                success=False,
+            )
 
     async def __aenter__(self):
-        await self._connector_search.__aenter__()
-        await self._connector_http.__aenter__()
+        await self.connector_search.__aenter__()
+        await self.connector_http.__aenter__()
+        await self.connector_llm.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self._connector_search.__aexit__(exc_type, exc_val, exc_tb)
-        await self._connector_http.__aexit__(exc_type, exc_val, exc_tb)
-        
-    # -----------------------
-    # Properties (public API)
-    # -----------------------
-
-    @property
-    def logger(self) -> logging.Logger:
-        return self._logger
-
-    @property
-    def config(self) -> ConnectorConfig:
-        return self._config
-
-    @property
-    def mandate(self) -> str:
-        return self._mandate
-
-    @mandate.setter
-    def mandate(self, value: str) -> None:
-        self._mandate = value
-
-    @property
-    def max_ticks(self) -> int:
-        return self._max_ticks
-
-    @max_ticks.setter
-    def max_ticks(self, value: int) -> None:
-        self._max_ticks = int(value)
-
-    @property
-    def current_tick(self) -> int:
-        return self._current_tick
-
-    @current_tick.setter
-    def current_tick(self, value: int) -> None:
-        self._current_tick = int(value)
-
-    @property
-    def history(self) -> List[str]:
-        return self._history
-
-    @history.setter
-    def history(self, value: List[str]) -> None:
-        self._history = value
-
-    @property
-    def notes(self) -> List[str]:
-        return self._notes
-
-    @notes.setter
-    def notes(self, value: List[str]) -> None:
-        self._notes = value
-
-    @property
-    def deliverables(self) -> List[str]:
-        return self._deliverables
-
-    @deliverables.setter
-    def deliverables(self, value: List[str]) -> None:
-        self._deliverables = value
-
-    @property
-    def pending_data_topics(self) -> List[str]:
-        return self._pending_data_topics
-
-    @pending_data_topics.setter
-    def pending_data_topics(self, value: List[str]) -> None:
-        self._pending_data_topics = value
-
-    @property
-    def retrieved_context(self) -> List[str]:
-        return self._retrieved_context
-
-    @retrieved_context.setter
-    def retrieved_context(self, value: List[str]) -> None:
-        self._retrieved_context = value
-
-    @property
-    def observations(self) -> str:
-        return self._observations
-
-    @observations.setter
-    def observations(self, value: str) -> None:
-        self._observations = value
-
-    @property
-    def collection_name(self) -> str:
-        return self._collection_name
-
-    @collection_name.setter
-    def collection_name(self, value: str) -> None:
-        self._collection_name = value
+        await self.connector_search.__aexit__(exc_type, exc_val, exc_tb)
+        await self.connector_http.__aexit__(exc_type, exc_val, exc_tb)
+        await self.connector_llm.__aexit__(exc_type, exc_val, exc_tb)

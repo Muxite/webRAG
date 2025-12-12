@@ -8,7 +8,7 @@ def test_basic():
         "history_update": "a",
         "note_update": "b",
         "next_action": " search, best cars",
-        "cache_retrieved": ["fish", "car", "bread"],
+        "cache_retrieve": ["fish", "car", "bread"],
         "cache_update": [{"document": "ok", "metadata": {"tag": "good"}},
                          {"document": "1", "metadata": {"1": "1"}},
                          {"document": "2", "metadata": {"3": "4"}}
@@ -34,7 +34,7 @@ def test_empty():
 def test_default():
     o = TickOutput({
         "next_action": " eggs ",
-        "cache_retrieved": ["a", "b", "c"],
+        "cache_retrieve": ["a", "b", "c"],
     })
     assert o.show_next_action() == (ActionType.THINK, None)
     assert o.show_requested_data_topics() == ["a", "b", "c"]

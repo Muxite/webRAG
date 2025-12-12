@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+aio-pika
+pydantic>=2
+redis
+httpx
+pytest
+pytest-asyncio

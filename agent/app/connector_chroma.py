@@ -22,7 +22,7 @@ class ConnectorChroma:
     async def _try_init_chroma(self) -> bool:
         """
         Single attempt to initialize HttpClient and heartbeat Chroma.
-        Returns True on success, False on failure.
+        :return bool: True on success, False on failure.
         """
         chroma_url = self.config.chroma_url
         if not chroma_url:
@@ -55,15 +55,15 @@ class ConnectorChroma:
 
     async def init_chroma(self) -> bool:
         """
-        Initialize or verify the ChromaDB connection.
-        Sets self.chroma_api_ready.
+        Initialize or verify the ChromaDB connection. Sets self.chroma_api_ready.
+        :return bool: True on success, False on failure.
         """
         if self.chroma_api_ready:
             return True
         retry = Retry(
             func=self._try_init_chroma,
             max_attempts=10,
-            delay=self.config.default_delay,
+            base_delay=self.config.default_delay,
             name="ChromaDBinit",
             jitter=self.config.jitter_seconds,
         )
@@ -75,7 +75,8 @@ class ConnectorChroma:
     async def get_or_create_collection(self, collection: str) -> Any:
         """
         Create a ChromaDB collection or get it if it already exists.
-        The collection will use our local embedding function.
+        :param collection: Name of the collection to create or get.
+        :return chromadb.Collection: ChromaDB collection object.
         """
         if not await self.init_chroma():
             self.logger.warning("ChromaDB not ready.")
@@ -84,7 +85,6 @@ class ConnectorChroma:
             coll = self._chroma.get_or_create_collection(
                 name=collection,
             )
-            self.logger.info(f"Collection '{collection}' ready (cached in map)")
             return coll
         except Exception as e:
             self.logger.error(f"Failed to create/get collection '{collection}': {e}")
@@ -99,6 +99,11 @@ class ConnectorChroma:
     ) -> bool:
         """
         Add documents to a ChromaDB collection.
+        :param collection: ChromaDB collection name.
+        :param ids: List of unique IDs for each document.
+        :param metadatas: List of metadata dicts for each document.
+        :param documents: List of document texts.
+        :return bool: True on success, False on failure.
         """
         if not self.chroma_api_ready:
             self.logger.warning("ChromaDB not ready.")
@@ -119,6 +124,10 @@ class ConnectorChroma:
     async def query_chroma(self, collection: str, query_texts: List[str], n_results: int = 3) -> Optional[Dict[str, Any]]:
         """
         Query a ChromaDB collection for nearest neighbors.
+        :param collection: ChromaDB collection name.
+        :param query_texts: List of query texts.
+        :param n_results: Number of results to return.
+        :return List of results, or None on failure.
         """
         if not self.chroma_api_ready:
             self.logger.warning("ChromaDB not ready.")
@@ -139,6 +148,8 @@ class ConnectorChroma:
     def _sanitize_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
         Ensure all metadata values are ChromaDB compatible types.
+        :param metadata: Metadata dict to sanitize.
+        :return Dict of sanitized metadata.
         """
         sanitized = {}
         for key, value in metadata.items():

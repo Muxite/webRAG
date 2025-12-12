@@ -1,5 +1,5 @@
 import asyncio
-from app.agent import Agent
+from agent.app.agent import Agent
 import logging
 from shared.pretty_log import pretty_log_print
 
@@ -25,7 +25,7 @@ async def main():
 
         print(f"\nExecuting mandate: {mandate}\n")
         try:
-            async with Agent(mandate=mandate, max_ticks=40) as agent:
+            async with Agent(mandate=mandate, max_ticks=80) as agent:
                 output = await agent.run()
                 logging.info(pretty_log_print(output))
         except Exception as e:

@@ -5,9 +5,6 @@ from shared.connector_config import ConnectorConfig
 import logging
 
 
-logging.basicConfig(level=logging.INFO)
-
-
 @pytest_asyncio.fixture
 def connector_config():
     return ConnectorConfig()
@@ -17,9 +14,9 @@ def connector(connector_config):
     return ConnectorHttp(connector_config)
 
 @pytest.mark.asyncio
-async def test_connector_http(connector):
+async def test_connector_http(connector, caplog):
     """Test the basic HTTP session works."""
-
+    caplog.set_level("INFO")
     async with connector as http_connector:
         result = await http_connector.request("GET", "https://www.google.com/")
         assert result.error is False

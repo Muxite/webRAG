@@ -2,7 +2,6 @@ name: "euglena"
 services:
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: euglena_rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -43,17 +42,20 @@ services:
       - PERSIST_DIRECTORY=/chroma-data
 
   agent:
-    profiles: ["main"]
+    profiles: ["main", "test"]
     build:
       context: .
       dockerfile: agent/.dockerfile
     depends_on:
       - chroma
       - rabbitmq
-    command: [ "python", "app/main.py" ]
+      - redis
+    command: ["python", "-m", "app.main"]
     env_file:
       - .env
       - keys.env
+    environment:
+      - AGENT_STATUS_TIME=0.2
 
   agent-cli:
     profiles: ["cli"]
@@ -64,7 +66,7 @@ services:
     tty: true
     depends_on:
       - chroma
-    command: ["python", "app/basic_cli.py"]
+    command: ["python", "-m", "app.basic_cli"]
     env_file:
       - .env
       - keys.env
@@ -76,11 +78,44 @@ services:
       dockerfile: agent/.dockerfile
     depends_on:
       - chroma
+      - redis
       - rabbitmq
-    command: [ "pytest", "-vv", "tests" ]
+    command: ["pytest", "-v", "tests"]
     env_file:
       - .env
       - keys.env
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - AGENT_STATUS_TIME=0.2
+
+  shared-test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: tests/.dockerfile
+    depends_on:
+      - rabbitmq
+    command: ["pytest", "-v", "shared/tests"]
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+
+  gateway-test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: gateway/.dockerfile
+    depends_on:
+      - rabbitmq
+      - redis
+      - agent
+    command: ["pytest", "-v", "tests"]
+    env_file:
+      - .env
+      - keys.env
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis://redis:6379/0
+      - TEST_MODE=1
 
   gateway:
     profiles: ["main"]
@@ -91,12 +126,17 @@ services:
       - "8080:8080"
     depends_on:
       - rabbitmq
-      - cache
+      - redis
     command: ["python", "-m", "app.main"]
+    env_file:
+      - .env
+      - keys.env
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis://redis:6379/0
 
-  cache:
+  redis:
     image: redis:7-alpine
-    container_name: euglena_cache
     ports:
       - "6379:6379"
     volumes:
