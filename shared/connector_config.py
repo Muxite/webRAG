@@ -21,7 +21,9 @@ class ConnectorConfig:
         self.status_queue = os.environ.get("AGENT_STATUS_QUEUE", "agent.status")
         self.status_time = float(os.environ.get("AGENT_STATUS_TIME", "10"))
 
-        self.daily_tick_limit = int(os.environ.get("DAILY_TICK_LIMIT"))
+        # Allow running without explicit env by providing a sane default.
+        # Tests may import modules at collection time; avoid raising here.
+        self.daily_tick_limit = int(os.environ.get("DAILY_TICK_LIMIT", "1000"))
 
         if not self.redis_url:
             self.logger.warning("No Redis URL set")

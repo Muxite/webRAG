@@ -1,10 +1,10 @@
 import asyncio
 import logging
-import random
 from typing import Optional
 import aiohttp
 from shared.request_result import RequestResult
 from shared.connector_config import ConnectorConfig
+from shared.retry import Retry
 
 class ConnectorHttp:
     """Manage a single HTTP session for a connector."""
@@ -64,40 +64,61 @@ class ConnectorHttp:
         return self.session
 
     async def request(self, method: str, url: str, retries: int = 4, **kwargs) -> RequestResult:
-        """Generic request with exponential backoff retry logic."""
+        """
+        Generic request using shared Retry with exponential backoff.
+        :return: RequestResult
+        """
         session = self.get_session()
-        last_exc = None
-        last_status = None
 
-        for attempt in range(1, retries + 1):
-            try:
-                timeout = self.config.default_timeout * 2 ** attempt
-                async with session.request(method=method, url=url, timeout=timeout, **kwargs) as resp:
-                    last_status = resp.status
+        class TransientHTTPError(Exception):
+            def __init__(self, status: Optional[int], message: str = "Transient HTTP error"):
+                super().__init__(message)
+                self.status = status
 
-                    if resp.status in self.PERMANENT_ERROR_CODES:
-                        error_msg = self.HTTP_STATUS_CODES.get(resp.status, "Permanent Error")
-                        return RequestResult(status=resp.status, error=True, data=error_msg)
+        async def do_request() -> RequestResult:
+            timeout = self.config.default_timeout
+            async with session.request(method=method, url=url, timeout=timeout, **kwargs) as resp:
+                status = resp.status
 
-                    if 200 <= resp.status < 300:
-                        content_type = resp.headers.get("Content-Type", "")
-                        if "application/json" in content_type:
-                            response_data = await resp.json()
-                        else:
-                            response_data = await resp.text()
-                        return RequestResult(status=resp.status, error=False, data=response_data)
+                if status in self.PERMANENT_ERROR_CODES:
+                    error_msg = self.HTTP_STATUS_CODES.get(status, "Permanent Error")
+                    return RequestResult(status=status, error=True, data=error_msg)
 
-            except (asyncio.TimeoutError, aiohttp.ClientError) as e:
-                last_exc = e
-                self.logger.warning(f"{method} {url} attempt {attempt}/{retries}: {e}")
+                if 200 <= status < 300:
+                    content_type = resp.headers.get("Content-Type", "")
+                    if "application/json" in content_type:
+                        response_data = await resp.json()
+                    else:
+                        response_data = await resp.text()
+                    return RequestResult(status=status, error=False, data=response_data)
 
-            if attempt < retries:
-                wait_secs = (min(60, self.config.default_delay * 2 ** attempt)
-                             + random.uniform(0.0, self.config.jitter_seconds))
-                await asyncio.sleep(wait_secs)
+                raise TransientHTTPError(status, self.HTTP_STATUS_CODES.get(status, "HTTP error"))
 
-        return RequestResult(
-            status=last_status,
-            error=True,
-            data=f"Request failed after {retries} attempts: {last_exc}"
-        )
+        def should_retry(result: Optional[RequestResult], exc: Optional[BaseException], attempt: int) -> bool:
+            if exc is not None:
+                if isinstance(exc, (asyncio.TimeoutError, aiohttp.ClientError, TransientHTTPError)):
+                    return True
+                return False
+            return False
+
+        try:
+            result: RequestResult = await Retry(
+                func=do_request,
+                max_attempts=retries,
+                base_delay=max(1.0, float(self.config.default_delay)),
+                multiplier=2.0,
+                max_delay=60.0,
+                jitter=float(self.config.jitter_seconds or 0.0),
+                name=f"HTTP {method} {url}",
+                retry_exceptions=(asyncio.TimeoutError, aiohttp.ClientError),
+                should_retry=should_retry,
+                raise_on_fail=True,
+            ).run()
+            return result
+        except Exception as e:
+            status = e.status if hasattr(e, "status") else None
+            return RequestResult(
+                status=status,
+                error=True,
+                data=f"Request failed after {retries} attempts: {e}"
+            )
