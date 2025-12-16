@@ -6,12 +6,12 @@ class TaskRequest(BaseModel):
     """Request a model for creating a new task."""
     mandate: str
     max_ticks: int = 50
-    task_id: Optional[str] = None
+    correlation_id: Optional[str] = None
 
 
 class TaskResponse(BaseModel):
     """Response model for task status and results."""
-    task_id: str
+    correlation_id: str
     status: str
     mandate: str
     created_at: str
@@ -26,7 +26,7 @@ class TaskRecord(BaseModel):
     """
     Canonical record stored in storage for a task lifecycle.
     """
-    task_id: str
+    correlation_id: str
     status: str
     mandate: str
     created_at: str
@@ -68,7 +68,6 @@ class StatusUpdate(BaseModel):
     type: str
     mandate: str
     correlation_id: Optional[str] = None
-    task_id: Optional[str] = None
     tick: Optional[int] = None
     max_ticks: Optional[int] = None
     result: Optional[dict] = None
@@ -83,7 +82,7 @@ class FinalResult(BaseModel):
     Final result of the Agent after completing the mandate.
     Contains the final deliverable text, a brief action summary, and success flag.
     """
-    task_id: Optional[str] = None
+    correlation_id: Optional[str] = None
     final_deliverable: str
     action_summary: str
     success: bool
@@ -94,7 +93,7 @@ class CompletionResult(BaseModel):
     Result payload used by Agent Worker when publishing COMPLETED status via RabbitMQ.
     Uses the exact keys expected by the message contract (success, deliverables, notes).
     """
-    task_id: Optional[str] = None
+    correlation_id: Optional[str] = None
     success: bool = True
     deliverables: List[str] = Field(default_factory=list)
     notes: str = ""

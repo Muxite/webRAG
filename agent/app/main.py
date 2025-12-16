@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from shared.connector_config import ConnectorConfig
-from agent.app.agent_worker import InterfaceAgent
+from agent.app.interface_agent import InterfaceAgent
 
 
 async def _run() -> None:

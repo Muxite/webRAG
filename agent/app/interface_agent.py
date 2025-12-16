@@ -13,6 +13,7 @@ from shared.message_contract import (
 )
 from shared.worker_presence import WorkerPresence
 from app.agent import Agent
+from shared.storage import RedisTaskStorage
 
 
 class InterfaceAgent:
@@ -26,6 +27,7 @@ class InterfaceAgent:
         self.config = connector_config
         self.logger = logging.getLogger(self.__class__.__name__)
         self.rabbitmq = ConnectorRabbitMQ(self.config)
+        self.storage = RedisTaskStorage(self.config)
         self._consumer_task: Optional[asyncio.Task] = None
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._presence = WorkerPresence(self.config, worker_type="agent")
@@ -33,7 +35,6 @@ class InterfaceAgent:
 
         self.agent: Optional[Agent] = None
         self.correlation_id: Optional[str] = None
-        self.task_id: Optional[str] = None
         self.mandate: Optional[str] = None
         self.worker_ready: bool = False
 
@@ -48,6 +49,7 @@ class InterfaceAgent:
         """Connect to RabbitMQ and start presence and consumer tasks."""
         if self.worker_ready:
             return
+        self.logger.info("InterfaceAgent starting: connecting to RabbitMQ and launching background tasks")
         await self.rabbitmq.connect()
         self._presence_task = asyncio.create_task(self._presence.run())
         self._consumer_task = asyncio.create_task(
@@ -90,9 +92,8 @@ class InterfaceAgent:
         Sets self.agent and self.correlation_id to the current job.
         :param payload: Task payload
         """
+        self.logger.debug("Received task payload", extra={"payload": payload})
         self.correlation_id = payload.get(KeyNames.CORRELATION_ID)
-
-        self.task_id = payload.get(getattr(KeyNames, "TASK_ID", "task_id")) or self.correlation_id
         self.mandate = payload.get(KeyNames.MANDATE)
         max_ticks = int(payload.get(KeyNames.MAX_TICKS, 50))
 
@@ -100,6 +101,14 @@ class InterfaceAgent:
             self.logger.warning("Invalid task payload, missing mandate or correlation_id")
             return
 
+        self.logger.info(
+            "Starting task",
+            extra={
+                "correlation_id": self.correlation_id,
+                "mandate": (self.mandate[:200] + "…") if isinstance(self.mandate, str) and len(self.mandate) > 200 else self.mandate,
+                "max_ticks": max_ticks,
+            },
+        )
         await self._publish_status(StatusType.ACCEPTED, max_ticks=max_ticks)
         await self._publish_status(StatusType.STARTED, max_ticks=max_ticks)
 
@@ -123,8 +132,16 @@ class InterfaceAgent:
             if isinstance(result, dict):
                 notes = result.get("notes") or result.get("action_summary") or ""
 
-            completion = CompletionResult(task_id=self.task_id, success=success, deliverables=deliverables, notes=notes)
+            completion = CompletionResult(correlation_id=self.correlation_id, success=success, deliverables=deliverables, notes=notes)
 
+            self.logger.info(
+                "Task completed",
+                extra={
+                    "correlation_id": self.correlation_id,
+                    "success": success,
+                    "deliverables_count": len(deliverables),
+                },
+            )
             await self._publish_status(
                 StatusType.COMPLETED,
                 max_ticks=max_ticks,
@@ -142,7 +159,6 @@ class InterfaceAgent:
                     pass
             self.agent = None
             self.correlation_id = None
-            self.task_id = None
             self.mandate = None
 
     async def _publish_status(self, status_type: StatusType, **kwargs) -> None:
@@ -155,7 +171,6 @@ class InterfaceAgent:
             type=status_type,
             mandate=self.mandate,
             correlation_id=self.correlation_id,
-            task_id=self.task_id,
             **kwargs
         )
         try:
@@ -165,7 +180,50 @@ class InterfaceAgent:
                 payload = envelope.model_dump(exclude_none=True)
             except Exception:
                 payload = envelope.dict(exclude_none=True)
+        self.logger.debug(
+            "Publishing status",
+            extra={
+                "type": str(status_type),
+                "correlation_id": self.correlation_id,
+                "fields": {k: v for k, v in kwargs.items() if k in {"tick", "max_ticks", "error"}},
+            },
+        )
         await self.rabbitmq.publish_status(payload)
+
+        try:
+            state: str
+            if status_type == StatusType.ACCEPTED:
+                state = "accepted"
+            elif status_type in (StatusType.STARTED, StatusType.IN_PROGRESS):
+                state = "in_progress"
+            elif status_type == StatusType.COMPLETED:
+                state = "completed"
+            elif status_type == StatusType.ERROR:
+                state = "failed"
+            else:
+                state = "in_progress"
+
+            updates = {
+                "status": state,
+            }
+            if self.mandate is not None:
+                updates["mandate"] = self.mandate
+            if "tick" in kwargs and kwargs.get("tick") is not None:
+                updates["tick"] = kwargs.get("tick")
+            if "max_ticks" in kwargs and kwargs.get("max_ticks") is not None:
+                try:
+                    updates["max_ticks"] = int(kwargs.get("max_ticks"))
+                except Exception:
+                    pass
+            if "result" in kwargs and kwargs.get("result") is not None:
+                updates["result"] = kwargs.get("result")
+            if "error" in kwargs and kwargs.get("error") is not None:
+                updates["error"] = kwargs.get("error")
+
+            if self.correlation_id:
+                await self.storage.update_task(self.correlation_id, updates)
+        except Exception:
+            pass
 
     async def _heartbeat_loop(self) -> None:
         """Publish periodic in-progress status while task is running."""
@@ -174,7 +232,14 @@ class InterfaceAgent:
             while True:
                 if self.agent is None:
                     return
-
+                self.logger.debug(
+                    "Heartbeat tick",
+                    extra={
+                        "correlation_id": self.correlation_id,
+                        "current_tick": getattr(self.agent, "current_tick", None),
+                        "max_ticks": getattr(self.agent, "max_ticks", None),
+                    },
+                )
                 await self._publish_status(
                     StatusType.IN_PROGRESS,
                     tick=self.agent.current_tick,

@@ -1,0 +1,6 @@
+# Local admin/testing API keys
+#
+# This file allows you to define a few special API keys accepted by the Gateway for local development or admin testing.
+# Each non-empty line that is not a comment will be treated as a valid key.
+ADMIN_TEST_KEY_1
+ADMIN_TEST_KEY_2

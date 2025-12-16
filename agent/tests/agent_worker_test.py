@@ -5,7 +5,7 @@ import logging
 
 from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
-from agent.app import agent_worker as aw
+from agent.app import interface_agent as aw
 
 
 @pytest.mark.asyncio
@@ -16,9 +16,9 @@ async def test_agent_worker_basic_flow(monkeypatch, caplog):
     """
     caplog.set_level("INFO")
 
-    task_id = str(uuid.uuid4())
-    input_q = f"test.agent.mandates.{task_id}"
-    status_q = f"test.agent.status.{task_id}"
+    correlation_id = str(uuid.uuid4())
+    input_q = f"test.agent.mandates.{correlation_id}"
+    status_q = f"test.agent.status.{correlation_id}"
 
     monkeypatch.setenv("AGENT_INPUT_QUEUE", input_q)
     monkeypatch.setenv("AGENT_STATUS_QUEUE", status_q)
@@ -44,8 +44,8 @@ async def test_agent_worker_basic_flow(monkeypatch, caplog):
         "Do not think more than one step, do not search, do not visit."
     )
 
-    task = {"mandate": mandate, "max_ticks": 2, "correlation_id": task_id}
-    await rmq.publish_task(task_id, task)
+    task = {"mandate": mandate, "max_ticks": 2, "correlation_id": correlation_id}
+    await rmq.publish_task(correlation_id=correlation_id, payload=task)
 
     for _ in range(600):
         if statuses and statuses[-1] in {"completed", "error"}:
@@ -108,7 +108,7 @@ async def test_agent_worker_many_tasks_logging(monkeypatch, caplog):
         )
         payload = {"mandate": mandate, "max_ticks": 2, "correlation_id": tid}
         tasks.append(tid)
-        await rmq.publish_task(tid, payload)
+        await rmq.publish_task(correlation_id=tid, payload=payload)
 
     for _ in range(600):
         if seen_complete == set(tasks):

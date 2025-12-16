@@ -9,6 +9,13 @@ from redis.asyncio import Redis
 class ConnectorRedis:
     """
     Async Redis connector managed by ConnectorConfig.
+
+    Persistent, lazy-initialized client:
+    - First access creates a single Redis client and verifies connectivity.
+    - Subsequent accesses reuse the same client for the lifetime of the instance.
+    - The async context manager does not close the connection on exit to avoid
+      reconnect churn during frequent operations; call disconnect() explicitly
+      at service shutdown if needed.
     """
 
     def __init__(self, config: ConnectorConfig):
@@ -21,22 +28,15 @@ class ConnectorRedis:
         return await self.connect()
 
     async def __aexit__(self, exc_type, exc, tb):
-        await self.disconnect()
+        return False
 
     async def connect(self):
-        if self._redis is None:
-            if not self.config.redis_url:
-                self.logger.warning("Redis URL not set; skipping connection")
-                raise RuntimeError("Redis URL not set")
-            self._redis = Redis.from_url(self.config.redis_url)
-            try:
-                await self._redis.ping()
-            except Exception as e:
-                self.logger.error(f"Redis connection failed: {e}")
-                self._redis = None
-                raise
-            self.redis_ready = True
-            self.logger.info("Redis connected")
+        """
+        Ensure the Redis client is initialized and ready; returns self.
+        """
+        ok = await self.init_redis()
+        if not ok:
+            raise RuntimeError("Redis not connected")
         return self
 
     async def _try_init_redis(self) -> bool:
@@ -83,6 +83,10 @@ class ConnectorRedis:
         return success
 
     async def disconnect(self):
+        """
+        Close the Redis client explicitly. This is typically called during
+        application shutdown; regular operations keep the connection open.
+        """
         if self._redis is not None:
             try:
                 await self._redis.aclose()
@@ -92,7 +96,7 @@ class ConnectorRedis:
                 pass
             self._redis = None
             self.redis_ready = False
-            self.logger.info("Redis connection closed")
+            self.logger.debug("Redis connection closed")
 
     async def get_client(self) -> Any:
         """

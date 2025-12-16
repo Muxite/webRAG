@@ -1,6 +1,5 @@
 import asyncio
 import json
-import uuid
 import pytest
 
 from shared.connector_config import ConnectorConfig
@@ -27,11 +26,11 @@ async def test_submit_task_and_consume_queue(client, auth_headers, rabbitmq):
     :param rabbitmq: Connected RabbitMQ connector
     :return None: Nothing is returned
     """
-    mandate = f"do thing {uuid.uuid4().hex[:6]}"
+    mandate = "Say 'pong' and exit."
     resp = await client.post("/tasks", headers=auth_headers, json={"mandate": mandate, "max_ticks": 3})
     assert resp.status_code == 202
     data = resp.json()
-    task_id = data["task_id"]
+    correlation_id = data["correlation_id"]
 
     ch = await rabbitmq.get_channel()
     assert ch is not None
@@ -40,48 +39,34 @@ async def test_submit_task_and_consume_queue(client, auth_headers, rabbitmq):
 
     msg = await asyncio.wait_for(q.get(), timeout=5.0)
     try:
-        assert msg.correlation_id == task_id
+        assert msg.correlation_id == correlation_id
         payload = json.loads(msg.body.decode("utf-8"))
-        assert payload.get(KeyNames.TASK_ID) == task_id
+        assert payload.get(KeyNames.CORRELATION_ID) == correlation_id
         assert payload.get(KeyNames.MANDATE) == mandate
     finally:
         await msg.ack()
 
 
 @pytest.mark.asyncio
-async def test_status_flow_via_status_queue(client, auth_headers, rabbitmq):
+async def test_status_flow_via_redis(client, auth_headers):
     """
-    Publishing status updates on the status queue should be reflected by GET /tasks.
+    Updating Redis with the latest status should be reflected by GET /tasks.
     :param client: Async http client bound to the app
     :param auth_headers: Headers with X-API-Key
-    :param rabbitmq: Connected RabbitMQ connector
     :return None: Nothing is returned
     """
     mandate = "status flow"
     resp = await client.post("/tasks", headers=auth_headers, json={"mandate": mandate, "max_ticks": 2})
     assert resp.status_code == 202
-    task_id = resp.json()["task_id"]
+    correlation_id = resp.json()["correlation_id"]
 
-    accepted = {
-        KeyNames.TYPE: "accepted",
-        KeyNames.MANDATE: mandate,
-        KeyNames.TASK_ID: task_id,
-        KeyNames.CORRELATION_ID: task_id,
-        KeyNames.MAX_TICKS: 2,
-    }
-    completed = {
-        KeyNames.TYPE: "completed",
-        KeyNames.MANDATE: mandate,
-        KeyNames.TASK_ID: task_id,
-        KeyNames.CORRELATION_ID: task_id,
-        KeyNames.MAX_TICKS: 2,
-        KeyNames.RESULT: {"success": True, "deliverables": ["ok"], "notes": "done"},
-    }
+    from shared.storage import RedisTaskStorage
+    storage = RedisTaskStorage()
 
-    await rabbitmq.publish_status(accepted)
+    await storage.update_task(correlation_id, {"status": "accepted", "mandate": mandate, "max_ticks": 2})
 
     for _ in range(30):
-        r = await client.get(f"/tasks/{task_id}", headers=auth_headers)
+        r = await client.get(f"/tasks/{correlation_id}", headers=auth_headers)
         assert r.status_code == 200
         if r.json()["status"] == "accepted":
             break
@@ -89,10 +74,15 @@ async def test_status_flow_via_status_queue(client, auth_headers, rabbitmq):
     else:
         raise AssertionError("Task did not reach accepted state")
 
-    await rabbitmq.publish_status(completed)
+    await storage.update_task(correlation_id, {
+        "status": "completed",
+        "mandate": mandate,
+        "max_ticks": 2,
+        "result": {"success": True, "deliverables": ["ok"], "notes": "done"},
+    })
 
     for _ in range(50):
-        r = await client.get(f"/tasks/{task_id}", headers=auth_headers)
+        r = await client.get(f"/tasks/{correlation_id}", headers=auth_headers)
         assert r.status_code == 200
         if r.json()["status"] == "completed":
             body = r.json()

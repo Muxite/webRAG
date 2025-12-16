@@ -7,7 +7,6 @@ from pydantic import BaseModel
 class KeyNames:
     """Canonical RabbitMQ message keys used across services."""
     CORRELATION_ID = "correlation_id"
-    TASK_ID = "task_id"
     TYPE = "type"
 
     MANDATE = "mandate"
@@ -42,7 +41,6 @@ class TaskEnvelope(BaseModel):
     mandate: str
     max_ticks: int = 50
     correlation_id: Optional[str] = None
-    task_id: Optional[str] = None
 
 
 class StatusEnvelope(BaseModel):
@@ -50,7 +48,6 @@ class StatusEnvelope(BaseModel):
     type: StatusType
     mandate: str
     correlation_id: Optional[str] = None
-    task_id: Optional[str] = None
     seq: Optional[int] = None
     ts: Optional[float] = None
     tick: Optional[int] = None

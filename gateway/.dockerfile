@@ -9,5 +9,6 @@ RUN pip install --no-cache-dir -r /app/gateway/requirements.txt
 COPY shared /app/shared
 RUN pip install --no-cache-dir /app/shared
 COPY gateway /app/gateway
+COPY special_api_keys.txt /app/gateway/special_api_keys.txt
 WORKDIR /app/gateway
 ENV PYTHONPATH=/app/gateway:/app
