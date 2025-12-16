@@ -8,41 +8,46 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
+    networks:
+      - enet
 
-  inference:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
-    volumes:
-      - ./inference/models:/models
-    environment:
-      - LLAMA_ARG_MODEL=/models/Phi-3-mini-4k-instruct-q4.gguf
-      - LLAMA_ARG_N_GPU_LAYERS=999
-      - LLAMA_ARG_PORT=8000
-      - LLAMA_ARG_HOST=0.0.0.0
-      - LLAMA_API=true
-    ports:
-      - "8000:8000"
-    entrypoint: ["/app/llama-server"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+#  inference:
+#    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+#    volumes:
+#      - ./inference/models:/models
+#    environment:
+#      - LLAMA_ARG_MODEL=/models/Phi-3-mini-4k-instruct-q4.gguf
+#      - LLAMA_ARG_N_GPU_LAYERS=999
+#      - LLAMA_ARG_PORT=8000
+#      - LLAMA_ARG_HOST=0.0.0.0
+#      - LLAMA_API=true
+#    ports:
+#      - "8000:8000"
+#    entrypoint: ["/app/llama-server"]
+#    deploy:
+#      resources:
+#        reservations:
+#          devices:
+#            - driver: nvidia
+#              count: all
+#              capabilities: [gpu]
+#    networks:
+#      - enet
 
   chroma:
     image: chromadb/chroma:latest
     container_name: chroma_db
     ports:
-      - "8001:8001"
+      - "8001:8000"
     volumes:
       - ./chroma:/chroma-cache_retrieved
     environment:
       - IS_PERSISTENT=TRUE
       - PERSIST_DIRECTORY=/chroma-data
+    networks:
+      - enet
 
   agent:
-    profiles: ["main", "test"]
     build:
       context: .
       dockerfile: agent/.dockerfile
@@ -56,6 +61,8 @@ services:
       - keys.env
     environment:
       - AGENT_STATUS_TIME=0.2
+    networks:
+      - enet
 
   agent-cli:
     profiles: ["cli"]
@@ -66,10 +73,14 @@ services:
     tty: true
     depends_on:
       - chroma
+      - redis
+      - rabbitmq
     command: ["python", "-m", "app.basic_cli"]
     env_file:
       - .env
       - keys.env
+    networks:
+      - enet
 
   agent-test:
     profiles: ["test"]
@@ -85,8 +96,9 @@ services:
       - .env
       - keys.env
     environment:
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - AGENT_STATUS_TIME=0.2
+    networks:
+      - enet
 
   shared-test:
     profiles: ["test"]
@@ -98,6 +110,8 @@ services:
     command: ["pytest", "-v", "shared/tests"]
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    networks:
+      - enet
 
   gateway-test:
     profiles: ["test"]
@@ -108,17 +122,16 @@ services:
       - rabbitmq
       - redis
       - agent
-    command: ["pytest", "-v", "tests"]
+    command: ["pytest", "-vv", "tests"]
     env_file:
       - .env
       - keys.env
     environment:
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - REDIS_URL=redis://redis:6379/0
       - TEST_MODE=1
+    networks:
+      - enet
 
   gateway:
-    profiles: ["main"]
     build:
       context: .
       dockerfile: gateway/.dockerfile
@@ -127,13 +140,29 @@ services:
     depends_on:
       - rabbitmq
       - redis
+      - agent
     command: ["python", "-m", "app.main"]
     env_file:
       - .env
       - keys.env
-    environment:
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - enet
+
+  api-cli:
+    profiles: ["cli"]
+    build:
+      context: .
+      dockerfile: apicli/.dockerfile
+    stdin_open: true
+    tty: true
+    depends_on:
+      - gateway
+    command: [ "python", "-m", "app.main" ]
+    env_file:
+      - .env
+      - keys.env
+    networks:
+      - enet
 
   redis:
     image: redis:7-alpine
@@ -142,6 +171,12 @@ services:
     volumes:
       - redis_data:/data
     command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - enet
 
 volumes:
   redis_data:
+
+networks:
+  enet:
+    driver: bridge

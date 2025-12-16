@@ -12,17 +12,17 @@ class TaskStorage(ABC):
     """Abstract interface for task storage backends."""
 
     @abstractmethod
-    async def create_task(self, task_id: str, task_data: dict) -> None:
+    async def create_task(self, correlation_id: str, task_data: dict) -> None:
         """Store a new task."""
         pass
 
     @abstractmethod
-    async def get_task(self, task_id: str) -> Optional[dict]:
+    async def get_task(self, correlation_id: str) -> Optional[dict]:
         """Retrieve a task by ID."""
         pass
 
     @abstractmethod
-    async def update_task(self, task_id: str, updates: dict) -> None:
+    async def update_task(self, correlation_id: str, updates: dict) -> None:
         """Update task fields."""
         pass
 
@@ -32,7 +32,7 @@ class TaskStorage(ABC):
         pass
 
     @abstractmethod
-    async def delete_task(self, task_id: str) -> bool:
+    async def delete_task(self, correlation_id: str) -> bool:
         """Delete a task."""
         pass
 
@@ -41,7 +41,7 @@ class RedisTaskStorage(TaskStorage):
     """Redis-backed task storage using JSON serialization.
 
     Uses ConnectorRedis for connection lifecycle.
-    Keys are stored under the prefix 'task:{task_id}'.
+    Keys are stored under the prefix 'task:{correlation_id}'.
     """
 
     def __init__(self, config: Optional[ConnectorConfig] = None):
@@ -50,29 +50,29 @@ class RedisTaskStorage(TaskStorage):
         self.logger = logging.getLogger(self.__class__.__name__)
         self._prefix = "task:"
 
-    def _key(self, task_id: str) -> str:
-        return f"{self._prefix}{task_id}"
+    def _key(self, correlation_id: str) -> str:
+        return f"{self._prefix}{correlation_id}"
 
-    async def create_task(self, task_id: str, task_data: dict) -> None:
+    async def create_task(self, correlation_id: str, task_data: dict) -> None:
         """Create a task record in Redis.
 
         Args:
-            task_id: Unique task identifier used as the redis key suffix
+            correlation_id: Unique identifier used as the redis key suffix
             task_data: JSON-serializable dictionary describing the task
         """
         async with self.connector as conn:
-            await conn.set_json(self._key(task_id), task_data)
-            self.logger.info(f"Created task {task_id} (redis)")
+            await conn.set_json(self._key(correlation_id), task_data)
+            self.logger.info(f"Created task {correlation_id} (redis)")
 
-    async def get_task(self, task_id: str) -> Optional[dict]:
+    async def get_task(self, correlation_id: str) -> Optional[dict]:
         """Get a task record from Redis (already JSON-decoded by the connector)."""
         async with self.connector as conn:
-            return await conn.get_json(self._key(task_id))
+            return await conn.get_json(self._key(correlation_id))
 
-    async def update_task(self, task_id: str, updates: dict) -> None:
+    async def update_task(self, correlation_id: str, updates: dict) -> None:
         """Apply partial updates to a task record and update the timestamp."""
         async with self.connector as conn:
-            key = self._key(task_id)
+            key = self._key(correlation_id)
             existing = await conn.get_json(key) or {}
             if not isinstance(existing, dict):
                 # Preserve any unexpected existing content under 'raw'
@@ -108,13 +108,13 @@ class RedisTaskStorage(TaskStorage):
                     break
             return tasks
 
-    async def delete_task(self, task_id: str) -> bool:
+    async def delete_task(self, correlation_id: str) -> bool:
         """Delete a task record by key. Returns True if a key was removed."""
         async with self.connector as conn:
             client = await conn.get_client()
             if client is None:
                 return False
-            deleted = await client.delete(self._key(task_id))
+            deleted = await client.delete(self._key(correlation_id))
             if deleted:
-                self.logger.info(f"Deleted task {task_id} (redis)")
+                self.logger.info(f"Deleted task {correlation_id} (redis)")
             return bool(deleted)

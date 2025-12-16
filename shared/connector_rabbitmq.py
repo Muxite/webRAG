@@ -38,9 +38,23 @@ class ConnectorRabbitMQ:
             return False
 
         try:
+            safe_url = rabbitmq_url
+            try:
+                if "://" in rabbitmq_url:
+                    scheme, rest = rabbitmq_url.split("://", 1)
+                    if "@" in rest:
+                        creds_host = rest.split("@", 1)
+                        rest = creds_host[1]
+                    safe_url = f"{scheme}://{rest}"
+            except Exception:
+                pass
+            self.logger.info(f"Attempting RabbitMQ connect: url={safe_url}")
             self.connection = await aio_pika.connect_robust(rabbitmq_url)
             self.channel = await self.connection.channel()
 
+            self.logger.debug(
+                f"Declaring queues: input={self.config.input_queue}, status={self.config.status_queue}"
+            )
             await self.channel.declare_queue(self.config.input_queue, durable=True)
             await self.channel.declare_queue(self.config.status_queue, durable=True)
 
@@ -133,29 +147,40 @@ class ConnectorRabbitMQ:
         if not await self.init_rabbitmq():
             raise RuntimeError("RabbitMQ not connected")
 
+        body_bytes = json.dumps(payload).encode("utf-8")
+        body_preview = body_bytes[:256]
+        self.logger.debug(
+            "Publishing message",
+            extra={
+                "queue": queue_name,
+                "correlation_id": correlation_id,
+                "payload_size": len(body_bytes),
+                "payload_preview": body_preview.decode("utf-8", errors="ignore"),
+            },
+        )
         await self.channel.default_exchange.publish(
             aio_pika.Message(
-                body=json.dumps(payload).encode("utf-8"),
+                body=body_bytes,
                 content_type="application/json",
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
                 correlation_id=correlation_id,
             ),
             routing_key=queue_name,
         )
-        self.logger.debug(f"Published message to {queue_name}: {correlation_id}")
+        self.logger.info(f"Published message to {queue_name}: correlation_id={correlation_id}")
 
-    async def publish_task(self, task_id: str, payload: dict) -> None:
+    async def publish_task(self, correlation_id: str, payload: dict) -> None:
         """
         Publish a task to the input queue with a correlation id.
-        :param task_id: Unique task identifier used as the correlation id.
+        :param correlation_id: Unique identifier used as the correlation id.
         :param payload: Task payload.
         """
         await self.publish_message(
             queue_name=self.config.input_queue,
             payload=payload,
-            correlation_id=task_id,
+            correlation_id=correlation_id,
         )
-        self.logger.info(f"Published task {task_id} to {self.config.input_queue}")
+        self.logger.info(f"Published task {correlation_id} to {self.config.input_queue}")
 
     async def publish_status(self, payload: dict) -> None:
         """
@@ -182,6 +207,7 @@ class ConnectorRabbitMQ:
         if not await self.init_rabbitmq():
             raise RuntimeError("RabbitMQ not connected")
 
+        self.logger.info(f"Preparing consumer for queue={queue_name}")
         queue = await self.channel.declare_queue(queue_name, durable=True)
 
         self.logger.info(f"Consuming from {queue_name}")
@@ -190,10 +216,27 @@ class ConnectorRabbitMQ:
             async for message in queue_iter:
                 async with message.process():
                     try:
-                        data = json.loads(message.body.decode("utf-8"))
+                        raw = message.body.decode("utf-8", errors="ignore")
+                        self.logger.debug(
+                            "Received message",
+                            extra={
+                                "queue": queue_name,
+                                "correlation_id": getattr(message, "correlation_id", None),
+                                "size": len(message.body or b""),
+                                "preview": raw[:256],
+                            },
+                        )
+                        data = json.loads(raw)
                         await callback(data)
+                        self.logger.debug(
+                            "Callback processed message",
+                            extra={
+                                "queue": queue_name,
+                                "correlation_id": getattr(message, "correlation_id", None),
+                            },
+                        )
                     except Exception as e:
-                        self.logger.error(f"Error processing message from {queue_name}: {e}")
+                        self.logger.exception(f"Error processing message from {queue_name}: {e}")
 
     async def consume_status_updates(self, callback: Callable[[dict], Any]) -> None:
         """Consume status updates from workers."""

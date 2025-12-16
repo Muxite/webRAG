@@ -17,14 +17,14 @@ async def test_agent_container_roundtrip_via_rabbitmq():
     rmq = ConnectorRabbitMQ(cfg)
     await rmq.connect()
 
-    task_id = str(uuid.uuid4())
-    codeword = "roundtrip"
-    mandate = f"Respond once using the word '{codeword}' and then exit."
+    correlation_id = str(uuid.uuid4())
+    codeword = "pong"
+    mandate = "Say 'pong' and exit."
 
     seen: list[dict] = []
 
     async def collect_status(message: dict):
-        if message.get(KeyNames.CORRELATION_ID) not in {None, task_id} and message.get(KeyNames.TASK_ID) not in {None, task_id}:
+        if message.get(KeyNames.CORRELATION_ID) not in {None, correlation_id}:
             return
         seen.append(message)
 
@@ -33,10 +33,9 @@ async def test_agent_container_roundtrip_via_rabbitmq():
     payload = {
         KeyNames.MANDATE: mandate,
         KeyNames.MAX_TICKS: 3,
-        KeyNames.CORRELATION_ID: task_id,
-        KeyNames.TASK_ID: task_id,
+        KeyNames.CORRELATION_ID: correlation_id,
     }
-    await rmq.publish_task(task_id=task_id, payload=payload)
+    await rmq.publish_task(correlation_id=correlation_id, payload=payload)
 
     final = None
     for _ in range(600):

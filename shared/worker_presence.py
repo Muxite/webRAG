@@ -27,6 +27,15 @@ class WorkerPresence:
         self._redis = ConnectorRedis(self.config)
         self._interval = config.status_time
         self._ttl = int(self._interval * 3)
+        self.logger.info(
+            "WorkerPresence initialized",
+            extra={
+                "worker_type": self.worker_type,
+                "worker_id": self.worker_id,
+                "interval": self._interval,
+                "ttl": self._ttl,
+            },
+        )
 
     def stop(self) -> None:
         self._stopped.set()
@@ -34,9 +43,10 @@ class WorkerPresence:
     async def run(self) -> None:
         """Background loop: periodically refresh membership and TTL key."""
         try:
-            await self._redis.init_redis()
-        except Exception:
-            pass
+            ok = await self._redis.init_redis()
+            self.logger.info(f"Redis init in WorkerPresence ok={ok}")
+        except Exception as e:
+            self.logger.warning(f"Redis init failed in WorkerPresence: {e}")
 
         set_key = f"workers:{self.worker_type}"
         pres_key = f"worker:{self.worker_type}:{self.worker_id}"
@@ -48,6 +58,10 @@ class WorkerPresence:
                     if client is not None:
                         await client.sadd(set_key, self.worker_id)
                         await client.set(pres_key, "1", ex=self._ttl)
+                        self.logger.debug(
+                            "Presence heartbeat stored",
+                            extra={"set_key": set_key, "pres_key": pres_key, "ttl": self._ttl},
+                        )
                 except Exception as e:
                     self.logger.debug(f"Presence heartbeat failed: {e}")
 
@@ -62,5 +76,6 @@ class WorkerPresence:
                 client = await self._redis.get_client()
                 if client is not None:
                     await client.delete(pres_key)
-            except Exception:
-                pass
+                    self.logger.info("Presence key deleted on shutdown", extra={"pres_key": pres_key})
+            except Exception as e:
+                self.logger.debug(f"Failed to delete presence key on shutdown: {e}")
