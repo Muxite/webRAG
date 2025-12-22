@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="f66bb68e-7de2-4bf1-88ae-85bf95d24b00" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/euglena.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/gateway/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/gateway/tests/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/shared/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/shared/tests/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/tests/.dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.dockerignore" beforeDir="false" afterPath="$PROJECT_DIR$/services/.dockerignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/services/.env" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/.dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/.dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/basic_cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/basic_cli.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/connector_chroma.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/connector_chroma.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/connector_http.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/connector_http.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/connector_llm.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/connector_llm.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/connector_search.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/connector_search.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/final_output_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/final_output_builder.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/interface_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/interface_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/local_embedding_function.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/local_embedding_function.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/observation.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/observation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/prompt_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/prompt_builder.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/app/tick_output.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/tick_output.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/agent_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/agent_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/agent_worker_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/agent_worker_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/connector_chroma_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/connector_chroma_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/connector_http_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/connector_http_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/connector_llm_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/connector_llm_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/connector_search_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/connector_search_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/long_text.txt" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/long_text.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/prompt_builder_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/prompt_builder_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/agent/tests/tick_output_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/tick_output_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apicli/.dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/services/apicli/.dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apicli/app/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/tests/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apicli/app/apicli.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/apicli/app/apicli.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apicli/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/services/apicli/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apicli/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/services/apicli/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/conftest.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/conftest.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/services/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/.dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/.dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/app/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/app/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/app/api.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/app/api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/app/gateway_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/app/gateway_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/app/security.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/app/security.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/tests/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/apicli/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/tests/conftest.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/tests/conftest.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/tests/test_gateway_agent_live.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/tests/test_gateway_agent_live.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/tests/test_gateway_api.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/tests/test_gateway_api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gateway/tests/test_gateway_e2e.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/tests/test_gateway_e2e.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/apicli/app/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/connector_config.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/connector_config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/connector_rabbitmq.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/connector_rabbitmq.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/connector_redis.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/connector_redis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/message_contract.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/message_contract.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/pretty_log.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/pretty_log.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/rate_limiter.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/rate_limiter.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/request_result.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/request_result.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/retry.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/retry.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/storage.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/storage.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/tests/rabbitmq_manager_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/tests/rabbitmq_manager_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/usage_quota.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/usage_quota.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shared/worker_presence.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/worker_presence.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/special_api_keys.txt" beforeDir="false" afterPath="$PROJECT_DIR$/services/special_api_keys.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/.dockerfile" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Muxite&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/Muxite/webRAG.git&quot;,
+    &quot;accountId&quot;: &quot;bd0c14a2-0543-4506-8c8a-636ef0335e42&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="33b3IYaLf24VgX7vK92ft5I9GOY" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
+    &quot;Docker.docker-compose.test.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python tests.Python tests in connector_search_test.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in prompt_builder_test.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in tick_output_test.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python.pretty_log.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/mukch/projects/euglena&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\mukch\projects\euglena\agent\tests" />
+      <recent name="C:\Users\mukch\projects\euglena\agent\app" />
+      <recent name="C:\Users\mukch\projects\euglena" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\mukch\projects\euglena\services" />
+      <recent name="C:\Users\mukch\projects\euglena" />
+      <recent name="C:\Users\mukch\projects\euglena\shared" />
+      <recent name="C:\Users\mukch\projects\euglena\agent\app" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Python.pretty_log">
+    <configuration name="pretty_log" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="euglena" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/shared" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/shared/pretty_log.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="docker-compose.test.yml: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" temporary="true" server-name="Docker">
+      <deployment type="docker-compose.yml">
+        <settings>
+          <option name="sourceFilePath" value="docker-compose.test.yml" />
+        </settings>
+      </deployment>
+      <method v="2" />
+    </configuration>
+    <configuration name="Python tests in connector_search_test.py" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
+      <module name="euglena" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/services/agent/tests/connector_search_test.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Python tests in prompt_builder_test.py" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
+      <module name="euglena" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/services/agent/tests/prompt_builder_test.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Python tests in tick_output_test.py" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
+      <module name="euglena" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/services/agent/tests/tick_output_test.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.pretty_log" />
+        <item itemvalue="Python tests.Python tests in connector_search_test.py" />
+        <item itemvalue="Python tests.Python tests in tick_output_test.py" />
+        <item itemvalue="Python tests.Python tests in prompt_builder_test.py" />
+        <item itemvalue="Docker.docker-compose.test.yml: Compose Deployment" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-PY-252.27397.106" />
+        <option value="bundled-python-sdk-4e2b1448bda8-9a97661f3031-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.27397.106" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="f66bb68e-7de2-4bf1-88ae-85bf95d24b00" name="Changes" comment="" />
+      <created>1759571865516</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1759571865516</updated>
+      <workItem from="1759571866603" duration="24000" />
+      <workItem from="1759571977070" duration="10058000" />
+      <workItem from="1759640504275" duration="3609000" />
+      <workItem from="1759666525812" duration="9719000" />
+      <workItem from="1760111928146" duration="13708000" />
+      <workItem from="1760229966255" duration="1375000" />
+      <workItem from="1760232215324" duration="1528000" />
+      <workItem from="1760288047539" duration="6673000" />
+      <workItem from="1760312453781" duration="712000" />
+      <workItem from="1760381356258" duration="449000" />
+      <workItem from="1760462669993" duration="650000" />
+      <workItem from="1760471986861" duration="6277000" />
+      <workItem from="1760558954493" duration="2000" />
+      <workItem from="1760568655729" duration="1810000" />
+      <workItem from="1760818929001" duration="183000" />
+      <workItem from="1760819237898" duration="516000" />
+      <workItem from="1760835733467" duration="30000" />
+      <workItem from="1760866287021" duration="4555000" />
+      <workItem from="1760887457982" duration="1082000" />
+      <workItem from="1761008704224" duration="1594000" />
+      <workItem from="1761044334464" duration="6779000" />
+      <workItem from="1761080594954" duration="3884000" />
+      <workItem from="1761098466387" duration="48000" />
+      <workItem from="1761241139212" duration="10018000" />
+      <workItem from="1761326143174" duration="15744000" />
+      <workItem from="1761566591631" duration="10742000" />
+      <workItem from="1761608765115" duration="23000" />
+      <workItem from="1761810682609" duration="20766000" />
+      <workItem from="1761971333934" duration="4282000" />
+      <workItem from="1762072395364" duration="2023000" />
+      <workItem from="1762119194657" duration="12955000" />
+      <workItem from="1762196633247" duration="889000" />
+      <workItem from="1762247326048" duration="5590000" />
+      <workItem from="1762290179781" duration="16274000" />
+      <workItem from="1762376401870" duration="4916000" />
+      <workItem from="1762474823617" duration="1039000" />
+      <workItem from="1762565356637" duration="8847000" />
+      <workItem from="1762583323424" duration="1193000" />
+      <workItem from="1762658808191" duration="9030000" />
+      <workItem from="1762781216142" duration="5342000" />
+      <workItem from="1762922742753" duration="19729000" />
+      <workItem from="1763478392381" duration="15638000" />
+      <workItem from="1763583782536" duration="18894000" />
+      <workItem from="1763677807134" duration="5423000" />
+      <workItem from="1763966214238" duration="30869000" />
+      <workItem from="1764163262512" duration="659000" />
+      <workItem from="1764209407291" duration="22879000" />
+      <workItem from="1764353691052" duration="2105000" />
+      <workItem from="1764463487395" duration="19356000" />
+      <workItem from="1764542464379" duration="19222000" />
+      <workItem from="1764653601817" duration="19238000" />
+      <workItem from="1764802544376" duration="2294000" />
+      <workItem from="1764833474532" duration="1626000" />
+      <workItem from="1764840598923" duration="5257000" />
+      <workItem from="1764881219521" duration="2912000" />
+      <workItem from="1764887661616" duration="4508000" />
+      <workItem from="1764896236859" duration="6038000" />
+      <workItem from="1764992231871" duration="12270000" />
+      <workItem from="1765073091334" duration="1425000" />
+      <workItem from="1765097004163" duration="7848000" />
+      <workItem from="1765270764108" duration="4155000" />
+      <workItem from="1765278063740" duration="868000" />
+      <workItem from="1765278948622" duration="15695000" />
+      <workItem from="1765461961830" duration="17824000" />
+      <workItem from="1765528998936" duration="13606000" />
+      <workItem from="1765593848988" duration="18206000" />
+      <workItem from="1765626789264" duration="5393000" />
+      <workItem from="1765846744417" duration="8111000" />
+      <workItem from="1765893571017" duration="5008000" />
+      <workItem from="1766388726870" duration="6328000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/services/shared/request_result.py</url>
+          <option name="timeStamp" value="5" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/services/agent/app/agent.py</url>
+          <line>133</line>
+          <option name="timeStamp" value="7" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/services/agent/app/connector_chroma.py</url>
+          <line>138</line>
+          <option name="timeStamp" value="8" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/services/agent/app/agent.py</url>
+          <line>245</line>
+          <option name="timeStamp" value="10" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/services/agent/app/interface_agent.py</url>
+          <line>61</line>
+          <option name="timeStamp" value="12" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/euglena$.coverage" NAME=" Coverage Results" MODIFIED="1762924382879" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/euglena$pretty_log.coverage" NAME="pretty_log Coverage Results" MODIFIED="1763999734668" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/shared" />
+  </component>
+</project>
