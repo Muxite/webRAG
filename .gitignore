@@ -1,5 +1,5 @@
-/inference/models
-keys.env
+/services/inference/models
+services/keys.env
 venv/
 env/
 .venv/
