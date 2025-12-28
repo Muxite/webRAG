@@ -1,8 +1,12 @@
 /services/inference/models
 services/keys.env
+services/task_definition.json
+services/secrets.json
+services/special_api_keys.txt
 venv/
 env/
 .venv/
 __pycache__/
 *.py[cod]
 *$py.class
+secrets.json
