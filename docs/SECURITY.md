@@ -1,48 +1,43 @@
-# SECURITY
+## Security model
 
-This document explains how API keys are handled by the Euglena Gateway and how to set up development/testing keys safely.
+- **Gateway access** is controlled by Supabase Auth JWTs only.
+- **Users** authenticate with email and password in Supabase and must confirm their email before they can use the site.
+- **Per-user limits** are enforced as daily tick quotas stored in Supabase.
 
-## Overview
+## Supabase authentication
 
-The Gateway protects all endpoints using an API key sent in the `X-API-Key` HTTP header. A request is authorized if and only if the provided key matches one of the allowed keys known to the server.
+- Supabase manages `auth.users` and sends confirmation emails on sign-up.
+- The frontend obtains an access token from Supabase and sends it as `Authorization: Bearer <token>`.
+- The Gateway validates the token using `SUPABASE_JWT_SECRET` and rejects requests when the token is invalid or the email is not confirmed.
 
-Allowed keys can come from:
+### Environment variables
 
-- A primary key from an environment variable.
-- A short list of special keys stored in a local file (for admin/dev testing only).
-- A generated key during automated tests.
+See [docs/SUPABASE_SETUP.md](SUPABASE_SETUP.md) for detailed setup instructions.
 
-## Environment variables
+**Required:**
+- `SUPABASE_URL` — Your Supabase project URL
+- `SUPABASE_ANON_KEY` — Publishable/anon key (NOT service role key) - use this for RLS
+- `SUPABASE_JWT_SECRET` — JWT secret for verifying user tokens
 
-- `GATEWAY_API_KEY` — Primary API key. If set, this key is accepted.
-- `TEST_MODE` — When set to `1`, the server will generate a temporary API key for tests if `GATEWAY_API_KEY` is not set. The generated key is placed in the environment so tests can read it.
-- `GATEWAY_SPECIAL_KEYS_FILE` — Optional path to a file containing additional allowed keys (one per line). If not set, the application looks for a file named `special_api_keys.txt` in the working directory.
+**Optional:**
+- `SUPABASE_ALLOW_UNCONFIRMED` — Set to `"true"` to allow unconfirmed emails in development
 
-## Special keys file
+**How to get `SUPABASE_JWT_SECRET`:**
+1. Go to your Supabase project dashboard: https://supabase.com/dashboard
+2. Navigate to **Settings** → **API**
+3. Scroll down to the **JWT Settings** section
+4. Copy the `JWT_SECRET` value (this is your `SUPABASE_JWT_SECRET`)
 
-For admin/dev testing, you may maintain a short list of extra keys in a local file. The Gateway will accept any key listed in this file in addition to the primary key.
+**Setting environment variables:**
+These values are treated as secrets and should only be provided via environment or Docker compose files, never committed to source control. The gateway container loads environment variables from:
+- `.env` file (in the `services/` directory)
+- `keys.env` file (in the `services/` directory)
 
-Defaults:
+Add `SUPABASE_JWT_SECRET=<your-secret>` to one of these files to make it available to the gateway container.
 
-- Default filename: `special_api_keys.txt` (in the project root) unless `GATEWAY_SPECIAL_KEYS_FILE` is set.
-- File format: UTF-8 text, one key per line.
-- Blank lines and lines starting with `#` are ignored.
+## Per-user tick quotas
 
-Example (`special_api_keys.txt`):
-
-```
-# Local admin/testing keys (DO NOT COMMIT REAL SECRETS)
-# Each non-empty, non-comment line is a valid key
-ADMIN_TEST_KEY_1
-ADMIN_TEST_KEY_2
-```
-
-Important: This file is intended for local use only and should be added to `.gitignore` to avoid committing secrets. The repository does not rely on the presence of this file; if it is missing or unreadable, only the primary key (and test-generated key, when applicable) will be accepted.
-
-## Client usage
-
-Include the API key with each request:
-
-```
-X-API-Key: <your key>
-```
+- Each user has a profile row in the `profiles` table with `daily_tick_limit` (default 32).
+- Daily usage is tracked in `user_daily_usage` keyed by `(user_id, usage_date)`.
+- On each `/tasks` call, the Gateway subtracts `max_ticks` from the user's remaining ticks and rejects the call with `429` when the quota is exhausted.
+- **Row-Level Security (RLS):** The `profiles` and `user_daily_usage` tables use RLS policies. See [docs/SUPABASE_SETUP.md](SUPABASE_SETUP.md) for setup instructions.

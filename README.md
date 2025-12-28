@@ -20,6 +20,7 @@ The agent uses LLM-powered reasoning to break down tasks, perform web searches, 
 ### Prerequisites
 - Docker and Docker Compose
 - API keys: `OPENAI_API_KEY`, `SEARCH_API_KEY` (set in `keys.env`)
+- Supabase configuration: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` (see [docs/SECURITY.md](docs/SECURITY.md))
 
 ### Start Services
 
@@ -58,8 +59,7 @@ Environment variables are managed in `.env`:
 - Service URLs: `RABBITMQ_URL`, `REDIS_URL`, `CHROMA_URL`, `GATEWAY_URL`
 - API Keys: `OPENAI_API_KEY`, `SEARCH_API_KEY`
 - Agent settings: `AGENT_STATUS_TIME`, `AGENT_INPUT_QUEUE`, `MAX_TICKS`
-
-API keys for gateway are defined in `special_api_keys.txt`.
+- Supabase: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` (see [docs/SECURITY.md](docs/SECURITY.md))
 
 ## Testing
 

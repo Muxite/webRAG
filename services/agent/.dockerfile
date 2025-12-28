@@ -10,3 +10,5 @@ RUN pip install --no-cache-dir /app/shared
 COPY agent /app/agent
 WORKDIR /app/agent
 ENV PYTHONPATH=/app
+ENV AGENT_STATUS_TIME=0.2
+CMD ["python", "-m", "app.main"]

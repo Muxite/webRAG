@@ -151,4 +151,3 @@ class GatewayService:
             max_ticks=record.max_ticks,
         )
 
-    # No status consumption: statuses are written to Redis by workers and read via storage

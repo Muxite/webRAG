@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from httpx import AsyncClient, ASGITransport
 
 from gateway.app.api import create_app
+from gateway.tests.auth_helpers import auth_headers
 
 
 @asynccontextmanager
@@ -15,15 +16,12 @@ async def lifespan(app):
 
 @pytest.mark.asyncio
 async def test_end_to_end_agent_roundtrip_default_queues():
-    """
-    End-to-end roundtrip using default queues with the agent container.
-    Submits a task via API with max_ticks=3 and waits for a terminal status.
-    :return None: Nothing is returned
-    """
-    os.environ["TEST_MODE"] = "1"
+    if not os.environ.get("SUPABASE_JWT_SECRET"):
+        os.environ["SUPABASE_JWT_SECRET"] = "test-jwt-secret-for-testing-only-do-not-use-in-production"
+    os.environ["SUPABASE_ALLOW_UNCONFIRMED"] = "true"
 
     app = create_app()
-    key = app.state.api_key
+    headers = auth_headers()
 
     async with lifespan(app):
         transport = ASGITransport(app=app)
@@ -31,7 +29,7 @@ async def test_end_to_end_agent_roundtrip_default_queues():
             mandate = "Say 'pong' and exit."
             r = await client.post(
                 "/tasks",
-                headers={"X-API-Key": key},
+                headers=headers,
                 json={"mandate": mandate, "max_ticks": 3},
             )
             assert r.status_code == 202
@@ -39,8 +37,8 @@ async def test_end_to_end_agent_roundtrip_default_queues():
 
             saw_intermediate = False
             last = None
-            for _ in range(600):  # up to 120s
-                g = await client.get(f"/tasks/{correlation_id}", headers={"X-API-Key": key})
+            for _ in range(600):
+                g = await client.get(f"/tasks/{correlation_id}", headers=headers)
                 assert g.status_code == 200
                 body = g.json()
                 last = body

@@ -3,6 +3,8 @@ uvicorn[standard]
 aio-pika
 pydantic>=2
 redis
-httpx
+aiohttp
 pytest
 pytest-asyncio
+supabase
+python-jose[cryptography]
