@@ -21,7 +21,7 @@ docker compose run shared-test
 - Agent loop logic, prompt building, tick parsing
 
 **Gateway Tests** (`gateway/tests/`):
-- API key enforcement
+- Supabase authentication enforcement
 - Task submission and RabbitMQ publishing
 - Status retrieval from Redis
 - End-to-end with live agent container

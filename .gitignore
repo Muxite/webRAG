@@ -1,8 +1,10 @@
-/services/inference/models
+services/inference/models
 services/keys.env
 services/task_definition.json
 services/secrets.json
 services/special_api_keys.txt
+frontend/build
+frontend/node_modules
 venv/
 env/
 .venv/

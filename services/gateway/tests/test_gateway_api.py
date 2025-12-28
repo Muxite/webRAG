@@ -7,25 +7,13 @@ from shared.message_contract import KeyNames
 
 
 @pytest.mark.asyncio
-async def test_api_key_is_enforced(client):
-    """
-    Verify that requests without the API key are rejected with 401.
-    :param client: Async http client bound to the app
-    :return None: Nothing is returned
-    """
+async def test_auth_is_enforced(client):
     resp = await client.post("/tasks", json={"mandate": "x"})
     assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_submit_task_and_consume_queue(client, auth_headers, rabbitmq):
-    """
-    Submitting a task should publish an envelope to the input queue.
-    :param client: Async http client bound to the app
-    :param auth_headers: Headers with X-API-Key
-    :param rabbitmq: Connected RabbitMQ connector
-    :return None: Nothing is returned
-    """
     mandate = "Say 'pong' and exit."
     resp = await client.post("/tasks", headers=auth_headers, json={"mandate": mandate, "max_ticks": 3})
     assert resp.status_code == 202
@@ -49,12 +37,6 @@ async def test_submit_task_and_consume_queue(client, auth_headers, rabbitmq):
 
 @pytest.mark.asyncio
 async def test_status_flow_via_redis(client, auth_headers):
-    """
-    Updating Redis with the latest status should be reflected by GET /tasks.
-    :param client: Async http client bound to the app
-    :param auth_headers: Headers with X-API-Key
-    :return None: Nothing is returned
-    """
     mandate = "status flow"
     resp = await client.post("/tasks", headers=auth_headers, json={"mandate": mandate, "max_ticks": 2})
     assert resp.status_code == 202

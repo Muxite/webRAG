@@ -21,14 +21,13 @@
 
 **Agent Core** (`agent.py`): Ticked loop with LLM calls, action execution (search/visit/think/exit), Chroma storage
 
-**Gateway Service** (`gateway_service.py`, `api.py`): FastAPI with API key auth, Redis-backed task storage
+**Gateway Service** (`gateway_service.py`, `api.py`): FastAPI with Supabase auth, Redis-backed task storage
 
 
 ## CLI Modules
 **Agent CLI** (`basic_cli.py`): Basic CLI for testing agent locally.
 
-**API CLI** (`apicli.py`): API caller container that allows users to submit tasks via API.
-It can add tasks using an API key, and allow manual status checks using the correllation id.
+**API CLI** (`apicli.py`): API caller container that allows users to submit tasks via API using Supabase authentication.
 
 
 ## Status States
