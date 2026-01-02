@@ -70,6 +70,10 @@ class InterfaceAgent:
         """Initializes all agent connectors and verifies they are ready."""
         self.logger.info("Initializing agent connectors...")
         
+        # Initialize HTTP sessions for connectors that need them (these are shared and reused)
+        await self.connector_search.__aenter__()
+        await self.connector_http.__aenter__()
+        
         await self.connector_search.init_search_api()
         await self.connector_chroma.init_chroma()
         await self.storage.connector.init_redis()
@@ -134,6 +138,20 @@ class InterfaceAgent:
             await self.rabbitmq.disconnect()
         except Exception as e:
             self.logger.warning(f"Error disconnecting RabbitMQ: {e}")
+
+        # Close shared HTTP connectors (they were initialized in _initialize_dependencies)
+        try:
+            await self.connector_search.__aexit__(None, None, None)
+        except Exception as e:
+            self.logger.debug(f"Error closing connector_search: {e}")
+        try:
+            await self.connector_http.__aexit__(None, None, None)
+        except Exception as e:
+            self.logger.debug(f"Error closing connector_http: {e}")
+        try:
+            await self.connector_llm.__aexit__(None, None, None)
+        except Exception as e:
+            self.logger.debug(f"Error closing connector_llm: {e}")
 
         self.worker_ready = False
         self.logger.info("InterfaceAgent stopped")
