@@ -26,12 +26,21 @@ export default function App() {
   const [randomColor] = useState(colors[Math.floor(Math.random() * colors.length)]);
 
   useEffect(() => {
+    // Handle email confirmation redirect
     supabase.auth.getSession().then(({ data }) => {
       setUserEmail(data.session?.user.email ?? null);
+      // Clear URL hash after processing
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user.email ?? null);
+      // Clear URL hash after auth state change (e.g., after email confirmation)
+      if (window.location.hash && session) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     });
 
     return () => {
@@ -293,7 +302,16 @@ export default function App() {
                 </div>
                 <button
                   onClick={handleSignOut}
-                  className="px-3 py-1 rounded-lg bg-red-600 border-2 border-red-400 text-white font-mono hover:bg-red-500 active:scale-95 transition-all"
+                  className="px-3 py-1 rounded-lg text-white font-mono active:scale-95 transition-all"
+                  style={{
+                    backgroundColor: 'rgb(220, 38, 38)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgb(239, 68, 68)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgb(220, 38, 38)';
+                  }}
                 >
                   Sign Out
                 </button>
@@ -327,7 +345,7 @@ export default function App() {
                       disabled={loading}
                       className={`w-full p-3 rounded-xl ${inputBg} placeholder:text-gray-400 font-mono disabled:opacity-50`}
                     />
-                    <p className="text-white/80 font-mono text-xs mt-1">
+                    <p className="font-mono text-xs mt-1" style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                       Each user is restricted to 32 ticks per day across all tasks.
                     </p>
                   </div>
@@ -338,9 +356,23 @@ export default function App() {
                 <button
                   onClick={handleSubmit}
                   disabled={loading || !mandate.trim() || !userEmail}
-                  className="flex-1 p-6 bg-white text-black rounded-xl border-4 border-gray-200 disabled:opacity-50
-                  font-mono hover:bg-green-400 hover:border-green-500 active:scale-95 transition-all
+                  className="px-4 py-2 bg-white text-black rounded-xl border-2 border-gray-200 disabled:opacity-50
+                  font-mono active:scale-95 transition-all
                   disabled:hover:bg-white disabled:hover:border-gray-200 disabled:active:scale-100"
+                  onMouseEnter={(e) => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.backgroundColor = '#a855f7';
+                      e.currentTarget.style.color = 'white';
+                      e.currentTarget.style.borderColor = '#9333ea';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.backgroundColor = 'white';
+                      e.currentTarget.style.color = 'black';
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                    }
+                  }}
                 >
                   {loading ? 'Processing...' : 'Submit Task'}
                 </button>
@@ -365,6 +397,25 @@ export default function App() {
               {task && (
                 <div className="space-y-4">
                   <div className="p-6 rounded-xl bg-white text-black">
+                    {task.tick !== undefined && task.max_ticks > 0 && (
+                      <div className="mb-4">
+                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{
+                              width: `${Math.min(100, (task.tick / task.max_ticks) * 100)}%`,
+                              background: 'linear-gradient(to right, #3b82f6, #a855f7)',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div 
+                      className="h-1 rounded-full mb-4"
+                      style={{
+                        backgroundColor: task.status === 'completed' ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)',
+                      }}
+                    />
                     <div className="space-y-2 font-mono">
                       <p>
                         <span className="font-bold">Status:</span> {task.status}
@@ -402,18 +453,18 @@ export default function App() {
                               <div key={index} className="markdown-content">
                                 <ReactMarkdown
                                   components={{
-                                    p: ({ children }) => <p className="mb-2">{children}</p>,
-                                    h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4">{children}</h1>,
-                                    h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-3">{children}</h2>,
-                                    h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-2">{children}</h3>,
-                                    ul: ({ children }) => <ul style={{ listStyle: 'disc', paddingLeft: '1.5rem', marginBottom: '0.5rem' }}>{children}</ul>,
-                                    ol: ({ children }) => <ol style={{ listStyle: 'decimal', paddingLeft: '1.5rem', marginBottom: '0.5rem' }}>{children}</ol>,
-                                    li: ({ children }) => <li style={{ marginBottom: '0.25rem' }}>{children}</li>,
+                                    p: ({ children }) => <p className="mb-2 font-mono">{children}</p>,
+                                    h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4 font-mono">{children}</h1>,
+                                    h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-3 font-mono">{children}</h2>,
+                                    h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-2 font-mono">{children}</h3>,
+                                    ul: ({ children }) => <ul className="font-mono" style={{ listStyle: 'disc', paddingLeft: '1.5rem', marginBottom: '0.5rem' }}>{children}</ul>,
+                                    ol: ({ children }) => <ol className="font-mono" style={{ listStyle: 'decimal', paddingLeft: '1.5rem', marginBottom: '0.5rem' }}>{children}</ol>,
+                                    li: ({ children }) => <li className="font-mono" style={{ marginBottom: '0.25rem' }}>{children}</li>,
                                     code: ({ children }) => <code className="bg-gray-200 px-1 rounded font-mono text-xs">{children}</code>,
                                     pre: ({ children }) => <pre className="bg-gray-200 p-2 rounded overflow-x-auto mb-2 font-mono text-xs">{children}</pre>,
-                                    strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                                    em: ({ children }) => <em className="italic">{children}</em>,
-                                    a: ({ href, children }) => <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                                    strong: ({ children }) => <strong className="font-bold font-mono">{children}</strong>,
+                                    em: ({ children }) => <em className="italic font-mono">{children}</em>,
+                                    a: ({ href, children }) => <a href={href} className="text-blue-600 underline font-mono" target="_blank" rel="noopener noreferrer">{children}</a>,
                                   }}
                                 >
                                   {deliverable}
@@ -432,18 +483,18 @@ export default function App() {
                           <div className="text-gray-800 markdown-content">
                             <ReactMarkdown
                               components={{
-                                p: ({ children }) => <p className="mb-2">{children}</p>,
-                                h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4">{children}</h1>,
-                                h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-3">{children}</h2>,
-                                h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-2">{children}</h3>,
-                                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                                li: ({ children }) => <li className="ml-4">{children}</li>,
+                                p: ({ children }) => <p className="mb-2 font-mono">{children}</p>,
+                                h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4 font-mono">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-3 font-mono">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-2 font-mono">{children}</h3>,
+                                ul: ({ children }) => <ul className="font-mono" style={{ listStyle: 'disc', paddingLeft: '1.5rem', marginBottom: '0.5rem' }}>{children}</ul>,
+                                ol: ({ children }) => <ol className="font-mono" style={{ listStyle: 'decimal', paddingLeft: '1.5rem', marginBottom: '0.5rem' }}>{children}</ol>,
+                                li: ({ children }) => <li className="font-mono" style={{ marginBottom: '0.25rem' }}>{children}</li>,
                                 code: ({ children }) => <code className="bg-gray-200 px-1 rounded font-mono text-xs">{children}</code>,
                                 pre: ({ children }) => <pre className="bg-gray-200 p-2 rounded overflow-x-auto mb-2 font-mono text-xs">{children}</pre>,
-                                strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                                em: ({ children }) => <em className="italic">{children}</em>,
-                                a: ({ href, children }) => <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                                strong: ({ children }) => <strong className="font-bold font-mono">{children}</strong>,
+                                em: ({ children }) => <em className="italic font-mono">{children}</em>,
+                                a: ({ href, children }) => <a href={href} className="text-blue-600 underline font-mono" target="_blank" rel="noopener noreferrer">{children}</a>,
                               }}
                             >
                               {task.result.notes}
