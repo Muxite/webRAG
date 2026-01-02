@@ -54,8 +54,11 @@ class ConnectorHttp:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session and not self.session.closed:
-            await self.session.close()
-            self.logger.info("HTTP Session closed.")
+            try:
+                await self.session.close()
+                self.logger.info("HTTP Session closed.")
+            except Exception as e:
+                self.logger.debug(f"Error closing HTTP session: {e}")
         self.session = None
 
     def get_session(self) -> aiohttp.ClientSession:
