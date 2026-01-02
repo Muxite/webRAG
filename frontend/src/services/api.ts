@@ -13,7 +13,12 @@ export interface TaskResponse {
   mandate: string;
   created_at: string;
   updated_at: string;
-  result?: Record<string, unknown>;
+  result?: {
+    success?: boolean;
+    deliverables?: string[];
+    notes?: string;
+    [key: string]: unknown;
+  };
   error?: string;
   tick?: number;
   max_ticks: number;
