@@ -186,7 +186,7 @@ export default function App() {
               className={`uppercase tracking-wider ${text}`}
               style={{ fontFamily: 'Impact, Arial Black, sans-serif', fontSize: '3rem' }}
             >
-              EUGLENA
+              EUGLENA WEB AGENT
             </h1>
             <p className={`${text} mt-2 font-mono`}>Autonomous RAG agent system for web automation</p>
           </div>
