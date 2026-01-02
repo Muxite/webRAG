@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sun, Moon, Github } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { apiClient, TaskResponse } from './services/api';
 import { supabase } from './services/supabaseClient';
 
@@ -17,7 +18,11 @@ export default function App() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const pollIntervalRef = useRef<number | null>(null);
 
-  const colors = ['bg-purple-600', 'bg-blue-600', 'bg-indigo-600'];
+  const colors = [
+    { background: 'linear-gradient(135deg, #4c1d95 0%, #581c87 100%)' }, // purple-900
+    { background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)' }, // blue-900
+    { background: 'linear-gradient(135deg, #312e81 0%, #3730a3 100%)' }, // indigo-900
+  ];
   const [randomColor] = useState(colors[Math.floor(Math.random() * colors.length)]);
 
   useEffect(() => {
@@ -173,47 +178,60 @@ export default function App() {
     <div className={`min-h-screen ${bg} ${text} p-4`}>
       <button
         onClick={() => setDark(!dark)}
-        className="fixed top-6 right-6 p-4 rounded-xl bg-white text-black border-4 border-gray-200
-         hover:bg-yellow-300 hover:border-yellow-400 active:scale-95 transition-all z-50"
+        className="fixed top-4 right-4 p-2 hover:opacity-70 active:scale-95 transition-all z-50"
       >
-        {dark ? <Sun size={24} /> : <Moon size={24} />}
+        {dark ? <Sun size={20} className={text} /> : <Moon size={20} className={text} />}
       </button>
 
       <div className="w-full max-w-4xl mx-auto">
-        <div className={`space-y-8 p-12 rounded-3xl ${randomColor}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1
-                className="uppercase tracking-wider text-white"
-                style={{ fontFamily: 'Impact, Arial Black, sans-serif', fontSize: '3rem' }}
-              >
-                EUGLENA
-              </h1>
-              <p className="text-white mt-2 font-mono text-sm">
-                Autonomous RAG agent for web automation and task execution
-              </p>
-            </div>
-            <a
-              href="https://github.com/Muxite/webRAG"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-3 rounded-lg bg-white/20 hover:bg-white/30 border-2 border-white/30 transition-colors"
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <h1
+              className="uppercase tracking-wider"
+              style={{
+                fontFamily: 'Impact, Arial Black, sans-serif',
+                fontSize: '4.5rem',
+                background: 'linear-gradient(to right, #ff00ff, #60a5fa, #38bdf8)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
             >
-              <Github size={24} className="text-white" />
-            </a>
+              EUGLENA
+            </h1>
+            <p className={`${text} mt-2 font-mono text-sm`}>
+              Autonomous RAG agent for web automation and task execution
+            </p>
           </div>
+          <a
+            href="https://github.com/Muxite/webRAG"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 hover:opacity-70 transition-opacity"
+          >
+            <Github size={24} className={text} />
+          </a>
+        </div>
 
+        <div className="space-y-8 p-12 rounded-3xl" style={randomColor}>
           {!isAuthenticated ? (
             <>
               <h2
-                className="uppercase tracking-wider text-white"
-                style={{ fontFamily: 'Impact, Arial Black, sans-serif', fontSize: '2rem' }}
+                className="uppercase tracking-wider"
+                style={{
+                  fontFamily: 'Impact, Arial Black, sans-serif',
+                  fontSize: '2rem',
+                  background: 'linear-gradient(to right, #ff00ff, #60a5fa, #38bdf8)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
               >
                 Sign In
               </h2>
               <div className="max-w-md space-y-4">
                 <p className="text-white font-mono text-sm">
-                  Create an account or sign in to submit tasks to Euglena. Each user has a daily limit of 32 ticks.
+                  Create an account or sign in to submit tasks to Euglena.
                 </p>
                 <input
                   type="email"
@@ -255,8 +273,15 @@ export default function App() {
           ) : (
             <>
               <h2
-                className="uppercase tracking-wider text-white"
-                style={{ fontFamily: 'Impact, Arial Black, sans-serif', fontSize: '2rem' }}
+                className="uppercase tracking-wider"
+                style={{
+                  fontFamily: 'Impact, Arial Black, sans-serif',
+                  fontSize: '2rem',
+                  background: 'linear-gradient(to right, #ff00ff, #60a5fa, #38bdf8)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
               >
                 TASK SUBMISSION
               </h2>
@@ -291,7 +316,7 @@ export default function App() {
                   </div>
                   <div>
                     <label className="block text-white font-mono mb-2">
-                      Max ticks (daily limit: 32 ticks)
+                      Max ticks
                     </label>
                     <input
                       type="number"
@@ -344,12 +369,17 @@ export default function App() {
                       <p>
                         <span className="font-bold">Status:</span> {task.status}
                       </p>
-                      <p>
-                        <span className="font-bold">Correlation ID:</span> {task.correlation_id}
-                      </p>
                       {task.tick !== undefined && (
                         <p>
                           <span className="font-bold">Tick:</span> {task.tick} / {task.max_ticks}
+                        </p>
+                      )}
+                      {task.result?.success !== undefined && (
+                        <p>
+                          <span className="font-bold">Success:</span>{' '}
+                          <span className={task.result.success ? 'text-green-600' : 'text-red-600'}>
+                            {task.result.success ? 'Yes' : 'No'}
+                          </span>
                         </p>
                       )}
                       {task.error && (
@@ -361,11 +391,66 @@ export default function App() {
                   </div>
 
                   {task.result && (
-                    <div className="p-6 rounded-xl bg-white text-black">
-                      <h3 className="font-mono font-bold mb-2">Result:</h3>
-                      <pre className="whitespace-pre-wrap font-mono text-sm">
-                        {JSON.stringify(task.result, null, 2)}
-                      </pre>
+                    <div className="space-y-4">
+                      {task.result.deliverables && task.result.deliverables.length > 0 && (
+                        <div className="p-6 rounded-xl bg-green-50 border-2 border-green-200">
+                          <h3 className="font-mono font-bold mb-4 text-green-900 uppercase tracking-wide">
+                            Deliverables
+                          </h3>
+                          <div className="space-y-4 text-gray-800">
+                            {task.result.deliverables.map((deliverable, index) => (
+                              <div key={index} className="markdown-content">
+                                <ReactMarkdown
+                                  components={{
+                                    p: ({ children }) => <p className="mb-2">{children}</p>,
+                                    h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4">{children}</h1>,
+                                    h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-3">{children}</h2>,
+                                    h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-2">{children}</h3>,
+                                    ul: ({ children }) => <ul style={{ listStyle: 'disc', paddingLeft: '1.5rem', marginBottom: '0.5rem' }}>{children}</ul>,
+                                    ol: ({ children }) => <ol style={{ listStyle: 'decimal', paddingLeft: '1.5rem', marginBottom: '0.5rem' }}>{children}</ol>,
+                                    li: ({ children }) => <li style={{ marginBottom: '0.25rem' }}>{children}</li>,
+                                    code: ({ children }) => <code className="bg-gray-200 px-1 rounded font-mono text-xs">{children}</code>,
+                                    pre: ({ children }) => <pre className="bg-gray-200 p-2 rounded overflow-x-auto mb-2 font-mono text-xs">{children}</pre>,
+                                    strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                                    em: ({ children }) => <em className="italic">{children}</em>,
+                                    a: ({ href, children }) => <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                                  }}
+                                >
+                                  {deliverable}
+                                </ReactMarkdown>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {task.result.notes && (
+                        <div className="p-6 rounded-xl bg-blue-50 border-2 border-blue-200">
+                          <h3 className="font-mono font-bold mb-4 text-blue-900 uppercase tracking-wide">
+                            Notes
+                          </h3>
+                          <div className="text-gray-800 markdown-content">
+                            <ReactMarkdown
+                              components={{
+                                p: ({ children }) => <p className="mb-2">{children}</p>,
+                                h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-3">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-2">{children}</h3>,
+                                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                                li: ({ children }) => <li className="ml-4">{children}</li>,
+                                code: ({ children }) => <code className="bg-gray-200 px-1 rounded font-mono text-xs">{children}</code>,
+                                pre: ({ children }) => <pre className="bg-gray-200 p-2 rounded overflow-x-auto mb-2 font-mono text-xs">{children}</pre>,
+                                strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                                em: ({ children }) => <em className="italic">{children}</em>,
+                                a: ({ href, children }) => <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                              }}
+                            >
+                              {task.result.notes}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -385,7 +470,7 @@ export default function App() {
           </h2>
           <div className="space-y-4 font-mono text-sm">
             <p>
-              Euglena is a production-ready autonomous RAG agent service that executes tasks through iterative reasoning, web interaction, and vector database storage. Tasks flow through a Gateway API, are consumed by Agent Workers via RabbitMQ, with status tracked in Redis and memory persisted in ChromaDB.
+              Euglena is an autonomous RAG agent service that executes tasks through iterative reasoning, web interaction, and vector database storage. Tasks flow through a Gateway API, are consumed by Agent Workers via RabbitMQ, with status tracked in Redis and memory persisted in ChromaDB.
             </p>
             <p>
               The agent uses LLM-powered reasoning to break down tasks, perform web searches, visit URLs, and build up knowledge over time through persistent memory.
