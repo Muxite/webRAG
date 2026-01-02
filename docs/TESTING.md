@@ -3,39 +3,30 @@
 ## Running Tests
 
 ```bash
-# Agent tests
-docker compose run agent-test
-
-# Gateway tests  
-docker compose run gateway-test
-
-# Shared tests
-docker compose run shared-test
+cd services
+docker compose --profile test up agent-test
+docker compose --profile test up gateway-test
+docker compose --profile test up shared-test
 ```
 
 ## Test Coverage
 
-**Agent Tests** (`agent/tests/`):
-- Worker orchestration (task consumption, status emission)
-- Connector unit tests (LLM, search, HTTP, Chroma) with mocks
-- Agent loop logic, prompt building, tick parsing
+**Agent Tests** (`agent/tests/`): Worker orchestration, connector unit tests with mocks, agent loop logic, dependency injection patterns, lifecycle handling, readiness checks
 
-**Gateway Tests** (`gateway/tests/`):
-- Supabase authentication enforcement
-- Task submission and RabbitMQ publishing
-- Status retrieval from Redis
-- End-to-end with live agent container
+**Gateway Tests** (`gateway/tests/`): Supabase auth enforcement, task submission, status retrieval, end-to-end with live agent
 
-**Shared Tests** (`shared/tests/`):
-- RabbitMQ connector (queue declaration, publish/consume)
-- Redis connector and retry helpers
+**Shared Tests** (`shared/tests/`): RabbitMQ connector, Redis connector, retry helpers
 
 ## Test Architecture
 
-- Tests use real RabbitMQ/Redis containers (no mocks)
-- Gateway E2E runs FastAPI in-process with ASGITransport
-- Agent E2E tests against live agent container
-- Status flow validated via Redis (no RabbitMQ status consumption)
+Uses real RabbitMQ/Redis containers. Gateway E2E runs FastAPI in-process. Agent E2E tests against live container. Pytest fixtures reduce complexity. Tests focus on single behaviors.
+
+## Test Patterns
+
+**Fixtures**: Common setup moved to reusable pytest fixtures
+**Dependency Injection**: Tests create connectors and inject into Agent
+**Mocking**: External APIs mocked, infrastructure uses real services
+**Cleanup**: Tests properly clean up connections and tasks
 
 ## Limitations
 
