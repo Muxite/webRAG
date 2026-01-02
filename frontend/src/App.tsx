@@ -179,34 +179,30 @@ export default function App() {
         {dark ? <Sun size={24} /> : <Moon size={24} />}
       </button>
 
-      <div className="w-full max-w-6xl mx-auto mb-8 pt-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1
-              className={`uppercase tracking-wider ${text}`}
-              style={{ fontFamily: 'Impact, Arial Black, sans-serif', fontSize: '3rem' }}
-            >
-              EUGLENA WEB AGENT
-            </h1>
-            <p className={`${text} mt-2 font-mono`}>Autonomous RAG agent system for web automation</p>
-          </div>
-          <a
-            href="https://github.com/Muxite/webRAG"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`p-3 rounded-lg ${
-              dark
-                ? 'bg-zinc-800 hover:bg-zinc-700 border-2 border-zinc-600'
-                : 'bg-zinc-300 hover:bg-zinc-400 border-2 border-zinc-400'
-            } transition-colors`}
-          >
-            <Github size={24} />
-          </a>
-        </div>
-      </div>
-
       <div className="w-full max-w-4xl mx-auto">
         <div className={`space-y-8 p-12 rounded-3xl ${randomColor}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1
+                className="uppercase tracking-wider text-white"
+                style={{ fontFamily: 'Impact, Arial Black, sans-serif', fontSize: '3rem' }}
+              >
+                EUGLENA
+              </h1>
+              <p className="text-white mt-2 font-mono text-sm">
+                Autonomous RAG agent for web automation and task execution
+              </p>
+            </div>
+            <a
+              href="https://github.com/Muxite/webRAG"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-3 rounded-lg bg-white/20 hover:bg-white/30 border-2 border-white/30 transition-colors"
+            >
+              <Github size={24} className="text-white" />
+            </a>
+          </div>
+
           {!isAuthenticated ? (
             <>
               <h2
@@ -217,7 +213,7 @@ export default function App() {
               </h2>
               <div className="max-w-md space-y-4">
                 <p className="text-white font-mono text-sm">
-                  Create an account or sign in to submit tasks to the Euglena agent.
+                  Create an account or sign in to submit tasks to Euglena. Each user has a daily limit of 32 ticks.
                 </p>
                 <input
                   type="email"
@@ -266,7 +262,10 @@ export default function App() {
               </h2>
 
               <div className="mb-4 flex items-center justify-between text-xs text-white font-mono">
-                <span>Signed in as {userEmail}</span>
+                <div className="space-y-1">
+                  <div>Signed in as {userEmail}</div>
+                  <div className="opacity-80">Daily limit: 32 ticks per day</div>
+                </div>
                 <button
                   onClick={handleSignOut}
                   className="px-3 py-1 rounded-lg bg-red-600 border-2 border-red-400 text-white font-mono hover:bg-red-500 active:scale-95 transition-all"
@@ -291,16 +290,21 @@ export default function App() {
                     />
                   </div>
                   <div>
-                    <label className="block text-white font-mono mb-2">Max ticks</label>
+                    <label className="block text-white font-mono mb-2">
+                      Max ticks (daily limit: 32 ticks)
+                    </label>
                     <input
                       type="number"
                       min={1}
-                      max={256}
+                      max={32}
                       value={maxTicks}
                       onChange={(e) => setMaxTicks(Number(e.target.value) || 1)}
                       disabled={loading}
                       className={`w-full p-3 rounded-xl ${inputBg} placeholder:text-gray-400 font-mono disabled:opacity-50`}
                     />
+                    <p className="text-white/80 font-mono text-xs mt-1">
+                      Each user is restricted to 32 ticks per day across all tasks.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -381,13 +385,13 @@ export default function App() {
           </h2>
           <div className="space-y-4 font-mono text-sm">
             <p>
-              A distributed agent framework where tasks flow through a Gateway API, are consumed by
-              Agent Workers via RabbitMQ, with status tracked in Redis and memory persisted in
-              ChromaDB.
+              Euglena is a production-ready autonomous RAG agent service that executes tasks through iterative reasoning, web interaction, and vector database storage. Tasks flow through a Gateway API, are consumed by Agent Workers via RabbitMQ, with status tracked in Redis and memory persisted in ChromaDB.
             </p>
             <p>
-              The agent uses LLM-powered reasoning to break down tasks, perform web searches, visit
-              URLs, and build up knowledge over time.
+              The agent uses LLM-powered reasoning to break down tasks, perform web searches, visit URLs, and build up knowledge over time through persistent memory.
+            </p>
+            <p className="opacity-80">
+              <span className="font-bold">Usage Limits:</span> Each user is restricted to 32 ticks per day. This limit applies across all tasks submitted in a 24-hour period.
             </p>
             <div className="pt-4">
               <h3 className="uppercase text-xs tracking-wide mb-2 opacity-70">Architecture</h3>
