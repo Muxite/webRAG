@@ -298,10 +298,11 @@ class Agent:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Exit async context manager, cleaning up connector resources."""
-        if self.connector_search:
-            await self.connector_search.__aexit__(exc_type, exc_val, exc_tb)
-        if self.connector_http:
-            await self.connector_http.__aexit__(exc_type, exc_val, exc_tb)
-        if self.connector_llm:
-            await self.connector_llm.__aexit__(exc_type, exc_val, exc_tb)
+        """Exit async context manager, cleaning up connector resources.
+        
+        Note: Connectors are shared and reused across multiple Agent instances,
+        so we do NOT close them here. They are managed at the InterfaceAgent level.
+        """
+        # Do not close shared connectors - they are reused across multiple agents
+        # The InterfaceAgent manages their lifecycle
+        pass
