@@ -2,6 +2,7 @@
 
 ## Components
 
+- **`frontend/`**: React web interface with Supabase authentication, task submission UI, and real-time status polling
 - **`agent/`**: Worker that consumes tasks from RabbitMQ, executes agent logic, and writes status to Redis
 - **`gateway/`**: FastAPI service that accepts tasks, publishes to RabbitMQ, and serves status from Redis
 - **`shared/`**: Common utilities (config, connectors, models, retry helpers)
