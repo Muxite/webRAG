@@ -3,24 +3,20 @@
 An autonomous RAG agent service that executes tasks through iterative reasoning, web interaction, and vector database storage. 
 The agent uses LLM-powered reasoning to break down tasks, perform web searches, visit URLs, and build up knowledge over time through persistent memory in ChromaDB.
 
-The AWS deployment is not active yet, but the website is here:
-[Link to WebRAG](https://web-rag-nine.vercel.app/)
+**Live Site**: [Euglena Web Agent](https://web-rag-nine.vercel.app/)
 
-## Current Status
+The MVP is complete and fully operational with AWS deployment and a working web interface.
 
-**Local Development: Complete**
+### Current Status
+- **Web interface live** - Full-featured frontend with authentication and task management
+- **AWS deployment operational** - ECS task definitions, Secrets Manager integration, container images
+- Users have a fixed number of ticks per day.
 - Full Docker Compose setup with all services
 - Agent worker with dependency injection and connector reuse
 - Gateway service with Supabase authentication
 - Test suite with fixtures
 - Connection cleanup and error handling
-- Agent CLI for local testing
-
-**AWS Deployment: In Progress**
-- ECS task definition generation scripts
-- Environment variable and secrets management
-- Container image building and ECR integration
-- Deployment automation
+- Agent CLI for local testing and integration
 
 ## Overview
 
@@ -63,6 +59,7 @@ docker compose --profile cli run agent-cli
 
 ### Components
 
+- **Frontend** (`frontend/`): React web interface with Supabase authentication, task submission, and real-time status monitoring
 - **Gateway** (`gateway/`): FastAPI on port 8080, accepts tasks, enforces Supabase auth, publishes to RabbitMQ, serves status from Redis
 - **Agent** (`agent/`): Consumes tasks from RabbitMQ, executes LLM reasoning loop, performs web searches and visits, stores context in ChromaDB, writes status to Redis
 - **Shared** (`shared/`): Common utilities - connectors (RabbitMQ, Redis, HTTP), models, retry helpers, config
@@ -96,6 +93,8 @@ Environment variables in `services/.env` and `services/keys.env`:
 See [docs/SECURITY.md](docs/SECURITY.md) for details.
 
 ## AWS Deployment
+
+The AWS deployment is operational and uses ECS with Secrets Manager for secure configuration.
 
 Generate ECS task definitions from environment files:
 
@@ -158,6 +157,9 @@ See [docs/SECURITY.md](docs/SECURITY.md) for detailed security documentation.
 │   │   └── tests/      # Shared test suite
 │   ├── apicli/         # API CLI client
 │   └── docker-compose.yml
+├── frontend/           # React web interface
+│   ├── src/            # React components and services
+│   └── index.html      # Entry point
 ├── scripts/            # Deployment and utility scripts
 │   ├── build-task-definition.py  # ECS task definition generator
 │   └── env-to-ecs.py              # Secrets manager generator
@@ -166,9 +168,9 @@ See [docs/SECURITY.md](docs/SECURITY.md) for detailed security documentation.
 
 ## Future Enhancements
 
-- AWS deployment automation and monitoring
 - Selenium/ChromeDriver integration for JavaScript-heavy sites
 - Enhanced web automation for complex user flows
 - Advanced memory and context retrieval
 - Multi-agent coordination and task delegation
-- Frontend web interface
+- Enhanced monitoring and observability
+- Performance optimizations and scaling improvements
