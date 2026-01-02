@@ -9,8 +9,6 @@ from shared.retry import Retry
 class ConnectorChroma:
     """
     Manages a connection to ChromaDB and exposes common operations.
-
-    This connector relies on a local sentence-transformers model via LocalEmbeddingFunction for embeddings.
     """
 
     def __init__(self, connector_config: ConnectorConfig):

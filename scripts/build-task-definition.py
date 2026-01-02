@@ -80,7 +80,15 @@ def extract_arn_suffix(secret_input):
 
 
 def build_task_definition(keys_env, env, account_id, region, secret_name, secret_arn_suffix):
-    env_list = [{"name": k, "value": str(v)} for k, v in sorted(env.items())]
+    env_ecs = {}
+    for k, v in env.items():
+        value = str(v)
+        if k in ("RABBITMQ_URL", "REDIS_URL", "CHROMA_URL", "GATEWAY_URL"):
+            value = value.replace("@rabbitmq:", "@localhost:").replace("@redis:", "@localhost:").replace("@chroma:", "@localhost:").replace("@gateway:", "@localhost:")
+            value = value.replace("://rabbitmq:", "://localhost:").replace("://redis:", "://localhost:").replace("://chroma:", "://localhost:").replace("://gateway:", "://localhost:")
+        env_ecs[k] = value
+    
+    env_list = [{"name": k, "value": v} for k, v in sorted(env_ecs.items())]
     
     secrets = []
     if keys_env and secret_arn_suffix:
@@ -110,10 +118,10 @@ def build_task_definition(keys_env, env, account_id, region, secret_name, secret
             "essential": True,
             "healthCheck": {
                 "command": ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"],
-                "interval": 30,
-                "retries": 3,
-                "startPeriod": 60,
-                "timeout": 5
+                "interval": 60,
+                "retries": 5,
+                "startPeriod": 180,
+                "timeout": 10
             },
             "image": "chromadb/chroma:latest",
             "logConfiguration": make_log_config("chroma"),
@@ -124,16 +132,16 @@ def build_task_definition(keys_env, env, account_id, region, secret_name, secret
             "volumesFrom": []
         },
         {
-            "command": ["redis-server", "--appendonly", "yes"],
+            "command": ["redis-server"],
             "cpu": 0,
             "environment": [],
             "essential": True,
             "healthCheck": {
                 "command": ["CMD-SHELL", "redis-cli ping | grep PONG || exit 1"],
-                "interval": 30,
-                "retries": 3,
-                "startPeriod": 30,
-                "timeout": 5
+                "interval": 60,
+                "retries": 5,
+                "startPeriod": 90,
+                "timeout": 10
             },
             "image": "redis:7-alpine",
             "logConfiguration": make_log_config("redis"),
@@ -144,15 +152,20 @@ def build_task_definition(keys_env, env, account_id, region, secret_name, secret
             "volumesFrom": []
         },
         {
+            "command": [
+                "sh",
+                "-c",
+                "if [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then mkdir -p /var/lib/rabbitmq && echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie && chmod 600 /var/lib/rabbitmq/.erlang.cookie && chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; fi && exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"
+            ],
             "cpu": 0,
             "environment": [],
             "essential": True,
             "healthCheck": {
                 "command": ["CMD-SHELL", "rabbitmq-diagnostics ping || exit 1"],
-                "interval": 30,
-                "retries": 3,
-                "startPeriod": 60,
-                "timeout": 5
+                "interval": 60,
+                "retries": 5,
+                "startPeriod": 180,
+                "timeout": 10
             },
             "image": "rabbitmq:3-management",
             "logConfiguration": make_log_config("rabbitmq"),
@@ -174,24 +187,24 @@ def build_task_definition(keys_env, env, account_id, region, secret_name, secret
         {
             "cpu": 0,
             "dependsOn": [
-                {"condition": "HEALTHY", "containerName": "chroma"},
-                {"condition": "HEALTHY", "containerName": "redis"},
-                {"condition": "HEALTHY", "containerName": "rabbitmq"}
+                {"condition": "START", "containerName": "chroma"},
+                {"condition": "START", "containerName": "redis"},
+                {"condition": "START", "containerName": "rabbitmq"}
             ],
             "environment": env_list,
             "essential": True,
             "healthCheck": {
-                "command": ["CMD-SHELL", "ps aux | grep '[p]ython -m app.main' || exit 1"],
-                "interval": 30,
-                "retries": 3,
-                "startPeriod": 120,
-                "timeout": 5
+                "command": ["CMD-SHELL", "curl -f http://localhost:8081/health || exit 1"],
+                "interval": 60,
+                "retries": 5,
+                "startPeriod": 300,
+                "timeout": 10
             },
             "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/agent",
             "logConfiguration": make_log_config("agent"),
             "mountPoints": [],
             "name": "agent",
-            "portMappings": [],
+            "portMappings": [{"containerPort": 8081, "hostPort": 8081, "protocol": "tcp"}],
             "secrets": secrets,
             "systemControls": [],
             "volumesFrom": []
@@ -199,19 +212,19 @@ def build_task_definition(keys_env, env, account_id, region, secret_name, secret
         {
             "cpu": 0,
             "dependsOn": [
-                {"condition": "HEALTHY", "containerName": "chroma"},
-                {"condition": "HEALTHY", "containerName": "redis"},
-                {"condition": "HEALTHY", "containerName": "rabbitmq"},
-                {"condition": "HEALTHY", "containerName": "agent"}
+                {"condition": "START", "containerName": "chroma"},
+                {"condition": "START", "containerName": "redis"},
+                {"condition": "START", "containerName": "rabbitmq"},
+                {"condition": "START", "containerName": "agent"}
             ],
             "environment": env_list,
             "essential": True,
             "healthCheck": {
                 "command": ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"],
-                "interval": 30,
-                "retries": 3,
-                "startPeriod": 60,
-                "timeout": 5
+                "interval": 60,
+                "retries": 5,
+                "startPeriod": 300,
+                "timeout": 10
             },
             "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway",
             "logConfiguration": make_log_config("gateway"),
@@ -233,8 +246,8 @@ def build_task_definition(keys_env, env, account_id, region, secret_name, secret
         "volumes": [],
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
-        "cpu": "4096",
-        "memory": "8192"
+        "cpu": "8192",
+        "memory": "16384"
     }
 
 

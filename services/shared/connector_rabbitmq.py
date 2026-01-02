@@ -108,13 +108,24 @@ class ConnectorRabbitMQ:
         return self
 
     async def disconnect(self) -> None:
-        """
-        Close RabbitMQ connections. Ignores already closed channels.
-        """
-        if self.channel and not self.channel.is_closed:
-            await self.channel.close()
-        if self.connection and not self.connection.is_closed:
-            await self.connection.close()
+        """Closes RabbitMQ connections gracefully."""
+        if not self.rabbitmq_ready:
+            return
+
+        try:
+            if self.channel and not self.channel.is_closed:
+                await self.channel.close()
+        except Exception as e:
+            self.logger.debug(f"Error closing channel: {e}")
+
+        try:
+            if self.connection and not self.connection.is_closed:
+                await self.connection.close()
+        except Exception as e:
+            self.logger.debug(f"Error closing connection: {e}")
+
+        self.connection = None
+        self.channel = None
         self.rabbitmq_ready = False
         self.logger.info("RabbitMQ connection closed")
 

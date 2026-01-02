@@ -1,7 +1,6 @@
 import logging
 import json
 from typing import Dict, List
-from shared.connector_config import ConnectorConfig
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
@@ -22,9 +21,18 @@ class Agent:
     Handles graceful degradation when external services fail.
     """
 
-    def __init__(self, mandate: str, max_ticks: int = 50):
+    def __init__(
+        self,
+        mandate: str,
+        max_ticks: int = 50,
+        connector_llm: ConnectorLLM = None,
+        connector_search: ConnectorSearch = None,
+        connector_http: ConnectorHttp = None,
+        connector_chroma: ConnectorChroma = None,
+    ):
         """
         Initialize the agent with a mandate and tick limit.
+        Connectors are injected via dependency injection for reuse across multiple mandates.
         """
         self._logger = logging.getLogger(self.__class__.__name__)
         self.mandate = mandate
@@ -38,21 +46,24 @@ class Agent:
         self.retrieved_context: List[str] = []
         self.observations: str = ""
 
-        self.config = ConnectorConfig()
-        self.connector_llm = ConnectorLLM(self.config)
-        self.connector_search = ConnectorSearch(self.config)
-        self.connector_http = ConnectorHttp(self.config)
-        self.connector_chroma = ConnectorChroma(self.config)
+        self.connector_llm = connector_llm
+        self.connector_search = connector_search
+        self.connector_http = connector_http
+        self.connector_chroma = connector_chroma
 
         self.collection_name = "agent_memory"
 
     async def initialize(self) -> bool:
-        """Initialize all connectors and setup dependencies."""
-        self._logger.info("Initializing agent connectors...")
+        """Verify that all required connectors are available."""
+        self._logger.info("Verifying agent connectors...")
 
-        search_ready = await self.connector_search.init_search_api()
-        chroma_ready = await self.connector_chroma.init_chroma()
+        if not self.connector_llm or not self.connector_search or not self.connector_http or not self.connector_chroma:
+            self._logger.error("Missing required connectors")
+            return False
+
         llm_ready = self.connector_llm.llm_api_ready
+        search_ready = self.connector_search.search_api_ready
+        chroma_ready = self.connector_chroma.chroma_api_ready
 
         return all([llm_ready, search_ready, chroma_ready])
 
@@ -72,7 +83,6 @@ class Agent:
             return {"success": False, "error": "Initialization failed", "deliverables": []}
 
         self._logger.info(f"Agent started: {self.mandate}\n")
-
 
         while self.current_tick < self.max_ticks:
             await asyncio.sleep(1)
@@ -278,12 +288,20 @@ class Agent:
             )
 
     async def __aenter__(self):
-        await self.connector_search.__aenter__()
-        await self.connector_http.__aenter__()
-        await self.connector_llm.__aenter__()
+        """Enter async context manager, ensuring connectors are ready."""
+        if self.connector_search:
+            await self.connector_search.__aenter__()
+        if self.connector_http:
+            await self.connector_http.__aenter__()
+        if self.connector_llm:
+            await self.connector_llm.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.connector_search.__aexit__(exc_type, exc_val, exc_tb)
-        await self.connector_http.__aexit__(exc_type, exc_val, exc_tb)
-        await self.connector_llm.__aexit__(exc_type, exc_val, exc_tb)
+        """Exit async context manager, cleaning up connector resources."""
+        if self.connector_search:
+            await self.connector_search.__aexit__(exc_type, exc_val, exc_tb)
+        if self.connector_http:
+            await self.connector_http.__aexit__(exc_type, exc_val, exc_tb)
+        if self.connector_llm:
+            await self.connector_llm.__aexit__(exc_type, exc_val, exc_tb)

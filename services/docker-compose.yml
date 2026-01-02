@@ -127,7 +127,7 @@ services:
       - .env
       - keys.env
     environment:
-      - TEST_MODE=1
+      - GATEWAY_TEST_MODE=1
     networks:
       - enet
 
