@@ -13,7 +13,6 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
 
-// Signup route
 app.post('/make-server-41ae29ad/signup', async (c) => {
   try {
     const { email, password } = await c.req.json();
@@ -21,7 +20,6 @@ app.post('/make-server-41ae29ad/signup', async (c) => {
     const { data, error } = await supabase.auth.admin.createUser({
       email,
       password,
-      // Automatically confirm the user's email since an email server hasn't been configured.
       email_confirm: true
     });
 
@@ -37,7 +35,6 @@ app.post('/make-server-41ae29ad/signup', async (c) => {
   }
 });
 
-// Scraper route (mock)
 app.post('/make-server-41ae29ad/scrape', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -49,7 +46,6 @@ app.post('/make-server-41ae29ad/scrape', async (c) => {
 
     const { prompt } = await c.req.json();
     
-    // Mock scraper logic
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     return c.json({ 
