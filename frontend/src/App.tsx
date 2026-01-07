@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Sun, Moon, Github } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Sun, Moon, Github, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { apiClient, TaskResponse } from './services/api';
 import { supabase } from './services/supabaseClient';
@@ -19,17 +19,15 @@ export default function App() {
   const pollIntervalRef = useRef<number | null>(null);
 
   const colors = [
-    { background: 'linear-gradient(135deg, #4c1d95 0%, #581c87 100%)' }, // purple-900
-    { background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)' }, // blue-900
-    { background: 'linear-gradient(135deg, #312e81 0%, #3730a3 100%)' }, // indigo-900
+    { background: 'linear-gradient(135deg, #4c1d95 0%, #581c87 100%)' },
+    { background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)' },
+    { background: 'linear-gradient(135deg, #312e81 0%, #3730a3 100%)' },
   ];
   const [randomColor] = useState(colors[Math.floor(Math.random() * colors.length)]);
 
   useEffect(() => {
-    // Handle email confirmation redirect
     supabase.auth.getSession().then(({ data }) => {
       setUserEmail(data.session?.user.email ?? null);
-      // Clear URL hash after processing
       if (window.location.hash) {
         window.history.replaceState(null, '', window.location.pathname);
       }
@@ -37,7 +35,6 @@ export default function App() {
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user.email ?? null);
-      // Clear URL hash after auth state change (e.g., after email confirmation)
       if (window.location.hash && session) {
         window.history.replaceState(null, '', window.location.pathname);
       }
@@ -212,14 +209,24 @@ export default function App() {
               Autonomous RAG agent for web automation and task execution
             </p>
           </div>
-          <a
-            href="https://github.com/Muxite/webRAG"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-2 hover:opacity-70 transition-opacity"
-          >
-            <Github size={24} className={text} />
-          </a>
+          <div className="flex gap-3">
+            <a
+              href="https://github.com/Muxite/webRAG"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 hover:opacity-70 transition-opacity"
+            >
+              <Github size={24} className={text} />
+            </a>
+            <a
+              href="https://muksite.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 hover:opacity-70 transition-opacity"
+            >
+              <ExternalLink size={24} className={text} />
+            </a>
+          </div>
         </div>
 
         <div className="space-y-8 p-12 rounded-3xl" style={randomColor}>
@@ -526,6 +533,23 @@ export default function App() {
             <p>
               The agent uses LLM-powered reasoning to break down tasks, perform web searches, visit URLs, and build up knowledge over time through persistent memory.
             </p>
+            <div className="pt-4">
+              <h3 className="uppercase text-xs tracking-wide mb-2 opacity-70">How the Scraper Works</h3>
+              <p className="text-xs opacity-80 mb-2">
+                When the agent needs to gather information from the web, it follows a two-step process:
+              </p>
+              <ul className="space-y-1 text-xs opacity-80">
+                <li>
+                  • <span className="font-bold">Web Search:</span> Uses the Brave Search API to find relevant URLs based on the task mandate. The search returns titles, URLs, and descriptions that help the agent identify which pages to visit.
+                </li>
+                <li>
+                  • <span className="font-bold">Content Extraction:</span> When visiting a URL, the agent makes an HTTP GET request to fetch the HTML content. It then uses BeautifulSoup to parse the HTML, removing script and style tags, and extracts the main text content. This cleaned text is stored in the agent's observations and can be retrieved from ChromaDB for future reference.
+                </li>
+                <li>
+                  • <span className="font-bold">Memory Storage:</span> Extracted content is embedded and stored in ChromaDB, allowing the agent to recall relevant information across multiple ticks and tasks through semantic similarity search.
+                </li>
+              </ul>
+            </div>
             <p className="opacity-80">
               <span className="font-bold">Usage Limits:</span> Each user is restricted to 32 ticks per day. This limit applies across all tasks submitted in a 24-hour period.
             </p>
@@ -556,6 +580,23 @@ export default function App() {
                 Built with FastAPI, RabbitMQ, Redis, ChromaDB, and Docker. Powered by OpenAI and
                 web search APIs.
               </p>
+            </div>
+            <div className="pt-4">
+              <h3 className="uppercase text-xs tracking-wide mb-2 opacity-70">Attributions</h3>
+              <ul className="space-y-1 text-xs opacity-80">
+                <li>
+                  • UI components from <a href="https://ui.shadcn.com/" target="_blank" rel="noopener noreferrer" className="underline">shadcn/ui</a> used under <a href="https://github.com/shadcn-ui/ui/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer" className="underline">MIT license</a>
+                </li>
+                <li>
+                  • Icons from <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer" className="underline">Lucide</a> used under <a href="https://github.com/lucide-icons/lucide/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="underline">ISC license</a>
+                </li>
+                <li>
+                  • Web scraping powered by <a href="https://www.crummy.com/software/BeautifulSoup/" target="_blank" rel="noopener noreferrer" className="underline">BeautifulSoup</a>
+                </li>
+                <li>
+                  • Search functionality via <a href="https://brave.com/search/api/" target="_blank" rel="noopener noreferrer" className="underline">Brave Search API</a>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
