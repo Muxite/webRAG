@@ -1,9 +1,11 @@
 import asyncio
 import json
 import pytest
+import uuid
 
 from shared.connector_config import ConnectorConfig
-from shared.message_contract import KeyNames
+from shared.message_contract import KeyNames, WorkerStatusType
+from shared.storage import RedisWorkerStorage
 
 
 @pytest.mark.asyncio
@@ -73,3 +75,20 @@ async def test_status_flow_via_redis(client, auth_headers):
         await asyncio.sleep(0.2)
     else:
         raise AssertionError("Task did not reach completed state")
+
+
+@pytest.mark.asyncio
+async def test_agent_count(client):
+    config = ConnectorConfig()
+    worker_storage = RedisWorkerStorage(config)
+    await worker_storage.connector.init_redis()
+
+    for _ in range(10):
+        worker_id = f"test-worker-{uuid.uuid4()}"
+        await worker_storage.publish_worker_status(worker_id, WorkerStatusType.FREE)
+
+    resp = await client.get("/agents/count")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "count" in data
+    assert data["count"] >= 10

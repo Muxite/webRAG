@@ -12,7 +12,7 @@ from shared.message_contract import (
     TaskState,
     to_dict,
 )
-from shared.storage import TaskStorage
+from shared.storage import TaskStorage, RedisWorkerStorage
 
 
 class GatewayService:
@@ -26,19 +26,13 @@ class GatewayService:
         storage: TaskStorage,
         rabbitmq: ConnectorRabbitMQ,
         quota: Optional[object] = None,
+        worker_storage: Optional[RedisWorkerStorage] = None,
     ) -> None:
-        """
-        Initialize the gateway service.
-        :param config: Shared connector configuration.
-        :param storage: Task storage implementation.
-        :param rabbitmq: RabbitMQ connector for publishing and consuming messages.
-        :param quota: Optional quota manager.
-        :return: None
-        """
         self.config = config
         self.storage = storage
         self.rabbitmq = rabbitmq
         self.quota = quota
+        self.worker_storage = worker_storage or RedisWorkerStorage(config)
         self.logger = logging.getLogger(self.__class__.__name__)
         self._running = False
 
@@ -150,4 +144,11 @@ class GatewayService:
             tick=record.tick,
             max_ticks=record.max_ticks,
         )
+
+    async def get_agent_count(self) -> int:
+        try:
+            await self.worker_storage.connector.init_redis()
+            return await self.worker_storage.get_worker_count()
+        except Exception:
+            return 0
 

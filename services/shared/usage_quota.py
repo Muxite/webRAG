@@ -8,6 +8,7 @@ from typing import Optional
 from shared.connector_config import ConnectorConfig
 from shared.connector_redis import ConnectorRedis
 
+# TODO track usage by token instead of by tick
 
 @dataclass
 class QuotaResult:
@@ -30,7 +31,7 @@ class UsageQuotaBackend(ABC):
 
     @abstractmethod
     async def get_usage(self) -> int:
-        """Return current accumulated usage for today (best-effort)."""
+        """Return current accumulated usage for today."""
         raise NotImplementedError
 
 
@@ -42,9 +43,8 @@ def _seconds_until_end_of_day_utc(now: Optional[datetime] = None) -> int:
 
 
 class InMemoryDailyQuota(UsageQuotaBackend):
-    """Process-local in-memory quota for development/testing.
-
-    Not suitable for multi-process or multi-instance deployments.
+    """
+    Process-local in-memory quota for development/testing.
     """
 
     def __init__(self, limit_per_day: int):
@@ -80,9 +80,8 @@ class InMemoryDailyQuota(UsageQuotaBackend):
 
 class RedisDailyQuota(UsageQuotaBackend):
     """Redis-based global daily quota using a date key and INCRBY.
-
     Key pattern: quota:daily:YYYYMMDD
-    We set an expire to end-of-day to auto-reset.
+    Set an expire to end-of-day to auto-reset.
     """
 
     def __init__(self, config: Optional[ConnectorConfig] = None):
@@ -103,18 +102,14 @@ class RedisDailyQuota(UsageQuotaBackend):
         async with self.connector as conn:
             client = await conn.get_client()
             if client is None:
-                # fail-open to avoid blocking service if Redis is down
                 self.logger.warning("Redis unavailable, quota check bypassed (fail-open)")
                 return QuotaResult(True, None)
 
             key = self._key()
-            # Ensure key exists and has TTL to end of day
             ttl = await client.ttl(key)
             if ttl is None or ttl < 0:
-                # Initialize to 0 with expire
                 await client.set(key, 0, ex=_seconds_until_end_of_day_utc())
 
-            # Optimistic check then incr in a Lua script for atomicity
             script = """
             local key = KEYS[1]
             local limit = tonumber(ARGV[1])
@@ -128,12 +123,10 @@ class RedisDailyQuota(UsageQuotaBackend):
             """
             try:
                 allowed, remaining = await client.eval(script, numkeys=1, keys=[key], args=[self.limit, units])
-                # remaining may be negative briefly; clamp at >=0
                 remaining = max(0, int(remaining)) if remaining is not None else 0
                 return QuotaResult(bool(allowed), remaining)
             except Exception as e:
                 self.logger.error(f"Redis quota script failed: {e}")
-                # fail-open
                 return QuotaResult(True, None)
 
     async def get_usage(self) -> int:

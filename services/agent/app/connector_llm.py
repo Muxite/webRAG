@@ -39,18 +39,15 @@ class ConnectorLLM:
     async def aclose(self):
         """Close the underlying HTTP client to avoid event loop shutdown errors."""
         try:
-            # AsyncOpenAI exposes aclose() to close its internal httpx.AsyncClient
             if hasattr(self.client, "aclose"):
                 await self.client.aclose()
             elif hasattr(self.client, "close"):
-                # Fallback just in case; may be sync in some versions
                 close_fn = getattr(self.client, "close")
                 if callable(close_fn):
                     result = close_fn()
                     if hasattr(result, "__await__"):
                         await result
         except Exception as e:
-            # Do not raise during shutdown; just log
             self.logger.debug(f"LLM client close ignored error: {e}")
 
     async def query_llm(self, payload: dict) -> Optional[str]:
@@ -79,14 +76,12 @@ class ConnectorLLM:
 
         def should_retry(result: Optional[str], exc: Optional[BaseException], attempt: int) -> bool:
             if exc is None:
-                # Have valid content
                 return False
             if isinstance(exc, APIStatusError):
                 status = getattr(exc, "status_code", None)
                 return status in (429, 500, 502, 503, 504)
             if isinstance(exc, (APIError, TimeoutError, asyncio.TimeoutError)):
                 return True
-            # Unexpected exceptions: retry once, then give up quickly
             return attempt < max_attempts
 
         try:

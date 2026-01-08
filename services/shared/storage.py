@@ -6,6 +6,7 @@ import json
 
 from shared.connector_redis import ConnectorRedis
 from shared.connector_config import ConnectorConfig
+from shared.message_contract import WorkerStatusType
 
 
 class TaskStorage(ABC):
@@ -38,10 +39,9 @@ class TaskStorage(ABC):
 
 
 class RedisTaskStorage(TaskStorage):
-    """Redis-backed task storage using JSON serialization.
-
-    Uses ConnectorRedis for connection lifecycle.
-    Keys are stored under the prefix 'task:{correlation_id}'.
+    """
+    Redis-backed task storage using JSON serialization.
+    Uses ConnectorRedis for connection lifecycle. Keys are stored under the prefix 'task:{correlation_id}'.
     """
 
     def __init__(self, config: Optional[ConnectorConfig] = None):
@@ -54,11 +54,10 @@ class RedisTaskStorage(TaskStorage):
         return f"{self._prefix}{correlation_id}"
 
     async def create_task(self, correlation_id: str, task_data: dict) -> None:
-        """Create a task record in Redis.
-
-        Args:
-            correlation_id: Unique identifier used as the redis key suffix
-            task_data: JSON-serializable dictionary describing the task
+        """
+        Create a task record in Redis.
+        :param correlation_id: Unique identifier for the task.
+        :param task_data: JSON-serializable dictionary describing the task.
         """
         async with self.connector as conn:
             await conn.set_json(self._key(correlation_id), task_data)
@@ -75,7 +74,6 @@ class RedisTaskStorage(TaskStorage):
             key = self._key(correlation_id)
             existing = await conn.get_json(key) or {}
             if not isinstance(existing, dict):
-                # Preserve any unexpected existing content under 'raw'
                 existing = {"raw": existing}
             existing.update(updates)
             existing["updated_at"] = datetime.utcnow().isoformat()
@@ -109,7 +107,11 @@ class RedisTaskStorage(TaskStorage):
             return tasks
 
     async def delete_task(self, correlation_id: str) -> bool:
-        """Delete a task record by key. Returns True if a key was removed."""
+        """
+        Delete a task record by key.
+        :param correlation_id: Unique identifier for the task.
+        :return: True if the key was found and deleted, False otherwise.
+        """
         async with self.connector as conn:
             client = await conn.get_client()
             if client is None:
@@ -118,3 +120,72 @@ class RedisTaskStorage(TaskStorage):
             if deleted:
                 self.logger.info(f"Deleted task {correlation_id} (redis)")
             return bool(deleted)
+
+
+class RedisWorkerStorage:
+    def __init__(self, config: Optional[ConnectorConfig] = None):
+        self.config = config or ConnectorConfig()
+        self.connector = ConnectorRedis(self.config)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self._set_key = self.config.worker_status_set_key
+        self._ttl = self.config.worker_status_ttl
+        self._status_prefix = "worker:status:"
+
+    def _status_key(self, worker_id: str) -> str:
+        return f"{self._status_prefix}{worker_id}"
+
+    async def publish_worker_status(self, worker_id: str, status: WorkerStatusType, metadata: Optional[dict] = None) -> None:
+        async with self.connector as conn:
+            client = await conn.get_client()
+            if client is None:
+                return
+
+            status_data = {
+                "worker_id": worker_id,
+                "status": status.value,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            if metadata:
+                status_data.update(metadata)
+
+            await client.sadd(self._set_key, worker_id)
+            await conn.set_json(self._status_key(worker_id), status_data, ex=self._ttl)
+
+    async def get_active_workers(self) -> list[dict]:
+        async with self.connector as conn:
+            client = await conn.get_client()
+            if client is None:
+                return []
+
+            worker_ids = await client.smembers(self._set_key)
+            if not worker_ids:
+                return []
+
+            workers = []
+            for worker_id_bytes in worker_ids:
+                try:
+                    worker_id = worker_id_bytes.decode("utf-8") if isinstance(worker_id_bytes, bytes) else str(worker_id_bytes)
+                    status_data = await conn.get_json(self._status_key(worker_id))
+                    if status_data:
+                        workers.append(status_data)
+                    else:
+                        await client.srem(self._set_key, worker_id)
+                except Exception:
+                    continue
+
+            return workers
+
+    async def get_worker_count(self) -> int:
+        async with self.connector as conn:
+            client = await conn.get_client()
+            if client is None:
+                return 0
+            return await client.scard(self._set_key)
+
+    async def remove_worker(self, worker_id: str) -> None:
+        async with self.connector as conn:
+            client = await conn.get_client()
+            if client is None:
+                return
+            await client.srem(self._set_key, worker_id)
+            await client.delete(self._status_key(worker_id))

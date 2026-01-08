@@ -60,9 +60,9 @@ class TaskUpdate(BaseModel):
             return self.dict(exclude_none=True)
 
 
-class StatusUpdate(BaseModel):
+class TaskStatusUpdate(BaseModel):
     """
-    Status update message from workers.
+    Status update message from workers regarding a task
     Types: accepted, started, in_progress, completed, error
     """
     type: str
@@ -75,7 +75,7 @@ class StatusUpdate(BaseModel):
     history_length: Optional[int] = None
     notes_len: Optional[int] = None
     deliverables_count: Optional[int] = None
-    
+
 
 class FinalResult(BaseModel):
     """

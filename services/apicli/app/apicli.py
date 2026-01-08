@@ -123,6 +123,14 @@ class ApiCli:
         except requests.exceptions.RequestException as e:
             print(f"Request failed: {e}")
 
+    def get_agent_count(self) -> None:
+        url = f"{self.base_url}/agents/count"
+        try:
+            resp = requests.get(url, timeout=self.timeout)
+            self._pretty({"status_code": resp.status_code, "body": self._safe_json(resp)})
+        except requests.exceptions.RequestException as e:
+            print(f"Request failed: {e}")
+
     def _safe_json(self, resp: requests.Response) -> object:
         try:
             return resp.json()
@@ -133,7 +141,7 @@ class ApiCli:
         print(f"Gateway: {self.base_url}")
         
         while True:
-            print("\nChoose: [1] Submit task  [2] Get task  [s] Sign in  [q] Quit")
+            print("\nChoose: [1] Submit task  [2] Get task  [3] Agent count  [s] Sign in  [q] Quit")
             choice = input("> ").strip().lower()
             if choice in {"q", "quit", "exit"}:
                 return
@@ -143,6 +151,8 @@ class ApiCli:
                 self.submit_task()
             elif choice == "2":
                 self.poll_task()
+            elif choice == "3":
+                self.get_agent_count()
             else:
                 print("Unknown choice")
 

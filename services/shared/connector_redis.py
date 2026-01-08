@@ -10,12 +10,11 @@ class ConnectorRedis:
     """
     Async Redis connector managed by ConnectorConfig.
 
-    Persistent, lazy-initialized client:
+    Persistent lazy-initialized client:
     - First access creates a single Redis client and verifies connectivity.
     - Subsequent accesses reuse the same client for the lifetime of the instance.
-    - The async context manager does not close the connection on exit to avoid
-      reconnect churn during frequent operations; call disconnect() explicitly
-      at service shutdown if needed.
+    - The async context manager does not close the connection on exit to avoid reconnect churn
+     during frequent operations. Call disconnect() explicitly at service shutdown if needed.
     """
 
     def __init__(self, config: ConnectorConfig):
@@ -32,7 +31,8 @@ class ConnectorRedis:
 
     async def connect(self):
         """
-        Ensure the Redis client is initialized and ready; returns self.
+        Ensure the Redis client is initialized and ready.
+        :returns: self
         """
         ok = await self.init_redis()
         if not ok:
@@ -64,8 +64,8 @@ class ConnectorRedis:
 
     async def init_redis(self) -> bool:
         """
-        Initialize or verify the Redis connection.
-        Sets self.redis_ready.
+        Initialize or verify the Redis connection. Set self.redis_ready.
+        returns True on success, False on failure.
         """
         if self.redis_ready:
             return True
@@ -84,8 +84,7 @@ class ConnectorRedis:
 
     async def disconnect(self):
         """
-        Close the Redis client explicitly. This is typically called during
-        application shutdown; regular operations keep the connection open.
+        Close the Redis client explicitly. Call during shutdown.
         """
         if self._redis is not None:
             try:

@@ -1,3 +1,4 @@
+from asyncio import Task
 from enum import Enum
 from typing import Optional, Dict, Any
 
@@ -20,12 +21,17 @@ class KeyNames:
     DELIVERABLES_COUNT = "deliverables_count"
 
 
-class StatusType(str, Enum):
+class TaskStatusType(str, Enum):
     ACCEPTED = "accepted"
     STARTED = "started"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     ERROR = "error"
+
+
+class WorkerStatusType(str, Enum):
+    FREE = "free"
+    WORKING = "working"
 
 
 class TaskState(str, Enum):
@@ -43,9 +49,9 @@ class TaskEnvelope(BaseModel):
     correlation_id: Optional[str] = None
 
 
-class StatusEnvelope(BaseModel):
+class TaskStatusEnvelope(BaseModel):
     """Standardized status update emitted by workers and consumed by Gateway."""
-    type: StatusType
+    type: TaskStatusType
     mandate: str
     correlation_id: Optional[str] = None
     seq: Optional[int] = None

@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
 from shared.models import TaskRequest, TaskResponse
-from shared.storage import RedisTaskStorage
+from shared.storage import RedisTaskStorage, RedisWorkerStorage
 from gateway.app.gateway_service import GatewayService
 from gateway.app.supabase_auth import SupabaseUser, get_current_supabase_user
 from shared.user_quota import SupabaseUserTickManager
@@ -65,7 +65,8 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
     if _service is None:
         storage = RedisTaskStorage(cfg)
         rmq = ConnectorRabbitMQ(cfg)
-        _service = GatewayService(config=cfg, storage=storage, rabbitmq=rmq)
+        worker_storage = RedisWorkerStorage(cfg)
+        _service = GatewayService(config=cfg, storage=storage, rabbitmq=rmq, worker_storage=worker_storage)
 
     app.state.gateway_service = _service
     app.state.user_tick_manager = SupabaseUserTickManager()
@@ -125,6 +126,11 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
         user: SupabaseUser = Depends(get_current_supabase_user),
     ) -> TaskResponse:
         return await _service.get_task(correlation_id)
+
+    @router.get("/agents/count")
+    async def get_agent_count() -> dict:
+        count = await _service.get_agent_count()
+        return {"count": count}
 
     app.include_router(router)
 

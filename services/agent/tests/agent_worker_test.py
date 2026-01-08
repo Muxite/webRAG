@@ -5,6 +5,7 @@ import logging
 
 from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
+from shared.storage import RedisTaskStorage
 from agent.app import interface_agent as aw
 
 
@@ -13,10 +14,8 @@ async def test_agent_worker_basic_flow(monkeypatch, caplog):
     caplog.set_level("INFO")
     correlation_id = str(uuid.uuid4())
     input_q = f"test.agent.mandates.{correlation_id}"
-    status_q = f"test.agent.status.{correlation_id}"
 
     monkeypatch.setenv("AGENT_INPUT_QUEUE", input_q)
-    monkeypatch.setenv("AGENT_STATUS_QUEUE", status_q)
     monkeypatch.setenv("AGENT_STATUS_TIME", "0.2")
 
     config = ConnectorConfig()
@@ -26,12 +25,8 @@ async def test_agent_worker_basic_flow(monkeypatch, caplog):
     rmq = ConnectorRabbitMQ(config)
     await rmq.connect()
 
-    statuses = []
-
-    async def collect_status(message: dict):
-        statuses.append(message.get("type"))
-
-    consumer = asyncio.create_task(rmq.consume_status_updates(collect_status))
+    storage = RedisTaskStorage(config)
+    await storage.connector.init_redis()
 
     mandate = (
         "Say the word 'pong' once as the deliverable and then exit immediately. "
@@ -41,24 +36,24 @@ async def test_agent_worker_basic_flow(monkeypatch, caplog):
     task = {"mandate": mandate, "max_ticks": 2, "correlation_id": correlation_id}
     await rmq.publish_task(correlation_id=correlation_id, payload=task)
 
+    statuses = []
     for _ in range(600):
-        if statuses and statuses[-1] in {"completed", "error"}:
-            await asyncio.sleep(0.2)
-            break
+        task_data = await storage.get_task(correlation_id)
+        if task_data:
+            status = task_data.get("status")
+            if status and (status not in statuses or statuses[-1] != status):
+                statuses.append(status)
+            if status in {"completed", "failed"}:
+                await asyncio.sleep(0.2)
+                break
         await asyncio.sleep(0.1)
 
-    consumer.cancel()
-    try:
-        await consumer
-    except asyncio.CancelledError:
-        pass
     await worker.stop()
     await rmq.disconnect()
 
     assert len(statuses) >= 3
     assert statuses[0] == "accepted"
-    assert statuses[1] == "started"
-    assert any(s == "in_progress" for s in statuses)
+    assert statuses[1] == "in_progress"
     assert "completed" in statuses
 
 
@@ -67,10 +62,8 @@ async def test_agent_worker_many_tasks(monkeypatch, caplog):
     caplog.set_level("INFO")
     base = str(uuid.uuid4())
     input_q = f"test.agent.mandates.{base}"
-    status_q = f"test.agent.status.{base}"
 
     monkeypatch.setenv("AGENT_INPUT_QUEUE", input_q)
-    monkeypatch.setenv("AGENT_STATUS_QUEUE", status_q)
     monkeypatch.setenv("AGENT_STATUS_TIME", "0.2")
 
     config = ConnectorConfig()
@@ -80,18 +73,8 @@ async def test_agent_worker_many_tasks(monkeypatch, caplog):
     rmq = ConnectorRabbitMQ(config)
     await rmq.connect()
 
-    seen_complete = set()
-
-    async def collect_status(message: dict):
-        t = message.get("type")
-        cid = message.get("correlation_id")
-        logger = logging.getLogger("agent_worker_test")
-        if t != "in_progress":
-            logger.info(f"status[{cid}]: {t}")
-        if t == "completed":
-            seen_complete.add(cid)
-
-    consumer = asyncio.create_task(rmq.consume_status_updates(collect_status))
+    storage = RedisTaskStorage(config)
+    await storage.connector.init_redis()
 
     tasks = []
     for i in range(3):
@@ -104,16 +87,18 @@ async def test_agent_worker_many_tasks(monkeypatch, caplog):
         tasks.append(tid)
         await rmq.publish_task(correlation_id=tid, payload=payload)
 
+    seen_complete = set()
     for _ in range(600):
+        for tid in tasks:
+            task_data = await storage.get_task(tid)
+            if task_data:
+                status = task_data.get("status")
+                if status == "completed":
+                    seen_complete.add(tid)
         if seen_complete == set(tasks):
             break
         await asyncio.sleep(0.1)
 
-    consumer.cancel()
-    try:
-        await consumer
-    except asyncio.CancelledError:
-        pass
     await worker.stop()
     await rmq.disconnect()
 

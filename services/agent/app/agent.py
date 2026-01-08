@@ -303,6 +303,4 @@ class Agent:
         Note: Connectors are shared and reused across multiple Agent instances,
         so we do NOT close them here. They are managed at the InterfaceAgent level.
         """
-        # Do not close shared connectors - they are reused across multiple agents
-        # The InterfaceAgent manages their lifecycle
         pass

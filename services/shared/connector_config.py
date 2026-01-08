@@ -21,8 +21,9 @@ class ConnectorConfig:
         self.status_queue = os.environ.get("AGENT_STATUS_QUEUE", "agent.status")
         self.status_time = float(os.environ.get("AGENT_STATUS_TIME", "10"))
 
-        # Allow running without explicit env by providing a sane default.
-        # Tests may import modules at collection time; avoid raising here.
+        self.worker_status_set_key = os.environ.get("WORKER_STATUS_SET_KEY", "workers:status")
+        self.worker_status_ttl = int(os.environ.get("WORKER_STATUS_TTL", "60"))
+
         self.daily_tick_limit = int(os.environ.get("DAILY_TICK_LIMIT", "1000"))
 
         if not self.redis_url:

@@ -173,7 +173,6 @@ class PromptBuilder:
             {"role": "user", "content": self._build_user_message()},
         ]
 
-    # === Observation formatting helpers ===
     @staticmethod
     def build_web_search_observation(query: str, search_results: Optional[List[Dict[str, str]]]) -> str:
         """
@@ -202,7 +201,6 @@ class PromptBuilder:
     def build_visit_observation(url: str, summary: str) -> str:
         return f"\nVisited {url}:\n{summary}\n"
 
-    # === Final output (synthesis) message builder ===
     FINAL_SYSTEM_INSTRUCTIONS = (
         "You are a synthesis agent that has run a project following the user's mandate "
         "for a number of ticks. Given the mandate, execution history, notes, deliverables, "
