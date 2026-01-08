@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sun, Moon, Github, ExternalLink } from 'lucide-react';
+import { Sun, Moon, Github, ExternalLink, Server } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { apiClient, TaskResponse } from './services/api';
 import { supabase } from './services/supabaseClient';
+import { getApiMode, setApiMode, getCurrentApiBaseURL, API_CONFIG } from './config/api';
 
 export default function App() {
   const [mandate, setMandate] = useState('');
   const [maxTicks, setMaxTicks] = useState(32);
+  const [maxTicksInput, setMaxTicksInput] = useState('32');
   const [task, setTask] = useState<TaskResponse | null>(null);
   const [error, setError] = useState('');
   const [authError, setAuthError] = useState('');
@@ -16,7 +18,16 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [apiMode, setApiModeState] = useState<'localhost' | 'aws' | 'auto'>(getApiMode());
+  const [currentApiUrl, setCurrentApiUrl] = useState(getCurrentApiBaseURL());
   const pollIntervalRef = useRef<number | null>(null);
+  
+  const isLocalhost = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.startsWith('192.168.') ||
+    window.location.hostname.startsWith('10.')
+  );
 
   const colors = [
     { background: 'linear-gradient(135deg, #4c1d95 0%, #581c87 100%)' },
@@ -39,6 +50,9 @@ export default function App() {
         window.history.replaceState(null, '', window.location.pathname);
       }
     });
+
+    setCurrentApiUrl(getCurrentApiBaseURL());
+    setApiModeState(getApiMode());
 
     return () => {
       listener.subscription.unsubscribe();
@@ -172,7 +186,14 @@ export default function App() {
     setLoading(false);
     stopPolling();
     setTask(null);
-    await supabase.auth.signOut();
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        setAuthError(signOutError.message || 'Failed to sign out');
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Failed to sign out. Please check your connection.');
+    }
   };
 
   const bg = dark ? 'bg-zinc-900' : 'bg-white';
@@ -180,14 +201,44 @@ export default function App() {
   const inputBg = 'bg-white text-black';
   const isAuthenticated = !!userEmail;
 
+  const handleApiModeChange = (mode: 'localhost' | 'aws' | 'auto') => {
+    setApiMode(mode);
+    setApiModeState(mode);
+  };
+
   return (
     <div className={`min-h-screen ${bg} ${text} p-4`}>
-      <button
-        onClick={() => setDark(!dark)}
-        className="fixed top-4 right-4 p-2 hover:opacity-70 active:scale-95 transition-all z-50"
-      >
-        {dark ? <Sun size={20} className={text} /> : <Moon size={20} className={text} />}
-      </button>
+      <div className="fixed top-4 right-4 flex gap-2 z-50">
+        {isLocalhost && (
+          <div className="relative group">
+            <button
+              onClick={() => {
+                const nextMode = apiMode === 'localhost' ? 'aws' : apiMode === 'aws' ? 'auto' : 'localhost';
+                handleApiModeChange(nextMode);
+              }}
+              className="p-2 hover:opacity-70 active:scale-95 transition-all rounded-lg border-2"
+              style={{
+                borderColor: apiMode === 'localhost' ? '#10b981' : apiMode === 'aws' ? '#3b82f6' : '#6b7280',
+                backgroundColor: apiMode === 'localhost' ? 'rgba(16, 185, 129, 0.1)' : apiMode === 'aws' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+              }}
+              title={`API: ${apiMode === 'localhost' ? 'Localhost' : apiMode === 'aws' ? 'AWS' : 'Auto'} (${currentApiUrl})`}
+            >
+              <Server size={20} className={text} />
+            </button>
+            <div className="absolute right-0 top-full mt-2 p-2 rounded-lg text-xs font-mono bg-zinc-800 text-white border border-zinc-600 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">
+              <div>API: {apiMode === 'localhost' ? 'Localhost' : apiMode === 'aws' ? 'AWS' : 'Auto'}</div>
+              <div className="text-zinc-400 mt-1">{currentApiUrl}</div>
+              <div className="text-zinc-500 mt-1">Click to switch</div>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => setDark(!dark)}
+          className="p-2 hover:opacity-70 active:scale-95 transition-all"
+        >
+          {dark ? <Sun size={20} className={text} /> : <Moon size={20} className={text} />}
+        </button>
+      </div>
 
       <div className="w-full max-w-4xl mx-auto">
         <div className="mb-6 flex items-start justify-between">
@@ -344,11 +395,36 @@ export default function App() {
                       Max ticks
                     </label>
                     <input
-                      type="number"
-                      min={1}
-                      max={32}
-                      value={maxTicks}
-                      onChange={(e) => setMaxTicks(Number(e.target.value) || 1)}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={maxTicksInput}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '' || /^\d+$/.test(value)) {
+                          setMaxTicksInput(value);
+                          if (value !== '') {
+                            const numValue = Number(value);
+                            if (!isNaN(numValue)) {
+                              const clampedValue = Math.max(1, Math.min(32, numValue));
+                              setMaxTicks(clampedValue);
+                            }
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const numValue = Number(e.target.value);
+                        if (isNaN(numValue) || numValue < 1) {
+                          setMaxTicks(1);
+                          setMaxTicksInput('1');
+                        } else if (numValue > 32) {
+                          setMaxTicks(32);
+                          setMaxTicksInput('32');
+                        } else {
+                          setMaxTicks(numValue);
+                          setMaxTicksInput(String(numValue));
+                        }
+                      }}
                       disabled={loading}
                       className={`w-full p-3 rounded-xl ${inputBg} placeholder:text-gray-400 font-mono disabled:opacity-50`}
                     />
@@ -403,17 +479,27 @@ export default function App() {
 
               {task && (
                 <div className="space-y-4">
-                  <div className="p-6 rounded-xl bg-white text-black">
+                  <div className="p-4 rounded-xl bg-white text-black">
                     {task.tick !== undefined && task.max_ticks > 0 && (
                       <div className="mb-4">
-                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="mb-2 flex items-center justify-between text-sm font-mono">
+                          <span className="font-bold">Usage</span>
+                          <span>{task.tick} / {task.max_ticks} ticks</span>
+                        </div>
+                        <div className="h-6 bg-gray-200 rounded-full overflow-hidden relative">
                           <div
-                            className="h-full rounded-full transition-all duration-300"
+                            className={`h-full rounded-full transition-all duration-300 flex items-center justify-end pr-2 ${
+                              task.status !== 'completed' && task.status !== 'error' ? 'animate-pulse' : ''
+                            }`}
                             style={{
                               width: `${Math.min(100, (task.tick / task.max_ticks) * 100)}%`,
                               background: 'linear-gradient(to right, #3b82f6, #a855f7)',
                             }}
-                          />
+                          >
+                            <span className="text-xs font-bold text-white">
+                              {Math.round((task.tick / task.max_ticks) * 100)}%
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}

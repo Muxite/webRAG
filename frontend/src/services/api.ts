@@ -31,6 +31,15 @@ class ApiClient {
     this.baseURL = API_CONFIG.baseURL;
   }
 
+  // Update base URL dynamically (for when API mode changes)
+  updateBaseURL(newBaseURL: string): void {
+    this.baseURL = newBaseURL;
+  }
+
+  getBaseURL(): string {
+    return this.baseURL;
+  }
+
   private async withAuthHeaders(headers: HeadersInit = {}): Promise<HeadersInit> {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
@@ -51,19 +60,32 @@ class ApiClient {
     const url = `${this.baseURL}${endpoint}`;
     const headers = await this.withAuthHeaders(options.headers || {});
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        detail: `HTTP ${response.status}: ${response.statusText}`,
-      }));
-      throw new Error(error.detail || 'Request failed');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({
+          detail: `HTTP ${response.status}: ${response.statusText}`,
+        }));
+        throw new Error(error.detail || 'Request failed');
+      }
+
+      return response.json();
+    } catch (error) {
+      // Handle network errors (e.g., failed to fetch on mobile devices or localhost server not running)
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        const isLocalhost = this.baseURL.includes('localhost') || this.baseURL.includes('127.0.0.1');
+        if (isLocalhost) {
+          throw new Error(`Cannot connect to API server at ${this.baseURL}. Make sure the gateway service is running (e.g., docker compose up gateway)`);
+        } else {
+          throw new Error(`Network error: Cannot reach ${this.baseURL}. Please check your internet connection.`);
+        }
+      }
+      throw error;
     }
-
-    return response.json();
   }
 
   async submitTask(request: TaskRequest): Promise<TaskResponse> {
