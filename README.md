@@ -1,3 +1,5 @@
+#### 2026-01-09, AWS DEPLOYMENT IS CURRENTLY DOWN FOR COST-OPTIMIZATION ISSUES
+
 # Euglena / WebRAG
 
 An autonomous RAG agent service that executes tasks through iterative reasoning, web interaction, and vector database storage. 
