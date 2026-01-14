@@ -4,23 +4,33 @@ import chromadb
 from chromadb.config import Settings
 from shared.connector_config import ConnectorConfig
 from shared.retry import Retry
+from agent.app.local_embedding_function import LocalEmbeddingFunction
 
 
 class ConnectorChroma:
-    """
-    Manages a connection to ChromaDB and exposes common operations.
-    """
+    """Manages ChromaDB connection and operations."""
 
     def __init__(self, connector_config: ConnectorConfig):
+        """
+        Initialize ChromaDB connector with config and embedding function.
+        
+        :param connector_config: ChromaDB connection settings.
+        """
         self.config = connector_config
         self.logger = logging.getLogger(self.__class__.__name__)
         self._chroma = None
         self.chroma_api_ready = False
+        try:
+            self._embedding_function = LocalEmbeddingFunction()
+        except Exception as e:
+            self.logger.error(f"Failed to initialize embedding function: {e}")
+            self._embedding_function = None
 
     async def _try_init_chroma(self) -> bool:
         """
-        Single attempt to initialize HttpClient and heartbeat Chroma.
-        :return bool: True on success, False on failure.
+        Single attempt to initialize HttpClient and heartbeat ChromaDB.
+        
+        :return: True on success, False on failure.
         """
         chroma_url = self.config.chroma_url
         if not chroma_url:
@@ -53,8 +63,9 @@ class ConnectorChroma:
 
     async def init_chroma(self) -> bool:
         """
-        Initialize or verify the ChromaDB connection. Sets self.chroma_api_ready.
-        :return bool: True on success, False on failure.
+        Initialize ChromaDB connection with retry logic. Sets chroma_api_ready on success.
+        
+        :return: True on success, False on failure.
         """
         if self.chroma_api_ready:
             return True
@@ -72,17 +83,16 @@ class ConnectorChroma:
 
     async def get_or_create_collection(self, collection: str) -> Any:
         """
-        Create a ChromaDB collection or get it if it already exists.
-        :param collection: Name of the collection to create or get.
-        :return chromadb.Collection: ChromaDB collection object.
+        Create or get ChromaDB collection. Embeddings computed client-side.
+        
+        :param collection: Collection name.
+        :return: Collection object or None on failure.
         """
         if not await self.init_chroma():
             self.logger.warning("ChromaDB not ready.")
             return None
         try:
-            coll = self._chroma.get_or_create_collection(
-                name=collection,
-            )
+            coll = self._chroma.get_or_create_collection(name=collection)
             return coll
         except Exception as e:
             self.logger.error(f"Failed to create/get collection '{collection}': {e}")
@@ -96,23 +106,33 @@ class ConnectorChroma:
         documents: List[str]
     ) -> bool:
         """
-        Add documents to a ChromaDB collection.
-        :param collection: ChromaDB collection name.
-        :param ids: List of unique IDs for each document.
-        :param metadatas: List of metadata dicts for each document.
-        :param documents: List of document texts.
-        :return bool: True on success, False on failure.
+        Add documents to ChromaDB collection. Computes embeddings client-side.
+        
+        :param collection: Collection name.
+        :param ids: Document IDs.
+        :param metadatas: Metadata dicts per document.
+        :param documents: Document texts.
+        :return: True on success, False on failure.
         """
         if not self.chroma_api_ready:
             self.logger.warning("ChromaDB not ready.")
             return False
+        if not self._embedding_function:
+            self.logger.error("Embedding function not available.")
+            return False
+        if not documents:
+            return True
         try:
             coll = await self.get_or_create_collection(collection)
+            if coll is None:
+                return False
+            embeddings = self._embedding_function.embed(documents)
             sanitized_metadatas = [self._sanitize_metadata(m) for m in metadatas]
             coll.add(
                 ids=ids,
+                embeddings=embeddings,
                 metadatas=sanitized_metadatas,
-                documents=documents,
+                documents=documents
             )
             return True
         except Exception as e:
@@ -121,22 +141,37 @@ class ConnectorChroma:
 
     async def query_chroma(self, collection: str, query_texts: List[str], n_results: int = 3) -> Optional[Dict[str, Any]]:
         """
-        Query a ChromaDB collection for nearest neighbors.
-        :param collection: ChromaDB collection name.
-        :param query_texts: List of query texts.
-        :param n_results: Number of results to return.
-        :return List of results, or None on failure.
+        Query ChromaDB collection for similar documents. Computes embeddings client-side.
+        
+        :param collection: Collection name.
+        :param query_texts: Query texts.
+        :param n_results: Number of results per query. Defaults to 3.
+        :return: Query results dict with documents/metadatas/distances, or None on failure.
         """
         if not self.chroma_api_ready:
             self.logger.warning("ChromaDB not ready.")
             return None
+        if not self._embedding_function:
+            self.logger.error("Embedding function not available.")
+            return None
+        if not query_texts:
+            return None
 
         try:
             coll = await self.get_or_create_collection(collection)
-            results = coll.query(
-                query_texts=query_texts,
-                n_results=n_results,
-            )
+            if coll is None:
+                return None
+            query_embeddings = self._embedding_function.embed(query_texts)
+            try:
+                results = coll.query(
+                    query_embeddings=query_embeddings,
+                    n_results=n_results,
+                )
+            except TypeError:
+                results = coll.query(
+                    embeddings=query_embeddings,
+                    n_results=n_results,
+                )
             return results
         except Exception as e:
             self.logger.error(f"ChromaDB query failed for collection {collection}: {e}")
@@ -145,9 +180,10 @@ class ConnectorChroma:
     @staticmethod
     def _sanitize_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Ensure all metadata values are ChromaDB compatible types.
+        Convert metadata to ChromaDB-compatible types. Lists -> comma-separated strings, dicts -> JSON strings.
+        
         :param metadata: Metadata dict to sanitize.
-        :return Dict of sanitized metadata.
+        :return: Sanitized metadata dict.
         """
         sanitized = {}
         for key, value in metadata.items():

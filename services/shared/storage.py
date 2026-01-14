@@ -58,15 +58,41 @@ class RedisTaskStorage(TaskStorage):
         Create a task record in Redis.
         :param correlation_id: Unique identifier for the task.
         :param task_data: JSON-serializable dictionary describing the task.
+        :raises RuntimeError: If task could not be stored in Redis
         """
-        async with self.connector as conn:
-            await conn.set_json(self._key(correlation_id), task_data)
-            self.logger.info(f"Created task {correlation_id} (redis)")
+        key = self._key(correlation_id)
+        self.logger.info(f"Storing task in Redis: key={key}, correlation_id={correlation_id}")
+        try:
+            async with self.connector as conn:
+                success = await conn.set_json(key, task_data)
+                if success:
+                    self.logger.info(f"Successfully stored task in Redis: key={key}, correlation_id={correlation_id}")
+                else:
+                    error_msg = f"Failed to store task in Redis: key={key}, correlation_id={correlation_id}"
+                    self.logger.error(error_msg)
+                    raise RuntimeError(error_msg)
+        except RuntimeError:
+            raise
+        except Exception as e:
+            error_msg = f"Exception storing task in Redis: key={key}, correlation_id={correlation_id}, error={e}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
 
     async def get_task(self, correlation_id: str) -> Optional[dict]:
         """Get a task record from Redis (already JSON-decoded by the connector)."""
-        async with self.connector as conn:
-            return await conn.get_json(self._key(correlation_id))
+        key = self._key(correlation_id)
+        self.logger.debug(f"Retrieving task from Redis: key={key}, correlation_id={correlation_id}")
+        try:
+            async with self.connector as conn:
+                result = await conn.get_json(key)
+                if result is None:
+                    self.logger.warning(f"Task not found in Redis: key={key}, correlation_id={correlation_id}")
+                else:
+                    self.logger.debug(f"Successfully retrieved task from Redis: key={key}, correlation_id={correlation_id}")
+                return result
+        except Exception as e:
+            self.logger.error(f"Exception retrieving task from Redis: key={key}, correlation_id={correlation_id}, error={e}", exc_info=True)
+            return None
 
     async def update_task(self, correlation_id: str, updates: dict) -> None:
         """Apply partial updates to a task record and update the timestamp."""
@@ -164,7 +190,11 @@ class RedisWorkerStorage:
             workers = []
             for worker_id_bytes in worker_ids:
                 try:
-                    worker_id = worker_id_bytes.decode("utf-8") if isinstance(worker_id_bytes, bytes) else str(worker_id_bytes)
+                    if isinstance(worker_id_bytes, bytes):
+                        worker_id = worker_id_bytes.decode("utf-8")
+                    else:
+                        worker_id = str(worker_id_bytes)
+
                     status_data = await conn.get_json(self._status_key(worker_id))
                     if status_data:
                         workers.append(status_data)

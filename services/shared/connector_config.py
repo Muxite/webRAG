@@ -25,6 +25,7 @@ class ConnectorConfig:
         self.worker_status_ttl = int(os.environ.get("WORKER_STATUS_TTL", "60"))
 
         self.daily_tick_limit = int(os.environ.get("DAILY_TICK_LIMIT", "1000"))
+        self.agent_free_timeout_seconds = int(os.environ.get("AGENT_FREE_TIMEOUT_SECONDS", "300"))
 
         if not self.redis_url:
             self.logger.warning("No Redis URL set")

@@ -33,7 +33,7 @@ Agent uses dependency injection to reuse connectors across mandates. Connectors 
 ### Prerequisites
 - Docker and Docker Compose
 - API keys: `OPENAI_API_KEY`, `SEARCH_API_KEY` (set in `services/keys.env`)
-- Supabase configuration: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` (see [docs/SECURITY.md](docs/SECURITY.md))
+- Supabase configuration: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`
 
 ### Start Services
 ```bash
@@ -83,29 +83,29 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture docum
 
 ## Configuration
 
-Environment variables in `services/.env` and `services/keys.env`:
-
-- Service URLs: `RABBITMQ_URL`, `REDIS_URL`, `CHROMA_URL`, `GATEWAY_URL`
-- API Keys: `OPENAI_API_KEY`, `SEARCH_API_KEY`
-- Agent: `AGENT_STATUS_TIME`, `AGENT_INPUT_QUEUE`, `AGENT_STATUS_QUEUE`, `MAX_TICKS`
-- Supabase: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`
-
-See [docs/SECURITY.md](docs/SECURITY.md) for details.
+Environment variables in `services/.env` and `services/keys.env`.
 
 ## AWS Deployment
 
-The AWS deployment is operational and uses ECS with Secrets Manager for secure configuration.
+### Push Images to ECR
 
-Generate ECS task definitions from environment files:
-
+Build and push Docker images:
 ```bash
-cd services
-python ../scripts/build-task-definition.py
+python scripts/push-to-ecr.py
 ```
 
-Loads env vars from `services/.env` and `services/keys.env`, generates task definition JSON + a redacted version.
+### Generate Task Definitions
 
-Converts env vars to Secrets Manager format, generates `secrets.json` for AWS CLI. See script comments for usage.
+Generate ECS task definitions:
+```bash
+python scripts/build-task-definition.py
+```
+
+Note: Environment variables are NOT automatically included in task definitions. Add them manually via ECS console or edit the generated JSON files.
+
+### Deploy Services
+
+Create ECS services via AWS Console. Gateway service contains gateway, redis, rabbitmq, chroma containers. Agent service contains agent container and uses service discovery to reach Gateway sidecars.
 
 ## Testing
 
@@ -140,7 +140,6 @@ See [docs/TESTING.md](docs/TESTING.md) for detailed testing documentation.
 
 **Secrets**: API keys in `keys.env` (not committed). AWS deployment uses Secrets Manager. No secrets in code.
 
-See [docs/SECURITY.md](docs/SECURITY.md) for detailed security documentation.
 
 ## Project Structure
 
@@ -162,7 +161,7 @@ See [docs/SECURITY.md](docs/SECURITY.md) for detailed security documentation.
 │   └── index.html      # Entry point
 ├── scripts/            # Deployment and utility scripts
 │   ├── build-task-definition.py  # ECS task definition generator
-│   └── env-to-ecs.py              # Secrets manager generator
+│   └── push-to-ecr.py            # Docker build and push to ECR
 └── docs/               # Documentation
 ```
 

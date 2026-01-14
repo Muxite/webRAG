@@ -4,29 +4,70 @@ from pathlib import Path
 from dotenv import dotenv_values
 
 
-def load_env_files(base_dir):
-    keys_env_path = base_dir / "keys.env"
-    env_path = base_dir / ".env"
-    keys_env = {}
-    env = {}
+def load_aws_config(base_dir):
+    """
+    Loads AWS configuration from aws.env file.
+    :param base_dir: Base directory to search for aws.env
+    :returns: Dictionary of AWS environment variables
+    """
+    aws_env_path = base_dir / "aws.env"
+    aws_env = {}
+    
+    if aws_env_path.exists():
+        aws_env = dict(dotenv_values(str(aws_env_path)))
+    
+    return aws_env
+
+
+def load_secrets_from_keys_env(services_dir):
+    """
+    Loads secret keys from keys.env file.
+    :param services_dir: Services directory path where keys.env should be located
+    :returns: List of secret key names
+    """
+    keys_env_path = services_dir / "keys.env"
+    secret_keys = []
     
     if keys_env_path.exists():
         keys_env = dict(dotenv_values(str(keys_env_path)))
-        print(f"Loaded {len(keys_env)} secrets from {keys_env_path}")
-    else:
-        print(f"Warning: {keys_env_path} not found")
+        secret_keys = [key for key in keys_env.keys() if key and keys_env[key] and not key.startswith("#")]
+    
+    return secret_keys
+
+
+def load_env_variables(services_dir, secret_keys):
+    """
+    Loads environment variables from .env file, excluding secrets and Lambda variables.
+    :param services_dir: Services directory path where .env should be located
+    :param secret_keys: List of secret key names to exclude
+    :returns: Dictionary of environment variables
+    """
+    env_path = services_dir / ".env"
+    env_vars = {}
     
     if env_path.exists():
-        env = dict(dotenv_values(str(env_path)))
-        print(f"Loaded {len(env)} environment variables from {env_path}")
-    else:
-        print(f"Warning: {env_path} not found")
+        env_dict = dict(dotenv_values(str(env_path)))
+        lambda_vars = {"MIN_WORKERS", "MAX_WORKERS", "TARGET_MESSAGES_PER_WORKER"}
+        
+        for key, value in env_dict.items():
+            if key and value and not key.startswith("#"):
+                if key not in secret_keys and key not in lambda_vars:
+                    env_vars[key] = value
     
-    return keys_env, env
+    return env_vars
+
+
+def build_environment_list(env_vars):
+    """
+    Converts environment variables dictionary to ECS environment list format.
+    :param env_vars: Dictionary of environment variables
+    :returns: List of {"name": key, "value": value} dictionaries
+    """
+    return [{"name": k, "value": v} for k, v in sorted(env_vars.items())]
 
 
 def redact_task_definition(task_def):
-    """Create a redacted version of the task definition with placeholders for account/region info."""
+    """Redact task definition with placeholders for account/region."""
     redacted = copy.deepcopy(task_def)
     
     if "taskRoleArn" in redacted:
@@ -60,185 +101,146 @@ def redact_task_definition(task_def):
 
 
 def extract_arn_suffix(secret_input):
-    if secret_input.startswith("arn:aws:secretsmanager:"):
-        try:
-            secret_idx = secret_input.find("secret:")
-            if secret_idx != -1:
-                after_secret = secret_input[secret_idx + 7:]
-                if ":" in after_secret:
-                    name_suffix_part = after_secret.split(":")[0]
-                else:
-                    name_suffix_part = after_secret
-                if "-" in name_suffix_part:
-                    last_dash_idx = name_suffix_part.rfind("-")
-                    return name_suffix_part[last_dash_idx + 1:]
-                return secret_input
-            return secret_input
-        except Exception:
-            return secret_input
+    """
+    Extracts ARN suffix from Secrets Manager ARN or returns as-is.
+    :param secret_input: Secret ARN or suffix string
+    :returns: Extracted suffix or original input
+    """
+    if not secret_input.startswith("arn:aws:secretsmanager:"):
+        return secret_input
+    
+    secret_idx = secret_input.find("secret:")
+    if secret_idx == -1:
+        return secret_input
+    
+    after_secret = secret_input[secret_idx + 7:]
+    name_suffix_part = after_secret.split(":")[0] if ":" in after_secret else after_secret
+    
+    if "-" in name_suffix_part:
+        return name_suffix_part[name_suffix_part.rfind("-") + 1:]
+    
     return secret_input
 
 
-def build_task_definition(keys_env, env, account_id, region, secret_name, secret_arn_suffix):
-    env_ecs = {}
-    for k, v in env.items():
-        value = str(v)
-        if k in ("RABBITMQ_URL", "REDIS_URL", "CHROMA_URL", "GATEWAY_URL"):
-            value = value.replace("@rabbitmq:", "@localhost:").replace("@redis:", "@localhost:").replace("@chroma:", "@localhost:").replace("@gateway:", "@localhost:")
-            value = value.replace("://rabbitmq:", "://localhost:").replace("://redis:", "://localhost:").replace("://chroma:", "://localhost:").replace("://gateway:", "://localhost:")
-        env_ecs[k] = value
-    
-    env_list = [{"name": k, "value": v} for k, v in sorted(env_ecs.items())]
-    
+def build_secrets_list(secret_name, secret_arn_suffix, region, account_id, secret_keys):
+    """
+    Builds secrets list from secret keys for ECS task definition.
+    :param secret_name: Secrets Manager secret name
+    :param secret_arn_suffix: ARN suffix for the secret
+    :param region: AWS region
+    :param account_id: AWS account ID
+    :param secret_keys: List of secret key names to include
+    :returns: List of secret dicts for ECS task definition
+    """
     secrets = []
-    if keys_env and secret_arn_suffix:
-        for key in sorted(keys_env.keys()):
+    if secret_arn_suffix and secret_keys:
+        for key in sorted(secret_keys):
             secrets.append({
                 "name": key,
                 "valueFrom": f"arn:aws:secretsmanager:{region}:{account_id}:secret:{secret_name}-{secret_arn_suffix}:{key}::"
             })
-    
-    def make_log_config(prefix):
-        return {
-            "logDriver": "awslogs",
-            "options": {
-                "awslogs-group": "/ecs/euglena",
-                "awslogs-region": region,
-                "awslogs-stream-prefix": prefix
-            }
+    return secrets
+
+
+def _make_health_check(command, start_period=300, interval=30, retries=3, timeout=5):
+    """
+    Creates health check config using command with specified timing.
+
+    :param command: Health check shell command.
+    :param start_period: Grace period before health checks start (seconds).
+    :param interval: Time between health checks (seconds).
+    :param retries: Consecutive failures before marking unhealthy.
+    :param timeout: Maximum time for health check to complete (seconds).
+    :returns: Health check configuration dictionary.
+    """
+    return {
+        "command": ["CMD-SHELL", command],
+        "interval": interval,
+        "retries": retries,
+        "startPeriod": start_period,
+        "timeout": timeout
+    }
+
+
+def _make_log_config(prefix, region):
+    """Creates CloudWatch log config for container logging."""
+    return {
+        "logDriver": "awslogs",
+        "options": {
+            "awslogs-group": "/ecs/euglena",
+            "awslogs-region": region,
+            "awslogs-stream-prefix": prefix
         }
+    }
+
+
+def _make_base_container(name, image, port, health_command, region, cpu=0, essential=True, start_period=300):
+    """Creates base container definition with health check and logging."""
+    return {
+        "cpu": cpu,
+        "essential": essential,
+        "healthCheck": _make_health_check(health_command, start_period=start_period),
+        "image": image,
+        "logConfiguration": _make_log_config(name, region),
+        "mountPoints": [],
+        "name": name,
+        "portMappings": [{"containerPort": port, "protocol": "tcp"}] if port else [],
+        "systemControls": [],
+        "volumesFrom": []
+    }
+
+
+def build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars):
+    """
+    Builds gateway task definition with redis, rabbitmq, chroma sidecars.
+    :param account_id: AWS account ID
+    :param region: AWS region
+    :param secret_name: Secrets Manager secret name
+    :param secret_arn_suffix: ARN suffix for the secret
+    :param secret_keys: List of secret key names
+    :param env_vars: Dictionary of environment variables from .env
+    :returns: Task definition dictionary
+    """
+    gateway_secrets = build_secrets_list(secret_name, secret_arn_suffix, region, account_id, secret_keys)
     
-    containers = [
-        {
-            "cpu": 0,
-            "environment": [
-                {"name": "IS_PERSISTENT", "value": "TRUE"},
-                {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}
-            ],
-            "essential": True,
-            "healthCheck": {
-                "command": ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"],
-                "interval": 60,
-                "retries": 5,
-                "startPeriod": 180,
-                "timeout": 10
-            },
-            "image": "chromadb/chroma:latest",
-            "logConfiguration": make_log_config("chroma"),
-            "mountPoints": [],
-            "name": "chroma",
-            "portMappings": [{"containerPort": 8000, "hostPort": 8000, "protocol": "tcp"}],
-            "systemControls": [],
-            "volumesFrom": []
-        },
-        {
-            "command": ["redis-server"],
-            "cpu": 0,
-            "environment": [],
-            "essential": True,
-            "healthCheck": {
-                "command": ["CMD-SHELL", "redis-cli ping | grep PONG || exit 1"],
-                "interval": 60,
-                "retries": 5,
-                "startPeriod": 90,
-                "timeout": 10
-            },
-            "image": "redis:7-alpine",
-            "logConfiguration": make_log_config("redis"),
-            "mountPoints": [],
-            "name": "redis",
-            "portMappings": [{"containerPort": 6379, "hostPort": 6379, "protocol": "tcp"}],
-            "systemControls": [],
-            "volumesFrom": []
-        },
-        {
-            "command": [
-                "sh",
-                "-c",
-                "if [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then mkdir -p /var/lib/rabbitmq && echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie && chmod 600 /var/lib/rabbitmq/.erlang.cookie && chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; fi && exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"
-            ],
-            "cpu": 0,
-            "environment": [],
-            "essential": True,
-            "healthCheck": {
-                "command": ["CMD-SHELL", "rabbitmq-diagnostics ping || exit 1"],
-                "interval": 60,
-                "retries": 5,
-                "startPeriod": 180,
-                "timeout": 10
-            },
-            "image": "rabbitmq:3-management",
-            "logConfiguration": make_log_config("rabbitmq"),
-            "mountPoints": [],
-            "name": "rabbitmq",
-            "portMappings": [
-                {"containerPort": 5672, "hostPort": 5672, "protocol": "tcp"},
-                {"containerPort": 15672, "hostPort": 15672, "protocol": "tcp"}
-            ],
-            "secrets": [
-                {
-                    "name": "RABBITMQ_ERLANG_COOKIE",
-                    "valueFrom": f"arn:aws:secretsmanager:{region}:{account_id}:secret:{secret_name}-{secret_arn_suffix}:RABBITMQ_ERLANG_COOKIE::"
-                }
-            ],
-            "systemControls": [],
-            "volumesFrom": []
-        },
-        {
-            "cpu": 0,
-            "dependsOn": [
-                {"condition": "START", "containerName": "chroma"},
-                {"condition": "START", "containerName": "redis"},
-                {"condition": "START", "containerName": "rabbitmq"}
-            ],
-            "environment": env_list,
-            "essential": True,
-            "healthCheck": {
-                "command": ["CMD-SHELL", "curl -f http://localhost:8081/health || exit 1"],
-                "interval": 60,
-                "retries": 5,
-                "startPeriod": 300,
-                "timeout": 10
-            },
-            "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/agent",
-            "logConfiguration": make_log_config("agent"),
-            "mountPoints": [],
-            "name": "agent",
-            "portMappings": [{"containerPort": 8081, "hostPort": 8081, "protocol": "tcp"}],
-            "secrets": secrets,
-            "systemControls": [],
-            "volumesFrom": []
-        },
-        {
-            "cpu": 0,
-            "dependsOn": [
-                {"condition": "START", "containerName": "chroma"},
-                {"condition": "START", "containerName": "redis"},
-                {"condition": "START", "containerName": "rabbitmq"},
-                {"condition": "START", "containerName": "agent"}
-            ],
-            "environment": env_list,
-            "essential": True,
-            "healthCheck": {
-                "command": ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"],
-                "interval": 60,
-                "retries": 5,
-                "startPeriod": 300,
-                "timeout": 10
-            },
-            "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway",
-            "logConfiguration": make_log_config("gateway"),
-            "mountPoints": [],
-            "name": "gateway",
-            "portMappings": [{"containerPort": 8080, "hostPort": 8080, "protocol": "tcp"}],
-            "secrets": secrets,
-            "systemControls": [],
-            "volumesFrom": []
-        }
-    ]
+    rabbitmq_secrets = []
+    if secret_arn_suffix and "RABBITMQ_ERLANG_COOKIE" in secret_keys:
+        rabbitmq_secrets.append({
+            "name": "RABBITMQ_ERLANG_COOKIE",
+            "valueFrom": f"arn:aws:secretsmanager:{region}:{account_id}:secret:{secret_name}-{secret_arn_suffix}:RABBITMQ_ERLANG_COOKIE::"
+        })
+    
+    chroma = _make_base_container("chroma", "chromadb/chroma:latest", 8000, "curl -f http://localhost:8000/api/v1/heartbeat || exit 1", region, start_period=240)
+    chroma["environment"] = [{"name": "IS_PERSISTENT", "value": "TRUE"}, {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}]
+    
+    redis = _make_base_container("redis", "redis:7-alpine", 6379, "redis-cli ping | grep PONG || exit 1", region, start_period=120)
+    redis["command"] = ["redis-server"]
+    
+    rabbitmq = _make_base_container("rabbitmq", "rabbitmq:3-management", None, "rabbitmq-diagnostics ping || exit 1", region, start_period=240)
+    rabbitmq["command"] = ["sh", "-c", "if [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then mkdir -p /var/lib/rabbitmq && echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie && chmod 600 /var/lib/rabbitmq/.erlang.cookie && chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; fi && exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"]
+    rabbitmq["portMappings"] = [{"containerPort": 5672, "protocol": "tcp"}, {"containerPort": 15672, "protocol": "tcp"}]
+    rabbitmq["secrets"] = rabbitmq_secrets
+    
+    gateway_env = env_vars.copy()
+    gateway_env["REDIS_URL"] = "redis://localhost:6379/0"
+    gateway_env["CHROMA_URL"] = "http://localhost:8000"
+    gateway_env["RABBITMQ_URL"] = "amqp://guest:guest@localhost:5672/"
+    
+    gateway = _make_base_container("gateway", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway:latest", 8080, "curl -f http://localhost:8080/health || exit 1", region, start_period=360)
+    gateway["dependsOn"] = [{"condition": "START", "containerName": "chroma"}, {"condition": "START", "containerName": "redis"}, {"condition": "START", "containerName": "rabbitmq"}]
+    gateway["secrets"] = gateway_secrets
+    gateway["environment"] = build_environment_list(gateway_env)
+
+    metrics_env = gateway_env.copy()
+    metrics = _make_base_container("metrics", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/metrics:latest", 8082, "curl -f http://localhost:8082/health || exit 1", region, start_period=180)
+    metrics["dependsOn"] = [{"condition": "START", "containerName": "rabbitmq"}]
+    metrics["secrets"] = gateway_secrets
+    metrics["environment"] = build_environment_list(metrics_env)
+    
+    containers = [chroma, redis, rabbitmq, gateway, metrics]
     
     return {
-        "family": "euglena",
+        "family": "euglena-gateway",
         "containerDefinitions": containers,
         "taskRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskRole",
         "executionRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskExecutionRole",
@@ -246,81 +248,130 @@ def build_task_definition(keys_env, env, account_id, region, secret_name, secret
         "volumes": [],
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
-        "cpu": "8192",
-        "memory": "16384"
+        "cpu": "512",
+        "memory": "1024"
     }
 
 
-def main():
-    base_dir = Path.cwd()
-    print(f"Working directory: {base_dir}\n")
+def build_agent_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env):
+    """
+    Builds agent task definition.
+    :param account_id: AWS account ID
+    :param region: AWS region
+    :param secret_name: Secrets Manager secret name
+    :param secret_arn_suffix: ARN suffix for the secret
+    :param secret_keys: List of secret key names
+    :param env_vars: Dictionary of environment variables from .env
+    :param aws_env: Dictionary of AWS environment variables from aws.env
+    :returns: Task definition dictionary
+    """
+    secrets = build_secrets_list(secret_name, secret_arn_suffix, region, account_id, secret_keys)
     
-    keys_env, env = load_env_files(base_dir)
+    agent_env = env_vars.copy()
     
-    if not keys_env and not env:
-        print("Error: No environment files found. Please ensure keys.env and/or .env exist in the current directory.")
-        return
+    gateway_service_name = aws_env.get("GATEWAY_SERVICE_NAME", "euglena-gateway")
+    namespace = aws_env.get("SERVICE_DISCOVERY_NAMESPACE", "euglena.local")
+    gateway_host = f"{gateway_service_name}.{namespace}"
     
-    print("\n" + "=" * 60)
-    print("AWS Configuration")
-    print("=" * 60)
-    account_id = input("Enter AWS Account ID: ").strip()
-    region = input("Enter AWS Region: ").strip()
-    secret_name = input("Enter secret name: ").strip()
+    agent_env["REDIS_URL"] = f"redis://{gateway_host}:6379/0"
+    agent_env["CHROMA_URL"] = f"http://{gateway_host}:8000"
+    agent_env["RABBITMQ_URL"] = f"amqp://guest:guest@{gateway_host}:5672/"
+    agent_env["ECS_ENABLED"] = "true"
+    agent_env["AWS_REGION"] = region
+    agent_env["ECS_CLUSTER"] = aws_env.get("ECS_CLUSTER", "euglena-cluster")
     
-    if not account_id or not region or not secret_name:
-        print("Error: Account ID, Region, and Secret Name are required.")
-        return
+    agent = _make_base_container("agent", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/agent:latest", 8081, "curl -f http://localhost:8081/health || exit 1", region)
+    agent["secrets"] = secrets
+    agent["environment"] = build_environment_list(agent_env)
     
-    secret_arn_suffix = ""
-    if keys_env:
-        secrets_file = base_dir / "secrets.json"
-        if secrets_file.exists():
-            secrets_file.unlink()
-        with open(secrets_file, 'w') as f:
-            json.dump(keys_env, f, indent=2)
-        print(f"\nCreated {secrets_file} with {len(keys_env)} secrets\n")
-        
-        print("To create a new secret:")
-        print(f"  aws secretsmanager create-secret --name {secret_name} --secret-string file://{secrets_file} --region {region}\n")
-        
-        print("To update an existing secret:")
-        print(f"  aws secretsmanager update-secret --secret-id {secret_name} --secret-string file://{secrets_file} --region {region}\n")
-        
-        print("After creating/updating the secret, AWS will return an ARN.")
-        secret_input = input("Provide the full ARN or just the suffix: ").strip()
-        if not secret_input:
-            print("Error: Secret ARN or suffix is required.")
-            return
-        
-        secret_arn_suffix = extract_arn_suffix(secret_input)
+    containers = [agent]
     
-    print("\n" + "=" * 32)
-    print("Generating Task Definition")
-    print("=" * 32)
+    return {
+        "family": "euglena-agent",
+        "containerDefinitions": containers,
+        "taskRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskRole",
+        "executionRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskExecutionRole",
+        "networkMode": "awsvpc",
+        "volumes": [],
+        "placementConstraints": [],
+        "requiresCompatibilities": ["FARGATE"],
+        "cpu": "256",
+        "memory": "2048"
+    }
+
+
+def _get_aws_config(aws_env):
+    """Gets AWS configuration from aws.env or prompts user for missing values."""
+    def get_or_prompt(key, prompt_text):
+        value = aws_env.get(key, "").strip() if aws_env else ""
+        return value if value else input(f"{prompt_text}: ").strip()
     
-    task_def = build_task_definition(keys_env, env, account_id, region, secret_name, secret_arn_suffix)
+    account_id = get_or_prompt("AWS_ACCOUNT_ID", "Account ID")
+    region = get_or_prompt("AWS_REGION", "Region")
+    secret_name = get_or_prompt("AWS_SECRET_NAME", "Secret name")
+    secret_arn_suffix = get_or_prompt("AWS_SECRET_ARN_SUFFIX", "Secret ARN suffix") or ""
     
-    output_path = base_dir / "task_definition.json"
-    if output_path.exists():
-        output_path.unlink()
-    with open(output_path, 'w') as f:
+    return account_id, region, secret_name, secret_arn_suffix
+
+
+def _write_task_definition(base_dir, task_def, name):
+    """Write task definition JSON files."""
+    path = base_dir / f"task-definition-{name}.json"
+    if path.exists():
+        path.unlink()
+    with open(path, 'w') as f:
         json.dump(task_def, f, indent=4)
     
-    redacted_def = redact_task_definition(task_def)
-    redacted_path = base_dir / "task_definition.redacted.json"
+    redacted_path = base_dir / f"task-definition-{name}.redacted.json"
     if redacted_path.exists():
         redacted_path.unlink()
     with open(redacted_path, 'w') as f:
-        json.dump(redacted_def, f, indent=4)
+        json.dump(redact_task_definition(task_def), f, indent=4)
     
-    print(f"\nGenerated task definition: {output_path}")
-    print(f"Generated redacted task definition: {redacted_path}")
-    print(f" - {len(task_def['containerDefinitions'])} containers")
-    print(f" - {len(keys_env)} secrets configured")
-    print(f" - {len(env)} environment variables configured")
-    print("\nYou can now register this task definition with:")
-    print(f"aws ecs register-task-definition --cli-input-json file://{output_path} --region {region}")
+    return path, redacted_path
+
+
+def main():
+    """
+    Generates ECS task definitions for gateway and agent services.
+    Loads secrets from keys.env and environment variables from .env automatically.
+    Expected to be run from services/ directory: python ../scripts/build-task-definition.py
+    """
+    base_dir = Path.cwd()
+    services_dir = base_dir
+    
+    aws_env = load_aws_config(services_dir)
+    account_id, region, secret_name, secret_arn_suffix = _get_aws_config(aws_env)
+    
+    if not account_id or not region:
+        print("Error: Account ID and Region required.")
+        return
+    
+    secret_keys = load_secrets_from_keys_env(services_dir)
+    env_vars = load_env_variables(services_dir, secret_keys)
+    
+    if not secret_arn_suffix or not secret_arn_suffix.strip():
+        if aws_env.get("AWS_SECRET_ARN_SUFFIX"):
+            secret_arn_suffix = aws_env.get("AWS_SECRET_ARN_SUFFIX").strip()
+        elif secret_keys:
+            secret_input = input("Secret ARN or suffix: ").strip()
+            if secret_input:
+                secret_arn_suffix = extract_arn_suffix(secret_input)
+    
+    gateway_task_def = build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars)
+    gateway_path, gateway_redacted_path = _write_task_definition(base_dir, gateway_task_def, "gateway")
+    
+    agent_task_def = build_agent_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
+    agent_path, agent_redacted_path = _write_task_definition(base_dir, agent_task_def, "agent")
+    
+    print(f"Generated: {gateway_path}")
+    print(f"Generated: {agent_path}")
+    print(f"\nRegister:")
+    print(f"  aws ecs register-task-definition --cli-input-json file://{gateway_path} --region {region}")
+    print(f"  aws ecs register-task-definition --cli-input-json file://{agent_path} --region {region}")
+    
+    from datetime import datetime
+    print(f"\nFinished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 if __name__ == "__main__":

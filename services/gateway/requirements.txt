@@ -8,3 +8,4 @@ pytest
 pytest-asyncio
 supabase
 python-jose[cryptography]
+boto3>=1.26.0

@@ -98,6 +98,10 @@ class ApiClient {
   async getTask(correlationId: string): Promise<TaskResponse> {
     return this.request<TaskResponse>(`/tasks/${correlationId}`);
   }
+
+  async getWorkerCount(): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/agents/count');
+  }
 }
 
 export const apiClient = new ApiClient();

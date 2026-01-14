@@ -1,12 +1,13 @@
 import asyncio
 import logging
 from typing import Optional, Dict, Any
+from datetime import datetime, timezone
 
 from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
 from shared.models import CompletionResult
 from shared.message_contract import (
-    TaskStatusType,
+    TaskState,
     WorkerStatusType,
     KeyNames,
 )
@@ -21,13 +22,17 @@ from shared.storage import RedisTaskStorage, RedisWorkerStorage
 
 class InterfaceAgent:
     """
-    Consumes tasks from RabbitMQ and runs the Agent.
-    Updates status transitions in Redis: accepted -> started -> in_progress -> completed | error
-    Creates a new agent for every task, handles 1 task at a time.
-    Connectors are initialized once and reused across all mandates.
+    Worker that consumes tasks from RabbitMQ and runs Agent to complete them.
+    Reports status to Redis and manages lifecycle for ECS autoscaling.
+    
+    :param connector_config: Connector configuration.
+    :param ecs_manager: ECS manager for task protection and metadata.
     """
-
-    def __init__(self, connector_config: ConnectorConfig):
+    def __init__(
+        self,
+        connector_config: ConnectorConfig,
+        ecs_manager=None
+    ):
         self.config = connector_config
         self.logger = logging.getLogger(self.__class__.__name__)
         
@@ -41,13 +46,18 @@ class InterfaceAgent:
         self.connector_http = ConnectorHttp(self.config)
         self.connector_chroma = ConnectorChroma(self.config)
         
+        self._ecs_manager = ecs_manager
+        
         self._consumer_task: Optional[asyncio.Task] = None
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._presence_task: Optional[asyncio.Task] = None
+        self._free_timeout_task: Optional[asyncio.Task] = None
         self.agent: Optional[Agent] = None
         self.correlation_id: Optional[str] = None
         self.mandate: Optional[str] = None
         self.worker_ready: bool = False
+        self._should_exit: bool = False
+        self._free_since: Optional[datetime] = None
 
     async def __aenter__(self):
         await self.start()
@@ -57,7 +67,6 @@ class InterfaceAgent:
         await self.stop()
 
     def _check_dependencies_ready(self) -> bool:
-        """Verifies all required dependencies are initialized and ready."""
         return (
             self.connector_llm.llm_api_ready and
             self.connector_search.search_api_ready and
@@ -67,7 +76,6 @@ class InterfaceAgent:
         )
 
     async def _initialize_dependencies(self) -> bool:
-        """Initializes all agent connectors and verifies they are ready."""
         self.logger.info("Initializing agent connectors...")
         
         await self.connector_search.__aenter__()
@@ -85,12 +93,17 @@ class InterfaceAgent:
             self.logger.warning("Some dependencies not ready")
             return False
 
+    async def _initialize_ecs(self) -> None:
+        if self._ecs_manager:
+            await self._ecs_manager.initialize()
+
     async def start(self) -> None:
-        """Connects to RabbitMQ, initializes dependencies, and starts consuming tasks."""
         if self.worker_ready:
             return
         
         self.logger.info("InterfaceAgent starting")
+        
+        await self._initialize_ecs()
         
         await self.rabbitmq.connect()
         
@@ -103,12 +116,49 @@ class InterfaceAgent:
         )
         self.worker_ready = True
         await self._publish_worker_status(WorkerStatusType.FREE)
+        self._free_since = datetime.now(timezone.utc)
+        self._start_free_timeout()
         self.logger.info(f"InterfaceAgent started; consuming '{self.config.input_queue}'")
 
+    def _start_free_timeout(self) -> None:
+        if self._free_timeout_task:
+            self._free_timeout_task.cancel()
+        self._free_timeout_task = asyncio.create_task(self._free_timeout_loop())
+
+    async def _free_timeout_loop(self) -> None:
+        timeout_seconds = self.config.agent_free_timeout_seconds
+        check_interval = min(10, timeout_seconds / 10)
+        
+        try:
+            while not self._should_exit:
+                if self._free_since is None:
+                    await asyncio.sleep(check_interval)
+                    continue
+                
+                free_duration = (datetime.now(timezone.utc) - self._free_since).total_seconds()
+                
+                if free_duration >= timeout_seconds:
+                    self.logger.info(f"Free timeout reached ({free_duration:.0f}s >= {timeout_seconds}s), exiting")
+                    self._should_exit = True
+                    if self._consumer_task:
+                        self._consumer_task.cancel()
+                    return
+                
+                await asyncio.sleep(check_interval)
+        except asyncio.CancelledError:
+            return
+
     async def stop(self) -> None:
-        """Stops consuming tasks and closes all connections."""
         if not self.worker_ready:
             return
+
+        if self._free_timeout_task:
+            self._free_timeout_task.cancel()
+            try:
+                await self._free_timeout_task
+            except asyncio.CancelledError:
+                pass
+            self._free_timeout_task = None
 
         if self._consumer_task:
             self._consumer_task.cancel()
@@ -134,6 +184,12 @@ class InterfaceAgent:
             except asyncio.CancelledError:
                 pass
             self._presence_task = None
+
+        if self._ecs_manager:
+            try:
+                await self._ecs_manager.update_protection(False)
+            except Exception:
+                pass
 
         try:
             await self.rabbitmq.disconnect()
@@ -161,12 +217,10 @@ class InterfaceAgent:
         self.worker_ready = False
         self.logger.info("InterfaceAgent stopped")
 
+    def should_exit(self) -> bool:
+        return self._should_exit
+
     async def _handle_task(self, payload: Dict[str, Any]) -> None:
-        """
-        Processes a single task from the queue.
-        :param payload: The task payload from the queue.
-        :return: None
-        """
         self.logger.debug("Received task payload", extra={"payload": payload})
         self.correlation_id = payload.get(KeyNames.CORRELATION_ID)
         self.mandate = payload.get(KeyNames.MANDATE)
@@ -176,6 +230,17 @@ class InterfaceAgent:
             self.logger.warning("Invalid task payload, missing mandate or correlation_id")
             return
 
+        self._free_since = None
+        if self._free_timeout_task:
+            self._free_timeout_task.cancel()
+            try:
+                await self._free_timeout_task
+            except asyncio.CancelledError:
+                pass
+
+        if self._ecs_manager:
+            await self._ecs_manager.update_protection(True)
+
         self.logger.info(
             "Starting task",
             extra={
@@ -184,8 +249,8 @@ class InterfaceAgent:
                 "max_ticks": max_ticks,
             },
         )
-        await self._publish_task_status(TaskStatusType.ACCEPTED, max_ticks=max_ticks)
-        await self._publish_task_status(TaskStatusType.STARTED, max_ticks=max_ticks)
+        await self._publish_task_status(TaskState.ACCEPTED, max_ticks=max_ticks)
+        await self._publish_task_status(TaskState.IN_PROGRESS, max_ticks=max_ticks)
         await self._publish_worker_status(WorkerStatusType.WORKING, {"correlation_id": self.correlation_id})
 
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
@@ -231,13 +296,13 @@ class InterfaceAgent:
                 },
             )
             await self._publish_task_status(
-                TaskStatusType.COMPLETED,
+                TaskState.COMPLETED,
                 max_ticks=max_ticks,
                 result=completion.result(),
             )
         except Exception as e:
             self.logger.exception("Agent execution failed")
-            await self._publish_task_status(TaskStatusType.ERROR, max_ticks=max_ticks, error=str(e))
+            await self._publish_task_status(TaskState.FAILED, max_ticks=max_ticks, error=str(e))
         finally:
             if self._heartbeat_task:
                 self._heartbeat_task.cancel()
@@ -245,41 +310,34 @@ class InterfaceAgent:
                     await self._heartbeat_task
                 except asyncio.CancelledError:
                     pass
+            if self._ecs_manager:
+                await self._ecs_manager.update_protection(False)
             await self._publish_worker_status(WorkerStatusType.FREE)
+            self._free_since = datetime.now(timezone.utc)
+            self._start_free_timeout()
             self.agent = None
             self.correlation_id = None
             self.mandate = None
 
-    async def _publish_task_status(self, task_status_type: TaskStatusType, **kwargs) -> None:
+    async def _publish_task_status(self, task_state: TaskState, **kwargs) -> None:
         """
-        Updates task status in Redis storage.
-        :param task_status_type: TaskStatusType enum value.
-        :param kwargs: Additional fields to update.
+        Update task status in Redis.
+        
+        :param task_state: New task state.
+        :param kwargs: Optional fields: tick, max_ticks, result, error.
         """
         self.logger.debug(
             "Updating status",
             extra={
-                "type": str(task_status_type),
+                "type": task_state.value,
                 "correlation_id": self.correlation_id,
                 "fields": {k: v for k, v in kwargs.items() if k in {"tick", "max_ticks", "error"}},
             },
         )
 
         try:
-            state: str
-            if task_status_type == TaskStatusType.ACCEPTED:
-                state = "accepted"
-            elif task_status_type in (TaskStatusType.STARTED, TaskStatusType.IN_PROGRESS):
-                state = "in_progress"
-            elif task_status_type == TaskStatusType.COMPLETED:
-                state = "completed"
-            elif task_status_type == TaskStatusType.ERROR:
-                state = "failed"
-            else:
-                state = "in_progress"
-
             updates = {
-                "status": state,
+                "status": task_state.value,
             }
             if self.mandate is not None:
                 updates["mandate"] = self.mandate
@@ -308,7 +366,6 @@ class InterfaceAgent:
             pass
 
     async def _heartbeat_loop(self) -> None:
-        """Updates periodic in-progress status in Redis while a task is running."""
         interval = self.config.status_time
         try:
             while True:
@@ -323,12 +380,9 @@ class InterfaceAgent:
                     },
                 )
                 await self._publish_task_status(
-                    TaskStatusType.IN_PROGRESS,
+                    TaskState.IN_PROGRESS,
                     tick=self.agent.current_tick,
                     max_ticks=self.agent.max_ticks,
-                    history_length=len(self.agent.history),
-                    notes_len=len(self.agent.notes),
-                    deliverables_count=len(self.agent.deliverables),
                 )
                 await self._publish_worker_status(WorkerStatusType.WORKING, {"correlation_id": self.correlation_id})
                 await asyncio.sleep(interval)

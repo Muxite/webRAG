@@ -2,23 +2,24 @@ import asyncio
 import logging
 from aiohttp import web
 from shared.connector_config import ConnectorConfig
+from shared.ecs_manager import EcsManager
+from shared.health import create_health_handler
+from shared.pretty_log import setup_service_logger, log_connection_status
 from agent.app.interface_agent import InterfaceAgent
 
 
-async def health_handler(request):
-    """Health check endpoint for ECS container health checks."""
-    return web.json_response({"status": "healthy", "service": "agent", "version": "0.1.0"})
+def get_health_handler():
+    """Get health check handler with properly initialized logger."""
+    logger = setup_service_logger("Agent", logging.INFO)
+    return create_health_handler("agent", "0.1.0", logger)
 
 
 async def _run() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    logger = logging.getLogger("AgentMain")
+    logger = setup_service_logger("Agent", logging.INFO)
     
+    logger.info("Starting Agent Service...")
     app = web.Application()
-    app.router.add_get('/health', health_handler)
+    app.router.add_get('/health', get_health_handler())
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8081)
@@ -26,19 +27,28 @@ async def _run() -> None:
     logger.info("Agent health check server started on port 8081")
     
     config = ConnectorConfig()
-    worker = InterfaceAgent(config)
+    ecs_manager = EcsManager()
+    
+    worker = InterfaceAgent(
+        connector_config=config,
+        ecs_manager=ecs_manager
+    )
     try:
+        logger.info("Initializing agent worker...")
         await worker.start()
+        log_connection_status(logger, "AgentWorker", "CONNECTED")
         logger.info("Agent worker started successfully")
     except Exception as e:
-        logger.error(f"Failed to start agent worker: {e}")
+        logger.error(f"Failed to start agent worker: {e}", exc_info=True)
         logger.info("Agent will continue running and health endpoint will remain available")
     
     try:
-        while True:
-            await asyncio.sleep(3600)
+        check_interval = 5
+        while not worker.should_exit():
+            await asyncio.sleep(check_interval)
+        logger.info("Agent exiting due to free timeout")
     except (asyncio.CancelledError, KeyboardInterrupt):
-        pass
+        logger.info("Agent interrupted")
     finally:
         try:
             await worker.stop()

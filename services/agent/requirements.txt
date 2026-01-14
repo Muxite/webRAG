@@ -6,6 +6,7 @@ urllib3
 openai
 sentence-transformers
 aio-pika
+boto3
 pytest
 pytest-asyncio
 pytest-repeat

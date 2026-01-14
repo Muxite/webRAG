@@ -9,7 +9,7 @@ from agent.app.prompt_builder import PromptBuilder
 from agent.app.prompt_builder import build_payload
 from agent.app.observation import clean_operation
 from agent.app.connector_chroma import ConnectorChroma
-from shared.pretty_log import pretty_log
+from shared.pretty_log import pretty_log, extract_string_from_json, pretty_log_print
 from urllib.parse import urlparse
 import asyncio
 from shared.models import FinalResult
@@ -260,7 +260,7 @@ class Agent:
         if llm_response is None:
             self._logger.error("Final output LLM query failed.")
 
-            deliverable_text = "\n\n".join(d for d in self.deliverables if d.strip())
+            deliverable_text = "\n\n".join(d for d in self.deliverables if d and isinstance(d, str) and d.strip())
             if not deliverable_text:
                 deliverable_text = (
                     "We could not complete the full mandate due to unavailable LLM service. "
@@ -274,15 +274,41 @@ class Agent:
         try:
             final_output = json.loads(llm_response)
             self._logger.info("Final output generated successfully")
+            
+            deliverable_text = extract_string_from_json(final_output)
+            if not deliverable_text or not deliverable_text.strip():
+                deliverable_text = "\n\n".join(d for d in self.deliverables if d and isinstance(d, str) and d.strip())
+                if not deliverable_text:
+                    deliverable_text = pretty_log_print(final_output, 0)
+            
+            summary_value = final_output.get("summary", "")
+            if summary_value:
+                summary_text = extract_string_from_json(summary_value)
+            else:
+                summary_text = ""
+            
             return FinalResult(
-                final_deliverable=final_output.get("deliverable", ""),
-                action_summary=final_output.get("summary", ""),
+                final_deliverable=deliverable_text,
+                action_summary=summary_text,
                 success=True,
+            )
+        except json.JSONDecodeError as e:
+            self._logger.error(f"Failed to parse final output as JSON: {e}")
+            deliverable_text = "\n\n".join(d for d in self.deliverables if d and isinstance(d, str) and d.strip())
+            if not deliverable_text:
+                deliverable_text = llm_response if isinstance(llm_response, str) else str(llm_response)
+            return FinalResult(
+                final_deliverable=deliverable_text,
+                action_summary="",
+                success=False,
             )
         except Exception as e:
             self._logger.error(f"Failed to parse final output: {e}")
+            deliverable_text = "\n\n".join(d for d in self.deliverables if d and isinstance(d, str) and d.strip())
+            if not deliverable_text:
+                deliverable_text = llm_response if isinstance(llm_response, str) else str(llm_response)
             return FinalResult(
-                final_deliverable="",
+                final_deliverable=deliverable_text,
                 action_summary="",
                 success=False,
             )
@@ -300,7 +326,6 @@ class Agent:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Exit async context manager, cleaning up connector resources.
         
-        Note: Connectors are shared and reused across multiple Agent instances,
-        so we do NOT close them here. They are managed at the InterfaceAgent level.
+        Note: Connectors are managed at the InterfaceAgent level.
         """
         pass

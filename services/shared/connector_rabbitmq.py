@@ -3,7 +3,14 @@ import logging
 from typing import Optional, Callable, Dict, Any
 import aio_pika
 from shared.connector_config import ConnectorConfig
+from shared.pretty_log import setup_service_logger, log_connection_status
 from shared.retry import Retry
+
+try:
+    import aio_pika.exceptions
+except ImportError:
+    aio_pika.exceptions = type('exceptions', (), {})()
+    aio_pika.exceptions.ChannelClosed = Exception
 
 
 class ConnectorRabbitMQ:
@@ -16,7 +23,7 @@ class ConnectorRabbitMQ:
 
     def __init__(self, config: ConnectorConfig):
         self.config = config
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = setup_service_logger("RabbitMQ", logging.INFO)
         self.connection: Optional[aio_pika.Connection] = None
         self.channel: Optional[aio_pika.Channel] = None
         self.rabbitmq_ready = False
@@ -59,11 +66,18 @@ class ConnectorRabbitMQ:
             await self.channel.declare_queue(self.config.status_queue, durable=True)
 
             self.rabbitmq_ready = True
-            self.logger.info(
-                f"RabbitMQ OPERATIONAL: {self.config.input_queue}, {self.config.status_queue}"
+            log_connection_status(
+                self.logger,
+                "RabbitMQ",
+                "CONNECTED",
+                {
+                    "input_queue": self.config.input_queue,
+                    "status_queue": self.config.status_queue,
+                },
             )
             return True
         except Exception as e:
+            log_connection_status(self.logger, "RabbitMQ", "FAILED", {"error": str(e)})
             self.logger.warning(f"RabbitMQ connection failed: {e}")
             try:
                 if self.channel and not self.channel.is_closed:
@@ -97,6 +111,7 @@ class ConnectorRabbitMQ:
         )
         success = await retry.run()
         if not success:
+            log_connection_status(self.logger, "RabbitMQ", "FAILED", {"reason": "retries_exhausted"})
             self.logger.error("RabbitMQ failed to initialize after retries.")
         return success
 
@@ -127,7 +142,7 @@ class ConnectorRabbitMQ:
         self.connection = None
         self.channel = None
         self.rabbitmq_ready = False
-        self.logger.info("RabbitMQ connection closed")
+        log_connection_status(self.logger, "RabbitMQ", "DISCONNECTED")
 
     def is_ready(self) -> bool:
         """Check if RabbitMQ is connected and ready."""
@@ -142,47 +157,85 @@ class ConnectorRabbitMQ:
             return None
         return self.channel
 
+    async def get_queue_depth(self, queue_name: str) -> Optional[int]:
+        """
+        Get the current number of ready messages in a queue.
+
+        :param queue_name: RabbitMQ queue name.
+        :returns: Message count if available, otherwise None.
+        """
+        ch = await self.get_channel()
+        if ch is None:
+            self.logger.warning(f"Queue depth check failed: channel unavailable, queue={queue_name}")
+            return None
+        
+        try:
+            q = await ch.declare_queue(queue_name, passive=True)
+            result = getattr(q, "declaration_result", None)
+            if result is None:
+                self.logger.warning(f"Queue depth check failed: no declaration result, queue={queue_name}")
+                return None
+            depth = int(result.message_count)
+            self.logger.debug(f"Queue depth: queue={queue_name}, depth={depth}")
+            return depth
+        except aio_pika.exceptions.ChannelClosed:
+            self.logger.warning(f"Queue depth check failed: channel closed, queue={queue_name}")
+            self.rabbitmq_ready = False
+            return None
+        except Exception as e:
+            self.logger.warning(f"Queue depth check failed: queue={queue_name}, error={e}")
+            return None
+
     async def publish_message(
             self,
             queue_name: str,
             payload: Dict[str, Any],
             correlation_id: Optional[str] = None,
     ) -> None:
-        """Publish a message to a queue.
+        """
+        Publish a message to a queue.
+
         :param queue_name: Name of the queue to publish to.
         :param payload: Message payload.
         :param correlation_id: Optional correlation id to set on the message.
-
-        :raise RuntimeError: If RabbitMQ is not connected.
+        :raises RuntimeError: If RabbitMQ is not connected or publish fails.
         """
         if not await self.init_rabbitmq():
             raise RuntimeError("RabbitMQ not connected")
 
+        if not self.channel or self.channel.is_closed:
+            raise RuntimeError("RabbitMQ channel not available or closed")
+
+        try:
+            await self.channel.declare_queue(queue_name, durable=True)
+        except Exception as e:
+            self.logger.warning(f"Failed to declare queue before publish: queue={queue_name}, error={e}")
+
         body_bytes = json.dumps(payload).encode("utf-8")
-        body_preview = body_bytes[:256]
-        self.logger.debug(
-            "Publishing message",
-            extra={
-                "queue": queue_name,
-                "correlation_id": correlation_id,
-                "payload_size": len(body_bytes),
-                "payload_preview": body_preview.decode("utf-8", errors="ignore"),
-            },
-        )
-        await self.channel.default_exchange.publish(
-            aio_pika.Message(
-                body=body_bytes,
-                content_type="application/json",
-                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                correlation_id=correlation_id,
-            ),
-            routing_key=queue_name,
-        )
-        self.logger.info(f"Published message to {queue_name}: correlation_id={correlation_id}")
+        self.logger.debug(f"Publishing: queue={queue_name}, correlation_id={correlation_id}, size={len(body_bytes)}")
+        
+        try:
+            await self.channel.default_exchange.publish(
+                aio_pika.Message(
+                    body=body_bytes,
+                    content_type="application/json",
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                    correlation_id=correlation_id,
+                ),
+                routing_key=queue_name,
+            )
+            self.logger.info(f"Published: queue={queue_name}, correlation_id={correlation_id}")
+        except Exception as exc:
+            self.logger.error(
+                f"Publish failed: queue={queue_name}, correlation_id={correlation_id}, error={exc}",
+                exc_info=True,
+            )
+            raise RuntimeError(f"Failed to publish message to {queue_name}: {exc}") from exc
 
     async def publish_task(self, correlation_id: str, payload: dict) -> None:
         """
         Publish a task to the input queue with a correlation id.
+        
         :param correlation_id: Unique identifier used as the correlation id.
         :param payload: Task payload.
         """
@@ -191,7 +244,6 @@ class ConnectorRabbitMQ:
             payload=payload,
             correlation_id=correlation_id,
         )
-        self.logger.info(f"Published task {correlation_id} to {self.config.input_queue}")
 
     async def publish_status(self, payload: dict) -> None:
         """

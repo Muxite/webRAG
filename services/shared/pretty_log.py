@@ -1,4 +1,69 @@
 import logging
+import sys
+from datetime import datetime
+
+
+def setup_service_logger(service_name: str, level: int = logging.INFO) -> logging.Logger:
+    """
+    Set up a standardized logger for a service with enhanced formatting.
+
+    :param service_name: Name of the service (e.g., "Gateway", "Agent", "Metrics").
+    :param level: Logging level (default: INFO).
+    :returns: Configured logger instance.
+    """
+    logger = logging.getLogger(service_name)
+    logger.setLevel(level)
+
+    if logger.handlers:
+        return logger
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(level)
+
+    formatter = logging.Formatter(
+        fmt="[%(asctime)s] [%(levelname)-8s] [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.propagate = False
+
+    return logger
+
+
+def log_connection_status(logger: logging.Logger, service: str, status: str, details: dict = None):
+    """
+    Log connection status with standardized formatting.
+
+    :param logger: Logger instance.
+    :param service: Service name (e.g., "Redis", "RabbitMQ").
+    :param status: Status ("CONNECTED", "DISCONNECTED", "FAILED").
+    :param details: Optional dictionary of additional details.
+    :returns: None.
+    """
+    msg = f"{service}: {status}"
+    if details:
+        detail_str = ", ".join(f"{k}={v}" for k, v in details.items())
+        msg = f"{msg}, {detail_str}"
+    logger.info(msg)
+
+
+def log_health_check(logger: logging.Logger, service: str, healthy: bool, components: dict = None):
+    """
+    Log health check status with standardized formatting.
+
+    :param logger: Logger instance.
+    :param service: Service name.
+    :param healthy: True if healthy, False otherwise.
+    :param components: Optional dictionary of component statuses.
+    :returns: None.
+    """
+    status = "HEALTHY" if healthy else "UNHEALTHY"
+    msg = f"{service} Health: {status}"
+    if components:
+        comp_status = ", ".join(f"{k}={('OK' if v else 'FAIL')}" for k, v in components.items())
+        msg = f"{msg}, Components: {comp_status}"
+    logger.info(msg)
 
 
 def pretty_log(data, logger=None, indents=0):
@@ -13,6 +78,13 @@ def pretty_log(data, logger=None, indents=0):
     logger.info(final)
 
 def pretty_log_print(data, indents=0):
+    """
+    Formats data structures (dicts, lists, primitives) into a readable string format.
+    
+    :param data: Data structure to format (dict, list, or primitive).
+    :param indents: Number of indentation levels to apply.
+    :return: Formatted string representation.
+    """
     indent_str = "    " * indents
     if isinstance(data, list):
         result = []
@@ -28,6 +100,23 @@ def pretty_log_print(data, indents=0):
         return "\n".join(result)
     else:
         return f"{indent_str}{str(data)}"
+
+
+def extract_string_from_json(data):
+    """
+    Converts JSON structures to string representation using pretty_log_print style.
+    Returns strings as-is, formats everything else recursively using pretty_log_print.
+    
+    :param data: JSON structure (dict, list, or primitive) to convert to string.
+    :return: String representation of the content formatted with pretty_log_print style.
+    """
+    if data is None:
+        return ""
+    
+    if isinstance(data, str):
+        return data
+    
+    return pretty_log_print(data, 0)
 
 if __name__ == "__main__":
     block = {

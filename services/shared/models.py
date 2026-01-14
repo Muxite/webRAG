@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
@@ -7,6 +8,25 @@ class TaskRequest(BaseModel):
     mandate: str
     max_ticks: int = 50
     correlation_id: Optional[str] = None
+
+    def log_details(self, logger: logging.Logger, context: str = "") -> None:
+        """
+        Log comprehensive details about this task request.
+        
+        :param logger: Logger instance.
+        :param context: Additional context string.
+        """
+        mandate_preview = self.mandate[:200] + "..." if len(self.mandate) > 200 else self.mandate
+        extra = {
+            "correlation_id": self.correlation_id,
+            "max_ticks": self.max_ticks,
+            "mandate_length": len(self.mandate),
+            "mandate_preview": mandate_preview,
+            "has_correlation_id": bool(self.correlation_id),
+        }
+        if context:
+            extra["context"] = context
+        logger.info("TASK REQUEST DETAILS", extra=extra)
 
 
 class TaskResponse(BaseModel):
@@ -20,6 +40,43 @@ class TaskResponse(BaseModel):
     error: Optional[str] = None
     tick: Optional[int] = None
     max_ticks: int = 50
+
+    def log_details(self, logger: logging.Logger, context: str = "") -> None:
+        """
+        Log comprehensive details about this task response.
+        
+        :param logger: Logger instance.
+        :param context: Additional context string.
+        """
+        mandate_preview = self.mandate[:200] + "..." if len(self.mandate) > 200 else self.mandate
+        result_summary = None
+        if self.result:
+            if isinstance(self.result, dict):
+                result_summary = {
+                    "has_success": "success" in self.result,
+                    "deliverables_count": len(self.result.get("deliverables", [])),
+                    "has_notes": bool(self.result.get("notes")),
+                    "keys": list(self.result.keys()),
+                }
+        
+        extra = {
+            "correlation_id": self.correlation_id,
+            "status": self.status,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "mandate_length": len(self.mandate),
+            "mandate_preview": mandate_preview,
+            "max_ticks": self.max_ticks,
+            "tick": self.tick,
+            "has_error": bool(self.error),
+            "has_result": bool(self.result),
+            "result_summary": result_summary,
+        }
+        if self.error:
+            extra["error"] = self.error[:500] + "..." if len(self.error) > 500 else self.error
+        if context:
+            extra["context"] = context
+        logger.info("TASK RESPONSE DETAILS", extra=extra)
 
 
 class TaskRecord(BaseModel):
@@ -41,6 +98,48 @@ class TaskRecord(BaseModel):
             return self.model_dump()
         except Exception:
             return self.dict()
+
+    def log_details(self, logger: logging.Logger, context: str = "") -> None:
+        """
+        Log comprehensive details about this task record.
+        
+        :param logger: Logger instance.
+        :param context: Additional context string.
+        """
+        mandate_preview = self.mandate[:200] + "..." if len(self.mandate) > 200 else self.mandate
+        result_summary = None
+        if self.result:
+            if isinstance(self.result, dict):
+                result_summary = {
+                    "has_success": "success" in self.result,
+                    "deliverables_count": len(self.result.get("deliverables", [])),
+                    "has_notes": bool(self.result.get("notes")),
+                    "keys": list(self.result.keys()),
+                }
+        
+        progress_percent = None
+        if self.tick is not None and self.max_ticks > 0:
+            progress_percent = min(100, (self.tick / self.max_ticks) * 100)
+        
+        extra = {
+            "correlation_id": self.correlation_id,
+            "status": self.status,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "mandate_length": len(self.mandate),
+            "mandate_preview": mandate_preview,
+            "max_ticks": self.max_ticks,
+            "tick": self.tick,
+            "progress_percent": progress_percent,
+            "has_error": bool(self.error),
+            "has_result": bool(self.result),
+            "result_summary": result_summary,
+        }
+        if self.error:
+            extra["error"] = self.error[:500] + "..." if len(self.error) > 500 else self.error
+        if context:
+            extra["context"] = context
+        logger.info("TASK RECORD DETAILS", extra=extra)
 
 
 class TaskUpdate(BaseModel):

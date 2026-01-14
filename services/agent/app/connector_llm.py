@@ -29,8 +29,6 @@ class ConnectorLLM:
 
     async def __aenter__(self):
         """Support async context manager for consistent lifecycle handling."""
-        # Nothing special to initialize beyond constructor for AsyncOpenAI
-        # but we keep this for symmetry with other connectors.
         return self
 
     async def __aexit__(self, exc_type, exc, tb):

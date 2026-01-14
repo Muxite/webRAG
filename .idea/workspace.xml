@@ -4,14 +4,97 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f66bb68e-7de2-4bf1-88ae-85bf95d24b00" name="Changes" comment="" />
+    <list default="true" id="f66bb68e-7de2-4bf1-88ae-85bf95d24b00" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/aws.env.template" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/dist/lambda-autoscaling-20260113222456.zip" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/dist/lambda-autoscaling-20260113224713.zip" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/AUTOSCALING_STATUS_CHECK.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/AUTOSCALING_TROUBLESHOOTING.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/DEPLOYMENT_SETTINGS.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/ENV_SETUP_INSTRUCTIONS.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/ENV_VARIABLES.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/EVENTBRIDGE_LAMBDA_PERMISSIONS.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/LAMBDA_AUTOSCALING_SETUP.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/LAMBDA_DEBUGGING_NO_LOGS.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/LAMBDA_LOGS_MONITORING.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/SERVICE_DISCOVERY_SETUP.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/env.template" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/auth/AuthSection.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/auth/LoginForm.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/layout/AboutSection.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/layout/ApiModeToggle.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/layout/Header.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/task/CompletedStatus.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/task/ErrorStatus.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/task/InProgressStatus.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/task/InQueueStatus.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/task/NoResponseStatus.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/task/OutOfTicksStatus.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/task/TaskForm.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/task/TaskStatusDisplay.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/components/task/UnknownStatus.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/check-autoscaling-aws-cli.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/check-autoscaling.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/check-lambda-queue-depth.ps1" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/create-secrets.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/fix-autoscaling-aws-cli.ps1" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/fix-autoscaling-aws-cli.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/fix-autoscaling-rule.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/package-lambda.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/push-to-ecr.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/lambda_autoscaling/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/lambda_autoscaling/lambda_function.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/lambda_autoscaling/requirements.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/metrics/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/metrics/app/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/metrics/app/main.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/metrics/requirements.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/shared/ecs_manager.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/shared/queue_metrics.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/euglena.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/euglena.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/desktop.ini" beforeDir="false" afterPath="$PROJECT_DIR$/desktop.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/ARCHITECTURE.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/ARCHITECTURE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/SECURITY.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/SECURITY.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/services/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/services/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/build-task-definition.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/build-task-definition.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/env-to-ecs.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/generate-rabbitmq-cookie.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/generate-rabbitmq-cookie.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/.env" beforeDir="false" afterPath="$PROJECT_DIR$/services/.env" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/agent/.dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/.dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/agent/app/agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/agent/app/connector_chroma.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/connector_chroma.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/agent/app/connector_llm.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/connector_llm.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/agent/app/interface_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/interface_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/agent/app/local_embedding_function.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/local_embedding_function.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/agent/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/agent/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/services/agent/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/autoscaler/app/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/.ai/mcp/mcp.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/services/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/gateway/app/api.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/app/api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/gateway/app/gateway_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/app/gateway_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/gateway/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/services/gateway/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/shared/connector_config.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/connector_config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/shared/connector_rabbitmq.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/connector_rabbitmq.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/shared/connector_redis.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/connector_redis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/shared/message_contract.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/message_contract.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/shared/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/shared/pretty_log.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/pretty_log.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/shared/storage.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/shared/storage.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/task_definition.redacted.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/tests/.dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/services/metrics/.dockerfile" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="167" />
+    <option name="cachedIndexableFilesCount" value="199" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="FileTemplateManagerImpl">
@@ -66,7 +149,7 @@
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
     &quot;ai.playground.ignore.import.keys.banner.in.settings&quot;: &quot;true&quot;,
     &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;autoscale&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
@@ -299,6 +382,9 @@
       <workItem from="1767241303887" duration="2789000" />
       <workItem from="1767304371661" duration="8543000" />
       <workItem from="1767381127835" duration="7996000" />
+      <workItem from="1767849865591" duration="2559000" />
+      <workItem from="1767939364807" duration="1628000" />
+      <workItem from="1768350204884" duration="9444000" />
     </task>
     <servers />
   </component>

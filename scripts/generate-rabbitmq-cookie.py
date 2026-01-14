@@ -14,4 +14,6 @@ def generate_rabbitmq_cookie(length=255):
 if __name__ == "__main__":
     cookie = generate_rabbitmq_cookie()
     print(cookie)
+    from datetime import datetime
+    print(f"\nFinished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
