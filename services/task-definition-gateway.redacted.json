@@ -138,7 +138,7 @@
                 ],
                 "interval": 30,
                 "retries": 3,
-                "startPeriod": 360,
+                "startPeriod": 300,
                 "timeout": 5
             },
             "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/euglena/gateway:latest",
@@ -439,6 +439,6 @@
     "requiresCompatibilities": [
         "FARGATE"
     ],
-    "cpu": "512",
-    "memory": "1024"
+    "cpu": "1024",
+    "memory": "4096"
 }

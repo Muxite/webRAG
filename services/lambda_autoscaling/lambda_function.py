@@ -50,7 +50,7 @@ ECS_CLUSTER = CONFIG.get('ECS_CLUSTER', 'euglena-cluster')
 ECS_SERVICE = CONFIG.get('ECS_SERVICE_NAME', 'euglena-agent')
 QUEUE_NAME = CONFIG.get('AGENT_INPUT_QUEUE', 'agent.mandates')
 TARGET_MESSAGES_PER_WORKER = int(CONFIG.get('TARGET_MESSAGES_PER_WORKER', '1'))
-MIN_WORKERS = int(CONFIG.get('MIN_WORKERS', '1'))
+MIN_WORKERS = max(1, int(CONFIG.get('MIN_WORKERS', '1')))
 MAX_WORKERS = int(CONFIG.get('MAX_WORKERS', '11'))
 CLOUDWATCH_NAMESPACE = CONFIG.get('CLOUDWATCH_NAMESPACE', QUEUE_DEPTH_METRIC.namespace)
 
@@ -116,18 +116,21 @@ def calculate_desired_workers(queue_depth: int) -> int:
     Calculate desired worker count based on queue depth.
     
     Policy:
+    - Minimum: MIN_WORKERS (enforced to be at least 1)
     - If 0 tasks: MIN_WORKERS
     - Otherwise: ceil(tasks / TARGET_MESSAGES_PER_WORKER)
     - Cap at MAX_WORKERS
     
     :param queue_depth: Current queue depth
-    :return: Desired worker count
+    :return: Desired worker count (always >= MIN_WORKERS, which is >= 1)
     """
+    min_workers = max(1, MIN_WORKERS)
+    
     if queue_depth == 0:
-        return MIN_WORKERS
+        return min_workers
     
     desired = math.ceil(queue_depth / TARGET_MESSAGES_PER_WORKER)
-    return max(MIN_WORKERS, min(desired, MAX_WORKERS))
+    return max(min_workers, min(desired, MAX_WORKERS))
 
 
 def update_service_desired_count(desired_count: int) -> bool:
@@ -150,6 +153,8 @@ def lambda_handler(event, context):
     """
     Main Lambda handler for auto-scaling.
     
+    When queue depth is unavailable, uses MIN_WORKERS as fallback for testing purposes.
+    
     :param event: Lambda event (ignored)
     :param context: Lambda context (ignored)
     :return: Response dictionary
@@ -159,7 +164,8 @@ def lambda_handler(event, context):
     queue_depth = get_queue_depth()
     if queue_depth is None:
         logger.warning(f"Could not get queue depth from CloudWatch. Namespace={CLOUDWATCH_NAMESPACE}, Metric=QueueDepth, QueueName={QUEUE_NAME}")
-        return {'statusCode': 200, 'body': json.dumps({'message': 'Could not get queue depth', 'action': 'none'})}
+        logger.info(f"Using fallback: MIN_WORKERS={MIN_WORKERS} (queue depth unavailable)")
+        queue_depth = 0
     
     current_count = get_current_worker_count()
     if current_count is None:
@@ -169,14 +175,14 @@ def lambda_handler(event, context):
     desired_count = calculate_desired_workers(queue_depth)
     
     if desired_count == current_count:
-        logger.info(f"No scaling: {current_count} workers, queue depth: {queue_depth}")
+        logger.info(f"No scaling: {current_count} workers, queue depth: {queue_depth if queue_depth is not None else 'unavailable (using MIN_WORKERS)'}")
         return {
             'statusCode': 200,
             'body': json.dumps({
                 'message': 'No scaling needed',
                 'current_count': current_count,
                 'desired_count': desired_count,
-                'queue_depth': queue_depth
+                'queue_depth': queue_depth if queue_depth is not None else None
             })
         }
     
@@ -184,14 +190,14 @@ def lambda_handler(event, context):
     action = 'scale_in' if desired_count < current_count else 'scale_out'
     
     if success:
-        logger.info(f"Scaling {action}: {current_count} -> {desired_count} (queue: {queue_depth})")
+        logger.info(f"Scaling {action}: {current_count} -> {desired_count} (queue: {queue_depth if queue_depth is not None else 'unavailable (using MIN_WORKERS)'})")
         return {
             'statusCode': 200,
             'body': json.dumps({
                 'action': action,
                 'current_count': current_count,
                 'desired_count': desired_count,
-                'queue_depth': queue_depth
+                'queue_depth': queue_depth if queue_depth is not None else None
             })
         }
     else:

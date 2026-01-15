@@ -37,6 +37,9 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
+            logger.info("=" * 32)
+            logger.info("**EUGLENA GATEWAY STARTING**")
+            logger.info("=" * 32)
             logger.info("Starting Gateway Service...")
             await app.state.gateway_service.start()
             log_connection_status(logger, "GatewayService", "CONNECTED")
@@ -44,7 +47,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             yield
         finally:
             try:
-                logger.info("Stopping Gateway Service...")
+                logger.info("GATEWAY SERVICE SHUTTING DOWN...")
                 await app.state.gateway_service.stop()
                 log_connection_status(logger, "GatewayService", "DISCONNECTED")
                 logger.info("Gateway Service stopped")
@@ -97,7 +100,21 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
         monitor = HealthMonitor(service="gateway", version="0.1.0", logger=logger)
         monitor.set_component("process", True)
         monitor.set_component("rabbitmq", app.state.gateway_service.rabbitmq.is_ready())
-        monitor.set_component("redis", app.state.gateway_service.storage.connector.redis_ready)
+        
+        redis_connector = app.state.gateway_service.storage.connector
+        redis_healthy = False
+        if redis_connector.redis_ready:
+            try:
+                client = await redis_connector.get_client()
+                if client:
+                    await client.ping()
+                    redis_healthy = True
+                else:
+                    redis_connector.redis_ready = False
+            except Exception:
+                redis_connector.redis_ready = False
+        
+        monitor.set_component("redis", redis_healthy)
         monitor.log_status()
         return monitor.payload()
 

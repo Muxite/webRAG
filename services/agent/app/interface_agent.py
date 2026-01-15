@@ -52,6 +52,7 @@ class InterfaceAgent:
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._presence_task: Optional[asyncio.Task] = None
         self._free_timeout_task: Optional[asyncio.Task] = None
+        self._reconnect_task: Optional[asyncio.Task] = None
         self.agent: Optional[Agent] = None
         self.correlation_id: Optional[str] = None
         self.mandate: Optional[str] = None
@@ -105,20 +106,104 @@ class InterfaceAgent:
         
         await self._initialize_ecs()
         
-        await self.rabbitmq.connect()
+        try:
+            await self.rabbitmq.connect()
+            self.logger.info("RabbitMQ connected successfully")
+        except Exception as e:
+            self.logger.warning(f"RabbitMQ initial connection failed: {e}. Will retry in background.")
+        
+        self._reconnect_task = asyncio.create_task(self._reconnect_rabbitmq_loop())
         
         if not await self._initialize_dependencies():
-            raise RuntimeError("Failed to initialize dependencies")
+            self.logger.warning("Some dependencies not ready, but continuing startup")
         
         self._presence_task = asyncio.create_task(self._presence.run())
-        self._consumer_task = asyncio.create_task(
-            self.rabbitmq.consume_queue(self.config.input_queue, self._handle_task)
-        )
+        
+        if self.rabbitmq.is_ready():
+            self._start_consumer()
+        else:
+            self.logger.info("RabbitMQ not ready, consumer will start when connection is established")
+        
         self.worker_ready = True
-        await self._publish_worker_status(WorkerStatusType.FREE)
+        try:
+            await self._publish_worker_status(WorkerStatusType.FREE)
+        except Exception:
+            pass
         self._free_since = datetime.now(timezone.utc)
         self._start_free_timeout()
-        self.logger.info(f"InterfaceAgent started; consuming '{self.config.input_queue}'")
+        self.logger.info(f"InterfaceAgent started; {'consuming' if self.rabbitmq.is_ready() else 'waiting for RabbitMQ connection'} '{self.config.input_queue}'")
+    
+    def _start_consumer(self) -> None:
+        """
+        Start consuming from RabbitMQ queue.
+        Should only be called when RabbitMQ is ready.
+        """
+        if self._consumer_task and not self._consumer_task.done():
+            return
+        
+        if not self.rabbitmq.is_ready():
+            self.logger.warning("Cannot start consumer: RabbitMQ not ready")
+            return
+        
+        async def _consumer_wrapper():
+            """
+            Wrapper for consumer that handles connection failures.
+            """
+            try:
+                await self.rabbitmq.consume_queue(self.config.input_queue, self._handle_task)
+            except Exception as e:
+                self.logger.error(f"Consumer failed: {e}", exc_info=True)
+                self.rabbitmq.rabbitmq_ready = False
+                if not self._should_exit:
+                    self.logger.info("Consumer will be restarted by reconnect loop")
+        
+        self._consumer_task = asyncio.create_task(_consumer_wrapper())
+        self.logger.info(f"Started consumer for '{self.config.input_queue}'")
+    
+    async def _reconnect_rabbitmq_loop(self) -> None:
+        """
+        Background task that continuously retries RabbitMQ connection.
+        Starts consumer once connection is established.
+        """
+        retry_interval = 10
+        max_retry_interval = 60
+        
+        while not self._should_exit:
+            try:
+                if self.rabbitmq.is_ready():
+                    connection_alive = False
+                    try:
+                        if self.rabbitmq.connection and not self.rabbitmq.connection.is_closed:
+                            if self.rabbitmq.channel and not self.rabbitmq.channel.is_closed:
+                                connection_alive = True
+                    except Exception:
+                        pass
+                    
+                    if not connection_alive:
+                        self.logger.warning("RabbitMQ connection lost, resetting ready flag")
+                        self.rabbitmq.rabbitmq_ready = False
+                    elif not self._consumer_task or self._consumer_task.done():
+                        self._start_consumer()
+                    
+                    await asyncio.sleep(retry_interval)
+                    continue
+                
+                self.logger.info("Retrying RabbitMQ connection...")
+                try:
+                    await self.rabbitmq.connect()
+                    self.logger.info("RabbitMQ connection established")
+                    self._start_consumer()
+                    retry_interval = 10
+                except Exception as e:
+                    self.logger.warning(f"RabbitMQ connection retry failed: {e}")
+                    retry_interval = min(retry_interval * 1.5, max_retry_interval)
+                
+                await asyncio.sleep(retry_interval)
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                self.logger.error(f"Error in RabbitMQ reconnect loop: {e}", exc_info=True)
+                await asyncio.sleep(retry_interval)
 
     def _start_free_timeout(self) -> None:
         if self._free_timeout_task:
@@ -159,6 +244,14 @@ class InterfaceAgent:
             except asyncio.CancelledError:
                 pass
             self._free_timeout_task = None
+
+        if self._reconnect_task:
+            self._reconnect_task.cancel()
+            try:
+                await self._reconnect_task
+            except asyncio.CancelledError:
+                pass
+            self._reconnect_task = None
 
         if self._consumer_task:
             self._consumer_task.cancel()

@@ -3,15 +3,34 @@ import logging
 from aiohttp import web
 from shared.connector_config import ConnectorConfig
 from shared.ecs_manager import EcsManager
-from shared.health import create_health_handler
+from shared.health import HealthMonitor
 from shared.pretty_log import setup_service_logger, log_connection_status
 from agent.app.interface_agent import InterfaceAgent
 
 
-def get_health_handler():
-    """Get health check handler with properly initialized logger."""
+async def health_handler(request):
+    """
+    Health check endpoint that verifies agent dependencies.
+    
+    :param request: aiohttp request object.
+    :returns: Health status with component breakdown.
+    """
     logger = setup_service_logger("Agent", logging.INFO)
-    return create_health_handler("agent", "0.1.0", logger)
+    monitor = HealthMonitor(service="agent", version="0.1.0", logger=logger)
+    monitor.set_component("process", True)
+    
+    worker = request.app.get("worker")
+    if worker:
+        monitor.set_component("rabbitmq", worker.rabbitmq.is_ready())
+        monitor.set_component("redis", worker.storage.connector.redis_ready)
+        monitor.set_component("worker_ready", worker.worker_ready)
+    else:
+        monitor.set_component("rabbitmq", False)
+        monitor.set_component("redis", False)
+        monitor.set_component("worker_ready", False)
+    
+    monitor.log_status()
+    return web.json_response(monitor.payload())
 
 
 async def _run() -> None:
@@ -19,7 +38,7 @@ async def _run() -> None:
     
     logger.info("Starting Agent Service...")
     app = web.Application()
-    app.router.add_get('/health', get_health_handler())
+    app.router.add_get('/health', health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8081)
@@ -33,6 +52,8 @@ async def _run() -> None:
         connector_config=config,
         ecs_manager=ecs_manager
     )
+    app["worker"] = worker
+    
     try:
         logger.info("Initializing agent worker...")
         await worker.start()

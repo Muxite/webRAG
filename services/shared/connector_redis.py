@@ -67,10 +67,17 @@ class ConnectorRedis:
     async def init_redis(self) -> bool:
         """
         Initialize or verify the Redis connection. Set self.redis_ready.
+        Verifies connection is actually alive if redis_ready flag is True.
         returns True on success, False on failure.
         """
-        if self.redis_ready:
-            return True
+        if self.redis_ready and self._redis:
+            try:
+                await self._redis.ping()
+                return True
+            except Exception:
+                self.logger.warning("Redis connection lost, reinitializing...")
+                self.redis_ready = False
+                self._redis = None
 
         retry = Retry(
             func=self._try_init_redis,
