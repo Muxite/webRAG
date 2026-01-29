@@ -1,0 +1,382 @@
+{
+    "family": "euglena-gateway",
+    "containerDefinitions": [
+        {
+            "cpu": 0,
+            "essential": true,
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "curl -f http://localhost:8000/api/v1/heartbeat || curl -f http://localhost:8000/ || exit 1"
+                ],
+                "interval": 60,
+                "retries": 10,
+                "startPeriod": 600,
+                "timeout": 10
+            },
+            "image": "chromadb/chroma:latest",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/euglena",
+                    "awslogs-region": "REGION",
+                    "awslogs-stream-prefix": "chroma"
+                }
+            },
+            "mountPoints": [
+                {
+                    "sourceVolume": "chroma-volume",
+                    "containerPath": "/chroma-data",
+                    "readOnly": false
+                }
+            ],
+            "name": "chroma",
+            "portMappings": [
+                {
+                    "containerPort": 8000,
+                    "hostPort": 8000,
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": [],
+            "environment": [
+                {
+                    "name": "IS_PERSISTENT",
+                    "value": "TRUE"
+                },
+                {
+                    "name": "PERSIST_DIRECTORY",
+                    "value": "/chroma-data"
+                }
+            ]
+        },
+        {
+            "cpu": 0,
+            "essential": true,
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "redis-cli ping | grep PONG || exit 1"
+                ],
+                "interval": 30,
+                "retries": 3,
+                "startPeriod": 120,
+                "timeout": 5
+            },
+            "image": "redis:7-alpine",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/euglena",
+                    "awslogs-region": "REGION",
+                    "awslogs-stream-prefix": "redis"
+                }
+            },
+            "mountPoints": [],
+            "name": "redis",
+            "portMappings": [
+                {
+                    "containerPort": 6379,
+                    "hostPort": 6379,
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": [],
+            "command": [
+                "redis-server"
+            ]
+        },
+        {
+            "cpu": 0,
+            "essential": true,
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "rabbitmq-diagnostics ping || exit 1"
+                ],
+                "interval": 30,
+                "retries": 3,
+                "startPeriod": 240,
+                "timeout": 5
+            },
+            "image": "rabbitmq:3-management",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/euglena",
+                    "awslogs-region": "REGION",
+                    "awslogs-stream-prefix": "rabbitmq"
+                }
+            },
+            "mountPoints": [],
+            "name": "rabbitmq",
+            "portMappings": [
+                {
+                    "containerPort": 5672,
+                    "hostPort": 5672,
+                    "protocol": "tcp"
+                },
+                {
+                    "containerPort": 15672,
+                    "hostPort": 15672,
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": [],
+            "command": [
+                "sh",
+                "-c",
+                "if [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then mkdir -p /var/lib/rabbitmq && echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie && chmod 600 /var/lib/rabbitmq/.erlang.cookie && chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; fi && exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"
+            ],
+            "secrets": [
+                {
+                    "name": "RABBITMQ_ERLANG_COOKIE",
+                    "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:SECRET_NAME-SUFFIX:RABBITMQ_ERLANG_COOKIE::"
+                }
+            ]
+        },
+        {
+            "cpu": 0,
+            "essential": true,
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "curl -f http://localhost:8080/health || exit 1"
+                ],
+                "interval": 60,
+                "retries": 10,
+                "startPeriod": 600,
+                "timeout": 10
+            },
+            "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/euglena/gateway:latest",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/euglena",
+                    "awslogs-region": "REGION",
+                    "awslogs-stream-prefix": "gateway"
+                }
+            },
+            "mountPoints": [],
+            "name": "gateway",
+            "portMappings": [
+                {
+                    "containerPort": 8080,
+                    "hostPort": 8080,
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": [],
+            "dependsOn": [
+                {
+                    "condition": "START",
+                    "containerName": "chroma"
+                },
+                {
+                    "condition": "START",
+                    "containerName": "redis"
+                },
+                {
+                    "condition": "START",
+                    "containerName": "rabbitmq"
+                }
+            ],
+            "secrets": [
+                {
+                    "name": "OPENAI_API_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:SECRET_NAME-SUFFIX:OPENAI_API_KEY::"
+                },
+                {
+                    "name": "RABBITMQ_ERLANG_COOKIE",
+                    "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:SECRET_NAME-SUFFIX:RABBITMQ_ERLANG_COOKIE::"
+                },
+                {
+                    "name": "SEARCH_API_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:SECRET_NAME-SUFFIX:SEARCH_API_KEY::"
+                },
+                {
+                    "name": "SUPABASE_ALLOW_UNCONFIRMED",
+                    "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:SECRET_NAME-SUFFIX:SUPABASE_ALLOW_UNCONFIRMED::"
+                },
+                {
+                    "name": "SUPABASE_ANON_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:SECRET_NAME-SUFFIX:SUPABASE_ANON_KEY::"
+                },
+                {
+                    "name": "SUPABASE_API_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:SECRET_NAME-SUFFIX:SUPABASE_API_KEY::"
+                },
+                {
+                    "name": "SUPABASE_JWT_SECRET",
+                    "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:SECRET_NAME-SUFFIX:SUPABASE_JWT_SECRET::"
+                },
+                {
+                    "name": "SUPABASE_URL",
+                    "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:SECRET_NAME-SUFFIX:SUPABASE_URL::"
+                }
+            ],
+            "environment": [
+                {
+                    "name": "AGENT_FREE_TIMEOUT_SECONDS",
+                    "value": "300"
+                },
+                {
+                    "name": "AGENT_INPUT_QUEUE",
+                    "value": "agent.mandates"
+                },
+                {
+                    "name": "AGENT_STATUS_TIME",
+                    "value": "10"
+                },
+                {
+                    "name": "CHROMA_URL",
+                    "value": "http://localhost:8000"
+                },
+                {
+                    "name": "CORS_ALLOWED_ORIGINS",
+                    "value": "https://web-rag-nine.vercel.app,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+                },
+                {
+                    "name": "DAILY_TICK_LIMIT",
+                    "value": "256"
+                },
+                {
+                    "name": "DEFAULT_DELAY",
+                    "value": "2"
+                },
+                {
+                    "name": "DEFAULT_TIMEOUT",
+                    "value": "10"
+                },
+                {
+                    "name": "JITTER_SECONDS",
+                    "value": "0.5"
+                },
+                {
+                    "name": "LITE",
+                    "value": "true"
+                },
+                {
+                    "name": "MODEL_API_URL",
+                    "value": "https://api.openai.com/v1/"
+                },
+                {
+                    "name": "MODEL_NAME",
+                    "value": "gpt-4o"
+                },
+                {
+                    "name": "PUBLISH_QUEUE_DEPTH_METRICS",
+                    "value": "true"
+                },
+                {
+                    "name": "QUEUE_DEPTH_METRICS_INTERVAL",
+                    "value": "5"
+                },
+                {
+                    "name": "RABBITMQ_URL",
+                    "value": "amqp://guest:guest@localhost:5672/"
+                },
+                {
+                    "name": "REDIS_URL",
+                    "value": "redis://localhost:6379/0"
+                },
+                {
+                    "name": "WORKER_STATUS_SET_KEY",
+                    "value": "workers:status"
+                },
+                {
+                    "name": "WORKER_STATUS_TTL",
+                    "value": "60"
+                }
+            ]
+        },
+        {
+            "cpu": 0,
+            "essential": false,
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "curl -f http://localhost:8082/health || exit 1"
+                ],
+                "interval": 30,
+                "retries": 3,
+                "startPeriod": 120,
+                "timeout": 5
+            },
+            "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/euglena/metrics:latest",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/euglena",
+                    "awslogs-region": "REGION",
+                    "awslogs-stream-prefix": "metrics"
+                }
+            },
+            "mountPoints": [],
+            "name": "metrics",
+            "portMappings": [
+                {
+                    "containerPort": 8082,
+                    "hostPort": 8082,
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": [],
+            "dependsOn": [
+                {
+                    "condition": "START",
+                    "containerName": "rabbitmq"
+                }
+            ],
+            "environment": [
+                {
+                    "name": "CLOUDWATCH_NAMESPACE",
+                    "value": "Euglena/RabbitMQ"
+                },
+                {
+                    "name": "PUBLISH_QUEUE_DEPTH_METRICS",
+                    "value": "true"
+                },
+                {
+                    "name": "QUEUE_DEPTH_METRICS_INTERVAL",
+                    "value": "5"
+                },
+                {
+                    "name": "QUEUE_NAME",
+                    "value": "agent.mandates"
+                },
+                {
+                    "name": "RABBITMQ_URL",
+                    "value": "amqp://guest:guest@localhost:5672/"
+                }
+            ]
+        }
+    ],
+    "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskRole",
+    "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "volumes": [
+        {
+            "name": "chroma-volume",
+            "efsVolumeConfiguration": {
+                "fileSystemId": "fs-0ec151e2adb754fc8",
+                "rootDirectory": "/",
+                "transitEncryption": "ENABLED",
+                "authorizationConfig": {
+                    "iam": "ENABLED"
+                }
+            }
+        }
+    ],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "512",
+    "memory": "1024"
+}

@@ -1,0 +1,169 @@
+{
+    "family": "euglena-agent",
+    "containerDefinitions": [
+        {
+            "cpu": 0,
+            "essential": true,
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "curl -f http://localhost:8081/health || exit 1"
+                ],
+                "interval": 30,
+                "retries": 3,
+                "startPeriod": 420,
+                "timeout": 5
+            },
+            "image": "848960888155.dkr.ecr.us-east-2.amazonaws.com/euglena/agent:latest",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/euglena",
+                    "awslogs-region": "us-east-2",
+                    "awslogs-stream-prefix": "agent"
+                }
+            },
+            "mountPoints": [],
+            "name": "agent",
+            "portMappings": [
+                {
+                    "containerPort": 8081,
+                    "hostPort": 8081,
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": [],
+            "secrets": [
+                {
+                    "name": "OPENAI_API_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena/secret-C5JPQd:OPENAI_API_KEY::"
+                },
+                {
+                    "name": "RABBITMQ_ERLANG_COOKIE",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena/secret-C5JPQd:RABBITMQ_ERLANG_COOKIE::"
+                },
+                {
+                    "name": "SEARCH_API_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena/secret-C5JPQd:SEARCH_API_KEY::"
+                },
+                {
+                    "name": "SUPABASE_ALLOW_UNCONFIRMED",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena/secret-C5JPQd:SUPABASE_ALLOW_UNCONFIRMED::"
+                },
+                {
+                    "name": "SUPABASE_ANON_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena/secret-C5JPQd:SUPABASE_ANON_KEY::"
+                },
+                {
+                    "name": "SUPABASE_API_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena/secret-C5JPQd:SUPABASE_API_KEY::"
+                },
+                {
+                    "name": "SUPABASE_JWT_SECRET",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena/secret-C5JPQd:SUPABASE_JWT_SECRET::"
+                },
+                {
+                    "name": "SUPABASE_URL",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena/secret-C5JPQd:SUPABASE_URL::"
+                }
+            ],
+            "environment": [
+                {
+                    "name": "AGENT_FREE_TIMEOUT_SECONDS",
+                    "value": "300"
+                },
+                {
+                    "name": "AGENT_INPUT_QUEUE",
+                    "value": "agent.mandates"
+                },
+                {
+                    "name": "AGENT_STATUS_TIME",
+                    "value": "10"
+                },
+                {
+                    "name": "AWS_REGION",
+                    "value": "us-east-2"
+                },
+                {
+                    "name": "CHROMA_URL",
+                    "value": "http://euglena-gateway.euglena.local:8000"
+                },
+                {
+                    "name": "CORS_ALLOWED_ORIGINS",
+                    "value": "https://web-rag-nine.vercel.app,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+                },
+                {
+                    "name": "DAILY_TICK_LIMIT",
+                    "value": "256"
+                },
+                {
+                    "name": "DEFAULT_DELAY",
+                    "value": "2"
+                },
+                {
+                    "name": "DEFAULT_TIMEOUT",
+                    "value": "10"
+                },
+                {
+                    "name": "ECS_CLUSTER",
+                    "value": "euglena-cluster"
+                },
+                {
+                    "name": "ECS_ENABLED",
+                    "value": "true"
+                },
+                {
+                    "name": "JITTER_SECONDS",
+                    "value": "0.5"
+                },
+                {
+                    "name": "LITE",
+                    "value": "true"
+                },
+                {
+                    "name": "MODEL_API_URL",
+                    "value": "https://api.openai.com/v1/"
+                },
+                {
+                    "name": "MODEL_NAME",
+                    "value": "gpt-4o"
+                },
+                {
+                    "name": "PUBLISH_QUEUE_DEPTH_METRICS",
+                    "value": "true"
+                },
+                {
+                    "name": "QUEUE_DEPTH_METRICS_INTERVAL",
+                    "value": "5"
+                },
+                {
+                    "name": "RABBITMQ_URL",
+                    "value": "amqp://guest:guest@euglena-gateway.euglena.local:5672/"
+                },
+                {
+                    "name": "REDIS_URL",
+                    "value": "redis://euglena-gateway.euglena.local:6379/0"
+                },
+                {
+                    "name": "WORKER_STATUS_SET_KEY",
+                    "value": "workers:status"
+                },
+                {
+                    "name": "WORKER_STATUS_TTL",
+                    "value": "60"
+                }
+            ]
+        }
+    ],
+    "taskRoleArn": "arn:aws:iam::848960888155:role/ecsTaskRole",
+    "executionRoleArn": "arn:aws:iam::848960888155:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "volumes": [],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "512",
+    "memory": "1024"
+}
