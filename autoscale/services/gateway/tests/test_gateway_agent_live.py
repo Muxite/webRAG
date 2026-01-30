@@ -92,7 +92,7 @@ async def test_agent_redis_registration_and_task_completion():
         logger.info(f"✓ Initial worker count in Redis: {initial_worker_count}")
         
         if initial_worker_count < 2:
-            logger.warning(f"⚠ Only {initial_worker_count} workers found, expected at least 2. Waiting 5 seconds for workers to register...")
+            logger.warning(f"WARN: Only {initial_worker_count} workers found, expected at least 2. Waiting 5 seconds for workers to register...")
             await asyncio.sleep(5.0)
             initial_worker_count = await worker_storage.get_worker_count()
             logger.info(f"Worker count after wait: {initial_worker_count}")

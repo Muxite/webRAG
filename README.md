@@ -94,18 +94,31 @@ See [docs/SECURITY.md](docs/SECURITY.md) for details.
 
 ## AWS Deployment
 
-The AWS deployment is operational and uses ECS with Secrets Manager for secure configuration.
+The AWS deployment uses ECS Fargate with a single service containing all containers.
 
-Generate ECS task definitions from environment files:
+### Quick Deploy
 
 ```bash
 cd services
-python ../scripts/build-task-definition.py
+python ../scripts/deploy.py
 ```
 
-Loads env vars from `services/.env` and `services/keys.env`, generates task definition JSON + a redacted version.
+This will:
+- Build and push Docker images to ECR
+- Generate and register task definitions
+- Create/update the ECS service with ALB integration
+- Configure IAM permissions
 
-Converts env vars to Secrets Manager format, generates `secrets.json` for AWS CLI. See script comments for usage.
+### Register Secrets
+
+```bash
+cd services
+python ../scripts/register-secrets.py
+```
+
+Automatically creates or updates secrets in AWS Secrets Manager.
+
+See [scripts/DEPLOYMENT.md](scripts/DEPLOYMENT.md) for detailed deployment documentation.
 
 ## Testing
 
