@@ -19,10 +19,12 @@ try:
     from scripts.network_discovery import NetworkDiscovery
     from scripts.ecs_infrastructure import EcsInfrastructure
     from scripts.network_utils import validate_network_configuration, fix_security_group_rules
+    from scripts.efs_manager import EfsManager
 except ImportError:
     from network_discovery import NetworkDiscovery
     from ecs_infrastructure import EcsInfrastructure
     from network_utils import validate_network_configuration, fix_security_group_rules
+    from efs_manager import EfsManager
 
 
 def load_aws_config(services_dir: Path) -> Dict:
@@ -383,6 +385,38 @@ def main():
             print("  WARN: fix-iam-permissions.py not found (skipping)")
     except Exception as e:
         print(f"  WARN: Could not fix IAM permissions: {e} (continuing anyway)")
+    
+    print("\n=== Setting Up EFS Mount Targets ===")
+    efs_file_system_id = aws_config.get("EFS_FILE_SYSTEM_ID", "").strip()
+    if efs_file_system_id:
+        try:
+            efs_manager = EfsManager(region=region, file_system_id=efs_file_system_id)
+            fs = efs_manager.get_file_system()
+            if fs:
+                print(f"  OK: EFS file system found: {efs_file_system_id}")
+                vpc_id = aws_config.get("VPC_ID")
+                subnet_ids = aws_config.get("SUBNET_IDS", "").split(",") if aws_config.get("SUBNET_IDS") else []
+                security_group_ids = aws_config.get("SECURITY_GROUP_IDS", "").split(",") if aws_config.get("SECURITY_GROUP_IDS") else []
+                
+                if subnet_ids:
+                    if not security_group_ids and vpc_id:
+                        sg_id = efs_manager.get_or_create_security_group_for_efs(vpc_id)
+                        if sg_id:
+                            security_group_ids = [sg_id]
+                    
+                    mount_targets = efs_manager.ensure_mount_targets(
+                        subnet_ids=[s.strip() for s in subnet_ids if s.strip()],
+                        security_group_ids=[s.strip() for s in security_group_ids if s.strip()]
+                    )
+                    print(f"  OK: {len(mount_targets)} mount target(s) ready")
+                else:
+                    print("  WARN: No subnet IDs configured (skipping mount target setup)")
+            else:
+                print(f"  WARN: EFS file system {efs_file_system_id} not found (skipping)")
+        except Exception as e:
+            print(f"  WARN: Could not set up EFS mount targets: {e} (continuing anyway)")
+    else:
+        print("  SKIP: EFS_FILE_SYSTEM_ID not set in aws.env (skipping EFS setup)")
     
     network_config = get_network_config(aws_config, network_discovery)
     if not network_config:

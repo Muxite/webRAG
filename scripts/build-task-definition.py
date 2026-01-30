@@ -190,13 +190,15 @@ def _make_log_config(prefix, region):
 def build_euglena_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env):
     """
     Builds single euglena task definition with all containers (chroma, redis, rabbitmq, agent, gateway).
+    Supports EFS volumes for persistent storage if EFS file system IDs are provided in aws_env.
+    
     :param account_id: AWS account ID
     :param region: AWS region
     :param secret_name: Secrets Manager secret name
     :param secret_arn_suffix: ARN suffix for the secret
     :param secret_keys: List of secret key names
     :param env_vars: Dictionary of environment variables from .env
-    :param aws_env: Dictionary of AWS environment variables from aws.env
+    :param aws_env: Dictionary of AWS environment variables from aws.env (may contain EFS file system IDs)
     :returns: Task definition dictionary
     """
     secrets = build_secrets_list(secret_name, secret_arn_suffix, region, account_id, secret_keys)
@@ -208,7 +210,16 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
             "valueFrom": f"arn:aws:secretsmanager:{region}:{account_id}:secret:{secret_name}-{secret_arn_suffix}:RABBITMQ_ERLANG_COOKIE::"
         })
     
+    shared_efs_id = aws_env.get("EFS_FILE_SYSTEM_ID", "").strip() if aws_env else ""
+    chroma_efs_id = aws_env.get("CHROMA_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
+    redis_efs_id = aws_env.get("REDIS_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
+    rabbitmq_efs_id = aws_env.get("RABBITMQ_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
+    
     chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"
+    chroma_mount_points = []
+    if chroma_efs_id:
+        chroma_mount_points.append({"sourceVolume": "chroma-data", "containerPath": "/chroma-data", "readOnly": False})
+    
     chroma = {
         "cpu": 0,
         "environment": [
@@ -219,27 +230,38 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         "healthCheck": _make_health_check(chroma_health_command, start_period=180),
         "image": "chromadb/chroma:latest",
         "logConfiguration": _make_log_config("chroma", region),
-        "mountPoints": [],
+        "mountPoints": chroma_mount_points,
         "name": "chroma",
         "portMappings": [{"containerPort": 8000, "hostPort": 8000, "protocol": "tcp"}],
         "systemControls": [],
         "volumesFrom": []
     }
     
+    redis_command = ["redis-server"]
+    redis_mount_points = []
+    if redis_efs_id:
+        redis_command.append("--appendonly")
+        redis_command.append("yes")
+        redis_mount_points.append({"sourceVolume": "redis-data", "containerPath": "/data", "readOnly": False})
+    
     redis = {
-        "command": ["redis-server"],
+        "command": redis_command,
         "cpu": 0,
         "environment": [],
         "essential": True,
         "healthCheck": _make_health_check("redis-cli ping | grep PONG || exit 1", start_period=90),
         "image": "redis:7-alpine",
         "logConfiguration": _make_log_config("redis", region),
-        "mountPoints": [],
+        "mountPoints": redis_mount_points,
         "name": "redis",
         "portMappings": [{"containerPort": 6379, "hostPort": 6379, "protocol": "tcp"}],
         "systemControls": [],
         "volumesFrom": []
     }
+    
+    rabbitmq_mount_points = []
+    if rabbitmq_efs_id:
+        rabbitmq_mount_points.append({"sourceVolume": "rabbitmq-data", "containerPath": "/var/lib/rabbitmq", "readOnly": False})
     
     rabbitmq = {
         "command": [
@@ -253,7 +275,7 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         "healthCheck": _make_health_check("rabbitmq-diagnostics ping || exit 1", start_period=180),
         "image": "rabbitmq:3-management",
         "logConfiguration": _make_log_config("rabbitmq", region),
-        "mountPoints": [],
+        "mountPoints": rabbitmq_mount_points,
         "name": "rabbitmq",
         "portMappings": [
             {"containerPort": 5672, "hostPort": 5672, "protocol": "tcp"},
@@ -309,13 +331,62 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
     
     containers = [chroma, redis, rabbitmq, agent, gateway]
     
+    volumes = []
+    using_shared_efs = (chroma_efs_id and redis_efs_id and rabbitmq_efs_id and 
+                        chroma_efs_id == redis_efs_id == rabbitmq_efs_id)
+    
+    if chroma_efs_id:
+        efs_config = {
+            "fileSystemId": chroma_efs_id,
+            "transitEncryption": "ENABLED",
+            "authorizationConfig": {
+                "iam": "ENABLED"
+            }
+        }
+        if using_shared_efs:
+            efs_config["rootDirectory"] = "/chroma-data"
+        volumes.append({
+            "name": "chroma-data",
+            "efsVolumeConfiguration": efs_config
+        })
+    
+    if redis_efs_id:
+        efs_config = {
+            "fileSystemId": redis_efs_id,
+            "transitEncryption": "ENABLED",
+            "authorizationConfig": {
+                "iam": "ENABLED"
+            }
+        }
+        if using_shared_efs:
+            efs_config["rootDirectory"] = "/redis-data"
+        volumes.append({
+            "name": "redis-data",
+            "efsVolumeConfiguration": efs_config
+        })
+    
+    if rabbitmq_efs_id:
+        efs_config = {
+            "fileSystemId": rabbitmq_efs_id,
+            "transitEncryption": "ENABLED",
+            "authorizationConfig": {
+                "iam": "ENABLED"
+            }
+        }
+        if using_shared_efs:
+            efs_config["rootDirectory"] = "/rabbitmq-data"
+        volumes.append({
+            "name": "rabbitmq-data",
+            "efsVolumeConfiguration": efs_config
+        })
+    
     return {
         "family": "euglena",
         "containerDefinitions": containers,
         "taskRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskRole",
         "executionRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskExecutionRole",
         "networkMode": "awsvpc",
-        "volumes": [],
+        "volumes": volumes,
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
         "cpu": "1024",

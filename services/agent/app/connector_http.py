@@ -44,8 +44,11 @@ class ConnectorHttp:
     async def __aenter__(self):
         if self.session is None or self.session.closed:
             timeout = aiohttp.ClientTimeout(total=self.config.default_timeout)
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
             try:
-                self.session = aiohttp.ClientSession(timeout=timeout)
+                self.session = aiohttp.ClientSession(timeout=timeout, headers=headers)
                 self.logger.info("HTTP Session created.")
             except Exception as e:
                 self.logger.error(f"HTTP session creation failed: {e}")
@@ -79,7 +82,7 @@ class ConnectorHttp:
                 self.status = status
 
         async def do_request() -> RequestResult:
-            timeout = self.config.default_timeout
+            timeout = kwargs.pop("timeout", self.config.default_timeout)
             async with session.request(method=method, url=url, timeout=timeout, **kwargs) as resp:
                 status = resp.status
 
