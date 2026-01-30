@@ -203,12 +203,15 @@ class InterfaceAgent:
         
         try:
             test_url = "https://www.google.com"
-            result = await self.connector_http.request("GET", test_url, timeout=5)
-            if result and result.status_code == 200:
+            timeout = aiohttp.ClientTimeout(total=5)
+            result = await self.connector_http.request("GET", test_url, timeout=timeout, retries=1)
+            if result and not result.error and result.status == 200:
                 connectivity["external_api"] = True
                 self.logger.info("  OK: External API access working")
             else:
-                self.logger.warning(f"  FAIL: External API returned status {result.status_code if result else 'None'}")
+                status = result.status if result else None
+                error = result.error if result else True
+                self.logger.warning(f"  FAIL: External API returned status {status}, error={error}")
         except Exception as e:
             self.logger.warning(f"  FAIL: External API check failed: {e}")
         

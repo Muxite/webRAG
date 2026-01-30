@@ -253,59 +253,91 @@ The agent will:
 
 ---
 
-### Stage 1: Infrastructure Improvements
+### Stage 1: Infrastructure Improvements and Stable Health Checks
 
-**Goal**: Port stable infrastructure utilities without changing deployment architecture
+**Goal**: Port stable infrastructure utilities and improve health checks without changing deployment architecture
 
 **Tasks**:
 
 1. Port `autoscale/services/shared/queue_metrics.py` (just the definitions, no publishing yet)
 2. Port improved error handling patterns from autoscale (if they're better)
-3. Port health check improvements
-4. Test: Verify no regressions, services remain stable
+3. **Add stable health checks**:
 
-**Files to Port**:
+   - Review and improve health check configurations in task definitions
+   - Ensure health checks are lenient enough to prevent false failures
+   - Add proper start periods, intervals, retries, and timeouts
+   - Test health checks don't cause unnecessary task restarts
+
+4. **Fix 403 errors**: Add User-Agent header to HTTP connector to avoid bot detection
+5. **Bake embedding model**: Pre-download Chroma embedding model in Docker image to avoid runtime downloads
+6. Test: Verify no regressions, services remain stable
+
+**Files to Port/Modify**:
 
 - `services/shared/queue_metrics.py` (metric definitions only)
+- `services/agent/app/connector_http.py` (add User-Agent header)
+- `services/agent/.dockerfile` (pre-download embedding model)
+- `scripts/build-task-definition.py` (improve health check configurations)
 
 **Success Criteria**:
 
 - No functionality changes
-- Services remain stable
-- Code quality improvements only
+- Health checks are stable and don't cause false failures
+- 403 errors reduced with proper User-Agent headers
+- Embedding model pre-downloaded in image (no runtime downloads)
+- Services remain stable for 30+ minutes
 
 ---
 
-### Stage 2: Service Separation (No Autoscaling Yet)
+### Stage 2: Service Separation with Volume Mounts
 
-**Goal**: Split into gateway and agent services, but keep agent at fixed count (1)
+**Goal**: Split into gateway and agent services with persistent storage, but keep agent at fixed count (1)
 
 **Tasks**:
 
-1. Modify `scripts/build-task-definition.py` to build two task definitions:
+1. **Set up EFS volumes** (if not using EFS, use EBS or other persistent storage):
+
+   - Create EFS file system for Chroma data (or use existing if configured)
+   - Create EBS volumes or use EFS for Redis/RabbitMQ persistence (optional but recommended)
+   - Update `scripts/deploy.py` to create EFS file system and mount targets if they don't exist
+   - Update `scripts/build-task-definition.py` to configure volume mounts
+
+2. Modify `scripts/build-task-definition.py` to build two task definitions:
 
    - `euglena-gateway`: gateway, redis, rabbitmq, chroma containers
+     - Chroma: Mount EFS volume to `/chroma-data` (if EFS configured)
+     - Redis: Optional volume mount for persistence
+     - RabbitMQ: Optional volume mount for persistence
    - `euglena-agent`: agent container only
 
-2. Update `scripts/deploy.py` to:
+3. Update `scripts/deploy.py` to:
 
    - Build both task definitions
    - Create/update two ECS services
+   - Create EFS file system and mount targets if they don't exist (or verify existing)
    - Keep agent service at desiredCount=1 (fixed)
 
-3. Update agent to connect to gateway via localhost (same task) → service discovery DNS
-4. Test: Deploy both services, verify agent can reach gateway services
+4. Update agent to connect to gateway via localhost (same task) → service discovery DNS
+5. Test: Deploy both services, verify agent can reach gateway services, verify data persists
 
 **Files to Modify**:
 
-- `scripts/build-task-definition.py` (split into `build_gateway_task_definition()` and `build_agent_task_definition()`)
-- `scripts/deploy.py` (handle two services)
+- `scripts/build-task-definition.py` (split into `build_gateway_task_definition()` and `build_agent_task_definition()`, add volume mounts)
+- `scripts/deploy.py` (handle two services, create EFS resources if needed)
+- `scripts/ecs_infrastructure.py` (add EFS file system creation/verification)
 - Agent environment variables (update connection URLs)
+
+**Volume Configuration**:
+
+- **Chroma**: EFS mount at `/chroma-data` (required for persistence)
+- **Redis**: Optional volume mount (can use EFS or ephemeral)
+- **RabbitMQ**: Optional volume mount (can use EFS or ephemeral)
 
 **Success Criteria**:
 
 - Both services deploy successfully
 - Agent can connect to gateway's redis/rabbitmq/chroma
+- Chroma data persists across task restarts (EFS working)
 - Services remain stable for 30+ minutes
 - No autoscaling active (fixed at 1 agent)
 

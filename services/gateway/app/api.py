@@ -10,6 +10,9 @@ from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
 from shared.models import TaskRequest, TaskResponse
 from shared.storage import RedisTaskStorage
+from shared.pretty_log import setup_service_logger, log_connection_status
+from shared.startup_message import log_startup_message, log_shutdown_message
+from shared.health import HealthMonitor
 from gateway.app.gateway_service import GatewayService
 from gateway.app.supabase_auth import SupabaseUser, get_current_supabase_user
 from shared.user_quota import SupabaseUserTickManager
@@ -25,19 +28,24 @@ def is_test_mode() -> bool:
 
 
 def create_app(service: Optional[GatewayService] = None) -> FastAPI:
-    logger = logging.getLogger("GatewayAPI")
+    logger = setup_service_logger("Gateway", logging.INFO)
     cfg = ConnectorConfig()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        log_startup_message(logger, "GATEWAY", "0.1.0")
         try:
             await app.state.gateway_service.start()
+            log_connection_status(logger, "GatewayService", "CONNECTED")
+            logger.info("Gateway service started successfully")
             yield
         finally:
+            log_shutdown_message(logger, "GATEWAY")
             try:
                 await app.state.gateway_service.stop()
+                logger.info("Gateway service stopped")
             except Exception as e:
-                logger.error("Failed to stop GatewayService: %s", e)
+                logger.error("Failed to stop GatewayService: %s", e, exc_info=True)
 
     app = FastAPI(title="Euglena Gateway", version="0.1.0", lifespan=lifespan)
     
@@ -76,8 +84,27 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
 
     @router.get("/health")
     async def health_check():
-        """Health check endpoint for ALB target group and ECS container health checks."""
-        return {"status": "healthy", "service": "gateway", "version": "0.1.0"}
+        """
+        Health check endpoint for ALB target group and ECS container health checks.
+        Always returns HTTP 200 if process is running (process-level health check).
+        Component status is informational but doesn't fail the health check.
+        
+        :returns: Health status with component breakdown.
+        """
+        monitor = HealthMonitor(service="gateway", version="0.1.0", logger=logger)
+        monitor.set_component("process", True)
+        
+        gateway_service = app.state.gateway_service
+        if gateway_service:
+            monitor.set_component("rabbitmq", gateway_service.rabbitmq.is_ready() if hasattr(gateway_service, 'rabbitmq') else False)
+            monitor.set_component("redis", gateway_service.storage.connector.redis_ready if hasattr(gateway_service, 'storage') else False)
+        else:
+            monitor.set_component("rabbitmq", False)
+            monitor.set_component("redis", False)
+        
+        payload = monitor.payload()
+        monitor.log_status()
+        return payload
 
     @router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
     async def submit_task(
