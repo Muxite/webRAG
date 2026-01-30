@@ -7,7 +7,10 @@ from shared.connector_config import ConnectorConfig
 from shared.retry import Retry
 
 class ConnectorHttp:
-    """Manage a single HTTP session for a connector."""
+    """
+    HTTP client connector for making requests with retry logic.
+    Manages session lifecycle and handles transient errors.
+    """
     HTTP_STATUS_CODES = {
         200: "OK - Request succeeded",
         201: "Created - Resource created successfully",
@@ -46,7 +49,6 @@ class ConnectorHttp:
             timeout = aiohttp.ClientTimeout(total=self.config.default_timeout)
             try:
                 self.session = aiohttp.ClientSession(timeout=timeout)
-                self.logger.info("HTTP Session created.")
             except Exception as e:
                 self.logger.error(f"HTTP session creation failed: {e}")
                 raise
@@ -56,7 +58,6 @@ class ConnectorHttp:
         if self.session and not self.session.closed:
             try:
                 await self.session.close()
-                self.logger.info("HTTP Session closed.")
             except Exception as e:
                 self.logger.debug(f"Error closing HTTP session: {e}")
         self.session = None
@@ -68,8 +69,11 @@ class ConnectorHttp:
 
     async def request(self, method: str, url: str, retries: int = 4, **kwargs) -> RequestResult:
         """
-        Generic request using shared Retry with exponential backoff.
-        :return: RequestResult
+        Make HTTP request with retry logic.
+        :param method: HTTP method
+        :param url: Request URL
+        :param retries: Max retry attempts
+        :returns RequestResult: response or error
         """
         session = self.get_session()
 
@@ -105,7 +109,7 @@ class ConnectorHttp:
             return False
 
         try:
-            result: RequestResult = await Retry(
+            return await Retry(
                 func=do_request,
                 max_attempts=retries,
                 base_delay=max(1.0, float(self.config.default_delay)),
@@ -117,9 +121,8 @@ class ConnectorHttp:
                 should_retry=should_retry,
                 raise_on_fail=True,
             ).run()
-            return result
         except Exception as e:
-            status = e.status if hasattr(e, "status") else None
+            status = getattr(e, "status", None)
             return RequestResult(
                 status=status,
                 error=True,

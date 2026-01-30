@@ -11,7 +11,7 @@
                 ],
                 "interval": 30,
                 "retries": 3,
-                "startPeriod": 300,
+                "startPeriod": 420,
                 "timeout": 5
             },
             "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/euglena/agent:latest",
@@ -28,6 +28,7 @@
             "portMappings": [
                 {
                     "containerPort": 8081,
+                    "hostPort": 8081,
                     "protocol": "tcp"
                 }
             ],
@@ -134,7 +135,7 @@
                 },
                 {
                     "name": "QUEUE_DEPTH_METRICS_INTERVAL",
-                    "value": "10"
+                    "value": "5"
                 },
                 {
                     "name": "RABBITMQ_URL",
@@ -163,6 +164,6 @@
     "requiresCompatibilities": [
         "FARGATE"
     ],
-    "cpu": "256",
-    "memory": "2048"
+    "cpu": "512",
+    "memory": "1024"
 }

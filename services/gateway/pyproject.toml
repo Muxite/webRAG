@@ -4,4 +4,17 @@ asyncio_mode = "auto"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::pydantic.warnings.PydanticDeprecatedSince212",
+    "ignore::UserWarning:pyiceberg",
+    "ignore:.*enablePackrat.*:DeprecationWarning",
+    "ignore:.*escChar.*:DeprecationWarning",
+    "ignore:.*unquoteResults.*:DeprecationWarning",
+    "ignore:.*enable_packrat.*:DeprecationWarning",
+    "ignore:.*esc_char.*:DeprecationWarning",
+    "ignore:.*unquote_results.*:DeprecationWarning",
+    "ignore:.*mode='after'.*:PydanticDeprecatedSince212",
+]
+markers = [
+    "unit: fast unit tests with minimal external dependencies",
+    "integration: tests that require real services (e.g., RabbitMQ)",
+    "e2e: end-to-end tests spanning multiple components/containers",
 ]

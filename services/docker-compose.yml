@@ -59,8 +59,6 @@ services:
     env_file:
       - .env
       - keys.env
-    environment:
-      - AGENT_STATUS_TIME=0.2
     networks:
       - enet
 
@@ -88,28 +86,19 @@ services:
       context: .
       dockerfile: agent/.dockerfile
     depends_on:
-      - chroma
-      - redis
-      - rabbitmq
-    command: ["pytest", "-v", "tests"]
+      chroma:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    command: ["pytest", "-v", "tests", "--tb=short", "--cache-clear"]
     env_file:
       - .env
       - keys.env
     environment:
-      - AGENT_STATUS_TIME=0.2
-    networks:
-      - enet
-
-  shared-test:
-    profiles: ["test"]
-    build:
-      context: .
-      dockerfile: tests/.dockerfile
-    depends_on:
-      - rabbitmq
-    command: ["pytest", "-v", "shared/tests"]
-    environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis://redis:6379/0
     networks:
       - enet
 
@@ -119,15 +108,53 @@ services:
       context: .
       dockerfile: gateway/.dockerfile
     depends_on:
-      - rabbitmq
-      - redis
-      - agent
-    command: ["pytest", "-vv", "tests"]
+      rabbitmq:
+        condition: service_started
+      redis:
+        condition: service_started
+      chroma:
+        condition: service_started
+      agent:
+        condition: service_started
+      metrics:
+        condition: service_started
+    command: ["pytest", "-v", "tests", "--tb=short", "-m", "not (integration or e2e)", "--cache-clear"]
     env_file:
       - .env
       - keys.env
     environment:
       - GATEWAY_TEST_MODE=1
+      - DISABLE_QUOTA_CHECKS=1
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - enet
+
+  integration-test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: gateway/.dockerfile
+    depends_on:
+      gateway:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      redis:
+        condition: service_started
+      chroma:
+        condition: service_started
+      agent:
+        condition: service_started
+    command: ["pytest", "-v", "-m", "integration or e2e", "tests/test_system_integration.py", "--tb=short", "--cache-clear"]
+    env_file:
+      - .env
+      - keys.env
+    environment:
+      - GATEWAY_TEST_MODE=1
+      - DISABLE_QUOTA_CHECKS=1
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis://redis:6379/0
     networks:
       - enet
 
@@ -145,6 +172,8 @@ services:
     env_file:
       - .env
       - keys.env
+    environment:
+      - DISABLE_QUOTA_CHECKS=1
     networks:
       - enet
 
@@ -156,11 +185,14 @@ services:
     stdin_open: true
     tty: true
     depends_on:
-      - gateway
+      gateway:
+        condition: service_started
     command: [ "python", "-m", "app.apicli" ]
     env_file:
       - .env
       - keys.env
+    environment:
+      - GATEWAY_URL=http://gateway:8080
     networks:
       - enet
 
@@ -185,7 +217,7 @@ services:
       - keys.env
     environment:
       - QUEUE_NAME=${AGENT_INPUT_QUEUE:-agent.mandates}
-      - QUEUE_DEPTH_METRICS_INTERVAL=${QUEUE_DEPTH_METRICS_INTERVAL:-10}
+      - QUEUE_DEPTH_METRICS_INTERVAL=${QUEUE_DEPTH_METRICS_INTERVAL:-5}
     networks:
       - enet
 

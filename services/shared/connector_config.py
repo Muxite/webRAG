@@ -2,7 +2,10 @@ import logging
 import os
 
 class ConnectorConfig:
-    """Holds shared configuration for all connectors."""
+    """
+    Central configuration manager for all connector services.
+    Loads settings from environment variables with defaults.
+    """
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.redis_url = os.environ.get("REDIS_URL")
@@ -19,13 +22,21 @@ class ConnectorConfig:
         self.rabbitmq_url = os.environ.get("RABBITMQ_URL")
         self.input_queue = os.environ.get("AGENT_INPUT_QUEUE", "agent.mandates")
         self.status_queue = os.environ.get("AGENT_STATUS_QUEUE", "agent.status")
-        self.status_time = float(os.environ.get("AGENT_STATUS_TIME", "10"))
+        self.status_time = float(os.environ.get("AGENT_STATUS_TIME", "20"))
 
         self.worker_status_set_key = os.environ.get("WORKER_STATUS_SET_KEY", "workers:status")
         self.worker_status_ttl = int(os.environ.get("WORKER_STATUS_TTL", "60"))
 
         self.daily_tick_limit = int(os.environ.get("DAILY_TICK_LIMIT", "1000"))
         self.agent_free_timeout_seconds = int(os.environ.get("AGENT_FREE_TIMEOUT_SECONDS", "300"))
+        
+        self.resilient_status_max_wait_seconds = float(os.environ.get("RESILIENT_STATUS_MAX_WAIT_SECONDS", "300.0"))
+        self.resilient_status_retry_timeout_seconds = float(os.environ.get("RESILIENT_STATUS_RETRY_TIMEOUT_SECONDS", "600.0"))
+        
+        self.agent_task_timeout_seconds = float(os.environ.get("AGENT_TASK_TIMEOUT_SECONDS", "3600.0"))
+        self.agent_max_pending_status_updates = int(os.environ.get("AGENT_MAX_PENDING_STATUS_UPDATES", "100"))
+        self.agent_heartbeat_timeout_seconds = float(os.environ.get("AGENT_HEARTBEAT_TIMEOUT_SECONDS", "30.0"))
+        self.rabbitmq_reconnect_delay_seconds = float(os.environ.get("RABBITMQ_RECONNECT_DELAY_SECONDS", "10.0"))
 
         if not self.redis_url:
             self.logger.warning("No Redis URL set")

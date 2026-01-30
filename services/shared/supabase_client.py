@@ -31,3 +31,22 @@ def create_user_client(access_token: str) -> Client:
     return client
 
 
+def create_service_client() -> Client:
+    """
+    Create a Supabase client with service role key for backend operations.
+    
+    Uses SUPABASE_SERVICE_ROLE_KEY which bypasses RLS policies.
+    This should only be used by backend services (agent, gateway) for system operations.
+    
+    :return: Supabase client with service role permissions
+    """
+    url = os.environ.get("SUPABASE_URL")
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    
+    if not url:
+        raise RuntimeError("Missing SUPABASE_URL environment variable")
+    if not service_key:
+        raise RuntimeError("Missing SUPABASE_SERVICE_ROLE_KEY environment variable")
+    
+    return create_client(url, service_key)
+

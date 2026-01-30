@@ -31,7 +31,6 @@ class ApiClient {
     this.baseURL = API_CONFIG.baseURL;
   }
 
-  // Update base URL dynamically (for when API mode changes)
   updateBaseURL(newBaseURL: string): void {
     this.baseURL = newBaseURL;
   }
@@ -67,15 +66,20 @@ class ApiClient {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({
-          detail: `HTTP ${response.status}: ${response.statusText}`,
-        }));
-        throw new Error(error.detail || 'Request failed');
+        let errorData: { detail?: string; message?: string };
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = {
+            detail: `HTTP ${response.status}: ${response.statusText}`,
+          };
+        }
+        const errorMessage = errorData.detail || errorData.message || `Request failed with status ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       return response.json();
     } catch (error) {
-      // Handle network errors (e.g., failed to fetch on mobile devices or localhost server not running)
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         const isLocalhost = this.baseURL.includes('localhost') || this.baseURL.includes('127.0.0.1');
         if (isLocalhost) {
@@ -101,6 +105,18 @@ class ApiClient {
 
   async getWorkerCount(): Promise<{ count: number }> {
     return this.request<{ count: number }>('/agents/count');
+  }
+
+  async listTasks(): Promise<TaskResponse[]> {
+    return this.request<TaskResponse[]>('/tasks');
+  }
+
+  async checkHealth(): Promise<{ status: string; components: Record<string, boolean> }> {
+    try {
+      return this.request<{ status: string; components: Record<string, boolean> }>('/health');
+    } catch (error) {
+      throw new Error(`Health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
 

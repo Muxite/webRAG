@@ -4,6 +4,7 @@ Provides structured logging with comprehensive data capture.
 """
 
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -18,15 +19,15 @@ def log_api_call(
     **kwargs: Any,
 ) -> None:
     """
-    Log an API call with comprehensive details.
+    Log an API call with comprehensive details (no message, just extra data for context).
     
-    :param logger: Logger instance.
-    :param method: HTTP method (GET, POST, etc.).
-    :param endpoint: API endpoint path.
-    :param user_id: User ID making the request.
-    :param user_email: User email making the request.
-    :param correlation_id: Task correlation ID if applicable.
-    :param kwargs: Additional fields to log.
+    :param logger: Logger instance
+    :param method: HTTP method ex: GET, POST
+    :param endpoint: API endpoint path
+    :param user_id: User ID making the request
+    :param user_email: User email making the request
+    :param correlation_id: Task correlation ID if applicable
+    :param kwargs: Additional fields to log
     """
     timestamp = datetime.utcnow().isoformat()
     extra = {
@@ -41,8 +42,6 @@ def log_api_call(
     if correlation_id:
         extra["correlation_id"] = correlation_id
     extra.update(kwargs)
-    
-    logger.info("API CALL RECEIVED", extra=extra)
 
 
 def log_task_operation(
@@ -56,12 +55,12 @@ def log_task_operation(
     """
     Log a task operation with comprehensive details.
     
-    :param logger: Logger instance.
-    :param operation: Operation name (e.g., "CREATED", "UPDATED", "PUBLISHED").
-    :param correlation_id: Task correlation ID.
-    :param status: Current task status.
-    :param stage: Processing stage.
-    :param kwargs: Additional fields to log.
+    :param logger: Logger instance
+    :param operation: Operation name ex: CREATED, UPDATED, PUBLISHED
+    :param correlation_id: Task correlation ID
+    :param status: Current task status
+    :param stage: Processing stage
+    :param kwargs: Additional fields to log
     """
     timestamp = datetime.utcnow().isoformat()
     extra = {
@@ -88,11 +87,11 @@ def log_connection_operation(
     """
     Log a connection operation.
     
-    :param logger: Logger instance.
-    :param operation: Operation name (e.g., "CONNECTED", "DISCONNECTED", "RECONNECTING").
-    :param service: Service name (e.g., "RabbitMQ", "Redis").
-    :param status: Connection status.
-    :param kwargs: Additional fields to log.
+    :param logger: Logger instance
+    :param operation: Operation name ex: CONNECTED, DISCONNECTED, RECONNECTING
+    :param service: Service name ex: RabbitMQ, Redis
+    :param status: Connection status
+    :param kwargs: Additional fields to log
     """
     timestamp = datetime.utcnow().isoformat()
     extra = {
@@ -116,13 +115,17 @@ def log_queue_operation(
     """
     Log a queue operation.
     
-    :param logger: Logger instance.
-    :param operation: Operation name (e.g., "PUBLISHED", "CONSUMED", "DEPTH_CHECK").
-    :param queue_name: Queue name.
-    :param correlation_id: Message correlation ID if applicable.
-    :param message_count: Queue depth if applicable.
-    :param kwargs: Additional fields to log.
+    :param logger: Logger instance
+    :param operation: Operation name ex: PUBLISHED, CONSUMED, DEPTH_CHECK
+    :param queue_name: Queue name
+    :param correlation_id: Message correlation ID if applicable
+    :param message_count: Queue depth if applicable
+    :param kwargs: Additional fields to log
     """
+    test_mode = os.environ.get("GATEWAY_TEST_MODE", "").lower() in ("1", "true", "yes")
+    if test_mode and operation in ("PUBLISHED", "PUBLISHING"):
+        return
+    
     timestamp = datetime.utcnow().isoformat()
     extra = {
         "timestamp": timestamp,
@@ -149,12 +152,12 @@ def log_storage_operation(
     """
     Log a storage operation.
     
-    :param logger: Logger instance.
-    :param operation: Operation name (e.g., "STORED", "RETRIEVED", "UPDATED", "DELETED").
-    :param correlation_id: Task correlation ID.
-    :param storage_type: Storage type (e.g., "Redis", "ChromaDB").
-    :param key: Storage key if applicable.
-    :param kwargs: Additional fields to log.
+    :param logger: Logger instance
+    :param operation: Operation name ex: STORED, RETRIEVED, UPDATED, DELETED
+    :param correlation_id: Task correlation ID
+    :param storage_type: Storage type ex: Redis, ChromaDB
+    :param key: Storage key if applicable
+    :param kwargs: Additional fields to log
     """
     timestamp = datetime.utcnow().isoformat()
     extra = {
@@ -180,11 +183,11 @@ def log_error_with_context(
     """
     Log an error with comprehensive context.
     
-    :param logger: Logger instance.
-    :param error: Exception that occurred.
-    :param operation: Operation that failed.
-    :param correlation_id: Task correlation ID if applicable.
-    :param kwargs: Additional context fields.
+    :param logger: Logger instance
+    :param error: Exception that occurred
+    :param operation: Operation that failed
+    :param correlation_id: Task correlation ID if applicable
+    :param kwargs: Additional context fields
     """
     timestamp = datetime.utcnow().isoformat()
     extra = {

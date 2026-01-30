@@ -1,5 +1,7 @@
 import json
 import copy
+import subprocess
+import sys
 from pathlib import Path
 from dotenv import dotenv_values
 
@@ -142,7 +144,7 @@ def build_secrets_list(secret_name, secret_arn_suffix, region, account_id, secre
     return secrets
 
 
-def _make_health_check(command, start_period=300, interval=30, retries=3, timeout=5):
+def _make_health_check(command, start_period=300, interval=30, retries=3, timeout=5, lenient=False):
     """
     Creates health check config using command with specified timing.
 
@@ -151,8 +153,15 @@ def _make_health_check(command, start_period=300, interval=30, retries=3, timeou
     :param interval: Time between health checks (seconds).
     :param retries: Consecutive failures before marking unhealthy.
     :param timeout: Maximum time for health check to complete (seconds).
+    :param lenient: If True, use very lenient settings to prevent task termination.
     :returns: Health check configuration dictionary.
     """
+    if lenient:
+        interval = 60
+        retries = 10
+        timeout = 10
+        start_period = max(start_period, 600)
+    
     return {
         "command": ["CMD-SHELL", command],
         "interval": interval,
@@ -174,31 +183,49 @@ def _make_log_config(prefix, region):
     }
 
 
-def _make_base_container(name, image, port, health_command, region, cpu=0, essential=True, start_period=300):
-    """Creates base container definition with health check and logging."""
+def _make_base_container(name, image, port, health_command, region, cpu=0, essential=True, start_period=300, lenient_health=False):
+    """
+    Creates base container definition with health check and logging.
+    
+    :param name: Container name.
+    :param image: Container image.
+    :param port: Container port (None if no port).
+    :param health_command: Health check command.
+    :param region: AWS region for logging.
+    :param cpu: CPU units (0 for shared).
+    :param essential: Whether container is essential.
+    :param start_period: Health check start period in seconds.
+    :param lenient_health: If True, use lenient health check settings.
+    :returns: Container definition dictionary.
+    """
+    port_mappings = []
+    if port:
+        port_mappings = [{"containerPort": port, "hostPort": port, "protocol": "tcp"}]
+    
     return {
         "cpu": cpu,
         "essential": essential,
-        "healthCheck": _make_health_check(health_command, start_period=start_period),
+        "healthCheck": _make_health_check(health_command, start_period=start_period, lenient=lenient_health),
         "image": image,
         "logConfiguration": _make_log_config(name, region),
         "mountPoints": [],
         "name": name,
-        "portMappings": [{"containerPort": port, "protocol": "tcp"}] if port else [],
+        "portMappings": port_mappings,
         "systemControls": [],
         "volumesFrom": []
     }
 
 
-def build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars):
+def build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env):
     """
-    Builds gateway task definition with redis, rabbitmq, chroma sidecars.
+    Builds gateway task definition with redis, rabbitmq, chroma, and metrics sidecars.
     :param account_id: AWS account ID
     :param region: AWS region
     :param secret_name: Secrets Manager secret name
     :param secret_arn_suffix: ARN suffix for the secret
     :param secret_keys: List of secret key names
     :param env_vars: Dictionary of environment variables from .env
+    :param aws_env: Dictionary of AWS environment variables from aws.env
     :returns: Task definition dictionary
     """
     gateway_secrets = build_secrets_list(secret_name, secret_arn_suffix, region, account_id, secret_keys)
@@ -210,15 +237,26 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
             "valueFrom": f"arn:aws:secretsmanager:{region}:{account_id}:secret:{secret_name}-{secret_arn_suffix}:RABBITMQ_ERLANG_COOKIE::"
         })
     
-    chroma = _make_base_container("chroma", "chromadb/chroma:latest", 8000, "curl -f http://localhost:8000/api/v1/heartbeat || exit 1", region, start_period=240)
+    chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || curl -f http://localhost:8000/ || exit 1"
+    chroma = _make_base_container("chroma", "chromadb/chroma:latest", 8000, chroma_health_command, region, start_period=600, lenient_health=True, essential=True)
     chroma["environment"] = [{"name": "IS_PERSISTENT", "value": "TRUE"}, {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}]
+    
+    chroma_fs_id = aws_env.get("CHROMA_EFS_FILE_SYSTEM_ID", "").strip()
+    if chroma_fs_id:
+        chroma["mountPoints"] = [{
+            "sourceVolume": "chroma-volume",
+            "containerPath": "/chroma-data",
+            "readOnly": False
+        }]
+    else:
+        chroma["mountPoints"] = []
     
     redis = _make_base_container("redis", "redis:7-alpine", 6379, "redis-cli ping | grep PONG || exit 1", region, start_period=120)
     redis["command"] = ["redis-server"]
     
     rabbitmq = _make_base_container("rabbitmq", "rabbitmq:3-management", None, "rabbitmq-diagnostics ping || exit 1", region, start_period=240)
     rabbitmq["command"] = ["sh", "-c", "if [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then mkdir -p /var/lib/rabbitmq && echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie && chmod 600 /var/lib/rabbitmq/.erlang.cookie && chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; fi && exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"]
-    rabbitmq["portMappings"] = [{"containerPort": 5672, "protocol": "tcp"}, {"containerPort": 15672, "protocol": "tcp"}]
+    rabbitmq["portMappings"] = [{"containerPort": 5672, "hostPort": 5672, "protocol": "tcp"}, {"containerPort": 15672, "hostPort": 15672, "protocol": "tcp"}]
     rabbitmq["secrets"] = rabbitmq_secrets
     
     gateway_env = env_vars.copy()
@@ -226,18 +264,37 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     gateway_env["CHROMA_URL"] = "http://localhost:8000"
     gateway_env["RABBITMQ_URL"] = "amqp://guest:guest@localhost:5672/"
     
-    gateway = _make_base_container("gateway", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway:latest", 8080, "curl -f http://localhost:8080/health || exit 1", region, start_period=360)
+    gateway = _make_base_container("gateway", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway:latest", 8080, "curl -f http://localhost:8080/health || exit 1", region, start_period=600, lenient_health=True)
     gateway["dependsOn"] = [{"condition": "START", "containerName": "chroma"}, {"condition": "START", "containerName": "redis"}, {"condition": "START", "containerName": "rabbitmq"}]
     gateway["secrets"] = gateway_secrets
     gateway["environment"] = build_environment_list(gateway_env)
-
-    metrics_env = gateway_env.copy()
-    metrics = _make_base_container("metrics", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/metrics:latest", 8082, "curl -f http://localhost:8082/health || exit 1", region, start_period=180)
+    
+    metrics_env = {
+        "QUEUE_NAME": env_vars.get("AGENT_INPUT_QUEUE", "agent.mandates"),
+        "QUEUE_DEPTH_METRICS_INTERVAL": env_vars.get("QUEUE_DEPTH_METRICS_INTERVAL", "5"),
+        "PUBLISH_QUEUE_DEPTH_METRICS": env_vars.get("PUBLISH_QUEUE_DEPTH_METRICS", "true"),
+        "RABBITMQ_URL": "amqp://guest:guest@localhost:5672/",
+        "CLOUDWATCH_NAMESPACE": env_vars.get("CLOUDWATCH_NAMESPACE", "Euglena/RabbitMQ")
+    }
+    metrics = _make_base_container("metrics", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/metrics:latest", 8082, "curl -f http://localhost:8082/health || exit 1", region, start_period=120, essential=False)
     metrics["dependsOn"] = [{"condition": "START", "containerName": "rabbitmq"}]
-    metrics["secrets"] = gateway_secrets
     metrics["environment"] = build_environment_list(metrics_env)
     
     containers = [chroma, redis, rabbitmq, gateway, metrics]
+    
+    volumes = []
+    if chroma_fs_id:
+        volumes.append({
+            "name": "chroma-volume",
+            "efsVolumeConfiguration": {
+                "fileSystemId": chroma_fs_id,
+                "rootDirectory": "/",
+                "transitEncryption": "ENABLED",
+                "authorizationConfig": {
+                    "iam": "ENABLED"
+                }
+            }
+        })
     
     return {
         "family": "euglena-gateway",
@@ -245,7 +302,7 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
         "taskRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskRole",
         "executionRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskExecutionRole",
         "networkMode": "awsvpc",
-        "volumes": [],
+        "volumes": volumes,
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
         "cpu": "512",
@@ -280,7 +337,12 @@ def build_agent_task_definition(account_id, region, secret_name, secret_arn_suff
     agent_env["AWS_REGION"] = region
     agent_env["ECS_CLUSTER"] = aws_env.get("ECS_CLUSTER", "euglena-cluster")
     
-    agent = _make_base_container("agent", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/agent:latest", 8081, "curl -f http://localhost:8081/health || exit 1", region)
+    if "WORKER_STATUS_SET_KEY" not in agent_env:
+        agent_env["WORKER_STATUS_SET_KEY"] = env_vars.get("WORKER_STATUS_SET_KEY", "workers:status")
+    if "WORKER_STATUS_TTL" not in agent_env:
+        agent_env["WORKER_STATUS_TTL"] = env_vars.get("WORKER_STATUS_TTL", "60")
+    
+    agent = _make_base_container("agent", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/agent:latest", 8081, "curl -f http://localhost:8081/health || exit 1", region, start_period=420)
     agent["secrets"] = secrets
     agent["environment"] = build_environment_list(agent_env)
     
@@ -295,8 +357,8 @@ def build_agent_task_definition(account_id, region, secret_name, secret_arn_suff
         "volumes": [],
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
-        "cpu": "256",
-        "memory": "2048"
+        "cpu": "512",
+        "memory": "1024"
     }
 
 
@@ -315,7 +377,14 @@ def _get_aws_config(aws_env):
 
 
 def _write_task_definition(base_dir, task_def, name):
-    """Write task definition JSON files."""
+    """
+    Write task definition JSON files.
+    
+    :param base_dir: Base directory to write files.
+    :param task_def: Task definition dictionary.
+    :param name: Task definition name (gateway/agent).
+    :returns: Tuple of (path, redacted_path).
+    """
     path = base_dir / f"task-definition-{name}.json"
     if path.exists():
         path.unlink()
@@ -331,9 +400,57 @@ def _write_task_definition(base_dir, task_def, name):
     return path, redacted_path
 
 
+def run_command(cmd, check=True):
+    """
+    Run a shell command and return success status.
+    
+    :param cmd: Command as list of strings.
+    :param check: Whether to raise on non-zero exit.
+    :returns: True on success, False on failure.
+    """
+    try:
+        result = subprocess.run(cmd, check=check, capture_output=True, text=True)
+        return result.returncode == 0
+    except subprocess.CalledProcessError as e:
+        print(f"Command failed: {' '.join(cmd)}")
+        if e.stderr:
+            print(f"Error: {e.stderr}")
+        return False
+    except FileNotFoundError:
+        print(f"Command not found: {cmd[0]}")
+        return False
+
+
+def register_task_definition(task_def_path, region):
+    """
+    Register task definition with AWS ECS.
+    
+    :param task_def_path: Path to task definition JSON file (Path object).
+    :param region: AWS region.
+    :returns: True on success, False on failure.
+    """
+    abs_path = task_def_path.resolve()
+    file_url = f"file://{abs_path.as_posix()}"
+    
+    cmd = [
+        "aws", "ecs", "register-task-definition",
+        "--cli-input-json", file_url,
+        "--region", region
+    ]
+    
+    if run_command(cmd):
+        print(f"Registered task definition: {task_def_path.name}")
+        return True
+    else:
+        print(f"Failed to register task definition: {task_def_path.name}")
+        return False
+
+
+
+
 def main():
     """
-    Generates ECS task definitions for gateway and agent services.
+    Generates and registers ECS task definitions for gateway and agent services.
     Loads secrets from keys.env and environment variables from .env automatically.
     Expected to be run from services/ directory: python ../scripts/build-task-definition.py
     """
@@ -345,7 +462,7 @@ def main():
     
     if not account_id or not region:
         print("Error: Account ID and Region required.")
-        return
+        sys.exit(1)
     
     secret_keys = load_secrets_from_keys_env(services_dir)
     env_vars = load_env_variables(services_dir, secret_keys)
@@ -358,17 +475,31 @@ def main():
             if secret_input:
                 secret_arn_suffix = extract_arn_suffix(secret_input)
     
-    gateway_task_def = build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars)
+    print("Generating task definitions...")
+    gateway_task_def = build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
     gateway_path, gateway_redacted_path = _write_task_definition(base_dir, gateway_task_def, "gateway")
+    print(f"Generated: {gateway_path}")
+    
+    chroma_fs_id = aws_env.get("CHROMA_EFS_FILE_SYSTEM_ID", "").strip()
+    if chroma_fs_id:
+        print(f"Chroma EFS volume configured: {chroma_fs_id}")
+    else:
+        print("Warning: CHROMA_EFS_FILE_SYSTEM_ID not set in aws.env - Chroma will use ephemeral storage")
     
     agent_task_def = build_agent_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
     agent_path, agent_redacted_path = _write_task_definition(base_dir, agent_task_def, "agent")
-    
-    print(f"Generated: {gateway_path}")
     print(f"Generated: {agent_path}")
-    print(f"\nRegister:")
-    print(f"  aws ecs register-task-definition --cli-input-json file://{gateway_path} --region {region}")
-    print(f"  aws ecs register-task-definition --cli-input-json file://{agent_path} --region {region}")
+    
+    print("\nRegistering task definitions with AWS ECS...")
+    gateway_success = register_task_definition(gateway_path, region)
+    agent_success = register_task_definition(agent_path, region)
+    
+    if not gateway_success or not agent_success:
+        print("\nError: Failed to register one or more task definitions.")
+        sys.exit(1)
+    
+    print("\nTask definitions registered successfully.")
+    print("To update services, run: python ../scripts/update-services.py")
     
     from datetime import datetime
     print(f"\nFinished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

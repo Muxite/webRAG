@@ -1,5 +1,6 @@
 import React from 'react';
 import { Github, ExternalLink } from 'lucide-react';
+import { theme } from '../../config/theme';
 
 interface HeaderProps {
   text: string;
@@ -10,24 +11,14 @@ export function Header({ text, workerCount }: HeaderProps) {
   return (
     <div className="mb-6 flex items-start justify-between">
       <div>
-        <h1
-          className="uppercase tracking-wider"
-          style={{
-            fontFamily: 'Impact, Arial Black, sans-serif',
-            fontSize: '4.5rem',
-            background: 'linear-gradient(to right, #ff00ff, #60a5fa, #38bdf8)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-          }}
-        >
+        <h1 className={`${theme.colors.text.primary} font-mono text-4xl font-bold uppercase tracking-wider`}>
           EUGLENA
         </h1>
-        <p className={`${text} mt-2 font-mono text-sm`}>
+        <p className={`${theme.colors.text.primary} mt-2 font-mono text-sm`}>
           Autonomous RAG agent for web automation and task execution
         </p>
         {workerCount !== null && (
-          <p className={`${text} mt-1 font-mono text-xs opacity-70`}>
+          <p className={`${theme.colors.text.primary} mt-1 font-mono text-xs ${theme.colors.text.muted}`}>
             Active workers: {workerCount}
           </p>
         )}
@@ -39,7 +30,7 @@ export function Header({ text, workerCount }: HeaderProps) {
           rel="noopener noreferrer"
           className="p-2 hover:opacity-70 transition-opacity"
         >
-          <Github size={24} className={text} />
+          <Github size={24} className={theme.colors.text.primary} />
         </a>
         <a
           href="https://muksite.vercel.app/"
@@ -47,7 +38,7 @@ export function Header({ text, workerCount }: HeaderProps) {
           rel="noopener noreferrer"
           className="p-2 hover:opacity-70 transition-opacity"
         >
-          <ExternalLink size={24} className={text} />
+          <ExternalLink size={24} className={theme.colors.text.primary} />
         </a>
       </div>
     </div>

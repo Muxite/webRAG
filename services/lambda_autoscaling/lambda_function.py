@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from dotenv import dotenv_values
 import boto3
+from botocore.exceptions import ClientError
 from shared.queue_metrics import QUEUE_DEPTH_METRIC
 
 logger = logging.getLogger()
@@ -50,7 +51,7 @@ ECS_CLUSTER = CONFIG.get('ECS_CLUSTER', 'euglena-cluster')
 ECS_SERVICE = CONFIG.get('ECS_SERVICE_NAME', 'euglena-agent')
 QUEUE_NAME = CONFIG.get('AGENT_INPUT_QUEUE', 'agent.mandates')
 TARGET_MESSAGES_PER_WORKER = int(CONFIG.get('TARGET_MESSAGES_PER_WORKER', '1'))
-MIN_WORKERS = max(1, int(CONFIG.get('MIN_WORKERS', '1')))
+MIN_WORKERS = max(0, int(CONFIG.get('MIN_WORKERS', '0')))
 MAX_WORKERS = int(CONFIG.get('MAX_WORKERS', '11'))
 CLOUDWATCH_NAMESPACE = CONFIG.get('CLOUDWATCH_NAMESPACE', QUEUE_DEPTH_METRIC.namespace)
 
@@ -58,35 +59,59 @@ CLOUDWATCH_NAMESPACE = CONFIG.get('CLOUDWATCH_NAMESPACE', QUEUE_DEPTH_METRIC.nam
 def get_queue_depth() -> Optional[int]:
     """
     Get current RabbitMQ queue depth from CloudWatch.
+    Uses shorter time window (2 minutes) since metrics are published every 5 seconds.
     
     :return: Queue depth or None on error
     """
     try:
         end_time = datetime.utcnow()
+        start_time = end_time - timedelta(minutes=2)
+        
+        logger.info(
+            f"Querying CloudWatch for queue depth: "
+            f"Namespace={CLOUDWATCH_NAMESPACE}, Metric={QUEUE_DEPTH_METRIC.metric_name}, "
+            f"QueueName={QUEUE_NAME}, StartTime={start_time}, EndTime={end_time}"
+        )
+        
         response = cloudwatch.get_metric_statistics(
             Namespace=CLOUDWATCH_NAMESPACE,
             MetricName=QUEUE_DEPTH_METRIC.metric_name,
             Dimensions=QUEUE_DEPTH_METRIC.dimensions(QUEUE_NAME),
-            StartTime=end_time - timedelta(minutes=5),
+            StartTime=start_time,
             EndTime=end_time,
             Period=60,
-            Statistics=['Average']
+            Statistics=['Average', 'Maximum']
         )
         
         datapoints = response.get('Datapoints', [])
         if not datapoints:
             logger.warning(
                 f"No datapoints found for {QUEUE_DEPTH_METRIC.metric_name} metric. "
-                f"Namespace={CLOUDWATCH_NAMESPACE}, QueueName={QUEUE_NAME}"
+                f"Namespace={CLOUDWATCH_NAMESPACE}, QueueName={QUEUE_NAME}, "
+                f"TimeWindow=2min. This may indicate metrics are not being published."
             )
             return None
         
         latest = max(datapoints, key=lambda x: x['Timestamp'])
-        queue_depth = int(latest['Average'])
-        logger.info(f"Queue depth: {queue_depth}")
-        return queue_depth
+        queue_depth_avg = int(latest.get('Average', 0))
+        queue_depth_max = int(latest.get('Maximum', 0))
+        timestamp = latest.get('Timestamp')
+        
+        logger.info(
+            f"Queue depth retrieved: Average={queue_depth_avg}, Maximum={queue_depth_max}, "
+            f"Timestamp={timestamp}, TotalDatapoints={len(datapoints)}"
+        )
+        
+        return queue_depth_avg
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+        error_msg = e.response.get('Error', {}).get('Message', str(e))
+        logger.error(
+            f"CloudWatch API error getting queue depth: Code={error_code}, Message={error_msg}"
+        )
+        return None
     except Exception as e:
-        logger.error(f"Error getting queue depth: {e}")
+        logger.error(f"Unexpected error getting queue depth: {type(e).__name__}: {e}", exc_info=True)
         return None
 
 

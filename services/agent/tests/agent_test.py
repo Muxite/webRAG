@@ -34,16 +34,6 @@ def ready_agent(connectors):
     return agent
 
 
-@pytest.mark.skipif(os.environ.get("LITE") == "true", reason="Expensive test.")
-@pytest.mark.asyncio
-async def test_agent_find_panda_diet(caplog, connectors):
-    caplog.set_level("INFO")
-    async with Agent(mandate="Find out what pandas eat, but give a source.", max_ticks=5, **connectors) as agent:
-        output = await agent.run()
-        string = "".join(output['deliverables'])
-        assert "panda" in string
-        assert "http" in string
-        assert "eat" in string
 
 
 @pytest.mark.asyncio

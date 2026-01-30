@@ -7,9 +7,9 @@ def setup_service_logger(service_name: str, level: int = logging.INFO) -> loggin
     """
     Set up a standardized logger for a service with enhanced formatting.
 
-    :param service_name: Name of the service (e.g., "Gateway", "Agent", "Metrics").
-    :param level: Logging level (default: INFO).
-    :returns: Configured logger instance.
+    :param service_name: Name of the service ex: Gateway, Agent, Metrics
+    :param level: Logging level default: INFO
+    :returns: Configured logger instance
     """
     logger = logging.getLogger(service_name)
     logger.setLevel(level)
@@ -35,11 +35,11 @@ def log_connection_status(logger: logging.Logger, service: str, status: str, det
     """
     Log connection status with standardized formatting.
 
-    :param logger: Logger instance.
-    :param service: Service name (e.g., "Redis", "RabbitMQ").
-    :param status: Status ("CONNECTED", "DISCONNECTED", "FAILED").
-    :param details: Optional dictionary of additional details.
-    :returns: None.
+    :param logger: Logger instance
+    :param service: Service name ex: Redis, RabbitMQ
+    :param status: Status ex: CONNECTED, DISCONNECTED, FAILED
+    :param details: Optional dictionary of additional details
+    :returns: None
     """
     msg = f"{service}: {status}"
     if details:
@@ -52,11 +52,11 @@ def log_health_check(logger: logging.Logger, service: str, healthy: bool, compon
     """
     Log health check status with standardized formatting.
 
-    :param logger: Logger instance.
-    :param service: Service name.
-    :param healthy: True if healthy, False otherwise.
-    :param components: Optional dictionary of component statuses.
-    :returns: None.
+    :param logger: Logger instance
+    :param service: Service name
+    :param healthy: True if healthy, False otherwise
+    :param components: Optional dictionary of component statuses
+    :returns: None
     """
     status = "HEALTHY" if healthy else "UNHEALTHY"
     msg = f"{service} Health: {status}"
@@ -69,9 +69,9 @@ def log_health_check(logger: logging.Logger, service: str, healthy: bool, compon
 def pretty_log(data, logger=None, indents=0):
     """
     Writes a well formatted log message to the console with data that has dicts and or lists.
-    :param data: Data made of lists and dicts.
+    :param data: Data made of lists and dicts
     :param logger: Logger to use or None
-    :param indents: How many indents to use at the base.
+    :param indents: How many indents to use at the base
     """
     logger = logger or logging.getLogger(__name__)
     final = pretty_log_print(data, indents)
@@ -81,9 +81,9 @@ def pretty_log_print(data, indents=0):
     """
     Formats data structures (dicts, lists, primitives) into a readable string format.
     
-    :param data: Data structure to format (dict, list, or primitive).
-    :param indents: Number of indentation levels to apply.
-    :return: Formatted string representation.
+    :param data: Data structure to format ex: dict, list, or primitive
+    :param indents: Number of indentation levels to apply
+    :return: Formatted string representation
     """
     indent_str = "    " * indents
     if isinstance(data, list):
@@ -107,8 +107,8 @@ def extract_string_from_json(data):
     Converts JSON structures to string representation using pretty_log_print style.
     Returns strings as-is, formats everything else recursively using pretty_log_print.
     
-    :param data: JSON structure (dict, list, or primitive) to convert to string.
-    :return: String representation of the content formatted with pretty_log_print style.
+    :param data: JSON structure ex: dict, list, or primitive to convert to string
+    :return: String representation of the content formatted with pretty_log_print style
     """
     if data is None:
         return ""

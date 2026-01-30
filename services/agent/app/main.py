@@ -1,10 +1,12 @@
 import asyncio
 import logging
+import os
 from aiohttp import web
 from shared.connector_config import ConnectorConfig
 from shared.ecs_manager import EcsManager
 from shared.health import HealthMonitor
 from shared.pretty_log import setup_service_logger, log_connection_status
+from shared.startup_message import log_startup_message, log_shutdown_message
 from agent.app.interface_agent import InterfaceAgent
 
 
@@ -36,7 +38,7 @@ async def health_handler(request):
 async def _run() -> None:
     logger = setup_service_logger("Agent", logging.INFO)
     
-    logger.info("Starting Agent Service...")
+    log_startup_message(logger, "AGENT", "0.1.0")
     app = web.Application()
     app.router.add_get('/health', health_handler)
     runner = web.AppRunner(app)
@@ -63,6 +65,7 @@ async def _run() -> None:
         logger.error(f"Failed to start agent worker: {e}", exc_info=True)
         logger.info("Agent will continue running and health endpoint will remain available")
     
+    shutdown_timeout = float(os.environ.get("AGENT_SHUTDOWN_TIMEOUT_SECONDS", "30.0"))
     try:
         check_interval = 5
         while not worker.should_exit():
@@ -71,11 +74,20 @@ async def _run() -> None:
     except (asyncio.CancelledError, KeyboardInterrupt):
         logger.info("Agent interrupted")
     finally:
+        log_shutdown_message(logger, "AGENT")
         try:
-            await worker.stop()
-        except Exception:
-            pass
-        await runner.cleanup()
+            await asyncio.wait_for(worker.stop(), timeout=shutdown_timeout)
+        except asyncio.TimeoutError:
+            logger.warning(f"Worker shutdown timed out after {shutdown_timeout}s")
+        except Exception as e:
+            logger.error(f"Error during worker shutdown: {e}", exc_info=True)
+        try:
+            await asyncio.wait_for(runner.cleanup(), timeout=5.0)
+        except asyncio.TimeoutError:
+            logger.warning("Runner cleanup timed out")
+        except Exception as e:
+            logger.error(f"Error during runner cleanup: {e}", exc_info=True)
+        logger.info("Agent Service stopped")
 
 
 def main() -> None:

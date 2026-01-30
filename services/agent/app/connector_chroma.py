@@ -8,13 +8,15 @@ from agent.app.local_embedding_function import LocalEmbeddingFunction
 
 
 class ConnectorChroma:
-    """Manages ChromaDB connection and operations."""
+    """
+    ChromaDB connector for vector storage and retrieval.
+    Handles connection lifecycle and document operations with client-side embeddings.
+    """
 
     def __init__(self, connector_config: ConnectorConfig):
         """
-        Initialize ChromaDB connector with config and embedding function.
-        
-        :param connector_config: ChromaDB connection settings.
+        Initialize connector.
+        :param connector_config: Configuration
         """
         self.config = connector_config
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -52,7 +54,6 @@ class ConnectorChroma:
             )
 
             self._chroma.heartbeat()
-            self.logger.info("ChromaDB OPERATIONAL")
             self.chroma_api_ready = True
             return True
 
@@ -63,9 +64,8 @@ class ConnectorChroma:
 
     async def init_chroma(self) -> bool:
         """
-        Initialize ChromaDB connection with retry logic. Sets chroma_api_ready on success.
-        
-        :return: True on success, False on failure.
+        Initialize connection with retry logic.
+        :returns Bool: true on success
         """
         if self.chroma_api_ready:
             return True
@@ -89,7 +89,6 @@ class ConnectorChroma:
         :return: Collection object or None on failure.
         """
         if not await self.init_chroma():
-            self.logger.warning("ChromaDB not ready.")
             return None
         try:
             coll = self._chroma.get_or_create_collection(name=collection)
@@ -106,13 +105,12 @@ class ConnectorChroma:
         documents: List[str]
     ) -> bool:
         """
-        Add documents to ChromaDB collection. Computes embeddings client-side.
-        
-        :param collection: Collection name.
-        :param ids: Document IDs.
-        :param metadatas: Metadata dicts per document.
-        :param documents: Document texts.
-        :return: True on success, False on failure.
+        Add documents to collection.
+        :param collection: Collection name
+        :param ids: Document IDs
+        :param metadatas: Metadata per document
+        :param documents: Document texts
+        :returns Bool: true on success
         """
         if not self.chroma_api_ready:
             self.logger.warning("ChromaDB not ready.")
@@ -149,7 +147,6 @@ class ConnectorChroma:
         :return: Query results dict with documents/metadatas/distances, or None on failure.
         """
         if not self.chroma_api_ready:
-            self.logger.warning("ChromaDB not ready.")
             return None
         if not self._embedding_function:
             self.logger.error("Embedding function not available.")
@@ -180,10 +177,9 @@ class ConnectorChroma:
     @staticmethod
     def _sanitize_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Convert metadata to ChromaDB-compatible types. Lists -> comma-separated strings, dicts -> JSON strings.
-        
-        :param metadata: Metadata dict to sanitize.
-        :return: Sanitized metadata dict.
+        Convert metadata to ChromaDB-compatible types.
+        :param metadata: Metadata dict
+        :returns Dict: sanitized metadata
         """
         sanitized = {}
         for key, value in metadata.items():

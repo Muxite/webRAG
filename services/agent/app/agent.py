@@ -55,8 +55,6 @@ class Agent:
 
     async def initialize(self) -> bool:
         """Verify that all required connectors are available."""
-        self._logger.info("Verifying agent connectors...")
-
         if not self.connector_llm or not self.connector_search or not self.connector_http or not self.connector_chroma:
             self._logger.error("Missing required connectors")
             return False
@@ -82,7 +80,7 @@ class Agent:
         if not await self.initialize():
             return {"success": False, "error": "Initialization failed", "deliverables": []}
 
-        self._logger.info(f"Agent started: {self.mandate}\n")
+        self._logger.info(f"Agent started: {self.mandate[:100]}")
 
         while self.current_tick < self.max_ticks:
             await asyncio.sleep(1)

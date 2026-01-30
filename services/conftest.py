@@ -43,4 +43,6 @@ def _configure_logging():
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s:%(lineno)d - %(message)s",
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     yield

@@ -1,116 +1,121 @@
-# Euglena / WebRAG
+# Euglena
 
-An autonomous RAG agent service that executes tasks through iterative reasoning, web interaction, and vector database storage. 
-The agent uses LLM-powered reasoning to break down tasks, perform web searches, visit URLs, and build up knowledge over time through persistent memory in ChromaDB.
+An autonomous RAG (Retrieval-Augmented Generation) agent service that executes complex tasks through iterative reasoning, web interaction, and persistent memory. The system uses LLM-powered reasoning to break down tasks, perform web searches, visit URLs, and build knowledge over time through vector database storage.
 
-**Live Site**: [Euglena Web Agent](https://web-rag-nine.vercel.app/)
+## What It Does
 
-The MVP is complete and fully operational with AWS deployment and a working web interface.
+Euglena is a distributed agent framework that accepts natural language tasks from users and executes them autonomously. The agent can:
 
-### Current Status
-- **Web interface live** - Full-featured frontend with authentication and task management
-- **AWS deployment operational** - ECS task definitions, Secrets Manager integration, container images
-- Users have a fixed number of ticks per day.
-- Full Docker Compose setup with all services
-- Agent worker with dependency injection and connector reuse
-- Gateway service with Supabase authentication
-- Test suite with fixtures
-- Connection cleanup and error handling
-- Agent CLI for local testing and integration
+- Understand complex task descriptions in natural language
+- Break down tasks into iterative reasoning steps
+- Perform web searches to gather information
+- Visit URLs to extract and analyze content
+- Build persistent knowledge through vector database storage
+- Deliver results with structured deliverables and notes
+- Track task progress in real-time with status updates
 
-## Overview
+## Key Features
 
-Distributed scalable agent framework:
-- **Gateway** accepts tasks via REST API with Supabase authentication
-- **Agents** consume tasks from RabbitMQ and execute tick-based reasoning loop
-- **Status** tracked in Redis for monitoring
-- **Memory** persisted in ChromaDB for context retention
+- **User Authentication**: Secure access via Supabase authentication with JWT tokens
+- **Task Management**: Persistent task storage with user association and history
+- **Real-time Monitoring**: Live status updates and progress tracking
+- **Scalable Architecture**: Distributed system with auto-scaling worker agents
+- **Persistent Memory**: Vector database stores context across tasks
+- **Quota Management**: Per-user daily tick limits with quota enforcement
+- **Web Interface**: Modern React frontend with task submission and monitoring
 
-Agent uses dependency injection to reuse connectors across mandates. Connectors initialized once at startup and verified before consuming tasks.
+## Tech Stack
+
+### Frontend
+- **React** with TypeScript
+- **Vite** for build tooling
+- **Supabase** for authentication
+- **Tailwind CSS** for styling
+
+### Backend
+- **FastAPI** (Python) for gateway service
+- **Supabase** (PostgreSQL) for persistent task storage
+- **RabbitMQ** for task queue management
+- **Redis** for caching and worker presence
+- **ChromaDB** for vector storage and context retrieval
+
+### Infrastructure
+- **Docker** and **Docker Compose** for local development
+- **AWS ECS** (Fargate) for container orchestration
+- **AWS ECR** for container registry
+- **AWS ALB** for load balancing
+- **AWS Lambda** for autoscaling
+- **AWS CloudWatch** for logging and metrics
+- **AWS Secrets Manager** for secure credential storage
+
+### AI/ML
+- **OpenAI API** for LLM reasoning
+- **Web Search API** for information retrieval
+- **ChromaDB** for semantic search and context retrieval
+
+## System Architecture
+
+The system consists of four main components:
+
+1. **Frontend**: Web interface where users submit tasks and monitor progress
+2. **Gateway**: API service that handles authentication, validates requests, stores tasks, and manages the task queue
+3. **Agent Workers**: Autonomous agents that consume tasks, execute reasoning loops, perform web actions, and update task status
+4. **Shared Services**: Common utilities and connectors used across components
+
+### How It Works
+
+1. User submits a task through the web interface with authentication
+2. Gateway validates the request, checks user quota, and stores the task in the database
+3. Task is published to a message queue for processing
+4. Agent worker picks up the task and begins execution
+5. Agent performs iterative reasoning, web searches, and URL visits as needed
+6. Progress and results are stored in the database
+7. Frontend polls for updates and displays real-time status to the user
 
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- API keys: `OPENAI_API_KEY`, `SEARCH_API_KEY` (set in `services/keys.env`)
-- Supabase configuration: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`
 
-### Start Services
+- Docker and Docker Compose
+- API keys for OpenAI and web search (configured in `services/keys.env`)
+- Supabase project with authentication enabled
+
+### Local Development
+
+Start all services:
 ```bash
 cd services
 docker compose up -d rabbitmq redis chroma gateway agent
 ```
 
+Access the frontend at `http://localhost:5173` (or configured port).
+
 ### API CLI
-Local API Client for testing. Exactly the same as the website. Includes authentication and task checking:
+
+Test the API from command line:
 ```bash
 cd services
-docker compose --profile cli run agent-cli
+docker compose --profile cli run --rm api-cli
 ```
 
-### Agent CLI
-Direct agent execution for local testing (bypasses gateway):
+## Deployment
+
+Deploy to AWS:
 ```bash
-cd services
-docker compose --profile cli run agent-cli
+python scripts/deploy.py  # Deploys all services
+python scripts/check.py   # Verifies deployment health
 ```
 
-## Architecture
-
-### Components
-
-- **Frontend** (`frontend/`): React web interface with Supabase authentication, task submission, and real-time status monitoring
-- **Gateway** (`gateway/`): FastAPI on port 8080, accepts tasks, enforces Supabase auth, publishes to RabbitMQ, serves status from Redis
-- **Agent** (`agent/`): Consumes tasks from RabbitMQ, executes LLM reasoning loop, performs web searches and visits, stores context in ChromaDB, writes status to Redis
-- **Shared** (`shared/`): Common utilities - connectors (RabbitMQ, Redis, HTTP), models, retry helpers, config
-
-### Runtime Flow
-
-1. Client submits task via gateway `/tasks` with Supabase JWT
-2. Gateway validates auth and quota, stores `pending` in Redis, publishes to RabbitMQ
-3. Agent worker consumes task (connectors already initialized and reused)
-4. Agent runs ticked loop: emits `accepted` → `started` → `in_progress` → `completed`/`error`, writes to Redis, publishes status
-5. Gateway serves `/tasks/{id}` from Redis
-
-### Key Design Patterns
-
-- **Dependency Injection**: Connectors (LLM, Search, HTTP, Chroma) injected and reused across mandates
-- **Graceful Degradation**: Handles connector failures, continues when possible
-- **Connection Management**: Proper cleanup with error handling on shutdown
-- **Readiness Checks**: Only consumes from RabbitMQ after all dependencies verified ready
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
-
-## Configuration
-
-Environment variables in `services/.env` and `services/keys.env`.
-
-## AWS Deployment
-
-### Push Images to ECR
-
-Build and push Docker images:
-```bash
-python scripts/push-to-ecr.py
-```
-
-### Generate Task Definitions
-
-Generate ECS task definitions:
-```bash
-python scripts/build-task-definition.py
-```
-
-Note: Environment variables are NOT automatically included in task definitions. Add them manually via ECS console or edit the generated JSON files.
-
-### Deploy Services
-
-Create ECS services via AWS Console. Gateway service contains gateway, redis, rabbitmq, chroma containers. Agent service contains agent container and uses service discovery to reach Gateway sidecars.
+The deployment script handles:
+- Building and pushing Docker images
+- Creating ECS task definitions
+- Configuring autoscaling
+- Setting up networking and service discovery
+- Managing IAM permissions
 
 ## Testing
 
-### Running Tests
-
+Run the test suite:
 ```bash
 cd services
 docker compose --profile test up agent-test
@@ -118,58 +123,30 @@ docker compose --profile test up gateway-test
 docker compose --profile test up shared-test
 ```
 
-### Test Coverage
-
-**Agent Tests** (`agent/tests/`): Worker orchestration, connector unit tests with mocks, agent loop logic, dependency injection patterns, lifecycle handling
-
-**Gateway Tests** (`gateway/tests/`): Supabase auth enforcement, task submission, status retrieval, end-to-end with live agent
-
-**Shared Tests** (`shared/tests/`): RabbitMQ connector, Redis connector, retry helpers
-
-### Test Architecture
-
-Uses real RabbitMQ/Redis containers. Gateway E2E runs FastAPI in-process. Agent E2E tests against live container. Pytest fixtures reduce complexity.
-
-See [docs/TESTING.md](docs/TESTING.md) for detailed testing documentation.
-
-## Security
-
-**Authentication**: Gateway access via Supabase Auth JWTs only. Email/password auth, confirmation required. JWT validated on every request.
-
-**Authorization**: Per-user tick quotas via Supabase. Daily limits in `user_daily_usage` table. Quota exhaustion returns 429. RLS policies protect user data.
-
-**Secrets**: API keys in `keys.env` (not committed). AWS deployment uses Secrets Manager. No secrets in code.
-
-
 ## Project Structure
 
 ```
-├── services/
-│   ├── agent/          # Agent worker and core logic
-│   │   ├── app/        # Agent implementation
-│   │   └── tests/      # Agent test suite
-│   ├── gateway/        # FastAPI gateway service
-│   │   ├── app/        # Gateway implementation
-│   │   └── tests/      # Gateway test suite
-│   ├── shared/         # Common utilities
-│   │   ├── connectors/ # RabbitMQ, Redis connectors
-│   │   └── tests/      # Shared test suite
-│   ├── apicli/         # API CLI client
-│   └── docker-compose.yml
-├── frontend/           # React web interface
-│   ├── src/            # React components and services
-│   └── index.html      # Entry point
-├── scripts/            # Deployment and utility scripts
-│   ├── build-task-definition.py  # ECS task definition generator
-│   └── push-to-ecr.py            # Docker build and push to ECR
-└── docs/               # Documentation
+├── services/          # Backend services
+│   ├── agent/        # Agent worker implementation
+│   ├── gateway/       # API gateway service
+│   ├── shared/       # Common utilities
+│   └── apicli/       # API CLI client
+├── frontend/         # React web application
+├── scripts/          # Deployment and utility scripts
+└── docs/             # Documentation
 ```
 
-## Future Enhancements
+## Security
 
-- Selenium/ChromeDriver integration for JavaScript-heavy sites
-- Enhanced web automation for complex user flows
-- Advanced memory and context retrieval
-- Multi-agent coordination and task delegation
-- Enhanced monitoring and observability
-- Performance optimizations and scaling improvements
+- **Authentication**: All API endpoints require Supabase JWT tokens
+- **Authorization**: Row-level security policies ensure users can only access their own tasks
+- **Quota Management**: Per-user daily limits prevent resource abuse
+- **Secrets Management**: API keys stored securely in AWS Secrets Manager
+
+## Documentation
+
+For detailed technical documentation, see `docs/README.md`.
+
+## Status
+
+The system is operational with full AWS deployment, web interface, authentication, and task management capabilities. All core features are implemented and tested.

@@ -6,8 +6,8 @@ from typing import Callable, Optional, Any, Tuple
 
 class Retry:
     """
-    Generic retry helper supporting async or sync callables with
-    configurable exponential backoff, jitter, and custom retry conditions.
+    Centralized retry mechanism with exponential backoff and jitter.
+    Supports async and sync callables with configurable retry conditions.
     """
 
     def __init__(
@@ -26,18 +26,18 @@ class Retry:
         log: bool = False,
     ):
         """
-        :param func: Callable (sync or async). If it returns a result, retry is controlled by should_retry.
-        :param max_attempts: Max attempts; None for infinite.
-        :param base_delay: Initial delay seconds.
-        :param multiplier: Exponential multiplier per attempt.
-        :param max_delay: Cap for delay seconds.
-        :param jitter: Random jitter seconds added to delay (0..jitter).
-        :param name: Optional name for logging purposes.
-        :param retry_exceptions: Exception types that are considered retriable by default.
-        :param should_retry: Predicate(result, exception, attempt)->bool to decide retry.
-        :param on_retry: Callback(attempt, next_delay, exception) invoked before sleeping.
-        :param raise_on_fail: If True, raise last exception on failure; else return last result/None.
-        :param log: If True, enable logging; defaults to False (silent).
+        :param func: Callable to retry
+        :param max_attempts: Max attempts or None for infinite
+        :param base_delay: Initial delay in seconds
+        :param multiplier: Exponential backoff multiplier
+        :param max_delay: Maximum delay cap in seconds
+        :param jitter: Random jitter added to delay
+        :param name: Name for logging
+        :param retry_exceptions: Exception types to retry on
+        :param should_retry: Function to determine if retry needed
+        :param on_retry: Callback before retry sleep
+        :param raise_on_fail: Raise exception on failure
+        :param log: Enable logging
         """
         self.func = func
         self.is_async = inspect.iscoroutinefunction(func)
@@ -63,9 +63,9 @@ class Retry:
         return delay
 
     async def run(self) -> Any:
-        """Run the retry loop and return the successful result.
-
-        If raise_on_fail is True and all attempts fail due to exceptions, the last exception is raised.
+        """
+        Execute retry loop until success or max attempts.
+        :returns Any: Successful result or last result if raise_on_fail is False
         """
         attempt = 0
         last_exception: Optional[BaseException] = None

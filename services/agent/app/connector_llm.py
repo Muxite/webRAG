@@ -8,14 +8,14 @@ from shared.retry import Retry
 
 class ConnectorLLM:
     """
-    Manages a connection to a generic OpenAI-compatible LLM API.
+    LLM API connector for OpenAI-compatible chat completions.
+    Handles API calls with retry logic for transient errors.
     """
 
     def __init__(self, connector_config: ConnectorConfig):
         """
-        Initializes the LLM connector
-
-        :param connector_config
+        Initialize connector.
+        :param connector_config: Configuration
         """
         self.config = connector_config
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -35,7 +35,7 @@ class ConnectorLLM:
         await self.aclose()
 
     async def aclose(self):
-        """Close the underlying HTTP client to avoid event loop shutdown errors."""
+        """Close HTTP client."""
         try:
             if hasattr(self.client, "aclose"):
                 await self.client.aclose()
@@ -45,15 +45,14 @@ class ConnectorLLM:
                     result = close_fn()
                     if hasattr(result, "__await__"):
                         await result
-        except Exception as e:
-            self.logger.debug(f"LLM client close ignored error: {e}")
+        except Exception:
+            pass
 
     async def query_llm(self, payload: dict) -> Optional[str]:
         """
-        Sends a chat completion request to the LLM API.
-
-        :param payload: The properly formatted dict payload.
-        :return: The response text content, or None if all retries failed.
+        Send chat completion request with retry logic.
+        :param payload: Request payload
+        :returns Optional[str]: response content or None
         """
 
         if payload.get("model") is None:

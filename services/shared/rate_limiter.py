@@ -5,8 +5,8 @@ from typing import Optional
 class RateLimiter:
     def __init__(self, period: float):
         """
-        Lock that ensures there is a date between calls.
-        :param period: Minimum wait date.
+        Lock that ensures there is a date between calls
+        :param period: Minimum wait date
         """
         self.period = period
         self.last_call = 0.0
@@ -14,7 +14,7 @@ class RateLimiter:
 
     async def acquire(self):
         """
-        Acquire the lock and wait if necessary.
+        Acquire the lock and wait if necessary
         """
         async with self._lock:
             current_time = time.time()

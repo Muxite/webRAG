@@ -3,6 +3,7 @@ services/keys.env
 services/task_definition.json
 services/secrets.json
 services/special_api_keys.txt
+dist/
 frontend/build
 frontend/node_modules
 venv/

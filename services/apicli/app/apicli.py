@@ -27,6 +27,12 @@ class ApiCli:
         
         self.supabase: Client = create_client(supabase_url, supabase_anon_key)
         self.access_token: Optional[str] = None
+        
+        is_docker = os.path.exists("/.dockerenv") or os.environ.get("DOCKER_CONTAINER") == "1"
+        if not is_docker and "localhost" not in self.base_url and "127.0.0.1" not in self.base_url:
+            print(f"Warning: Running locally but gateway URL is {self.base_url}")
+            print("If connecting to Docker services, use service names (e.g., http://gateway:8080)")
+            print("If connecting to local gateway, use http://localhost:8080")
 
     def _ensure_authenticated(self) -> bool:
         if self.access_token:
@@ -101,6 +107,13 @@ class ApiCli:
             self._pretty({"status_code": resp.status_code, "body": self._safe_json(resp)})
             if resp.status_code == 401:
                 self.access_token = None
+        except requests.exceptions.ConnectionError as e:
+            print(f"Connection failed: {e}")
+            print(f"Unable to connect to gateway at {self.base_url}")
+            print("Make sure the gateway is running and accessible")
+        except requests.exceptions.Timeout as e:
+            print(f"Request timed out after {self.timeout}s: {e}")
+            print("The gateway may be slow or unresponsive")
         except requests.exceptions.RequestException as e:
             print(f"Request failed: {e}")
 
@@ -120,6 +133,13 @@ class ApiCli:
             self._pretty({"status_code": resp.status_code, "body": self._safe_json(resp)})
             if resp.status_code == 401:
                 self.access_token = None
+        except requests.exceptions.ConnectionError as e:
+            print(f"Connection failed: {e}")
+            print(f"Unable to connect to gateway at {self.base_url}")
+            print("Make sure the gateway is running and accessible")
+        except requests.exceptions.Timeout as e:
+            print(f"Request timed out after {self.timeout}s: {e}")
+            print("The gateway may be slow or unresponsive")
         except requests.exceptions.RequestException as e:
             print(f"Request failed: {e}")
 
@@ -128,6 +148,13 @@ class ApiCli:
         try:
             resp = requests.get(url, timeout=self.timeout)
             self._pretty({"status_code": resp.status_code, "body": self._safe_json(resp)})
+        except requests.exceptions.ConnectionError as e:
+            print(f"Connection failed: {e}")
+            print(f"Unable to connect to gateway at {self.base_url}")
+            print("Make sure the gateway is running and accessible")
+        except requests.exceptions.Timeout as e:
+            print(f"Request timed out after {self.timeout}s: {e}")
+            print("The gateway may be slow or unresponsive")
         except requests.exceptions.RequestException as e:
             print(f"Request failed: {e}")
 
@@ -139,6 +166,7 @@ class ApiCli:
 
     def run(self) -> None:
         print(f"Gateway: {self.base_url}")
+        print(f"Timeout: {self.timeout}s")
         
         while True:
             print("\nChoose: [1] Submit task  [2] Get task  [3] Agent count  [s] Sign in  [q] Quit")

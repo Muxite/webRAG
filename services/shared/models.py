@@ -92,6 +92,7 @@ class TaskRecord(BaseModel):
     error: Optional[str] = None
     tick: Optional[int] = None
     max_ticks: int = 50
+    user_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         try:

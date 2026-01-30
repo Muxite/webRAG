@@ -24,7 +24,6 @@ class ConnectorSearch(ConnectorHttp):
             self.logger.error("Cannot initialize Search API without an API key.")
             return False
 
-        self.logger.info("Probing Search API...")
         headers = {
             "Accept": "application/json",
             "X-Subscription-Token": self.search_api_key
@@ -36,11 +35,10 @@ class ConnectorSearch(ConnectorHttp):
         )
 
         if result.error or result.status != 200:
-            self.logger.warning(f"Search API health probe failed with status {result.status}: {result.data}")
+            self.logger.warning(f"Search API health check failed: {result.status}")
             self.search_api_ready = False
             return False
 
-        self.logger.info("Search API OPERATIONAL")
         self.search_api_ready = True
         return True
 
@@ -52,7 +50,6 @@ class ConnectorSearch(ConnectorHttp):
         :return: List of search results or None if request failed or bad response
         """
         if not await self.init_search_api():
-            self.logger.warning("Setup failed.")
             return None
 
         url = "https://api.search.brave.com/res/v1/web/search"

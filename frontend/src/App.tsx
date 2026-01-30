@@ -1,20 +1,21 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiClient, TaskResponse } from './services/api';
 import { supabase } from './services/supabaseClient';
 import { getApiMode, setApiMode, getCurrentApiBaseURL } from './config/api';
+import { theme } from './config/theme';
 import { Header } from './components/layout/Header';
 import { ApiModeToggle } from './components/layout/ApiModeToggle';
 import { AboutSection } from './components/layout/AboutSection';
 import { LoginForm } from './components/auth/LoginForm';
 import { AuthSection } from './components/auth/AuthSection';
 import { TaskForm } from './components/task/TaskForm';
-import { TaskStatusDisplay } from './components/task/TaskStatusDisplay';
+import { TaskCard } from './components/task/TaskCard';
 
 export default function App() {
   const [mandate, setMandate] = useState('');
   const [maxTicks, setMaxTicks] = useState(32);
   const [maxTicksInput, setMaxTicksInput] = useState('32');
-  const [task, setTask] = useState<TaskResponse | null>(null);
+  const [tasks, setTasks] = useState<TaskResponse[]>([]);
   const [error, setError] = useState('');
   const [authError, setAuthError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,9 +27,10 @@ export default function App() {
   const [apiMode, setApiModeState] = useState<'localhost' | 'aws' | 'auto'>(getApiMode());
   const [currentApiUrl, setCurrentApiUrl] = useState(getCurrentApiBaseURL());
   const [workerCount, setWorkerCount] = useState<number | null>(null);
-  const [rotationAngle, setRotationAngle] = useState(0);
-  const animationFrameRef = useRef<number | null>(null);
-  const lastApiCallAngleRef = useRef<number>(-1);
+  const [gatewayConnected, setGatewayConnected] = useState(false);
+  const [gatewayConnecting, setGatewayConnecting] = useState(false);
+  
+  const isAuthenticated = useMemo(() => !!userEmail, [userEmail]);
   
   const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' || 
@@ -57,6 +59,10 @@ export default function App() {
       if (window.location.hash && session) {
         window.history.replaceState(null, '', window.location.pathname);
       }
+      if (!session) {
+        setTasks([]);
+        setGatewayConnected(false);
+      }
     });
 
     setCurrentApiUrl(getCurrentApiBaseURL());
@@ -67,34 +73,78 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
+  const loadTaskHistory = useCallback(async () => {
+    try {
+      const taskList = await apiClient.listTasks();
+      setTasks(taskList);
+    } catch (err) {
+      console.error('Failed to load task history:', err);
+    }
   }, []);
 
   const pollTaskStatus = useCallback(async (correlationId: string) => {
     try {
       const updatedTask = await apiClient.getTask(correlationId);
-      setTask(updatedTask);
-
-      if (updatedTask.status === 'completed' || updatedTask.status === 'error' || updatedTask.status === 'failed') {
-        setLoading(false);
-      }
+      setTasks(prevTasks => {
+        const index = prevTasks.findIndex(t => t.correlation_id === correlationId);
+        if (index >= 0) {
+          const newTasks = [...prevTasks];
+          newTasks[index] = updatedTask;
+          return newTasks;
+        }
+        return [updatedTask, ...prevTasks];
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch task status';
-      if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-        setError('Task not found');
-        setLoading(false);
-      } else {
+      if (!errorMessage.includes('404') && !errorMessage.includes('not found')) {
         console.error('Error polling task status:', err);
       }
     }
   }, []);
 
+  const waitForGatewayConnection = useCallback(async (maxRetries: number = 10, initialDelay: number = 1000): Promise<boolean> => {
+    setGatewayConnecting(true);
+    let delay = initialDelay;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        await apiClient.checkHealth();
+        setGatewayConnected(true);
+        setGatewayConnecting(false);
+        return true;
+      } catch (err) {
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay = Math.min(delay * 1.5, 5000);
+        }
+      }
+    }
+    
+    setGatewayConnecting(false);
+    return false;
+  }, []);
+
   useEffect(() => {
+    if (!isAuthenticated) {
+      setGatewayConnected(false);
+      return;
+    }
+
+    const initializeGateway = async () => {
+      const connected = await waitForGatewayConnection();
+      if (connected) {
+        await loadTaskHistory();
+      }
+    };
+
+    initializeGateway();
+  }, [isAuthenticated, waitForGatewayConnection, loadTaskHistory]);
+
+  useEffect(() => {
+    if (!gatewayConnected || !isAuthenticated) {
+      return;
+    }
+
     const pollWorkerCount = async () => {
       try {
         const response = await apiClient.getWorkerCount();
@@ -106,36 +156,19 @@ export default function App() {
 
     pollWorkerCount();
 
-    const animate = () => {
-      setRotationAngle((prev) => {
-        const newAngle = (prev + 2) % 360;
-        
-        const prevAngle = prev;
-        const crossedTop = prevAngle >= 358 && newAngle < 2;
-        
-        if (crossedTop) {
-          lastApiCallAngleRef.current = newAngle;
-          pollWorkerCount();
-          
-          if (task && task.status !== 'completed' && task.status !== 'error' && task.status !== 'failed') {
-            pollTaskStatus(task.correlation_id);
-          }
+    const interval = setInterval(() => {
+      pollWorkerCount();
+      tasks.forEach(task => {
+        if (task.status !== 'completed' && task.status !== 'error' && task.status !== 'failed') {
+          pollTaskStatus(task.correlation_id);
         }
-        
-        return newAngle;
       });
-      
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-    
-    animationFrameRef.current = requestAnimationFrame(animate);
+    }, 5000);
 
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      clearInterval(interval);
     };
-  }, [task, pollTaskStatus]);
+  }, [gatewayConnected, isAuthenticated, tasks, pollTaskStatus]);
 
   const parseOutOfTicksError = (errorMessage: string): { isOutOfTicks: boolean; remaining: number } => {
     if (errorMessage.includes('Daily tick limit exceeded')) {
@@ -159,7 +192,6 @@ export default function App() {
 
     setLoading(true);
     setError('');
-    setTask(null);
 
     try {
       const response = await apiClient.submitTask({
@@ -167,8 +199,10 @@ export default function App() {
         max_ticks: maxTicks,
       });
 
-      setTask(response);
+      setTasks(prevTasks => [response, ...prevTasks]);
+      setMandate('');
       setLoading(false);
+      await loadTaskHistory();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to submit task';
       setError(errorMessage);
@@ -177,7 +211,6 @@ export default function App() {
   };
 
   const handleReset = () => {
-    setTask(null);
     setError('');
     setMandate('');
     setLoading(false);
@@ -232,7 +265,7 @@ export default function App() {
   const handleSignOut = async () => {
     setAuthError('');
     setLoading(false);
-    setTask(null);
+    setTasks([]);
     try {
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) {
@@ -270,18 +303,25 @@ export default function App() {
     }
   };
 
-  const handleApiModeChange = () => {
+  const handleApiModeChange = async () => {
     const nextMode = apiMode === 'localhost' ? 'aws' : apiMode === 'aws' ? 'auto' : 'localhost';
     setApiMode(nextMode);
     setApiModeState(nextMode);
     const newUrl = getCurrentApiBaseURL();
     setCurrentApiUrl(newUrl);
     apiClient.updateBaseURL(newUrl);
+    
+    setGatewayConnected(false);
+    if (isAuthenticated) {
+      const connected = await waitForGatewayConnection();
+      if (connected) {
+        await loadTaskHistory();
+      }
+    }
   };
 
-  const bg = dark ? 'bg-zinc-900' : 'bg-white';
-  const text = dark ? 'text-white' : 'text-zinc-900';
-  const isAuthenticated = !!userEmail;
+  const bg = theme.colors.background.primary;
+  const text = theme.colors.text.primary;
   const { isOutOfTicks, remaining: remainingTicks } = parseOutOfTicksError(error);
 
   return (
@@ -295,9 +335,28 @@ export default function App() {
       />
 
       <div className="w-full max-w-4xl mx-auto">
+        <div className={`mb-4 p-3 rounded-lg ${theme.colors.status.pending.bg} ${theme.colors.status.pending.border} border-2`}>
+          <p className={`${theme.colors.status.pending.text} font-mono text-sm font-bold`}>
+            Note: This is an interim version. A frontend overhaul is coming soon.
+          </p>
+        </div>
+        {isAuthenticated && gatewayConnecting && (
+          <div className={`mb-4 p-3 rounded-lg ${theme.colors.status.pending.bg} ${theme.colors.status.pending.border} border-2`}>
+            <p className={`${theme.colors.status.pending.text} font-mono text-sm`}>
+              Connecting to gateway at {currentApiUrl}...
+            </p>
+          </div>
+        )}
+        {isAuthenticated && !gatewayConnected && !gatewayConnecting && (
+          <div className={`mb-4 p-3 rounded-lg ${theme.colors.status.error.bg} ${theme.colors.status.error.border} border-2`}>
+            <p className={`${theme.colors.status.error.text} font-mono text-sm`}>
+              Cannot connect to gateway at {currentApiUrl}. Please ensure the gateway service is running.
+            </p>
+          </div>
+        )}
         <Header text={text} workerCount={workerCount} />
 
-        <div className="space-y-8 p-12 rounded-3xl" style={randomColor}>
+        <div className={`space-y-8 p-12 rounded-3xl ${theme.colors.background.secondary} ${theme.colors.border.primary} border-2`}>
           {!isAuthenticated ? (
             <LoginForm
               email={email}
@@ -322,21 +381,39 @@ export default function App() {
                 onMaxTicksBlur={handleMaxTicksBlur}
                 onSubmit={handleSubmit}
                 onReset={handleReset}
-                hasTask={!!task}
               />
 
-              <TaskStatusDisplay
-                task={task}
-                error={error}
-                rotationAngle={rotationAngle}
-                isOutOfTicks={isOutOfTicks}
-                remainingTicks={remainingTicks}
-              />
+              {error && !isOutOfTicks && (
+                <div className={`p-4 rounded-xl ${theme.colors.status.error.bg} ${theme.colors.status.error.text} ${theme.colors.status.error.border} border-2`}>
+                  <p className="font-mono font-bold">Error: {error}</p>
+                </div>
+              )}
+
+              {isOutOfTicks && (
+                <div className={`p-4 rounded-xl ${theme.colors.status.pending.bg} ${theme.colors.status.pending.text} ${theme.colors.status.pending.border} border-2`}>
+                  <p className="font-mono font-bold">
+                    Daily tick limit exceeded. Remaining ticks: {remainingTicks}
+                  </p>
+                </div>
+              )}
+
+              {tasks.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className={`${theme.colors.text.primary} font-mono text-base font-bold uppercase tracking-wide`}>
+                    Task History ({tasks.length})
+                  </h3>
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                    {tasks.map((task) => (
+                      <TaskCard key={task.correlation_id} task={task} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
 
-        <AboutSection dark={dark} text={text} />
+        <AboutSection text={text} />
       </div>
     </div>
   );
