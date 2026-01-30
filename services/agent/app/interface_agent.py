@@ -156,8 +156,68 @@ class InterfaceAgent:
         self.worker_ready = False
         self.logger.info("InterfaceAgent stopped")
 
+    async def _test_connectivity(self) -> Dict[str, bool]:
+        """
+        Test connectivity to all required services.
+        
+        :returns: Dictionary with connectivity status for each service.
+        """
+        connectivity = {
+            "rabbitmq": False,
+            "redis": False,
+            "chroma": False,
+            "external_api": False
+        }
+        
+        try:
+            if self.rabbitmq.is_ready():
+                connectivity["rabbitmq"] = True
+                self.logger.info("  OK: RabbitMQ connected")
+            else:
+                self.logger.warning("  FAIL: RabbitMQ not connected")
+        except Exception as e:
+            self.logger.warning(f"  FAIL: RabbitMQ check failed: {e}")
+        
+        try:
+            if self.storage.connector.redis_ready:
+                client = await self.storage.connector.get_client()
+                if client:
+                    await client.ping()
+                    connectivity["redis"] = True
+                    self.logger.info("  OK: Redis connected")
+                else:
+                    self.logger.warning("  FAIL: Redis client not available")
+            else:
+                self.logger.warning("  FAIL: Redis not connected")
+        except Exception as e:
+            self.logger.warning(f"  FAIL: Redis check failed: {e}")
+        
+        try:
+            if self.connector_chroma.chroma_api_ready:
+                connectivity["chroma"] = True
+                self.logger.info("  OK: Chroma connected")
+            else:
+                self.logger.warning("  FAIL: Chroma not connected")
+        except Exception as e:
+            self.logger.warning(f"  FAIL: Chroma check failed: {e}")
+        
+        try:
+            test_url = "https://www.google.com"
+            result = await self.connector_http.request("GET", test_url, timeout=5)
+            if result and result.status_code == 200:
+                connectivity["external_api"] = True
+                self.logger.info("  OK: External API access working")
+            else:
+                self.logger.warning(f"  FAIL: External API returned status {result.status_code if result else 'None'}")
+        except Exception as e:
+            self.logger.warning(f"  FAIL: External API check failed: {e}")
+        
+        return connectivity
+
     async def _handle_task(self, payload: Dict[str, Any]) -> None:
         """Processes a single task from the queue."""
+        import os
+        
         self.logger.debug("Received task payload", extra={"payload": payload})
         self.correlation_id = payload.get(KeyNames.CORRELATION_ID)
         self.mandate = payload.get(KeyNames.MANDATE)
@@ -165,6 +225,46 @@ class InterfaceAgent:
 
         if not self.correlation_id or not self.mandate:
             self.logger.warning("Invalid task payload, missing mandate or correlation_id")
+            return
+
+        skip_phrase = os.environ.get("AGENT_SKIP_PHRASE", "skipskipskip")
+        
+        if skip_phrase and skip_phrase.lower() in self.mandate.lower():
+            self.logger.info(
+                f"SKIP MODE: Mandate contains skip phrase '{skip_phrase}' - testing connectivity only",
+                extra={
+                    "correlation_id": self.correlation_id,
+                    "mandate": (self.mandate[:200] + "…") if isinstance(self.mandate, str) and len(self.mandate) > 200 else self.mandate,
+                },
+            )
+            await self._publish_status(StatusType.ACCEPTED, max_ticks=max_ticks)
+            await self._publish_status(StatusType.STARTED, max_ticks=max_ticks)
+            
+            self.logger.info("=== Testing Connectivity ===")
+            connectivity = await self._test_connectivity()
+            
+            all_connected = all(connectivity.values())
+            status_msg = "All services connected" if all_connected else "Some services not connected"
+            
+            result_msg = f"SKIP MODE: {status_msg}\n"
+            result_msg += f"RabbitMQ: {'✓' if connectivity['rabbitmq'] else '✗'}\n"
+            result_msg += f"Redis: {'✓' if connectivity['redis'] else '✗'}\n"
+            result_msg += f"Chroma: {'✓' if connectivity['chroma'] else '✗'}\n"
+            result_msg += f"External API: {'✓' if connectivity['external_api'] else '✗'}\n"
+            
+            completion = CompletionResult(
+                correlation_id=self.correlation_id,
+                success=all_connected,
+                deliverables=[result_msg],
+                notes=f"Connectivity test results: {connectivity}"
+            )
+            
+            self.logger.info(f"SKIP MODE: Connectivity test complete - {status_msg}")
+            await self._publish_status(
+                StatusType.COMPLETED,
+                max_ticks=max_ticks,
+                result=completion.result(),
+            )
             return
 
         self.logger.info(

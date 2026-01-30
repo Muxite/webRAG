@@ -231,15 +231,15 @@ When gateway reads a task:
 ## Worker Isolation
 
 Agents are completely isolated and can only:
-- ✅ Read from RabbitMQ (consume tasks)
-- ✅ Write to Redis (status updates, worker presence)
-- ✅ Read/write to ChromaDB (context storage)
-- ✅ Make external API calls (LLM, search, HTTP)
+- Read from RabbitMQ (consume tasks)
+- Write to Redis (status updates, worker presence)
+- Read/write to ChromaDB (context storage)
+- Make external API calls (LLM, search, HTTP)
 
 Agents cannot:
-- ❌ Write to Supabase (gateway handles this)
-- ❌ Interact with frontend directly
-- ❌ Access user authentication data
+- Does NOT write to Supabase (gateway handles this)
+- Does NOT interact with frontend directly
+- Does NOT access user authentication data
 
 ## Authentication & Authorization
 
