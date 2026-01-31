@@ -72,6 +72,36 @@ def run_command(cmd: List[str], check: bool = True, capture: bool = False, shell
         return False, "", f"Command not found: {cmd[0] if isinstance(cmd, list) else cmd}"
 
 
+def get_image_size(image_name: str) -> Optional[str]:
+    """
+    Get the size of a Docker image in human-readable format.
+    
+    :param image_name: Docker image name (e.g., "euglena/agent").
+    :returns: Formatted size string (e.g., "245.3 MB") or None on error.
+    """
+    try:
+        cmd = ["docker", "inspect", "--format", "{{.Size}}", image_name]
+        success, stdout, stderr = run_command(cmd, check=False, capture=True)
+        if not success or not stdout.strip():
+            return None
+        
+        size_bytes = int(stdout.strip())
+        
+        if size_bytes >= 1024 * 1024 * 1024:
+            size_gb = size_bytes / (1024 * 1024 * 1024)
+            return f"{size_gb:.2f} GB"
+        elif size_bytes >= 1024 * 1024:
+            size_mb = size_bytes / (1024 * 1024)
+            return f"{size_mb:.2f} MB"
+        elif size_bytes >= 1024:
+            size_kb = size_bytes / 1024
+            return f"{size_kb:.2f} KB"
+        else:
+            return f"{size_bytes} B"
+    except (ValueError, Exception):
+        return None
+
+
 def push_to_ecr(services_dir: Path, aws_config: Dict, services: List[str]) -> bool:
     """
     Push Docker images to ECR.
@@ -144,7 +174,12 @@ def push_to_ecr(services_dir: Path, aws_config: Dict, services: List[str]) -> bo
                 continue
         finally:
             os.chdir(original_dir)
-        print(f"    OK: Image built")
+        
+        image_size = get_image_size(image_name)
+        if image_size:
+            print(f"    OK: Image built (size: {image_size})")
+        else:
+            print(f"    OK: Image built")
         
         print(f"  Tagging and pushing...")
         ecr_image = f"{registry_url}/euglena/{service}:latest"
@@ -242,6 +277,7 @@ def get_network_config(aws_config: Dict, network_discovery: NetworkDiscovery) ->
     assign_public_ip = aws_config.get("ASSIGN_PUBLIC_IP", "ENABLED").upper()
     
     return {
+        "vpcId": vpc_id,
         "subnets": subnet_ids,
         "securityGroups": security_group_ids,
         "assignPublicIp": assign_public_ip
@@ -303,7 +339,7 @@ def main():
     parser.add_argument("--service", choices=["euglena", "all"], default="all",
                        help="Service to deploy (default: all, deploys single euglena service)")
     parser.add_argument("--skip-ecr", action="store_true",
-                       help="Skip pushing images to ECR")
+                       help="Skip building and pushing images to ECR (use existing images)")
     parser.add_argument("--skip-network-check", action="store_true",
                        help="Skip network validation")
     parser.add_argument("--wait", action="store_true",
@@ -394,29 +430,53 @@ def main():
             fs = efs_manager.get_file_system()
             if fs:
                 print(f"  OK: EFS file system found: {efs_file_system_id}")
-                vpc_id = aws_config.get("VPC_ID")
-                subnet_ids = aws_config.get("SUBNET_IDS", "").split(",") if aws_config.get("SUBNET_IDS") else []
-                security_group_ids = aws_config.get("SECURITY_GROUP_IDS", "").split(",") if aws_config.get("SECURITY_GROUP_IDS") else []
                 
-                if subnet_ids:
-                    if not security_group_ids and vpc_id:
-                        sg_id = efs_manager.get_or_create_security_group_for_efs(vpc_id)
-                        if sg_id:
-                            security_group_ids = [sg_id]
-                    
-                    mount_targets = efs_manager.ensure_mount_targets(
-                        subnet_ids=[s.strip() for s in subnet_ids if s.strip()],
-                        security_group_ids=[s.strip() for s in security_group_ids if s.strip()]
-                    )
-                    print(f"  OK: {len(mount_targets)} mount target(s) ready")
+                network_config = get_network_config(aws_config, network_discovery)
+                if not network_config:
+                    print("  WARN: Could not determine network configuration (skipping mount target setup)")
                 else:
-                    print("  WARN: No subnet IDs configured (skipping mount target setup)")
+                    vpc_id = network_config.get("vpcId") or aws_config.get("VPC_ID")
+                    subnet_ids = network_config.get("subnets", [])
+                    security_group_ids = aws_config.get("SECURITY_GROUP_IDS", "").split(",") if aws_config.get("SECURITY_GROUP_IDS") else []
+                    ecs_security_group_ids = network_config.get("securityGroups", [])
+                    
+                    if subnet_ids:
+                        if not security_group_ids and vpc_id:
+                            sg_id = efs_manager.get_or_create_security_group_for_efs(
+                                vpc_id, 
+                                ecs_security_group_ids=ecs_security_group_ids
+                            )
+                            if sg_id:
+                                security_group_ids = [sg_id]
+                        
+                        mount_targets = efs_manager.ensure_mount_targets(
+                            subnet_ids=[s.strip() for s in subnet_ids if s.strip()],
+                            security_group_ids=[s.strip() for s in security_group_ids if s.strip()]
+                        )
+                        print(f"  OK: {len(mount_targets)} mount target(s) ready")
+                        
+                        if ecs_security_group_ids:
+                            actual_efs_sg_ids = efs_manager.get_mount_target_security_groups()
+                            if not actual_efs_sg_ids and security_group_ids:
+                                actual_efs_sg_ids = security_group_ids
+                            
+                            for efs_sg_id in actual_efs_sg_ids:
+                                print(f"  Ensuring ECS access to EFS security group {efs_sg_id}...")
+                                try:
+                                    efs_manager._ensure_ecs_access_to_efs(efs_sg_id, ecs_security_group_ids)
+                                except Exception as sg_error:
+                                    print(f"  WARN: Could not update security group {efs_sg_id}: {sg_error}")
+                                    print(f"  NOTE: You may need to manually add NFS (port 2049) access from ECS security groups")
+                            print(f"  OK: EFS security groups configured for ECS access")
+                    else:
+                        print("  WARN: No subnet IDs configured (skipping mount target setup)")
             else:
                 print(f"  WARN: EFS file system {efs_file_system_id} not found (skipping)")
         except Exception as e:
             print(f"  WARN: Could not set up EFS mount targets: {e} (continuing anyway)")
+            print(f"  NOTE: EFS volumes will be skipped if security groups are not configured correctly")
     else:
-        print("  SKIP: EFS_FILE_SYSTEM_ID not set in aws.env (skipping EFS setup)")
+        print("  SKIP: EFS_FILE_SYSTEM_ID not set in aws.env (EFS volumes will not be used)")
     
     network_config = get_network_config(aws_config, network_discovery)
     if not network_config:

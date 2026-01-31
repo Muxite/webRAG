@@ -153,11 +153,38 @@ class EfsManager:
         
         return mount_targets
     
-    def get_or_create_security_group_for_efs(self, vpc_id: str, security_group_name: str = "efs-mount-target-sg") -> Optional[str]:
+    def get_mount_target_security_groups(self, file_system_id: Optional[str] = None) -> List[str]:
+        """
+        Get all unique security group IDs from existing mount targets.
+        
+        :param file_system_id: EFS file system ID (uses self.file_system_id if None).
+        :returns: List of unique security group IDs.
+        """
+        fs_id = file_system_id or self.file_system_id
+        if not fs_id:
+            return []
+        
+        mount_targets = self.get_mount_targets(fs_id)
+        security_group_ids = set()
+        
+        for mt in mount_targets:
+            mt_id = mt.get("MountTargetId")
+            if mt_id:
+                try:
+                    response = self.efs_client.describe_mount_target_security_groups(MountTargetId=mt_id)
+                    sg_ids = response.get("SecurityGroups", [])
+                    security_group_ids.update(sg_ids)
+                except Exception as e:
+                    print(f"  WARN: Could not get security groups for mount target {mt_id}: {e}", file=sys.stderr)
+        
+        return list(security_group_ids)
+    
+    def get_or_create_security_group_for_efs(self, vpc_id: str, ecs_security_group_ids: List[str] = None, security_group_name: str = "efs-mount-target-sg") -> Optional[str]:
         """
         Get or create a security group for EFS mount targets.
         
         :param vpc_id: VPC ID where security group should be created.
+        :param ecs_security_group_ids: List of ECS task security group IDs that need access to EFS.
         :param security_group_name: Name for the security group.
         :returns: Security group ID or None on failure.
         """
@@ -172,6 +199,11 @@ class EfsManager:
             if sgs:
                 sg_id = sgs[0]["GroupId"]
                 print(f"Using existing security group {sg_id} for EFS mount targets")
+                
+                # Ensure ECS security groups can access EFS
+                if ecs_security_group_ids:
+                    self._ensure_ecs_access_to_efs(sg_id, ecs_security_group_ids)
+                
                 return sg_id
             
             response = self.ec2_client.create_security_group(
@@ -181,6 +213,15 @@ class EfsManager:
             )
             sg_id = response["GroupId"]
             
+            # Allow NFS traffic from ECS task security groups
+            user_group_pairs = []
+            if ecs_security_group_ids:
+                for ecs_sg_id in ecs_security_group_ids:
+                    user_group_pairs.append({"GroupId": ecs_sg_id})
+            else:
+                # If no ECS security groups provided, allow from self (for backward compatibility)
+                user_group_pairs.append({"GroupId": sg_id})
+            
             self.ec2_client.authorize_security_group_ingress(
                 GroupId=sg_id,
                 IpPermissions=[
@@ -188,7 +229,7 @@ class EfsManager:
                         "IpProtocol": "tcp",
                         "FromPort": 2049,
                         "ToPort": 2049,
-                        "UserIdGroupPairs": [{"GroupId": sg_id}]
+                        "UserIdGroupPairs": user_group_pairs
                     }
                 ]
             )
@@ -198,6 +239,59 @@ class EfsManager:
         except Exception as e:
             print(f"Error creating security group for EFS: {e}", file=sys.stderr)
             return None
+    
+    def _ensure_ecs_access_to_efs(self, efs_sg_id: str, ecs_security_group_ids: List[str]):
+        """
+        Ensure ECS security groups have access to EFS mount target.
+        
+        Checks existing rules and only adds missing ones. Handles duplicate rules gracefully.
+        
+        :param efs_sg_id: EFS mount target security group ID.
+        :param ecs_security_group_ids: List of ECS task security group IDs.
+        """
+        try:
+            response = self.ec2_client.describe_security_groups(GroupIds=[efs_sg_id])
+            current_sg = response.get("SecurityGroups", [{}])[0]
+            current_rules = current_sg.get("IpPermissions", [])
+            
+            allowed_sg_ids = set()
+            for rule in current_rules:
+                if (rule.get("IpProtocol") == "tcp" and 
+                    rule.get("FromPort") == 2049 and 
+                    rule.get("ToPort") == 2049):
+                    for pair in rule.get("UserIdGroupPairs", []):
+                        allowed_sg_ids.add(pair.get("GroupId"))
+            
+            missing_sg_ids = [sg_id for sg_id in ecs_security_group_ids if sg_id not in allowed_sg_ids]
+            if missing_sg_ids:
+                user_group_pairs = [{"GroupId": sg_id} for sg_id in missing_sg_ids]
+                try:
+                    self.ec2_client.authorize_security_group_ingress(
+                        GroupId=efs_sg_id,
+                        IpPermissions=[
+                            {
+                                "IpProtocol": "tcp",
+                                "FromPort": 2049,
+                                "ToPort": 2049,
+                                "UserIdGroupPairs": user_group_pairs
+                            }
+                        ]
+                    )
+                    print(f"  Added NFS access from ECS security groups: {', '.join(missing_sg_ids)}")
+                except Exception as add_error:
+                    error_str = str(add_error)
+                    if "already exists" in error_str or "Duplicate" in error_str or "InvalidPermission.Duplicate" in error_str:
+                        print(f"  OK: NFS access rules already exist (no changes needed)")
+                    else:
+                        raise
+            else:
+                print(f"  OK: NFS access already configured for all ECS security groups")
+        except Exception as e:
+            error_str = str(e)
+            if "already exists" in error_str or "Duplicate" in error_str:
+                print(f"  OK: Security group rules already exist (no changes needed)")
+            else:
+                print(f"  WARN: Could not update EFS security group rules: {e}", file=sys.stderr)
 
 
 def main():
@@ -212,7 +306,8 @@ def main():
     parser = argparse.ArgumentParser(description="Manage EFS mount targets")
     parser.add_argument("--file-system-id", help="EFS file system ID")
     parser.add_argument("--subnet-ids", help="Comma-separated list of subnet IDs")
-    parser.add_argument("--security-group-ids", help="Comma-separated list of security group IDs")
+    parser.add_argument("--security-group-ids", help="Comma-separated list of security group IDs for EFS mount targets")
+    parser.add_argument("--ecs-security-group-ids", help="Comma-separated list of ECS task security group IDs that need EFS access")
     parser.add_argument("--services-dir", type=Path, default=None,
                        help="Services directory containing aws.env (defaults to current directory)")
     
@@ -244,6 +339,8 @@ def main():
     
     subnet_ids = [s.strip() for s in subnet_ids_str.split(",") if s.strip()] if subnet_ids_str else []
     security_group_ids = [s.strip() for s in security_group_ids_str.split(",") if s.strip()] if security_group_ids_str else []
+    ecs_security_group_ids_str = args.ecs_security_group_ids or aws_config.get("SECURITY_GROUP_IDS", "") if aws_env_path.exists() else ""
+    ecs_security_group_ids = [s.strip() for s in ecs_security_group_ids_str.split(",") if s.strip()] if ecs_security_group_ids_str else []
     
     if not subnet_ids:
         print("Error: No subnet IDs provided", file=sys.stderr)
@@ -261,9 +358,14 @@ def main():
     print(f"Performance Mode: {fs.get('PerformanceMode', 'N/A')}")
     
     if not security_group_ids and vpc_id:
-        sg_id = manager.get_or_create_security_group_for_efs(vpc_id)
+        sg_id = manager.get_or_create_security_group_for_efs(vpc_id, ecs_security_group_ids=ecs_security_group_ids)
         if sg_id:
             security_group_ids = [sg_id]
+    elif security_group_ids and vpc_id and ecs_security_group_ids:
+        # Ensure ECS security groups can access the EFS mount target security group
+        efs_sg_id = security_group_ids[0] if security_group_ids else None
+        if efs_sg_id:
+            manager._ensure_ecs_access_to_efs(efs_sg_id, ecs_security_group_ids)
     
     print(f"\n=== Ensuring Mount Targets ===")
     print(f"Subnets: {', '.join(subnet_ids)}")

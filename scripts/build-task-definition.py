@@ -187,6 +187,247 @@ def _make_log_config(prefix, region):
     }
 
 
+def build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env):
+    """
+    Builds gateway task definition with chroma, redis, rabbitmq, and gateway containers.
+    Supports EFS volumes for persistent storage if EFS file system IDs are provided in aws_env.
+    
+    :param account_id: AWS account ID
+    :param region: AWS region
+    :param secret_name: Secrets Manager secret name
+    :param secret_arn_suffix: ARN suffix for the secret
+    :param secret_keys: List of secret key names
+    :param env_vars: Dictionary of environment variables from .env
+    :param aws_env: Dictionary of AWS environment variables from aws.env (may contain EFS file system IDs)
+    :returns: Task definition dictionary
+    """
+    secrets = build_secrets_list(secret_name, secret_arn_suffix, region, account_id, secret_keys)
+    
+    rabbitmq_secrets = []
+    if secret_arn_suffix and "RABBITMQ_ERLANG_COOKIE" in secret_keys:
+        rabbitmq_secrets.append({
+            "name": "RABBITMQ_ERLANG_COOKIE",
+            "valueFrom": f"arn:aws:secretsmanager:{region}:{account_id}:secret:{secret_name}-{secret_arn_suffix}:RABBITMQ_ERLANG_COOKIE::"
+        })
+    
+    shared_efs_id = aws_env.get("EFS_FILE_SYSTEM_ID", "").strip() if aws_env else ""
+    chroma_efs_id = aws_env.get("CHROMA_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
+    redis_efs_id = aws_env.get("REDIS_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
+    rabbitmq_efs_id = aws_env.get("RABBITMQ_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
+    
+    chroma_efs_id = chroma_efs_id if chroma_efs_id else None
+    redis_efs_id = redis_efs_id if redis_efs_id else None
+    rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
+    
+    chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"
+    chroma_mount_points = []
+    if chroma_efs_id:
+        chroma_mount_points.append({"sourceVolume": "chroma-data", "containerPath": "/chroma-data", "readOnly": False})
+    
+    chroma = {
+        "cpu": 0,
+        "environment": [
+            {"name": "IS_PERSISTENT", "value": "TRUE"},
+            {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}
+        ],
+        "essential": True,
+        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=90, retries=6, timeout=15),
+        "image": "chromadb/chroma:latest",
+        "logConfiguration": _make_log_config("chroma", region),
+        "mountPoints": chroma_mount_points,
+        "name": "chroma",
+        "portMappings": [{"containerPort": 8000, "hostPort": 8000, "protocol": "tcp"}],
+        "systemControls": [],
+        "volumesFrom": []
+    }
+    
+    redis_command = ["redis-server"]
+    redis_mount_points = []
+    if redis_efs_id:
+        redis_command.append("--appendonly")
+        redis_command.append("yes")
+        redis_mount_points.append({"sourceVolume": "redis-data", "containerPath": "/data", "readOnly": False})
+    
+    redis = {
+        "command": redis_command,
+        "cpu": 0,
+        "environment": [],
+        "essential": True,
+        "healthCheck": _make_health_check("redis-cli ping | grep PONG || exit 1", start_period=120, interval=90, retries=6, timeout=15),
+        "image": "redis:7-alpine",
+        "logConfiguration": _make_log_config("redis", region),
+        "mountPoints": redis_mount_points,
+        "name": "redis",
+        "portMappings": [{"containerPort": 6379, "hostPort": 6379, "protocol": "tcp"}],
+        "systemControls": [],
+        "volumesFrom": []
+    }
+    
+    rabbitmq_mount_points = []
+    if rabbitmq_efs_id:
+        rabbitmq_mount_points.append({"sourceVolume": "rabbitmq-data", "containerPath": "/var/lib/rabbitmq", "readOnly": False})
+    
+    rabbitmq = {
+        "command": [
+            "sh",
+            "-c",
+            "if [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then mkdir -p /var/lib/rabbitmq && echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie && chmod 600 /var/lib/rabbitmq/.erlang.cookie && chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; fi && exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"
+        ],
+        "cpu": 0,
+        "environment": [],
+        "essential": True,
+        "healthCheck": _make_health_check("rabbitmq-diagnostics ping || exit 1", start_period=300, interval=90, retries=6, timeout=15),
+        "image": "rabbitmq:3-management",
+        "logConfiguration": _make_log_config("rabbitmq", region),
+        "mountPoints": rabbitmq_mount_points,
+        "name": "rabbitmq",
+        "portMappings": [
+            {"containerPort": 5672, "hostPort": 5672, "protocol": "tcp"},
+            {"containerPort": 15672, "hostPort": 15672, "protocol": "tcp"}
+        ],
+        "secrets": rabbitmq_secrets,
+        "systemControls": [],
+        "volumesFrom": []
+    }
+    
+    env_list = build_environment_list(env_vars)
+    
+    gateway = {
+        "cpu": 0,
+        "dependsOn": [
+            {"condition": "START", "containerName": "chroma"},
+            {"condition": "START", "containerName": "redis"},
+            {"condition": "START", "containerName": "rabbitmq"}
+        ],
+        "environment": env_list,
+        "essential": True,
+        "healthCheck": _make_health_check("curl -f http://localhost:8080/health || exit 1", start_period=300, interval=90, retries=6, timeout=15),
+        "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway:latest",
+        "logConfiguration": _make_log_config("gateway", region),
+        "mountPoints": [],
+        "name": "gateway",
+        "portMappings": [{"containerPort": 8080, "hostPort": 8080, "protocol": "tcp"}],
+        "secrets": secrets,
+        "systemControls": [],
+        "volumesFrom": []
+    }
+    
+    containers = [chroma, redis, rabbitmq, gateway]
+    
+    volumes = []
+    using_shared_efs = (chroma_efs_id and redis_efs_id and rabbitmq_efs_id and 
+                        chroma_efs_id == redis_efs_id == rabbitmq_efs_id)
+    
+    if chroma_efs_id:
+        efs_config = {
+            "fileSystemId": chroma_efs_id,
+            "transitEncryption": "ENABLED",
+            "authorizationConfig": {
+                "iam": "ENABLED"
+            }
+        }
+        volumes.append({
+            "name": "chroma-data",
+            "efsVolumeConfiguration": efs_config
+        })
+    
+    if redis_efs_id:
+        efs_config = {
+            "fileSystemId": redis_efs_id,
+            "transitEncryption": "ENABLED",
+            "authorizationConfig": {
+                "iam": "ENABLED"
+            }
+        }
+        volumes.append({
+            "name": "redis-data",
+            "efsVolumeConfiguration": efs_config
+        })
+    
+    if rabbitmq_efs_id:
+        efs_config = {
+            "fileSystemId": rabbitmq_efs_id,
+            "transitEncryption": "ENABLED",
+            "authorizationConfig": {
+                "iam": "ENABLED"
+            }
+        }
+        volumes.append({
+            "name": "rabbitmq-data",
+            "efsVolumeConfiguration": efs_config
+        })
+    
+    return {
+        "family": "euglena-gateway",
+        "containerDefinitions": containers,
+        "taskRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskRole",
+        "executionRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskExecutionRole",
+        "networkMode": "awsvpc",
+        "volumes": volumes,
+        "placementConstraints": [],
+        "requiresCompatibilities": ["FARGATE"],
+        "cpu": "1024",
+        "memory": "2048"
+    }
+
+
+def build_agent_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env, gateway_host="euglena-gateway.euglena.local"):
+    """
+    Builds agent task definition with agent container only.
+    Agent connects to gateway services via gateway_host parameter (for service discovery).
+    
+    :param account_id: AWS account ID
+    :param region: AWS region
+    :param secret_name: Secrets Manager secret name
+    :param secret_arn_suffix: ARN suffix for the secret
+    :param secret_keys: List of secret key names
+    :param env_vars: Dictionary of environment variables from .env
+    :param aws_env: Dictionary of AWS environment variables from aws.env
+    :param gateway_host: Hostname for gateway service (default: service discovery DNS name)
+    :returns: Task definition dictionary
+    """
+    secrets = build_secrets_list(secret_name, secret_arn_suffix, region, account_id, secret_keys)
+    
+    agent_env_vars = env_vars.copy()
+    
+    if "RABBITMQ_URL" in agent_env_vars:
+        agent_env_vars["RABBITMQ_URL"] = agent_env_vars["RABBITMQ_URL"].replace("@localhost:", f"@{gateway_host}:").replace("://localhost:", f"://{gateway_host}:")
+    if "REDIS_URL" in agent_env_vars:
+        agent_env_vars["REDIS_URL"] = agent_env_vars["REDIS_URL"].replace("@localhost:", f"@{gateway_host}:").replace("://localhost:", f"://{gateway_host}:")
+    if "CHROMA_URL" in agent_env_vars:
+        agent_env_vars["CHROMA_URL"] = agent_env_vars["CHROMA_URL"].replace("@localhost:", f"@{gateway_host}:").replace("://localhost:", f"://{gateway_host}:")
+    
+    env_list = build_environment_list(agent_env_vars)
+    
+    agent = {
+        "cpu": 0,
+        "environment": env_list,
+        "essential": True,
+        "healthCheck": _make_health_check("curl -f http://localhost:8081/health || exit 1", start_period=300, interval=90, retries=6, timeout=15),
+        "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/agent:latest",
+        "logConfiguration": _make_log_config("agent", region),
+        "mountPoints": [],
+        "name": "agent",
+        "portMappings": [{"containerPort": 8081, "hostPort": 8081, "protocol": "tcp"}],
+        "secrets": secrets,
+        "systemControls": [],
+        "volumesFrom": []
+    }
+    
+    return {
+        "family": "euglena-agent",
+        "containerDefinitions": [agent],
+        "taskRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskRole",
+        "executionRoleArn": f"arn:aws:iam::{account_id}:role/ecsTaskExecutionRole",
+        "networkMode": "awsvpc",
+        "volumes": [],
+        "placementConstraints": [],
+        "requiresCompatibilities": ["FARGATE"],
+        "cpu": "1024",
+        "memory": "2048"
+    }
+
+
 def build_euglena_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env):
     """
     Builds single euglena task definition with all containers (chroma, redis, rabbitmq, agent, gateway).
@@ -215,6 +456,10 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
     redis_efs_id = aws_env.get("REDIS_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
     rabbitmq_efs_id = aws_env.get("RABBITMQ_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
     
+    chroma_efs_id = chroma_efs_id if chroma_efs_id else None
+    redis_efs_id = redis_efs_id if redis_efs_id else None
+    rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
+    
     chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"
     chroma_mount_points = []
     if chroma_efs_id:
@@ -227,7 +472,7 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
             {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}
         ],
         "essential": True,
-        "healthCheck": _make_health_check(chroma_health_command, start_period=180),
+        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=90, retries=6, timeout=15),
         "image": "chromadb/chroma:latest",
         "logConfiguration": _make_log_config("chroma", region),
         "mountPoints": chroma_mount_points,
@@ -249,7 +494,7 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         "cpu": 0,
         "environment": [],
         "essential": True,
-        "healthCheck": _make_health_check("redis-cli ping | grep PONG || exit 1", start_period=90),
+        "healthCheck": _make_health_check("redis-cli ping | grep PONG || exit 1", start_period=120, interval=90, retries=6, timeout=15),
         "image": "redis:7-alpine",
         "logConfiguration": _make_log_config("redis", region),
         "mountPoints": redis_mount_points,
@@ -272,7 +517,7 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         "cpu": 0,
         "environment": [],
         "essential": True,
-        "healthCheck": _make_health_check("rabbitmq-diagnostics ping || exit 1", start_period=180),
+        "healthCheck": _make_health_check("rabbitmq-diagnostics ping || exit 1", start_period=300, interval=90, retries=6, timeout=15),
         "image": "rabbitmq:3-management",
         "logConfiguration": _make_log_config("rabbitmq", region),
         "mountPoints": rabbitmq_mount_points,
@@ -297,7 +542,7 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         ],
         "environment": env_list,
         "essential": True,
-        "healthCheck": _make_health_check("curl -f http://localhost:8081/health || exit 1", start_period=300),
+        "healthCheck": _make_health_check("curl -f http://localhost:8081/health || exit 1", start_period=300, interval=90, retries=6, timeout=15),
         "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/agent:latest",
         "logConfiguration": _make_log_config("agent", region),
         "mountPoints": [],
@@ -318,7 +563,7 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         ],
         "environment": env_list,
         "essential": True,
-        "healthCheck": _make_health_check("curl -f http://localhost:8080/health || exit 1", start_period=300),
+        "healthCheck": _make_health_check("curl -f http://localhost:8080/health || exit 1", start_period=300, interval=90, retries=6, timeout=15),
         "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway:latest",
         "logConfiguration": _make_log_config("gateway", region),
         "mountPoints": [],
@@ -328,6 +573,10 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         "systemControls": [],
         "volumesFrom": []
     }
+    
+    chroma_efs_id = chroma_efs_id if chroma_efs_id else None
+    redis_efs_id = redis_efs_id if redis_efs_id else None
+    rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
     
     containers = [chroma, redis, rabbitmq, agent, gateway]
     
@@ -343,8 +592,6 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
                 "iam": "ENABLED"
             }
         }
-        if using_shared_efs:
-            efs_config["rootDirectory"] = "/chroma-data"
         volumes.append({
             "name": "chroma-data",
             "efsVolumeConfiguration": efs_config
@@ -358,8 +605,6 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
                 "iam": "ENABLED"
             }
         }
-        if using_shared_efs:
-            efs_config["rootDirectory"] = "/redis-data"
         volumes.append({
             "name": "redis-data",
             "efsVolumeConfiguration": efs_config
@@ -373,8 +618,6 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
                 "iam": "ENABLED"
             }
         }
-        if using_shared_efs:
-            efs_config["rootDirectory"] = "/rabbitmq-data"
         volumes.append({
             "name": "rabbitmq-data",
             "efsVolumeConfiguration": efs_config

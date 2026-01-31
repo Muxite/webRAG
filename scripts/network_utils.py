@@ -118,8 +118,10 @@ def validate_network_configuration(aws_config: Dict):
     """
     region = aws_config["AWS_REGION"]
     cluster = aws_config.get("ECS_CLUSTER", "euglena-cluster")
+    
+    single_service_name = aws_config.get("ECS_SERVICE_NAME", "euglena-service")
     gateway_service = aws_config.get("GATEWAY_SERVICE_NAME", "euglena-gateway")
-    agent_service = aws_config.get("ECS_SERVICE_NAME", "euglena-agent")
+    agent_service = aws_config.get("AGENT_SERVICE_NAME", "euglena-agent")
     
     ecs_client = boto3.client("ecs", region_name=region)
     ec2_client = boto3.client("ec2", region_name=region)
@@ -129,19 +131,39 @@ def validate_network_configuration(aws_config: Dict):
     print("\n=== Network Configuration Validation ===")
     
     try:
+        single_service_response = ecs_client.describe_services(cluster=cluster, services=[single_service_name])
         gateway_response = ecs_client.describe_services(cluster=cluster, services=[gateway_service])
         agent_response = ecs_client.describe_services(cluster=cluster, services=[agent_service])
         
-        gateway_svc = gateway_response.get("services", [{}])[0]
-        agent_svc = agent_response.get("services", [{}])[0]
+        single_services = single_service_response.get("services", [])
+        gateway_services = gateway_response.get("services", [])
+        agent_services = agent_response.get("services", [])
         
-        gateway_network = gateway_svc.get("networkConfiguration", {}).get("awsvpcConfiguration", {})
-        agent_network = agent_svc.get("networkConfiguration", {}).get("awsvpcConfiguration", {})
+        if not single_services and not gateway_services and not agent_services:
+            issues.append("No services found - services may not be deployed yet")
+            print("  WARN: No services found - skipping network validation")
+            return True, issues
         
-        gateway_sgs = gateway_network.get("securityGroups", [])
-        agent_sgs = agent_network.get("securityGroups", [])
-        gateway_subnets = gateway_network.get("subnets", [])
-        agent_subnets = agent_network.get("subnets", [])
+        if single_services:
+            single_svc = single_services[0]
+            single_network = single_svc.get("networkConfiguration", {}).get("awsvpcConfiguration", {})
+            gateway_sgs = single_network.get("securityGroups", [])
+            agent_sgs = single_network.get("securityGroups", [])
+            gateway_subnets = single_network.get("subnets", [])
+            agent_subnets = single_network.get("subnets", [])
+            print(f"  Using single service configuration: {single_service_name}")
+        else:
+            gateway_svc = gateway_services[0] if gateway_services else {}
+            agent_svc = agent_services[0] if agent_services else {}
+            
+            gateway_network = gateway_svc.get("networkConfiguration", {}).get("awsvpcConfiguration", {})
+            agent_network = agent_svc.get("networkConfiguration", {}).get("awsvpcConfiguration", {})
+            
+            gateway_sgs = gateway_network.get("securityGroups", [])
+            agent_sgs = agent_network.get("securityGroups", [])
+            gateway_subnets = gateway_network.get("subnets", [])
+            agent_subnets = agent_network.get("subnets", [])
+            print("  Using separate service configuration (gateway + agent)")
         
         print(f"\n1. VPC and Subnet Configuration...")
         
@@ -168,15 +190,22 @@ def validate_network_configuration(aws_config: Dict):
         gateway_vpcs = {subnet_info[s]["vpc_id"] for s in gateway_subnets if s in subnet_info}
         agent_vpcs = {subnet_info[s]["vpc_id"] for s in agent_subnets if s in subnet_info}
         
+        all_vpcs = gateway_vpcs | agent_vpcs
+        
         if len(gateway_vpcs) > 1 or len(agent_vpcs) > 1:
             issues.append("Services span multiple VPCs")
             print("  FAIL: Services are in multiple VPCs")
-        elif gateway_vpcs != agent_vpcs:
+        elif gateway_vpcs and agent_vpcs and gateway_vpcs != agent_vpcs:
             issues.append("Gateway and agent are in different VPCs")
             print(f"  FAIL: VPC mismatch: Gateway={gateway_vpcs}, Agent={agent_vpcs}")
-        else:
-            vpc_id = list(gateway_vpcs)[0] if gateway_vpcs else None
-            print(f"  OK: Both services in same VPC: {vpc_id}")
+        elif all_vpcs:
+            vpc_id = list(all_vpcs)[0]
+            if gateway_vpcs and agent_vpcs:
+                print(f"  OK: Both services in same VPC: {vpc_id}")
+            elif gateway_vpcs:
+                print(f"  OK: Gateway service in VPC: {vpc_id}")
+            elif agent_vpcs:
+                print(f"  OK: Agent service in VPC: {vpc_id}")
         
         if set(gateway_subnets) != set(agent_subnets):
             print("  WARN: Subnets differ")
@@ -243,14 +272,21 @@ def validate_network_configuration(aws_config: Dict):
                 print(f"  FAIL: Error checking security group {sg_id}: {e}")
         
         print(f"\n3. Internet Access...")
-        if gateway_vpcs:
-            vpc_id = list(gateway_vpcs)[0]
-            has_internet, desc = check_internet_access(ec2_client, vpc_id, list(set(gateway_subnets + agent_subnets)))
-            if has_internet:
-                print(f"  OK: {desc}")
+        all_vpcs = gateway_vpcs | agent_vpcs
+        if all_vpcs:
+            vpc_id = list(all_vpcs)[0]
+            all_subnets = list(set(gateway_subnets + agent_subnets))
+            if all_subnets:
+                has_internet, desc = check_internet_access(ec2_client, vpc_id, all_subnets)
+                if has_internet:
+                    print(f"  OK: {desc}")
+                else:
+                    issues.append(f"No internet access: {desc}")
+                    print(f"  FAIL: {desc}")
             else:
-                issues.append(f"No internet access: {desc}")
-                print(f"  FAIL: {desc}")
+                print("  WARN: No subnets configured, skipping internet access check")
+        else:
+            print("  WARN: No VPC found, skipping internet access check")
         
         return len(issues) == 0, issues
         
@@ -278,13 +314,21 @@ def fix_security_group_rules(aws_config: Dict) -> Tuple[bool, List[str]]:
     
     try:
         gateway_response = ecs_client.describe_services(cluster=cluster, services=[gateway_service])
-        gateway_svc = gateway_response.get("services", [{}])[0]
+        gateway_services = gateway_response.get("services", [])
+        
+        if not gateway_services:
+            messages.append(f"Gateway service '{gateway_service}' not found")
+            print(f"  WARN: Gateway service '{gateway_service}' not found - skipping security group fix")
+            return True, messages
+        
+        gateway_svc = gateway_services[0]
         gateway_network = gateway_svc.get("networkConfiguration", {}).get("awsvpcConfiguration", {})
         gateway_sgs = gateway_network.get("securityGroups", [])
         
         if not gateway_sgs:
             messages.append("No security groups found for gateway service")
-            return False, messages
+            print("  WARN: No security groups found for gateway service")
+            return True, messages
         
         sg_id = gateway_sgs[0]
         

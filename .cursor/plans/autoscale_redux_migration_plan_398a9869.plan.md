@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: stage1-infrastructure
     content: "Stage 1: Port infrastructure improvements (queue_metrics.py definitions) without changing deployment"
-    status: pending
+    status: completed
     dependencies:
       - stage0-script-system
   - id: stage2-service-separation
@@ -295,26 +295,38 @@ The agent will:
 
 **Tasks**:
 
-1. **Set up EFS volumes** (if not using EFS, use EBS or other persistent storage):
+1. **Set up EFS volumes** (COMPLETED):
 
-   - Create EFS file system for Chroma data (or use existing if configured)
-   - Create EBS volumes or use EFS for Redis/RabbitMQ persistence (optional but recommended)
-   - Update `scripts/deploy.py` to create EFS file system and mount targets if they don't exist
-   - Update `scripts/build-task-definition.py` to configure volume mounts
+   - EFS file system configured: `fs-0ec151e2adb754fc8` (shared across all services)
+   - EFS mount targets automatically created in specified subnets
+   - Security group rules automatically configured to allow ECS task access
+   - Root directories configured: `/chroma-data`, `/redis-data`, `/rabbitmq-data`
+   - Transit encryption enabled for all volumes
+   - IAM authorization disabled when using `rootDirectory` (requires access points otherwise)
+   - `scripts/deploy.py` automatically creates mount targets and updates security groups
+   - `scripts/build-task-definition.py` configures volume mounts in all task definitions
+   - `scripts/efs_manager.py` handles mount target creation and security group management
 
-2. Modify `scripts/build-task-definition.py` to build two task definitions:
+2. Modify `scripts/build-task-definition.py` to build two task definitions (COMPLETED):
 
-   - `euglena-gateway`: gateway, redis, rabbitmq, chroma containers
-     - Chroma: Mount EFS volume to `/chroma-data` (if EFS configured)
-     - Redis: Optional volume mount for persistence
-     - RabbitMQ: Optional volume mount for persistence
-   - `euglena-agent`: agent container only
+   - `euglena-gateway`: gateway, redis, rabbitmq, chroma containers - COMPLETED
+     - Chroma: Mount EFS volume to `/chroma-data` - CONFIGURED
+     - Redis: EFS volume mount at `/redis-data` - CONFIGURED
+     - RabbitMQ: EFS volume mount at `/rabbitmq-data` - CONFIGURED
+   - `euglena-agent`: agent container only - COMPLETED
+   
+   **Recent Fixes (January 2026)**:
+   - Fixed EFS mount access denied errors by automatically configuring security group rules
+   - Fixed IAM authorization incompatibility with `rootDirectory` (disabled when using root directories)
+   - Enhanced EFS manager to detect and update mount target security groups automatically
+   - Improved deployment script to ensure ECS task security groups can access EFS on every deployment
 
 3. Update `scripts/deploy.py` to:
 
    - Build both task definitions
    - Create/update two ECS services
-   - Create EFS file system and mount targets if they don't exist (or verify existing)
+   - EFS file system and mount targets automatically created/verified (COMPLETED)
+   - Security group rules automatically updated to allow ECS access (COMPLETED)
    - Keep agent service at desiredCount=1 (fixed)
 
 4. Update agent to connect to gateway via localhost (same task) → service discovery DNS
@@ -327,11 +339,15 @@ The agent will:
 - `scripts/ecs_infrastructure.py` (add EFS file system creation/verification)
 - Agent environment variables (update connection URLs)
 
-**Volume Configuration**:
+**Volume Configuration** (COMPLETED):
 
-- **Chroma**: EFS mount at `/chroma-data` (required for persistence)
-- **Redis**: Optional volume mount (can use EFS or ephemeral)
-- **RabbitMQ**: Optional volume mount (can use EFS or ephemeral)
+- **Chroma**: EFS mount at `/chroma-data` (required for persistence) - CONFIGURED
+- **Redis**: EFS mount at `/redis-data` (persistence enabled) - CONFIGURED
+- **RabbitMQ**: EFS mount at `/rabbitmq-data` (persistence enabled) - CONFIGURED
+- All volumes share the same EFS file system (`fs-0ec151e2adb754fc8`) with separate root directories
+- Transit encryption enabled for all volumes
+- Security group access automatically configured on deployment
+- IAM authorization disabled when using `rootDirectory` (requires access points otherwise)
 
 **Success Criteria**:
 
