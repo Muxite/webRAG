@@ -53,6 +53,25 @@ python ../scripts/build-task-definition.py
 
 Generates task definition JSON from `keys.env` and `.env` files.
 
+### Comprehensive Diagnostics
+
+```bash
+cd services
+python ../scripts/diagnose.py [--service SERVICE_NAME] [--hours HOURS]
+```
+
+Gathers extensive diagnostic data including:
+- Service and task status
+- Container health and logs (recent and error logs)
+- CloudWatch metrics
+- EFS mount status
+- Task definition details
+- Resource utilization
+
+Options:
+- `--service`: Service name (default: from aws.env ECS_SERVICE_NAME)
+- `--hours`: Hours of logs to retrieve (default: 24)
+
 ## Configuration
 
 Scripts read from `services/aws.env`:
