@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import Optional, Dict, Any
+import aiohttp
 
 from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ

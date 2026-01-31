@@ -6,6 +6,7 @@ Can be run directly or imported as a module.
 import boto3
 from typing import Dict, List, Optional
 import sys
+import time
 
 
 class EcsInfrastructure:
@@ -89,6 +90,9 @@ class EcsInfrastructure:
         """
         Create ECS service if it doesn't exist, or update if it does.
         
+        Handles service lifecycle: checks if service exists, waits for ACTIVE state if updating,
+        creates new service if it doesn't exist, and retries on ServiceNotActiveException.
+        
         :param service_name: Service name.
         :param task_family: Task definition family name.
         :param network_config: Network configuration dictionary with subnets, securityGroups, assignPublicIp.
@@ -130,53 +134,143 @@ class EcsInfrastructure:
                     cluster=self.cluster_name,
                     services=[service_name]
                 )
-                current_service = current_response.get("services", [{}])[0]
-                current_desired = current_service.get("desiredCount", 0)
-                
-                update_params = {
-                    "cluster": self.cluster_name,
-                    "service": service_name,
-                    "taskDefinition": task_family,
-                    "desiredCount": desired_count,
-                    "forceNewDeployment": True,
-                    "deploymentConfiguration": deployment_config,
-                    "capacityProviderStrategy": capacity_provider_strategy,
-                    "platformVersion": "LATEST"
-                }
-                
-                if health_check_grace_period is not None:
-                    update_params["healthCheckGracePeriodSeconds"] = health_check_grace_period
-                
-                if service_registries:
-                    update_params["serviceRegistries"] = service_registries
-                elif current_service.get("serviceRegistries"):
-                    update_params["serviceRegistries"] = current_service["serviceRegistries"]
-                
-                if load_balancers:
-                    update_params["loadBalancers"] = load_balancers
-                elif current_service.get("loadBalancers"):
-                    update_params["loadBalancers"] = current_service["loadBalancers"]
-                
-                self.ecs_client.update_service(**update_params)
-                
-                if current_desired > desired_count:
-                    print(f"  Scaling down from {current_desired} to {desired_count} tasks...")
-                
-                print(f"  OK: Service {service_name} updated")
-                return True
+                services = current_response.get("services", [])
+                if not services:
+                    exists = False
+                else:
+                    current_service = services[0]
+                    service_status = current_service.get("status", "UNKNOWN")
+                    current_desired = current_service.get("desiredCount", 0)
+                    
+                    if service_status == "INACTIVE":
+                        print(f"  Service is INACTIVE, will create new service")
+                        exists = False
+                    elif service_status != "ACTIVE":
+                        print(f"  Service status: {service_status}, waiting for ACTIVE state...")
+                        max_wait = 300
+                        wait_interval = 10
+                        waited = 0
+                        
+                        while service_status != "ACTIVE" and waited < max_wait:
+                            time.sleep(wait_interval)
+                            waited += wait_interval
+                            
+                            current_response = self.ecs_client.describe_services(
+                                cluster=self.cluster_name,
+                                services=[service_name]
+                            )
+                            services = current_response.get("services", [])
+                            if services:
+                                current_service = services[0]
+                                service_status = current_service.get("status", "UNKNOWN")
+                                if service_status == "INACTIVE":
+                                    print(f"    Service became INACTIVE, will create new service")
+                                    exists = False
+                                    break
+                                print(f"    Status: {service_status} (waited {waited}s)")
+                            else:
+                                exists = False
+                                break
+                        
+                        if service_status != "ACTIVE" and waited >= max_wait and exists:
+                            print(f"  WARN: Service did not become ACTIVE within {max_wait}s (status: {service_status})")
+                            print(f"  Attempting update anyway...")
+                    
+                    if exists:
+                        update_params = {
+                            "cluster": self.cluster_name,
+                            "service": service_name,
+                            "taskDefinition": task_family,
+                            "desiredCount": desired_count,
+                            "forceNewDeployment": True,
+                            "deploymentConfiguration": deployment_config,
+                            "capacityProviderStrategy": capacity_provider_strategy,
+                            "platformVersion": "LATEST"
+                        }
+                        
+                        if health_check_grace_period is not None:
+                            update_params["healthCheckGracePeriodSeconds"] = health_check_grace_period
+                        
+                        if service_registries:
+                            update_params["serviceRegistries"] = service_registries
+                        elif current_service.get("serviceRegistries"):
+                            update_params["serviceRegistries"] = current_service["serviceRegistries"]
+                        
+                        if load_balancers:
+                            update_params["loadBalancers"] = load_balancers
+                        elif current_service.get("loadBalancers"):
+                            update_params["loadBalancers"] = current_service["loadBalancers"]
+                        
+                        try:
+                            self.ecs_client.update_service(**update_params)
+                            
+                            if current_desired > desired_count:
+                                print(f"  Scaling down from {current_desired} to {desired_count} tasks...")
+                            
+                            print(f"  OK: Service {service_name} updated")
+                            return True
+                        except Exception as update_error:
+                            error_str = str(update_error)
+                            if "ServiceNotActiveException" in error_str or "Service was not ACTIVE" in error_str:
+                                print(f"  WARN: Service not in ACTIVE state, waiting and retrying...")
+                                time.sleep(30)
+                                try:
+                                    retry_response = self.ecs_client.describe_services(
+                                        cluster=self.cluster_name,
+                                        services=[service_name]
+                                    )
+                                    retry_services = retry_response.get("services", [])
+                                    if retry_services and retry_services[0].get("status") == "ACTIVE":
+                                        self.ecs_client.update_service(**update_params)
+                                        print(f"  OK: Service {service_name} updated (after retry)")
+                                        return True
+                                except:
+                                    pass
+                                print(f"  FAIL: Service {service_name} is not in ACTIVE state and could not be updated")
+                                return False
+                            else:
+                                raise
             except Exception as e:
-                print(f"  FAIL: Error updating service: {e}", file=sys.stderr)
+                error_str = str(e)
+                if "ServiceNotActiveException" in error_str or "Service was not ACTIVE" in error_str:
+                    print(f"  WARN: Service not in ACTIVE state, waiting and retrying...")
+                    time.sleep(30)
+                    try:
+                        retry_response = self.ecs_client.describe_services(
+                            cluster=self.cluster_name,
+                            services=[service_name]
+                        )
+                        retry_services = retry_response.get("services", [])
+                        if retry_services and retry_services[0].get("status") == "ACTIVE":
+                            return self.ensure_service(
+                                service_name, task_family, network_config,
+                                desired_count, load_balancers, health_check_grace_period,
+                                service_registries, enable_az_rebalancing
+                            )
+                    except:
+                        pass
+                    print(f"  FAIL: Service {service_name} is not in ACTIVE state and could not be updated")
+                    return False
+                else:
+                    print(f"  FAIL: Error updating service: {e}", file=sys.stderr)
                 return False
-        else:
+        
+        if not exists:
             print(f"  Creating service {service_name}...")
             try:
+                awsvpc_config = {
+                    "subnets": network_config.get("subnets", []),
+                    "securityGroups": network_config.get("securityGroups", []),
+                    "assignPublicIp": network_config.get("assignPublicIp", "ENABLED")
+                }
+                
                 create_params = {
                     "cluster": self.cluster_name,
                     "serviceName": service_name,
                     "taskDefinition": task_family,
                     "desiredCount": desired_count,
                     "networkConfiguration": {
-                        "awsvpcConfiguration": network_config
+                        "awsvpcConfiguration": awsvpc_config
                     },
                     "deploymentConfiguration": deployment_config,
                     "capacityProviderStrategy": capacity_provider_strategy,

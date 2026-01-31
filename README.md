@@ -10,6 +10,7 @@ The MVP is complete and fully operational with AWS deployment and a working web 
 ### Current Status
 - **Web interface live** - Full-featured frontend with authentication and task management
 - **AWS deployment operational** - ECS task definitions, Secrets Manager integration, container images
+- **Autoscaling migration in progress** - Foundation complete, service separation in progress (see [docs/AUTOSCALE_STATUS.md](docs/AUTOSCALE_STATUS.md))
 - Users have a fixed number of ticks per day.
 - Full Docker Compose setup with all services
 - Agent worker with dependency injection and connector reuse
@@ -108,6 +109,17 @@ This will:
 - Generate and register task definitions
 - Create/update the ECS service with ALB integration
 - Configure IAM permissions
+
+### Skip ECR Push
+
+To skip building and pushing images (useful when images haven't changed):
+
+```bash
+cd services
+python ../scripts/deploy.py --skip-ecr
+```
+
+This will use existing images in ECR and only update task definitions and services.
 
 ### Register Secrets
 

@@ -1,5 +1,5 @@
 """
-Add IAM permission for ECS task protection.
+Add IAM permissions for ECS task protection and EFS access.
 """
 import boto3
 import sys
@@ -64,6 +64,100 @@ def get_role_policies(iam_client, role_name: str) -> dict:
         print(f"  WARN: Could not list policies: {e}")
     
     return policy_doc
+
+
+def add_efs_permissions(aws_config: dict) -> bool:
+    """
+    Add EFS permissions to ecsTaskExecutionRole for mounting EFS volumes.
+    
+    :param aws_config: AWS configuration dictionary.
+    :returns: True on success.
+    """
+    print("\n=== Adding IAM Permissions for EFS Access ===")
+    
+    region = aws_config.get("AWS_REGION", "us-east-1")
+    role_name = aws_config.get("ECS_TASK_EXECUTION_ROLE_NAME", "ecsTaskExecutionRole")
+    efs_file_system_id = aws_config.get("EFS_FILE_SYSTEM_ID", "").strip()
+    
+    if not efs_file_system_id:
+        print("  SKIP: EFS_FILE_SYSTEM_ID not set (EFS not configured)")
+        return True
+    
+    iam_client = boto3.client("iam", region_name=region)
+    
+    try:
+        print(f"  Role name: {role_name}")
+        
+        try:
+            iam_client.get_role(RoleName=role_name)
+            print(f"  OK: Role exists: {role_name}")
+        except iam_client.exceptions.NoSuchEntityException:
+            print(f"  FAIL: Role not found: {role_name}")
+            return False
+        
+        efs_file_system_arn = f"arn:aws:elasticfilesystem:{region}:{aws_config.get('AWS_ACCOUNT_ID', '')}:file-system/{efs_file_system_id}"
+        
+        required_permissions = {
+            "Effect": "Allow",
+            "Action": [
+                "elasticfilesystem:ClientMount",
+                "elasticfilesystem:ClientWrite",
+                "elasticfilesystem:ClientRootAccess",
+                "elasticfilesystem:DescribeMountTargets"
+            ],
+            "Resource": efs_file_system_arn
+        }
+        
+        try:
+            response = iam_client.list_role_policies(RoleName=role_name)
+            policy_names = response.get("PolicyNames", [])
+            
+            efs_policy_name = "EFSAccessPolicy"
+            has_efs_policy = efs_policy_name in policy_names
+            
+            if has_efs_policy:
+                existing_policy = iam_client.get_role_policy(
+                    RoleName=role_name,
+                    PolicyName=efs_policy_name
+                )
+                existing_doc = json.loads(existing_policy["PolicyDocument"])
+                
+                has_permissions = False
+                for stmt in existing_doc.get("Statement", []):
+                    actions = stmt.get("Action", [])
+                    if isinstance(actions, str):
+                        actions = [actions]
+                    if (stmt.get("Effect") == "Allow" and 
+                        "elasticfilesystem:ClientMount" in actions):
+                        has_permissions = True
+                        break
+                
+                if has_permissions:
+                    print(f"  OK: EFS permissions already exist")
+                    return True
+            
+            policy_doc = {
+                "Version": "2012-10-17",
+                "Statement": [required_permissions]
+            }
+            
+            print("  Adding EFS permissions...")
+            iam_client.put_role_policy(
+                RoleName=role_name,
+                PolicyName=efs_policy_name,
+                PolicyDocument=json.dumps(policy_doc)
+            )
+            print(f"  OK: EFS permissions added successfully!")
+            return True
+            
+        except Exception as e:
+            print(f"  WARN: Could not add EFS permissions: {e}")
+            print(f"  NOTE: You may need to manually add EFS permissions to {role_name}")
+            return False
+    
+    except Exception as e:
+        print(f"  WARN: Error checking EFS permissions: {e}")
+        return False
 
 
 def add_task_protection_permission(aws_config: dict) -> bool:
@@ -151,13 +245,15 @@ def main():
     
     aws_config = load_aws_config(services_dir)
     
-    success = add_task_protection_permission(aws_config)
+    efs_success = add_efs_permissions(aws_config)
+    task_protection_success = add_task_protection_permission(aws_config)
     
-    if success:
+    if efs_success and task_protection_success:
         print("\nOK: IAM permission update completed")
     else:
-        print("\nFAIL: IAM permission update failed")
-        sys.exit(1)
+        print("\nWARN: Some IAM permission updates had issues (check output above)")
+        if not task_protection_success:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
