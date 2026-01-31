@@ -231,7 +231,7 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
             {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}
         ],
         "essential": True,
-        "healthCheck": _make_health_check(chroma_health_command, start_period=180, interval=60, retries=3, timeout=10),
+        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=90, retries=6, timeout=15),
         "image": "chromadb/chroma:latest",
         "logConfiguration": _make_log_config("chroma", region),
         "mountPoints": chroma_mount_points,
@@ -241,15 +241,22 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
         "volumesFrom": []
     }
     
+    redis_command = ["redis-server"]
+    redis_mount_points = []
+    if redis_efs_id:
+        redis_command.append("--appendonly")
+        redis_command.append("yes")
+        redis_mount_points.append({"sourceVolume": "redis-data", "containerPath": "/data", "readOnly": False})
+    
     redis = {
-        "command": ["redis-server"],
+        "command": redis_command,
         "cpu": 0,
         "environment": [],
         "essential": True,
-        "healthCheck": _make_health_check("redis-cli ping | grep -q PONG || exit 1", start_period=120, interval=60, retries=3, timeout=10),
+        "healthCheck": _make_health_check("redis-cli ping | grep PONG || exit 1", start_period=120, interval=90, retries=6, timeout=15),
         "image": "redis:7-alpine",
         "logConfiguration": _make_log_config("redis", region),
-        "mountPoints": [],
+        "mountPoints": redis_mount_points,
         "name": "redis",
         "portMappings": [{"containerPort": 6379, "hostPort": 6379, "protocol": "tcp"}],
         "systemControls": [],
@@ -260,32 +267,16 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     if rabbitmq_efs_id:
         rabbitmq_mount_points.append({"sourceVolume": "rabbitmq-data", "containerPath": "/var/lib/rabbitmq", "readOnly": False})
     
-    rabbitmq_startup_cmd = """#!/bin/sh
-# Ensure directory exists (ignore errors)
-mkdir -p /var/lib/rabbitmq 2>/dev/null || true
-# Fix permissions on EFS mount (ignore errors - may fail on EFS)
-chown -R rabbitmq:rabbitmq /var/lib/rabbitmq 2>/dev/null || true
-chmod -R 755 /var/lib/rabbitmq 2>/dev/null || true
-# Set up Erlang cookie if provided (ignore errors)
-if [ -n "$RABBITMQ_ERLANG_COOKIE" ]; then
-    mkdir -p /var/lib/rabbitmq 2>/dev/null || true
-    echo "$RABBITMQ_ERLANG_COOKIE" > /var/lib/rabbitmq/.erlang.cookie 2>/dev/null || true
-    chmod 600 /var/lib/rabbitmq/.erlang.cookie 2>/dev/null || true
-    chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie 2>/dev/null || true
-fi
-# Start RabbitMQ - let entrypoint handle errors
-exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"""
-    
     rabbitmq = {
-        "command": ["sh", "-c", rabbitmq_startup_cmd],
-        "cpu": 0,
-        "environment": [
-            {"name": "RABBITMQ_VM_MEMORY_HIGH_WATERMARK", "value": "0.6"},
-            {"name": "RABBITMQ_DISK_FREE_LIMIT", "value": "2GB"},
-            {"name": "RABBITMQ_DISK_FREE_ABSOLUTE", "value": "2147483648"}
+        "command": [
+            "sh",
+            "-c",
+            "if [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then mkdir -p /var/lib/rabbitmq && echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie && chmod 600 /var/lib/rabbitmq/.erlang.cookie && chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; fi && exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"
         ],
+        "cpu": 0,
+        "environment": [],
         "essential": True,
-        "healthCheck": _make_health_check("rabbitmq-diagnostics ping || exit 1", start_period=240, interval=60, retries=5, timeout=15),
+        "healthCheck": _make_health_check("rabbitmq-diagnostics ping || exit 1", start_period=300, interval=90, retries=6, timeout=15),
         "image": "rabbitmq:3-management",
         "logConfiguration": _make_log_config("rabbitmq", region),
         "mountPoints": rabbitmq_mount_points,
@@ -310,7 +301,7 @@ exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"""
         ],
         "environment": env_list,
         "essential": True,
-        "healthCheck": _make_health_check("curl -f http://localhost:8080/health || exit 1", start_period=180, interval=60, retries=3, timeout=10),
+        "healthCheck": _make_health_check("curl -f http://localhost:8080/health || exit 1", start_period=300, interval=90, retries=6, timeout=15),
         "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway:latest",
         "logConfiguration": _make_log_config("gateway", region),
         "mountPoints": [],
@@ -324,8 +315,8 @@ exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"""
     containers = [chroma, redis, rabbitmq, gateway]
     
     volumes = []
-    using_shared_efs = (chroma_efs_id and rabbitmq_efs_id and 
-                        chroma_efs_id == rabbitmq_efs_id)
+    using_shared_efs = (chroma_efs_id and redis_efs_id and rabbitmq_efs_id and 
+                        chroma_efs_id == redis_efs_id == rabbitmq_efs_id)
     
     if chroma_efs_id:
         efs_config = {
@@ -337,6 +328,19 @@ exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"""
         }
         volumes.append({
             "name": "chroma-data",
+            "efsVolumeConfiguration": efs_config
+        })
+    
+    if redis_efs_id:
+        efs_config = {
+            "fileSystemId": redis_efs_id,
+            "transitEncryption": "ENABLED",
+            "authorizationConfig": {
+                "iam": "ENABLED"
+            }
+        }
+        volumes.append({
+            "name": "redis-data",
             "efsVolumeConfiguration": efs_config
         })
     
@@ -399,7 +403,7 @@ def build_agent_task_definition(account_id, region, secret_name, secret_arn_suff
         "cpu": 0,
         "environment": env_list,
         "essential": True,
-        "healthCheck": _make_health_check("curl -f http://localhost:8081/health || exit 1", start_period=180, interval=60, retries=3, timeout=10),
+        "healthCheck": _make_health_check("curl -f http://localhost:8081/health || exit 1", start_period=300, interval=90, retries=6, timeout=15),
         "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/agent:latest",
         "logConfiguration": _make_log_config("agent", region),
         "mountPoints": [],
@@ -468,7 +472,7 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
             {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}
         ],
         "essential": True,
-        "healthCheck": _make_health_check(chroma_health_command, start_period=180, interval=60, retries=3, timeout=10),
+        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=90, retries=6, timeout=15),
         "image": "chromadb/chroma:latest",
         "logConfiguration": _make_log_config("chroma", region),
         "mountPoints": chroma_mount_points,
@@ -478,15 +482,22 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         "volumesFrom": []
     }
     
+    redis_command = ["redis-server"]
+    redis_mount_points = []
+    if redis_efs_id:
+        redis_command.append("--appendonly")
+        redis_command.append("yes")
+        redis_mount_points.append({"sourceVolume": "redis-data", "containerPath": "/data", "readOnly": False})
+    
     redis = {
-        "command": ["redis-server"],
+        "command": redis_command,
         "cpu": 0,
         "environment": [],
         "essential": True,
-        "healthCheck": _make_health_check("redis-cli ping | grep -q PONG || exit 1", start_period=120, interval=60, retries=3, timeout=10),
+        "healthCheck": _make_health_check("redis-cli ping | grep PONG || exit 1", start_period=120, interval=90, retries=6, timeout=15),
         "image": "redis:7-alpine",
         "logConfiguration": _make_log_config("redis", region),
-        "mountPoints": [],
+        "mountPoints": redis_mount_points,
         "name": "redis",
         "portMappings": [{"containerPort": 6379, "hostPort": 6379, "protocol": "tcp"}],
         "systemControls": [],
@@ -497,32 +508,16 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
     if rabbitmq_efs_id:
         rabbitmq_mount_points.append({"sourceVolume": "rabbitmq-data", "containerPath": "/var/lib/rabbitmq", "readOnly": False})
     
-    rabbitmq_startup_cmd = """#!/bin/sh
-# Ensure directory exists (ignore errors)
-mkdir -p /var/lib/rabbitmq 2>/dev/null || true
-# Fix permissions on EFS mount (ignore errors - may fail on EFS)
-chown -R rabbitmq:rabbitmq /var/lib/rabbitmq 2>/dev/null || true
-chmod -R 755 /var/lib/rabbitmq 2>/dev/null || true
-# Set up Erlang cookie if provided (ignore errors)
-if [ -n "$RABBITMQ_ERLANG_COOKIE" ]; then
-    mkdir -p /var/lib/rabbitmq 2>/dev/null || true
-    echo "$RABBITMQ_ERLANG_COOKIE" > /var/lib/rabbitmq/.erlang.cookie 2>/dev/null || true
-    chmod 600 /var/lib/rabbitmq/.erlang.cookie 2>/dev/null || true
-    chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie 2>/dev/null || true
-fi
-# Start RabbitMQ - let entrypoint handle errors
-exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"""
-    
     rabbitmq = {
-        "command": ["sh", "-c", rabbitmq_startup_cmd],
-        "cpu": 0,
-        "environment": [
-            {"name": "RABBITMQ_VM_MEMORY_HIGH_WATERMARK", "value": "0.6"},
-            {"name": "RABBITMQ_DISK_FREE_LIMIT", "value": "2GB"},
-            {"name": "RABBITMQ_DISK_FREE_ABSOLUTE", "value": "2147483648"}
+        "command": [
+            "sh",
+            "-c",
+            "if [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then mkdir -p /var/lib/rabbitmq && echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie && chmod 600 /var/lib/rabbitmq/.erlang.cookie && chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; fi && exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"
         ],
+        "cpu": 0,
+        "environment": [],
         "essential": True,
-        "healthCheck": _make_health_check("rabbitmq-diagnostics ping || exit 1", start_period=240, interval=60, retries=5, timeout=15),
+        "healthCheck": _make_health_check("rabbitmq-diagnostics ping || exit 1", start_period=300, interval=90, retries=6, timeout=15),
         "image": "rabbitmq:3-management",
         "logConfiguration": _make_log_config("rabbitmq", region),
         "mountPoints": rabbitmq_mount_points,
@@ -547,7 +542,7 @@ exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"""
         ],
         "environment": env_list,
         "essential": True,
-        "healthCheck": _make_health_check("curl -f http://localhost:8081/health || exit 1", start_period=180, interval=60, retries=3, timeout=10),
+        "healthCheck": _make_health_check("curl -f http://localhost:8081/health || exit 1", start_period=300, interval=90, retries=6, timeout=15),
         "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/agent:latest",
         "logConfiguration": _make_log_config("agent", region),
         "mountPoints": [],
@@ -563,11 +558,12 @@ exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"""
         "dependsOn": [
             {"condition": "START", "containerName": "chroma"},
             {"condition": "START", "containerName": "redis"},
-            {"condition": "START", "containerName": "rabbitmq"}
+            {"condition": "START", "containerName": "rabbitmq"},
+            {"condition": "START", "containerName": "agent"}
         ],
         "environment": env_list,
         "essential": True,
-        "healthCheck": _make_health_check("curl -f http://localhost:8080/health || exit 1", start_period=180, interval=60, retries=3, timeout=10),
+        "healthCheck": _make_health_check("curl -f http://localhost:8080/health || exit 1", start_period=300, interval=90, retries=6, timeout=15),
         "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway:latest",
         "logConfiguration": _make_log_config("gateway", region),
         "mountPoints": [],
@@ -585,8 +581,8 @@ exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"""
     containers = [chroma, redis, rabbitmq, agent, gateway]
     
     volumes = []
-    using_shared_efs = (chroma_efs_id and rabbitmq_efs_id and 
-                        chroma_efs_id == rabbitmq_efs_id)
+    using_shared_efs = (chroma_efs_id and redis_efs_id and rabbitmq_efs_id and 
+                        chroma_efs_id == redis_efs_id == rabbitmq_efs_id)
     
     if chroma_efs_id:
         efs_config = {
@@ -598,6 +594,19 @@ exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"""
         }
         volumes.append({
             "name": "chroma-data",
+            "efsVolumeConfiguration": efs_config
+        })
+    
+    if redis_efs_id:
+        efs_config = {
+            "fileSystemId": redis_efs_id,
+            "transitEncryption": "ENABLED",
+            "authorizationConfig": {
+                "iam": "ENABLED"
+            }
+        }
+        volumes.append({
+            "name": "redis-data",
             "efsVolumeConfiguration": efs_config
         })
     
@@ -646,30 +655,24 @@ def _write_task_definition(base_dir, task_def, name):
     """
     Write task definition JSON files.
     
-    Writes only redacted version to td/ subdirectory.
-    Returns path to unredacted version (temporary, should be deleted after registration).
-    
-    :param base_dir: Base directory (services/).
+    :param base_dir: Base directory to write files.
     :param task_def: Task definition dictionary.
     :param name: Task definition name (euglena).
-    :returns: Tuple of (unredacted_path, redacted_path).
+    :returns: Tuple of (path, redacted_path).
     """
-    td_dir = base_dir / "td"
-    td_dir.mkdir(exist_ok=True)
+    path = base_dir / f"task-definition-{name}.json"
+    if path.exists():
+        path.unlink()
+    with open(path, 'w') as f:
+        json.dump(task_def, f, indent=4)
     
-    redacted_path = td_dir / f"task-definition-{name}.redacted.json"
+    redacted_path = base_dir / f"task-definition-{name}.redacted.json"
     if redacted_path.exists():
         redacted_path.unlink()
     with open(redacted_path, 'w') as f:
         json.dump(redact_task_definition(task_def), f, indent=4)
     
-    unredacted_path = td_dir / f"task-definition-{name}.json"
-    if unredacted_path.exists():
-        unredacted_path.unlink()
-    with open(unredacted_path, 'w') as f:
-        json.dump(task_def, f, indent=4)
-    
-    return unredacted_path, redacted_path
+    return path, redacted_path
 
 
 def run_command(cmd, check=True):
@@ -748,19 +751,16 @@ def main():
     print("Generating task definition...")
     task_def = build_euglena_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
     task_path, task_redacted_path = _write_task_definition(base_dir, task_def, "euglena")
+    print(f"Generated: {task_path}")
     
     print("\nRegistering task definition with AWS ECS...")
     success = register_task_definition(task_path, region)
-    
-    if task_path.exists():
-        task_path.unlink()
     
     if not success:
         print("\nError: Failed to register task definition.")
         sys.exit(1)
     
-    print(f"\nTask definition registered successfully.")
-    print(f"Redacted task definition saved to: {task_redacted_path}")
+    print("\nTask definition registered successfully.")
     
     from datetime import datetime
     print(f"\nFinished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
