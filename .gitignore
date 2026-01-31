@@ -3,6 +3,8 @@ services/keys.env
 services/task_definition.json
 services/secrets.json
 services/special_api_keys.txt
+services/td/task-definition-*.json
+!services/td/task-definition-*.redacted.json
 frontend/build
 frontend/node_modules
 venv/
@@ -12,3 +14,5 @@ __pycache__/
 *.py[cod]
 *$py.class
 secrets.json
+.cursor/plans/
+.idea/

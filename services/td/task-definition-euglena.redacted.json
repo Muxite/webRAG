@@ -19,10 +19,10 @@
                     "CMD-SHELL",
                     "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"
                 ],
-                "interval": 90,
-                "retries": 6,
-                "startPeriod": 300,
-                "timeout": 15
+                "interval": 60,
+                "retries": 3,
+                "startPeriod": 180,
+                "timeout": 10
             },
             "image": "chromadb/chroma:latest",
             "logConfiguration": {
@@ -53,9 +53,7 @@
         },
         {
             "command": [
-                "redis-server",
-                "--appendonly",
-                "yes"
+                "redis-server"
             ],
             "cpu": 0,
             "environment": [],
@@ -63,12 +61,12 @@
             "healthCheck": {
                 "command": [
                     "CMD-SHELL",
-                    "redis-cli ping | grep PONG || exit 1"
+                    "redis-cli ping | grep -q PONG || exit 1"
                 ],
-                "interval": 90,
-                "retries": 6,
+                "interval": 60,
+                "retries": 3,
                 "startPeriod": 120,
-                "timeout": 15
+                "timeout": 10
             },
             "image": "redis:7-alpine",
             "logConfiguration": {
@@ -79,13 +77,7 @@
                     "awslogs-stream-prefix": "redis"
                 }
             },
-            "mountPoints": [
-                {
-                    "sourceVolume": "redis-data",
-                    "containerPath": "/data",
-                    "readOnly": false
-                }
-            ],
+            "mountPoints": [],
             "name": "redis",
             "portMappings": [
                 {
@@ -101,19 +93,32 @@
             "command": [
                 "sh",
                 "-c",
-                "if [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then mkdir -p /var/lib/rabbitmq && echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie && chmod 600 /var/lib/rabbitmq/.erlang.cookie && chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; fi && exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"
+                "#!/bin/sh\n# Don't use set -e here - permission changes may fail on EFS and that's OK\nmkdir -p /var/lib/rabbitmq\n# Fix permissions on EFS mount (may fail if not EFS or already correct, that's OK)\nchown -R rabbitmq:rabbitmq /var/lib/rabbitmq 2>/dev/null || true\nchmod -R 755 /var/lib/rabbitmq 2>/dev/null || true\n# Set up Erlang cookie if provided\nif [ -n \"$RABBITMQ_ERLANG_COOKIE\" ]; then\n    mkdir -p /var/lib/rabbitmq\n    echo \"$RABBITMQ_ERLANG_COOKIE\" > /var/lib/rabbitmq/.erlang.cookie\n    chmod 600 /var/lib/rabbitmq/.erlang.cookie\n    chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie || true\nfi\n# Start RabbitMQ (use exec to replace shell process)\nexec /usr/local/bin/docker-entrypoint.sh rabbitmq-server"
             ],
             "cpu": 0,
-            "environment": [],
+            "environment": [
+                {
+                    "name": "RABBITMQ_VM_MEMORY_HIGH_WATERMARK",
+                    "value": "0.6"
+                },
+                {
+                    "name": "RABBITMQ_DISK_FREE_LIMIT",
+                    "value": "2GB"
+                },
+                {
+                    "name": "RABBITMQ_DISK_FREE_ABSOLUTE",
+                    "value": "2147483648"
+                }
+            ],
             "essential": true,
             "healthCheck": {
                 "command": [
                     "CMD-SHELL",
                     "rabbitmq-diagnostics ping || exit 1"
                 ],
-                "interval": 90,
-                "retries": 6,
-                "startPeriod": 300,
+                "interval": 60,
+                "retries": 5,
+                "startPeriod": 240,
                 "timeout": 15
             },
             "image": "rabbitmq:3-management",
@@ -242,10 +247,10 @@
                     "CMD-SHELL",
                     "curl -f http://localhost:8081/health || exit 1"
                 ],
-                "interval": 90,
-                "retries": 6,
-                "startPeriod": 300,
-                "timeout": 15
+                "interval": 60,
+                "retries": 3,
+                "startPeriod": 180,
+                "timeout": 10
             },
             "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/euglena/agent:latest",
             "logConfiguration": {
@@ -316,10 +321,6 @@
                 {
                     "condition": "START",
                     "containerName": "rabbitmq"
-                },
-                {
-                    "condition": "START",
-                    "containerName": "agent"
                 }
             ],
             "environment": [
@@ -394,10 +395,10 @@
                     "CMD-SHELL",
                     "curl -f http://localhost:8080/health || exit 1"
                 ],
-                "interval": 90,
-                "retries": 6,
-                "startPeriod": 300,
-                "timeout": 15
+                "interval": 60,
+                "retries": 3,
+                "startPeriod": 180,
+                "timeout": 10
             },
             "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/euglena/gateway:latest",
             "logConfiguration": {
@@ -461,16 +462,6 @@
     "volumes": [
         {
             "name": "chroma-data",
-            "efsVolumeConfiguration": {
-                "fileSystemId": "fs-0ec151e2adb754fc8",
-                "transitEncryption": "ENABLED",
-                "authorizationConfig": {
-                    "iam": "ENABLED"
-                }
-            }
-        },
-        {
-            "name": "redis-data",
             "efsVolumeConfiguration": {
                 "fileSystemId": "fs-0ec151e2adb754fc8",
                 "transitEncryption": "ENABLED",
