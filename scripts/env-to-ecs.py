@@ -3,7 +3,12 @@ import json
 
 
 def write_dict(input_dict):
-    # return "{" + ",".join(f'"{k}":"{v}"' for k, v in input_dict.items()) + "}"
+    """
+    Write dictionary to JSON file and return file:// URI.
+    
+    :param input_dict: Dictionary to write.
+    :returns: File URI string.
+    """
     with open("secrets.json", "w") as f:
         f.write(json.dumps(input_dict))
 
@@ -11,6 +16,13 @@ def write_dict(input_dict):
 
 
 def format_json_array(items, indent_level=4):
+    """
+    Format a list of items as a JSON array string with indentation.
+    
+    :param items: List of items to format.
+    :param indent_level: Number of spaces for indentation.
+    :returns: Formatted JSON array string.
+    """
     if not items:
         return "[]"
 
@@ -27,6 +39,11 @@ def format_json_array(items, indent_level=4):
 
 
 def main():
+    """
+    Main entry point for generating ECS task definition configuration.
+    Prompts for secret name, region, account ID, and ARN, then outputs
+    formatted secrets and environment variable configuration.
+    """
     keys_env = dict(dotenv_values("services/keys.env"))
     env = dict(dotenv_values("services/.env"))
 

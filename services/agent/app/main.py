@@ -26,10 +26,12 @@ async def health_handler(request):
     if worker:
         monitor.set_component("rabbitmq", worker.rabbitmq.is_ready() if hasattr(worker, 'rabbitmq') else False)
         monitor.set_component("redis", worker.storage.connector.redis_ready if hasattr(worker, 'storage') else False)
+        monitor.set_component("chroma", worker.connector_chroma.chroma_api_ready if hasattr(worker, 'connector_chroma') else False)
         monitor.set_component("worker_ready", worker.worker_ready if hasattr(worker, 'worker_ready') else False)
     else:
         monitor.set_component("rabbitmq", False)
         monitor.set_component("redis", False)
+        monitor.set_component("chroma", False)
         monitor.set_component("worker_ready", False)
     
     payload = monitor.payload()

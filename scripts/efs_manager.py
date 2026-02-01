@@ -200,7 +200,6 @@ class EfsManager:
                 sg_id = sgs[0]["GroupId"]
                 print(f"Using existing security group {sg_id} for EFS mount targets")
                 
-                # Ensure ECS security groups can access EFS
                 if ecs_security_group_ids:
                     self._ensure_ecs_access_to_efs(sg_id, ecs_security_group_ids)
                 
@@ -213,13 +212,11 @@ class EfsManager:
             )
             sg_id = response["GroupId"]
             
-            # Allow NFS traffic from ECS task security groups
             user_group_pairs = []
             if ecs_security_group_ids:
                 for ecs_sg_id in ecs_security_group_ids:
                     user_group_pairs.append({"GroupId": ecs_sg_id})
             else:
-                # If no ECS security groups provided, allow from self (for backward compatibility)
                 user_group_pairs.append({"GroupId": sg_id})
             
             self.ec2_client.authorize_security_group_ingress(
@@ -362,7 +359,6 @@ def main():
         if sg_id:
             security_group_ids = [sg_id]
     elif security_group_ids and vpc_id and ecs_security_group_ids:
-        # Ensure ECS security groups can access the EFS mount target security group
         efs_sg_id = security_group_ids[0] if security_group_ids else None
         if efs_sg_id:
             manager._ensure_ecs_access_to_efs(efs_sg_id, ecs_security_group_ids)

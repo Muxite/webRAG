@@ -11,18 +11,26 @@
                 {
                     "name": "PERSIST_DIRECTORY",
                     "value": "/chroma-data"
+                },
+                {
+                    "name": "SENTENCE_TRANSFORMERS_HOME",
+                    "value": "/chroma-data/.cache"
+                },
+                {
+                    "name": "TRANSFORMERS_CACHE",
+                    "value": "/chroma-data/.cache/huggingface"
                 }
             ],
             "essential": true,
             "healthCheck": {
                 "command": [
                     "CMD-SHELL",
-                    "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"
+                    "curl -f http://localhost:8000/api/v1/heartbeat || (echo 'Chroma health check failed' && exit 1)"
                 ],
-                "interval": 90,
+                "interval": 60,
                 "retries": 6,
                 "startPeriod": 300,
-                "timeout": 15
+                "timeout": 20
             },
             "image": "chromadb/chroma:latest",
             "logConfiguration": {
@@ -53,9 +61,7 @@
         },
         {
             "command": [
-                "redis-server",
-                "--appendonly",
-                "yes"
+                "redis-server"
             ],
             "cpu": 0,
             "environment": [],
@@ -79,13 +85,7 @@
                     "awslogs-stream-prefix": "redis"
                 }
             },
-            "mountPoints": [
-                {
-                    "sourceVolume": "redis-data",
-                    "containerPath": "/data",
-                    "readOnly": false
-                }
-            ],
+            "mountPoints": [],
             "name": "redis",
             "portMappings": [
                 {
@@ -157,10 +157,6 @@
         {
             "cpu": 0,
             "dependsOn": [
-                {
-                    "condition": "START",
-                    "containerName": "chroma"
-                },
                 {
                     "condition": "START",
                     "containerName": "redis"
@@ -461,16 +457,6 @@
     "volumes": [
         {
             "name": "chroma-data",
-            "efsVolumeConfiguration": {
-                "fileSystemId": "fs-0ec151e2adb754fc8",
-                "transitEncryption": "ENABLED",
-                "authorizationConfig": {
-                    "iam": "ENABLED"
-                }
-            }
-        },
-        {
-            "name": "redis-data",
             "efsVolumeConfiguration": {
                 "fileSystemId": "fs-0ec151e2adb754fc8",
                 "transitEncryption": "ENABLED",
