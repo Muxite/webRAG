@@ -1,9 +1,5 @@
 """
-Helper script to register secrets in AWS Secrets Manager and get the ARN suffix.
-
-Usage:
-    cd services
-    python ../scripts/register-secrets.py [--create|--update] [--secret-name NAME]
+Register secrets in AWS Secrets Manager and get the ARN suffix.
 """
 import boto3
 import json

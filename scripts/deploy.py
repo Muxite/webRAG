@@ -1,8 +1,6 @@
 """
 Deployment script for Euglena services.
-
-Works from scratch (creates everything) or updates existing deployment.
-Uses OOP modules for network discovery and ECS infrastructure management.
+Supports single service or autoscale gateway/agent deployment modes.
 """
 import boto3
 import subprocess
@@ -10,6 +8,7 @@ import sys
 import time
 import argparse
 import os
+import io
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
@@ -20,11 +19,13 @@ try:
     from scripts.ecs_infrastructure import EcsInfrastructure
     from scripts.network_utils import validate_network_configuration, fix_security_group_rules
     from scripts.efs_manager import EfsManager
+    from scripts.deployment_mode import DeploymentMode
 except ImportError:
     from network_discovery import NetworkDiscovery
     from ecs_infrastructure import EcsInfrastructure
     from network_utils import validate_network_configuration, fix_security_group_rules
     from efs_manager import EfsManager
+    from deployment_mode import DeploymentMode
 
 
 def load_aws_config(services_dir: Path) -> Dict:
@@ -167,7 +168,12 @@ def push_to_ecr(services_dir: Path, aws_config: Dict, services: List[str]) -> bo
                 bufsize=1
             )
             for line in process.stdout:
-                print(line.rstrip())
+                try:
+                    safe_line = line.rstrip().encode(sys.stdout.encoding or 'utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8', errors='replace')
+                    print(safe_line)
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    safe_line = line.rstrip().encode('ascii', errors='replace').decode('ascii')
+                    print(safe_line)
             process.wait()
             if process.returncode != 0:
                 print(f"    FAIL: Build failed with exit code {process.returncode}")
@@ -200,7 +206,12 @@ def push_to_ecr(services_dir: Path, aws_config: Dict, services: List[str]) -> bo
             bufsize=1
         )
         for line in process.stdout:
-            print(line.rstrip())
+            try:
+                safe_line = line.rstrip().encode(sys.stdout.encoding or 'utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8', errors='replace')
+                print(safe_line)
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                safe_line = line.rstrip().encode('ascii', errors='replace').decode('ascii')
+                print(safe_line)
         process.wait()
         if process.returncode != 0:
             print(f"    FAIL: Push failed with exit code {process.returncode}")
@@ -210,18 +221,20 @@ def push_to_ecr(services_dir: Path, aws_config: Dict, services: List[str]) -> bo
     return True
 
 
-def build_and_register_task_definitions(services_dir: Path) -> bool:
+def build_and_register_task_definitions(services_dir: Path, mode: DeploymentMode = DeploymentMode.SINGLE) -> bool:
     """
     Build and register task definitions.
     
     :param services_dir: Services directory path.
+    :param mode: Deployment mode enum.
     :returns: True on success.
     """
     print("\n=== Building Task Definitions ===")
     
     script_path = services_dir.parent / "scripts" / "build-task-definition.py"
+    cmd = ["python", str(script_path), "--mode", mode]
     process = subprocess.Popen(
-        ["python", str(script_path)],
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -230,7 +243,12 @@ def build_and_register_task_definitions(services_dir: Path) -> bool:
         bufsize=1
     )
     for line in process.stdout:
-        print(line.rstrip())
+        try:
+            safe_line = line.rstrip().encode(sys.stdout.encoding or 'utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8', errors='replace')
+            print(safe_line)
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            safe_line = line.rstrip().encode('ascii', errors='replace').decode('ascii')
+            print(safe_line)
     process.wait()
     
     if process.returncode != 0:
@@ -354,6 +372,87 @@ def stop_old_tasks(aws_config: Dict, service_name: str) -> bool:
             return True
         print(f"  WARN: Error stopping old tasks: {e} (continuing anyway)")
         return True  # Continue deployment even if we can't stop old tasks
+
+
+def stop_other_mode_services(aws_config: Dict, current_mode: DeploymentMode) -> bool:
+    """
+    Stop services from the other deployment mode to prevent conflicts.
+    
+    :param aws_config: AWS configuration dictionary.
+    :param current_mode: Current deployment mode enum.
+    :returns: True on success.
+    """
+    region = aws_config["AWS_REGION"]
+    cluster = aws_config["ECS_CLUSTER"]
+    ecs_client = boto3.client("ecs", region_name=region)
+    
+    if current_mode == DeploymentMode.SINGLE:
+        other_services = ["euglena-gateway", "euglena-agent"]
+        print("\n=== Stopping Autoscale Services ===")
+    else:
+        other_services = ["euglena-service"]
+        print("\n=== Stopping Single Service ===")
+    
+    for service_name in other_services:
+        try:
+            response = ecs_client.describe_services(
+                cluster=cluster,
+                services=[service_name]
+            )
+            services = response.get("services", [])
+            
+            if not services:
+                print(f"  OK: {service_name} does not exist (nothing to stop)")
+                continue
+            
+            service = services[0]
+            current_desired = service.get("desiredCount", 0)
+            
+            if current_desired == 0:
+                print(f"  OK: {service_name} already stopped (desired count: 0)")
+                continue
+            
+            print(f"  Stopping {service_name} (current desired count: {current_desired})...")
+            
+            ecs_client.update_service(
+                cluster=cluster,
+                service=service_name,
+                desiredCount=0
+            )
+            
+            print(f"  OK: Set {service_name} desired count to 0")
+            
+            max_wait = 120
+            wait_interval = 5
+            waited = 0
+            
+            while waited < max_wait:
+                response = ecs_client.describe_services(
+                    cluster=cluster,
+                    services=[service_name]
+                )
+                services = response.get("services", [])
+                if services:
+                    service = services[0]
+                    running = service.get("runningCount", 0)
+                    if running == 0:
+                        print(f"  OK: {service_name} stopped (all tasks terminated)")
+                        break
+                    print(f"    Waiting for {service_name} to stop... ({running} tasks running, {waited}s)")
+                time.sleep(wait_interval)
+                waited += wait_interval
+            
+            if waited >= max_wait:
+                print(f"  WARN: {service_name} did not fully stop within {max_wait}s (continuing anyway)")
+        
+        except Exception as e:
+            error_str = str(e)
+            if "ServiceNotFoundException" in error_str or "does not exist" in error_str:
+                print(f"  OK: {service_name} does not exist (nothing to stop)")
+            else:
+                print(f"  WARN: Error stopping {service_name}: {e} (continuing anyway)")
+    
+    return True
 
 
 def cleanup_old_deployments(aws_config: Dict, service_name: str) -> bool:
@@ -501,12 +600,10 @@ def wait_for_services_stable(aws_config: Dict, services: List[str], timeout: int
 
 
 def main():
-    """
-    Main deployment entry point.
-    """
+    """Main deployment entry point."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--service", choices=["euglena", "all"], default="all",
-                       help="Service to deploy (default: all, deploys single euglena service)")
+    parser.add_argument("--mode", choices=["single", "autoscale"], default="single",
+                       help="Deployment mode: single (all containers) or autoscale (gateway/agent)")
     parser.add_argument("--skip-ecr", action="store_true",
                        help="Skip building and pushing images to ECR (use existing images)")
     parser.add_argument("--skip-network-check", action="store_true",
@@ -515,6 +612,7 @@ def main():
                        help="Wait for services to stabilize after deployment")
     
     args = parser.parse_args()
+    mode = DeploymentMode.from_string(args.mode)
     
     services_dir = Path.cwd()
     if not (services_dir / "aws.env").exists():
@@ -526,7 +624,10 @@ def main():
     print("=" * 60)
     print("Euglena Deployment")
     print("=" * 60)
-    print(f"Service: euglena (single service with all containers)")
+    if mode == DeploymentMode.SINGLE:
+        print(f"Mode: Single service (all containers)")
+    else:
+        print(f"Mode: Autoscale services (gateway + agent)")
     print(f"Region: {aws_config['AWS_REGION']}")
     print(f"Cluster: {aws_config['ECS_CLUSTER']}")
     print("=" * 60)
@@ -551,7 +652,7 @@ def main():
     else:
         print("\nSKIP: Skipping ECR push")
     
-    if not build_and_register_task_definitions(services_dir):
+    if not build_and_register_task_definitions(services_dir, mode):
         print("\nFAIL: Task definition build failed")
         all_success = False
     
@@ -677,25 +778,63 @@ def main():
         else:
             print("  SKIP: TARGET_GROUP_NAME not set in aws.env (skipping ALB configuration)")
         
-        print("\n=== Creating/Updating ECS Service ===")
-        service_name = "euglena-service"
-        task_family = "euglena"
+        print("\n=== Stopping Other Mode Services ===")
+        stop_other_mode_services(aws_config, mode)
         
-        if not ensure_exact_service_config(
-            ecs_infrastructure=ecs_infrastructure,
-            aws_config=aws_config,
-            service_name=service_name,
-            task_family=task_family,
-            network_config=network_config,
-            load_balancers=load_balancers,
-            desired_count=1
-        ):
-            print(f"  FAIL: Failed to create/update {service_name}")
-            all_success = False
-    
-    if args.wait:
-        time.sleep(120)
-        wait_for_services_stable(aws_config, ["euglena-service"])
+        print("\n=== Creating/Updating ECS Service ===")
+        
+        if mode == DeploymentMode.SINGLE:
+            service_name = "euglena-service"
+            task_family = "euglena"
+            
+            if not ensure_exact_service_config(
+                ecs_infrastructure=ecs_infrastructure,
+                aws_config=aws_config,
+                service_name=service_name,
+                task_family=task_family,
+                network_config=network_config,
+                load_balancers=load_balancers,
+                desired_count=1
+            ):
+                print(f"  FAIL: Failed to create/update {service_name}")
+                all_success = False
+            
+            if args.wait:
+                time.sleep(120)
+                wait_for_services_stable(aws_config, ["euglena-service"])
+        else:
+            gateway_service_name = "euglena-gateway"
+            agent_service_name = "euglena-agent"
+            gateway_task_family = "euglena-gateway"
+            agent_task_family = "euglena-agent"
+            
+            if not ensure_exact_service_config(
+                ecs_infrastructure=ecs_infrastructure,
+                aws_config=aws_config,
+                service_name=gateway_service_name,
+                task_family=gateway_task_family,
+                network_config=network_config,
+                load_balancers=load_balancers,
+                desired_count=1
+            ):
+                print(f"  FAIL: Failed to create/update {gateway_service_name}")
+                all_success = False
+            
+            if not ensure_exact_service_config(
+                ecs_infrastructure=ecs_infrastructure,
+                aws_config=aws_config,
+                service_name=agent_service_name,
+                task_family=agent_task_family,
+                network_config=network_config,
+                load_balancers=None,
+                desired_count=1
+            ):
+                print(f"  FAIL: Failed to create/update {agent_service_name}")
+                all_success = False
+            
+            if args.wait:
+                time.sleep(120)
+                wait_for_services_stable(aws_config, [gateway_service_name, agent_service_name])
     
     if all_success:
         print("\n" + "=" * 60)

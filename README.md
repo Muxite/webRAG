@@ -10,7 +10,7 @@ The MVP is complete and fully operational with AWS deployment and a working web 
 ### Current Status
 - **Web interface live** - Full-featured frontend with authentication and task management
 - **AWS deployment operational** - ECS task definitions, Secrets Manager integration, container images
-- **Autoscaling migration in progress** - Foundation complete, service separation in progress (see [docs/AUTOSCALE_STATUS.md](docs/AUTOSCALE_STATUS.md))
+- **Service separation complete** - Gateway and agent services deployed separately, stable for 8+ hours (see [docs/AUTOSCALE_STATUS.md](docs/AUTOSCALE_STATUS.md))
 - Users have a fixed number of ticks per day.
 - Full Docker Compose setup with all services
 - Agent worker with dependency injection and connector reuse

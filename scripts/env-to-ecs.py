@@ -40,9 +40,9 @@ def format_json_array(items, indent_level=4):
 
 def main():
     """
-    Main entry point for generating ECS task definition configuration.
-    Prompts for secret name, region, account ID, and ARN, then outputs
-    formatted secrets and environment variable configuration.
+    Generate ECS task definition configuration from keys.env and .env files.
+    
+    :returns: None.
     """
     keys_env = dict(dotenv_values("services/keys.env"))
     env = dict(dotenv_values("services/.env"))

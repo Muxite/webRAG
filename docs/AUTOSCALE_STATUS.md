@@ -4,9 +4,9 @@ This document tracks the progress of migrating the Euglena project to full autos
 
 ## Current State Summary
 
-**Status**: Foundation complete, service separation in progress
+**Status**: Service separation complete, stable for 8+ hours
 
-The project has successfully completed the foundational stages (0, 0.5, and 1) and is currently working on service separation (Stage 2). The core deployment infrastructure is stable and operational.
+The project has successfully completed service separation (Stage 2). Gateway and agent services are deployed separately with service discovery, and the system has been stable for 8+ hours. The core deployment infrastructure is operational.
 
 ## Completed Stages
 
@@ -113,9 +113,9 @@ The project has successfully completed the foundational stages (0, 0.5, and 1) a
 
 **Verification**: No functionality changes, health checks more stable, infrastructure ready for metrics publishing.
 
-## In Progress
+## Completed Stages
 
-### Stage 2: Service Separation with Volume Mounts (EFS WORKING)
+### Stage 2: Service Separation with Volume Mounts (COMPLETED)
 
 **Goal**: Split into gateway and agent services with persistent storage, but keep agent at fixed count (1).
 
@@ -127,13 +127,11 @@ The project has successfully completed the foundational stages (0, 0.5, and 1) a
   - EFS volume mount support for persistent storage
   - Environment variable transformation for agent to connect to gateway services
 
-**Completed Components**:
-
 - EFS volume configuration (WORKING)
   - IAM authorization enabled for all volumes
   - Transit encryption enabled
   - File system ID: fs-0ec151e2adb754fc8
-  - Volumes: chroma-data, redis-data, rabbitmq-data
+  - Volumes: chroma-data, rabbitmq-data
   - Applied to all task definition functions
 
 - EFS security group access configuration
@@ -151,14 +149,21 @@ The project has successfully completed the foundational stages (0, 0.5, and 1) a
   - EFS permissions added to ecsTaskExecutionRole (ClientMount, ClientWrite, ClientRootAccess, DescribeMountTargets)
   - Automatic permission setup during deployment
 
-**Remaining Work**:
+- Separate deployment scripts
+  - `scripts/deploy-autoscale.py` - Deploys gateway and agent services separately
+  - `scripts/deploy-single.py` - Deploys single service with all containers
+  - `scripts/deploy_shared.py` split into modular components (deploy_common, deploy_ecr, deploy_ecs, etc.)
 
-- Update `scripts/deploy.py` to build and deploy both task definitions (partially complete - EFS setup integrated)
-- Create/update two ECS services (euglena-gateway and euglena-agent)
-- Agent environment variable updates for service discovery DNS
-- Testing: Deploy both services, verify agent can reach gateway services, verify data persists
+- Service discovery
+  - AWS Cloud Map service discovery configured
+  - Gateway service registered at `euglena-gateway.euglena.local`
+  - Agent connects to gateway services via service discovery DNS
 
-**Status**: EFS infrastructure complete and tested. Deployment integration for separate services in progress.
+- Resource allocations
+  - Gateway service: 0.5 vCPU (512 CPU units), 1GB RAM (1024 MB)
+  - Agent service: 0.25 vCPU (256 CPU units), 0.5GB RAM (512 MB)
+
+**Status**: Service separation complete and stable. System has been running stable for 8+ hours.
 
 ## Planned Stages (Not Yet Started)
 
@@ -241,10 +246,14 @@ The project has successfully completed the foundational stages (0, 0.5, and 1) a
 
 - Agent image size increased from ~641 MB to ~4.4 GB due to embedding model pre-download
 - This is disk storage only, not RAM usage
-- RAM allocation remains 2048 MB (2 GB) for agent tasks (doubled from 1024 MB)
-- CPU allocation is 1024 vCPU (doubled from 512 vCPU)
 - Cost impact: ~$0.38/month for extra ECR storage
 - Trade-off: Faster startup (no model download) vs larger image size
+
+### Resource Allocations
+
+- Gateway service: 0.5 vCPU (512 CPU units), 1GB RAM (1024 MB)
+- Agent service: 0.25 vCPU (256 CPU units), 0.5GB RAM (512 MB)
+- Single service: 1 vCPU (1024 CPU units), 2GB RAM (2048 MB)
 
 ### ECR Push Performance
 
@@ -269,8 +278,10 @@ The project has successfully completed the foundational stages (0, 0.5, and 1) a
 
 ### Deployment Architecture
 
-- Currently using single task definition with all containers
-- Service separation (Stage 2) in progress but not yet deployed
+- Two deployment modes available:
+  - Single service: All containers in one ECS service (`deploy-single.py`)
+  - Autoscale: Separate gateway and agent services (`deploy-autoscale.py`)
+- Service separation complete and stable (8+ hours)
 - Autoscaling not yet active (fixed at 1 agent)
 
 ### Stability
@@ -294,11 +305,15 @@ The project has successfully completed the foundational stages (0, 0.5, and 1) a
 - EFS security group configuration
 - IAM permissions for EFS access
 
+### Verified Working
+
+- Service separation (gateway + agent as separate services) - COMPLETE
+- Agent-to-gateway communication via service discovery - WORKING
+- EFS volume persistence across task restarts - WORKING
+- System stability - 8+ hours stable operation
+
 ### Pending Testing
 
-- Service separation (gateway + agent as separate services)
-- Agent-to-gateway communication via service discovery
-- EFS volume persistence across task restarts (infrastructure ready, needs deployment verification)
 - Metrics service and CloudWatch publishing
 - Lambda autoscaling function
 - Task protection

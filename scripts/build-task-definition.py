@@ -1,6 +1,6 @@
 """
-Builds and registers ECS task definition for single euglena service.
-Loads configuration from aws.env, keys.env, and .env automatically.
+Builds and registers ECS task definitions.
+Supports single service or autoscale gateway/agent deployment modes.
 """
 import json
 import copy
@@ -350,8 +350,8 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
         "volumes": volumes,
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
-        "cpu": "1024",
-        "memory": "2048"
+        "cpu": "512",
+        "memory": "1024"
     }
 
 
@@ -374,14 +374,20 @@ def build_agent_task_definition(account_id, region, secret_name, secret_arn_suff
     
     agent_env_vars = env_vars.copy()
     
-    if "RABBITMQ_URL" in agent_env_vars:
-        agent_env_vars["RABBITMQ_URL"] = agent_env_vars["RABBITMQ_URL"].replace("@localhost:", f"@{gateway_host}:").replace("://localhost:", f"://{gateway_host}:")
-    if "REDIS_URL" in agent_env_vars:
-        agent_env_vars["REDIS_URL"] = agent_env_vars["REDIS_URL"].replace("@localhost:", f"@{gateway_host}:").replace("://localhost:", f"://{gateway_host}:")
-    if "CHROMA_URL" in agent_env_vars:
-        agent_env_vars["CHROMA_URL"] = agent_env_vars["CHROMA_URL"].replace("@localhost:", f"@{gateway_host}:").replace("://localhost:", f"://{gateway_host}:")
-    
     env_list = build_environment_list(agent_env_vars)
+    
+    for env_item in env_list:
+        key = env_item.get("name", "")
+        value = env_item.get("value", "")
+        if key in ("RABBITMQ_URL", "REDIS_URL", "CHROMA_URL", "GATEWAY_URL"):
+            value = value.replace("@localhost:", f"@{gateway_host}:")
+            value = value.replace("://localhost:", f"://{gateway_host}:")
+            value = value.replace("localhost:", f"{gateway_host}:")
+            value = value.replace("http://localhost", f"http://{gateway_host}")
+            value = value.replace("https://localhost", f"https://{gateway_host}")
+            value = value.replace("amqp://localhost", f"amqp://{gateway_host}")
+            value = value.replace("redis://localhost", f"redis://{gateway_host}")
+            env_item["value"] = value
     
     agent = {
         "cpu": 0,
@@ -407,8 +413,8 @@ def build_agent_task_definition(account_id, region, secret_name, secret_arn_suff
         "volumes": [],
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
-        "cpu": "1024",
-        "memory": "2048"
+        "cpu": "256",
+        "memory": "512"
     }
 
 
@@ -690,10 +696,23 @@ def register_task_definition(task_def_path, region):
 
 def main():
     """
-    Generates and registers ECS task definition for single euglena service.
-    Loads secrets from keys.env and environment variables from .env automatically.
-    Expected to be run from services/ directory: python ../scripts/build-task-definition.py
+    Generates and registers ECS task definitions.
+    Supports both single service and autoscale gateway/agent modes.
     """
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Build and register ECS task definitions")
+    try:
+        from scripts.deployment_mode import DeploymentMode
+    except ImportError:
+        from deployment_mode import DeploymentMode
+    
+    parser.add_argument("--mode", choices=["single", "autoscale"], default="single",
+                       help="Deployment mode: single (all containers) or autoscale (gateway/agent)")
+    
+    args = parser.parse_args()
+    mode = DeploymentMode.from_string(args.mode)
+    
     base_dir = Path.cwd()
     services_dir = base_dir
     
@@ -715,19 +734,42 @@ def main():
             if secret_input:
                 secret_arn_suffix = extract_arn_suffix(secret_input)
     
-    print("Generating task definition...")
-    task_def = build_euglena_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
-    task_path, task_redacted_path = _write_task_definition(base_dir, task_def, "euglena")
-    print(f"Generated: {task_path}")
-    
-    print("\nRegistering task definition with AWS ECS...")
-    success = register_task_definition(task_path, region)
-    
-    if not success:
-        print("\nError: Failed to register task definition.")
-        sys.exit(1)
-    
-    print("\nTask definition registered successfully.")
+    if mode == DeploymentMode.SINGLE:
+        print("Generating single service task definition...")
+        task_def = build_euglena_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
+        task_path, task_redacted_path = _write_task_definition(base_dir, task_def, "euglena")
+        print(f"Generated: {task_path}")
+        
+        print("\nRegistering task definition with AWS ECS...")
+        success = register_task_definition(task_path, region)
+        
+        if not success:
+            print("\nError: Failed to register task definition.")
+            sys.exit(1)
+        
+        print("\nTask definition registered successfully.")
+    else:
+        print("Generating gateway task definition...")
+        gateway_task_def = build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
+        gateway_path, gateway_redacted_path = _write_task_definition(base_dir, gateway_task_def, "euglena-gateway")
+        print(f"Generated: {gateway_path}")
+        
+        print("\nRegistering gateway task definition...")
+        gateway_success = register_task_definition(gateway_path, region)
+        
+        print("Generating agent task definition...")
+        agent_task_def = build_agent_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
+        agent_path, agent_redacted_path = _write_task_definition(base_dir, agent_task_def, "euglena-agent")
+        print(f"Generated: {agent_path}")
+        
+        print("\nRegistering agent task definition...")
+        agent_success = register_task_definition(agent_path, region)
+        
+        if not gateway_success or not agent_success:
+            print("\nError: Failed to register one or more task definitions.")
+            sys.exit(1)
+        
+        print("\nBoth task definitions registered successfully.")
     
     from datetime import datetime
     print(f"\nFinished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

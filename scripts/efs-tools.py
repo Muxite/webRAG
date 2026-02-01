@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 EFS verification and diagnostic tools.
-
-Verifies EFS setup and provides detailed diagnostics.
 """
 import boto3
 import sys
