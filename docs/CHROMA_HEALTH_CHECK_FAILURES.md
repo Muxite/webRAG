@@ -191,7 +191,10 @@ Current settings:
 
 **Total Failure Window**: 6 retries × 60 seconds = 6 minutes before marking unhealthy (after 5-minute start period)
 
-**Task Resources**: 1 vCPU (1024 CPU units), 2GB RAM (2048 MB)
+**Task Resources**:
+- Gateway service: 0.5 vCPU (512 CPU units), 1GB RAM (1024 MB)
+- Agent service: 0.25 vCPU (256 CPU units), 0.5GB RAM (512 MB)
+- Single service: 1 vCPU (1024 CPU units), 2GB RAM (2048 MB)
 
 **Health Check Command**: Simplified to `curl -f http://localhost:8000/api/v1/heartbeat || (echo 'Chroma health check failed' && exit 1)`
 - Removed complex timeout flags to avoid premature failures

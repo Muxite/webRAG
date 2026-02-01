@@ -4,7 +4,8 @@ Scripts for AWS ECS deployment and management.
 
 ## Scripts
 
-- **`deploy.py`**: Full deployment automation (ECR push, task definitions, ECS service)
+- **`deploy-single.py`**: Deploy single service mode (all containers in one service)
+- **`deploy-autoscale.py`**: Deploy autoscale mode (separate gateway and agent services)
 - **`build-task-definition.py`**: Generate and register ECS task definitions from env files
 - **`register-secrets.py`**: Register/update secrets in AWS Secrets Manager
 - **`network_discovery.py`**: Auto-discover VPC, subnets, security groups (OOP module)
@@ -12,8 +13,9 @@ Scripts for AWS ECS deployment and management.
 - **`network_utils.py`**: Network validation and security group fixes
 - **`fix-iam-permissions.py`**: Setup IAM permissions for ECS task protection
 - **`check.py`**: Health checks for deployed services
-- **`efs-tools.py`**: EFS verification and diagnostic tools (merged verify-efs.py and diagnose-efs.py)
-- **`verify-config.py`**: Verify task definition and security group configuration (merged check-task-definition.py and verify-security-groups.py)
+- **`diagnose-deployment.py`**: Comprehensive deployment diagnostics
+- **`efs-tools.py`**: EFS verification and diagnostic tools
+- **`verify-config.py`**: Verify task definition and security group configuration
 
 ## Quick Start
 
@@ -21,21 +23,29 @@ All scripts must be run from the `services/` directory.
 
 ### Full Deployment
 
+**Single Service Mode:**
 ```bash
 cd services
-python ../scripts/deploy.py
+python ../scripts/deploy-single.py [--skip-ecr] [--skip-network-check] [--wait]
+```
+
+**Autoscale Mode:**
+```bash
+cd services
+python ../scripts/deploy-autoscale.py [--skip-ecr] [--skip-network-check] [--wait]
 ```
 
 Deploys everything:
 - Builds and pushes Docker images to ECR
 - Generates and registers task definitions
-- Creates/updates ECS service with ALB integration
+- Creates/updates ECS service(s) with ALB integration
 - Configures IAM permissions
+- Sets up service discovery (autoscale mode only)
 
 Options:
 - `--skip-ecr`: Skip Docker build/push
 - `--skip-network-check`: Skip network validation
-- `--wait`: Wait for service to stabilize after deployment
+- `--wait`: Wait for service(s) to stabilize after deployment
 
 ### Register Secrets
 
@@ -63,6 +73,20 @@ Options:
 - `--file PATH`: Path to task definition JSON file
 - `--from-aws`: Get task definition from AWS instead of local file
 
+### Health Checks
+
+```bash
+cd services
+python ../scripts/check.py [--mode single|autoscale] [--service gateway|agent|all] [--verbose]
+```
+
+Check health of deployed services.
+
+Options:
+- `--mode`: Deployment mode - single or autoscale (default: single)
+- `--service`: Service to check - gateway, agent, or all (default: all, only for autoscale mode)
+- `--verbose`: Show verbose output
+
 ### EFS Tools
 
 ```bash
@@ -83,10 +107,14 @@ Options:
 
 ```bash
 cd services
-python ../scripts/build-task-definition.py
+python ../scripts/build-task-definition.py [--mode single|autoscale]
 ```
 
 Generates task definition JSON from `keys.env` and `.env` files.
+
+Modes:
+- `--mode single` (default): Single task definition with all containers
+- `--mode autoscale`: Autoscale task definitions for gateway and agent
 
 ## Configuration
 
@@ -108,13 +136,29 @@ pip install -r scripts/requirements.txt
 
 ## Service Configuration
 
-The deployment creates a single ECS service `euglena-service` with:
+### Single Service Mode
+
+Creates a single ECS service `euglena-service` with:
 - Task definition: `euglena` (all containers in one task)
-- Resources: 1 vCPU, 2GB RAM
+- Resources: 1 vCPU (1024 CPU units), 2GB RAM (2048 MB)
 - Desired count: 1
 - Capacity provider: FARGATE
 - ALB integration: Routes to `gateway` container on port 8080
 - Health check grace period: 100 seconds
 - Chroma is optional - agent continues working even if Chroma health checks fail
+
+### Autoscale Service Mode
+
+Creates two ECS services:
+- `euglena-gateway`: Gateway service with ALB integration
+  - Resources: 0.5 vCPU (512 CPU units), 1GB RAM (1024 MB)
+  - Containers: chroma, redis, rabbitmq, gateway
+  - Service discovery: Registered at `euglena-gateway.euglena.local`
+- `euglena-agent`: Agent service (no ALB)
+  - Resources: 0.25 vCPU (256 CPU units), 0.5GB RAM (512 MB)
+  - Containers: agent
+  - Connects to gateway via service discovery DNS
+
+Both services use FARGATE launch type.
 
 See `docs/ECS_SERVICE_CONFIG.md` for complete configuration details.

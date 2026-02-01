@@ -1,16 +1,6 @@
 """
 Comprehensive health check script for Euglena services.
-
-Combines all health checks into a single command:
-- ECS service status
-- Container health
-- Network connectivity
-- Agent registration
-- Task diagnostics
-
-Usage:
-    cd services
-    python ../scripts/check.py [--service gateway|agent|all] [--verbose]
+Supports both single service and autoscale gateway/agent deployment modes.
 """
 import boto3
 import sys
@@ -35,12 +25,12 @@ def load_aws_config(services_dir: Path) -> Dict:
     return dict(dotenv_values(str(aws_env_path)))
 
 
-def check_ecs_services(aws_config: Dict, services: list, verbose: bool = False):
+def check_ecs_services(aws_config: Dict, service_names: list, verbose: bool = False):
     """
     Check ECS service health.
     
     :param aws_config: AWS configuration dictionary.
-    :param services: List of services to check.
+    :param service_names: List of service names to check.
     :param verbose: Whether to show verbose output.
     """
     region = aws_config["AWS_REGION"]
@@ -49,8 +39,7 @@ def check_ecs_services(aws_config: Dict, services: list, verbose: bool = False):
     
     print("\n=== ECS Service Status ===")
     
-    for service in services:
-        service_name = f"euglena-{service}"
+    for service_name in service_names:
         
         try:
             response = ecs_client.describe_services(cluster=cluster, services=[service_name])
@@ -77,12 +66,12 @@ def check_ecs_services(aws_config: Dict, services: list, verbose: bool = False):
             print(f"  FAIL: {service_name} - {e}")
 
 
-def check_container_health(aws_config: Dict, services: list, verbose: bool = False):
+def check_container_health(aws_config: Dict, service_names: list, verbose: bool = False):
     """
     Check container health status.
     
     :param aws_config: AWS configuration dictionary.
-    :param services: List of services to check.
+    :param service_names: List of service names to check.
     :param verbose: Whether to show verbose output.
     """
     region = aws_config["AWS_REGION"]
@@ -91,8 +80,7 @@ def check_container_health(aws_config: Dict, services: list, verbose: bool = Fal
     
     print("\n=== Container Health ===")
     
-    for service in services:
-        service_name = f"euglena-{service}"
+    for service_name in service_names:
         
         try:
             response = ecs_client.list_tasks(cluster=cluster, serviceName=service_name)
@@ -149,16 +137,22 @@ def check_container_health(aws_config: Dict, services: list, verbose: bool = Fal
 
 
 def main():
-    """
-    Main entry point.
-    """
+    """Main entry point."""
     parser = argparse.ArgumentParser(description="Check Euglena service health")
+    try:
+        from scripts.deployment_mode import DeploymentMode
+    except ImportError:
+        from deployment_mode import DeploymentMode
+    
+    parser.add_argument("--mode", choices=["single", "autoscale"], default="single",
+                       help="Deployment mode: single or autoscale")
     parser.add_argument("--service", choices=["gateway", "agent", "all"], default="all",
-                       help="Service to check (default: all)")
+                       help="Service to check (default: all, only for autoscale mode)")
     parser.add_argument("--verbose", action="store_true",
                        help="Show verbose output")
     
     args = parser.parse_args()
+    mode = DeploymentMode.from_string(args.mode)
     
     services_dir = Path.cwd()
     if not (services_dir / "aws.env").exists():
@@ -168,18 +162,25 @@ def main():
     
     aws_config = load_aws_config(services_dir)
     
-    services = ["gateway", "agent"] if args.service == "all" else [args.service]
+    if mode == DeploymentMode.SINGLE:
+        service_names = ["euglena-service"]
+    else:
+        if args.service == "all":
+            service_names = ["euglena-gateway", "euglena-agent"]
+        else:
+            service_names = [f"euglena-{args.service}"]
     
     print("=" * 60)
     print("Euglena Health Check")
     print("=" * 60)
-    print(f"Services: {', '.join(services)}")
+    print(f"Mode: {args.mode}")
+    print(f"Services: {', '.join(service_names)}")
     print(f"Region: {aws_config['AWS_REGION']}")
     print(f"Cluster: {aws_config['ECS_CLUSTER']}")
     print("=" * 60)
     
-    check_ecs_services(aws_config, services, args.verbose)
-    check_container_health(aws_config, services, args.verbose)
+    check_ecs_services(aws_config, service_names, args.verbose)
+    check_container_health(aws_config, service_names, args.verbose)
     
     print("\n" + "=" * 60)
     print("Health check complete")

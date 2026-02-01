@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 Verify ECS task definition and security group configuration.
-
-Validates EFS configuration in task definitions and security group rules.
 """
 import json
 import sys

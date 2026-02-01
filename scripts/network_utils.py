@@ -163,7 +163,7 @@ def validate_network_configuration(aws_config: Dict):
             agent_sgs = agent_network.get("securityGroups", [])
             gateway_subnets = gateway_network.get("subnets", [])
             agent_subnets = agent_network.get("subnets", [])
-            print("  Using separate service configuration (gateway + agent)")
+            print("  Using autoscale service configuration (gateway + agent)")
         
         print(f"\n1. VPC and Subnet Configuration...")
         
