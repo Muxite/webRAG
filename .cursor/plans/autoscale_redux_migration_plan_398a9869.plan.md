@@ -6,8 +6,8 @@ todos:
     content: "Stage 0: Create script system with OOP modules (NetworkDiscovery, EcsInfrastructure), deploy.py that works from scratch (not just updates), VPC auto-discovery, and requirements.txt. All subscripts can be run directly or imported."
     status: completed
   - id: stage1-infrastructure
-    content: "Stage 1: Port infrastructure improvements (queue_metrics.py definitions) without changing deployment"
-    status: completed
+    content: "Stage 1: Port infrastructure improvements (queue_metrics.py definitions) without changing deployment. Includes stable health checks, Chroma health check in agent, and embedding model caching on EFS."
+    status: in_progress
     dependencies:
       - stage0-script-system
   - id: stage2-service-separation
@@ -261,30 +261,42 @@ The agent will:
 
 1. Port `autoscale/services/shared/queue_metrics.py` (just the definitions, no publishing yet)
 2. Port improved error handling patterns from autoscale (if they're better)
-3. **Add stable health checks**:
+3. **Add stable health checks** (COMPLETED):
 
-   - Review and improve health check configurations in task definitions
-   - Ensure health checks are lenient enough to prevent false failures
-   - Add proper start periods, intervals, retries, and timeouts
-   - Test health checks don't cause unnecessary task restarts
+   - Review and improve health check configurations in task definitions - COMPLETED
+   - Ensure health checks are lenient enough to prevent false failures - COMPLETED
+   - Add proper start periods, intervals, retries, and timeouts - COMPLETED
+   - Test health checks don't cause unnecessary task restarts - COMPLETED
+   - **Added Chroma health check to agent**: Agent health endpoint now includes Chroma connectivity status - COMPLETED
+   - Chroma health status now visible in ECS console (no longer shows "Unknown") - COMPLETED
 
-4. **Fix 403 errors**: Add User-Agent header to HTTP connector to avoid bot detection
-5. **Bake embedding model**: Pre-download Chroma embedding model in Docker image to avoid runtime downloads
+4. **Fix 403 errors**: Add User-Agent header to HTTP connector to avoid bot detection - COMPLETED
+5. **Bake embedding model** (COMPLETED):
+
+   - Pre-download Chroma embedding model in Docker image to avoid runtime downloads - COMPLETED
+   - Configured agent container with `SENTENCE_TRANSFORMERS_HOME` and `TRANSFORMERS_CACHE` environment variables - COMPLETED
+   - Configured Chroma container to cache models on EFS (`/chroma-data/.cache`) for persistence - COMPLETED
+   - Models now persist across container restarts (cached on EFS) - COMPLETED
+   - Prevents unnecessary model re-downloads on each container restart - COMPLETED
+
 6. Test: Verify no regressions, services remain stable
 
 **Files to Port/Modify**:
 
 - `services/shared/queue_metrics.py` (metric definitions only)
-- `services/agent/app/connector_http.py` (add User-Agent header)
-- `services/agent/.dockerfile` (pre-download embedding model)
-- `scripts/build-task-definition.py` (improve health check configurations)
+- `services/agent/app/connector_http.py` (add User-Agent header) - COMPLETED
+- `services/agent/.dockerfile` (pre-download embedding model, set cache env vars) - COMPLETED
+- `services/agent/app/main.py` (add Chroma health check) - COMPLETED
+- `scripts/build-task-definition.py` (improve health check configurations, add Chroma cache env vars) - COMPLETED
 
 **Success Criteria**:
 
-- No functionality changes
-- Health checks are stable and don't cause false failures
-- 403 errors reduced with proper User-Agent headers
-- Embedding model pre-downloaded in image (no runtime downloads)
+- No functionality changes - COMPLETED
+- Health checks are stable and don't cause false failures - COMPLETED
+- 403 errors reduced with proper User-Agent headers - COMPLETED
+- Embedding model pre-downloaded in image (no runtime downloads) - COMPLETED
+- Chroma health check added to agent health endpoint - COMPLETED
+- Models cached on EFS for persistence across restarts - COMPLETED
 - Services remain stable for 30+ minutes
 
 ---

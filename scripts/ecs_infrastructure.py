@@ -177,6 +177,12 @@ class EcsInfrastructure:
                             print(f"  Attempting update anyway...")
                     
                     if exists:
+                        awsvpc_config = {
+                            "subnets": network_config.get("subnets", []),
+                            "securityGroups": network_config.get("securityGroups", []),
+                            "assignPublicIp": network_config.get("assignPublicIp", "ENABLED")
+                        }
+                        
                         update_params = {
                             "cluster": self.cluster_name,
                             "service": service_name,
@@ -185,21 +191,24 @@ class EcsInfrastructure:
                             "forceNewDeployment": True,
                             "deploymentConfiguration": deployment_config,
                             "capacityProviderStrategy": capacity_provider_strategy,
-                            "platformVersion": "LATEST"
+                            "platformVersion": "LATEST",
+                            "networkConfiguration": {
+                                "awsvpcConfiguration": awsvpc_config
+                            }
                         }
                         
                         if health_check_grace_period is not None:
                             update_params["healthCheckGracePeriodSeconds"] = health_check_grace_period
                         
-                        if service_registries:
+                        if service_registries is not None:
                             update_params["serviceRegistries"] = service_registries
                         elif current_service.get("serviceRegistries"):
-                            update_params["serviceRegistries"] = current_service["serviceRegistries"]
+                            update_params["serviceRegistries"] = []
                         
-                        if load_balancers:
+                        if load_balancers is not None:
                             update_params["loadBalancers"] = load_balancers
                         elif current_service.get("loadBalancers"):
-                            update_params["loadBalancers"] = current_service["loadBalancers"]
+                            update_params["loadBalancers"] = []
                         
                         try:
                             self.ecs_client.update_service(**update_params)

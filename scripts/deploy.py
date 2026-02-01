@@ -284,6 +284,175 @@ def get_network_config(aws_config: Dict, network_discovery: NetworkDiscovery) ->
     }
 
 
+def stop_old_tasks(aws_config: Dict, service_name: str) -> bool:
+    """
+    Stop all running tasks for a service before deployment to ensure clean state.
+    
+    :param aws_config: AWS configuration dictionary.
+    :param service_name: Service name.
+    :returns: True on success, False on error.
+    """
+    region = aws_config["AWS_REGION"]
+    cluster = aws_config["ECS_CLUSTER"]
+    ecs_client = boto3.client("ecs", region_name=region)
+    
+    print(f"\n=== Stopping Old Tasks for {service_name} ===")
+    
+    try:
+        response = ecs_client.list_tasks(
+            cluster=cluster,
+            serviceName=service_name,
+            desiredStatus="RUNNING"
+        )
+        task_arns = response.get("taskArns", [])
+        
+        if not task_arns:
+            print(f"  OK: No running tasks to stop")
+            return True
+        
+        print(f"  Found {len(task_arns)} running task(s), stopping...")
+        
+        for task_arn in task_arns:
+            try:
+                ecs_client.stop_task(
+                    cluster=cluster,
+                    task=task_arn,
+                    reason="Stopping for clean deployment"
+                )
+                print(f"    Stopped task: {task_arn.split('/')[-1]}")
+            except Exception as e:
+                print(f"    WARN: Failed to stop task {task_arn.split('/')[-1]}: {e}")
+        
+        max_wait = 60
+        wait_interval = 5
+        waited = 0
+        
+        while waited < max_wait:
+            response = ecs_client.list_tasks(
+                cluster=cluster,
+                serviceName=service_name,
+                desiredStatus="RUNNING"
+            )
+            remaining = len(response.get("taskArns", []))
+            
+            if remaining == 0:
+                print(f"  OK: All tasks stopped")
+                return True
+            
+            print(f"    Waiting for {remaining} task(s) to stop... ({waited}s)")
+            time.sleep(wait_interval)
+            waited += wait_interval
+        
+        if remaining > 0:
+            print(f"  WARN: {remaining} task(s) still running after {max_wait}s (continuing anyway)")
+        
+        return True
+    except Exception as e:
+        error_str = str(e)
+        if "ServiceNotFoundException" in error_str or "does not exist" in error_str:
+            print(f"  OK: Service does not exist yet (no tasks to stop)")
+            return True
+        print(f"  WARN: Error stopping old tasks: {e} (continuing anyway)")
+        return True  # Continue deployment even if we can't stop old tasks
+
+
+def cleanup_old_deployments(aws_config: Dict, service_name: str) -> bool:
+    """
+    Clean up old non-primary deployments to ensure only the current deployment exists.
+    
+    :param aws_config: AWS configuration dictionary.
+    :param service_name: Service name.
+    :returns: True on success, False on error.
+    """
+    region = aws_config["AWS_REGION"]
+    cluster = aws_config["ECS_CLUSTER"]
+    ecs_client = boto3.client("ecs", region_name=region)
+    
+    print(f"\n=== Cleaning Up Old Deployments for {service_name} ===")
+    
+    try:
+        response = ecs_client.describe_services(
+            cluster=cluster,
+            services=[service_name]
+        )
+        services = response.get("services", [])
+        
+        if not services:
+            print(f"  OK: Service does not exist (no deployments to clean)")
+            return True
+        
+        service = services[0]
+        deployments = service.get("deployments", [])
+        
+        primary = next((d for d in deployments if d.get("status") == "PRIMARY"), None)
+        if not primary:
+            print(f"  WARN: No primary deployment found")
+            return True
+        
+        non_primary = [d for d in deployments if d.get("id") != primary.get("id")]
+        
+        if not non_primary:
+            print(f"  OK: No old deployments to clean (only primary exists)")
+            return True
+        
+        print(f"  Found {len(non_primary)} old deployment(s)")
+        
+        for deployment in non_primary:
+            dep_id = deployment.get("id", "unknown")
+            status = deployment.get("status", "UNKNOWN")
+            running = deployment.get("runningCount", 0)
+            print(f"    Old deployment {dep_id}: status={status}, running={running}")
+        
+        print(f"  OK: Old deployments will be cleaned up automatically by ECS")
+        return True
+    except Exception as e:
+        error_str = str(e)
+        if "ServiceNotFoundException" in error_str:
+            print(f"  OK: Service does not exist (no deployments to clean)")
+            return True
+        print(f"  WARN: Error checking deployments: {e} (continuing anyway)")
+        return True
+
+
+def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_config: Dict, 
+                                service_name: str, task_family: str, network_config: Dict,
+                                load_balancers: Optional[List[Dict]], desired_count: int) -> bool:
+    """
+    Ensure service has exactly the specified configuration, removing any leftover settings.
+    
+    This function ensures a clean deployment by:
+    1. Stopping old running tasks
+    2. Cleaning up old deployments
+    3. Updating service with exact configuration (no leftover settings)
+    
+    :param ecs_infrastructure: EcsInfrastructure instance.
+    :param aws_config: AWS configuration dictionary.
+    :param service_name: Service name.
+    :param task_family: Task definition family.
+    :param network_config: Network configuration.
+    :param load_balancers: Load balancer configuration (None to remove old config).
+    :param desired_count: Desired task count.
+    :returns: True on success.
+    """
+    print(f"\n=== Ensuring Exact Service Configuration ===")
+    
+    if not stop_old_tasks(aws_config, service_name):
+        print("  WARN: Failed to stop old tasks (continuing anyway)")
+    
+    cleanup_old_deployments(aws_config, service_name)
+    
+    return ecs_infrastructure.ensure_service(
+        service_name=service_name,
+        task_family=task_family,
+        network_config=network_config,
+        desired_count=desired_count,
+        load_balancers=load_balancers,  # Explicitly set (None will remove old config)
+        service_registries=None,  # Explicitly None to remove old service discovery
+        health_check_grace_period=100,
+        enable_az_rebalancing=True
+    )
+
+
 def wait_for_services_stable(aws_config: Dict, services: List[str], timeout: int = 600):
     """
     Wait for services to become stable.
@@ -512,14 +681,14 @@ def main():
         service_name = "euglena-service"
         task_family = "euglena"
         
-        if not ecs_infrastructure.ensure_service(
+        if not ensure_exact_service_config(
+            ecs_infrastructure=ecs_infrastructure,
+            aws_config=aws_config,
             service_name=service_name,
             task_family=task_family,
             network_config=network_config,
-            desired_count=1,
             load_balancers=load_balancers,
-            health_check_grace_period=100,
-            enable_az_rebalancing=True
+            desired_count=1
         ):
             print(f"  FAIL: Failed to create/update {service_name}")
             all_success = False

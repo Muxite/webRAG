@@ -212,26 +212,31 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     
     shared_efs_id = aws_env.get("EFS_FILE_SYSTEM_ID", "").strip() if aws_env else ""
     chroma_efs_id = aws_env.get("CHROMA_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
-    redis_efs_id = aws_env.get("REDIS_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
     rabbitmq_efs_id = aws_env.get("RABBITMQ_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
     
     chroma_efs_id = chroma_efs_id if chroma_efs_id else None
-    redis_efs_id = redis_efs_id if redis_efs_id else None
     rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
     
-    chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"
+    chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || (echo 'Chroma health check failed' && exit 1)"
     chroma_mount_points = []
     if chroma_efs_id:
         chroma_mount_points.append({"sourceVolume": "chroma-data", "containerPath": "/chroma-data", "readOnly": False})
     
+    chroma_env = [
+        {"name": "IS_PERSISTENT", "value": "TRUE"},
+        {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}
+    ]
+    if chroma_efs_id:
+        chroma_env.extend([
+            {"name": "SENTENCE_TRANSFORMERS_HOME", "value": "/chroma-data/.cache"},
+            {"name": "TRANSFORMERS_CACHE", "value": "/chroma-data/.cache/huggingface"}
+        ])
+    
     chroma = {
         "cpu": 0,
-        "environment": [
-            {"name": "IS_PERSISTENT", "value": "TRUE"},
-            {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}
-        ],
+        "environment": chroma_env,
         "essential": True,
-        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=90, retries=6, timeout=15),
+        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=60, retries=6, timeout=20),
         "image": "chromadb/chroma:latest",
         "logConfiguration": _make_log_config("chroma", region),
         "mountPoints": chroma_mount_points,
@@ -241,22 +246,15 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
         "volumesFrom": []
     }
     
-    redis_command = ["redis-server"]
-    redis_mount_points = []
-    if redis_efs_id:
-        redis_command.append("--appendonly")
-        redis_command.append("yes")
-        redis_mount_points.append({"sourceVolume": "redis-data", "containerPath": "/data", "readOnly": False})
-    
     redis = {
-        "command": redis_command,
+        "command": ["redis-server"],
         "cpu": 0,
         "environment": [],
         "essential": True,
         "healthCheck": _make_health_check("redis-cli ping | grep PONG || exit 1", start_period=120, interval=90, retries=6, timeout=15),
         "image": "redis:7-alpine",
         "logConfiguration": _make_log_config("redis", region),
-        "mountPoints": redis_mount_points,
+        "mountPoints": [],
         "name": "redis",
         "portMappings": [{"containerPort": 6379, "hostPort": 6379, "protocol": "tcp"}],
         "systemControls": [],
@@ -295,7 +293,6 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     gateway = {
         "cpu": 0,
         "dependsOn": [
-            {"condition": "START", "containerName": "chroma"},
             {"condition": "START", "containerName": "redis"},
             {"condition": "START", "containerName": "rabbitmq"}
         ],
@@ -315,8 +312,8 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     containers = [chroma, redis, rabbitmq, gateway]
     
     volumes = []
-    using_shared_efs = (chroma_efs_id and redis_efs_id and rabbitmq_efs_id and 
-                        chroma_efs_id == redis_efs_id == rabbitmq_efs_id)
+    using_shared_efs = (chroma_efs_id and rabbitmq_efs_id and 
+                        chroma_efs_id == rabbitmq_efs_id)
     
     if chroma_efs_id:
         efs_config = {
@@ -328,19 +325,6 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
         }
         volumes.append({
             "name": "chroma-data",
-            "efsVolumeConfiguration": efs_config
-        })
-    
-    if redis_efs_id:
-        efs_config = {
-            "fileSystemId": redis_efs_id,
-            "transitEncryption": "ENABLED",
-            "authorizationConfig": {
-                "iam": "ENABLED"
-            }
-        }
-        volumes.append({
-            "name": "redis-data",
             "efsVolumeConfiguration": efs_config
         })
     
@@ -453,26 +437,31 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
     
     shared_efs_id = aws_env.get("EFS_FILE_SYSTEM_ID", "").strip() if aws_env else ""
     chroma_efs_id = aws_env.get("CHROMA_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
-    redis_efs_id = aws_env.get("REDIS_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
     rabbitmq_efs_id = aws_env.get("RABBITMQ_EFS_FILE_SYSTEM_ID", shared_efs_id).strip() if aws_env else shared_efs_id
     
     chroma_efs_id = chroma_efs_id if chroma_efs_id else None
-    redis_efs_id = redis_efs_id if redis_efs_id else None
     rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
     
-    chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"
+    chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || (echo 'Chroma health check failed' && exit 1)"
     chroma_mount_points = []
     if chroma_efs_id:
         chroma_mount_points.append({"sourceVolume": "chroma-data", "containerPath": "/chroma-data", "readOnly": False})
     
+    chroma_env = [
+        {"name": "IS_PERSISTENT", "value": "TRUE"},
+        {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}
+    ]
+    if chroma_efs_id:
+        chroma_env.extend([
+            {"name": "SENTENCE_TRANSFORMERS_HOME", "value": "/chroma-data/.cache"},
+            {"name": "TRANSFORMERS_CACHE", "value": "/chroma-data/.cache/huggingface"}
+        ])
+    
     chroma = {
         "cpu": 0,
-        "environment": [
-            {"name": "IS_PERSISTENT", "value": "TRUE"},
-            {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}
-        ],
+        "environment": chroma_env,
         "essential": True,
-        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=90, retries=6, timeout=15),
+        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=60, retries=6, timeout=20),
         "image": "chromadb/chroma:latest",
         "logConfiguration": _make_log_config("chroma", region),
         "mountPoints": chroma_mount_points,
@@ -482,22 +471,15 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         "volumesFrom": []
     }
     
-    redis_command = ["redis-server"]
-    redis_mount_points = []
-    if redis_efs_id:
-        redis_command.append("--appendonly")
-        redis_command.append("yes")
-        redis_mount_points.append({"sourceVolume": "redis-data", "containerPath": "/data", "readOnly": False})
-    
     redis = {
-        "command": redis_command,
+        "command": ["redis-server"],
         "cpu": 0,
         "environment": [],
         "essential": True,
         "healthCheck": _make_health_check("redis-cli ping | grep PONG || exit 1", start_period=120, interval=90, retries=6, timeout=15),
         "image": "redis:7-alpine",
         "logConfiguration": _make_log_config("redis", region),
-        "mountPoints": redis_mount_points,
+        "mountPoints": [],
         "name": "redis",
         "portMappings": [{"containerPort": 6379, "hostPort": 6379, "protocol": "tcp"}],
         "systemControls": [],
@@ -536,7 +518,6 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
     agent = {
         "cpu": 0,
         "dependsOn": [
-            {"condition": "START", "containerName": "chroma"},
             {"condition": "START", "containerName": "redis"},
             {"condition": "START", "containerName": "rabbitmq"}
         ],
@@ -575,14 +556,13 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
     }
     
     chroma_efs_id = chroma_efs_id if chroma_efs_id else None
-    redis_efs_id = redis_efs_id if redis_efs_id else None
     rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
     
     containers = [chroma, redis, rabbitmq, agent, gateway]
     
     volumes = []
-    using_shared_efs = (chroma_efs_id and redis_efs_id and rabbitmq_efs_id and 
-                        chroma_efs_id == redis_efs_id == rabbitmq_efs_id)
+    using_shared_efs = (chroma_efs_id and rabbitmq_efs_id and 
+                        chroma_efs_id == rabbitmq_efs_id)
     
     if chroma_efs_id:
         efs_config = {
@@ -594,19 +574,6 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         }
         volumes.append({
             "name": "chroma-data",
-            "efsVolumeConfiguration": efs_config
-        })
-    
-    if redis_efs_id:
-        efs_config = {
-            "fileSystemId": redis_efs_id,
-            "transitEncryption": "ENABLED",
-            "authorizationConfig": {
-                "iam": "ENABLED"
-            }
-        }
-        volumes.append({
-            "name": "redis-data",
             "efsVolumeConfiguration": efs_config
         })
     

@@ -25,7 +25,7 @@ Distributed scalable agent framework:
 - **Gateway** accepts tasks via REST API with Supabase authentication
 - **Agents** consume tasks from RabbitMQ and execute tick-based reasoning loop
 - **Status** tracked in Redis for monitoring
-- **Memory** persisted in ChromaDB for context retention
+- **Memory** persisted in ChromaDB for context retention (optional - agent continues without it)
 
 Agent uses dependency injection to reuse connectors across mandates. Connectors initialized once at startup and verified before consuming tasks.
 
@@ -76,7 +76,7 @@ docker compose --profile cli run agent-cli
 ### Key Design Patterns
 
 - **Dependency Injection**: Connectors (LLM, Search, HTTP, Chroma) injected and reused across mandates
-- **Graceful Degradation**: Handles connector failures, continues when possible
+- **Graceful Degradation**: Handles connector failures, continues when possible. Agent continues working even if Chroma is unavailable
 - **Connection Management**: Proper cleanup with error handling on shutdown
 - **Readiness Checks**: Only consumes from RabbitMQ after all dependencies verified ready
 
