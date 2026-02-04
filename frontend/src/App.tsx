@@ -21,6 +21,19 @@ export default function App() {
   const [apiMode, setApiModeState] = useState<'localhost' | 'aws' | 'auto'>(getApiMode());
   const [currentApiUrl, setCurrentApiUrl] = useState(getCurrentApiBaseURL());
   const pollIntervalRef = useRef<number | null>(null);
+  const batchPollIntervalRef = useRef<number | null>(null);
+  const batchTasksRef = useRef<Array<{ correlationId: string; status: string; result?: any }>>([]);
+  const [batchTest, setBatchTest] = useState<{
+    loading: boolean;
+    tasks: Array<{ correlationId: string; status: string; result?: any }>;
+    startTime?: number;
+    endTime?: number;
+    completed: number;
+  }>({
+    loading: false,
+    tasks: [],
+    completed: 0,
+  });
   
   const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' || 
@@ -63,6 +76,9 @@ export default function App() {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+      }
+      if (batchPollIntervalRef.current) {
+        clearInterval(batchPollIntervalRef.current);
       }
     };
   }, []);
@@ -133,6 +149,120 @@ export default function App() {
     setError('');
     setMandate('');
     setLoading(false);
+  };
+
+  const handleBatchSkipTest = async () => {
+    if (!userEmail) {
+      setError('You must be logged in to run batch test');
+      return;
+    }
+
+    setBatchTest({
+      loading: true,
+      tasks: [],
+      completed: 0,
+      startTime: Date.now(),
+    });
+    setError('');
+
+    try {
+      const skipPhrase = 'skipskipskip';
+      const tasks: Array<{ correlationId: string; status: string; result?: any }> = [];
+
+      for (let i = 0; i < 32; i++) {
+        try {
+          const response = await apiClient.submitTask({
+            mandate: `${skipPhrase} test ${i + 1}`,
+            max_ticks: 1,
+          });
+          tasks.push({
+            correlationId: response.correlation_id,
+            status: response.status,
+          });
+        } catch (err) {
+          tasks.push({
+            correlationId: `error-${i}`,
+            status: 'error',
+            result: { error: err instanceof Error ? err.message : 'Failed to submit' },
+          });
+        }
+      }
+
+      setBatchTest((prev) => ({
+        ...prev,
+        tasks,
+      }));
+
+      batchTasksRef.current = tasks;
+
+      const pollAllTasks = () => {
+        if (batchPollIntervalRef.current) {
+          clearInterval(batchPollIntervalRef.current);
+        }
+
+        batchPollIntervalRef.current = window.setInterval(async () => {
+          const currentTasks = batchTasksRef.current;
+          
+          const updatedTasks = await Promise.all(
+            currentTasks.map(async (task) => {
+              if (task.status === 'completed' || task.status === 'error' || task.status === 'failed') {
+                return task;
+              }
+
+              try {
+                const updated = await apiClient.getTask(task.correlationId);
+                const newTask = {
+                  correlationId: task.correlationId,
+                  status: updated.status,
+                  result: updated.result,
+                };
+                batchTasksRef.current = batchTasksRef.current.map((t) =>
+                  t.correlationId === task.correlationId ? newTask : t
+                );
+                return newTask;
+              } catch (err) {
+                const newTask = {
+                  ...task,
+                  status: 'error' as const,
+                  result: { error: err instanceof Error ? err.message : 'Failed to fetch' },
+                };
+                batchTasksRef.current = batchTasksRef.current.map((t) =>
+                  t.correlationId === task.correlationId ? newTask : t
+                );
+                return newTask;
+              }
+            })
+          );
+
+          const completedCount = updatedTasks.filter(
+            (t) => t.status === 'completed' || t.status === 'error' || t.status === 'failed'
+          ).length;
+          const allCompleted = completedCount === 32;
+
+          setBatchTest((prev) => ({
+            ...prev,
+            tasks: updatedTasks,
+            completed: completedCount,
+            loading: !allCompleted,
+            endTime: allCompleted ? Date.now() : prev.endTime,
+          }));
+
+          if (allCompleted && batchPollIntervalRef.current) {
+            clearInterval(batchPollIntervalRef.current);
+            batchPollIntervalRef.current = null;
+          }
+        }, 1000);
+      };
+
+      pollAllTasks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run batch test');
+      setBatchTest({
+        loading: false,
+        tasks: [],
+        completed: 0,
+      });
+    }
   };
 
   const handleSignUp = async () => {
@@ -435,10 +565,10 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex gap-4 flex-wrap">
                 <button
                   onClick={handleSubmit}
-                  disabled={loading || !mandate.trim() || !userEmail}
+                  disabled={loading || !mandate.trim() || !userEmail || batchTest.loading}
                   className="px-4 py-2 bg-white text-black rounded-xl border-2 border-gray-200 disabled:opacity-50
                   font-mono active:scale-95 transition-all
                   disabled:hover:bg-white disabled:hover:border-gray-200 disabled:active:scale-100"
@@ -459,10 +589,18 @@ export default function App() {
                 >
                   {loading ? 'Processing...' : 'Submit Task'}
                 </button>
+                <button
+                  onClick={handleBatchSkipTest}
+                  disabled={loading || !userEmail || batchTest.loading}
+                  className="px-4 py-2 bg-yellow-500 text-black rounded-xl border-2 border-yellow-600 disabled:opacity-50
+                  font-mono active:scale-95 transition-all hover:bg-yellow-400 hover:border-yellow-500"
+                >
+                  {batchTest.loading ? `Testing... (${batchTest.completed}/32)` : 'Test: 32 Skip Messages'}
+                </button>
                 {task && (
                   <button
                     onClick={handleReset}
-                    disabled={loading}
+                    disabled={loading || batchTest.loading}
                     className="px-6 py-4 bg-black text-white rounded-xl border-4 border-gray-800 font-mono
                     hover:bg-red-600 hover:border-red-400 active:scale-95 transition-all disabled:opacity-50"
                   >
@@ -474,6 +612,78 @@ export default function App() {
               {error && (
                 <div className="p-6 rounded-xl bg-red-100 text-red-800 border-2 border-red-300">
                   <p className="font-mono font-bold">Error: {error}</p>
+                </div>
+              )}
+
+              {batchTest.tasks.length > 0 && (
+                <div className="p-6 rounded-xl bg-yellow-50 border-2 border-yellow-200">
+                  <h3 className="font-mono font-bold mb-4 text-yellow-900 uppercase tracking-wide">
+                    Batch Skip Test Results
+                  </h3>
+                  {batchTest.startTime && batchTest.endTime && (
+                    <div className="mb-4 p-3 bg-white rounded-lg border border-yellow-300">
+                      <p className="font-mono text-sm">
+                        <span className="font-bold">Total Time:</span>{' '}
+                        {((batchTest.endTime - batchTest.startTime) / 1000).toFixed(2)}s
+                      </p>
+                      <p className="font-mono text-sm">
+                        <span className="font-bold">Average Time per Task:</span>{' '}
+                        {((batchTest.endTime - batchTest.startTime) / (32 * 1000)).toFixed(2)}s
+                      </p>
+                    </div>
+                  )}
+                  <div className="mb-4">
+                    <div className="mb-2 flex items-center justify-between text-sm font-mono">
+                      <span className="font-bold">Progress</span>
+                      <span>{batchTest.completed} / 32 completed</span>
+                    </div>
+                    <div className="h-6 bg-gray-200 rounded-full overflow-hidden relative">
+                      <div
+                        className="h-full rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                        style={{
+                          width: `${(batchTest.completed / 32) * 100}%`,
+                          background: 'linear-gradient(to right, #fbbf24, #f59e0b)',
+                        }}
+                      >
+                        <span className="text-xs font-bold text-black">
+                          {Math.round((batchTest.completed / 32) * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {batchTest.tasks.map((task, index) => (
+                      <div
+                        key={task.correlationId}
+                        className="p-2 rounded bg-white border border-yellow-200 text-xs font-mono"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold">Task {index + 1}:</span>
+                          <span
+                            className={
+                              task.status === 'completed'
+                                ? 'text-green-600'
+                                : task.status === 'error' || task.status === 'failed'
+                                ? 'text-red-600'
+                                : 'text-yellow-600'
+                            }
+                          >
+                            {task.status}
+                          </span>
+                        </div>
+                        {task.result?.error && (
+                          <p className="text-red-600 mt-1">{task.result.error}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {batchTest.completed === 32 && batchTest.endTime && (
+                    <div className="mt-4 p-3 bg-green-100 rounded-lg border border-green-300">
+                      <p className="font-mono text-sm text-green-800 font-bold">
+                        All 32 tasks completed successfully!
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

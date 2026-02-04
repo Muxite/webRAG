@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from datetime import datetime
@@ -51,12 +52,30 @@ class GatewayService:
         await self.rabbitmq.connect()
         self._running = True
         self.logger.info("GatewayService started")
+        
+        if hasattr(self.storage, 'connector'):
+            asyncio.create_task(self._init_redis_background())
+    
+    async def _init_redis_background(self) -> None:
+        """
+        Initialize Redis in the background without blocking startup.
+        """
+        try:
+            await self.storage.connector.init_redis()
+            self.logger.info("Redis initialized successfully")
+        except Exception as e:
+            self.logger.warning(f"Redis initialization failed: {e}")
 
     async def stop(self) -> None:
         """
         Disconnect connectors.
         """
         await self.rabbitmq.disconnect()
+        if hasattr(self.storage, 'connector'):
+            try:
+                await self.storage.connector.disconnect()
+            except Exception as e:
+                self.logger.debug(f"Error disconnecting Redis: {e}")
         self._running = False
         self.logger.info("GatewayService stopped")
 

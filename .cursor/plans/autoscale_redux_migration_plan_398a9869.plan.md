@@ -326,8 +326,9 @@ The agent will:
      - Redis: EFS volume mount at `/redis-data` - CONFIGURED
      - RabbitMQ: EFS volume mount at `/rabbitmq-data` - CONFIGURED
    - `euglena-agent`: agent container only - COMPLETED
-   
-   **Recent Fixes (January 2026)**:
+
+**Recent Fixes (January 2026)**:
+
    - Fixed EFS mount access denied errors by automatically configuring security group rules
    - Fixed IAM authorization incompatibility with `rootDirectory` (disabled when using root directories)
    - Enhanced EFS manager to detect and update mount target security groups automatically

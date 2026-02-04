@@ -72,7 +72,7 @@ def main():
         all_success = False
     
     if not args.skip_ecr:
-        ecr_services = ["gateway", "agent"]
+        ecr_services = ["gateway", "agent", "metrics"]
         if not push_to_ecr(services_dir, aws_config, ecr_services, image_suffix=""):
             print("\nFAIL: ECR push failed")
             all_success = False

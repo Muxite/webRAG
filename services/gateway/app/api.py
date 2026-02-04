@@ -117,9 +117,13 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             quota = app.state.user_tick_manager
             access_token = credentials.credentials
 
+            skip_phrase = os.environ.get("AGENT_SKIP_PHRASE", "skipskipskip")
+            is_skip_message = skip_phrase and skip_phrase.lower() in (req.mandate or "").lower()
+            units_to_consume = 0 if is_skip_message else max_ticks
+
             if not app.state.test_mode:
                 try:
-                    result = quota.check_and_consume(access_token=access_token, user_id=user.id, email=user.email, units=max_ticks)
+                    result = quota.check_and_consume(access_token=access_token, user_id=user.id, email=user.email, units=units_to_consume)
                     if not result.allowed:
                         remaining = 0 if result.remaining is None else result.remaining
                         raise HTTPException(
@@ -135,7 +139,11 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
                         detail="Quota system error",
                     )
             else:
-                logger.debug(f"Test mode: skipping quota check for user {user.id}, units={max_ticks}")
+                logger.debug(f"Test mode: skipping quota check for user {user.id}, units={units_to_consume}")
+            
+            if is_skip_message:
+                logger.info(f"Skip message detected: consuming 0 ticks instead of {max_ticks}")
+            
             return await _service.create_task(req)
         except HTTPException:
             raise

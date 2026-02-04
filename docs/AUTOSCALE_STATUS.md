@@ -165,13 +165,21 @@ The project has successfully completed service separation (Stage 2). Gateway and
 
 **Status**: Service separation complete and stable. System has been running stable for 8+ hours.
 
-## Planned Stages (Not Yet Started)
+## Completed Stages
 
-### Stage 3: Metrics Service
+### Stage 3: Metrics Service (COMPLETED)
 
-- Add metrics service to gateway task
-- Publish queue depth to CloudWatch
-- Use queue_metrics.py definitions from Stage 1
+- Metrics service added to gateway task (autoscale mode only)
+- Publishes queue depth to CloudWatch
+- Uses queue_metrics.py definitions from Stage 1
+- Health check endpoint on port 8082
+- Configurable via environment variables:
+  - `PUBLISH_QUEUE_DEPTH_METRICS`: Enable CloudWatch publishing (default: true)
+  - `QUEUE_DEPTH_METRICS_INTERVAL`: Collection interval in seconds (default: 5)
+  - `CLOUDWATCH_NAMESPACE`: CloudWatch namespace (default: Euglena/RabbitMQ)
+  - `QUEUE_NAME`: Queue name to monitor (default: agent.mandates)
+
+**Status**: Metrics service integrated into autoscale gateway task definition.
 
 ### Stage 4: Lambda Autoscaling Function
 

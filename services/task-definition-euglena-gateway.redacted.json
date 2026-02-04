@@ -297,6 +297,68 @@
             ],
             "systemControls": [],
             "volumesFrom": []
+        },
+        {
+            "cpu": 0,
+            "dependsOn": [
+                {
+                    "condition": "START",
+                    "containerName": "rabbitmq"
+                }
+            ],
+            "environment": [
+                {
+                    "name": "RABBITMQ_URL",
+                    "value": "amqp://guest:guest@localhost:5672/"
+                },
+                {
+                    "name": "PUBLISH_QUEUE_DEPTH_METRICS",
+                    "value": "true"
+                },
+                {
+                    "name": "QUEUE_DEPTH_METRICS_INTERVAL",
+                    "value": "5"
+                },
+                {
+                    "name": "CLOUDWATCH_NAMESPACE",
+                    "value": "Euglena/RabbitMQ"
+                },
+                {
+                    "name": "QUEUE_NAME",
+                    "value": "agent.mandates"
+                }
+            ],
+            "essential": false,
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "curl -f http://localhost:8082/health || exit 1"
+                ],
+                "interval": 30,
+                "retries": 3,
+                "startPeriod": 60,
+                "timeout": 10
+            },
+            "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/euglena/metrics:latest",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/euglena",
+                    "awslogs-region": "REGION",
+                    "awslogs-stream-prefix": "metrics"
+                }
+            },
+            "mountPoints": [],
+            "name": "metrics",
+            "portMappings": [
+                {
+                    "containerPort": 8082,
+                    "hostPort": 8082,
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": []
         }
     ],
     "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskRole",
@@ -328,6 +390,6 @@
     "requiresCompatibilities": [
         "FARGATE"
     ],
-    "cpu": "1024",
-    "memory": "2048"
+    "cpu": "512",
+    "memory": "1024"
 }
