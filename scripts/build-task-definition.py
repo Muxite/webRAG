@@ -309,7 +309,47 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
         "volumesFrom": []
     }
     
-    containers = [chroma, redis, rabbitmq, gateway]
+    rabbitmq_url_original = env_vars.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+    
+    if "@" in rabbitmq_url_original:
+        creds_and_rest = rabbitmq_url_original.split("@", 1)
+        creds = creds_and_rest[0]
+        rest = creds_and_rest[1]
+        if ":" in rest:
+            port_and_path = rest.split(":", 1)[1]
+            rabbitmq_url = f"{creds}@localhost:{port_and_path}"
+        else:
+            rabbitmq_url = f"{creds}@localhost:5672/"
+    else:
+        scheme = rabbitmq_url_original.split("://")[0] if "://" in rabbitmq_url_original else "amqp"
+        rabbitmq_url = f"{scheme}://localhost:5672/"
+    
+    metrics_env = [
+        {"name": "RABBITMQ_URL", "value": rabbitmq_url},
+        {"name": "PUBLISH_QUEUE_DEPTH_METRICS", "value": "true"},
+        {"name": "QUEUE_DEPTH_METRICS_INTERVAL", "value": "5"},
+        {"name": "CLOUDWATCH_NAMESPACE", "value": "Euglena/RabbitMQ"},
+        {"name": "QUEUE_NAME", "value": env_vars.get("AGENT_INPUT_QUEUE", "agent.mandates")}
+    ]
+    
+    metrics = {
+        "cpu": 0,
+        "dependsOn": [
+            {"condition": "START", "containerName": "rabbitmq"}
+        ],
+        "environment": metrics_env,
+        "essential": False,
+        "healthCheck": _make_health_check("curl -f http://localhost:8082/health || exit 1", start_period=60, interval=30, retries=3, timeout=10),
+        "image": f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/metrics:latest",
+        "logConfiguration": _make_log_config("metrics", region),
+        "mountPoints": [],
+        "name": "metrics",
+        "portMappings": [{"containerPort": 8082, "hostPort": 8082, "protocol": "tcp"}],
+        "systemControls": [],
+        "volumesFrom": []
+    }
+    
+    containers = [chroma, redis, rabbitmq, gateway, metrics]
     
     volumes = []
     using_shared_efs = (chroma_efs_id and rabbitmq_efs_id and 

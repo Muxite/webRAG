@@ -250,6 +250,10 @@ class InterfaceAgent:
             all_connected = all(connectivity.values())
             status_msg = "All services connected" if all_connected else "Some services not connected"
             
+            skip_delay_seconds = int(os.environ.get("AGENT_SKIP_DELAY_SECONDS", "10"))
+            self.logger.info(f"SKIP MODE: Waiting {skip_delay_seconds}s to allow queue to fill up for testing...")
+            await asyncio.sleep(skip_delay_seconds)
+            
             result_msg = f"SKIP MODE: {status_msg}\n"
             result_msg += f"RabbitMQ: {'✓' if connectivity['rabbitmq'] else '✗'}\n"
             result_msg += f"Redis: {'✓' if connectivity['redis'] else '✗'}\n"

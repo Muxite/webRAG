@@ -233,6 +233,77 @@ def add_task_protection_permission(aws_config: dict) -> bool:
         return False
 
 
+def add_cloudwatch_permissions(aws_config: dict) -> bool:
+    """
+    Add CloudWatch PutMetricData permission to ecsTaskRole for metrics service.
+    
+    :param aws_config: AWS configuration dictionary.
+    :returns: True on success.
+    """
+    print("\n=== Adding IAM Permission for CloudWatch Metrics ===")
+    
+    region = aws_config.get("AWS_REGION", "us-east-1")
+    role_name = aws_config.get("ECS_TASK_ROLE_NAME", "ecsTaskRole")
+    
+    iam_client = boto3.client("iam", region_name=region)
+    
+    try:
+        print(f"  Role name: {role_name}")
+        
+        try:
+            iam_client.get_role(RoleName=role_name)
+            print(f"  OK: Role exists: {role_name}")
+        except iam_client.exceptions.NoSuchEntityException:
+            print(f"  FAIL: Role not found: {role_name}")
+            print("  Create the role first or update ECS_TASK_ROLE_NAME in aws.env")
+            return False
+        
+        policy_doc = get_role_policies(iam_client, role_name)
+        
+        statements = policy_doc.get("Statement", [])
+        
+        has_permission = False
+        for stmt in statements:
+            actions = stmt.get("Action", [])
+            if isinstance(actions, str):
+                actions = [actions]
+            
+            if (stmt.get("Effect") == "Allow" and 
+                "cloudwatch:PutMetricData" in actions):
+                has_permission = True
+                print(f"  OK: CloudWatch permission already exists in role")
+                break
+        
+        if not has_permission:
+            required_permission = {
+                "Effect": "Allow",
+                "Action": "cloudwatch:PutMetricData",
+                "Resource": "*"
+            }
+            
+            if not isinstance(statements, list):
+                statements = []
+            
+            statements.append(required_permission)
+            policy_doc["Statement"] = statements
+            
+            policy_json = json.dumps(policy_doc)
+            
+            print("  Adding CloudWatch permission...")
+            iam_client.put_role_policy(
+                RoleName=role_name,
+                PolicyName="CloudWatchMetricsPolicy",
+                PolicyDocument=policy_json
+            )
+            print(f"  OK: CloudWatch permission added successfully!")
+        
+        return True
+    
+    except Exception as e:
+        print(f"  WARN: Error adding CloudWatch permission: {e}")
+        return False
+
+
 def main():
     """
     Main entry point.
@@ -247,8 +318,9 @@ def main():
     
     efs_success = add_efs_permissions(aws_config)
     task_protection_success = add_task_protection_permission(aws_config)
+    cloudwatch_success = add_cloudwatch_permissions(aws_config)
     
-    if efs_success and task_protection_success:
+    if efs_success and task_protection_success and cloudwatch_success:
         print("\nOK: IAM permission update completed")
     else:
         print("\nWARN: Some IAM permission updates had issues (check output above)")
