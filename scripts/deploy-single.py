@@ -231,6 +231,23 @@ def main():
         print("\n" + "=" * 60)
         print("OK: Deployment complete")
         print("=" * 60)
+        
+        print("\n=== Creating Deployment Snapshot ===")
+        try:
+            import subprocess
+            snapshot_cmd = [sys.executable, str(Path(__file__).parent / "snapshot-deployment.py"), "--mode", "single"]
+            result = subprocess.run(snapshot_cmd, cwd=services_dir, capture_output=True, text=True, timeout=300)
+            if result.returncode == 0:
+                print("  OK: Deployment snapshot created")
+                if result.stdout:
+                    for line in result.stdout.strip().split('\n'):
+                        if 'Snapshot saved' in line or 'Summary saved' in line:
+                            print(f"  {line}")
+            else:
+                print(f"  WARN: Snapshot creation failed: {result.stderr}")
+        except Exception as e:
+            print(f"  WARN: Could not create snapshot: {e}")
+        
         print(f"\nFinished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         sys.exit(0)
     else:

@@ -25,6 +25,7 @@ class EcsInfrastructure:
     def ensure_cluster(self) -> bool:
         """
         Ensure ECS cluster exists, create if it doesn't.
+        Enables Container Insights for task-level metrics.
         
         :returns: True on success, False on error.
         """
@@ -37,20 +38,43 @@ class EcsInfrastructure:
                 status = cluster.get("status", "UNKNOWN")
                 if status == "ACTIVE":
                     print(f"  OK: Cluster {self.cluster_name} exists and is active")
+                    settings = cluster.get("settings", [])
+                    container_insights_enabled = any(
+                        s.get("name") == "containerInsights" and s.get("value") == "enabled"
+                        for s in settings
+                    )
+                    if not container_insights_enabled:
+                        print(f"  Enabling Container Insights on cluster {self.cluster_name}...")
+                        try:
+                            self.ecs_client.update_cluster_settings(
+                                cluster=self.cluster_name,
+                                settings=[{"name": "containerInsights", "value": "enabled"}]
+                            )
+                            print(f"  OK: Container Insights enabled")
+                        except Exception as e:
+                            print(f"  WARN: Failed to enable Container Insights: {e}")
+                    else:
+                        print(f"  OK: Container Insights already enabled")
                     return True
                 else:
                     print(f"  WARN: Cluster {self.cluster_name} exists but status is {status}")
                     return False
             
-            print(f"  Creating cluster {self.cluster_name}...")
-            self.ecs_client.create_cluster(clusterName=self.cluster_name)
-            print(f"  OK: Cluster {self.cluster_name} created")
+            print(f"  Creating cluster {self.cluster_name} with Container Insights...")
+            self.ecs_client.create_cluster(
+                clusterName=self.cluster_name,
+                settings=[{"name": "containerInsights", "value": "enabled"}]
+            )
+            print(f"  OK: Cluster {self.cluster_name} created with Container Insights")
             return True
         except self.ecs_client.exceptions.ClusterNotFoundException:
-            print(f"  Creating cluster {self.cluster_name}...")
+            print(f"  Creating cluster {self.cluster_name} with Container Insights...")
             try:
-                self.ecs_client.create_cluster(clusterName=self.cluster_name)
-                print(f"  OK: Cluster {self.cluster_name} created")
+                self.ecs_client.create_cluster(
+                    clusterName=self.cluster_name,
+                    settings=[{"name": "containerInsights", "value": "enabled"}]
+                )
+                print(f"  OK: Cluster {self.cluster_name} created with Container Insights")
                 return True
             except Exception as e:
                 print(f"  FAIL: Error creating cluster: {e}", file=sys.stderr)
@@ -177,6 +201,16 @@ class EcsInfrastructure:
                             print(f"  Attempting update anyway...")
                     
                     if exists:
+                        current_task_def = current_service.get("taskDefinition", "")
+                        latest_task_def_arn = None
+                        try:
+                            latest_response = self.ecs_client.describe_task_definition(taskDefinition=task_family)
+                            latest_task_def_arn = latest_response.get("taskDefinition", {}).get("taskDefinitionArn", "")
+                        except Exception:
+                            pass
+                        
+                        task_def_changed = current_task_def != latest_task_def_arn if latest_task_def_arn else True
+                        
                         awsvpc_config = {
                             "subnets": network_config.get("subnets", []),
                             "securityGroups": network_config.get("securityGroups", []),
@@ -188,7 +222,7 @@ class EcsInfrastructure:
                             "service": service_name,
                             "taskDefinition": task_family,
                             "desiredCount": desired_count,
-                            "forceNewDeployment": True,
+                            "forceNewDeployment": task_def_changed,
                             "deploymentConfiguration": deployment_config,
                             "capacityProviderStrategy": capacity_provider_strategy,
                             "platformVersion": "LATEST",
@@ -196,6 +230,9 @@ class EcsInfrastructure:
                                 "awsvpcConfiguration": awsvpc_config
                             }
                         }
+                        
+                        if not task_def_changed:
+                            print(f"  Task definition unchanged, skipping force deployment")
                         
                         if health_check_grace_period is not None:
                             update_params["healthCheckGracePeriodSeconds"] = health_check_grace_period

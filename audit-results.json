@@ -1,0 +1,1679 @@
+{
+  "target_time": "2026-02-01T15:56:28-08:00",
+  "window": {
+    "start": "2026-01-29T15:56:28-08:00",
+    "end": "2026-02-06T13:00:45.781062+00:00"
+  },
+  "summary": {
+    "target_time": "2026-02-01T15:56:28-08:00",
+    "window": {
+      "start": "2026-01-29T15:56:28-08:00",
+      "end": "2026-02-06T13:00:45.781062+00:00"
+    },
+    "git_commits": 0,
+    "cloudtrail_events": 50,
+    "ecs_events": {},
+    "task_definitions": {
+      "euglena-gateway": 10,
+      "euglena-agent": 10,
+      "euglena": 10
+    },
+    "ecr_pushes": {
+      "agent": 1,
+      "metrics": 1
+    },
+    "data": {
+      "commits": [],
+      "cloudtrail": [
+        {
+          "time": "2026-02-05 04:57:38-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:57:38-08:00",
+          "name": "DescribeInternetGateways",
+          "source": "ec2",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:57:38-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:57:38-08:00",
+          "name": "DescribeSubnets",
+          "source": "ec2",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:57:38-08:00",
+          "name": "DescribeVpcs",
+          "source": "ec2",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:57:38-08:00",
+          "name": "RegisterTargets",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:57:39-08:00",
+          "name": "GetOperation",
+          "source": "servicediscovery",
+          "user": "ecs-service-discovery-provisioning"
+        },
+        {
+          "time": "2026-02-05 04:57:47-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:57:48-08:00",
+          "name": "DescribeTags",
+          "source": "elasticloadbalancing",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-05 04:57:48-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-05 04:57:48-08:00",
+          "name": "GetResource",
+          "source": "cloudcontrolapi",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-05 04:57:48-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:57:48-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:57:48-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:57:48-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-05 04:57:48-08:00",
+          "name": "DescribeTargetGroupAttributes",
+          "source": "elasticloadbalancing",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-05 04:57:48-08:00",
+          "name": "AssumeRole",
+          "source": "sts",
+          "user": "N/A"
+        },
+        {
+          "time": "2026-02-05 04:57:57-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:57:57-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:57:57-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:57:57-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:57:58-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:57:58-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:57:58-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:57:58-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:08-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:08-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:08-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:08-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:17-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:17-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:17-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:17-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:19-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:19-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:19-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:19-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:20-08:00",
+          "name": "DescribeServices",
+          "source": "ecs",
+          "user": "euglena-autoscale"
+        },
+        {
+          "time": "2026-02-05 04:58:20-08:00",
+          "name": "AssumeRole",
+          "source": "sts",
+          "user": "N/A"
+        },
+        {
+          "time": "2026-02-05 04:58:28-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:28-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:28-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:28-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:38-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:38-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:38-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:38-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:39-08:00",
+          "name": "DescribeTargetGroups",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-05 04:58:39-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-05 04:58:39-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        }
+      ],
+      "ecs_events": {},
+      "task_defs": {
+        "euglena-gateway": [
+          {
+            "revision": 64,
+            "time": "2026-02-05T04:41:00.625000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 63,
+            "time": "2026-02-05T04:37:43.636000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 62,
+            "time": "2026-02-05T03:06:40.541000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 61,
+            "time": "2026-02-05T01:26:41.216000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 60,
+            "time": "2026-02-05T01:08:32.380000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 59,
+            "time": "2026-02-05T00:21:46.083000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 58,
+            "time": "2026-02-04T19:36:32.975000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 57,
+            "time": "2026-02-04T18:01:13.985000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 56,
+            "time": "2026-02-04T05:11:44.844000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 55,
+            "time": "2026-02-04T05:09:56.598000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          }
+        ],
+        "euglena-agent": [
+          {
+            "revision": 63,
+            "time": "2026-02-05T04:41:02.896000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 62,
+            "time": "2026-02-05T04:37:45.993000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 61,
+            "time": "2026-02-05T03:06:42.848000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 60,
+            "time": "2026-02-05T01:26:43.440000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 59,
+            "time": "2026-02-05T01:08:34.701000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 58,
+            "time": "2026-02-05T00:21:47.661000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 57,
+            "time": "2026-02-04T19:36:35.665000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 56,
+            "time": "2026-02-04T18:01:16.628000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 55,
+            "time": "2026-02-04T05:11:47.219000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 54,
+            "time": "2026-02-04T05:09:59.009000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          }
+        ],
+        "euglena": [
+          {
+            "revision": 58,
+            "time": "2026-02-01T06:33:09.435000-08:00",
+            "cpu": "1024",
+            "memory": "2048",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          },
+          {
+            "revision": 57,
+            "time": "2026-02-01T05:22:58.239000-08:00",
+            "cpu": "1024",
+            "memory": "2048",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          },
+          {
+            "revision": 56,
+            "time": "2026-02-01T05:07:46.752000-08:00",
+            "cpu": "1024",
+            "memory": "2048",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          },
+          {
+            "revision": 55,
+            "time": "2026-01-31T19:47:40.956000-08:00",
+            "cpu": "1024",
+            "memory": "2048",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          },
+          {
+            "revision": 54,
+            "time": "2026-01-31T15:21:39.159000-08:00",
+            "cpu": "4096",
+            "memory": "8192",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          },
+          {
+            "revision": 53,
+            "time": "2026-01-31T14:41:11.935000-08:00",
+            "cpu": "2048",
+            "memory": "4096",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          },
+          {
+            "revision": 52,
+            "time": "2026-01-31T12:41:05.316000-08:00",
+            "cpu": "2048",
+            "memory": "4096",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          },
+          {
+            "revision": 51,
+            "time": "2026-01-31T12:14:17.090000-08:00",
+            "cpu": "2048",
+            "memory": "4096",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          },
+          {
+            "revision": 50,
+            "time": "2026-01-31T12:00:39.515000-08:00",
+            "cpu": "2048",
+            "memory": "4096",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          },
+          {
+            "revision": 49,
+            "time": "2026-01-31T11:36:56.237000-08:00",
+            "cpu": "2048",
+            "memory": "4096",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "agent",
+              "gateway"
+            ]
+          }
+        ]
+      },
+      "ecr_pushes": {
+        "agent": [
+          {
+            "time": "2026-02-03T17:01:48.778000-08:00",
+            "tags": [],
+            "digest": "sha256:85e57553d"
+          }
+        ],
+        "metrics": [
+          {
+            "time": "2026-02-04T02:29:20.716000-08:00",
+            "tags": [],
+            "digest": "sha256:ebdc6745f"
+          }
+        ]
+      }
+    }
+  },
+  "analysis": {
+    "issues": [
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 64,
+        "time": "2026-02-05T04:41:00.625000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 63,
+        "time": "2026-02-05T04:37:43.636000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 62,
+        "time": "2026-02-05T03:06:40.541000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 61,
+        "time": "2026-02-05T01:26:41.216000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 60,
+        "time": "2026-02-05T01:08:32.380000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 59,
+        "time": "2026-02-05T00:21:46.083000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 58,
+        "time": "2026-02-04T19:36:32.975000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 57,
+        "time": "2026-02-04T18:01:13.985000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 56,
+        "time": "2026-02-04T05:11:44.844000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-gateway",
+        "revision": 55,
+        "time": "2026-02-04T05:09:56.598000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 63,
+        "time": "2026-02-05T04:41:02.896000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 62,
+        "time": "2026-02-05T04:37:45.993000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 61,
+        "time": "2026-02-05T03:06:42.848000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 60,
+        "time": "2026-02-05T01:26:43.440000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 59,
+        "time": "2026-02-05T01:08:34.701000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 58,
+        "time": "2026-02-05T00:21:47.661000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 57,
+        "time": "2026-02-04T19:36:35.665000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 56,
+        "time": "2026-02-04T18:01:16.628000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 55,
+        "time": "2026-02-04T05:11:47.219000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena-agent",
+        "revision": 54,
+        "time": "2026-02-04T05:09:59.009000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 58,
+        "time": "2026-02-01T06:33:09.435000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 57,
+        "time": "2026-02-01T05:22:58.239000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 56,
+        "time": "2026-02-01T05:07:46.752000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 55,
+        "time": "2026-01-31T19:47:40.956000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 54,
+        "time": "2026-01-31T15:21:39.159000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 53,
+        "time": "2026-01-31T14:41:11.935000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 52,
+        "time": "2026-01-31T12:41:05.316000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 51,
+        "time": "2026-01-31T12:14:17.090000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 50,
+        "time": "2026-01-31T12:00:39.515000-08:00",
+        "note": "No nearby git commit"
+      },
+      {
+        "type": "orphaned_task_definition",
+        "family": "euglena",
+        "revision": 49,
+        "time": "2026-01-31T11:36:56.237000-08:00",
+        "note": "No nearby git commit"
+      }
+    ],
+    "summary": {
+      "target_time": "2026-02-01T15:56:28-08:00",
+      "window": {
+        "start": "2026-01-29T15:56:28-08:00",
+        "end": "2026-02-06T13:00:45.781062+00:00"
+      },
+      "git_commits": 0,
+      "cloudtrail_events": 50,
+      "ecs_events": {},
+      "task_definitions": {
+        "euglena-gateway": 10,
+        "euglena-agent": 10,
+        "euglena": 10
+      },
+      "ecr_pushes": {
+        "agent": 1,
+        "metrics": 1
+      },
+      "data": {
+        "commits": [],
+        "cloudtrail": [
+          {
+            "time": "2026-02-05 04:57:38-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:57:38-08:00",
+            "name": "DescribeInternetGateways",
+            "source": "ec2",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:57:38-08:00",
+            "name": "ListInstances",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:57:38-08:00",
+            "name": "DescribeSubnets",
+            "source": "ec2",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:57:38-08:00",
+            "name": "DescribeVpcs",
+            "source": "ec2",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:57:38-08:00",
+            "name": "RegisterTargets",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:57:39-08:00",
+            "name": "GetOperation",
+            "source": "servicediscovery",
+            "user": "ecs-service-discovery-provisioning"
+          },
+          {
+            "time": "2026-02-05 04:57:47-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:57:48-08:00",
+            "name": "DescribeTags",
+            "source": "elasticloadbalancing",
+            "user": "resource-explorer-2"
+          },
+          {
+            "time": "2026-02-05 04:57:48-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "resource-explorer-2"
+          },
+          {
+            "time": "2026-02-05 04:57:48-08:00",
+            "name": "GetResource",
+            "source": "cloudcontrolapi",
+            "user": "resource-explorer-2"
+          },
+          {
+            "time": "2026-02-05 04:57:48-08:00",
+            "name": "ListInstances",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:57:48-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:57:48-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:57:48-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "resource-explorer-2"
+          },
+          {
+            "time": "2026-02-05 04:57:48-08:00",
+            "name": "DescribeTargetGroupAttributes",
+            "source": "elasticloadbalancing",
+            "user": "resource-explorer-2"
+          },
+          {
+            "time": "2026-02-05 04:57:48-08:00",
+            "name": "AssumeRole",
+            "source": "sts",
+            "user": "N/A"
+          },
+          {
+            "time": "2026-02-05 04:57:57-08:00",
+            "name": "ListInstances",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:57:57-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:57:57-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:57:57-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:57:58-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:57:58-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:57:58-08:00",
+            "name": "ListInstances",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:57:58-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:08-08:00",
+            "name": "ListInstances",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:08-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:08-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:08-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:17-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:17-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:17-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:17-08:00",
+            "name": "ListInstances",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:19-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:19-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:19-08:00",
+            "name": "ListInstances",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:19-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:20-08:00",
+            "name": "DescribeServices",
+            "source": "ecs",
+            "user": "euglena-autoscale"
+          },
+          {
+            "time": "2026-02-05 04:58:20-08:00",
+            "name": "AssumeRole",
+            "source": "sts",
+            "user": "N/A"
+          },
+          {
+            "time": "2026-02-05 04:58:28-08:00",
+            "name": "ListInstances",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:28-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:28-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:28-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:38-08:00",
+            "name": "ListInstances",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:38-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:38-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:38-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:39-08:00",
+            "name": "DescribeTargetGroups",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          },
+          {
+            "time": "2026-02-05 04:58:39-08:00",
+            "name": "GetInstancesHealthStatus",
+            "source": "servicediscovery",
+            "user": "ECS_STS_Session"
+          },
+          {
+            "time": "2026-02-05 04:58:39-08:00",
+            "name": "DescribeTargetHealth",
+            "source": "elasticloadbalancing",
+            "user": "ecs-service-scheduler"
+          }
+        ],
+        "ecs_events": {},
+        "task_defs": {
+          "euglena-gateway": [
+            {
+              "revision": 64,
+              "time": "2026-02-05T04:41:00.625000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            },
+            {
+              "revision": 63,
+              "time": "2026-02-05T04:37:43.636000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            },
+            {
+              "revision": 62,
+              "time": "2026-02-05T03:06:40.541000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            },
+            {
+              "revision": 61,
+              "time": "2026-02-05T01:26:41.216000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            },
+            {
+              "revision": 60,
+              "time": "2026-02-05T01:08:32.380000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            },
+            {
+              "revision": 59,
+              "time": "2026-02-05T00:21:46.083000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            },
+            {
+              "revision": 58,
+              "time": "2026-02-04T19:36:32.975000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            },
+            {
+              "revision": 57,
+              "time": "2026-02-04T18:01:13.985000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            },
+            {
+              "revision": 56,
+              "time": "2026-02-04T05:11:44.844000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            },
+            {
+              "revision": 55,
+              "time": "2026-02-04T05:09:56.598000-08:00",
+              "cpu": "512",
+              "memory": "1024",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "gateway",
+                "metrics"
+              ]
+            }
+          ],
+          "euglena-agent": [
+            {
+              "revision": 63,
+              "time": "2026-02-05T04:41:02.896000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            },
+            {
+              "revision": 62,
+              "time": "2026-02-05T04:37:45.993000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            },
+            {
+              "revision": 61,
+              "time": "2026-02-05T03:06:42.848000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            },
+            {
+              "revision": 60,
+              "time": "2026-02-05T01:26:43.440000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            },
+            {
+              "revision": 59,
+              "time": "2026-02-05T01:08:34.701000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            },
+            {
+              "revision": 58,
+              "time": "2026-02-05T00:21:47.661000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            },
+            {
+              "revision": 57,
+              "time": "2026-02-04T19:36:35.665000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            },
+            {
+              "revision": 56,
+              "time": "2026-02-04T18:01:16.628000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            },
+            {
+              "revision": 55,
+              "time": "2026-02-04T05:11:47.219000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            },
+            {
+              "revision": 54,
+              "time": "2026-02-04T05:09:59.009000-08:00",
+              "cpu": "256",
+              "memory": "512",
+              "containers": 1,
+              "container_names": [
+                "agent"
+              ]
+            }
+          ],
+          "euglena": [
+            {
+              "revision": 58,
+              "time": "2026-02-01T06:33:09.435000-08:00",
+              "cpu": "1024",
+              "memory": "2048",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            },
+            {
+              "revision": 57,
+              "time": "2026-02-01T05:22:58.239000-08:00",
+              "cpu": "1024",
+              "memory": "2048",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            },
+            {
+              "revision": 56,
+              "time": "2026-02-01T05:07:46.752000-08:00",
+              "cpu": "1024",
+              "memory": "2048",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            },
+            {
+              "revision": 55,
+              "time": "2026-01-31T19:47:40.956000-08:00",
+              "cpu": "1024",
+              "memory": "2048",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            },
+            {
+              "revision": 54,
+              "time": "2026-01-31T15:21:39.159000-08:00",
+              "cpu": "4096",
+              "memory": "8192",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            },
+            {
+              "revision": 53,
+              "time": "2026-01-31T14:41:11.935000-08:00",
+              "cpu": "2048",
+              "memory": "4096",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            },
+            {
+              "revision": 52,
+              "time": "2026-01-31T12:41:05.316000-08:00",
+              "cpu": "2048",
+              "memory": "4096",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            },
+            {
+              "revision": 51,
+              "time": "2026-01-31T12:14:17.090000-08:00",
+              "cpu": "2048",
+              "memory": "4096",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            },
+            {
+              "revision": 50,
+              "time": "2026-01-31T12:00:39.515000-08:00",
+              "cpu": "2048",
+              "memory": "4096",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            },
+            {
+              "revision": 49,
+              "time": "2026-01-31T11:36:56.237000-08:00",
+              "cpu": "2048",
+              "memory": "4096",
+              "containers": 5,
+              "container_names": [
+                "chroma",
+                "redis",
+                "rabbitmq",
+                "agent",
+                "gateway"
+              ]
+            }
+          ]
+        },
+        "ecr_pushes": {
+          "agent": [
+            {
+              "time": "2026-02-03T17:01:48.778000-08:00",
+              "tags": [],
+              "digest": "sha256:85e57553d"
+            }
+          ],
+          "metrics": [
+            {
+              "time": "2026-02-04T02:29:20.716000-08:00",
+              "tags": [],
+              "digest": "sha256:ebdc6745f"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

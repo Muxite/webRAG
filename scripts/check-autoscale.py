@@ -7,6 +7,7 @@ import sys
 import argparse
 from pathlib import Path
 from typing import Dict, List, Optional
+from datetime import datetime, timedelta, timezone
 from dotenv import dotenv_values
 
 
@@ -256,6 +257,171 @@ def check_service_discovery(aws_config: Dict, verbose: bool = False):
         print(f"  FAIL: Service discovery check - {e}")
 
 
+def check_stopped_tasks(aws_config: Dict, service_names: List[str], max_tasks: int = 5):
+    """
+    Check recently stopped tasks and their reasons.
+    
+    :param aws_config: AWS configuration dictionary.
+    :param service_names: List of service names to check.
+    :param max_tasks: Maximum number of stopped tasks to show per service.
+    """
+    region = aws_config["AWS_REGION"]
+    cluster = aws_config["ECS_CLUSTER"]
+    ecs_client = boto3.client("ecs", region_name=region)
+    
+    print("\n=== Recently Stopped Tasks ===")
+    
+    for service_name in service_names:
+        try:
+            response = ecs_client.list_tasks(
+                cluster=cluster,
+                serviceName=service_name,
+                desiredStatus="STOPPED",
+                maxResults=max_tasks
+            )
+            task_arns = response.get("taskArns", [])
+            
+            if not task_arns:
+                print(f"  {service_name}: No stopped tasks found")
+                continue
+            
+            tasks_response = ecs_client.describe_tasks(cluster=cluster, tasks=task_arns)
+            tasks = tasks_response.get("tasks", [])
+            
+            print(f"  {service_name}: {len(tasks)} stopped task(s)")
+            
+            for task in tasks[:max_tasks]:
+                task_id = task.get("taskArn", "").split("/")[-1]
+                stopped_reason = task.get("stoppedReason", "N/A")
+                stop_code = task.get("stopCode", "N/A")
+                stopped_at = task.get("stoppedAt")
+                
+                if stopped_at:
+                    stopped_time = datetime.fromtimestamp(stopped_at.timestamp())
+                    time_ago = datetime.now() - stopped_time
+                    time_str = f"{stopped_time.strftime('%Y-%m-%d %H:%M:%S')} ({time_ago.total_seconds()/60:.1f} min ago)"
+                else:
+                    time_str = "N/A"
+                
+                print(f"    Task {task_id[:8]}...")
+                print(f"      Stop Code: {stop_code}")
+                print(f"      Reason: {stopped_reason[:100]}")
+                print(f"      Stopped: {time_str}")
+                
+                containers = task.get("containers", [])
+                for container in containers:
+                    name = container.get("name", "unknown")
+                    exit_code = container.get("exitCode")
+                    reason = container.get("reason", "N/A")
+                    if exit_code is not None or reason != "N/A":
+                        print(f"      Container {name}: exit_code={exit_code}, reason={reason}")
+        except Exception as e:
+            print(f"  FAIL: {service_name} - {e}")
+
+
+def check_cloudwatch_logs(aws_config: Dict, service_names: List[str], minutes: int = 10, max_lines: int = 20):
+    """
+    Check recent CloudWatch logs for errors and warnings.
+    
+    :param aws_config: AWS configuration dictionary.
+    :param service_names: List of service names to check.
+    :param minutes: Number of minutes to look back.
+    :param max_lines: Maximum number of log lines to show.
+    """
+    region = aws_config["AWS_REGION"]
+    logs_client = boto3.client("logs", region_name=region)
+    
+    print(f"\n=== CloudWatch Logs (Last {minutes} minutes) ===")
+    
+    log_group = "/ecs/euglena"
+    start_time = int((datetime.now(timezone.utc) - timedelta(minutes=minutes)).timestamp() * 1000)
+    
+    try:
+        for service_name in service_names:
+            prefix = service_name.replace("euglena-", "")
+            
+            try:
+                response = logs_client.filter_log_events(
+                    logGroupName=log_group,
+                    logStreamNamePrefix=prefix,
+                    startTime=start_time,
+                    filterPattern="ERROR WARN error warn exception Exception failed Failed"
+                )
+                
+                events = response.get("events", [])
+                if not events:
+                    print(f"  {service_name}: No errors/warnings found")
+                    continue
+                
+                print(f"  {service_name}: Found {len(events)} error/warning event(s)")
+                
+                for event in events[:max_lines]:
+                    timestamp = datetime.fromtimestamp(event.get("timestamp", 0) / 1000)
+                    message = event.get("message", "").strip()
+                    if message:
+                        print(f"    [{timestamp.strftime('%H:%M:%S')}] {message[:150]}")
+            except logs_client.exceptions.ResourceNotFoundException:
+                print(f"  {service_name}: Log group not found")
+            except Exception as e:
+                print(f"  {service_name}: Error - {e}")
+    except Exception as e:
+        print(f"  FAIL: CloudWatch logs check - {e}")
+
+
+def check_task_definitions(aws_config: Dict, service_names: List[str]):
+    """
+    Check task definition details.
+    
+    :param aws_config: AWS configuration dictionary.
+    :param service_names: List of service names to check.
+    """
+    region = aws_config["AWS_REGION"]
+    cluster = aws_config["ECS_CLUSTER"]
+    ecs_client = boto3.client("ecs", region_name=region)
+    
+    print("\n=== Task Definitions ===")
+    
+    for service_name in service_names:
+        try:
+            response = ecs_client.describe_services(cluster=cluster, services=[service_name])
+            services_list = response.get("services", [])
+            
+            if not services_list:
+                continue
+            
+            svc = services_list[0]
+            deployments = svc.get("deployments", [])
+            primary = next((d for d in deployments if d.get("status") == "PRIMARY"), None)
+            
+            if not primary:
+                print(f"  {service_name}: No active deployment")
+                continue
+            
+            task_def_arn = primary.get("taskDefinition", "")
+            task_def_name = task_def_arn.split("/")[-1].split(":")[0]
+            task_def_revision = task_def_arn.split(":")[-1]
+            
+            task_def_response = ecs_client.describe_task_definition(taskDefinition=task_def_arn)
+            task_def = task_def_response.get("taskDefinition", {})
+            containers = task_def.get("containerDefinitions", [])
+            
+            print(f"  {service_name}: {task_def_name}:{task_def_revision}")
+            print(f"    CPU: {task_def.get('cpu', 'N/A')}, Memory: {task_def.get('memory', 'N/A')}")
+            print(f"    Containers ({len(containers)}):")
+            
+            for container in containers:
+                name = container.get("name", "unknown")
+                image = container.get("image", "N/A")
+                cpu = container.get("cpu", 0)
+                memory = container.get("memory", 0)
+                health_check = container.get("healthCheck")
+                has_health = "Yes" if health_check else "No"
+                print(f"      - {name}: {image.split('/')[-1]}")
+                print(f"        CPU: {cpu}, Memory: {memory}, Health Check: {has_health}")
+        except Exception as e:
+            print(f"  FAIL: {service_name} - {e}")
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Check autoscale deployment health")
@@ -263,6 +429,14 @@ def main():
                        help="Service to check (default: all)")
     parser.add_argument("--verbose", action="store_true",
                        help="Show verbose output")
+    parser.add_argument("--logs", action="store_true",
+                       help="Show CloudWatch logs")
+    parser.add_argument("--logs-minutes", type=int, default=10,
+                       help="Minutes of logs to show (default: 10)")
+    parser.add_argument("--history", action="store_true",
+                       help="Show stopped task history")
+    parser.add_argument("--task-defs", action="store_true",
+                       help="Show task definition details")
     
     args = parser.parse_args()
     
@@ -293,6 +467,15 @@ def main():
     if "euglena-gateway" in service_names or args.service == "all":
         check_alb_target_health(aws_config, args.verbose)
         check_service_discovery(aws_config, args.verbose)
+    
+    if args.history:
+        check_stopped_tasks(aws_config, service_names)
+    
+    if args.task_defs:
+        check_task_definitions(aws_config, service_names)
+    
+    if args.logs:
+        check_cloudwatch_logs(aws_config, service_names, minutes=args.logs_minutes)
     
     print("\n" + "=" * 60)
     print("Health check complete")

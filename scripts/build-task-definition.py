@@ -217,7 +217,7 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     chroma_efs_id = chroma_efs_id if chroma_efs_id else None
     rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
     
-    chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || (echo 'Chroma health check failed' && exit 1)"
+    chroma_health_command = "curl -f -s -S --max-time 15 --connect-timeout 5 http://localhost:8000/api/v1/heartbeat > /dev/null 2>&1 || exit 1"
     chroma_mount_points = []
     if chroma_efs_id:
         chroma_mount_points.append({"sourceVolume": "chroma-data", "containerPath": "/chroma-data", "readOnly": False})
@@ -235,8 +235,8 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     chroma = {
         "cpu": 0,
         "environment": chroma_env,
-        "essential": True,
-        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=60, retries=6, timeout=20),
+        "essential": False,
+        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=60, retries=6, timeout=30),
         "image": "chromadb/chroma:latest",
         "logConfiguration": _make_log_config("chroma", region),
         "mountPoints": chroma_mount_points,
@@ -289,6 +289,8 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     }
     
     env_list = build_environment_list(env_vars)
+    env_list.append({"name": "GATEWAY_DEBUG_QUEUE_NAME", "value": env_vars.get("GATEWAY_DEBUG_QUEUE_NAME", "gateway.debug")})
+    env_list.append({"name": "GATEWAY_DEBUG_QUEUE_PHRASE", "value": env_vars.get("GATEWAY_DEBUG_QUEUE_PHRASE", "debugdebugdebug")})
     
     gateway = {
         "cpu": 0,
@@ -327,9 +329,10 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     metrics_env = [
         {"name": "RABBITMQ_URL", "value": rabbitmq_url},
         {"name": "PUBLISH_QUEUE_DEPTH_METRICS", "value": "true"},
-        {"name": "QUEUE_DEPTH_METRICS_INTERVAL", "value": "5"},
+        {"name": "QUEUE_DEPTH_METRICS_INTERVAL", "value": "1"},
         {"name": "CLOUDWATCH_NAMESPACE", "value": "Euglena/RabbitMQ"},
-        {"name": "QUEUE_NAME", "value": env_vars.get("AGENT_INPUT_QUEUE", "agent.mandates")}
+        {"name": "QUEUE_NAME", "value": env_vars.get("AGENT_INPUT_QUEUE", "agent.mandates")},
+        {"name": "GATEWAY_DEBUG_QUEUE_NAME", "value": env_vars.get("GATEWAY_DEBUG_QUEUE_NAME", "gateway.debug")}
     ]
     
     metrics = {
@@ -390,8 +393,8 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
         "volumes": volumes,
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
-        "cpu": "512",
-        "memory": "1024"
+        "cpu": "1024",
+        "memory": "2048"
     }
 
 
@@ -488,7 +491,7 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
     chroma_efs_id = chroma_efs_id if chroma_efs_id else None
     rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
     
-    chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || (echo 'Chroma health check failed' && exit 1)"
+    chroma_health_command = "curl -f -s -S --max-time 15 --connect-timeout 5 http://localhost:8000/api/v1/heartbeat > /dev/null 2>&1 || exit 1"
     chroma_mount_points = []
     if chroma_efs_id:
         chroma_mount_points.append({"sourceVolume": "chroma-data", "containerPath": "/chroma-data", "readOnly": False})
@@ -506,8 +509,8 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
     chroma = {
         "cpu": 0,
         "environment": chroma_env,
-        "essential": True,
-        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=60, retries=6, timeout=20),
+        "essential": False,
+        "healthCheck": _make_health_check(chroma_health_command, start_period=300, interval=60, retries=6, timeout=30),
         "image": "chromadb/chroma:latest",
         "logConfiguration": _make_log_config("chroma", region),
         "mountPoints": chroma_mount_points,
@@ -645,8 +648,8 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         "volumes": volumes,
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
-        "cpu": "1024",
-        "memory": "2048"
+        "cpu": "512",
+        "memory": "1024"
     }
 
 

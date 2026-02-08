@@ -192,14 +192,15 @@ Current settings:
 **Total Failure Window**: 6 retries × 60 seconds = 6 minutes before marking unhealthy (after 5-minute start period)
 
 **Task Resources**:
-- Gateway service: 0.5 vCPU (512 CPU units), 1GB RAM (1024 MB)
+- Gateway service: 1 vCPU (1024 CPU units), 2GB RAM (2048 MB) - updated 2026-02-04
 - Agent service: 0.25 vCPU (256 CPU units), 0.5GB RAM (512 MB)
 - Single service: 1 vCPU (1024 CPU units), 2GB RAM (2048 MB)
 
-**Health Check Command**: Simplified to `curl -f http://localhost:8000/api/v1/heartbeat || (echo 'Chroma health check failed' && exit 1)`
-- Removed complex timeout flags to avoid premature failures
-- Added error message for better logging
-- Basic connectivity test focuses on endpoint availability
+**Health Check Command**: `curl -f http://localhost:8000/api/v1/heartbeat || (echo 'Chroma health check failed' && exit 1)`
+- Start period: 600 seconds (10 minutes) - updated 2026-02-04
+- Timeout: 30 seconds - updated 2026-02-04
+- Interval: 60 seconds
+- Retries: 6
 
 ## Recommendations
 

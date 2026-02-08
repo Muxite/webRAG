@@ -162,9 +162,6 @@ def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_confi
     """
     print(f"\n=== Ensuring Exact Service Configuration ===")
     
-    if not stop_old_tasks(aws_config, service_name):
-        print("  WARN: Failed to stop old tasks (continuing anyway)")
-    
     cleanup_old_deployments(aws_config, service_name)
     
     if service_registries is None:

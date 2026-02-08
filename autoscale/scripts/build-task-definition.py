@@ -238,7 +238,17 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
         })
     
     chroma_health_command = "curl -f http://localhost:8000/api/v1/heartbeat || curl -f http://localhost:8000/ || exit 1"
-    chroma = _make_base_container("chroma", "chromadb/chroma:latest", 8000, chroma_health_command, region, start_period=600, lenient_health=True, essential=True)
+    chroma = _make_base_container(
+        "chroma",
+        "chromadb/chroma:latest",
+        8000,
+        chroma_health_command,
+        region,
+        # Align with stable configuration and ECS limit (max 300s)
+        start_period=300,
+        lenient_health=True,
+        essential=True,
+    )
     chroma["environment"] = [{"name": "IS_PERSISTENT", "value": "TRUE"}, {"name": "PERSIST_DIRECTORY", "value": "/chroma-data"}]
     
     chroma_fs_id = aws_env.get("CHROMA_EFS_FILE_SYSTEM_ID", "").strip()
@@ -263,18 +273,21 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     gateway_env["REDIS_URL"] = "redis://localhost:6379/0"
     gateway_env["CHROMA_URL"] = "http://localhost:8000"
     gateway_env["RABBITMQ_URL"] = "amqp://guest:guest@localhost:5672/"
+    gateway_env["GATEWAY_DEBUG_QUEUE_NAME"] = env_vars.get("GATEWAY_DEBUG_QUEUE_NAME", "gateway.debug")
+    gateway_env["GATEWAY_DEBUG_QUEUE_PHRASE"] = env_vars.get("GATEWAY_DEBUG_QUEUE_PHRASE", "debugdebugdebug")
     
-    gateway = _make_base_container("gateway", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway:latest", 8080, "curl -f http://localhost:8080/health || exit 1", region, start_period=600, lenient_health=True)
+    gateway = _make_base_container("gateway", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/gateway:latest", 8080, "curl -f http://localhost:8080/health || exit 1", region, start_period=300, lenient_health=True)
     gateway["dependsOn"] = [{"condition": "START", "containerName": "chroma"}, {"condition": "START", "containerName": "redis"}, {"condition": "START", "containerName": "rabbitmq"}]
     gateway["secrets"] = gateway_secrets
     gateway["environment"] = build_environment_list(gateway_env)
     
     metrics_env = {
         "QUEUE_NAME": env_vars.get("AGENT_INPUT_QUEUE", "agent.mandates"),
-        "QUEUE_DEPTH_METRICS_INTERVAL": env_vars.get("QUEUE_DEPTH_METRICS_INTERVAL", "5"),
+        "QUEUE_DEPTH_METRICS_INTERVAL": env_vars.get("QUEUE_DEPTH_METRICS_INTERVAL", "1"),
         "PUBLISH_QUEUE_DEPTH_METRICS": env_vars.get("PUBLISH_QUEUE_DEPTH_METRICS", "true"),
         "RABBITMQ_URL": "amqp://guest:guest@localhost:5672/",
-        "CLOUDWATCH_NAMESPACE": env_vars.get("CLOUDWATCH_NAMESPACE", "Euglena/RabbitMQ")
+        "CLOUDWATCH_NAMESPACE": env_vars.get("CLOUDWATCH_NAMESPACE", "Euglena/RabbitMQ"),
+        "GATEWAY_DEBUG_QUEUE_NAME": env_vars.get("GATEWAY_DEBUG_QUEUE_NAME", "gateway.debug")
     }
     metrics = _make_base_container("metrics", f"{account_id}.dkr.ecr.{region}.amazonaws.com/euglena/metrics:latest", 8082, "curl -f http://localhost:8082/health || exit 1", region, start_period=120, essential=False)
     metrics["dependsOn"] = [{"condition": "START", "containerName": "rabbitmq"}]
@@ -305,8 +318,8 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
         "volumes": volumes,
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
-        "cpu": "512",
-        "memory": "1024"
+        "cpu": "1024",
+        "memory": "2048"
     }
 
 

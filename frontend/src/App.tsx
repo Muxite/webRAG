@@ -151,117 +151,71 @@ export default function App() {
     setLoading(false);
   };
 
-  const handleBatchSkipTest = async () => {
+  const handleDebugQueueTest = async () => {
     if (!userEmail) {
-      setError('You must be logged in to run batch test');
+      setError('You must be logged in to run debug queue test');
       return;
     }
 
-    setBatchTest({
-      loading: true,
-      tasks: [],
-      completed: 0,
-      startTime: Date.now(),
-    });
+    setError('');
+
+    const debugPhrase = 'debugdebugdebug';
+    try {
+      const response = await apiClient.submitTask({
+        mandate: `${debugPhrase} test message`,
+        max_ticks: 1,
+      });
+      setError(`Debug queue test: Published 1 message to debug queue (correlation_id: ${response.correlation_id})`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to publish to debug queue';
+      if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+          const response = await apiClient.submitTask({
+            mandate: `${debugPhrase} test message`,
+            max_ticks: 1,
+          });
+          setError(`Debug queue test: Published 1 message to debug queue (correlation_id: ${response.correlation_id})`);
+        } catch (retryErr) {
+          setError(`Debug queue test failed: ${retryErr instanceof Error ? retryErr.message : 'Failed to submit after retry'}`);
+        }
+      } else {
+        setError(`Debug queue test failed: ${errorMessage}`);
+      }
+    }
+  };
+
+  const handleBatchSkipTest = async () => {
+    if (!userEmail) {
+      setError('You must be logged in to run skip test');
+      return;
+    }
+
     setError('');
 
     try {
       const skipPhrase = 'skipskipskip';
-      const tasks: Array<{ correlationId: string; status: string; result?: any }> = [];
-
-      for (let i = 0; i < 32; i++) {
+      const response = await apiClient.submitTask({
+        mandate: `${skipPhrase} test`,
+        max_ticks: 1,
+      });
+      setError(`Skip test: Published 1 message (correlation_id: ${response.correlation_id})`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to submit';
+      if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
         try {
           const response = await apiClient.submitTask({
-            mandate: `${skipPhrase} test ${i + 1}`,
+            mandate: `${skipPhrase} test`,
             max_ticks: 1,
           });
-          tasks.push({
-            correlationId: response.correlation_id,
-            status: response.status,
-          });
-        } catch (err) {
-          tasks.push({
-            correlationId: `error-${i}`,
-            status: 'error',
-            result: { error: err instanceof Error ? err.message : 'Failed to submit' },
-          });
+          setError(`Skip test: Published 1 message (correlation_id: ${response.correlation_id})`);
+        } catch (retryErr) {
+          setError(`Skip test failed: ${retryErr instanceof Error ? retryErr.message : 'Failed to submit after retry'}`);
         }
+      } else {
+        setError(`Skip test failed: ${errorMessage}`);
       }
-
-      setBatchTest((prev) => ({
-        ...prev,
-        tasks,
-      }));
-
-      batchTasksRef.current = tasks;
-
-      const pollAllTasks = () => {
-        if (batchPollIntervalRef.current) {
-          clearInterval(batchPollIntervalRef.current);
-        }
-
-        batchPollIntervalRef.current = window.setInterval(async () => {
-          const currentTasks = batchTasksRef.current;
-          
-          const updatedTasks = await Promise.all(
-            currentTasks.map(async (task) => {
-              if (task.status === 'completed' || task.status === 'error' || task.status === 'failed') {
-                return task;
-              }
-
-              try {
-                const updated = await apiClient.getTask(task.correlationId);
-                const newTask = {
-                  correlationId: task.correlationId,
-                  status: updated.status,
-                  result: updated.result,
-                };
-                batchTasksRef.current = batchTasksRef.current.map((t) =>
-                  t.correlationId === task.correlationId ? newTask : t
-                );
-                return newTask;
-              } catch (err) {
-                const newTask = {
-                  ...task,
-                  status: 'error' as const,
-                  result: { error: err instanceof Error ? err.message : 'Failed to fetch' },
-                };
-                batchTasksRef.current = batchTasksRef.current.map((t) =>
-                  t.correlationId === task.correlationId ? newTask : t
-                );
-                return newTask;
-              }
-            })
-          );
-
-          const completedCount = updatedTasks.filter(
-            (t) => t.status === 'completed' || t.status === 'error' || t.status === 'failed'
-          ).length;
-          const allCompleted = completedCount === 32;
-
-          setBatchTest((prev) => ({
-            ...prev,
-            tasks: updatedTasks,
-            completed: completedCount,
-            loading: !allCompleted,
-            endTime: allCompleted ? Date.now() : prev.endTime,
-          }));
-
-          if (allCompleted && batchPollIntervalRef.current) {
-            clearInterval(batchPollIntervalRef.current);
-            batchPollIntervalRef.current = null;
-          }
-        }, 1000);
-      };
-
-      pollAllTasks();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to run batch test');
-      setBatchTest({
-        loading: false,
-        tasks: [],
-        completed: 0,
-      });
     }
   };
 
@@ -568,7 +522,7 @@ export default function App() {
               <div className="flex gap-4 flex-wrap">
                 <button
                   onClick={handleSubmit}
-                  disabled={loading || !mandate.trim() || !userEmail || batchTest.loading}
+                  disabled={loading || !mandate.trim() || !userEmail}
                   className="px-4 py-2 bg-white text-black rounded-xl border-2 border-gray-200 disabled:opacity-50
                   font-mono active:scale-95 transition-all
                   disabled:hover:bg-white disabled:hover:border-gray-200 disabled:active:scale-100"
@@ -591,16 +545,24 @@ export default function App() {
                 </button>
                 <button
                   onClick={handleBatchSkipTest}
-                  disabled={loading || !userEmail || batchTest.loading}
+                  disabled={loading || !userEmail}
                   className="px-4 py-2 bg-yellow-500 text-black rounded-xl border-2 border-yellow-600 disabled:opacity-50
                   font-mono active:scale-95 transition-all hover:bg-yellow-400 hover:border-yellow-500"
                 >
-                  {batchTest.loading ? `Testing... (${batchTest.completed}/32)` : 'Test: 32 Skip Messages'}
+                  Skip Test
+                </button>
+                <button
+                  onClick={handleDebugQueueTest}
+                  disabled={loading || !userEmail}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-xl border-2 border-orange-600 disabled:opacity-50
+                  font-mono active:scale-95 transition-all hover:bg-orange-400 hover:border-orange-500"
+                >
+                  Debug Test
                 </button>
                 {task && (
                   <button
                     onClick={handleReset}
-                    disabled={loading || batchTest.loading}
+                    disabled={loading}
                     className="px-6 py-4 bg-black text-white rounded-xl border-4 border-gray-800 font-mono
                     hover:bg-red-600 hover:border-red-400 active:scale-95 transition-all disabled:opacity-50"
                   >
