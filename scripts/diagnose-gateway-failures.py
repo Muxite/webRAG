@@ -1,6 +1,7 @@
 """
 Diagnose gateway service failures and restarts.
 """
+import argparse
 import boto3
 import sys
 from pathlib import Path
@@ -17,8 +18,22 @@ def load_aws_config(services_dir: Path) -> dict:
     return dict(dotenv_values(str(aws_env_path)))
 
 
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Diagnose gateway failures")
+    return parser.parse_args()
+
+
 def main():
-    """Diagnose gateway failures."""
+    """
+    Diagnose gateway failures.
+    """
+    args = parse_args()
+    _ = args
     services_dir = Path.cwd()
     if (services_dir / "services").exists():
         services_dir = services_dir / "services"
@@ -33,7 +48,6 @@ def main():
     
     print("=== Gateway Service Status ===\n")
     
-    # Check service status
     response = ecs.describe_services(cluster=cluster, services=[service_name])
     services = response.get("services", [])
     
@@ -48,13 +62,11 @@ def main():
     
     print(f"Desired: {desired}, Running: {running}, Pending: {pending}")
     
-    # Recent events
     print("\n=== Recent Service Events ===")
     events = svc.get("events", [])[:10]
     for event in events:
         print(f"  {event.get('createdAt', 'N/A')}: {event.get('message', 'N/A')}")
     
-    # Check stopped tasks
     print("\n=== Stopped Tasks (Last 10) ===")
     end_time = datetime.now(timezone.utc)
     start_time = end_time - timedelta(hours=1)
@@ -90,7 +102,6 @@ def main():
     else:
         print("  No stopped tasks found")
     
-    # Check running tasks
     print("\n=== Running Tasks ===")
     response = ecs.list_tasks(cluster=cluster, serviceName=service_name, desiredStatus="RUNNING")
     running_tasks = response.get("taskArns", [])
@@ -116,7 +127,6 @@ def main():
     else:
         print("  No running tasks")
     
-    # Check recent logs
     print("\n=== Recent Gateway Logs (Last 50 lines) ===")
     log_group = "/ecs/euglena-gateway"
     
@@ -142,7 +152,6 @@ def main():
     except Exception as e:
         print(f"  Error fetching logs: {e}")
     
-    # Check task definition
     print("\n=== Current Task Definition ===")
     deployments = svc.get("deployments", [])
     primary = next((d for d in deployments if d.get("status") == "PRIMARY"), None)

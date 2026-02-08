@@ -225,7 +225,7 @@ class TaskInvestigator:
                                 })
             
             return sorted(failed_tasks, key=lambda x: x["stopped_at"], reverse=True)
-        except ClientError as e:
+        except (ClientError, Exception) as e:
             return [{"error": str(e)}]
     
     def analyze_task_failure(self, task_arn: str, target_group_arn: Optional[str] = None) -> Dict:
@@ -253,7 +253,6 @@ class TaskInvestigator:
             },
         }
         
-        # Analyze containers
         for container in task_details.get("containers", []):
             name = container.get("name")
             exit_code = container.get("exit_code")
@@ -285,7 +284,6 @@ class TaskInvestigator:
                         "Increase task memory allocation (currently may be insufficient for 5 containers)"
                     )
         
-        # Analyze stop reason
         stop_reason = task_details.get("stopped_reason", "")
         if "ELB health checks" in stop_reason:
             analysis["analysis"]["root_cause"].append("ELB health check failures")
@@ -296,7 +294,6 @@ class TaskInvestigator:
                 tg_health = self.get_target_group_health(target_group_arn)
                 analysis["target_group_health"] = tg_health
         
-        # Analyze task definition
         if task_def:
             total_memory = int(task_def.get("memory", "0"))
             container_count = len(task_def.get("containers", []))
@@ -315,7 +312,6 @@ class TaskInvestigator:
                     f"Consider increasing total memory from {total_memory} MB"
                 )
             
-            # Check for RabbitMQ container specifically
             for container in task_def.get("containers", []):
                 if "rabbitmq" in container.get("name", "").lower():
                     rabbitmq_memory = container.get("memory_reservation") or container.get("memory") or 0
@@ -379,23 +375,19 @@ def comprehensive_audit(
         "task_investigation": {},
     }
     
-    # Task-specific investigation
     if task_arn:
         investigator = TaskInvestigator(region, cluster)
         results["task_investigation"] = investigator.analyze_task_failure(task_arn, target_group_arn)
     
-    # Analyze recent failures
     investigator = TaskInvestigator(region, cluster)
     for service in ["euglena-gateway", "euglena-agent"]:
         failed_tasks = investigator.get_recent_failed_tasks(service, hours=24)
         if failed_tasks:
             results["task_investigation"][f"{service}_recent_failures"] = failed_tasks
     
-    # Analyze changes
     issues = []
     data = audit_data["data"]
     
-    # Find container count changes
     for family, revs in data["task_defs"].items():
         prev_cnt = None
         for rev in sorted(revs, key=lambda x: x["time"]):
@@ -409,7 +401,6 @@ def comprehensive_audit(
                 })
             prev_cnt = rev["containers"]
     
-    # Find resource changes
     for family, revs in data["task_defs"].items():
         prev_cpu = None
         prev_mem = None
@@ -430,8 +421,12 @@ def comprehensive_audit(
     return results
 
 
-def main():
-    """Main entry point."""
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(
         description="Comprehensive ECS audit and troubleshooting tool"
     )
@@ -463,6 +458,11 @@ def main():
         help="Output JSON file path",
     )
     parser.add_argument(
+        "--stable",
+        action="store_true",
+        help="Save results as a stable release audit",
+    )
+    parser.add_argument(
         "--region",
         type=str,
         help="AWS region (overrides aws.env)",
@@ -473,9 +473,12 @@ def main():
         help="ECS cluster name (overrides aws.env)",
     )
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main entry point."""
+    args = parse_args()
     
-    # Load AWS config
     services_dir = Path.cwd()
     if (services_dir / "services").exists():
         services_dir = services_dir / "services"
@@ -485,7 +488,6 @@ def main():
     cluster = args.cluster or aws_config.get("ECS_CLUSTER_NAME", "euglena-cluster")
     account_id = aws_config.get("AWS_ACCOUNT_ID", "")
     
-    # Parse target time
     if args.target_time:
         try:
             target_time = parse_time(args.target_time)
@@ -507,7 +509,6 @@ def main():
         print(f"Investigating task: {args.task_arn}")
     print()
     
-    # Run audit
     results = comprehensive_audit(
         target_time=target_time,
         days=args.days,
@@ -518,7 +519,6 @@ def main():
         account_id=account_id,
     )
     
-    # Print summary
     audit_data = results["summary"]
     print(f"Git commits: {audit_data['git_commits']}")
     print(f"CloudTrail events: {audit_data['cloudtrail_events']}")
@@ -526,7 +526,6 @@ def main():
     print(f"Task definitions: {sum(audit_data['task_definitions'].values())} revisions")
     print(f"Issues found: {len(results['analysis']['issues'])}")
     
-    # Print task investigation
     if results.get("task_investigation"):
         print("\n" + "=" * 80)
         print("TASK INVESTIGATION")
@@ -549,20 +548,31 @@ def main():
             for rec in results["task_investigation"]["analysis"]["recommendations"]:
                 print(f"  - {rec}")
         
-        # Recent failures
         for key, value in results["task_investigation"].items():
             if key.endswith("_recent_failures") and value:
                 service = key.replace("_recent_failures", "")
                 print(f"\nRecent failures in {service}: {len(value)}")
                 for task in value[:5]:
-                    print(f"  - {task['stopped_at'][:19]}: {task['stopped_reason'][:60]}")
+                    if "error" in task:
+                        print(f"  - error: {task['error'][:120]}")
+                    else:
+                        print(f"  - {task['stopped_at'][:19]}: {task['stopped_reason'][:60]}")
     
-    # Save results
+    output_path = None
     if args.output:
         output_path = Path(args.output)
+    elif args.stable:
+        repo_root = Path(__file__).resolve().parent.parent
+        audits_dir = repo_root / "snapshots" / "audits"
+        audits_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        output_path = audits_dir / f"audit-{timestamp}-stable.json"
+        results["release_tag"] = "stable"
+    
+    if output_path:
         with open(output_path, "w") as f:
             json.dump(results, f, indent=2, default=str)
-        print(f"\nResults saved to: {args.output}")
+        print(f"\nResults saved to: {output_path}")
     else:
         print("\nUse --output to save detailed results to JSON file")
     

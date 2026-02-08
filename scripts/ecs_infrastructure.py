@@ -376,6 +376,20 @@ class EcsInfrastructure:
         )
 
 
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Manage ECS infrastructure")
+    parser.add_argument("--region", help="AWS region")
+    parser.add_argument("--cluster", help="ECS cluster name")
+    parser.add_argument("--services-dir", type=Path, default=None,
+                       help="Services directory containing aws.env (defaults to current directory)")
+    
+    return parser.parse_args()
+
 def main():
     """
     Main entry point when run directly.
@@ -384,13 +398,7 @@ def main():
     from pathlib import Path
     from dotenv import dotenv_values
     
-    parser = argparse.ArgumentParser(description="Manage ECS infrastructure")
-    parser.add_argument("--region", help="AWS region")
-    parser.add_argument("--cluster", help="ECS cluster name")
-    parser.add_argument("--services-dir", type=Path, default=None,
-                       help="Services directory containing aws.env (defaults to current directory)")
-    
-    args = parser.parse_args()
+    args = parse_args()
     
     services_dir = args.services_dir or Path.cwd()
     aws_env_path = services_dir / "aws.env"

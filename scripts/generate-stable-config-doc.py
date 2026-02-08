@@ -44,7 +44,6 @@ def generate_markdown(config_path: str, output_path: str = "STABLE_CONFIG.md"):
             "",
         ])
     
-    # Service configurations
     for service_name, service_config in config.get("services", {}).items():
         if "error" in service_config:
             continue
@@ -107,7 +106,6 @@ def generate_markdown(config_path: str, output_path: str = "STABLE_CONFIG.md"):
                 
                 md_lines.append("")
         
-        # Service configuration
         md_lines.extend([
             "### Service Configuration",
             "",
@@ -153,7 +151,6 @@ def generate_markdown(config_path: str, output_path: str = "STABLE_CONFIG.md"):
         
         md_lines.append("")
     
-    # Target group configuration
     if "target_group" in config:
         tg = config.get("target_group")
         if "error" not in tg:
@@ -177,19 +174,46 @@ def generate_markdown(config_path: str, output_path: str = "STABLE_CONFIG.md"):
                 "",
             ])
     
-    # Write markdown file
     with open(output_path, "w") as f:
         f.write("\n".join(md_lines))
     
     print(f"Generated documentation: {output_path}")
 
 
-if __name__ == "__main__":
-    config_path = sys.argv[1] if len(sys.argv) > 1 else "stable-config.json"
-    output_path = sys.argv[2] if len(sys.argv) > 2 else "STABLE_CONFIG.md"
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: Namespace with config_path and output_path
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate stable config markdown")
+    parser.add_argument("config_path", nargs="?", help="Path to captured config JSON")
+    parser.add_argument("output_path", nargs="?", default="STABLE_CONFIG.md", help="Output markdown path")
+    return parser.parse_args()
+
+
+def main():
+    """
+    CLI entrypoint.
+
+    :returns: None
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    default_config_path = repo_root / "services" / "stable-configs" / "stable-config.json"
+    args = parse_args()
+    config_path = args.config_path or (
+        str(default_config_path) if default_config_path.exists() else "stable-config.json"
+    )
+    output_path = args.output_path or "STABLE_CONFIG.md"
     
     if not Path(config_path).exists():
         print(f"Error: {config_path} not found", file=sys.stderr)
         sys.exit(1)
     
     generate_markdown(config_path, output_path)
+
+
+if __name__ == "__main__":
+    main()

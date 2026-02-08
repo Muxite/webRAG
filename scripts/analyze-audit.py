@@ -8,17 +8,27 @@ from pathlib import Path
 
 
 def parse_time(time_str):
-    """Parse ISO time string."""
+    """
+    Parse ISO time string.
+
+    :param time_str: ISO timestamp string
+    :returns: datetime or None when parsing fails
+    """
     try:
         if "T" in time_str:
             return datetime.fromisoformat(time_str.replace("Z", "+00:00"))
         return datetime.fromisoformat(time_str)
-    except:
+    except Exception:
         return None
 
 
 def analyze_audit(json_path):
-    """Analyze audit results."""
+    """
+    Analyze audit results from a JSON snapshot.
+
+    :param json_path: Path to audit JSON file
+    :returns: None
+    """
     with open(json_path) as f:
         data = json.load(f)
     
@@ -32,7 +42,6 @@ def analyze_audit(json_path):
     if window:
         print(f"Time window: {window.get('start', 'N/A')} to {window.get('end', 'N/A')}")
     
-    # Analyze task definitions
     print("\n" + "=" * 80)
     print("TASK DEFINITION TIMELINE")
     print("=" * 80)
@@ -42,14 +51,13 @@ def analyze_audit(json_path):
     agent_tds = task_defs.get("euglena-agent", [])
     single_tds = task_defs.get("euglena", [])
     
-    # Find "good" state (around target time)
     print("\n--- GOOD STATE (around target time) ---")
     good_gateway = None
     good_agent = None
     
     for td in gateway_tds:
         reg_time = parse_time(td["registeredAt"])
-        if reg_time and abs((reg_time - target_time).total_seconds()) < 86400:  # Within 24h
+        if reg_time and abs((reg_time - target_time).total_seconds()) < 86400:
             good_gateway = td
             print(f"Gateway r{td['revision']}: {td['registeredAt']}")
             print(f"  CPU: {td['cpu']}, Memory: {td['memory']}, Containers: {td['containerCount']}")
@@ -63,10 +71,8 @@ def analyze_audit(json_path):
             print(f"  CPU: {td['cpu']}, Memory: {td['memory']}, Containers: {td['containerCount']}")
             break
     
-    # Find breaking point (first failure after good state)
     print("\n--- BREAKING POINT ANALYSIS ---")
     
-    # Gateway failures
     gateway_failures = []
     for event in data["ecs_service_events"]["euglena-gateway"]:
         msg = event["message"]
@@ -74,12 +80,11 @@ def analyze_audit(json_path):
             gateway_failures.append(event)
     
     if gateway_failures:
-        first_failure = gateway_failures[-1]  # Most recent
+        first_failure = gateway_failures[-1]
         failure_time = parse_time(first_failure["createdAt"])
         print(f"\nFirst gateway failure: {first_failure['createdAt']}")
         print(f"  Message: {first_failure['message']}")
         
-        # Find task def in use at failure time
         active_td = None
         for td in sorted(gateway_tds, key=lambda x: parse_time(x["registeredAt"]) or datetime.min, reverse=True):
             reg_time = parse_time(td["registeredAt"])
@@ -92,7 +97,6 @@ def analyze_audit(json_path):
             print(f"  Registered: {active_td['registeredAt']}")
             print(f"  CPU: {active_td['cpu']}, Memory: {active_td['memory']}, Containers: {active_td['containerCount']}")
             
-            # Compare with good state
             if good_gateway:
                 print(f"\nComparison with good state (r{good_gateway['revision']}):")
                 changes = []
@@ -108,7 +112,6 @@ def analyze_audit(json_path):
                 else:
                     print(f"  No resource changes (likely code/image issue)")
     
-    # Analyze timeline of changes
     print("\n--- TIMELINE OF CHANGES ---")
     print("\nGateway task definitions:")
     for td in sorted(gateway_tds, key=lambda x: parse_time(x["registeredAt"]) or datetime.min):
@@ -120,10 +123,8 @@ def analyze_audit(json_path):
             print(f"  r{td['revision']}: {td['registeredAt'][:16]} ({time_diff:+.1f}h) "
                   f"CPU:{td['cpu']} MEM:{td['memory']} CNT:{td['containerCount']}{marker}")
     
-    # Find suspicious changes
     print("\n--- SUSPICIOUS CHANGES ---")
     
-    # Container count changes
     prev_count = None
     for td in sorted(gateway_tds, key=lambda x: parse_time(x["registeredAt"]) or datetime.min):
         if prev_count is not None and td['containerCount'] != prev_count:
@@ -133,7 +134,6 @@ def analyze_audit(json_path):
                   f"{prev_count} -> {td['containerCount']} containers")
         prev_count = td['containerCount']
     
-    # Resource changes
     prev_cpu = None
     prev_mem = None
     for td in sorted(gateway_tds, key=lambda x: parse_time(x["registeredAt"]) or datetime.min):
@@ -145,7 +145,6 @@ def analyze_audit(json_path):
         prev_cpu = td['cpu']
         prev_mem = td['memory']
     
-    # ECR push analysis
     print("\n--- ECR IMAGE PUSHES ---")
     for repo, images in data["ecr_image_pushes"].items():
         for img in images:
@@ -155,7 +154,6 @@ def analyze_audit(json_path):
                 tags = img.get("imageTags", ["<untagged>"])[:3]
                 print(f"  {repo}: {img['imagePushedAt'][:16]} ({time_diff:+.1f}h) tags:{tags}")
     
-    # Summary
     print("\n" + "=" * 80)
     print("SUMMARY")
     print("=" * 80)
@@ -171,10 +169,8 @@ def analyze_audit(json_path):
             print(f"\n[!] Same task definition (r{good_gateway['revision']}) but failing now.")
             print(f"   This suggests AWS infrastructure or external dependency changed.")
     
-    # Key findings
     print("\n--- KEY FINDINGS ---")
     
-    # Check for container count drop
     if good_gateway:
         for td in gateway_tds:
             if td['containerCount'] < good_gateway['containerCount']:
@@ -184,7 +180,6 @@ def analyze_audit(json_path):
                           f"{good_gateway['containerCount']} -> {td['containerCount']}")
                     print(f"   This might indicate missing metrics container or other container.")
     
-    # Check for resource changes
     if good_gateway:
         for td in gateway_tds:
             reg_time = parse_time(td["registeredAt"])
@@ -197,9 +192,34 @@ def analyze_audit(json_path):
     print("\n" + "=" * 80)
 
 
-if __name__ == "__main__":
-    json_path = sys.argv[1] if len(sys.argv) > 1 else "audit_results.json"
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: Namespace with json_path
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Analyze audit results JSON")
+    parser.add_argument("json_path", nargs="?", help="Path to audit JSON file")
+    return parser.parse_args()
+
+
+def main():
+    """
+    CLI entrypoint.
+
+    :returns: None
+    """
+    args = parse_args()
+    repo_root = Path(__file__).resolve().parent.parent
+    default_path = repo_root / "snapshots" / "audits" / "audit_results.json"
+    json_path = args.json_path or (str(default_path) if default_path.exists() else "audit_results.json")
     if not Path(json_path).exists():
         print(f"Error: {json_path} not found", file=sys.stderr)
         sys.exit(1)
     analyze_audit(json_path)
+
+
+if __name__ == "__main__":
+    main()

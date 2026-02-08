@@ -371,7 +371,7 @@ def stop_old_tasks(aws_config: Dict, service_name: str) -> bool:
             print(f"  OK: Service does not exist yet (no tasks to stop)")
             return True
         print(f"  WARN: Error stopping old tasks: {e} (continuing anyway)")
-        return True  # Continue deployment even if we can't stop old tasks
+        return True
 
 
 def stop_other_mode_services(aws_config: Dict, current_mode: DeploymentMode) -> bool:
@@ -545,8 +545,8 @@ def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_confi
         task_family=task_family,
         network_config=network_config,
         desired_count=desired_count,
-        load_balancers=load_balancers,  # Explicitly set (None will remove old config)
-        service_registries=None,  # Explicitly None to remove old service discovery
+        load_balancers=load_balancers,
+        service_registries=None,
         health_check_grace_period=100,
         enable_az_rebalancing=True
     )
@@ -599,8 +599,12 @@ def wait_for_services_stable(aws_config: Dict, services: List[str], timeout: int
             print(f"    WARN: {service_name} did not stabilize within {timeout}s")
 
 
-def main():
-    """Main deployment entry point."""
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["single", "autoscale"], default="single",
                        help="Deployment mode: single (all containers) or autoscale (gateway/agent)")
@@ -611,7 +615,11 @@ def main():
     parser.add_argument("--wait", action="store_true",
                        help="Wait for services to stabilize after deployment")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main deployment entry point."""
+    args = parse_args()
     mode = DeploymentMode.from_string(args.mode)
     
     services_dir = Path.cwd()

@@ -148,13 +148,11 @@ class ConfigCapturer:
             
             service = services[0]
             
-            # Get task definition details
             task_def_arn = service.get("taskDefinition")
             task_def_config = None
             if task_def_arn:
                 task_def_config = self.get_task_definition_config(task_def_arn)
             
-            # Get load balancer config
             load_balancers = []
             for lb in service.get("loadBalancers", []):
                 load_balancers.append({
@@ -163,7 +161,6 @@ class ConfigCapturer:
                     "container_port": lb.get("containerPort"),
                 })
             
-            # Get service discovery config
             service_registries = []
             for reg in service.get("serviceRegistries", []):
                 service_registries.append({
@@ -171,7 +168,6 @@ class ConfigCapturer:
                     "port": reg.get("port"),
                 })
             
-            # Get network config
             network_config = service.get("networkConfiguration", {})
             awsvpc = network_config.get("awsvpcConfiguration", {})
             
@@ -244,21 +240,23 @@ class ConfigCapturer:
             "services": {},
         }
         
-        # Capture service configurations
         for service_name in service_names:
             service_config = self.get_service_config(service_name)
             if "error" not in service_config:
                 config["services"][service_name] = service_config
         
-        # Capture target group if provided
         if target_group_arn:
             config["target_group"] = self.get_target_group_config(target_group_arn)
         
         return config
 
 
-def main():
-    """Main entry point."""
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(
         description="Capture stable ECS configuration from AWS"
     )
@@ -291,12 +289,14 @@ def main():
         help="ECS cluster name (overrides aws.env)",
     )
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main entry point."""
+    args = parse_args()
     
-    # Load AWS config
-    services_dir = Path.cwd()
-    if (services_dir / "services").exists():
-        services_dir = services_dir / "services"
+    repo_root = Path(__file__).resolve().parent.parent
+    services_dir = repo_root / "services"
     
     aws_config = load_aws_config(services_dir)
     region = args.region or aws_config.get("AWS_REGION", "us-east-2")
@@ -312,23 +312,27 @@ def main():
         print(f"Target Group: {args.target_group_arn}")
     print()
     
-    # Capture configuration
     capturer = ConfigCapturer(region, cluster)
     config = capturer.capture_all_config(args.services, args.target_group_arn)
     
-    # Generate output filename with date if not specified
+    latest_path = None
     if args.output:
         output_path = Path(args.output)
     else:
         date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
-        output_path = Path(f"stable-config-{date_str}.json")
+        output_dir = repo_root / "services" / "stable-configs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"stable-config-{date_str}.json"
+        latest_path = output_dir / "stable-config.json"
     with open(output_path, "w") as f:
         json.dump(config, f, indent=2, default=str)
+    if latest_path:
+        with open(latest_path, "w") as f:
+            json.dump(config, f, indent=2, default=str)
     
     print(f"Configuration captured and saved to: {output_path}")
     print()
     
-    # Print summary
     print("Summary:")
     cluster_config = config.get("cluster_config", {})
     if "error" not in cluster_config:

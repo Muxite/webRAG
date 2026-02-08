@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 Verify ECS task definition and security group configuration.
+
+:returns: None
 """
 import json
 import sys
@@ -365,11 +367,16 @@ def verify_task_definition(aws_config: Dict, task_def: Optional[Dict] = None) ->
         region = aws_config.get("AWS_REGION")
         ecs_client = boto3.client("ecs", region_name=region)
         task_family = aws_config.get("ECS_SERVICE_NAME", "euglena").replace("-service", "")
-        services_dir = Path.cwd() / "services" if Path.cwd().name != "services" else Path.cwd()
-        task_def_file = services_dir / "task-definition-euglena.json"
+        repo_root = Path(__file__).resolve().parent.parent
+        services_dir = repo_root / "services"
+        task_def_dir = services_dir / "task-definitions"
+        task_def_file = task_def_dir / "task-definition-euglena.json"
+        legacy_task_def_file = services_dir / "task-definition-euglena.json"
         
         if task_def_file.exists():
             task_def = load_task_definition_from_file(task_def_file)
+        elif legacy_task_def_file.exists():
+            task_def = load_task_definition_from_file(legacy_task_def_file)
         else:
             task_def = get_task_definition_from_aws(ecs_client, task_family)
     
@@ -570,8 +577,12 @@ def verify_security_groups(aws_config: Dict) -> int:
         return 0
 
 
-def main():
-    """Main entry point."""
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(description="Verify ECS task definition and security group configuration")
     parser.add_argument("--mode", choices=["task-def", "security-groups", "all"], default="all",
                        help="Verification mode (default: all)")
@@ -579,7 +590,11 @@ def main():
     parser.add_argument("--file", help="Path to task definition JSON file (overrides AWS lookup)")
     parser.add_argument("--from-aws", action="store_true", help="Get task definition from AWS instead of local file")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main entry point."""
+    args = parse_args()
     
     aws_config = load_aws_config()
     
