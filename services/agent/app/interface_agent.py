@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import os
 from typing import Optional, Dict, Any
+import aiohttp
 
 from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
@@ -12,6 +14,7 @@ from shared.message_contract import (
     to_dict,
 )
 from shared.worker_presence import WorkerPresence
+from shared.worker_state import WorkerState
 from agent.app.agent import Agent
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
@@ -35,6 +38,7 @@ class InterfaceAgent:
         self.rabbitmq = ConnectorRabbitMQ(self.config)
         self.storage = RedisTaskStorage(self.config)
         self._presence = WorkerPresence(self.config, worker_type="agent")
+        self._state = WorkerState(self.config, worker_type="agent", worker_id=self._presence.worker_id)
         
         self.connector_llm = ConnectorLLM(self.config)
         self.connector_search = ConnectorSearch(self.config)
@@ -44,6 +48,7 @@ class InterfaceAgent:
         self._consumer_task: Optional[asyncio.Task] = None
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._presence_task: Optional[asyncio.Task] = None
+        self._waiting_task: Optional[asyncio.Task] = None
         self.agent: Optional[Agent] = None
         self.correlation_id: Optional[str] = None
         self.mandate: Optional[str] = None
@@ -101,6 +106,7 @@ class InterfaceAgent:
         self._consumer_task = asyncio.create_task(
             self.rabbitmq.consume_queue(self.config.input_queue, self._handle_task)
         )
+        await self._set_worker_state("free")
         self.worker_ready = True
         self.logger.info(f"InterfaceAgent started; consuming '{self.config.input_queue}'")
 
@@ -134,6 +140,19 @@ class InterfaceAgent:
                 pass
             self._presence_task = None
 
+        if self._waiting_task:
+            self._waiting_task.cancel()
+            try:
+                await self._waiting_task
+            except asyncio.CancelledError:
+                pass
+            self._waiting_task = None
+
+        try:
+            await self._state.delete_state()
+        except Exception:
+            pass
+
         try:
             await self.rabbitmq.disconnect()
         except Exception as e:
@@ -156,8 +175,138 @@ class InterfaceAgent:
         self.worker_ready = False
         self.logger.info("InterfaceAgent stopped")
 
+    def _working_ttl_seconds(self) -> int:
+        """
+        Compute TTL for working/free state updates.
+
+        :returns: TTL seconds
+        """
+        return int(max(self.config.status_time * 3, 60))
+
+    def _waiting_seconds(self) -> int:
+        """
+        Duration to remain in waiting state before switching to free.
+
+        :returns: Waiting duration in seconds
+        """
+        return int(os.environ.get("AGENT_IDLE_WAIT_SECONDS", "360"))
+
+    async def _set_worker_state(self, state: str, ttl_seconds: Optional[int] = None) -> None:
+        """
+        Update worker state in Redis with TTL.
+
+        :param state: State value
+        :param ttl_seconds: Optional TTL override
+        :returns: None
+        """
+        ttl = ttl_seconds if ttl_seconds is not None else self._working_ttl_seconds()
+        try:
+            await self._state.set_state(state, ttl_seconds=ttl)
+        except Exception:
+            pass
+
+    async def _enter_waiting_state(self) -> None:
+        """
+        Transition to waiting state, then free after the wait window.
+
+        :returns: None
+        """
+        wait_seconds = self._waiting_seconds()
+        await self._set_worker_state("waiting", ttl_seconds=wait_seconds + 60)
+
+        async def _wait_and_free() -> None:
+            try:
+                await asyncio.sleep(wait_seconds)
+                await self._set_worker_state("free")
+            except asyncio.CancelledError:
+                return
+
+        if self._waiting_task:
+            self._waiting_task.cancel()
+            try:
+                await self._waiting_task
+            except asyncio.CancelledError:
+                pass
+        self._waiting_task = asyncio.create_task(_wait_and_free())
+
+    async def _cancel_waiting_state(self) -> None:
+        """
+        Cancel waiting timer when new work starts.
+
+        :returns: None
+        """
+        if self._waiting_task:
+            self._waiting_task.cancel()
+            try:
+                await self._waiting_task
+            except asyncio.CancelledError:
+                pass
+            self._waiting_task = None
+
+    async def _test_connectivity(self) -> Dict[str, bool]:
+        """
+        Test connectivity to all required services.
+        
+        :returns: Dictionary with connectivity status for each service.
+        """
+        connectivity = {
+            "rabbitmq": False,
+            "redis": False,
+            "chroma": False,
+            "external_api": False
+        }
+        
+        try:
+            if self.rabbitmq.is_ready():
+                connectivity["rabbitmq"] = True
+                self.logger.info("  OK: RabbitMQ connected")
+            else:
+                self.logger.warning("  FAIL: RabbitMQ not connected")
+        except Exception as e:
+            self.logger.warning(f"  FAIL: RabbitMQ check failed: {e}")
+        
+        try:
+            if self.storage.connector.redis_ready:
+                client = await self.storage.connector.get_client()
+                if client:
+                    await client.ping()
+                    connectivity["redis"] = True
+                    self.logger.info("  OK: Redis connected")
+                else:
+                    self.logger.warning("  FAIL: Redis client not available")
+            else:
+                self.logger.warning("  FAIL: Redis not connected")
+        except Exception as e:
+            self.logger.warning(f"  FAIL: Redis check failed: {e}")
+        
+        try:
+            if self.connector_chroma.chroma_api_ready:
+                connectivity["chroma"] = True
+                self.logger.info("  OK: Chroma connected")
+            else:
+                self.logger.warning("  FAIL: Chroma not connected")
+        except Exception as e:
+            self.logger.warning(f"  FAIL: Chroma check failed: {e}")
+        
+        try:
+            test_url = "https://www.google.com"
+            timeout = aiohttp.ClientTimeout(total=5)
+            result = await self.connector_http.request("GET", test_url, timeout=timeout, retries=1)
+            if result and not result.error and result.status == 200:
+                connectivity["external_api"] = True
+                self.logger.info("  OK: External API access working")
+            else:
+                status = result.status if result else None
+                error = result.error if result else True
+                self.logger.warning(f"  FAIL: External API returned status {status}, error={error}")
+        except Exception as e:
+            self.logger.warning(f"  FAIL: External API check failed: {e}")
+        
+        return connectivity
+
     async def _handle_task(self, payload: Dict[str, Any]) -> None:
         """Processes a single task from the queue."""
+
         self.logger.debug("Received task payload", extra={"payload": payload})
         self.correlation_id = payload.get(KeyNames.CORRELATION_ID)
         self.mandate = payload.get(KeyNames.MANDATE)
@@ -165,6 +314,54 @@ class InterfaceAgent:
 
         if not self.correlation_id or not self.mandate:
             self.logger.warning("Invalid task payload, missing mandate or correlation_id")
+            return
+
+        skip_phrase = os.environ.get("AGENT_SKIP_PHRASE", "skipskipskip")
+
+        await self._cancel_waiting_state()
+        await self._set_worker_state("working")
+        
+        if skip_phrase and skip_phrase.lower() in self.mandate.lower():
+            self.logger.info(
+                f"SKIP MODE: Mandate contains skip phrase '{skip_phrase}' - testing connectivity only",
+                extra={
+                    "correlation_id": self.correlation_id,
+                    "mandate": (self.mandate[:200] + "…") if isinstance(self.mandate, str) and len(self.mandate) > 200 else self.mandate,
+                },
+            )
+            await self._publish_status(StatusType.ACCEPTED, max_ticks=max_ticks)
+            await self._publish_status(StatusType.STARTED, max_ticks=max_ticks)
+            
+            self.logger.info("=== Testing Connectivity ===")
+            connectivity = await self._test_connectivity()
+            
+            all_connected = all(connectivity.values())
+            status_msg = "All services connected" if all_connected else "Some services not connected"
+            
+            skip_delay_seconds = int(os.environ.get("AGENT_SKIP_DELAY_SECONDS", "10"))
+            self.logger.info(f"SKIP MODE: Waiting {skip_delay_seconds}s to allow queue to fill up for testing...")
+            await asyncio.sleep(skip_delay_seconds)
+            
+            result_msg = f"SKIP MODE: {status_msg}\n"
+            result_msg += f"RabbitMQ: {'✓' if connectivity['rabbitmq'] else '✗'}\n"
+            result_msg += f"Redis: {'✓' if connectivity['redis'] else '✗'}\n"
+            result_msg += f"Chroma: {'✓' if connectivity['chroma'] else '✗'}\n"
+            result_msg += f"External API: {'✓' if connectivity['external_api'] else '✗'}\n"
+            
+            completion = CompletionResult(
+                correlation_id=self.correlation_id,
+                success=all_connected,
+                deliverables=[result_msg],
+                notes=f"Connectivity test results: {connectivity}"
+            )
+            
+            self.logger.info(f"SKIP MODE: Connectivity test complete - {status_msg}")
+            await self._publish_status(
+                StatusType.COMPLETED,
+                max_ticks=max_ticks,
+                result=completion.result(),
+            )
+            await self._enter_waiting_state()
             return
 
         self.logger.info(
@@ -238,6 +435,7 @@ class InterfaceAgent:
             self.agent = None
             self.correlation_id = None
             self.mandate = None
+            await self._enter_waiting_state()
 
     async def _publish_status(self, status_type: StatusType, **kwargs) -> None:
         """Publishes a status update for the current task."""
@@ -322,6 +520,7 @@ class InterfaceAgent:
                     notes_len=len(self.agent.notes),
                     deliverables_count=len(self.agent.deliverables),
                 )
+                await self._set_worker_state("working")
                 await asyncio.sleep(interval)
         except asyncio.CancelledError:
             return

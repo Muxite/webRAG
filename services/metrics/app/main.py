@@ -1,0 +1,260 @@
+import asyncio
+import logging
+import os
+from typing import Optional
+
+import boto3
+from botocore.exceptions import ClientError
+from aiohttp import web
+
+from shared.connector_config import ConnectorConfig
+from shared.connector_rabbitmq import ConnectorRabbitMQ
+from shared.health import HealthMonitor
+from shared.pretty_log import setup_service_logger, log_connection_status
+from shared.queue_metrics import QUEUE_DEPTH_METRIC
+
+
+_rabbitmq_connector = None
+
+def get_health_handler():
+    """
+    Get health check handler with properly initialized logger.
+    
+    :returns: Health check handler function.
+    """
+    logger = setup_service_logger("Metrics", logging.INFO)
+    
+    async def health_handler(request):
+        """
+        Health check endpoint handler.
+        
+        :param request: HTTP request object.
+        :returns: JSON response with health status.
+        """
+        monitor = HealthMonitor(service="metrics", version="0.1.0", logger=logger)
+        monitor.set_component("process", True)
+        monitor.set_component("rabbitmq", _rabbitmq_connector.is_ready() if _rabbitmq_connector else False)
+        monitor.log_status()
+        
+        from aiohttp import web
+        return web.json_response(monitor.payload())
+    
+    return health_handler
+
+
+async def _init_cloudwatch_client(logger: logging.Logger, namespace: str) -> Optional[object]:
+    """
+    Initialize CloudWatch client if boto3 and credentials are available.
+
+    :param logger: Logger instance for diagnostics.
+    :param namespace: CloudWatch namespace for metrics.
+    :returns: CloudWatch client instance or None when unavailable.
+    """
+
+    try:
+        logger.info("Initializing CloudWatch client...")
+        session = boto3.Session()
+        credentials = session.get_credentials()
+        if credentials:
+            client = boto3.client("cloudwatch")
+            log_connection_status(logger, "CloudWatch", "CONNECTED", {"namespace": namespace})
+            return client
+        else:
+            logger.warning(
+                "CloudWatch metrics enabled but no AWS credentials found. "
+                "Ensure task role has cloudwatch:PutMetricData permission."
+            )
+            return None
+    except Exception as exc:
+        logger.error(f"Failed to initialize CloudWatch client: {exc}", exc_info=True)
+        return None
+
+
+async def _publish_queue_depth_loop() -> None:
+    """
+    Periodically check RabbitMQ queue depth and publish to CloudWatch.
+    Checks multiple queues (agent.mandates and gateway.debug) every second.
+
+    :returns: None
+    """
+    global _rabbitmq_connector
+    
+    logger = setup_service_logger("MetricsService", logging.INFO)
+    cfg = ConnectorConfig()
+
+    interval_s = int(os.environ.get("QUEUE_DEPTH_METRICS_INTERVAL", "5"))
+    cloudwatch_enabled = os.environ.get("PUBLISH_QUEUE_DEPTH_METRICS", "true").lower() in ("1", "true", "yes")
+    namespace = os.environ.get("CLOUDWATCH_NAMESPACE", QUEUE_DEPTH_METRIC.namespace)
+    storage_resolution = os.environ.get("CLOUDWATCH_METRIC_STORAGE_RESOLUTION")
+    if storage_resolution is None:
+        storage_resolution = "1" if interval_s < 60 else "60"
+    try:
+        storage_resolution_value = int(storage_resolution)
+        if storage_resolution_value not in (1, 60):
+            storage_resolution_value = 60
+    except ValueError:
+        storage_resolution_value = 60
+    
+    primary_queue = os.environ.get("QUEUE_NAME", cfg.input_queue)
+    debug_queue = cfg.gateway_debug_queue_name
+    queue_names = [primary_queue, debug_queue]
+
+    logger.info(f"Starting metrics: queues={queue_names}, interval={interval_s}s, cloudwatch={cloudwatch_enabled}")
+    
+    rabbitmq = ConnectorRabbitMQ(cfg)
+    _rabbitmq_connector = rabbitmq
+
+    try:
+        await rabbitmq.connect()
+        log_connection_status(logger, "RabbitMQ", "CONNECTED", {"queues": queue_names})
+    except Exception as exc:
+        logger.error(f"Failed to connect to RabbitMQ: {exc}", exc_info=True)
+        return
+
+    cloudwatch = None
+    if cloudwatch_enabled:
+        cloudwatch = await _init_cloudwatch_client(logger, namespace)
+        if cloudwatch is None:
+            logger.warning("CloudWatch unavailable, metrics will only be logged")
+    else:
+        logger.info("CloudWatch publishing disabled, metrics will only be logged")
+
+    try:
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+
+        while True:
+            try:
+                if not rabbitmq.is_ready():
+                    logger.warning(f"RabbitMQ not ready, reconnecting: queues={queue_names}")
+                    try:
+                        await rabbitmq.connect()
+                        log_connection_status(logger, "RabbitMQ", "RECONNECTED", {"queues": queue_names})
+                    except Exception as reconnect_exc:
+                        logger.error(f"RabbitMQ reconnect failed: {reconnect_exc}", exc_info=True)
+                        consecutive_failures += 1
+                        if consecutive_failures >= max_consecutive_failures:
+                            logger.error(f"Too many consecutive failures ({consecutive_failures}), retrying after interval")
+                        await asyncio.sleep(max(1, interval_s))
+                        continue
+
+                metric_data = []
+                queue_results = {}
+
+                for queue_name in queue_names:
+                    try:
+                        depth = await rabbitmq.get_queue_depth(queue_name)
+                        if depth is None:
+                            consecutive_failures += 1
+                            logger.warning(
+                                f"Queue backlog check returned None: queue={queue_name}, "
+                                f"consecutive_failures={consecutive_failures}, reconnecting..."
+                            )
+                            try:
+                                await rabbitmq.connect()
+                                depth = await rabbitmq.get_queue_depth(queue_name)
+                            except Exception as reconnect_exc:
+                                logger.error(f"Queue backlog reconnect failed: {reconnect_exc}", exc_info=True)
+                                if consecutive_failures >= max_consecutive_failures:
+                                    logger.error(f"Too many consecutive failures ({consecutive_failures})")
+                                queue_results[queue_name] = None
+                                continue
+                        else:
+                            consecutive_failures = 0
+
+                        queue_results[queue_name] = depth
+
+                        if depth is not None:
+                            logger.info(
+                                f"Queue depth: queue={queue_name}, depth={depth}"
+                            )
+
+                            if cloudwatch_enabled and cloudwatch is not None:
+                                metric_data.extend([
+                                    {
+                                        "MetricName": QUEUE_DEPTH_METRIC.metric_name,
+                                        "Dimensions": QUEUE_DEPTH_METRIC.dimensions(queue_name),
+                                        "Unit": "Count",
+                                        "Value": float(depth),
+                                        "StorageResolution": storage_resolution_value,
+                                    },
+                                ])
+                        else:
+                            logger.warning(f"Queue depth unavailable after reconnect: queue={queue_name}")
+                            queue_results[queue_name] = None
+                    except Exception as e:
+                        logger.warning(
+                            "Queue depth check error",
+                            extra={"queue": queue_name, "error": str(e), "error_type": type(e).__name__, "service": "metrics"},
+                            exc_info=True
+                        )
+                        queue_results[queue_name] = None
+
+                if not any(v is not None for v in queue_results.values()):
+                    logger.warning(f"All queue checks failed: {queue_results}")
+
+                if cloudwatch_enabled and cloudwatch is not None and metric_data:
+                    try:
+                        await asyncio.to_thread(
+                            cloudwatch.put_metric_data,
+                            Namespace=namespace,
+                            MetricData=metric_data,
+                        )
+                        logger.debug(f"Published to CloudWatch: queues={queue_names}")
+                    except ClientError as exc:
+                        logger.warning(f"CloudWatch publish failed: {exc}")
+                    except Exception as exc:
+                        logger.warning(f"CloudWatch error: {exc}")
+
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.error(f"Metrics loop error: {exc}", exc_info=True)
+
+            await asyncio.sleep(max(1, interval_s))
+    finally:
+        try:
+            await rabbitmq.disconnect()
+        except Exception:
+            pass
+
+
+async def main() -> None:
+    """
+    Entry point for metrics service that reports RabbitMQ queue depth.
+
+    :returns: None
+    """
+
+    logger = setup_service_logger("Metrics", logging.INFO)
+    logger.info("Starting Metrics Service...")
+
+    app = web.Application()
+    app.router.add_get("/health", get_health_handler())
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8082)
+    await site.start()
+    logger.info("Metrics health check server started on port 8082")
+
+    metrics_task = None
+    try:
+        metrics_task = asyncio.create_task(_publish_queue_depth_loop())
+        await metrics_task
+    except asyncio.CancelledError:
+        logger.info("Metrics service cancelled")
+    except Exception as exc:
+        logger.error(f"Metrics service error: {exc}", exc_info=True)
+    finally:
+        if metrics_task and not metrics_task.done():
+            metrics_task.cancel()
+            try:
+                await metrics_task
+            except asyncio.CancelledError:
+                pass
+        await runner.cleanup()
+        logger.info("Metrics service stopped")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
