@@ -59,7 +59,6 @@ def snapshot_task_definitions(region: str, families: List[str]) -> Dict:
     task_defs = {}
     
     for family in families:
-        # Get latest revision
         latest = run_aws_command([
             "aws", "ecs", "describe-task-definition",
             "--task-definition", family,
@@ -69,7 +68,6 @@ def snapshot_task_definitions(region: str, families: List[str]) -> Dict:
         ])
         
         if latest:
-            # Also get all revisions
             revisions = run_aws_command([
                 "aws", "ecs", "list-task-definitions",
                 "--family-prefix", family,
@@ -119,7 +117,6 @@ def snapshot_ecs_services(region: str, cluster: str, services: List[str]) -> Dic
                 "recentEvents": svc.get("events", [])[:10]
             }
             
-            # Get running tasks
             tasks = run_aws_command([
                 "aws", "ecs", "list-tasks",
                 "--cluster", cluster,
@@ -168,7 +165,6 @@ def snapshot_load_balancer(region: str, target_group_arn: str) -> Dict:
     """Snapshot ALB target group configuration."""
     print("  Snapshotting load balancer configuration...")
     
-    # Extract target group name from ARN
     tg_name = target_group_arn.split("/")[-1] if "/" in target_group_arn else target_group_arn
     
     tg = run_aws_command([
@@ -196,7 +192,6 @@ def snapshot_load_balancer(region: str, target_group_arn: str) -> Dict:
             "matcher": tg_info.get("Matcher")
         }
         
-        # Get target health
         health = run_aws_command([
             "aws", "elbv2", "describe-target-health",
             "--target-group-arn", target_group_arn,
@@ -214,7 +209,6 @@ def snapshot_service_discovery(region: str, namespace_name: str) -> Dict:
     """Snapshot Cloud Map service discovery configuration."""
     print("  Snapshotting service discovery...")
     
-    # Get namespace
     namespaces = run_aws_command([
         "aws", "servicediscovery", "list-namespaces",
         "--region", region,
@@ -233,7 +227,6 @@ def snapshot_service_discovery(region: str, namespace_name: str) -> Dict:
                 "type": ns.get("Type")
             }
             
-            # Get services in namespace
             services = run_aws_command([
                 "aws", "servicediscovery", "list-services",
                 "--filters", f"Name=NAMESPACE_ID,Values={ns_id}",
@@ -287,7 +280,6 @@ def snapshot_iam_roles(region: str, role_names: List[str]) -> Dict:
                 "assumeRolePolicyDocument": r.get("AssumeRolePolicyDocument")
             }
             
-            # Get attached policies (names only)
             policies = run_aws_command([
                 "aws", "iam", "list-attached-role-policies",
                 "--role-name", role_name,
@@ -382,7 +374,6 @@ def snapshot_network(region: str, vpc_id: str) -> Dict:
             "state": vpc_info.get("State")
         }
         
-        # Get subnets
         subnets = run_aws_command([
             "aws", "ec2", "describe-subnets",
             "--filters", f"Name=vpc-id,Values={vpc_id}",
@@ -401,7 +392,6 @@ def snapshot_network(region: str, vpc_id: str) -> Dict:
                 for s in subnets.get("Subnets", [])
             ]
         
-        # Get security groups
         sgs = run_aws_command([
             "aws", "ec2", "describe-security-groups",
             "--filters", f"Name=vpc-id,Values={vpc_id}",
@@ -429,7 +419,6 @@ def snapshot_environment(services_dir: Path) -> Dict:
     print("  Snapshotting environment configuration...")
     env_data = {}
     
-    # Load but redact secrets
     for env_file in ["aws.env", ".env", "keys.env"]:
         env_path = services_dir / env_file
         if env_path.exists():
@@ -439,23 +428,30 @@ def snapshot_environment(services_dir: Path) -> Dict:
     return env_data
 
 
-def main():
-    """Create deployment snapshot."""
-    import argparse
-    
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(description="Create deployment snapshot")
     parser.add_argument("--mode", choices=["single", "autoscale"], default="autoscale",
                        help="Deployment mode")
-    parser.add_argument("--output-dir", type=str, default="deployment-snapshots",
+    parser.add_argument("--output-dir", type=str, default="snapshots/deployment",
                        help="Output directory for snapshots")
     parser.add_argument("--cluster", type=str, help="ECS cluster name (overrides aws.env)")
     parser.add_argument("--region", type=str, help="AWS region (overrides aws.env)")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Create deployment snapshot."""
+    import argparse
     
-    services_dir = Path.cwd()
-    if (services_dir / "services").exists():
-        services_dir = services_dir / "services"
+    args = parse_args()
+    
+    repo_root = Path(__file__).resolve().parent.parent
+    services_dir = repo_root / "services"
     
     aws_config = load_aws_config(services_dir)
     
@@ -463,7 +459,6 @@ def main():
     cluster = args.cluster or aws_config.get("ECS_CLUSTER_NAME", "euglena-cluster")
     account_id = aws_config.get("AWS_ACCOUNT_ID", "")
     
-    # Determine services based on mode
     if args.mode == "autoscale":
         services = ["euglena-gateway", "euglena-agent"]
         task_families = ["euglena-gateway", "euglena-agent"]
@@ -471,25 +466,20 @@ def main():
         services = ["euglena"]
         task_families = ["euglena"]
     
-    # Get target group ARN from aws.env or service
     target_group_arn = aws_config.get("TARGET_GROUP_ARN", "")
     if not target_group_arn:
-        # Try to get from service
         svc_data = snapshot_ecs_services(region, cluster, services[:1])
         if services[0] in svc_data and svc_data[services[0]].get("loadBalancers"):
             target_group_arn = svc_data[services[0]]["loadBalancers"][0].get("targetGroupArn", "")
     
-    # Get EFS IDs
     efs_ids = []
     for key in ["EFS_FILE_SYSTEM_ID", "CHROMA_EFS_FILE_SYSTEM_ID", "RABBITMQ_EFS_FILE_SYSTEM_ID"]:
         if aws_config.get(key):
             efs_ids.append(aws_config[key])
-    efs_ids = list(set(efs_ids))  # Deduplicate
+    efs_ids = list(set(efs_ids))
     
-    # Get VPC ID
     vpc_id = aws_config.get("VPC_ID", "")
     if not vpc_id:
-        # Try to get from cluster
         cluster_info = run_aws_command([
             "aws", "ecs", "describe-clusters",
             "--clusters", cluster,
@@ -497,12 +487,9 @@ def main():
             "--include", "CONFIGURATIONS",
             "--no-cli-pager"
         ])
-        # VPC would be in network config, but we'll skip if not available
     
-    # Get IAM roles
     iam_roles = ["ecsTaskRole", "ecsTaskExecutionRole"]
     
-    # Get ECR repos
     ecr_repos = ["gateway", "agent", "metrics"]
     if args.mode == "single":
         ecr_repos = ["gateway", "agent"]
@@ -528,9 +515,10 @@ def main():
         "environment": snapshot_environment(services_dir)
     }
     
-    # Write snapshot
     output_dir = Path(args.output_dir)
-    output_dir.mkdir(exist_ok=True)
+    if not output_dir.is_absolute():
+        output_dir = repo_root / output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"snapshot_{args.mode}_{timestamp_str}.json"
@@ -542,7 +530,6 @@ def main():
     print(f"\nSnapshot saved to: {output_path}")
     print(f"Size: {output_path.stat().st_size / 1024:.2f} KB")
     
-    # Also create a summary
     summary = {
         "timestamp": snapshot["timestamp"],
         "mode": args.mode,

@@ -1,47 +1,38 @@
 # Architecture
 
 ## Components
+- `frontend/`: React UI with Supabase auth
+- `services/gateway/`: FastAPI gateway and task intake
+- `services/agent/`: Worker that executes the reasoning loop
+- `services/shared/`: Connectors and storage helpers
+- `services/metrics/`: QueueDepth publisher
+- `services/lambda_autoscaling/`: ECS autoscaler
 
-- **`frontend/`**: React web interface with Supabase authentication, task submission UI, and real-time status polling
-- **`agent/`**: Worker that consumes tasks from RabbitMQ, executes agent logic, and writes status to Redis
-- **`gateway/`**: FastAPI service that accepts tasks, publishes to RabbitMQ, and serves status from Redis
-- **`shared/`**: Common utilities (config, connectors, models, retry helpers)
+## Message Flow
+1. Client submits task to `gateway /tasks` with JWT
+2. Gateway validates auth/quota, stores initial task state, publishes `TaskEnvelope` to RabbitMQ
+3. Agent consumes a task, emits status updates, and writes status to Redis
+4. Gateway serves task status from Redis at `/tasks/{id}`
+5. Metrics service publishes QueueDepth to CloudWatch
+6. Lambda autoscaler reads QueueDepth and adjusts agent ECS desired count
 
-## Runtime Flow
+## Queues and Stores
+- RabbitMQ: `agent.mandates` (tasks), `agent.status` (status updates)
+- Redis: task status, worker presence, worker state
+- ChromaDB: long-term context storage
+- Supabase: authenticated task history and quotas
 
-1. Client submits task via gateway `/tasks` endpoint with Supabase JWT token
-2. Gateway validates authentication and quota, stores `pending` state in Redis and publishes `TaskEnvelope` to RabbitMQ
-3. Agent worker consumes task and runs ticked loop:
-   - Emits `accepted` → `started` → periodic `in_progress` → `completed`/`error`
-   - Writes latest state to Redis on each transition
-   - Publishes status updates to RabbitMQ
-4. Gateway serves `/tasks/{id}` by reading from Redis
+## Status and Worker State
+- Task states: `pending` → `accepted` → `in_progress` → `completed`/`error`
+- Worker states: `free`, `working`, `waiting`
+- Waiting window keeps a worker alive for short bursts before scaling in
 
-## Key Modules
+## Autoscaling Signals
+- QueueDepth metric drives desired count
+- Worker state in Redis blocks scale-in for `working` or `waiting` workers
+- Minimum worker count and target-per-worker rules enforce baseline capacity
 
-**Agent Worker** (`interface_agent.py`): Consumes RabbitMQ tasks, initializes and reuses connectors via dependency injection, verifies dependencies ready before consuming, runs Agent per task, publishes status, maintains presence, handles graceful shutdown
-
-**Agent Core** (`agent.py`): Ticked loop with LLM calls, action execution (search/visit/think/exit), ChromaDB storage/retrieval, connectors injected for reuse
-
-**Gateway Service** (`gateway_service.py`, `api.py`): FastAPI with Supabase auth, Redis task storage, RabbitMQ publishing, per-user quota enforcement
-
-## Dependency Injection Pattern
-
-Connectors (LLM, Search, HTTP, Chroma) created once in InterfaceAgent, reused across mandates. Reduces overhead, improves utilization, maintains persistent connections, ensures readiness before processing.
-
-## Status States
-
-- `pending` → initial state
-- `accepted` → task acknowledged
-- `started` → agent constructed
-- `in_progress` → periodic heartbeat with tick info
-- `completed` → success with result
-- `error` → failure with error details
-
-## Configuration
-
-Environment variables (see `services/.env` and `services/keys.env`):
-- `RABBITMQ_URL`, `REDIS_URL`, `CHROMA_URL`, `GATEWAY_URL`
-- `MODEL_API_URL`, `OPENAI_API_KEY`, `SEARCH_API_KEY`
-- `AGENT_STATUS_TIME`, `AGENT_INPUT_QUEUE`, `AGENT_STATUS_QUEUE`
-- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`
+## Failure Handling
+- Connector readiness checks before consuming tasks
+- Retry helpers around external services
+- Graceful shutdown for agent and connectors

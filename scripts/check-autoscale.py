@@ -422,8 +422,12 @@ def check_task_definitions(aws_config: Dict, service_names: List[str]):
             print(f"  FAIL: {service_name} - {e}")
 
 
-def main():
-    """Main entry point."""
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(description="Check autoscale deployment health")
     parser.add_argument("--service", choices=["gateway", "agent", "all"], default="all",
                        help="Service to check (default: all)")
@@ -438,7 +442,11 @@ def main():
     parser.add_argument("--task-defs", action="store_true",
                        help="Show task definition details")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main entry point."""
+    args = parse_args()
     
     services_dir = Path.cwd()
     if not (services_dir / "aws.env").exists():

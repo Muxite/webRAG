@@ -1,6 +1,7 @@
 """
 Enable VPC DNS resolution and support for service discovery.
 """
+import argparse
 import boto3
 import sys
 from pathlib import Path
@@ -11,8 +12,22 @@ except ImportError:
     from deploy_common import load_aws_config
 
 
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Enable VPC DNS settings")
+    return parser.parse_args()
+
+
 def main():
-    """Enable VPC DNS."""
+    """
+    Enable VPC DNS.
+    """
+    args = parse_args()
+    _ = args
     services_dir = Path.cwd()
     if (services_dir / "services").exists():
         services_dir = services_dir / "services"
@@ -25,7 +40,6 @@ def main():
     
     print("=== Fixing VPC DNS Configuration ===\n")
     
-    # Get VPC from ECS service
     cluster = aws_config["ECS_CLUSTER"]
     response = ecs.describe_services(cluster=cluster, services=["euglena-gateway"])
     services = response.get("services", [])
@@ -46,7 +60,6 @@ def main():
     
     print(f"VPC ID: {vpc_id}")
     
-    # Check current DNS settings
     vpc = ec2.describe_vpcs(VpcIds=[vpc_id])["Vpcs"][0]
     dns_resolution = vpc.get("EnableDnsHostnames", {}).get("Value", False)
     dns_support = vpc.get("EnableDnsSupport", {}).get("Value", False)
@@ -54,7 +67,6 @@ def main():
     print(f"Current DNS Resolution: {dns_resolution}")
     print(f"Current DNS Support: {dns_support}")
     
-    # Enable DNS if needed
     if not dns_resolution:
         print("\nEnabling DNS Resolution...")
         ec2.modify_vpc_attribute(VpcId=vpc_id, EnableDnsHostnames={"Value": True})

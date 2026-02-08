@@ -33,8 +33,12 @@ except ImportError:
     from efs_manager import EfsManager
 
 
-def main():
-    """Main deployment entry point for autoscale mode."""
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(description="Deploy autoscale mode")
     parser.add_argument("--skip-ecr", action="store_true",
                        help="Skip building and pushing images to ECR (use existing images)")
@@ -43,7 +47,11 @@ def main():
     parser.add_argument("--wait", action="store_true",
                        help="Wait for services to stabilize after deployment")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main deployment entry point for autoscale mode."""
+    args = parse_args()
     
     services_dir = Path.cwd()
     if not (services_dir / "aws.env").exists():

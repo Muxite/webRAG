@@ -1,6 +1,7 @@
 """
 Add IAM permissions for ECS task protection and EFS access.
 """
+import argparse
 import boto3
 import sys
 import json
@@ -304,10 +305,22 @@ def add_cloudwatch_permissions(aws_config: dict) -> bool:
         return False
 
 
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Add IAM permissions for ECS and EFS")
+    return parser.parse_args()
+
+
 def main():
     """
     Main entry point.
     """
+    args = parse_args()
+    _ = args
     services_dir = Path.cwd()
     if not (services_dir / "aws.env").exists():
         print(f"Error: aws.env not found in current directory ({services_dir})")

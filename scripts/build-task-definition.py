@@ -737,13 +737,12 @@ def register_task_definition(task_def_path, region):
         return False
 
 
-def main():
+def parse_args():
     """
-    Generates and registers ECS task definitions.
-    Supports both single service and autoscale gateway/agent modes.
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
     """
-    import argparse
-    
     parser = argparse.ArgumentParser(description="Build and register ECS task definitions")
     try:
         from scripts.deployment_mode import DeploymentMode
@@ -753,11 +752,22 @@ def main():
     parser.add_argument("--mode", choices=["single", "autoscale"], default="single",
                        help="Deployment mode: single (all containers) or autoscale (gateway/agent)")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """
+    Generates and registers ECS task definitions.
+    Supports both single service and autoscale gateway/agent modes.
+    """
+    import argparse
+    
+    args = parse_args()
     mode = DeploymentMode.from_string(args.mode)
     
-    base_dir = Path.cwd()
-    services_dir = base_dir
+    repo_root = Path(__file__).resolve().parent.parent
+    base_dir = repo_root / "services" / "task-definitions"
+    base_dir.mkdir(parents=True, exist_ok=True)
+    services_dir = repo_root / "services"
     
     aws_env = load_aws_config(services_dir)
     account_id, region, secret_name, secret_arn_suffix = _get_aws_config(aws_env)

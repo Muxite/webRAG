@@ -1,6 +1,7 @@
 """
 Check RabbitMQ queue status and agent processing.
 """
+import argparse
 import boto3
 import sys
 from pathlib import Path
@@ -12,8 +13,22 @@ except ImportError:
     from deploy_common import load_aws_config
 
 
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Check queue and agent status")
+    return parser.parse_args()
+
+
 def main():
-    """Check queue and agent status."""
+    """
+    Check queue and agent status.
+    """
+    args = parse_args()
+    _ = args
     services_dir = Path.cwd()
     if (services_dir / "services").exists():
         services_dir = services_dir / "services"
@@ -27,7 +42,6 @@ def main():
     
     print("=== Queue and Agent Status ===\n")
     
-    # Check agent service
     print("1. Agent Service:")
     response = ecs.describe_services(cluster=cluster, services=["euglena-agent"])
     services = response.get("services", [])
@@ -51,7 +65,6 @@ def main():
         print("  FAIL: Agent service not found")
         return
     
-    # Check agent logs for recent activity
     print("\n2. Recent Agent Activity (last 5 minutes):")
     log_group = "/ecs/euglena-agent"
     
@@ -99,7 +112,6 @@ def main():
     except Exception as e:
         print(f"  WARN: Could not check logs: {e}")
     
-    # Check metrics service queue depth
     print("\n3. Current Queue Depth (from metrics):")
     log_group_metrics = "/ecs/euglena-gateway"
     
@@ -126,7 +138,6 @@ def main():
     except Exception as e:
         print(f"  WARN: Could not check metrics: {e}")
     
-    # Check gateway logs for task submissions
     print("\n4. Recent Task Submissions (last 10 minutes):")
     try:
         end_time = datetime.now()

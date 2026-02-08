@@ -4,6 +4,7 @@ Network validation utilities.
 Uses NetworkDiscovery class for network resource discovery.
 Can be run directly or imported as a module.
 """
+import argparse
 import boto3
 from typing import Dict, List, Optional, Tuple
 import sys
@@ -412,10 +413,22 @@ def fix_security_group_rules(aws_config: Dict) -> Tuple[bool, List[str]]:
         return False, messages
 
 
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Validate network configuration")
+    return parser.parse_args()
+
+
 def main():
     """
     Main entry point when run directly.
     """
+    args = parse_args()
+    _ = args
     from dotenv import dotenv_values
     
     services_dir = Path.cwd()

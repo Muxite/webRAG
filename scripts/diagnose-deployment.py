@@ -441,8 +441,12 @@ def diagnose_ecr_images(aws_config: Dict, repositories: List[str]):
             traceback.print_exc()
 
 
-def main():
-    """Main entry point."""
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(description="Comprehensive deployment diagnostics")
     parser.add_argument("--mode", choices=["single", "autoscale"], default="autoscale",
                        help="Deployment mode to diagnose")
@@ -451,7 +455,11 @@ def main():
     parser.add_argument("--skip-logs", action="store_true",
                        help="Skip CloudWatch logs check")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main entry point."""
+    args = parse_args()
     mode = DeploymentMode.from_string(args.mode)
     
     services_dir = Path.cwd()

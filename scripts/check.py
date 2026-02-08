@@ -136,8 +136,12 @@ def check_container_health(aws_config: Dict, service_names: list, verbose: bool 
             print(f"  FAIL: {service_name} - {e}")
 
 
-def main():
-    """Main entry point."""
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(description="Check Euglena service health")
     try:
         from scripts.deployment_mode import DeploymentMode
@@ -151,7 +155,11 @@ def main():
     parser.add_argument("--verbose", action="store_true",
                        help="Show verbose output")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main entry point."""
+    args = parse_args()
     mode = DeploymentMode.from_string(args.mode)
     
     services_dir = Path.cwd()

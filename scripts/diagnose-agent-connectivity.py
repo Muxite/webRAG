@@ -1,6 +1,7 @@
 """
 Diagnose agent connectivity to gateway services in autoscale mode.
 """
+import argparse
 import boto3
 import sys
 from pathlib import Path
@@ -11,8 +12,22 @@ except ImportError:
     from deploy_common import load_aws_config
 
 
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Diagnose agent connectivity")
+    return parser.parse_args()
+
+
 def main():
-    """Diagnose agent connectivity issues."""
+    """
+    Diagnose agent connectivity issues.
+    """
+    args = parse_args()
+    _ = args
     services_dir = Path.cwd()
     if (services_dir / "services").exists():
         services_dir = services_dir / "services"
@@ -27,7 +42,6 @@ def main():
     
     print("=== Agent Connectivity Diagnosis ===\n")
     
-    # Check service discovery
     print("1. Service Discovery:")
     namespace_name = aws_config.get("SERVICE_DISCOVERY_NAMESPACE", "euglena.local")
     namespaces = sd.list_namespaces()["Namespaces"]
@@ -60,7 +74,6 @@ def main():
         ip = attrs.get("AWS_INSTANCE_IPV4", "N/A")
         print(f"  OK: Gateway instance registered: {ip}")
     
-    # Check ECS services
     print("\n2. ECS Services:")
     response = ecs.describe_services(cluster=cluster, services=["euglena-gateway", "euglena-agent"])
     services_list = response["services"]
@@ -86,7 +99,6 @@ def main():
             else:
                 print("  WARN: Services use different security groups")
     
-    # Check security group rules
     print("\n3. Security Group Rules:")
     if gateway_sg:
         sg_id = gateway_sg[0]
@@ -106,7 +118,6 @@ def main():
             else:
                 print(f"  FAIL: Port {port} missing ingress rule from same SG")
     
-    # Check VPC DNS
     print("\n4. VPC DNS Configuration:")
     if gateway_subnets:
         subnet = ec2.describe_subnets(SubnetIds=[gateway_subnets[0]])["Subnets"][0]
@@ -127,7 +138,6 @@ def main():
         else:
             print("  OK: VPC DNS enabled")
     
-    # Check agent task definition
     print("\n5. Agent Task Definition:")
     agent_tasks = ecs.list_tasks(cluster=cluster, serviceName="euglena-agent")["taskArns"]
     if agent_tasks:

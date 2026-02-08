@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 EFS verification and diagnostic tools.
+
+:returns: None
 """
 import boto3
 import sys
@@ -741,15 +743,23 @@ def diagnose_efs(aws_config: Dict, file_system_id: Optional[str] = None, hours: 
         print_status("FAIL", f"Only {len(available_mts)}/{len(mount_targets)} mount targets are available")
 
 
-def main():
-    """Main entry point."""
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(description="EFS verification and diagnostic tools")
     parser.add_argument("--mode", choices=["verify", "diagnose"], default="verify",
                        help="Mode: verify (default) or diagnose")
     parser.add_argument("--file-system-id", help="EFS file system ID (overrides aws.env)")
     parser.add_argument("--hours", type=int, default=24, help="Hours to look back for ECS task errors (diagnose mode)")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main entry point."""
+    args = parse_args()
     
     aws_config = load_aws_config()
     

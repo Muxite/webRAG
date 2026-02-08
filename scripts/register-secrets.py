@@ -162,9 +162,11 @@ def get_existing_secret_arn(aws_config: dict) -> tuple[bool, str]:
         return False, ""
 
 
-def main():
+def parse_args():
     """
-    Main entry point.
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
     """
     parser = argparse.ArgumentParser(description="Register secrets in AWS Secrets Manager")
     parser.add_argument("--create", action="store_true", help="Create new secret")
@@ -172,7 +174,13 @@ def main():
     parser.add_argument("--get-arn", action="store_true", help="Get ARN of existing secret")
     parser.add_argument("--secret-name", help="Secret name (overrides aws.env)")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """
+    Main entry point.
+    """
+    args = parse_args()
     
     services_dir = Path.cwd()
     if not (services_dir / "aws.env").exists():

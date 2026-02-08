@@ -291,6 +291,22 @@ class EfsManager:
                 print(f"  WARN: Could not update EFS security group rules: {e}", file=sys.stderr)
 
 
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Manage EFS mount targets")
+    parser.add_argument("--file-system-id", help="EFS file system ID")
+    parser.add_argument("--subnet-ids", help="Comma-separated list of subnet IDs")
+    parser.add_argument("--security-group-ids", help="Comma-separated list of security group IDs for EFS mount targets")
+    parser.add_argument("--ecs-security-group-ids", help="Comma-separated list of ECS task security group IDs that need EFS access")
+    parser.add_argument("--services-dir", type=Path, default=None,
+                       help="Services directory containing aws.env (defaults to current directory)")
+    
+    return parser.parse_args()
+
 def main():
     """
     Main entry point when run directly.
@@ -300,15 +316,7 @@ def main():
     from pathlib import Path
     from dotenv import dotenv_values
     
-    parser = argparse.ArgumentParser(description="Manage EFS mount targets")
-    parser.add_argument("--file-system-id", help="EFS file system ID")
-    parser.add_argument("--subnet-ids", help="Comma-separated list of subnet IDs")
-    parser.add_argument("--security-group-ids", help="Comma-separated list of security group IDs for EFS mount targets")
-    parser.add_argument("--ecs-security-group-ids", help="Comma-separated list of ECS task security group IDs that need EFS access")
-    parser.add_argument("--services-dir", type=Path, default=None,
-                       help="Services directory containing aws.env (defaults to current directory)")
-    
-    args = parser.parse_args()
+    args = parse_args()
     
     services_dir = args.services_dir or Path.cwd()
     aws_env_path = services_dir / "aws.env"

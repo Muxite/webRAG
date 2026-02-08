@@ -28,7 +28,6 @@ def analyze_changes(audit_data: Dict) -> Dict:
     issues = []
     data = audit_data["data"]
     
-    # Find orphaned task defs
     for family, revs in data["task_defs"].items():
         for rev in revs:
             reg_time = datetime.fromisoformat(rev["time"].replace("Z", "+00:00"))
@@ -43,7 +42,6 @@ def analyze_changes(audit_data: Dict) -> Dict:
                     "note": "No nearby git commit"
                 })
     
-    # Find container count changes
     for family, revs in data["task_defs"].items():
         prev_cnt = None
         for rev in sorted(revs, key=lambda x: x["time"]):
@@ -60,10 +58,12 @@ def analyze_changes(audit_data: Dict) -> Dict:
     return {"issues": issues, "summary": audit_data}
 
 
-def main():
-    """Main audit function."""
-    import argparse
-    
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(description="Audit AWS changes and correlate with git commits")
     parser.add_argument("--target-time", type=str, 
                        default="2026-02-01 15:56:28 -0800",
@@ -79,9 +79,14 @@ def main():
     parser.add_argument("--cluster", type=str,
                        help="ECS cluster name (overrides aws.env)")
     
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    """Main audit function."""
+    import argparse
     
-    # Parse target time
+    args = parse_args()
+    
     try:
         target_time = parse_git_time(args.target_time)
     except ValueError:
@@ -89,7 +94,6 @@ def main():
         print("Expected format: YYYY-MM-DD HH:MM:SS TZ (e.g., '2026-02-01 15:56:28 -0800')", file=sys.stderr)
         sys.exit(1)
     
-    # Load AWS config
     services_dir = Path.cwd()
     if (services_dir / "services").exists():
         services_dir = services_dir / "services"
@@ -132,7 +136,6 @@ def main():
             json.dump(results, f, indent=2, default=str)
         print(f"\nResults saved to: {args.output}")
     else:
-        # Print summary JSON
         print("\n=== Summary JSON ===")
         print(json.dumps({
             "summary": analysis["summary"],
