@@ -1,0 +1,611 @@
+{
+  "target_time": "2026-02-05T03:31:40.254078+00:00",
+  "window": {
+    "start": "2026-02-02T03:31:40.254078+00:00",
+    "end": "2026-02-09T03:31:41.129527+00:00"
+  },
+  "summary": {
+    "target_time": "2026-02-05T03:31:40.254078+00:00",
+    "window": {
+      "start": "2026-02-02T03:31:40.254078+00:00",
+      "end": "2026-02-09T03:31:41.129527+00:00"
+    },
+    "git_commits": 0,
+    "cloudtrail_events": 50,
+    "ecs_events": {},
+    "task_definitions": {
+      "euglena-gateway": 10,
+      "euglena-agent": 10
+    },
+    "ecr_pushes": {
+      "agent": 1,
+      "metrics": 2
+    },
+    "data": {
+      "commits": [],
+      "cloudtrail": [
+        {
+          "time": "2026-02-07 19:26:23-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-07 19:26:23-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-07 19:26:23-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-07 19:26:51-08:00",
+          "name": "UpdateFunctionCode20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:51-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:52-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:52-08:00",
+          "name": "GetFunctionConfiguration20150331v2",
+          "source": "lambda",
+          "user": "N/A"
+        },
+        {
+          "time": "2026-02-07 19:26:52-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:54-08:00",
+          "name": "GetFunctionConfiguration20150331v2",
+          "source": "lambda",
+          "user": "N/A"
+        },
+        {
+          "time": "2026-02-07 19:26:55-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:55-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:55-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:55-08:00",
+          "name": "GetCallerIdentity",
+          "source": "sts",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:55-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:55-08:00",
+          "name": "GetCallerIdentity",
+          "source": "sts",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:55-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:56-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:56-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:57-08:00",
+          "name": "GetRuntimeManagementConfig",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:26:57-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:27:08-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-07 19:27:08-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-07 19:27:08-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-07 19:27:20-08:00",
+          "name": "AssumeRole",
+          "source": "sts",
+          "user": "N/A"
+        },
+        {
+          "time": "2026-02-07 19:27:20-08:00",
+          "name": "AssumeRole",
+          "source": "sts",
+          "user": "N/A"
+        },
+        {
+          "time": "2026-02-07 19:27:21-08:00",
+          "name": "DescribeServices",
+          "source": "ecs",
+          "user": "euglena-autoscale"
+        },
+        {
+          "time": "2026-02-07 19:27:28-08:00",
+          "name": "CreateLogStream",
+          "source": "logs",
+          "user": "euglena-autoscale"
+        },
+        {
+          "time": "2026-02-07 19:27:55-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:27:56-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-07 19:27:56-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-07 19:27:56-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-07 19:28:20-08:00",
+          "name": "DescribeServices",
+          "source": "ecs",
+          "user": "euglena-autoscale"
+        },
+        {
+          "time": "2026-02-07 19:28:21-08:00",
+          "name": "AssumeRole",
+          "source": "sts",
+          "user": "N/A"
+        },
+        {
+          "time": "2026-02-07 19:28:42-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-07 19:28:42-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-07 19:28:42-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-07 19:28:53-08:00",
+          "name": "GetFunctionCodeSigningConfig",
+          "source": "lambda",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-07 19:28:53-08:00",
+          "name": "AssumeRole",
+          "source": "sts",
+          "user": "N/A"
+        },
+        {
+          "time": "2026-02-07 19:28:53-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-07 19:28:53-08:00",
+          "name": "GetRuntimeManagementConfig",
+          "source": "lambda",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-07 19:28:53-08:00",
+          "name": "GetResource",
+          "source": "cloudcontrolapi",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-07 19:28:53-08:00",
+          "name": "GetFunctionRecursionConfig",
+          "source": "lambda",
+          "user": "resource-explorer-2"
+        },
+        {
+          "time": "2026-02-07 19:28:55-08:00",
+          "name": "GetFunction20150331v2",
+          "source": "lambda",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:28:57-08:00",
+          "name": "AuthorizeOAuth2Access",
+          "source": "signin",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:28:58-08:00",
+          "name": "CreateOAuth2Token",
+          "source": "signin",
+          "user": "root"
+        },
+        {
+          "time": "2026-02-07 19:29:20-08:00",
+          "name": "DescribeServices",
+          "source": "ecs",
+          "user": "euglena-autoscale"
+        },
+        {
+          "time": "2026-02-07 19:29:20-08:00",
+          "name": "AssumeRole",
+          "source": "sts",
+          "user": "N/A"
+        },
+        {
+          "time": "2026-02-07 19:29:29-08:00",
+          "name": "DescribeTargetHealth",
+          "source": "elasticloadbalancing",
+          "user": "ecs-service-scheduler"
+        },
+        {
+          "time": "2026-02-07 19:29:29-08:00",
+          "name": "ListInstances",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        },
+        {
+          "time": "2026-02-07 19:29:29-08:00",
+          "name": "GetInstancesHealthStatus",
+          "source": "servicediscovery",
+          "user": "ECS_STS_Session"
+        }
+      ],
+      "ecs_events": {},
+      "task_defs": {
+        "euglena-gateway": [
+          {
+            "revision": 70,
+            "time": "2026-02-05T20:02:37.673000-08:00",
+            "cpu": "1024",
+            "memory": "2048",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 69,
+            "time": "2026-02-05T18:56:26.243000-08:00",
+            "cpu": "1024",
+            "memory": "2048",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 68,
+            "time": "2026-02-05T16:34:09.924000-08:00",
+            "cpu": "1024",
+            "memory": "2048",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 67,
+            "time": "2026-02-05T05:20:51.269000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 66,
+            "time": "2026-02-05T05:09:58.649000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 65,
+            "time": "2026-02-05T05:00:47.492000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 64,
+            "time": "2026-02-05T04:41:00.625000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 63,
+            "time": "2026-02-05T04:37:43.636000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 62,
+            "time": "2026-02-05T03:06:40.541000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          },
+          {
+            "revision": 61,
+            "time": "2026-02-05T01:26:41.216000-08:00",
+            "cpu": "512",
+            "memory": "1024",
+            "containers": 5,
+            "container_names": [
+              "chroma",
+              "redis",
+              "rabbitmq",
+              "gateway",
+              "metrics"
+            ]
+          }
+        ],
+        "euglena-agent": [
+          {
+            "revision": 69,
+            "time": "2026-02-05T20:02:40.712000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 68,
+            "time": "2026-02-05T18:56:28.832000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 67,
+            "time": "2026-02-05T16:34:12.386000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 66,
+            "time": "2026-02-05T05:20:53.716000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 65,
+            "time": "2026-02-05T05:10:00.854000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 64,
+            "time": "2026-02-05T05:00:49.823000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 63,
+            "time": "2026-02-05T04:41:02.896000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 62,
+            "time": "2026-02-05T04:37:45.993000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 61,
+            "time": "2026-02-05T03:06:42.848000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          },
+          {
+            "revision": 60,
+            "time": "2026-02-05T01:26:43.440000-08:00",
+            "cpu": "256",
+            "memory": "512",
+            "containers": 1,
+            "container_names": [
+              "agent"
+            ]
+          }
+        ]
+      },
+      "ecr_pushes": {
+        "agent": [
+          {
+            "time": "2026-02-03T17:01:48.778000-08:00",
+            "tags": [],
+            "digest": "sha256:85e57553d"
+          }
+        ],
+        "metrics": [
+          {
+            "time": "2026-02-05T16:34:07.139000-08:00",
+            "tags": [],
+            "digest": "sha256:2be54b640"
+          },
+          {
+            "time": "2026-02-05T05:20:48.538000-08:00",
+            "tags": [],
+            "digest": "sha256:2743d5fcc"
+          }
+        ]
+      }
+    }
+  },
+  "task_investigation": {},
+  "analysis": {
+    "issues": [
+      {
+        "type": "resource_change",
+        "family": "euglena-gateway",
+        "revision": 68,
+        "time": "2026-02-05T16:34:09.924000-08:00",
+        "note": "CPU: 512->1024, Memory: 1024->2048"
+      }
+    ]
+  },
+  "release_tag": "stable"
+}

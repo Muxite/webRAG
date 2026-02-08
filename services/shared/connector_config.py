@@ -20,6 +20,7 @@ class ConnectorConfig:
         self.input_queue = os.environ.get("AGENT_INPUT_QUEUE", "agent.mandates")
         self.status_queue = os.environ.get("AGENT_STATUS_QUEUE", "agent.status")
         self.status_time = float(os.environ.get("AGENT_STATUS_TIME", "10"))
+        self.gateway_debug_queue_name = os.environ.get("GATEWAY_DEBUG_QUEUE_NAME", "gateway.debug")
 
         # Allow running without explicit env by providing a sane default.
         # Tests may import modules at collection time; avoid raising here.

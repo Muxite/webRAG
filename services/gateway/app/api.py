@@ -10,6 +10,9 @@ from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
 from shared.models import TaskRequest, TaskResponse
 from shared.storage import RedisTaskStorage
+from shared.pretty_log import setup_service_logger, log_connection_status
+from shared.startup_message import log_startup_message, log_shutdown_message
+from shared.health import HealthMonitor
 from gateway.app.gateway_service import GatewayService
 from gateway.app.supabase_auth import SupabaseUser, get_current_supabase_user
 from shared.user_quota import SupabaseUserTickManager
@@ -25,19 +28,24 @@ def is_test_mode() -> bool:
 
 
 def create_app(service: Optional[GatewayService] = None) -> FastAPI:
-    logger = logging.getLogger("GatewayAPI")
+    logger = setup_service_logger("Gateway", logging.INFO)
     cfg = ConnectorConfig()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        log_startup_message(logger, "GATEWAY", "0.1.0")
         try:
             await app.state.gateway_service.start()
+            log_connection_status(logger, "GatewayService", "CONNECTED")
+            logger.info("Gateway service started successfully")
             yield
         finally:
+            log_shutdown_message(logger, "GATEWAY")
             try:
                 await app.state.gateway_service.stop()
+                logger.info("Gateway service stopped")
             except Exception as e:
-                logger.error("Failed to stop GatewayService: %s", e)
+                logger.error("Failed to stop GatewayService: %s", e, exc_info=True)
 
     app = FastAPI(title="Euglena Gateway", version="0.1.0", lifespan=lifespan)
     
@@ -76,8 +84,41 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
 
     @router.get("/health")
     async def health_check():
-        """Health check endpoint for ALB target group and ECS container health checks."""
-        return {"status": "healthy", "service": "gateway", "version": "0.1.0"}
+        """
+        Health check endpoint for ALB target group and ECS container health checks.
+        Always returns HTTP 200 if process is running (process-level health check).
+        Component status is informational but doesn't fail the health check.
+        Includes queue depth information for monitoring.
+        
+        :returns: Health status with component breakdown and queue depths.
+        """
+        monitor = HealthMonitor(service="gateway", version="0.1.0", logger=logger)
+        monitor.set_component("process", True)
+        
+        gateway_service = app.state.gateway_service
+        queue_depths = {}
+        if gateway_service:
+            monitor.set_component("rabbitmq", gateway_service.rabbitmq.is_ready() if hasattr(gateway_service, 'rabbitmq') else False)
+            redis_ok = False
+            try:
+                if hasattr(gateway_service, "storage") and hasattr(gateway_service.storage, "connector"):
+                    redis_ok = await gateway_service.storage.connector.quick_ping(timeout_s=1.0)
+            except Exception:
+                redis_ok = False
+            monitor.set_component("redis", redis_ok)
+            
+            if hasattr(gateway_service, 'get_queue_depths'):
+                queue_depths = gateway_service.get_queue_depths()
+        else:
+            monitor.set_component("rabbitmq", False)
+            monitor.set_component("redis", False)
+        
+        payload = monitor.payload()
+        if queue_depths:
+            payload["queue_depths"] = queue_depths
+        
+        monitor.log_status()
+        return payload
 
     @router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
     async def submit_task(
@@ -90,9 +131,15 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             quota = app.state.user_tick_manager
             access_token = credentials.credentials
 
+            skip_phrase = os.environ.get("AGENT_SKIP_PHRASE", "skipskipskip")
+            debug_phrase = os.environ.get("GATEWAY_DEBUG_QUEUE_PHRASE", "debugdebugdebug")
+            is_skip_message = skip_phrase and skip_phrase.lower() in (req.mandate or "").lower()
+            is_debug_message = debug_phrase and debug_phrase.lower() in (req.mandate or "").lower()
+            units_to_consume = 0 if (is_skip_message or is_debug_message) else max_ticks
+
             if not app.state.test_mode:
                 try:
-                    result = quota.check_and_consume(access_token=access_token, user_id=user.id, email=user.email, units=max_ticks)
+                    result = quota.check_and_consume(access_token=access_token, user_id=user.id, email=user.email, units=units_to_consume)
                     if not result.allowed:
                         remaining = 0 if result.remaining is None else result.remaining
                         raise HTTPException(
@@ -108,7 +155,13 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
                         detail="Quota system error",
                     )
             else:
-                logger.debug(f"Test mode: skipping quota check for user {user.id}, units={max_ticks}")
+                logger.debug(f"Test mode: skipping quota check for user {user.id}, units={units_to_consume}")
+            
+            if is_skip_message:
+                logger.info(f"Skip message detected: consuming 0 ticks instead of {max_ticks}")
+            if is_debug_message:
+                logger.info(f"Debug message detected: consuming 0 ticks instead of {max_ticks}")
+            
             return await _service.create_task(req)
         except HTTPException:
             raise
