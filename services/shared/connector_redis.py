@@ -4,6 +4,7 @@ from typing import Any, Optional
 from shared.connector_config import ConnectorConfig
 from shared.retry import Retry
 from redis.asyncio import Redis
+import asyncio
 
 
 class ConnectorRedis:
@@ -106,6 +107,45 @@ class ConnectorRedis:
             self.logger.warning("Redis not ready.")
             return None
         return self._redis
+
+    async def quick_ping(self, timeout_s: float = 1.0) -> bool:
+        """
+        Quick Redis connectivity probe without retries.
+
+        :param timeout_s: Timeout in seconds for connect+ping.
+        :returns: True when ping succeeds, False otherwise.
+        """
+        redis_url = self.config.redis_url
+        if not redis_url:
+            self.redis_ready = False
+            return False
+
+        async def _do() -> bool:
+            client = Redis.from_url(
+                redis_url,
+                socket_connect_timeout=timeout_s,
+                socket_timeout=timeout_s,
+            )
+            try:
+                await client.ping()
+                return True
+            finally:
+                try:
+                    await client.aclose()
+                except Exception:
+                    try:
+                        await client.close()
+                    except Exception:
+                        pass
+
+        try:
+            ok = await asyncio.wait_for(_do(), timeout=timeout_s)
+            self.redis_ready = bool(ok)
+            return bool(ok)
+        except Exception as e:
+            self.logger.debug(f"Redis quick_ping failed: {e}")
+            self.redis_ready = False
+            return False
 
     async def get_json(self, key: str) -> Optional[Any]:
         """

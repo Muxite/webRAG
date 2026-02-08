@@ -21,6 +21,19 @@ export default function App() {
   const [apiMode, setApiModeState] = useState<'localhost' | 'aws' | 'auto'>(getApiMode());
   const [currentApiUrl, setCurrentApiUrl] = useState(getCurrentApiBaseURL());
   const pollIntervalRef = useRef<number | null>(null);
+  const batchPollIntervalRef = useRef<number | null>(null);
+  const batchTasksRef = useRef<Array<{ correlationId: string; status: string; result?: any }>>([]);
+  const [batchTest, setBatchTest] = useState<{
+    loading: boolean;
+    tasks: Array<{ correlationId: string; status: string; result?: any }>;
+    startTime?: number;
+    endTime?: number;
+    completed: number;
+  }>({
+    loading: false,
+    tasks: [],
+    completed: 0,
+  });
   
   const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' || 
@@ -63,6 +76,9 @@ export default function App() {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+      }
+      if (batchPollIntervalRef.current) {
+        clearInterval(batchPollIntervalRef.current);
       }
     };
   }, []);
@@ -133,6 +149,74 @@ export default function App() {
     setError('');
     setMandate('');
     setLoading(false);
+  };
+
+  const handleDebugQueueTest = async () => {
+    if (!userEmail) {
+      setError('You must be logged in to run debug queue test');
+      return;
+    }
+
+    setError('');
+
+    const debugPhrase = 'debugdebugdebug';
+    try {
+      const response = await apiClient.submitTask({
+        mandate: `${debugPhrase} test message`,
+        max_ticks: 1,
+      });
+      setError(`Debug queue test: Published 1 message to debug queue (correlation_id: ${response.correlation_id})`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to publish to debug queue';
+      if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+          const response = await apiClient.submitTask({
+            mandate: `${debugPhrase} test message`,
+            max_ticks: 1,
+          });
+          setError(`Debug queue test: Published 1 message to debug queue (correlation_id: ${response.correlation_id})`);
+        } catch (retryErr) {
+          setError(`Debug queue test failed: ${retryErr instanceof Error ? retryErr.message : 'Failed to submit after retry'}`);
+        }
+      } else {
+        setError(`Debug queue test failed: ${errorMessage}`);
+      }
+    }
+  };
+
+  const handleBatchSkipTest = async () => {
+    if (!userEmail) {
+      setError('You must be logged in to run skip test');
+      return;
+    }
+
+    setError('');
+
+    try {
+      const skipPhrase = 'skipskipskip';
+      const response = await apiClient.submitTask({
+        mandate: `${skipPhrase} test`,
+        max_ticks: 1,
+      });
+      setError(`Skip test: Published 1 message (correlation_id: ${response.correlation_id})`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to submit';
+      if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+          const response = await apiClient.submitTask({
+            mandate: `${skipPhrase} test`,
+            max_ticks: 1,
+          });
+          setError(`Skip test: Published 1 message (correlation_id: ${response.correlation_id})`);
+        } catch (retryErr) {
+          setError(`Skip test failed: ${retryErr instanceof Error ? retryErr.message : 'Failed to submit after retry'}`);
+        }
+      } else {
+        setError(`Skip test failed: ${errorMessage}`);
+      }
+    }
   };
 
   const handleSignUp = async () => {
@@ -435,7 +519,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex gap-4 flex-wrap">
                 <button
                   onClick={handleSubmit}
                   disabled={loading || !mandate.trim() || !userEmail}
@@ -459,6 +543,22 @@ export default function App() {
                 >
                   {loading ? 'Processing...' : 'Submit Task'}
                 </button>
+                <button
+                  onClick={handleBatchSkipTest}
+                  disabled={loading || !userEmail}
+                  className="px-4 py-2 bg-yellow-500 text-black rounded-xl border-2 border-yellow-600 disabled:opacity-50
+                  font-mono active:scale-95 transition-all hover:bg-yellow-400 hover:border-yellow-500"
+                >
+                  Skip Test
+                </button>
+                <button
+                  onClick={handleDebugQueueTest}
+                  disabled={loading || !userEmail}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-xl border-2 border-orange-600 disabled:opacity-50
+                  font-mono active:scale-95 transition-all hover:bg-orange-400 hover:border-orange-500"
+                >
+                  Debug Test
+                </button>
                 {task && (
                   <button
                     onClick={handleReset}
@@ -474,6 +574,78 @@ export default function App() {
               {error && (
                 <div className="p-6 rounded-xl bg-red-100 text-red-800 border-2 border-red-300">
                   <p className="font-mono font-bold">Error: {error}</p>
+                </div>
+              )}
+
+              {batchTest.tasks.length > 0 && (
+                <div className="p-6 rounded-xl bg-yellow-50 border-2 border-yellow-200">
+                  <h3 className="font-mono font-bold mb-4 text-yellow-900 uppercase tracking-wide">
+                    Batch Skip Test Results
+                  </h3>
+                  {batchTest.startTime && batchTest.endTime && (
+                    <div className="mb-4 p-3 bg-white rounded-lg border border-yellow-300">
+                      <p className="font-mono text-sm">
+                        <span className="font-bold">Total Time:</span>{' '}
+                        {((batchTest.endTime - batchTest.startTime) / 1000).toFixed(2)}s
+                      </p>
+                      <p className="font-mono text-sm">
+                        <span className="font-bold">Average Time per Task:</span>{' '}
+                        {((batchTest.endTime - batchTest.startTime) / (32 * 1000)).toFixed(2)}s
+                      </p>
+                    </div>
+                  )}
+                  <div className="mb-4">
+                    <div className="mb-2 flex items-center justify-between text-sm font-mono">
+                      <span className="font-bold">Progress</span>
+                      <span>{batchTest.completed} / 32 completed</span>
+                    </div>
+                    <div className="h-6 bg-gray-200 rounded-full overflow-hidden relative">
+                      <div
+                        className="h-full rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                        style={{
+                          width: `${(batchTest.completed / 32) * 100}%`,
+                          background: 'linear-gradient(to right, #fbbf24, #f59e0b)',
+                        }}
+                      >
+                        <span className="text-xs font-bold text-black">
+                          {Math.round((batchTest.completed / 32) * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {batchTest.tasks.map((task, index) => (
+                      <div
+                        key={task.correlationId}
+                        className="p-2 rounded bg-white border border-yellow-200 text-xs font-mono"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold">Task {index + 1}:</span>
+                          <span
+                            className={
+                              task.status === 'completed'
+                                ? 'text-green-600'
+                                : task.status === 'error' || task.status === 'failed'
+                                ? 'text-red-600'
+                                : 'text-yellow-600'
+                            }
+                          >
+                            {task.status}
+                          </span>
+                        </div>
+                        {task.result?.error && (
+                          <p className="text-red-600 mt-1">{task.result.error}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {batchTest.completed === 32 && batchTest.endTime && (
+                    <div className="mt-4 p-3 bg-green-100 rounded-lg border border-green-300">
+                      <p className="font-mono text-sm text-green-800 font-bold">
+                        All 32 tasks completed successfully!
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
