@@ -1,5 +1,6 @@
 services/inference/models
 services/keys.env
+services/aws.env
 services/task_definition.json
 services/secrets.json
 services/special_api_keys.txt
@@ -12,3 +13,5 @@ __pycache__/
 *.py[cod]
 *$py.class
 secrets.json
+dist/
+.pytest_cache/
