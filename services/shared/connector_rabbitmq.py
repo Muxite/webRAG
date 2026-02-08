@@ -133,6 +133,102 @@ class ConnectorRabbitMQ:
         """Check if RabbitMQ is connected and ready."""
         return self.rabbitmq_ready
 
+    async def get_queue_depth(self, queue_name: str) -> Optional[int]:
+        """
+        Get the number of messages in a queue.
+        Declares the queue if it doesn't exist (idempotent operation).
+        
+        Failure modes:
+        - RABBITMQ_NOT_READY: Connection not established
+        - CHANNEL_UNAVAILABLE: Channel creation/retrieval failed
+        - CHANNEL_CLOSED: Channel was closed before operation
+        - QUEUE_DECLARE_NONE: Queue declaration returned None
+        - NO_DECLARATION_RESULT: Queue object missing declaration_result
+        - NO_MESSAGE_COUNT: Declaration result missing message_count
+        - CHANNEL_CLOSED_DURING_OP: Channel closed during queue operation
+        - CHANNEL_INVALID_STATE: Channel in invalid state
+        - UNKNOWN_ERROR: Unexpected exception
+        
+        :param queue_name: Name of the queue to check.
+        :returns: Number of messages in queue, or None on error.
+        """
+        if not self.rabbitmq_ready:
+            self.logger.warning(
+                "Queue depth check failed: RABBITMQ_NOT_READY",
+                extra={"queue": queue_name, "error_code": "RABBITMQ_NOT_READY", "rabbitmq_ready": False}
+            )
+            return None
+        
+        ch = await self.get_channel()
+        if ch is None:
+            self.logger.warning(
+                "Queue depth check failed: CHANNEL_UNAVAILABLE",
+                extra={"queue": queue_name, "error_code": "CHANNEL_UNAVAILABLE"}
+            )
+            return None
+        
+        if ch.is_closed:
+            self.logger.warning(
+                "Queue depth check failed: CHANNEL_CLOSED",
+                extra={"queue": queue_name, "error_code": "CHANNEL_CLOSED", "channel_closed": True}
+            )
+            self.rabbitmq_ready = False
+            return None
+        
+        try:
+            q = await ch.declare_queue(queue_name, durable=True)
+            
+            if q is None:
+                self.logger.warning(
+                    "Queue depth check failed: QUEUE_DECLARE_NONE",
+                    extra={"queue": queue_name, "error_code": "QUEUE_DECLARE_NONE"}
+                )
+                return None
+            
+            result = getattr(q, "declaration_result", None)
+            if result is None:
+                self.logger.warning(
+                    "Queue depth check failed: NO_DECLARATION_RESULT",
+                    extra={"queue": queue_name, "error_code": "NO_DECLARATION_RESULT", "queue_obj_type": type(q).__name__}
+                )
+                return None
+            
+            message_count = getattr(result, "message_count", None)
+            if message_count is None:
+                self.logger.warning(
+                    "Queue depth check failed: NO_MESSAGE_COUNT",
+                    extra={"queue": queue_name, "error_code": "NO_MESSAGE_COUNT", "result_type": type(result).__name__}
+                )
+                return None
+            
+            depth = int(message_count)
+            self.logger.debug(
+                "Queue depth retrieved",
+                extra={"queue": queue_name, "depth": depth, "error_code": None}
+            )
+            return depth
+        except aio_pika.exceptions.ChannelClosed as e:
+            self.logger.warning(
+                "Queue depth check failed: CHANNEL_CLOSED_DURING_OP",
+                extra={"queue": queue_name, "error_code": "CHANNEL_CLOSED_DURING_OP", "exception": str(e)}
+            )
+            self.rabbitmq_ready = False
+            return None
+        except aio_pika.exceptions.ChannelInvalidStateError as e:
+            self.logger.warning(
+                "Queue depth check failed: CHANNEL_INVALID_STATE",
+                extra={"queue": queue_name, "error_code": "CHANNEL_INVALID_STATE", "exception": str(e)}
+            )
+            self.rabbitmq_ready = False
+            return None
+        except Exception as e:
+            self.logger.warning(
+                "Queue depth check failed: UNKNOWN_ERROR",
+                extra={"queue": queue_name, "error_code": "UNKNOWN_ERROR", "exception_type": type(e).__name__, "exception": str(e)},
+                exc_info=True
+            )
+            return None
+
     async def get_channel(self) -> Optional[aio_pika.Channel]:
         """
         Accessor for the underlying aio-pika channel after ensuring readiness.
@@ -212,6 +308,7 @@ class ConnectorRabbitMQ:
     ) -> None:
         """
         Start consuming messages from a queue.
+        Ensures only one unacknowledged message at a time (prefetch=1).
         :param queue_name: Name of the queue to consume from.
         :param callback: Async function to handle each message.
         """
@@ -219,6 +316,10 @@ class ConnectorRabbitMQ:
             raise RuntimeError("RabbitMQ not connected")
 
         self.logger.info(f"Preparing consumer for queue={queue_name}")
+        
+        await self.channel.set_qos(prefetch_count=1)
+        self.logger.debug(f"Set QoS prefetch=1 for queue={queue_name}")
+        
         queue = await self.channel.declare_queue(queue_name, durable=True)
 
         self.logger.info(f"Consuming from {queue_name}")

@@ -1,0 +1,3 @@
+aio-pika
+aiohttp
+boto3

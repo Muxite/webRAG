@@ -1,9 +1,20 @@
+"""
+Generate ECS Secrets Manager payload from env files.
+
+:returns: None
+"""
+import argparse
 from dotenv import dotenv_values
 import json
 
 
 def write_dict(input_dict):
-    # return "{" + ",".join(f'"{k}":"{v}"' for k, v in input_dict.items()) + "}"
+    """
+    Write dictionary to JSON file and return file:// URI.
+    
+    :param input_dict: Dictionary to write.
+    :returns: File URI string.
+    """
     with open("secrets.json", "w") as f:
         f.write(json.dumps(input_dict))
 
@@ -11,6 +22,13 @@ def write_dict(input_dict):
 
 
 def format_json_array(items, indent_level=4):
+    """
+    Format a list of items as a JSON array string with indentation.
+    
+    :param items: List of items to format.
+    :param indent_level: Number of spaces for indentation.
+    :returns: Formatted JSON array string.
+    """
     if not items:
         return "[]"
 
@@ -26,7 +44,24 @@ def format_json_array(items, indent_level=4):
     return result
 
 
+def parse_args():
+    """
+    Parse CLI arguments.
+
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Generate ECS Secrets Manager payload")
+    return parser.parse_args()
+
+
 def main():
+    """
+    Generate ECS task definition configuration from keys.env and .env files.
+    
+    :returns: None.
+    """
+    args = parse_args()
+    _ = args
     keys_env = dict(dotenv_values("services/keys.env"))
     env = dict(dotenv_values("services/.env"))
 
