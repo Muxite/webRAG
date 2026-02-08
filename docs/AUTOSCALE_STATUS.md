@@ -259,7 +259,7 @@ The project has successfully completed service separation (Stage 2). Gateway and
 
 ### Resource Allocations
 
-- Gateway service: 0.5 vCPU (512 CPU units), 1GB RAM (1024 MB)
+- Gateway service: 1 vCPU (1024 CPU units), 2GB RAM (2048 MB) - updated 2026-02-04
 - Agent service: 0.25 vCPU (256 CPU units), 0.5GB RAM (512 MB)
 - Single service: 1 vCPU (1024 CPU units), 2GB RAM (2048 MB)
 

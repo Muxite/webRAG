@@ -11,7 +11,7 @@ from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
 from shared.health import HealthMonitor
 from shared.pretty_log import setup_service_logger, log_connection_status
-from shared.queue_metrics import QUEUE_DEPTH_METRIC
+from shared.queue_metrics import QUEUE_DEPTH_METRIC, QUEUE_BACKLOG_METRIC
 from shared.task_logging import log_queue_operation, log_error_with_context
 
 
@@ -74,6 +74,7 @@ async def _init_cloudwatch_client(logger: logging.Logger, namespace: str) -> Opt
 async def _publish_queue_depth_loop() -> None:
     """
     Periodically log RabbitMQ queue depth and optionally publish CloudWatch metrics.
+    Checks multiple queues (agent.mandates and gateway.debug) every second.
 
     :returns: None
     """
@@ -82,12 +83,15 @@ async def _publish_queue_depth_loop() -> None:
     logger = setup_service_logger("MetricsService", logging.INFO)
     cfg = ConnectorConfig()
 
-    interval_s = int(os.environ.get("QUEUE_DEPTH_METRICS_INTERVAL", "5"))
+    interval_s = int(os.environ.get("QUEUE_DEPTH_METRICS_INTERVAL", "1"))
     cloudwatch_enabled = os.environ.get("PUBLISH_QUEUE_DEPTH_METRICS", "").lower() in ("1", "true", "yes")
     namespace = os.environ.get("CLOUDWATCH_NAMESPACE", QUEUE_DEPTH_METRIC.namespace)
-    queue_name = os.environ.get("QUEUE_NAME", cfg.input_queue)
+    
+    primary_queue = os.environ.get("QUEUE_NAME", cfg.input_queue)
+    debug_queue = cfg.gateway_debug_queue_name
+    queue_names = [primary_queue, debug_queue]
 
-    logger.info(f"Starting metrics collection: queue={queue_name}, interval={interval_s}s, cloudwatch={cloudwatch_enabled}")
+    logger.info(f"Starting metrics collection: queues={queue_names}, interval={interval_s}s, cloudwatch={cloudwatch_enabled}")
     
     rabbitmq = ConnectorRabbitMQ(cfg)
     _rabbitmq_connector = rabbitmq
@@ -95,9 +99,9 @@ async def _publish_queue_depth_loop() -> None:
     try:
         logger.info("Connecting to RabbitMQ...")
         await rabbitmq.connect()
-        log_connection_status(logger, "RabbitMQ", "CONNECTED", {"queue": queue_name})
+        log_connection_status(logger, "RabbitMQ", "CONNECTED", {"queues": queue_names})
     except Exception as exc:
-        log_error_with_context(logger, exc, "METRICS SERVICE INITIALIZATION", queue_name=queue_name)
+        log_error_with_context(logger, exc, "METRICS SERVICE INITIALIZATION", queues=queue_names)
         return
 
     cloudwatch = None
@@ -115,78 +119,100 @@ async def _publish_queue_depth_loop() -> None:
         while True:
             try:
                 if not rabbitmq.is_ready():
-                    logger.warning(f"RabbitMQ not ready, reconnecting: queue={queue_name}")
+                    logger.warning(f"RabbitMQ not ready, reconnecting: queues={queue_names}")
                     try:
                         await rabbitmq.connect()
-                        log_connection_status(logger, "RabbitMQ", "RECONNECTED", {"queue": queue_name})
+                        log_connection_status(logger, "RabbitMQ", "RECONNECTED", {"queues": queue_names})
                     except Exception as reconnect_exc:
-                        log_error_with_context(logger, reconnect_exc, "RABBITMQ RECONNECTION", queue_name=queue_name)
+                        log_error_with_context(logger, reconnect_exc, "RABBITMQ RECONNECTION", queues=queue_names)
                         consecutive_failures += 1
                         if consecutive_failures >= max_consecutive_failures:
                             logger.error(f"Too many consecutive failures ({consecutive_failures}), will retry after interval")
-                        await asyncio.sleep(max(5, interval_s))
+                        await asyncio.sleep(max(1, interval_s))
                         continue
                 
-                depth = await rabbitmq.get_queue_depth(queue_name)
-                if depth is None:
-                    consecutive_failures += 1
-                    logger.warning(
-                        f"Queue depth check returned None: queue={queue_name}, "
-                        f"consecutive_failures={consecutive_failures}, reconnecting..."
-                    )
+                metric_data = []
+                queue_results = {}
+                
+                for queue_name in queue_names:
                     try:
-                        await rabbitmq.connect()
                         depth = await rabbitmq.get_queue_depth(queue_name)
-                    except Exception as reconnect_exc:
-                        log_error_with_context(logger, reconnect_exc, "QUEUE DEPTH RECONNECTION", queue_name=queue_name)
-                        if consecutive_failures >= max_consecutive_failures:
-                            logger.error(f"Too many consecutive failures ({consecutive_failures})")
-                        await asyncio.sleep(max(5, interval_s))
-                        continue
-                else:
-                    consecutive_failures = 0
+                        if depth is None:
+                            consecutive_failures += 1
+                            logger.warning(
+                                f"Queue backlog check returned None: queue={queue_name}, "
+                                f"consecutive_failures={consecutive_failures}, reconnecting..."
+                            )
+                            try:
+                                await rabbitmq.connect()
+                                depth = await rabbitmq.get_queue_depth(queue_name)
+                            except Exception as reconnect_exc:
+                                log_error_with_context(logger, reconnect_exc, "QUEUE BACKLOG RECONNECTION", queue_name=queue_name)
+                                if consecutive_failures >= max_consecutive_failures:
+                                    logger.error(f"Too many consecutive failures ({consecutive_failures})")
+                                queue_results[queue_name] = None
+                                continue
+                        else:
+                            consecutive_failures = 0
+                        
+                        queue_results[queue_name] = depth
+                        
+                        if depth is not None:
+                            logger.info(f"Queue Backlog: queue={queue_name}, waiting={depth}")
+                            log_queue_operation(logger, "QUEUE BACKLOG CHECK", queue_name, message_count=depth)
+                            
+                            if cloudwatch_enabled and cloudwatch is not None:
+                                metric_data.extend([
+                                    {
+                                        "MetricName": QUEUE_DEPTH_METRIC.metric_name,
+                                        "Dimensions": QUEUE_DEPTH_METRIC.dimensions(queue_name),
+                                        "Unit": "Count",
+                                        "Value": float(depth),
+                                    },
+                                    {
+                                        "MetricName": QUEUE_BACKLOG_METRIC.metric_name,
+                                        "Dimensions": QUEUE_BACKLOG_METRIC.dimensions(queue_name),
+                                        "Unit": "Count",
+                                        "Value": float(depth),
+                                    },
+                                ])
+                        else:
+                            logger.warning(f"Queue backlog unavailable after reconnect: queue={queue_name}")
+                            queue_results[queue_name] = None
+                    except Exception as queue_exc:
+                        logger.error(f"Error checking queue {queue_name}: {queue_exc}", exc_info=True)
+                        queue_results[queue_name] = None
                 
-                if depth is not None:
-                    logger.info(f"Queue Depth: queue={queue_name}, depth={depth}")
-                    log_queue_operation(logger, "QUEUE DEPTH CHECK", queue_name, message_count=depth)
-                else:
-                    logger.warning(f"Queue depth unavailable after reconnect: queue={queue_name}")
+                if not any(v is not None for v in queue_results.values()):
+                    logger.warning(f"All queue checks failed: {queue_results}")
 
-                if cloudwatch_enabled and cloudwatch is not None and depth is not None:
+                if cloudwatch_enabled and cloudwatch is not None and metric_data:
                     try:
                         response = await asyncio.to_thread(
                             cloudwatch.put_metric_data,
                             Namespace=namespace,
-                            MetricData=[
-                                {
-                                    "MetricName": QUEUE_DEPTH_METRIC.metric_name,
-                                    "Dimensions": QUEUE_DEPTH_METRIC.dimensions(queue_name),
-                                    "Unit": "Count",
-                                    "Value": float(depth),
-                                }
-                            ],
+                            MetricData=metric_data,
                         )
-                        logger.info(
-                            f"Published queue depth metric to CloudWatch: queue={queue_name}, depth={depth}, namespace={namespace}",
-                            extra={"queue": queue_name, "depth": depth, "namespace": namespace, "response_metadata": response.get("ResponseMetadata", {})}
+                        logger.debug(
+                            f"Published queue backlog metrics to CloudWatch: queues={queue_names}, namespace={namespace}",
+                            extra={"queues": queue_names, "namespace": namespace, "response_metadata": response.get("ResponseMetadata", {})}
                         )
                     except ClientError as exc:
                         log_error_with_context(
                             logger,
                             exc,
                             "CLOUDWATCH METRIC PUBLISH",
-                            queue_name=queue_name,
-                            depth=depth,
+                            queues=queue_names,
                             namespace=namespace,
                             error_code=exc.response.get("Error", {}).get("Code"),
                         )
                     except Exception as exc:
-                        log_error_with_context(logger, exc, "CLOUDWATCH METRIC PUBLISH", queue_name=queue_name, depth=depth, namespace=namespace)
+                        log_error_with_context(logger, exc, "CLOUDWATCH METRIC PUBLISH", queues=queue_names, namespace=namespace)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                log_error_with_context(logger, exc, "QUEUE DEPTH METRICS LOOP", queue_name=queue_name)
-            await asyncio.sleep(max(5, interval_s))
+                log_error_with_context(logger, exc, "QUEUE BACKLOG METRICS LOOP", queues=queue_names)
+            await asyncio.sleep(max(1, interval_s))
     finally:
         try:
             await rabbitmq.disconnect()

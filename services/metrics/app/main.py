@@ -11,7 +11,7 @@ from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
 from shared.health import HealthMonitor
 from shared.pretty_log import setup_service_logger, log_connection_status
-from shared.queue_metrics import QUEUE_DEPTH_METRIC
+from shared.queue_metrics import QUEUE_DEPTH_METRIC, QUEUE_BACKLOG_METRIC
 
 
 _rabbitmq_connector = None
@@ -73,6 +73,7 @@ async def _init_cloudwatch_client(logger: logging.Logger, namespace: str) -> Opt
 async def _publish_queue_depth_loop() -> None:
     """
     Periodically check RabbitMQ queue depth and publish to CloudWatch.
+    Checks multiple queues (agent.mandates and gateway.debug) every second.
     
     :returns: None
     """
@@ -81,19 +82,22 @@ async def _publish_queue_depth_loop() -> None:
     logger = setup_service_logger("MetricsService", logging.INFO)
     cfg = ConnectorConfig()
 
-    interval_s = int(os.environ.get("QUEUE_DEPTH_METRICS_INTERVAL", "5"))
+    interval_s = int(os.environ.get("QUEUE_DEPTH_METRICS_INTERVAL", "1"))
     cloudwatch_enabled = os.environ.get("PUBLISH_QUEUE_DEPTH_METRICS", "").lower() in ("1", "true", "yes")
     namespace = os.environ.get("CLOUDWATCH_NAMESPACE", QUEUE_DEPTH_METRIC.namespace)
-    queue_name = os.environ.get("QUEUE_NAME", cfg.input_queue)
+    
+    primary_queue = os.environ.get("QUEUE_NAME", cfg.input_queue)
+    debug_queue = cfg.gateway_debug_queue_name
+    queue_names = [primary_queue, debug_queue]
 
-    logger.info(f"Starting metrics: queue={queue_name}, interval={interval_s}s, cloudwatch={cloudwatch_enabled}")
+    logger.info(f"Starting metrics: queues={queue_names}, interval={interval_s}s, cloudwatch={cloudwatch_enabled}")
     
     rabbitmq = ConnectorRabbitMQ(cfg)
     _rabbitmq_connector = rabbitmq
 
     try:
         await rabbitmq.connect()
-        logger.info(f"Connected to RabbitMQ: queue={queue_name}")
+        logger.info(f"Connected to RabbitMQ: queues={queue_names}")
     except Exception as exc:
         logger.error(f"Failed to connect to RabbitMQ: {exc}", exc_info=True)
         return
@@ -111,30 +115,57 @@ async def _publish_queue_depth_loop() -> None:
                     logger.warning("RabbitMQ not ready, reconnecting...")
                     await rabbitmq.connect()
                 
-                depth = await rabbitmq.get_queue_depth(queue_name)
-                
-                if depth is not None:
-                    logger.info(f"Queue depth: {queue_name}={depth}")
-                    
-                    if cloudwatch_enabled and cloudwatch is not None:
-                        try:
-                            await asyncio.to_thread(
-                                cloudwatch.put_metric_data,
-                                Namespace=namespace,
-                                MetricData=[{
-                                    "MetricName": QUEUE_DEPTH_METRIC.metric_name,
-                                    "Dimensions": QUEUE_DEPTH_METRIC.dimensions(queue_name),
-                                    "Unit": "Count",
-                                    "Value": float(depth),
-                                }],
+                metric_data = []
+                for queue_name in queue_names:
+                    try:
+                        depth = await rabbitmq.get_queue_depth(queue_name)
+                        
+                        if depth is not None:
+                            logger.info(
+                                "Queue depth",
+                                extra={"queue": queue_name, "depth": depth, "service": "metrics"}
                             )
-                            logger.debug(f"Published to CloudWatch: {queue_name}={depth}")
-                        except ClientError as exc:
-                            logger.warning(f"CloudWatch publish failed: {exc}")
-                        except Exception as exc:
-                            logger.warning(f"CloudWatch error: {exc}")
-                else:
-                    logger.warning(f"Queue depth unavailable: {queue_name}")
+                            
+                            if cloudwatch_enabled and cloudwatch is not None:
+                                metric_data.extend([
+                                    {
+                                        "MetricName": QUEUE_DEPTH_METRIC.metric_name,
+                                        "Dimensions": QUEUE_DEPTH_METRIC.dimensions(queue_name),
+                                        "Unit": "Count",
+                                        "Value": float(depth),
+                                    },
+                                    {
+                                        "MetricName": QUEUE_BACKLOG_METRIC.metric_name,
+                                        "Dimensions": QUEUE_BACKLOG_METRIC.dimensions(queue_name),
+                                        "Unit": "Count",
+                                        "Value": float(depth),
+                                    },
+                                ])
+                        else:
+                            logger.debug(
+                                "Queue depth unavailable",
+                                extra={"queue": queue_name, "service": "metrics"}
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            "Queue depth check error",
+                            extra={"queue": queue_name, "error": str(e), "error_type": type(e).__name__, "service": "metrics"},
+                            exc_info=True
+                        )
+                        continue
+                
+                if cloudwatch_enabled and cloudwatch is not None and metric_data:
+                    try:
+                        await asyncio.to_thread(
+                            cloudwatch.put_metric_data,
+                            Namespace=namespace,
+                            MetricData=metric_data,
+                        )
+                        logger.debug(f"Published to CloudWatch: queues={queue_names}")
+                    except ClientError as exc:
+                        logger.warning(f"CloudWatch publish failed: {exc}")
+                    except Exception as exc:
+                        logger.warning(f"CloudWatch error: {exc}")
                     
             except asyncio.CancelledError:
                 raise

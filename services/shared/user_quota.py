@@ -30,7 +30,10 @@ class SupabaseUserTickManager:
         profile_table: str = "profiles",
         usage_table: str = "user_daily_usage",
     ) -> None:
-        """Initialize with default limit and table names."""
+        """
+        Initialize with default limit and table names.
+        :param default_daily_limit: Default daily tick limit (defaults to 32)
+        """
         self.default_daily_limit = default_daily_limit
         self.profile_table = profile_table
         self.usage_table = usage_table

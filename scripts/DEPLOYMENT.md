@@ -2,6 +2,19 @@
 
 Scripts for AWS ECS deployment and management.
 
+## Recent Changes
+
+### 2026-02-04: Deployment Snapshot & Audit System
+- Added `snapshot-deployment.py` - Creates comprehensive deployment snapshots for reproducibility
+- Added `audit-aws-changes.py` - Tracks AWS changes and correlates with git commits
+- Chroma health check: Increased start period to 600s (10 minutes), timeout to 30s
+- Gateway resources: Doubled to 1 vCPU (1024), 2GB RAM (2048) for autoscale mode
+
+### 2026-02-01: Service Separation Complete
+- Gateway service: 0.5 vCPU (512), 1GB RAM (1024) - now 1 vCPU, 2GB RAM
+- Agent service: 0.25 vCPU (256), 0.5GB RAM (512)
+- Service separation stable (8+ hours)
+
 ## Scripts
 
 - **`deploy-single.py`**: Deploy single service mode (all containers in one service)
@@ -13,9 +26,12 @@ Scripts for AWS ECS deployment and management.
 - **`network_utils.py`**: Network validation and security group fixes
 - **`fix-iam-permissions.py`**: Setup IAM permissions for ECS task protection
 - **`check.py`**: Health checks for deployed services
+- **`check-autoscale.py`**: Enhanced health checks for autoscale mode (with logs, history, task definitions)
 - **`diagnose-deployment.py`**: Comprehensive deployment diagnostics
 - **`efs-tools.py`**: EFS verification and diagnostic tools
 - **`verify-config.py`**: Verify task definition and security group configuration
+- **`snapshot-deployment.py`**: Create deployment snapshots for reproducibility
+- **`audit-aws-changes.py`**: Track AWS changes and correlate with git commits
 
 ## Quick Start
 
@@ -151,8 +167,8 @@ Creates a single ECS service `euglena-service` with:
 
 Creates two ECS services:
 - `euglena-gateway`: Gateway service with ALB integration
-  - Resources: 0.5 vCPU (512 CPU units), 1GB RAM (1024 MB)
-  - Containers: chroma, redis, rabbitmq, gateway
+  - Resources: 1 vCPU (1024 CPU units), 2GB RAM (2048 MB) - updated 2026-02-04
+  - Containers: chroma, redis, rabbitmq, gateway, metrics
   - Service discovery: Registered at `euglena-gateway.euglena.local`
 - `euglena-agent`: Agent service (no ALB)
   - Resources: 0.25 vCPU (256 CPU units), 0.5GB RAM (512 MB)
