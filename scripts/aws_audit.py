@@ -1,6 +1,7 @@
 """
 AWS audit utilities - reusable OOP module for tracking changes.
 """
+import argparse
 import json
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -8,6 +9,8 @@ from typing import Dict, List
 from pathlib import Path
 import boto3
 from botocore.exceptions import ClientError
+
+from deploy_common import load_aws_config
 
 
 class AWSAuditor:
@@ -168,3 +171,38 @@ class AWSAuditor:
                 "ecr_pushes": ecr_pushes
             }
         }
+
+
+def parse_args():
+    """
+    Parse CLI arguments.
+    
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Run AWS audit report")
+    parser.add_argument("--services-dir", type=Path, default=None,
+                       help="Services directory containing aws.env")
+    parser.add_argument("--days", type=int, default=10, help="Days to look back")
+    return parser.parse_args()
+
+
+def main():
+    """
+    Main entry point.
+    """
+    args = parse_args()
+    services_dir = args.services_dir or Path.cwd()
+    aws_config = load_aws_config(services_dir)
+    region = aws_config.get("AWS_REGION")
+    cluster = aws_config.get("ECS_CLUSTER")
+    account_id = aws_config.get("AWS_ACCOUNT_ID", "")
+    if not region or not cluster:
+        print("AWS_REGION and ECS_CLUSTER are required in aws.env")
+        raise SystemExit(1)
+    auditor = AWSAuditor(region=region, cluster=cluster, account_id=account_id)
+    report = auditor.audit(datetime.now(timezone.utc), days=args.days)
+    print(json.dumps(report, indent=2))
+
+
+if __name__ == "__main__":
+    main()

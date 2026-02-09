@@ -231,8 +231,8 @@ def build_and_register_task_definitions(services_dir: Path, mode: DeploymentMode
     """
     print("\n=== Building Task Definitions ===")
     
-    script_path = services_dir.parent / "scripts" / "build-task-definition.py"
-    cmd = ["python", str(script_path), "--mode", mode]
+    script_path = services_dir.parent / "scripts" / "build_task_definition.py"
+    cmd = ["python", str(script_path), "--mode", mode.value]
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
@@ -513,9 +513,10 @@ def cleanup_old_deployments(aws_config: Dict, service_name: str) -> bool:
         return True
 
 
-def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_config: Dict, 
+def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_config: Dict,
                                 service_name: str, task_family: str, network_config: Dict,
-                                load_balancers: Optional[List[Dict]], desired_count: int) -> bool:
+                                load_balancers: Optional[List[Dict]], desired_count: int,
+                                force_deploy: bool = False) -> bool:
     """
     Ensure service has exactly the specified configuration, removing any leftover settings.
     
@@ -531,6 +532,7 @@ def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_confi
     :param network_config: Network configuration.
     :param load_balancers: Load balancer configuration (None to remove old config).
     :param desired_count: Desired task count.
+    :param force_deploy: Force a new deployment even when task definition is unchanged.
     :returns: True on success.
     """
     print(f"\n=== Ensuring Exact Service Configuration ===")
@@ -548,7 +550,8 @@ def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_confi
         load_balancers=load_balancers,
         service_registries=None,
         health_check_grace_period=100,
-        enable_az_rebalancing=True
+        enable_az_rebalancing=True,
+        force_deploy=force_deploy
     )
 
 
@@ -614,6 +617,10 @@ def parse_args():
                        help="Skip network validation")
     parser.add_argument("--wait", action="store_true",
                        help="Wait for services to stabilize after deployment")
+    parser.add_argument("--force-deploy", action="store_true",
+                       help="Force new deployment even if task definition is unchanged")
+    parser.add_argument("--update-secrets", action="store_true",
+                       help="Update Secrets Manager values from keys.env before deployment")
     
     return parser.parse_args()
 
@@ -652,6 +659,25 @@ def main():
         print("\nFAIL: Cluster setup failed")
         all_success = False
     
+    if args.update_secrets:
+        print("\n=== Updating Secrets Manager ===")
+        try:
+            import sys as _sys
+            script_dir = Path(__file__).parent
+            if str(script_dir) not in _sys.path:
+                _sys.path.insert(0, str(script_dir))
+            from register_secrets import update_secrets_from_keys_env
+        except Exception as e:
+            print(f"  WARN: Secrets update failed: {e}")
+            all_success = False
+        else:
+            if update_secrets_from_keys_env(services_dir):
+                print("  OK: Secrets updated")
+                args.force_deploy = True
+            else:
+                print("  WARN: Secrets update failed")
+                all_success = False
+
     if not args.skip_ecr:
         ecr_services = ["gateway", "agent"]
         if not push_to_ecr(services_dir, aws_config, ecr_services):
@@ -685,7 +711,7 @@ def main():
     try:
         import importlib.util
         script_dir = Path(__file__).parent
-        iam_script_path = script_dir / "fix-iam-permissions.py"
+        iam_script_path = script_dir / "fix_iam_permissions.py"
         if iam_script_path.exists():
             spec = importlib.util.spec_from_file_location("fix_iam_permissions", iam_script_path)
             fix_iam_module = importlib.util.module_from_spec(spec)
@@ -696,7 +722,7 @@ def main():
             else:
                 print("  WARN: add_task_protection_permission function not found (skipping)")
         else:
-            print("  WARN: fix-iam-permissions.py not found (skipping)")
+            print("  WARN: fix_iam_permissions.py not found (skipping)")
     except Exception as e:
         print(f"  WARN: Could not fix IAM permissions: {e} (continuing anyway)")
     
@@ -802,14 +828,15 @@ def main():
                 task_family=task_family,
                 network_config=network_config,
                 load_balancers=load_balancers,
-                desired_count=1
+                desired_count=1,
+                force_deploy=args.force_deploy
             ):
                 print(f"  FAIL: Failed to create/update {service_name}")
                 all_success = False
             
-            if args.wait:
-                time.sleep(120)
-                wait_for_services_stable(aws_config, ["euglena-service"])
+        if args.wait:
+            time.sleep(120)
+            wait_for_services_stable(aws_config, ["euglena-service"])
         else:
             gateway_service_name = "euglena-gateway"
             agent_service_name = "euglena-agent"
@@ -823,7 +850,8 @@ def main():
                 task_family=gateway_task_family,
                 network_config=network_config,
                 load_balancers=load_balancers,
-                desired_count=1
+                desired_count=1,
+                force_deploy=args.force_deploy
             ):
                 print(f"  FAIL: Failed to create/update {gateway_service_name}")
                 all_success = False
@@ -835,14 +863,15 @@ def main():
                 task_family=agent_task_family,
                 network_config=network_config,
                 load_balancers=None,
-                desired_count=1
+                desired_count=1,
+                force_deploy=args.force_deploy
             ):
                 print(f"  FAIL: Failed to create/update {agent_service_name}")
                 all_success = False
             
-            if args.wait:
-                time.sleep(120)
-                wait_for_services_stable(aws_config, [gateway_service_name, agent_service_name])
+        if args.wait:
+            time.sleep(120)
+            wait_for_services_stable(aws_config, [gateway_service_name, agent_service_name])
     
     if all_success:
         print("\n" + "=" * 60)
@@ -860,3 +889,4 @@ def main():
 if __name__ == "__main__":
     main()
     
+

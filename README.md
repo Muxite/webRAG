@@ -1,28 +1,32 @@
-#### 2026-01-09, AWS DEPLOYMENT IS CURRENTLY DOWN FOR COST-OPTIMIZATION ISSUES
+# Euglena AI
 
-# Euglena / WebRAG
+Euglena is an agentic AI service with web crawling and extensive retrival augmented generation.
+Context space is greatly extended through use of a vector database, and value to cost ratio is maximized through efficient autoscaling and token efficient workflows.
 
-Euglena is an autonomous RAG agent system that accepts tasks, runs a tick-based reasoning loop, and streams progress updates while persisting results and context.
+## Live Website
+- https://web-rag-nine.vercel.app/
+Users can sign up for account and recieve a number of free actions that resets every day.
 
-## What It Is
-- Distributed agent platform with a web UI, API gateway, and worker agents
-- RabbitMQ-based work queue, Redis status store, ChromaDB memory, Supabase auth
-- ECS-based deployment with autoscaling workers
+Agents search the internet, follow links, read websites, and construct detailed responses. Data is persisted in vector databases for long-term knowledge.
 
-## Components
-- `frontend/`: React UI for task submission and status
-- `services/gateway/`: FastAPI gateway, auth, task intake, status readback
-- `services/agent/`: Worker that consumes tasks and executes agent logic
-- `services/shared/`: Connectors, models, retry helpers, storage utilities
-- `services/metrics/`: Queue depth metrics to CloudWatch
-- `services/lambda_autoscaling/`: Lambda autoscaler for ECS desired count
+## What it does
+- End-to-end task lifecycle: submit -> queue -> process -> stream status -> persist results
+- Internet-native agents: Agents can search the web, visit links recursively, and extracted structured information to produce detailed, in-depth responses.
+- Long-term memory (RAG): crawled/learned content is embedded into a vector database so context grows over time, stays queryable, and can be reused in future tasks.
+- Elastic Worker Fleet: efficiently scales workers to meet demand, and winds down workers once demand subsides.
+- User-scope history + quotas: Supabase persists task history and status and enforces per-user daily usage.
+- Single-Script Production Deployment: infrastructure-as-code scripts provision and deploy the full stack consistantly.
 
-## Message Flow (High Level)
-1. Client submits task to gateway `/tasks` with Supabase JWT
-2. Gateway stores initial task state and publishes to RabbitMQ
-3. Agent consumes task and emits status transitions to RabbitMQ + Redis
-4. Gateway serves `/tasks/{id}` from Redis
-5. Autoscaler reads QueueDepth and adjusts agent desired count
+## Functionality
+- Web UI for task submission, status, and results
+- FastAPI gateway for auth, task intake, and Supabase sync
+- Worker agents execute tasks, publish statuses, access the internet, and do web actions.
+- Redis for transient worker presence and status, Supabase for durable history
+
+## Tech Stack
+- Frontend: React, Vite, Supabase Auth
+- Backend: FastAPI, RabbitMQ, Redis, ChromaDB, Supabase
+- Infra: AWS ECS, ECR, CloudWatch, Lambda, 
 
 ## Quick Start (Local)
 ```bash
@@ -31,15 +35,14 @@ docker compose up -d rabbitmq redis chroma gateway agent
 ```
 
 ## Docs
-- Architecture and message flow: `docs/ARCHITECTURE.md`
-- Scripts guide: `scripts/README.md`
+- Architecture: `docs/ARCHITECTURE.md`
+- Scripts: `scripts/README.md`
 - Security: `docs/SECURITY.md`
-- Testing: `docs/TESTING.md`
 
 ## Deployment
 Run from `services/`:
 ```bash
-python ../scripts/deploy.py
+python ../scripts/deploy_autoscale.py
 python ../scripts/check.py
 ```
 

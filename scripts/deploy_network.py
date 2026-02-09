@@ -1,7 +1,11 @@
 """
 Network configuration for deployment scripts.
 """
+import argparse
+from pathlib import Path
 from typing import Dict, Optional
+
+from deploy_common import load_aws_config
 
 try:
     from scripts.network_discovery import NetworkDiscovery
@@ -50,3 +54,31 @@ def get_network_config(aws_config: Dict, network_discovery: NetworkDiscovery) ->
         "securityGroups": security_group_ids,
         "assignPublicIp": assign_public_ip
     }
+
+
+def parse_args():
+    """
+    Parse CLI arguments.
+    
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Print ECS network configuration")
+    parser.add_argument("--services-dir", type=Path, default=None,
+                       help="Services directory containing aws.env")
+    return parser.parse_args()
+
+
+def main():
+    """
+    Main entry point.
+    """
+    args = parse_args()
+    services_dir = args.services_dir or Path.cwd()
+    aws_config = load_aws_config(services_dir)
+    discovery = NetworkDiscovery(region=aws_config["AWS_REGION"], vpc_id=aws_config.get("VPC_ID"))
+    config = get_network_config(aws_config, discovery)
+    print(config or "None")
+
+
+if __name__ == "__main__":
+    main()

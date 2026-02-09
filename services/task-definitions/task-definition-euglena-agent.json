@@ -41,6 +41,14 @@
                     "value": "10"
                 },
                 {
+                    "name": "DEPLOYMENT_NUMBER",
+                    "value": "57"
+                },
+                {
+                    "name": "ECS_CLUSTER",
+                    "value": "euglena-cluster"
+                },
+                {
                     "name": "GATEWAY_URL",
                     "value": "http://euglena-gateway.euglena.local:8080"
                 },
@@ -51,6 +59,14 @@
                 {
                     "name": "LITE",
                     "value": "true"
+                },
+                {
+                    "name": "MAX_WORKERS",
+                    "value": "11"
+                },
+                {
+                    "name": "MIN_WORKERS",
+                    "value": "1"
                 },
                 {
                     "name": "MODEL_API_URL",
@@ -67,6 +83,18 @@
                 {
                     "name": "REDIS_URL",
                     "value": "redis://euglena-gateway.euglena.local:6379/0"
+                },
+                {
+                    "name": "TARGET_MESSAGES_PER_WORKER",
+                    "value": "2"
+                },
+                {
+                    "name": "VARIANT_NUMBER",
+                    "value": "1"
+                },
+                {
+                    "name": "WORKER_STATE_PREFIX",
+                    "value": "worker_state"
                 }
             ],
             "essential": true,
@@ -116,16 +144,24 @@
                     "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena-secrets-zFuHS6:SUPABASE_ALLOW_UNCONFIRMED::"
                 },
                 {
-                    "name": "SUPABASE_ANON_KEY",
-                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena-secrets-zFuHS6:SUPABASE_ANON_KEY::"
-                },
-                {
-                    "name": "SUPABASE_API_KEY",
-                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena-secrets-zFuHS6:SUPABASE_API_KEY::"
+                    "name": "SUPABASE_ANON_PUBLIC_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena-secrets-zFuHS6:SUPABASE_ANON_PUBLIC_KEY::"
                 },
                 {
                     "name": "SUPABASE_JWT_SECRET",
                     "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena-secrets-zFuHS6:SUPABASE_JWT_SECRET::"
+                },
+                {
+                    "name": "SUPABASE_PUBLISHABLE_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena-secrets-zFuHS6:SUPABASE_PUBLISHABLE_KEY::"
+                },
+                {
+                    "name": "SUPABASE_SECRET_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena-secrets-zFuHS6:SUPABASE_SECRET_KEY::"
+                },
+                {
+                    "name": "SUPABASE_SERVICE_ROLE_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:848960888155:secret:euglena-secrets-zFuHS6:SUPABASE_SERVICE_ROLE_KEY::"
                 },
                 {
                     "name": "SUPABASE_URL",

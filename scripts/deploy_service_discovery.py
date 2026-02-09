@@ -1,8 +1,12 @@
 """
 Service discovery setup for deployment scripts.
 """
+import argparse
 import boto3
+from pathlib import Path
 from typing import Dict, List, Optional
+
+from deploy_common import load_aws_config
 
 
 def setup_service_discovery(aws_config: Dict) -> Optional[List[Dict]]:
@@ -183,3 +187,30 @@ def setup_service_discovery(aws_config: Dict) -> Optional[List[Dict]]:
         import traceback
         traceback.print_exc()
         return None
+
+
+def parse_args():
+    """
+    Parse CLI arguments.
+    
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Configure service discovery")
+    parser.add_argument("--services-dir", type=Path, default=None,
+                       help="Services directory containing aws.env")
+    return parser.parse_args()
+
+
+def main():
+    """
+    Main entry point.
+    """
+    args = parse_args()
+    services_dir = args.services_dir or Path.cwd()
+    aws_config = load_aws_config(services_dir)
+    registries = setup_service_discovery(aws_config)
+    print(registries or "None")
+
+
+if __name__ == "__main__":
+    main()

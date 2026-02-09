@@ -11,10 +11,10 @@ from shared.models import TaskRequest, TaskResponse, TaskRecord
 from shared.message_contract import (
     TaskEnvelope,
     KeyNames,
-    TaskState,
     to_dict,
 )
-from shared.storage import TaskStorage
+from shared.storage import RedisTaskStorage, SupabaseTaskStorage
+from gateway.app.task_registrar import GatewayTaskRegistrar
 
 
 class GatewayService:
@@ -25,25 +25,32 @@ class GatewayService:
     def __init__(
         self,
         config: ConnectorConfig,
-        storage: TaskStorage,
+        redis_storage: RedisTaskStorage,
+        supabase_storage: SupabaseTaskStorage,
+        registrar: GatewayTaskRegistrar,
         rabbitmq: ConnectorRabbitMQ,
         quota: Optional[object] = None,
     ) -> None:
         """
         Initialize the gateway service.
         :param config: Shared connector configuration.
-        :param storage: Task storage implementation.
+        :param redis_storage: Redis task storage for worker status updates.
+        :param supabase_storage: Supabase task storage for persisted history.
+        :param registrar: Task registrar orchestrating sync between storages.
         :param rabbitmq: RabbitMQ connector for publishing and consuming messages.
         :param quota: Optional quota manager.
         :return: None
         """
         self.config = config
-        self.storage = storage
+        self.redis_storage = redis_storage
+        self.supabase_storage = supabase_storage
+        self.registrar = registrar
         self.rabbitmq = rabbitmq
         self.quota = quota
         self.logger = logging.getLogger(self.__class__.__name__)
         self._running = False
         self._queue_depth_task: Optional[asyncio.Task] = None
+        self._status_sync_task: Optional[asyncio.Task] = None
         self._queue_depths: dict[str, Optional[int]] = {}
 
     async def start(self) -> None:
@@ -56,17 +63,19 @@ class GatewayService:
         self._running = True
         self.logger.info("GatewayService started")
         
-        if hasattr(self.storage, 'connector'):
+        if hasattr(self.redis_storage, 'connector'):
             asyncio.create_task(self._init_redis_background())
         
         self._queue_depth_task = asyncio.create_task(self._queue_depth_loop())
+        self._status_sync_task = asyncio.create_task(self._status_sync_loop())
+        self.logger.info("Gateway status sync loop started")
     
     async def _init_redis_background(self) -> None:
         """
         Initialize Redis in the background without blocking startup.
         """
         try:
-            await self.storage.connector.init_redis()
+            await self.redis_storage.connector.init_redis()
             self.logger.info("Redis initialized successfully")
         except Exception as e:
             self.logger.warning(f"Redis initialization failed: {e}")
@@ -82,11 +91,17 @@ class GatewayService:
                 await self._queue_depth_task
             except asyncio.CancelledError:
                 pass
+        if self._status_sync_task and not self._status_sync_task.done():
+            self._status_sync_task.cancel()
+            try:
+                await self._status_sync_task
+            except asyncio.CancelledError:
+                pass
         
         await self.rabbitmq.disconnect()
-        if hasattr(self.storage, 'connector'):
+        if hasattr(self.redis_storage, 'connector'):
             try:
-                await self.storage.connector.disconnect()
+                await self.redis_storage.connector.disconnect()
             except Exception as e:
                 self.logger.debug(f"Error disconnecting Redis: {e}")
         self.logger.info("GatewayService stopped")
@@ -156,10 +171,38 @@ class GatewayService:
         """
         return self._queue_depths.copy()
 
-    async def create_task(self, req: TaskRequest) -> TaskResponse:
+    async def _status_sync_loop(self) -> None:
+        """
+        Periodically sync Redis task statuses into Supabase.
+        :returns: None
+        """
+        interval_s = float(os.environ.get("GATEWAY_STATUS_SYNC_INTERVAL", str(self.config.status_time)))
+        self.logger.info("Status sync interval configured", extra={"interval_s": interval_s})
+        try:
+            while self._running:
+                try:
+                    await self.registrar.sync_from_redis_once()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self.logger.warning(
+                        "Status sync loop error",
+                        extra={"error": str(e), "error_type": type(e).__name__},
+                        exc_info=True,
+                    )
+                await asyncio.sleep(interval_s)
+        except asyncio.CancelledError:
+            self.logger.info("Status sync loop stopped")
+            raise
+        except Exception as e:
+            self.logger.error(f"Status sync loop fatal error: {e}", exc_info=True)
+
+    async def create_task(self, req: TaskRequest, user_id: str, access_token: str) -> TaskResponse:
         """
         Create a new task record and publish an envelope to the input queue.
         :param req: Task creation request containing mandate and max_ticks.
+        :param user_id: Supabase auth user id for task ownership.
+        :param access_token: Supabase JWT token for RLS write.
         :return: Initial task response with identifiers and status.
         """
         correlation_id = req.correlation_id or str(uuid.uuid4())
@@ -167,7 +210,7 @@ class GatewayService:
 
         record = TaskRecord(
             correlation_id=correlation_id,
-            status=TaskState.PENDING.value,
+            status="in_queue",
             mandate=req.mandate,
             created_at=now,
             updated_at=now,
@@ -176,7 +219,7 @@ class GatewayService:
             tick=None,
             max_ticks=int(req.max_ticks or 50),
         )
-        await self.storage.create_task(correlation_id, record.to_dict())
+        await self.registrar.register_new_task(user_id, access_token, req, correlation_id)
         self.logger.info(
             "Created task record",
             extra={
@@ -235,7 +278,7 @@ class GatewayService:
         :param correlation_id: Identifier of the task.
         :return: Task response reflecting current state or unknown when missing.
         """
-        data = await self.storage.get_task(correlation_id)
+        data = await self.supabase_storage.get_task(correlation_id)
         if not data:
             now = datetime.utcnow().isoformat()
             return TaskResponse(
@@ -250,7 +293,17 @@ class GatewayService:
                 max_ticks=50,
             )
 
-        record = TaskRecord(**data)
+        record = TaskRecord(
+            correlation_id=data.get("correlation_id", correlation_id),
+            status=data.get("status", "unknown"),
+            mandate=data.get("mandate", ""),
+            created_at=data.get("created_at", ""),
+            updated_at=data.get("updated_at", ""),
+            result=data.get("result"),
+            error=data.get("error"),
+            tick=data.get("tick"),
+            max_ticks=data.get("max_ticks", 50),
+        )
         return TaskResponse(
             correlation_id=record.correlation_id,
             status=record.status,

@@ -7,6 +7,7 @@ from shared.pretty_log import setup_service_logger, log_connection_status
 from shared.startup_message import log_startup_message, log_shutdown_message
 from shared.health import HealthMonitor
 from agent.app.interface_agent import InterfaceAgent
+from shared.versioning import get_version_info
 
 
 async def health_handler(request):
@@ -19,7 +20,8 @@ async def health_handler(request):
     :returns: Health status with component breakdown.
     """
     logger = setup_service_logger("Agent", logging.INFO)
-    monitor = HealthMonitor(service="agent", version="0.1.0", logger=logger)
+    version_info = request.app.get("version_info", {"version": "0.0"})
+    monitor = HealthMonitor(service="agent", version=version_info["version"], logger=logger)
     monitor.set_component("process", True)
     
     worker = request.app.get("worker")
@@ -39,12 +41,24 @@ async def health_handler(request):
     return web.json_response(payload)
 
 
+async def version_handler(request):
+    """
+    Return agent version metadata.
+    :param request: aiohttp request object.
+    :returns: Version information payload.
+    """
+    version_info = request.app.get("version_info", {"version": "0.0", "variant": "0", "deployment": "0"})
+    return web.json_response(version_info)
+
+
 async def _run() -> None:
     logger = setup_service_logger("Agent", logging.INFO)
-    
-    log_startup_message(logger, "AGENT", "0.1.0")
+    version_info = get_version_info()
+    log_startup_message(logger, "AGENT", version_info["version"])
     app = web.Application()
     app.router.add_get('/health', health_handler)
+    app.router.add_get('/version', version_handler)
+    app["version_info"] = version_info
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8081)
