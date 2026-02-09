@@ -3,9 +3,12 @@ from abc import ABC, abstractmethod
 from typing import Optional
 from datetime import datetime
 import json
+import asyncio
 
 from shared.connector_redis import ConnectorRedis
 from shared.connector_config import ConnectorConfig
+from supabase import Client
+from shared.supabase_client import create_service_client
 
 
 class TaskStorage(ABC):
@@ -77,6 +80,7 @@ class RedisTaskStorage(TaskStorage):
             if not isinstance(existing, dict):
                 # Preserve any unexpected existing content under 'raw'
                 existing = {"raw": existing}
+            existing.setdefault("correlation_id", correlation_id)
             existing.update(updates)
             existing["updated_at"] = datetime.utcnow().isoformat()
             await conn.set_json(key, existing)
@@ -118,3 +122,130 @@ class RedisTaskStorage(TaskStorage):
             if deleted:
                 self.logger.info(f"Deleted task {correlation_id} (redis)")
             return bool(deleted)
+
+
+class SupabaseTaskStorage(TaskStorage):
+    """
+    Supabase-backed task storage.
+    :param table: Table name for tasks
+    :param client: Supabase client instance
+    """
+
+    def __init__(self, table: str = "tasks", client: Client | None = None):
+        self.table = table
+        self.client = client or create_service_client()
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    async def _execute(self, fn):
+        """
+        Run blocking Supabase call in a worker thread.
+        :param fn: Callable returning a Supabase response
+        :return: Supabase response
+        """
+        return await asyncio.to_thread(fn)
+
+    async def create_task(self, correlation_id: str, task_data: dict) -> None:
+        """
+        Create a task row in Supabase.
+        :param correlation_id: Task correlation id
+        :param task_data: Task payload
+        :return: None
+        """
+        payload = dict(task_data or {})
+        payload["correlation_id"] = correlation_id
+
+        def _do():
+            return self.client.table(self.table).insert(payload).execute()
+
+        response = await self._execute(_do)
+        error = getattr(response, "error", None)
+        if error:
+            raise RuntimeError(f"Failed to insert task: {error}")
+
+    async def get_task(self, correlation_id: str) -> Optional[dict]:
+        """
+        Get a task row by correlation id.
+        :param correlation_id: Task correlation id
+        :return: Task row or None
+        """
+        def _do():
+            return (
+                self.client
+                .table(self.table)
+                .select("*")
+                .eq("correlation_id", correlation_id)
+                .maybe_single()
+                .execute()
+            )
+
+        response = await self._execute(_do)
+        error = getattr(response, "error", None)
+        if error:
+            self.logger.warning(f"Failed to fetch task: {error}")
+            return None
+        return getattr(response, "data", None)
+
+    async def update_task(self, correlation_id: str, updates: dict) -> None:
+        """
+        Update a task row by correlation id.
+        :param correlation_id: Task correlation id
+        :param updates: Partial update payload
+        :return: None
+        """
+        payload = dict(updates or {})
+        payload.setdefault("updated_at", datetime.utcnow().isoformat())
+
+        def _do():
+            return (
+                self.client
+                .table(self.table)
+                .update(payload)
+                .eq("correlation_id", correlation_id)
+                .execute()
+            )
+
+        response = await self._execute(_do)
+        error = getattr(response, "error", None)
+        if error:
+            raise RuntimeError(f"Failed to update task: {error}")
+
+    async def list_tasks(self) -> list[dict]:
+        """
+        List all tasks.
+        :return: List of task rows
+        """
+        def _do():
+            return self.client.table(self.table).select("*").execute()
+
+        response = await self._execute(_do)
+        error = getattr(response, "error", None)
+        if error:
+            self.logger.warning(f"Failed to list tasks: {error}")
+            return []
+        data = getattr(response, "data", None)
+        return data if isinstance(data, list) else []
+
+    async def delete_task(self, correlation_id: str) -> bool:
+        """
+        Delete a task row by correlation id.
+        :param correlation_id: Task correlation id
+        :return: True if a row was deleted
+        """
+        def _do():
+            return (
+                self.client
+                .table(self.table)
+                .delete()
+                .eq("correlation_id", correlation_id)
+                .execute()
+            )
+
+        response = await self._execute(_do)
+        error = getattr(response, "error", None)
+        if error:
+            self.logger.warning(f"Failed to delete task: {error}")
+            return False
+        data = getattr(response, "data", None)
+        return bool(data)
+
+

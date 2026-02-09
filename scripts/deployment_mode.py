@@ -31,3 +31,15 @@ class DeploymentMode(Enum):
             if mode.value == value_lower:
                 return mode
         raise ValueError(f"Invalid deployment mode: {value}. Must be 'single' or 'autoscale'")
+
+
+def main():
+    """
+    Main entry point.
+    """
+    modes = ", ".join([mode.value for mode in DeploymentMode])
+    print(f"Available modes: {modes}")
+
+
+if __name__ == "__main__":
+    main()

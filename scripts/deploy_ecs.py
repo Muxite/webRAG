@@ -1,6 +1,7 @@
 """
 ECS service management for deployment scripts.
 """
+import argparse
 import boto3
 import time
 from typing import Dict, List, Optional
@@ -143,10 +144,11 @@ def cleanup_old_deployments(aws_config: Dict, service_name: str) -> bool:
         return True
 
 
-def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_config: Dict, 
+def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_config: Dict,
                                 service_name: str, task_family: str, network_config: Dict,
                                 load_balancers: Optional[List[Dict]], desired_count: int,
-                                service_registries: Optional[List[Dict]] = None) -> bool:
+                                service_registries: Optional[List[Dict]] = None,
+                                force_deploy: bool = False) -> bool:
     """
     Ensure service has exactly the specified configuration, removing any leftover settings.
     
@@ -158,6 +160,7 @@ def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_confi
     :param load_balancers: Load balancer configuration (None to remove old config).
     :param desired_count: Desired task count.
     :param service_registries: Optional service discovery registries (None to preserve existing).
+    :param force_deploy: Force a new deployment even when task definition is unchanged.
     :returns: True on success.
     """
     print(f"\n=== Ensuring Exact Service Configuration ===")
@@ -186,7 +189,8 @@ def ensure_exact_service_config(ecs_infrastructure: EcsInfrastructure, aws_confi
         load_balancers=load_balancers,
         service_registries=service_registries,
         health_check_grace_period=100,
-        enable_az_rebalancing=True
+        enable_az_rebalancing=True,
+        force_deploy=force_deploy
     )
 
 
@@ -316,3 +320,38 @@ def stop_other_mode_services(aws_config: Dict, current_mode: DeploymentMode) -> 
                 print(f"  WARN: Error stopping {service_name}: {e} (continuing anyway)")
     
     return True
+
+
+def parse_args():
+    """
+    Parse CLI arguments.
+    
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Describe ECS service status")
+    parser.add_argument("--region", required=True, help="AWS region")
+    parser.add_argument("--cluster", required=True, help="ECS cluster name")
+    parser.add_argument("--service", required=True, help="ECS service name")
+    return parser.parse_args()
+
+
+def main():
+    """
+    Main entry point.
+    """
+    args = parse_args()
+    ecs_client = boto3.client("ecs", region_name=args.region)
+    response = ecs_client.describe_services(cluster=args.cluster, services=[args.service])
+    services = response.get("services", [])
+    if not services:
+        print("Service not found")
+        raise SystemExit(1)
+    service = services[0]
+    print(f"Service: {service.get('serviceName')}")
+    print(f"Status: {service.get('status')}")
+    print(f"TaskDefinition: {service.get('taskDefinition')}")
+    print(f"Running: {service.get('runningCount')}, Desired: {service.get('desiredCount')}, Pending: {service.get('pendingCount')}")
+
+
+if __name__ == "__main__":
+    main()

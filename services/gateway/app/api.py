@@ -9,13 +9,15 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from shared.connector_config import ConnectorConfig
 from shared.connector_rabbitmq import ConnectorRabbitMQ
 from shared.models import TaskRequest, TaskResponse
-from shared.storage import RedisTaskStorage
+from shared.storage import RedisTaskStorage, SupabaseTaskStorage
+from gateway.app.task_registrar import GatewayTaskRegistrar
 from shared.pretty_log import setup_service_logger, log_connection_status
 from shared.startup_message import log_startup_message, log_shutdown_message
 from shared.health import HealthMonitor
 from gateway.app.gateway_service import GatewayService
 from gateway.app.supabase_auth import SupabaseUser, get_current_supabase_user
 from shared.user_quota import SupabaseUserTickManager
+from shared.versioning import get_version_info
 
 
 def is_test_mode() -> bool:
@@ -30,10 +32,11 @@ def is_test_mode() -> bool:
 def create_app(service: Optional[GatewayService] = None) -> FastAPI:
     logger = setup_service_logger("Gateway", logging.INFO)
     cfg = ConnectorConfig()
+    version_info = get_version_info()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        log_startup_message(logger, "GATEWAY", "0.1.0")
+        log_startup_message(logger, "GATEWAY", version_info["version"])
         try:
             await app.state.gateway_service.start()
             log_connection_status(logger, "GatewayService", "CONNECTED")
@@ -47,7 +50,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             except Exception as e:
                 logger.error("Failed to stop GatewayService: %s", e, exc_info=True)
 
-    app = FastAPI(title="Euglena Gateway", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Euglena Gateway", version=version_info["version"], lifespan=lifespan)
     
     trusted_hosts = os.environ.get("TRUSTED_HOSTS")
     if trusted_hosts:
@@ -71,13 +74,22 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
 
     _service = service
     if _service is None:
-        storage = RedisTaskStorage(cfg)
+        redis_storage = RedisTaskStorage(cfg)
+        supabase_storage = SupabaseTaskStorage()
+        registrar = GatewayTaskRegistrar(redis_storage, supabase_storage)
         rmq = ConnectorRabbitMQ(cfg)
-        _service = GatewayService(config=cfg, storage=storage, rabbitmq=rmq)
+        _service = GatewayService(
+            config=cfg,
+            redis_storage=redis_storage,
+            supabase_storage=supabase_storage,
+            registrar=registrar,
+            rabbitmq=rmq,
+        )
 
     app.state.gateway_service = _service
     app.state.user_tick_manager = SupabaseUserTickManager()
     app.state.test_mode = is_test_mode()
+    app.state.version_info = version_info
     
     if app.state.test_mode:
         logger.info("Gateway running in TEST MODE - some production checks may be relaxed")
@@ -92,7 +104,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
         
         :returns: Health status with component breakdown and queue depths.
         """
-        monitor = HealthMonitor(service="gateway", version="0.1.0", logger=logger)
+        monitor = HealthMonitor(service="gateway", version=version_info["version"], logger=logger)
         monitor.set_component("process", True)
         
         gateway_service = app.state.gateway_service
@@ -101,8 +113,8 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             monitor.set_component("rabbitmq", gateway_service.rabbitmq.is_ready() if hasattr(gateway_service, 'rabbitmq') else False)
             redis_ok = False
             try:
-                if hasattr(gateway_service, "storage") and hasattr(gateway_service.storage, "connector"):
-                    redis_ok = await gateway_service.storage.connector.quick_ping(timeout_s=1.0)
+                if hasattr(gateway_service, "redis_storage") and hasattr(gateway_service.redis_storage, "connector"):
+                    redis_ok = await gateway_service.redis_storage.connector.quick_ping(timeout_s=1.0)
             except Exception:
                 redis_ok = False
             monitor.set_component("redis", redis_ok)
@@ -117,8 +129,17 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
         if queue_depths:
             payload["queue_depths"] = queue_depths
         
+        if os.environ.get("GATEWAY_HEALTH_LOG", "false").lower() in ("1", "true", "yes"):
         monitor.log_status()
         return payload
+
+    @router.get("/version")
+    async def version():
+        """
+        Return gateway version metadata.
+        :returns: Version information payload.
+        """
+        return app.state.version_info
 
     @router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
     async def submit_task(
@@ -162,7 +183,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             if is_debug_message:
                 logger.info(f"Debug message detected: consuming 0 ticks instead of {max_ticks}")
             
-            return await _service.create_task(req)
+            return await _service.create_task(req, user.id, access_token)
         except HTTPException:
             raise
         except Exception as e:

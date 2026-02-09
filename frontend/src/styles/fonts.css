@@ -1,0 +1,21 @@
+/* Cyberpunk fonts - Standardized to 2 typesets */
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+/**
+ * FONT SYSTEM:
+ * 1. Rajdhani - Display/Heading font (geometric, bold, cyberpunk aesthetic)
+ * 2. JetBrains Mono - Technical/Code font (monospace, highly readable)
+ */
+
+body {
+  font-family: 'Rajdhani', sans-serif;
+}
+
+.font-mono,
+.font-code {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.font-display {
+  font-family: 'Rajdhani', sans-serif !important;
+}

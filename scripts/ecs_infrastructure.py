@@ -109,7 +109,8 @@ class EcsInfrastructure:
         service_registries: Optional[List[Dict]] = None,
         load_balancers: Optional[List[Dict]] = None,
         health_check_grace_period: Optional[int] = None,
-        enable_az_rebalancing: bool = False
+        enable_az_rebalancing: bool = False,
+        force_deploy: bool = False
     ) -> bool:
         """
         Create ECS service if it doesn't exist, or update if it does.
@@ -125,6 +126,7 @@ class EcsInfrastructure:
         :param load_balancers: Optional load balancer configuration.
         :param health_check_grace_period: Health check grace period in seconds.
         :param enable_az_rebalancing: Enable Availability Zone rebalancing.
+        :param force_deploy: Force a new deployment even when task definition is unchanged.
         :returns: True on success, False on error.
         """
         exists = self.service_exists(service_name)
@@ -210,6 +212,7 @@ class EcsInfrastructure:
                             pass
                         
                         task_def_changed = current_task_def != latest_task_def_arn if latest_task_def_arn else True
+                        should_force = force_deploy or task_def_changed
                         
                         awsvpc_config = {
                             "subnets": network_config.get("subnets", []),
@@ -222,7 +225,7 @@ class EcsInfrastructure:
                             "service": service_name,
                             "taskDefinition": task_family,
                             "desiredCount": desired_count,
-                            "forceNewDeployment": task_def_changed,
+                            "forceNewDeployment": should_force,
                             "deploymentConfiguration": deployment_config,
                             "capacityProviderStrategy": capacity_provider_strategy,
                             "platformVersion": "LATEST",
@@ -231,8 +234,10 @@ class EcsInfrastructure:
                             }
                         }
                         
-                        if not task_def_changed:
-                            print(f"  Task definition unchanged, skipping force deployment")
+                        if force_deploy:
+                            print("  Forcing new deployment (task definition may be unchanged)")
+                        elif not task_def_changed:
+                            print("  Task definition unchanged, skipping force deployment")
                         
                         if health_check_grace_period is not None:
                             update_params["healthCheckGracePeriodSeconds"] = health_check_grace_period
@@ -348,7 +353,8 @@ class EcsInfrastructure:
         service_registries: Optional[List[Dict]] = None,
         load_balancers: Optional[List[Dict]] = None,
         health_check_grace_period: Optional[int] = None,
-        enable_az_rebalancing: bool = False
+        enable_az_rebalancing: bool = False,
+        force_deploy: bool = False
     ) -> bool:
         """
         Ensure ECS service exists with correct configuration.
@@ -362,6 +368,7 @@ class EcsInfrastructure:
         :param load_balancers: Optional load balancer configuration.
         :param health_check_grace_period: Health check grace period in seconds.
         :param enable_az_rebalancing: Enable Availability Zone rebalancing.
+        :param force_deploy: Force a new deployment even when task definition is unchanged.
         :returns: True on success, False on error.
         """
         return self.create_or_update_service(
@@ -372,7 +379,8 @@ class EcsInfrastructure:
             service_registries=service_registries,
             load_balancers=load_balancers,
             health_check_grace_period=health_check_grace_period,
-            enable_az_rebalancing=enable_az_rebalancing
+            enable_az_rebalancing=enable_az_rebalancing,
+            force_deploy=force_deploy
         )
 
 

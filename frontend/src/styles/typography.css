@@ -1,0 +1,172 @@
+/**
+ * CENTRALIZED TYPOGRAPHY SYSTEM
+ * 
+ * FONT HIERARCHY:
+ * - Rajdhani: Display/Heading font (titles, main headings)
+ * - JetBrains Mono: Technical/Code font (labels, metadata, buttons, inputs)
+ * 
+ * FONT SIZE SYSTEM (4 SIZES ONLY):
+ * - XL: 1.5rem (24px)  - Large titles (EUGLENA)
+ * - LG: 1rem (16px)    - Section headings, form labels, inputs, body text
+ * - MD: 0.875rem (14px) - Buttons, status badges, metadata
+ * - SM: 0.75rem (12px)  - Small labels, timestamps, helper text
+ */
+
+/**
+ * STANDARD FONT SIZES
+ * Using rem units for responsive scaling across different screen sizes
+ */
+:root {
+  --font-sm: 0.75rem;    /* 12px - Small labels, timestamps */
+  --font-md: 0.875rem;   /* 14px - Buttons, status, metadata */
+  --font-lg: 1rem;       /* 16px - Headings, labels, body, inputs */
+  --font-xl: 1.5rem;     /* 24px - Main title */
+  
+  /* Font families */
+  --font-display: 'Rajdhani', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/**
+ * STANDARD TEXT COLOR CLASSES
+ */
+.text-primary {
+  color: var(--color-primary, currentColor);
+}
+
+.text-secondary {
+  color: var(--color-secondary, currentColor);
+}
+
+.text-base {
+  color: var(--color-text, currentColor);
+}
+
+.text-muted {
+  color: var(--color-text-muted, currentColor);
+}
+
+.text-accent {
+  color: var(--color-accent, currentColor);
+}
+
+/**
+ * STANDARD FONT SIZE CLASSES
+ */
+.font-sm {
+  font-size: var(--font-sm);
+}
+
+.font-md {
+  font-size: var(--font-md);
+}
+
+.font-lg {
+  font-size: var(--font-lg);
+}
+
+.font-xl {
+  font-size: var(--font-xl);
+}
+
+/**
+ * CENTRALIZED TEXT TYPE CLASSES
+ * All font sizes and colors in one place
+ */
+
+/* Main Title - EUGLENA */
+.text-title {
+  font-size: var(--font-xl);
+  font-weight: bold;
+  font-family: var(--font-display);
+}
+
+/* Section Headings - NEW_TASK_SUBMISSION, TASK_HISTORY */
+.text-heading {
+  font-size: var(--font-lg);
+  font-weight: bold;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+}
+
+/* Sub-headings - BACKEND, MANDATE, AI_OUTPUT */
+.text-subheading {
+  font-size: var(--font-sm);
+  font-weight: bold;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+}
+
+/* Form Labels - AI_MANDATE, MAX_TICKS, EMAIL_ADDRESS */
+.text-label {
+  font-size: var(--font-lg);
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+}
+
+/* Body Text - Task mandates, input values, email */
+.text-body {
+  font-size: var(--font-lg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+/* Metadata - Timestamps, tick counts, backend info, version numbers */
+.text-metadata {
+  font-size: var(--font-md);
+  font-family: var(--font-mono);
+  /* Removed color to allow inline color classes like text-red-300 to work */
+}
+
+/* Metadata Muted - Less important metadata */
+.text-metadata-muted {
+  font-size: var(--font-md);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Secondary Metadata - Labels in progress bars */
+.text-metadata-secondary {
+  font-size: var(--font-md);
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+}
+
+/* Primary Metadata - Values in progress bars */
+.text-metadata-primary {
+  font-size: var(--font-md);
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+}
+
+/* Small Labels - Field settings labels, helper text */
+.text-small-label {
+  font-size: var(--font-sm);
+  font-family: var(--font-mono);
+  /* Removed color to allow inline color classes like text-purple-400 to work */
+}
+
+/* Button Text */
+.text-button {
+  font-size: var(--font-md);
+  font-family: var(--font-mono);
+}
+
+/* Status Text - ONLINE, COMPLETED, RUNNING */
+.text-status {
+  font-size: var(--font-md);
+  font-family: var(--font-mono);
+}
+
+/* Input Text */
+.text-input {
+  font-size: var(--font-lg);
+  font-family: var(--font-mono);
+  /* Removed color: var(--color-text) to allow inline text-white to work */
+}
+
+/* Description Text - Subtitles like "ACCESS TERMINAL v1.0.0" */
+.text-description {
+  font-size: var(--font-sm);
+  font-family: var(--font-mono);
+}

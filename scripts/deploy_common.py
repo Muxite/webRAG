@@ -1,6 +1,7 @@
 """
 Common utilities for deployment scripts.
 """
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -81,3 +82,30 @@ def get_image_size(image_name: str) -> Optional[str]:
             return f"{size_bytes} B"
     except (ValueError, Exception):
         return None
+
+
+def parse_args():
+    """
+    Parse CLI arguments.
+    
+    :returns: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Show AWS config loaded from aws.env")
+    parser.add_argument("--services-dir", type=Path, default=None,
+                       help="Services directory containing aws.env")
+    return parser.parse_args()
+
+
+def main():
+    """
+    Main entry point.
+    """
+    args = parse_args()
+    services_dir = args.services_dir or Path.cwd()
+    aws_config = load_aws_config(services_dir)
+    keys = ", ".join(sorted(aws_config.keys()))
+    print(f"AWS config keys ({len(aws_config)}): {keys}")
+
+
+if __name__ == "__main__":
+    main()
