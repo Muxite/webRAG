@@ -70,12 +70,15 @@ def apply_version_overrides(env_vars):
     :param env_vars: Environment variables dictionary.
     :returns: Updated environment variables dictionary.
     """
-    deployment_number = os.environ.get("DEPLOYMENT_NUMBER")
-    variant_number = os.environ.get("VARIANT_NUMBER")
-    if variant_number:
-        env_vars["VARIANT_NUMBER"] = variant_number
-    if deployment_number:
-        env_vars["DEPLOYMENT_NUMBER"] = deployment_number
+    version = os.environ.get("VERSION")
+    gateway_version = os.environ.get("GATEWAY_VERSION")
+    agent_version = os.environ.get("AGENT_VERSION")
+    if version:
+        env_vars["VERSION"] = version
+    if gateway_version:
+        env_vars["GATEWAY_VERSION"] = gateway_version
+    if agent_version:
+        env_vars["AGENT_VERSION"] = agent_version
     return env_vars
 
 
@@ -769,6 +772,8 @@ def parse_args():
     
     parser.add_argument("--mode", choices=["single", "autoscale"], default="single",
                        help="Deployment mode: single (all containers) or autoscale (gateway/agent)")
+    parser.add_argument("--service", choices=["all", "gateway", "agent"], default="all",
+                       help="Service to build in autoscale mode")
     
     return parser.parse_args()
 
@@ -822,21 +827,26 @@ def main():
             sys.exit(1)
         print("\nRegister ok")
     else:
-        print("Generate gateway task definition")
-        gateway_task_def = build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
-        gateway_path, gateway_redacted_path = _write_task_definition(base_dir, gateway_task_def, "euglena-gateway")
-        print(f"Generated: {gateway_path}")
+        service_target = args.service
+        gateway_success = True
+        agent_success = True
+        if service_target in ("all", "gateway"):
+            print("Generate gateway task definition")
+            gateway_task_def = build_gateway_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
+            gateway_path, gateway_redacted_path = _write_task_definition(base_dir, gateway_task_def, "euglena-gateway")
+            print(f"Generated: {gateway_path}")
+            
+            print("\nRegister gateway task definition")
+            gateway_success = register_task_definition(gateway_path, region)
         
-        print("\nRegister gateway task definition")
-        gateway_success = register_task_definition(gateway_path, region)
-        
-        print("Generate agent task definition")
-        agent_task_def = build_agent_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
-        agent_path, agent_redacted_path = _write_task_definition(base_dir, agent_task_def, "euglena-agent")
-        print(f"Generated: {agent_path}")
-        
-        print("\nRegister agent task definition")
-        agent_success = register_task_definition(agent_path, region)
+        if service_target in ("all", "agent"):
+            print("Generate agent task definition")
+            agent_task_def = build_agent_task_definition(account_id, region, secret_name, secret_arn_suffix, secret_keys, env_vars, aws_env)
+            agent_path, agent_redacted_path = _write_task_definition(base_dir, agent_task_def, "euglena-agent")
+            print(f"Generated: {agent_path}")
+            
+            print("\nRegister agent task definition")
+            agent_success = register_task_definition(agent_path, region)
         
         if not gateway_success or not agent_success:
             print("\nRegister failed")

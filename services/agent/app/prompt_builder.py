@@ -28,61 +28,52 @@ class PromptBuilder:
     """
 
     SYSTEM_INSTRUCTIONS = (
-        "You are an autonomous agent reasoning in discrete ticks, where each tick is one step of thought or action. "
-        "You persist memory between ticks through NOTES and cached data. You can deliver 'deliverable' in each tick. "
-        "Deliver whatever matches your mandate, trickling deliverable every few ticks is highly encouraged. "
-        "Do not deliver unfinished products, Ex: if you are returning a link, write down your goals, visit the link, "
-        "read the content, and then deliver the link once you are sure it is good. \n\n"
+        "You are a cost-optimized autonomous agent operating in discrete ticks. "
+        "Each tick is a small step: decide, act, store, retrieve. "
+        "Use tick count to plan and update notes with a brief plan. "
+        "Minimize generated text each tick; reading is cheaper than writing. "
+        "Use the vector database aggressively as primary memory. "
+        "It is acceptable to spend multiple ticks only retrieving or only storing facts. "
+        "Final deliverables can be deferred; small partials are ok when useful.\n\n"
 
-        "INPUT STRUCTURE:\n"
-        "- MANDATE: Your immutable directive or mission.\n"
-        "- SHORT TERM MEMORY: Summary of recent actions in this reasoning branch. BE DESCRIPTIVE\n"
-        "- NOTES: Your scratchpad for reasoning. You wrote these last tick and passed them here because "
-        "they are meaningful. "
-        "- RETRIEVED CONTEXT: Information fetched from your vector database based on the previous tick’s 'cache_retrieved' request.\n"
-        "- OBSERVATIONS: New external input, such as user text or HTML, from this tick.\n\n"
+        "INPUTS:\n"
+        "- MANDATE: immutable goal.\n"
+        "- TICK STATUS: current tick and max ticks.\n"
+        "- SHORT TERM MEMORY: brief recent summaries.\n"
+        "- NOTES: tiny scratchpad, keep minimal.\n"
+        "- RETRIEVED CONTEXT: vector DB hits from prior cache_retrieve.\n"
+        "- OBSERVATIONS: new external input (may be long, full pages are ok).\n\n"
 
-        "SYSTEM RULES:\n"
-        "- If you need specific knowledge, list it in the 'cache_retrieved' field as a short, comma-separated set of topics "
-        "(ex: 'fish, ocean ecosystem').\n"
-        "- The system will retrieve relevant semantic chunks and include them in 'cache_retrieved' on the next tick.\n"
-        "Each paragraph should summarize one complete idea or piece of information."
-        "Write as many paragraphs as you find informative and relevant. Each paragraph will be "
-        "separately stored for future retrieval. These will later be accessible by the 'cache_retrieved' field.\n"
-        "Recommended Strategy: make many searches at the start, and cache_update as many comprehensible facts. "
-        "The cache is extremely fast, so do not worry about having too much data.\n\n"
-        
-        "OUTPUT FORMAT:\n"
-        "You must output valid JSON with EXACTLY these top-level keys:\n"
-        "* history_update : two or three sentence summary of this tick’s action, including what action is taken "
-        "key findings and observations made based on the data recevied, and how this advances the mandate.\n"
-        "* note_update : updated notes or reasoning to persist into the next tick. 3 to 5 sentences is approprate."
-        "This becomes notes in the next input. Explain how your tick advances the goal of the mandate, next steps,"
-        "hypotheses, decisions made, relevant context that next ticks will need.\n"
-         "* cache_update : (list of dicts) detailed, focused, data to store in semantic database."
-        "Contents must fit a topic, concept, idea, or key note.\n"
-        "  Format: [\n"
-        "    {'document': 'DOCUMENT_TEXT', 'metadata': {'KEY1': 'VALUE1', 'KEY2': 'VALUE2'}},\n"
-        "    {'document': 'DOCUMENT_TEXT', 'metadata': {'KEY1': 'VALUE1', 'KEY2': 'VALUE2'}}\n"
-        "  ]\n"
-        "  - Each entry must have 'document' (60 word detailed summary) and 'metadata'\n"
-        "  - Metadata values MUST be scalars (strings, numbers, booleans). Do NOT use lists or nested dicts.\n"
-        "  - Use comma-separated strings for multi-value fields (ex: 'topics': 'AI, robotics, machine learning').\n"
-        "* next_action : the next action you will take\n"
-        "* cache_retrieve : list of sentences to query and retrieve from storage\n"
-        "* deliverable : a final output to be sent to the user based on your mandate, a viable product or nothing.\n"
-        "Do not include any commentary or keys outside this JSON.\n\n"
-        
-        "INFO ON ACTION:\n"
-        "The agent must output 'next_action': 'ACTION_NAME, PARAM'\n"
-        "Allowed actions (case sensitive):\n"
-        "* think : reason internally, param unused. You can use this to buy time and search your database.\n"
-        "* search : search internet for a search term. Useful for preliminary data gathering.\n"
-        "Ex: 'next_action': 'search, how to implement BFS'\n"
-        "* visit : visits a link directly. Very useful if you are on a webpage and want to investigate further.\n"
-        "Ex: 'next_action': 'visit, https://en.wikipedia.org/wiki/Main_Page'\n"
-        "* exit : ends the program, param unused. PROGRAM WILL END, USE ONLY WHEN FINISHED EVERYTHING."
+        "MEMORY STRATEGY:\n"
+        "- Always check vector memory before searching the internet.\n"
+        "- Use NOTES as pointers to memory (what to retrieve next); keep them short.\n"
+        "- Anything not written to NOTES or stored in vector DB will be lost next tick.\n"
+        "- Rely on cache_update/cache_retrieve every tick to reduce context growth.\n"
+        "- Store small, atomic facts with strong titles and tags in metadata.\n"
+        "- You can query memory like a search engine; use precise queries.\n"
+        "- If a visit returns 403/blocked, do not retry that site; pivot to other sources.\n"
+        "- When blocked, log the block in notes and shift strategy or revisit planning.\n"
+        "- If you determine you are stuck (blocked with no alternatives), use exit and return what you have.\n"
+        "- If unclear, do more searches/visits rather than long reasoning.\n\n"
 
+        "OUTPUT FORMAT (JSON only, exact keys):\n"
+        "* history_update: 1-2 concise sentences about what happened and why.\n"
+        "* note_update: 1-2 short sentences; keep minimal, prefer cache_update.\n"
+        "* cache_update: list of dicts for vector DB storage.\n"
+        "  Format: [{'document': '...', 'metadata': {'KEY': 'VALUE'}}]\n"
+        "  - document: ~40-80 words focused on a single fact/idea.\n"
+        "  - metadata values must be scalars; use comma-separated strings for multi-values.\n"
+        "  - include metadata.title and metadata.topics for better retrieval.\n"
+        "* next_action: 'ACTION, PARAM'\n"
+        "* cache_retrieve: list of short query sentences.\n"
+        "* deliverable: empty unless you have a usable partial or final output.\n"
+        "No extra keys or commentary.\n\n"
+
+        "ACTIONS (case sensitive):\n"
+        "* think : internal reasoning, no param.\n"
+        "* search : web search. Example: 'search, query'.\n"
+        "* visit : visit URL. Example: 'visit, https://...'.\n"
+        "* exit : end program, only when finished."
     )
 
     def __init__(
@@ -92,6 +83,8 @@ class PromptBuilder:
         notes: Optional[str] = None,
         retrieved_long_term: Optional[List[str]] = None,
         observations: Optional[str] = None,
+        current_tick: Optional[int] = None,
+        max_ticks: Optional[int] = None,
     ):
         """
         Initializes the agent's context for one tick.
@@ -101,6 +94,8 @@ class PromptBuilder:
         self._notes = notes or ""
         self._retrieved_long_term = retrieved_long_term or []
         self._observations = observations or ""
+        self._current_tick = current_tick
+        self._max_ticks = max_ticks
 
     def set_mandate(self, text: str):
         """Set the agent's mandate."""
@@ -141,6 +136,14 @@ class PromptBuilder:
 
         if self._mandate:
             parts.append(self._format_section("MANDATE", self._mandate))
+
+        if self._current_tick is not None and self._max_ticks is not None:
+            parts.append(
+                self._format_section(
+                    "TICK STATUS",
+                    f"{self._current_tick} / {self._max_ticks}"
+                )
+            )
 
         if self._short_term_summary:
             joined_history = "\n".join(
@@ -202,13 +205,22 @@ class PromptBuilder:
     def build_visit_observation(url: str, summary: str) -> str:
         return f"\nVisited {url}:\n{summary}\n"
 
+    @staticmethod
+    def build_exception_observation(action: str, error: str) -> str:
+        """
+        Build an observation string for action exceptions.
+        :param action: Action name that failed.
+        :param error: Exception message.
+        :return: Observation string.
+        """
+        return f"\n[Action error: {action}] {error}\n"
+
     # === Final output (synthesis) message builder ===
     FINAL_SYSTEM_INSTRUCTIONS = (
-        "You are a synthesis agent that has run a project following the user's mandate "
-        "for a number of ticks. Given the mandate, execution history, notes, deliverables, "
-        "and retrieved context, generate a comprehensive final deliverable and concise action summary."
-        "Your answer should be at least 50 words per tick. If you have 20 ticks, write about 1000 words."
-        " Return JSON with keys: 'deliverable' and 'summary'."
+        "You are a synthesis agent. Produce the final deliverable using the mandate, "
+        "execution history, final notes, accumulated deliverables, and retrieved context. "
+        "Be accurate and complete, but avoid unnecessary verbosity. "
+        "Return JSON with keys: 'deliverable' and 'summary'."
     )
 
     @classmethod

@@ -51,27 +51,11 @@ def parse_args():
                        help="Force new deployment even if task definition is unchanged")
     parser.add_argument("--update-secrets", action="store_true",
                        help="Update Secrets Manager values from keys.env before deployment")
+    parser.add_argument("--service", choices=["all", "gateway", "agent"], default="all",
+                       help="Service target for autoscale deployment")
     
     return parser.parse_args()
 
-
-def resolve_deployment_number(region: str, repository_name: str) -> str:
-    """
-    Resolve deployment number from ECR image history count.
-    :param region: AWS region.
-    :param repository_name: ECR repository name.
-    :returns: Deployment number string.
-    """
-    try:
-        client = boto3.client("ecr", region_name=region)
-        paginator = client.get_paginator("describe_images")
-        count = 0
-        for page in paginator.paginate(repositoryName=repository_name):
-            count += len(page.get("imageDetails", []))
-        return str(count)
-    except Exception as e:
-        print(f"  WARN: Could not resolve deployment number: {e}")
-        return "0"
 
 def main():
     """Main deployment entry point for autoscale mode."""
@@ -120,18 +104,22 @@ def main():
             print(f"  WARN: Secrets update failed: {e}")
             all_success = False
 
+    service_target = args.service
+
     if not args.skip_ecr:
-        ecr_services = ["gateway", "agent", "metrics"]
+        if service_target == "gateway":
+            ecr_services = ["gateway"]
+        elif service_target == "agent":
+            ecr_services = ["agent"]
+        else:
+            ecr_services = ["gateway", "agent", "metrics"]
         if not push_to_ecr(services_dir, aws_config, ecr_services, image_suffix=""):
             print("\nFAIL: ECR push failed")
             all_success = False
     else:
         print("\nSKIP: Skipping ECR push")
     
-    deployment_number = resolve_deployment_number(region, "euglena/gateway")
-    os.environ["DEPLOYMENT_NUMBER"] = deployment_number
-
-    if not build_and_register_task_definitions(services_dir, DeploymentMode.AUTOSCALE):
+    if not build_and_register_task_definitions(services_dir, DeploymentMode.AUTOSCALE, service_target):
         print("\nFAIL: Task definition build failed")
         all_success = False
     
@@ -271,36 +259,44 @@ def main():
         gateway_task_family = "euglena-gateway"
         agent_task_family = "euglena-agent"
         
-        if not ensure_exact_service_config(
-            ecs_infrastructure=ecs_infrastructure,
-            aws_config=aws_config,
-            service_name=gateway_service_name,
-            task_family=gateway_task_family,
-            network_config=network_config,
-            load_balancers=load_balancers,
-            desired_count=1,
-            service_registries=service_registries,
-            force_deploy=args.force_deploy
-        ):
-            print(f"  FAIL: Failed to create/update {gateway_service_name}")
-            all_success = False
+        if service_target in ("all", "gateway"):
+            if not ensure_exact_service_config(
+                ecs_infrastructure=ecs_infrastructure,
+                aws_config=aws_config,
+                service_name=gateway_service_name,
+                task_family=gateway_task_family,
+                network_config=network_config,
+                load_balancers=load_balancers,
+                desired_count=1,
+                service_registries=service_registries,
+                force_deploy=args.force_deploy
+            ):
+                print(f"  FAIL: Failed to create/update {gateway_service_name}")
+                all_success = False
         
-        if not ensure_exact_service_config(
-            ecs_infrastructure=ecs_infrastructure,
-            aws_config=aws_config,
-            service_name=agent_service_name,
-            task_family=agent_task_family,
-            network_config=network_config,
-            load_balancers=None,
-            desired_count=1,
-            force_deploy=args.force_deploy
-        ):
-            print(f"  FAIL: Failed to create/update {agent_service_name}")
-            all_success = False
+        if service_target in ("all", "agent"):
+            if not ensure_exact_service_config(
+                ecs_infrastructure=ecs_infrastructure,
+                aws_config=aws_config,
+                service_name=agent_service_name,
+                task_family=agent_task_family,
+                network_config=network_config,
+                load_balancers=None,
+                desired_count=1,
+                force_deploy=args.force_deploy
+            ):
+                print(f"  FAIL: Failed to create/update {agent_service_name}")
+                all_success = False
         
         if args.wait:
             time.sleep(120)
-            wait_for_services_stable(aws_config, [gateway_service_name, agent_service_name])
+            services_to_wait = []
+            if service_target in ("all", "gateway"):
+                services_to_wait.append(gateway_service_name)
+            if service_target in ("all", "agent"):
+                services_to_wait.append(agent_service_name)
+            if services_to_wait:
+                wait_for_services_stable(aws_config, services_to_wait)
     
     if all_success:
         print("\n" + "=" * 60)

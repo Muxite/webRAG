@@ -26,6 +26,9 @@ class ConnectorLLM:
             api_key=self.config.openai_api_key
         )
         self.llm_api_ready = True
+        self.last_usage: Optional[dict] = None
+        self.total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        self.model_profiles: dict[str, dict] = {}
 
     async def __aenter__(self):
         """Support async context manager for consistent lifecycle handling."""
@@ -63,6 +66,17 @@ class ConnectorLLM:
 
         if payload.get("model") is None:
             payload["model"] = self.model_name
+        model_name = str(payload.get("model") or "")
+        profile = self.model_profiles.get(model_name, {})
+        if "temperature" in payload:
+            if profile.get("temperature") is None:
+                payload.pop("temperature", None)
+            elif "temperature" in profile:
+                payload["temperature"] = profile["temperature"]
+        if "max_tokens" in payload and (profile.get("use_max_completion_tokens") or model_name.startswith(("gpt-5", "gpt-4o"))):
+            payload["max_completion_tokens"] = payload.pop("max_tokens")
+        if "temperature" in payload and model_name.startswith(("gpt-5", "gpt-4o")) and payload["temperature"] != 1:
+            payload.pop("temperature", None)
 
         max_attempts = 3
         base_delay = max(1.0, float(self.config.default_delay))
@@ -71,10 +85,25 @@ class ConnectorLLM:
         async def do_call() -> Optional[str]:
             response = await self.client.chat.completions.create(**payload)
             if not response or not getattr(response, "choices", None):
-                raise APIError("Empty response or no choices returned from LLM")
+                raise RuntimeError("Empty response or no choices returned from LLM")
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                prompt_tokens = getattr(usage, "prompt_tokens", None)
+                completion_tokens = getattr(usage, "completion_tokens", None)
+                total_tokens = getattr(usage, "total_tokens", None)
+                if prompt_tokens is not None and completion_tokens is not None:
+                    total_tokens = total_tokens if total_tokens is not None else prompt_tokens + completion_tokens
+                    self.last_usage = {
+                        "prompt_tokens": int(prompt_tokens),
+                        "completion_tokens": int(completion_tokens),
+                        "total_tokens": int(total_tokens),
+                    }
+                    self.total_usage["prompt_tokens"] += int(prompt_tokens)
+                    self.total_usage["completion_tokens"] += int(completion_tokens)
+                    self.total_usage["total_tokens"] += int(total_tokens)
             content = response.choices[0].message.content if response.choices[0].message else None
             if content is None or (isinstance(content, str) and not content.strip()):
-                raise APIError("LLM returned empty content")
+                raise RuntimeError("LLM returned empty content")
             return content
 
         def should_retry(result: Optional[str], exc: Optional[BaseException], attempt: int) -> bool:
@@ -104,3 +133,45 @@ class ConnectorLLM:
         except Exception as e:
             self.logger.error(f"LLM query failed after {max_attempts} attempts: {e}")
             return None
+
+    def set_model(self, model_name: Optional[str]) -> None:
+        """
+        Update the default model used for requests.
+        :param model_name: Model identifier to use for subsequent requests.
+        :return: None
+        """
+        if model_name and model_name.strip():
+            self.model_name = model_name.strip()
+
+    def get_model(self) -> str:
+        """
+        Get the current default model name.
+        :return: Model identifier string.
+        """
+        return self.model_name
+
+    def pop_last_usage(self) -> Optional[dict]:
+        """
+        Retrieve and clear the most recent token usage.
+        :return: Usage dict or None.
+        """
+        usage = self.last_usage
+        self.last_usage = None
+        return usage
+
+    def get_total_usage(self) -> dict:
+        """
+        Get cumulative token usage for this connector.
+        :return: Usage totals dict.
+        """
+        return dict(self.total_usage)
+
+    def set_model_profile(self, model_name: str, profile: dict) -> None:
+        """
+        Store per-model runtime settings.
+        :param model_name: Model identifier.
+        :param profile: Profile dict.
+        :return: None
+        """
+        if model_name:
+            self.model_profiles[model_name] = dict(profile or {})

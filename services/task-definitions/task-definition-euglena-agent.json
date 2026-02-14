@@ -41,10 +41,6 @@
                     "value": "10"
                 },
                 {
-                    "name": "DEPLOYMENT_NUMBER",
-                    "value": "57"
-                },
-                {
                     "name": "ECS_CLUSTER",
                     "value": "euglena-cluster"
                 },
@@ -87,10 +83,6 @@
                 {
                     "name": "TARGET_MESSAGES_PER_WORKER",
                     "value": "2"
-                },
-                {
-                    "name": "VARIANT_NUMBER",
-                    "value": "1"
                 },
                 {
                     "name": "WORKER_STATE_PREFIX",

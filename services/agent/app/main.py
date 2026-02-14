@@ -47,13 +47,13 @@ async def version_handler(request):
     :param request: aiohttp request object.
     :returns: Version information payload.
     """
-    version_info = request.app.get("version_info", {"version": "0.0", "variant": "0", "deployment": "0"})
+    version_info = request.app.get("version_info", {"version": "0.0"})
     return web.json_response(version_info)
 
 
 async def _run() -> None:
     logger = setup_service_logger("Agent", logging.INFO)
-    version_info = get_version_info()
+    version_info = get_version_info("agent")
     log_startup_message(logger, "AGENT", version_info["version"])
     app = web.Application()
     app.router.add_get('/health', health_handler)

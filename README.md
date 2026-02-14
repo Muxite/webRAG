@@ -4,7 +4,7 @@ Euglena is an agentic AI service with web crawling and extensive retrival augmen
 Context space is greatly extended through use of a vector database, and value to cost ratio is maximized through efficient autoscaling and token efficient workflows.
 
 ## Live Website
-- https://web-rag-nine.vercel.app/
+https://web-rag-nine.vercel.app/
 Users can sign up for account and recieve a number of free actions that resets every day.
 
 Agents search the internet, follow links, read websites, and construct detailed responses. Data is persisted in vector databases for long-term knowledge.

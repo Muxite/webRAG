@@ -37,6 +37,9 @@ async def test_initialize_dependencies_success(worker):
     worker.connector_search.init_search_api = AsyncMock(return_value=True)
     worker.connector_chroma.init_chroma = AsyncMock(return_value=True)
     worker.storage.connector.init_redis = AsyncMock(return_value=True)
+    worker.connector_search.__aenter__ = AsyncMock()
+    worker.connector_http.__aenter__ = AsyncMock()
+    
     worker.connector_llm.llm_api_ready = True
     worker.connector_search.search_api_ready = True
     worker.connector_chroma.chroma_api_ready = True
@@ -55,6 +58,9 @@ async def test_initialize_dependencies_failure(worker):
     worker.connector_search.init_search_api = AsyncMock(return_value=True)
     worker.connector_chroma.init_chroma = AsyncMock(return_value=True)
     worker.storage.connector.init_redis = AsyncMock(return_value=True)
+    worker.connector_search.__aenter__ = AsyncMock()
+    worker.connector_http.__aenter__ = AsyncMock()
+    
     worker.connector_llm.llm_api_ready = True
     worker.connector_search.search_api_ready = False
     worker.connector_chroma.chroma_api_ready = True
@@ -73,6 +79,9 @@ async def test_start_success(worker):
     worker.connector_search.init_search_api = AsyncMock(return_value=True)
     worker.connector_chroma.init_chroma = AsyncMock(return_value=True)
     worker.storage.connector.init_redis = AsyncMock(return_value=True)
+    worker.connector_search.__aenter__ = AsyncMock()
+    worker.connector_http.__aenter__ = AsyncMock()
+    
     worker.connector_llm.llm_api_ready = True
     worker.connector_search.search_api_ready = True
     worker.connector_chroma.chroma_api_ready = True
@@ -91,6 +100,9 @@ async def test_start_raises_on_failure(worker):
     worker.connector_search.init_search_api = AsyncMock(return_value=True)
     worker.connector_chroma.init_chroma = AsyncMock(return_value=True)
     worker.storage.connector.init_redis = AsyncMock(return_value=True)
+    worker.connector_search.__aenter__ = AsyncMock()
+    worker.connector_http.__aenter__ = AsyncMock()
+    
     worker.connector_llm.llm_api_ready = True
     worker.connector_search.search_api_ready = False
     worker.connector_chroma.chroma_api_ready = True
@@ -111,6 +123,9 @@ async def test_start_idempotent(worker):
     worker.connector_search.init_search_api = AsyncMock(return_value=True)
     worker.connector_chroma.init_chroma = AsyncMock(return_value=True)
     worker.storage.connector.init_redis = AsyncMock(return_value=True)
+    worker.connector_search.__aenter__ = AsyncMock()
+    worker.connector_http.__aenter__ = AsyncMock()
+    
     worker.connector_llm.llm_api_ready = True
     worker.connector_search.search_api_ready = True
     worker.connector_chroma.chroma_api_ready = True
@@ -163,6 +178,8 @@ async def test_handle_task_publishes_status(worker):
         worker.connector_llm.llm_api_ready = True
         worker.connector_search.search_api_ready = True
         worker.connector_chroma.chroma_api_ready = True
+        worker.rabbitmq.rabbitmq_ready = True
+        worker.storage.connector.redis_ready = True
         
         payload = {"correlation_id": "test-id", "mandate": "test", "max_ticks": 10}
         worker._heartbeat_task = None

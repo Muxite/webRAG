@@ -41,6 +41,7 @@ services:
       - "8001:8000"
     volumes:
       - ./chroma:/chroma-cache_retrieved
+      - chroma_cache:/root/.cache
     environment:
       - IS_PERSISTENT=TRUE
       - PERSIST_DIRECTORY=/chroma-data
@@ -79,6 +80,24 @@ services:
     env_file:
       - .env
       - keys.env
+    networks:
+      - enet
+
+  agent-benchmark:
+    profiles: ["bench"]
+    build:
+      context: .
+      dockerfile: agent/.dockerfile
+    depends_on:
+      - chroma
+      - redis
+      - rabbitmq
+    command: ["python", "-m", "app.benchmark_cli"]
+    env_file:
+      - .env
+      - keys.env
+    volumes:
+      - ./agent/app/benchmark_results:/app/agent/app/benchmark_results
     networks:
       - enet
 
@@ -176,6 +195,7 @@ services:
 
 volumes:
   redis_data:
+  chroma_cache:
 
 networks:
   enet:

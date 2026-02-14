@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [movingSourceStrength, setMovingSourceStrength] = useState(1.0);
   const [sourceSpeed, setSourceSpeed] = useState(0.536);
   const [ditherEndHeight, setDitherEndHeight] = useState(0.5);
+  const showFieldSettings = false;
   
   const navigate = useNavigate();
   
@@ -243,29 +244,30 @@ export default function Dashboard() {
         ditherEndHeight={ditherEndHeight}
       />
       
-      {/* Vector Field Settings */}
-      <VectorFieldSettings
-        spacing={fieldSpacing}
-        lineLength={fieldLineLength}
-        opacity={fieldOpacity}
-        arrangement={fieldArrangement}
-        baseFieldStrength={baseFieldStrength}
-        noiseThreshold={noiseThreshold}
-        noiseScale={noiseScale}
-        movingSourceStrength={movingSourceStrength}
-        sourceSpeed={sourceSpeed}
-        ditherEndHeight={ditherEndHeight}
-        onSpacingChange={setFieldSpacing}
-        onLineLengthChange={setFieldLineLength}
-        onOpacityChange={setFieldOpacity}
-        onArrangementChange={setFieldArrangement}
-        onBaseFieldStrengthChange={setBaseFieldStrength}
-        onNoiseThresholdChange={setNoiseThreshold}
-        onNoiseScaleChange={setNoiseScale}
-        onMovingSourceStrengthChange={setMovingSourceStrength}
-        onSourceSpeedChange={setSourceSpeed}
-        onDitherEndHeightChange={setDitherEndHeight}
-      />
+      {showFieldSettings && (
+        <VectorFieldSettings
+          spacing={fieldSpacing}
+          lineLength={fieldLineLength}
+          opacity={fieldOpacity}
+          arrangement={fieldArrangement}
+          baseFieldStrength={baseFieldStrength}
+          noiseThreshold={noiseThreshold}
+          noiseScale={noiseScale}
+          movingSourceStrength={movingSourceStrength}
+          sourceSpeed={sourceSpeed}
+          ditherEndHeight={ditherEndHeight}
+          onSpacingChange={setFieldSpacing}
+          onLineLengthChange={setFieldLineLength}
+          onOpacityChange={setFieldOpacity}
+          onArrangementChange={setFieldArrangement}
+          onBaseFieldStrengthChange={setBaseFieldStrength}
+          onNoiseThresholdChange={setNoiseThreshold}
+          onNoiseScaleChange={setNoiseScale}
+          onMovingSourceStrengthChange={setMovingSourceStrength}
+          onSourceSpeedChange={setSourceSpeed}
+          onDitherEndHeightChange={setDitherEndHeight}
+        />
+      )}
       
       {/* Cyberpunk grid background */}
       <div className="absolute inset-0 opacity-10" style={{
@@ -410,7 +412,9 @@ export default function Dashboard() {
           <VectorBoxHeavy padding={4} borderColor={themeColors.secondary} bgColor={themeColors.boxBgHeavy}>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               <div className="text-metadata" style={{ color: themeColors.text }}>{userStats.email}</div>
-              <div className="text-metadata" style={{ color: themeColors.text }}>{userStats.dailyTicks} ticks</div>
+              <div className="text-metadata" style={{ color: themeColors.text }}>
+                {userStats.ticksRemaining}/{userStats.dailyTicks} ticks
+              </div>
             </div>
           </VectorBoxHeavy>
         )}
