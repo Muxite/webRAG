@@ -27,6 +27,7 @@ export const API_CONFIG = {
  */
 export const API_ENDPOINTS = {
   systemInfo: `${API_CONFIG.gatewayBaseUrl}/system-info`,
+  workerCount: `${API_CONFIG.gatewayBaseUrl}/worker-count`,
   submitTask: `${API_CONFIG.gatewayBaseUrl}/tasks`,
 } as const;
 
@@ -203,11 +204,32 @@ export async function fetchSystemInfo(): Promise<SystemInfo> {
     if (!response.ok) {
       throw new Error(`System info request failed: ${response.status}`);
     }
-    
-    return await response.json();
+    const systemInfo = await response.json();
+    const activeWorkers = await fetchWorkerCount();
+    return {
+      ...systemInfo,
+      activeWorkers,
+    };
   } catch (error) {
     console.error("Error fetching system info:", error);
     return MOCK_DATA.systemInfo;
+  }
+}
+
+export async function fetchWorkerCount(): Promise<number> {
+  try {
+    const response = await fetch(API_ENDPOINTS.workerCount, {
+      headers: createAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Worker count request failed: ${response.status}`);
+    }
+    const data = await response.json();
+    const activeWorkers = Number(data?.activeWorkers);
+    return Number.isFinite(activeWorkers) ? activeWorkers : MOCK_DATA.systemInfo.activeWorkers;
+  } catch (error) {
+    console.error("Error fetching worker count:", error);
+    return MOCK_DATA.systemInfo.activeWorkers;
   }
 }
 

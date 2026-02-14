@@ -69,19 +69,51 @@ class ConnectorSearch(ConnectorHttp):
         result = await self.request("GET", url, retries=3, headers=headers, params=params)
 
         if result.error:
-            self.logger.error(f"Search API query failed with {result.status}, {result.data}")
-            return None
+            raise RuntimeError(f"Search API query failed: status={result.status} data={result.data}")
+
+        data = result.data
+        if hasattr(data, "data"):
+            data = getattr(data, "data")
+
+        if not isinstance(data, dict):
+            raise RuntimeError(f"Unexpected search response type: {type(data).__name__}")
+
+        def _collect(items: list) -> List[Dict[str, str]]:
+            collected: List[Dict[str, str]] = []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                url_value = item.get("url") or item.get("link") or item.get("href")
+                if not url_value:
+                    nested = item.get("results")
+                    if isinstance(nested, list):
+                        collected.extend(_collect(nested))
+                    continue
+                collected.append(
+                    {
+                        "title": item.get("title") or item.get("name") or "",
+                        "url": url_value,
+                        "description": item.get("description") or item.get("snippet") or "",
+                    }
+                )
+            return collected
 
         try:
-            web_results = result.data["web"]["results"]
-            return [
-                {
-                    "title": item.get("title", ""),
-                    "url": item.get("url", ""),
-                    "description": item.get("description", "")
-                }
-                for item in web_results
-            ]
-        except (KeyError, TypeError, IndexError):
-            self.logger.warning(f"Unexpected Search API response structure: {result}")
-            return None
+            web_results = []
+            if isinstance(data.get("web"), dict):
+                web_results = data.get("web", {}).get("results") or []
+            if isinstance(web_results, list) and web_results:
+                return _collect(web_results)
+
+            mixed = data.get("mixed", {})
+            if isinstance(mixed, dict):
+                mixed_items: List[Dict[str, str]] = []
+                for key, value in mixed.items():
+                    if isinstance(value, list):
+                        mixed_items.extend(_collect(value))
+                if mixed_items:
+                    return mixed_items
+
+            return []
+        except Exception as exc:
+            raise RuntimeError(f"Search parse failed: {data} ({exc})")

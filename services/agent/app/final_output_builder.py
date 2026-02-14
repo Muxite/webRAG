@@ -22,11 +22,10 @@ class FinalOutputBuilder:
         self._deliverables = deliverables
         self._retrieved_context = retrieved_context
         self._SYSTEM_INSTRUCTIONS = (
-            "You are a synthesis agent that has run a project following the user's mandate "
-            "for a number of ticks. Given the mandate, execution history, notes, deliverables, "
-            "and retrieved context, generate a comprehensive final deliverable and concise action summary."
-            "Your answer should be at least 50 words per tick. If you have 20 ticks, write about 1000 words."
-            " Return JSON with keys: 'deliverable' and 'summary'."
+            "You are a synthesis agent. Produce the final deliverable using the mandate, "
+            "execution history, final notes, accumulated deliverables, and retrieved context. "
+            "Be accurate and complete, but avoid unnecessary verbosity. "
+            "Return JSON with keys: 'deliverable' and 'summary'."
         )
 
     @staticmethod

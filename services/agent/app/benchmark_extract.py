@@ -1,0 +1,143 @@
+"""
+Convert a benchmark JSONL file into a plain text file of final answers.
+:param argv: Optional CLI args for testing.
+:returns: Exit code.
+"""
+import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Any, Dict, Iterable, Optional, Sequence
+
+
+def _iter_jsonl(path: Path) -> Iterable[Dict[str, Any]]:
+    """
+    Yield JSON objects from a JSONL file.
+    :param path: Path to the JSONL file.
+    :returns: Iterable of parsed JSON dicts.
+    """
+    with path.open("r", encoding="utf-8") as handle:
+        for idx, line in enumerate(handle, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError as exc:
+                print(f"Skipping line {idx}: {exc}", file=sys.stderr)
+                continue
+            if isinstance(payload, dict):
+                yield payload
+
+
+def _get_nested(record: Dict[str, Any], keys: Sequence[str]) -> Optional[Any]:
+    """
+    Retrieve a nested value from a dictionary.
+    :param record: Source dictionary.
+    :param keys: Key path to traverse.
+    :returns: The nested value or None.
+    """
+    current: Any = record
+    for key in keys:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+
+def _extract_final_deliverable(record: Dict[str, Any]) -> Optional[str]:
+    """
+    Extract the final deliverable text from a benchmark record.
+    :param record: JSONL record.
+    :returns: The final deliverable if found.
+    """
+    candidates = [
+        ("result", "output", "final_deliverable"),
+        ("result", "output", "deliverable"),
+        ("output", "final_deliverable"),
+        ("output", "deliverable"),
+        ("final_deliverable",),
+        ("deliverable",),
+    ]
+    for path in candidates:
+        value = _get_nested(record, path)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            text = value.strip()
+            if text:
+                return text
+            continue
+        try:
+            return json.dumps(value, ensure_ascii=True)
+        except TypeError:
+            return str(value)
+    return None
+
+
+def _format_header(record: Dict[str, Any]) -> str:
+    """
+    Build a header line from a benchmark record.
+    :param record: JSONL record.
+    :returns: Header string.
+    """
+    run_id = record.get("run_id") or ""
+    protocol = record.get("protocol") or ""
+    model = record.get("model") or record.get("result", {}).get("model") or ""
+    trace_file = record.get("trace_file") or ""
+    header_parts = [part for part in [run_id, protocol, model] if part]
+    header = " | ".join(header_parts) if header_parts else "benchmark_entry"
+    if trace_file:
+        header = f"{header} | {trace_file}"
+    return header
+
+
+def convert_jsonl_to_text(input_path: Path, output_path: Path) -> int:
+    """
+    Convert JSONL benchmark output to a text file of final answers.
+    :param input_path: Input JSONL path.
+    :param output_path: Output text path.
+    :returns: Exit code.
+    """
+    extracted = 0
+    with output_path.open("w", encoding="utf-8") as out:
+        for record in _iter_jsonl(input_path):
+            final_text = _extract_final_deliverable(record)
+            if not final_text:
+                continue
+            header = _format_header(record)
+            out.write(header + "\n")
+            out.write(final_text.rstrip() + "\n")
+            out.write("-" * 72 + "\n\n")
+            extracted += 1
+    print(f"Extracted {extracted} final answers to {output_path}")
+    return 0
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """
+    CLI entrypoint.
+    :param argv: Optional CLI args for testing.
+    :returns: Exit code.
+    """
+    parser = argparse.ArgumentParser(
+        description="Extract final benchmark answers from a JSONL file.",
+    )
+    parser.add_argument("input", type=Path, help="Path to benchmark JSONL file")
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        help="Path to output text file (default: input with .txt)",
+    )
+    args = parser.parse_args(argv)
+    input_path = args.input
+    output_path = args.output or input_path.with_suffix(".txt")
+    if not input_path.exists():
+        print(f"Input not found: {input_path}", file=sys.stderr)
+        return 2
+    return convert_jsonl_to_text(input_path, output_path)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

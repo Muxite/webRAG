@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
@@ -32,7 +33,8 @@ def is_test_mode() -> bool:
 def create_app(service: Optional[GatewayService] = None) -> FastAPI:
     logger = setup_service_logger("Gateway", logging.INFO)
     cfg = ConnectorConfig()
-    version_info = get_version_info()
+    version_info = get_version_info("gateway")
+    worker_version_info = get_version_info("agent")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -90,6 +92,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
     app.state.user_tick_manager = SupabaseUserTickManager()
     app.state.test_mode = is_test_mode()
     app.state.version_info = version_info
+    app.state.worker_version_info = worker_version_info
     
     if app.state.test_mode:
         logger.info("Gateway running in TEST MODE - some production checks may be relaxed")
@@ -140,6 +143,60 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
         :returns: Version information payload.
         """
         return app.state.version_info
+
+    async def _get_active_worker_count(worker_type: str = "agent") -> Optional[int]:
+        """
+        Count active workers tracked in Redis presence sets.
+        :param worker_type: Worker type name used in Redis keys.
+        :returns: Active worker count or None when unavailable.
+        """
+        gateway_service = app.state.gateway_service
+        if not gateway_service or not hasattr(gateway_service, "redis_storage"):
+            return None
+        connector = getattr(gateway_service.redis_storage, "connector", None)
+        if connector is None:
+            return None
+        client = await connector.get_client()
+        if client is None:
+            return None
+        set_key = f"workers:{worker_type}"
+        members = await client.smembers(set_key)
+        if not members:
+            return 0
+        member_ids = [
+            m.decode("utf-8") if isinstance(m, (bytes, bytearray)) else str(m)
+            for m in members
+        ]
+        keys = [f"worker:{worker_type}:{member_id}" for member_id in member_ids]
+        values = await client.mget(keys)
+        active_count = sum(1 for value in values if value)
+        return active_count
+
+    @router.get("/worker-count")
+    async def worker_count():
+        """
+        Return active worker count.
+        :returns: Worker count payload.
+        """
+        count = await _get_active_worker_count()
+        return {"activeWorkers": 0 if count is None else count}
+
+    @router.get("/system-info")
+    async def system_info():
+        """
+        Return gateway system metadata for the frontend.
+        :returns: System info payload.
+        """
+        count = await _get_active_worker_count()
+        github_url = os.environ.get("GITHUB_URL", "https://github.com/muxite/webRAG")
+        return {
+            "title": "Euglena Gateway",
+            "gatewayVersion": app.state.version_info.get("version", "0.0"),
+            "workerVersion": app.state.worker_version_info.get("version", "0.0"),
+            "activeWorkers": 0 if count is None else count,
+            "lastUpdate": datetime.utcnow().date().isoformat(),
+            "github": github_url,
+        }
 
     @router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
     async def submit_task(

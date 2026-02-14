@@ -1,4 +1,4 @@
-"""
+cd"""
 Comprehensive ECS audit and troubleshooting tool.
 Combines audit-aws-changes, analyze-audit, and adds task-level investigation.
 """

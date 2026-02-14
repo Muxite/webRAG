@@ -14,17 +14,24 @@ except ImportError:
     from deployment_mode import DeploymentMode
 
 
-def build_and_register_task_definitions(services_dir: Path, mode: DeploymentMode = DeploymentMode.SINGLE) -> bool:
+def build_and_register_task_definitions(
+    services_dir: Path,
+    mode: DeploymentMode = DeploymentMode.SINGLE,
+    service: str = "all",
+) -> bool:
     """
     Build and register task definitions.
     :param services_dir: Services directory path.
     :param mode: Deployment mode enum.
+    :param service: Service target for autoscale mode.
     :returns: True on success.
     """
     print("\nBuild task definitions")
     
     script_path = services_dir.parent / "scripts" / "build_task_definition.py"
     cmd = ["python", str(script_path), "--mode", str(mode.value)]
+    if mode == DeploymentMode.AUTOSCALE and service != "all":
+        cmd.extend(["--service", service])
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
@@ -59,6 +66,8 @@ def parse_args():
                        help="Services directory containing aws.env")
     parser.add_argument("--mode", choices=["single", "autoscale"], default="single",
                        help="Deployment mode")
+    parser.add_argument("--service", choices=["all", "gateway", "agent"], default="all",
+                       help="Service target for autoscale mode")
     return parser.parse_args()
 
 
@@ -70,7 +79,7 @@ def main():
     args = parse_args()
     services_dir = args.services_dir or Path.cwd()
     mode = DeploymentMode.from_string(args.mode)
-    success = build_and_register_task_definitions(services_dir, mode)
+    success = build_and_register_task_definitions(services_dir, mode, args.service)
     sys.exit(0 if success else 1)
 
 

@@ -2,33 +2,20 @@ import os
 from typing import Dict
 
 
-def _normalize_number(value: str | None) -> str:
-    """
-    Normalize a numeric environment value.
-    :param value: Raw value from environment.
-    :returns: Normalized numeric string.
-    """
-    if value is None:
-        return "0"
-    stripped = value.strip()
-    if not stripped:
-        return "0"
-    try:
-        return str(int(stripped))
-    except ValueError:
-        return stripped
-
-
-def get_version_info() -> Dict[str, str]:
+def get_version_info(service: str | None = None) -> Dict[str, str]:
     """
     Build version metadata from environment variables.
-    :returns: Dict with version, variant, and deployment fields.
+    :param service: Optional service name for per-service versions.
+    :returns: Dict with version field.
     """
-    variant = _normalize_number(os.environ.get("VARIANT_NUMBER"))
-    deployment = _normalize_number(os.environ.get("DEPLOYMENT_NUMBER"))
-    version = f"{variant}.{deployment}"
+    service_version = None
+    if service:
+        service_key = service.strip().upper()
+        if service_key:
+            service_version = os.environ.get(f"{service_key}_VERSION")
+    if not service_version:
+        service_version = os.environ.get("VERSION")
+    version = service_version.strip() if service_version else "0.0"
     return {
         "version": version,
-        "variant": variant,
-        "deployment": deployment,
     }

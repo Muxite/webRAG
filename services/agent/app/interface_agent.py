@@ -79,9 +79,13 @@ class InterfaceAgent:
         await self.connector_search.__aenter__()
         await self.connector_http.__aenter__()
         
+        # Initialize each connector explicitly
         await self.connector_search.init_search_api()
         await self.connector_chroma.init_chroma()
         await self.storage.connector.init_redis()
+        
+        # Note: connector_llm is marked ready by default and doesn't have an init method
+        # and rabbitmq.connect() is called in start() before _initialize_dependencies()
         
         if self._check_dependencies_ready():
             self.logger.info("All dependencies ready")
