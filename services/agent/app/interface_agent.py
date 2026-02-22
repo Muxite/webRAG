@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+import time
+from pathlib import Path
 from typing import Optional, Dict, Any
 import aiohttp
 
@@ -10,6 +12,8 @@ from shared.models import CompletionResult
 from shared.message_contract import (
     StatusEnvelope,
     StatusType,
+    TaskState,
+    map_status_to_task_state,
     KeyNames,
     to_dict,
 )
@@ -20,6 +24,8 @@ from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
+from agent.app.agent_io import AgentIO
+from agent.app.telemetry import TelemetrySession
 from shared.storage import RedisTaskStorage
 
 
@@ -53,6 +59,7 @@ class InterfaceAgent:
         self.correlation_id: Optional[str] = None
         self.mandate: Optional[str] = None
         self.worker_ready: bool = False
+        self._telemetry: Optional[TelemetrySession] = None
 
     async def __aenter__(self):
         await self.start()
@@ -75,18 +82,13 @@ class InterfaceAgent:
         """Initializes all agent connectors and verifies they are ready."""
         self.logger.info("Initializing agent connectors...")
         
-        # Initialize HTTP sessions for connectors that need them (these are shared and reused)
         await self.connector_search.__aenter__()
         await self.connector_http.__aenter__()
         
-        # Initialize each connector explicitly
         await self.connector_search.init_search_api()
         await self.connector_chroma.init_chroma()
         await self.storage.connector.init_redis()
-        
-        # Note: connector_llm is marked ready by default and doesn't have an init method
-        # and rabbitmq.connect() is called in start() before _initialize_dependencies()
-        
+    
         if self._check_dependencies_ready():
             self.logger.info("All dependencies ready")
             return True
@@ -320,6 +322,8 @@ class InterfaceAgent:
             self.logger.warning("Invalid task payload, missing mandate or correlation_id")
             return
 
+        self._telemetry = self._build_telemetry()
+
         skip_phrase = os.environ.get("AGENT_SKIP_PHRASE", "skipskipskip")
 
         await self._cancel_waiting_state()
@@ -365,6 +369,8 @@ class InterfaceAgent:
                 max_ticks=max_ticks,
                 result=completion.result(),
             )
+            self._finalize_telemetry(success=all_connected)
+            self._clear_task_telemetry()
             await self._enter_waiting_state()
             return
 
@@ -382,6 +388,14 @@ class InterfaceAgent:
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
         try:
+            agent_io = AgentIO(
+                connector_llm=self.connector_llm,
+                connector_search=self.connector_search,
+                connector_http=self.connector_http,
+                connector_chroma=self.connector_chroma,
+                telemetry=self._telemetry,
+                collection_name=f"agent_memory_{self.correlation_id or 'unknown'}",
+            )
             self.agent = Agent(
                 mandate=self.mandate,
                 max_ticks=max_ticks,
@@ -389,6 +403,7 @@ class InterfaceAgent:
                 connector_search=self.connector_search,
                 connector_http=self.connector_http,
                 connector_chroma=self.connector_chroma,
+                agent_io=agent_io,
             )
             async with self.agent:
                 result = await self.agent.run()
@@ -426,9 +441,11 @@ class InterfaceAgent:
                 max_ticks=max_ticks,
                 result=completion.result(),
             )
+            self._finalize_telemetry(success=success)
         except Exception as e:
             self.logger.exception("Agent execution failed")
             await self._publish_status(StatusType.ERROR, max_ticks=max_ticks, error=str(e))
+            self._finalize_telemetry(success=False)
         finally:
             if self._heartbeat_task:
                 self._heartbeat_task.cancel()
@@ -437,9 +454,54 @@ class InterfaceAgent:
                 except asyncio.CancelledError:
                     pass
             self.agent = None
+            self._clear_task_telemetry()
             self.correlation_id = None
             self.mandate = None
             await self._enter_waiting_state()
+
+    def _build_telemetry(self) -> Optional[TelemetrySession]:
+        """
+        Build a telemetry session when tracking is enabled.
+        :returns: TelemetrySession or None.
+        """
+        if not self.config.enable_tracking:
+            return None
+        trace_dir = (self.config.trace_dir or "").strip()
+        trace_path = None
+        if trace_dir:
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"{ts}_agent_trace_{self.correlation_id or 'unknown'}.jsonl"
+            trace_path = Path(trace_dir) / filename
+        return TelemetrySession(
+            enabled=True,
+            mandate=self.mandate,
+            correlation_id=self.correlation_id,
+            trace_path=trace_path,
+        )
+
+    def _finalize_telemetry(self, success: Optional[bool] = None) -> None:
+        """
+        Finalize telemetry if enabled.
+        :param success: Optional success flag.
+        :returns: None
+        """
+        if self._telemetry:
+            self._telemetry.finish(success=success)
+
+    def _clear_task_telemetry(self) -> None:
+        """
+        Clear telemetry from connectors after a task finishes.
+        :returns: None
+        """
+        if self.connector_llm:
+            self.connector_llm.clear_telemetry()
+        if self.connector_search:
+            self.connector_search.clear_telemetry()
+        if self.connector_http:
+            self.connector_http.clear_telemetry()
+        if self.connector_chroma:
+            self.connector_chroma.clear_telemetry()
+        self._telemetry = None
 
     async def _publish_status(self, status_type: StatusType, **kwargs) -> None:
         """Publishes a status update for the current task."""
@@ -467,20 +529,10 @@ class InterfaceAgent:
         await self.rabbitmq.publish_status(payload)
 
         try:
-            state: str
-            if status_type == StatusType.ACCEPTED:
-                state = "accepted"
-            elif status_type in (StatusType.STARTED, StatusType.IN_PROGRESS):
-                state = "in_progress"
-            elif status_type == StatusType.COMPLETED:
-                state = "completed"
-            elif status_type == StatusType.ERROR:
-                state = "failed"
-            else:
-                state = "in_progress"
+            state: TaskState = map_status_to_task_state(status_type)
 
             updates = {
-                "status": state,
+                "status": state.value,
             }
             if self.mandate is not None:
                 updates["mandate"] = self.mandate

@@ -1,13 +1,16 @@
 import asyncio
-import logging
+import time
 from typing import Optional
 import aiohttp
 from shared.request_result import RequestResult
 from shared.connector_config import ConnectorConfig
 from shared.retry import Retry
+from agent.app.connector_base import ConnectorBase
 
-class ConnectorHttp:
-    """Manage a single HTTP session for a connector."""
+class ConnectorHttp(ConnectorBase):
+    """
+    Manage a single HTTP session for a connector.
+    """
     HTTP_STATUS_CODES = {
         200: "OK - Request succeeded",
         201: "Created - Resource created successfully",
@@ -37,8 +40,7 @@ class ConnectorHttp:
     PERMANENT_ERROR_CODES = {401, 403, 404, 405, 422}
 
     def __init__(self, config: ConnectorConfig):
-        self.config = config
-        self.logger = logging.getLogger(self.__class__.__name__)
+        super().__init__(config)
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def __aenter__(self):
@@ -72,12 +74,32 @@ class ConnectorHttp:
             raise RuntimeError("HTTP session not initialized. Use 'async with' context.")
         return self.session
 
+    async def _ensure_session(self) -> None:
+        """
+        Ensure an HTTP session exists for requests.
+        :returns: None
+        """
+        if self.session is None or self.session.closed:
+            await self.__aenter__()
+
+    async def _reset_session(self) -> None:
+        """
+        Close and reset the HTTP session.
+        :returns: None
+        """
+        try:
+            await self.__aexit__(None, None, None)
+        except Exception:
+            self.session = None
+
     async def request(self, method: str, url: str, retries: int = 4, **kwargs) -> RequestResult:
         """
         Generic request using shared Retry with exponential backoff.
         :return: RequestResult
         """
-        session = self.get_session()
+        async def _get_session() -> aiohttp.ClientSession:
+            await self._ensure_session()
+            return self.get_session()
 
         class TransientHTTPError(Exception):
             def __init__(self, status: Optional[int], message: str = "Transient HTTP error"):
@@ -85,32 +107,47 @@ class ConnectorHttp:
                 self.status = status
 
         async def do_request() -> RequestResult:
+            session = await _get_session()
             timeout = kwargs.pop("timeout", self.config.default_timeout)
-            async with session.request(method=method, url=url, timeout=timeout, **kwargs) as resp:
-                status = resp.status
+            try:
+                async with session.request(method=method, url=url, timeout=timeout, **kwargs) as resp:
+                    status = resp.status
 
-                if status in self.PERMANENT_ERROR_CODES:
-                    error_msg = self.HTTP_STATUS_CODES.get(status, "Permanent Error")
-                    return RequestResult(status=status, error=True, data=error_msg)
+                    if status in self.PERMANENT_ERROR_CODES:
+                        error_msg = self.HTTP_STATUS_CODES.get(status, "Permanent Error")
+                        return RequestResult(status=status, error=True, data=error_msg)
 
-                if 200 <= status < 300:
-                    content_type = resp.headers.get("Content-Type", "")
-                    if "application/json" in content_type:
-                        response_data = await resp.json()
-                    else:
-                        response_data = await resp.text()
-                    return RequestResult(status=status, error=False, data=response_data)
+                    if 200 <= status < 300:
+                        content_type = resp.headers.get("Content-Type", "")
+                        if "application/json" in content_type:
+                            response_data = await resp.json()
+                        else:
+                            response_data = await resp.text()
+                        return RequestResult(status=status, error=False, data=response_data)
 
-                raise TransientHTTPError(status, self.HTTP_STATUS_CODES.get(status, "HTTP error"))
+                    raise TransientHTTPError(status, self.HTTP_STATUS_CODES.get(status, "HTTP error"))
+            except RuntimeError as exc:
+                if "Session is closed" in str(exc) or "session is closed" in str(exc):
+                    await self._reset_session()
+                raise
 
         def should_retry(result: Optional[RequestResult], exc: Optional[BaseException], attempt: int) -> bool:
             if exc is not None:
                 if isinstance(exc, (asyncio.TimeoutError, aiohttp.ClientError, TransientHTTPError)):
                     return True
+                if isinstance(exc, RuntimeError) and "session" in str(exc).lower():
+                    return True
                 return False
             return False
 
         try:
+            started_at = time.perf_counter()
+            timeout_value = kwargs.get("timeout", self.config.default_timeout)
+            self._record_io(
+                direction="in",
+                operation="http_request",
+                payload={"method": method, "url": url, "retries": retries, "timeout": timeout_value},
+            )
             result: RequestResult = await Retry(
                 func=do_request,
                 max_attempts=retries,
@@ -123,9 +160,33 @@ class ConnectorHttp:
                 should_retry=should_retry,
                 raise_on_fail=True,
             ).run()
+            self._record_timing(
+                name="http_request",
+                started_at=started_at,
+                success=not result.error,
+                payload={"method": method, "url": url, "status": result.status},
+            )
+            self._record_io(
+                direction="out",
+                operation="http_request",
+                payload={"method": method, "url": url, "status": result.status, "error": result.error},
+            )
             return result
         except Exception as e:
             status = e.status if hasattr(e, "status") else None
+            self._record_timing(
+                name="http_request",
+                started_at=started_at,
+                success=False,
+                payload={"method": method, "url": url, "status": status},
+                error=str(e),
+            )
+            self._record_io(
+                direction="out",
+                operation="http_request",
+                payload={"method": method, "url": url, "status": status},
+                error=str(e),
+            )
             return RequestResult(
                 status=status,
                 error=True,

@@ -77,6 +77,48 @@ def pretty_log(data, logger=None, indents=0):
     final = pretty_log_print(data, indents)
     logger.info(final)
 
+def pretty_log_graph(graph, logger=None, indents=0):
+    """
+    Writes a well formatted log message for a graph structure.
+    :param graph: Graph instance or dict with nodes/root_id.
+    :param logger: Logger to use or None
+    :param indents: How many indents to use at the base.
+    """
+    logger = logger or logging.getLogger(__name__)
+    final = pretty_log_graph_print(graph, indents)
+    logger.info(final)
+
+def pretty_log_graph_print(graph, indents=0, render: str = "ascii"):
+    """
+    Format a graph structure with indentation.
+    :param graph: Graph instance or dict with nodes/root_id.
+    :param indents: How many indents to use at the base.
+    :param render: ascii | data
+    :returns: Formatted graph string.
+    """
+    payload = graph.to_dict() if hasattr(graph, "to_dict") else graph
+    root_id = payload.get("root_id") if isinstance(payload, dict) else None
+    nodes = payload.get("nodes", {}) if isinstance(payload, dict) else {}
+    if not root_id or root_id not in nodes:
+        return pretty_log_print(payload, indents)
+
+    if render == "data":
+        return _build_idea_dag_data(graph)
+    if render == "ascii":
+        from services.agent.app.idea_dag_log import idea_dag_to_ascii
+        return idea_dag_to_ascii(graph)
+
+    return pretty_log_print(payload, indents)
+
+def _build_idea_dag_data(graph):
+    """
+    Build a graph data structure for idea graph visualization.
+    :param graph: Graph instance or dict with nodes.
+    :returns: Dict with nodes and edges.
+    """
+    from services.agent.app.idea_dag_log import idea_dag_data
+    return idea_dag_data(graph)
+
 def pretty_log_print(data, indents=0):
     indent_str = "    " * indents
     if isinstance(data, list):
@@ -94,13 +136,23 @@ def pretty_log_print(data, indents=0):
     else:
         return f"{indent_str}{str(data)}"
 
-if __name__ == "__main__":
-    block = {
-        "world" : "Earth",
-        "time" : 2025,
-        "animals" : [
+def main() -> None:
+    """
+    Run a demo of pretty log rendering.
+    :returns: None
+    """
+    mock_block = {
+        "world": "Earth",
+        "time": 2025,
+        "animals": [
             {"blue_fish": ["tuna", "sardine", "grouper"]},
             {"birds": ["hawk", "sparrow", "pelican"]},
-                    ]
+        ],
     }
-    print(pretty_log_print(block, 1))
+    print("=== pretty_log_print ===")
+    print(pretty_log_print(mock_block, 1))
+
+
+
+if __name__ == "__main__":
+    main()

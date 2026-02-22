@@ -11,6 +11,7 @@ from shared.models import TaskRequest, TaskResponse, TaskRecord
 from shared.message_contract import (
     TaskEnvelope,
     KeyNames,
+    TaskQueueState,
     to_dict,
 )
 from shared.storage import RedisTaskStorage, SupabaseTaskStorage
@@ -210,7 +211,7 @@ class GatewayService:
 
         record = TaskRecord(
             correlation_id=correlation_id,
-            status="in_queue",
+            status=TaskQueueState.IN_QUEUE.value,
             mandate=req.mandate,
             created_at=now,
             updated_at=now,

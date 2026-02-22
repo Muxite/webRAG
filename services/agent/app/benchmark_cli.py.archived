@@ -1,0 +1,759 @@
+import argparse
+import asyncio
+import json
+import os
+import re
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+
+import logging
+
+try:
+    import openai
+    OPENAI_VERSION = openai.__version__
+except (ImportError, AttributeError):
+    OPENAI_VERSION = "unknown"
+
+from agent.app.agent import Agent
+from agent.app.agent_io import AgentIO
+from agent.app.telemetry import TelemetrySession
+from agent.app.connector_llm import ConnectorLLM
+from agent.app.connector_search import ConnectorSearch
+from agent.app.connector_http import ConnectorHttp
+from agent.app.connector_chroma import ConnectorChroma
+from shared.connector_config import ConnectorConfig
+from agent.app.trace_recorder import TraceRecorder
+from agent.app.benchmark_writer import BenchmarkWriter
+from agent.app.idea_dag_log import idea_dag_to_ascii
+from agent.app.idea_dag_settings import load_idea_dag_settings
+from agent.app.idea_engine import IdeaDagEngine
+
+
+MODEL_CANDIDATES = [
+    "gpt-5-mini",
+    "gpt-4o",
+]
+
+MODEL_ALIASES = {
+    "gpt-5": "gpt-5",
+    "gpt-5-mini": "gpt-5-mini",
+    "gpt-5-nano": "gpt-5-nano",
+    "gpt-4o": "gpt-4o",
+}
+
+
+def normalize_model_name(model_name: str) -> str:
+    """
+    Normalize model identifiers to canonical names.
+    :param model_name: Raw model string.
+    :return: Canonical model name.
+    """
+    candidate = model_name.strip()
+    return MODEL_ALIASES.get(candidate, candidate)
+
+
+def load_models_from_env() -> List[str]:
+    """
+    Load benchmark models from environment if present.
+    Priority: BENCHMARK_MODELS > MODEL_NAME > default (gpt-5-mini)
+    :return: List of model names.
+    """
+    raw = os.environ.get("BENCHMARK_MODELS", "").strip()
+    if not raw:
+        default_model = os.environ.get("MODEL_NAME", "").strip()
+        if default_model:
+            return [normalize_model_name(default_model)]
+        return [MODEL_CANDIDATES[0]]  # Default to first candidate (gpt-5-mini)
+    parts = [normalize_model_name(p) for p in raw.split(",")]
+    return [p for p in parts if p]
+
+
+def _resolve_protocol_paths(choice: str) -> List[Path]:
+    """
+    Resolve benchmark protocol selection.
+    :param choice: User or env choice string.
+    :return: List of protocol file paths.
+    """
+    base_dir = Path(__file__).resolve().parent / "benchmark_protocols"
+    protocol_1 = base_dir / "benchmark_protocol_1_downfall.md"
+    protocol_2 = base_dir / "benchmark_protocol_2_tensor_core_evolution.md"
+    protocol_3 = base_dir / "benchmark_protocol_3_regresshion.md"
+    options = {
+        "1": protocol_1,
+        "2": protocol_2,
+        "3": protocol_3,
+        "both": [protocol_1, protocol_2],
+        "all": [protocol_1, protocol_2, protocol_3],
+    }
+    value = choice.strip().lower()
+    if value in {"a", "all"}:
+        return options["all"]
+    if value in {"b", "both"}:
+        return options["both"]
+    if value in options:
+        return [options[value]]
+    return []
+
+
+def prompt_benchmark_choice(cli_choice: str | None = None) -> List[Path]:
+    """
+    Prompt user to select benchmark protocols.
+    Supports non-interactive mode via BENCHMARK_PROTOCOLS env var or CLI arg.
+    :return: List of protocol file paths.
+    """
+    choice = (cli_choice or os.environ.get("BENCHMARK_PROTOCOLS", "")).strip()
+    if choice:
+        resolved = _resolve_protocol_paths(choice)
+        if resolved:
+            print(f"Using protocol: {choice}")
+            return resolved
+    
+    if not sys.stdin.isatty() or os.environ.get("BENCHMARK_NON_INTERACTIVE", "").lower() in ("1", "true", "yes"):
+        default_choice = os.environ.get("BENCHMARK_PROTOCOLS", "3")
+        resolved = _resolve_protocol_paths(default_choice)
+        if resolved:
+            print(f"Non-interactive mode: protocol {default_choice}")
+            return resolved
+        return _resolve_protocol_paths("3")
+    base_dir = Path(__file__).resolve().parent / "benchmark_protocols"
+    protocol_1 = base_dir / "benchmark_protocol_1_downfall.md"
+    protocol_2 = base_dir / "benchmark_protocol_2_tensor_core_evolution.md"
+    protocol_3 = base_dir / "benchmark_protocol_3_regresshion.md"
+    options = {
+        "1": protocol_1,
+        "2": protocol_2,
+        "3": protocol_3,
+        "both": [protocol_1, protocol_2],
+        "all": [protocol_1, protocol_2, protocol_3],
+    }
+
+    print("\nSelect benchmark:")
+    print("  [1] Downfall (CVE-2022-40982)")
+    print("  [2] NVIDIA Tensor Core Evolution")
+    print("  [3] OpenSSH regreSSHion (CVE-2024-6387)")
+    print("  [b] Both (1 + 2)")
+    print("  [a] All (1 + 2 + 3)")
+    try:
+        choice = input("> ").strip().lower()
+    except EOFError:
+        choice = "3"
+    resolved = _resolve_protocol_paths(choice)
+    if resolved:
+        return resolved
+    return [protocol_3]
+
+
+def load_protocol_text(path: Path) -> str:
+    """
+    Load protocol text from file.
+    :param path: Path to protocol file.
+    :return: Protocol text.
+    """
+    return path.read_text(encoding="utf-8").strip()
+
+
+def collect_chronological_logs(telemetry: TelemetrySession, trace_path: Path) -> List[Dict[str, Any]]:
+    """
+    Collect all logs from trace file, sorted chronologically.
+    The trace file contains all events with proper timestamps.
+    :param telemetry: Telemetry session (unused, kept for API compatibility).
+    :param trace_path: Path to trace JSONL file.
+    :return: List of log entries sorted by timestamp.
+    """
+    all_logs: List[Dict[str, Any]] = []
+    
+    if trace_path.exists():
+        try:
+            with trace_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        if isinstance(entry, dict) and "ts" in entry:
+                            all_logs.append({
+                                "ts": entry.get("ts", 0),
+                                "event": entry.get("event", "unknown"),
+                                "payload": entry.get("payload", {}),
+                            })
+                    except json.JSONDecodeError:
+                        continue
+        except Exception:
+            pass
+    
+    all_logs.sort(key=lambda x: x.get("ts", 0))
+    return all_logs
+
+
+def _to_kilobytes(char_count: int) -> float:
+    """
+    Convert character count to kilobytes.
+    :param char_count: Character count.
+    :return: Kilobytes.
+    """
+    return round(char_count / 1024.0, 3)
+
+
+def _count_words(text: str) -> int:
+    """
+    Count words in a text string.
+    :param text: Input text.
+    :return: Word count.
+    """
+    return len(str(text).split())
+
+
+def _count_chars(text: str) -> int:
+    """
+    Count characters in a text string.
+    :param text: Input text.
+    :return: Character count.
+    """
+    return len(str(text))
+
+
+def summarize_observability(result: Dict[str, Any], telemetry: TelemetrySession) -> Dict[str, Any]:
+    """
+    Summarize observability metrics for benchmark runs.
+    :param result: Benchmark result payload.
+    :param telemetry: Telemetry session.
+    :return: Summary dictionary.
+    """
+    output = result.get("output") if isinstance(result, dict) else {}
+    final_text = ""
+    if isinstance(output, dict):
+        final_text = output.get("final_deliverable") or ""
+        if not final_text:
+            final_text = "\n".join(output.get("deliverables") or [])
+    final_chars = _count_chars(final_text)
+    final_words = _count_words(final_text)
+
+    llm_prompt_chars = 0
+    llm_prompt_words = 0
+    llm_completion_chars = 0
+    llm_completion_words = 0
+    llm_prompt_tokens = 0
+    llm_completion_tokens = 0
+
+    for entry in telemetry.events:
+        if entry.get("event") != "connector_io":
+            continue
+        payload = entry.get("payload") or {}
+        if payload.get("connector") != "ConnectorLLM":
+            continue
+        io_payload = payload.get("payload") or {}
+        llm_prompt_chars += int(io_payload.get("prompt_chars", 0))
+        llm_prompt_words += int(io_payload.get("prompt_words", 0))
+        llm_completion_chars += int(io_payload.get("completion_chars", 0))
+        llm_completion_words += int(io_payload.get("completion_words", 0))
+
+    for usage in telemetry.llm_usage:
+        usage_payload = usage.get("usage") or {}
+        llm_prompt_tokens += int(usage_payload.get("prompt_tokens", 0))
+        llm_completion_tokens += int(usage_payload.get("completion_tokens", 0))
+
+    chroma_store_chars = 0
+    chroma_store_words = 0
+    for entry in telemetry.chroma_stored:
+        for doc in entry.get("documents") or []:
+            chroma_store_chars += _count_chars(doc)
+            chroma_store_words += _count_words(doc)
+
+    chroma_retrieve_chars = 0
+    chroma_retrieve_words = 0
+    for entry in telemetry.chroma_retrieved:
+        for doc in entry.get("documents") or []:
+            chroma_retrieve_chars += _count_chars(doc)
+            chroma_retrieve_words += _count_words(doc)
+
+    search_chars = 0
+    search_words = 0
+    visit_chars = 0
+    visit_words = 0
+    for entry in telemetry.documents_seen:
+        source = entry.get("source")
+        document = entry.get("document") or {}
+        if source == "search":
+            text = " ".join(
+                str(value) for value in [document.get("title"), document.get("url"), document.get("description")] if value
+            )
+            search_chars += _count_chars(text)
+            search_words += _count_words(text)
+        elif source == "visit":
+            content = document.get("content") or ""
+            visit_chars += _count_chars(content)
+            visit_words += _count_words(content)
+
+    return {
+        "final_output": {
+            "chars": final_chars,
+            "words": final_words,
+            "kilobytes": _to_kilobytes(final_chars),
+        },
+        "llm_prompt": {
+            "chars": llm_prompt_chars,
+            "words": llm_prompt_words,
+            "kilobytes": _to_kilobytes(llm_prompt_chars),
+            "tokens": llm_prompt_tokens,
+        },
+        "llm_completion": {
+            "chars": llm_completion_chars,
+            "words": llm_completion_words,
+            "kilobytes": _to_kilobytes(llm_completion_chars),
+            "tokens": llm_completion_tokens,
+        },
+        "chroma_store": {
+            "chars": chroma_store_chars,
+            "words": chroma_store_words,
+            "kilobytes": _to_kilobytes(chroma_store_chars),
+        },
+        "chroma_retrieve": {
+            "chars": chroma_retrieve_chars,
+            "words": chroma_retrieve_words,
+            "kilobytes": _to_kilobytes(chroma_retrieve_chars),
+        },
+        "search_retrieved": {
+            "chars": search_chars,
+            "words": search_words,
+            "kilobytes": _to_kilobytes(search_chars),
+        },
+        "visit_retrieved": {
+            "chars": visit_chars,
+            "words": visit_words,
+            "kilobytes": _to_kilobytes(visit_chars),
+        },
+    }
+
+
+def _extract_urls(text: str) -> List[str]:
+    """
+    Extract URLs from text.
+    :param text: Input text.
+    :return: List of URLs.
+    """
+    return re.findall(r"https?://[^\s)\\\"]+", text or "")
+
+
+def validate_benchmark(output: Dict[str, Any], telemetry: TelemetrySession) -> Dict[str, Any]:
+    """
+    Validate benchmark output using telemetry and text checks.
+    :param output: Agent output payload.
+    :param telemetry: Telemetry session.
+    :return: Validation payload.
+    """
+    reasons = []
+    search_docs = sum(1 for entry in telemetry.documents_seen if entry.get("source") == "search")
+    visit_docs = sum(1 for entry in telemetry.documents_seen if entry.get("source") == "visit")
+
+    if search_docs < 1:
+        reasons.append("no_search_activity")
+    if visit_docs < 1:
+        reasons.append("no_visit_activity")
+
+    final_text = ""
+    if isinstance(output, dict):
+        final_deliverable = output.get("final_deliverable") or ""
+        if isinstance(final_deliverable, dict):
+            final_text = json.dumps(final_deliverable, ensure_ascii=True)
+        elif isinstance(final_deliverable, str):
+            final_text = final_deliverable
+        summary = output.get("action_summary") or ""
+        final_text = f"{final_text}\n{summary}"
+
+    urls = _extract_urls(final_text)
+    unique_domains = {url.split("/")[2] for url in urls if "://" in url}
+    if len(unique_domains) < 3:
+        reasons.append("insufficient_citations")
+
+    return {
+        "passed": len(reasons) == 0,
+        "reasons": reasons,
+        "search_docs": search_docs,
+        "visit_docs": visit_docs,
+        "unique_domains": sorted(unique_domains),
+    }
+
+
+def build_benchmark_mandate(topic: str) -> str:
+    """
+    Build a benchmark mandate that exercises search, browsing, and vector memory.
+    :param topic: Research topic.
+    :return: Mandate string.
+    """
+    return (
+        "You are running a research benchmark to evaluate model quality.\n"
+        f"Topic: {topic}\n"
+        "Requirements:\n"
+        "1) Perform at least 6 distinct web searches with varied keywords.\n"
+        "2) Visit at least 10 unique websites from those searches.\n"
+        "3) Follow and visit at least 3 links found within visited websites.\n"
+        "4) Extract key facts and store them in the vector database with detailed cache_update entries.\n"
+        "5) Use cache_retrieve to pull previously stored facts and integrate them into later reasoning.\n"
+        "6) Deliver a final report that compares at least 8 sources and highlights conflicts.\n"
+        "7) Include a brief methods section describing how sources were selected.\n"
+    )
+
+
+def result_path(run_id: str) -> Path:
+    """
+    Build a file path for storing benchmark results.
+    :param run_id: Run identifier.
+    :return: Path to output file.
+    """
+    base_dir = Path(__file__).resolve().parent / "benchmark_results"
+    base_dir.mkdir(parents=True, exist_ok=True)
+    return base_dir / f"{run_id}.json"
+
+
+async def run_benchmark(
+    model_name: str,
+    mandate: str,
+    max_ticks: int,
+    connector_llm: ConnectorLLM,
+    connector_search: ConnectorSearch,
+    connector_http: ConnectorHttp,
+    connector_chroma: ConnectorChroma,
+    tracer: TraceRecorder,
+    telemetry: TelemetrySession,
+    idea_settings: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Run a single benchmark job for the given model.
+    :param model_name: Model identifier.
+    :param mandate: Benchmark mandate.
+    :param max_ticks: Max ticks for the agent run.
+    :return: Result payload.
+    """
+    connector_llm.set_model(model_name)
+    agent_io = AgentIO(
+        connector_llm=connector_llm,
+        connector_search=connector_search,
+        connector_http=connector_http,
+        connector_chroma=connector_chroma,
+        telemetry=telemetry,
+        collection_name=f"agent_memory_{telemetry.correlation_id}",
+    )
+    agent = Agent(
+        mandate=mandate,
+        max_ticks=max_ticks,
+        connector_llm=connector_llm,
+        connector_search=connector_search,
+        connector_http=connector_http,
+        connector_chroma=connector_chroma,
+        model_name=model_name,
+        tracer=tracer,
+        agent_io=agent_io,
+        idea_dag_settings=idea_settings,
+    )
+    started = time.time()
+    output = await agent.run()
+    ended = time.time()
+    return {
+        "model": model_name,
+        "duration_seconds": round(ended - started, 2),
+        "mandate": mandate,
+        "output": output,
+        "metrics": output.get("metrics") if isinstance(output, dict) else None,
+    }
+
+
+async def probe_model(connector_llm: ConnectorLLM, model_name: str) -> dict:
+    """
+    Probe a model with small requests to infer supported parameters.
+    Uses simplified payload (no advanced parameters) to match main code behavior.
+    :param connector_llm: LLM connector.
+    :param model_name: Model identifier.
+    :return: Profile dict.
+    """
+    messages = [
+        {"role": "system", "content": "You are a terse assistant."},
+        {"role": "user", "content": "Reply with the word OK."},
+    ]
+    candidates = [
+        {"max_completion_tokens": 16},
+        {"max_tokens": 16},
+        {"temperature": 1, "max_completion_tokens": 16},
+        {"temperature": 1},
+        {},
+    ]
+    for payload in candidates:
+        try:
+            # Use simplified payload (no reasoning_effort, text, response_format)
+            safe_payload = dict(payload)
+            safe_payload.pop("response_format", None)
+            safe_payload.pop("reasoning_effort", None)
+            safe_payload.pop("text", None)
+            
+            response = await connector_llm.client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                **safe_payload,
+            )
+            if response and getattr(response, "choices", None):
+                profile = {}
+                if "temperature" in safe_payload:
+                    profile["temperature"] = safe_payload.get("temperature")
+                else:
+                    profile["temperature"] = None
+                if "max_completion_tokens" in safe_payload or "max_tokens" in safe_payload:
+                    profile["use_max_completion_tokens"] = True
+                return profile
+        except Exception as exc:
+            continue
+    return {"temperature": None, "use_max_completion_tokens": True}
+
+
+def _parse_args() -> argparse.Namespace:
+    """
+    Parse CLI args for benchmarks.
+    :return: Parsed args.
+    """
+    parser = argparse.ArgumentParser(description="Run benchmark protocols.")
+    parser.add_argument(
+        "--protocols",
+        default="",
+        help="Protocol selection: 1,2,3,both,all",
+    )
+    return parser.parse_args()
+
+
+async def preflight_connectors(
+    connector_llm: ConnectorLLM,
+    connector_search: ConnectorSearch,
+    connector_http: ConnectorHttp,
+    connector_chroma: ConnectorChroma,
+    idea_settings: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """
+    Run preflight checks for all connectors using a minimal DAG step with same settings as expansion.
+    :param connector_llm: LLM connector.
+    :param connector_search: Search connector.
+    :param connector_http: HTTP connector.
+    :param connector_chroma: ChromaDB connector.
+    :param idea_settings: Optional DAG settings (uses defaults if not provided).
+    :return: True if all checks pass.
+    """
+    print("\n=== Preflight Checks ===")
+    all_ok = True
+    
+    # Load settings if not provided
+    if idea_settings is None:
+        idea_settings = load_idea_dag_settings()
+    
+    # Test LLM with a minimal DAG step (same settings as real expansion)
+    print("  [LLM] Testing with minimal DAG step (using expansion settings)...")
+    try:
+        io = AgentIO(
+            connector_llm=connector_llm,
+            connector_search=connector_search,
+            connector_http=connector_http,
+            connector_chroma=connector_chroma,
+        )
+        engine = IdeaDagEngine(
+            io=io,
+            settings=idea_settings,
+            model_name=connector_llm.model_name,
+        )
+        # Run a single step with a simple test mandate
+        test_mandate = "Test: Reply with OK"
+        graph = engine.io  # We'll create the graph in the step
+        from agent.app.idea_dag import IdeaDag
+        test_graph = IdeaDag(root_title=test_mandate, root_details={"mandate": test_mandate})
+        current_id = test_graph.root_id()
+        
+        # Run one step - this will test expansion with real settings
+        result_id = await engine.step(test_graph, current_id, 0)
+        
+        # Check if expansion worked (should have created children or at least attempted expansion)
+        node = test_graph.get_node(current_id)
+        if node and (len(node.children) > 0 or node.details.get("expansion_error") is None):
+            print(f"  [LLM] ✓ DAG expansion test passed (created {len(node.children)} children)")
+        else:
+            print(f"  [LLM] ✗ DAG expansion test failed (no children created)")
+            all_ok = False
+    except Exception as exc:
+        print(f"  [LLM] ✗ DAG expansion test failed: {exc}")
+        import traceback
+        traceback.print_exc()
+        all_ok = False
+    
+    print("  [Search] Testing connection...")
+    search_ok = await connector_search.init_search_api()
+    if search_ok:
+        print("  [Search] ✓ Connected")
+    else:
+        print("  [Search] ✗ Failed")
+        all_ok = False
+    
+    print("  [ChromaDB] Testing connection...")
+    chroma_ok = await connector_chroma.init_chroma()
+    if chroma_ok:
+        print("  [ChromaDB] ✓ Connected")
+    else:
+        print("  [ChromaDB] ✗ Failed")
+        all_ok = False
+    
+    print("  [HTTP] HTTP connector ready (no preflight needed)")
+    
+    if all_ok:
+        print("=== All preflight checks passed ===\n")
+    else:
+        print("=== Some preflight checks failed ===\n")
+    return all_ok
+
+
+async def main() -> None:
+    """
+    Run benchmark tasks for a list of models.
+    """
+    max_ticks = int(os.environ.get("BENCHMARK_MAX_TICKS", "100"))
+    log_level = os.environ.get("BENCHMARK_LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(
+        level=getattr(logging, log_level, logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
+    )
+    print(f"OpenAI library version: {OPENAI_VERSION}")
+    print()
+    models = load_models_from_env()
+    run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    all_results: List[Dict[str, Any]] = []
+
+    config = ConnectorConfig()
+    idea_settings = load_idea_dag_settings()
+    idea_settings["log_dag_ascii"] = True
+    idea_settings["log_dag_step_interval"] = 1
+    idea_settings["allowed_actions"] = ["search", "visit", "save"]
+    idea_settings["expansion_temperature"] = float(os.environ.get("BENCHMARK_EXPANSION_TEMP", "0.3"))
+    idea_settings["evaluation_temperature"] = float(os.environ.get("BENCHMARK_EVAL_TEMP", "0.1"))
+    connector_llm = ConnectorLLM(config)
+    connector_search = ConnectorSearch(config)
+    connector_http = ConnectorHttp(config)
+    connector_chroma = ConnectorChroma(config)
+
+    async with connector_search, connector_http, connector_llm:
+        preflight_ok = await preflight_connectors(connector_llm, connector_search, connector_http, connector_chroma, idea_settings)
+        if not preflight_ok:
+            print("WARNING: Some connectors failed preflight checks. Continuing anyway...")
+
+        model_profiles: Dict[str, dict] = {}
+        for model_name in models:
+            normalized = normalize_model_name(model_name)
+            profile = await probe_model(connector_llm, normalized)
+            connector_llm.set_model_profile(normalized, profile)
+            model_profiles[normalized] = profile
+
+        args = _parse_args()
+        protocol_paths = prompt_benchmark_choice(args.protocols)
+        summary_path = result_path(run_id).with_suffix(".jsonl")
+        writer = BenchmarkWriter(summary_path)
+
+        try:
+            for protocol_path in protocol_paths:
+                mandate = load_protocol_text(protocol_path)
+                print(f"\nRunning protocol: {protocol_path.name}")
+                for model_name in models:
+                    normalized = normalize_model_name(model_name)
+                    print(f"  Model: {normalized}")
+                    run_stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                    trace_path = Path(__file__).resolve().parent / "benchmark_results" / f"{run_id}-{protocol_path.stem}-{normalized}-{run_stamp}.jsonl"
+                    tracer = TraceRecorder(trace_path)
+                    telemetry = TelemetrySession(
+                        enabled=True,
+                        mandate=mandate,
+                        correlation_id=f"{run_id}-{protocol_path.stem}-{normalized}-{run_stamp}",
+                        trace_path=trace_path,
+                    )
+                    success = None
+                    result = None
+                    observability = None
+                    validation = None
+                    try:
+                        result = await run_benchmark(
+                            model_name=normalized,
+                            mandate=mandate,
+                            max_ticks=max_ticks,
+                            connector_llm=connector_llm,
+                            connector_search=connector_search,
+                            connector_http=connector_http,
+                            connector_chroma=connector_chroma,
+                            tracer=tracer,
+                            telemetry=telemetry,
+                            idea_settings=idea_settings,
+                        )
+                        success = result.get("output", {}).get("success") if isinstance(result.get("output"), dict) else None
+                        duration = result.get("duration_seconds", 0)
+                        print(f"  Done: {normalized} (success={success}, duration={duration:.2f}s)")
+                        observability = summarize_observability(result, telemetry)
+                        validation = validate_benchmark(result.get("output") or {}, telemetry)
+                        if not validation.get("passed"):
+                            print(f"  Validation failed: {validation.get('reasons', [])}")
+                        else:
+                            print(f"  Validation passed")
+                        if not validation.get("passed"):
+                            success = False
+                            result["output"] = dict(result.get("output") or {})
+                            result["output"]["success"] = False
+                            result["output"]["benchmark_validation"] = validation
+                        graph_payload = result.get("output", {}).get("graph")
+                        print("\n=== DAG Visualization ===")
+                        if graph_payload:
+                            print(idea_dag_to_ascii(graph_payload))
+                        else:
+                            print("(No DAG data available)")
+                        print("=" * 50)
+                    except Exception as exc:
+                        tracer.record(
+                            "run_error",
+                            {"model": normalized, "protocol": protocol_path.name, "error": str(exc)},
+                        )
+                        writer.append(
+                            {
+                                "run_id": run_id,
+                                "protocol": protocol_path.name,
+                                "model": normalized,
+                                "error": str(exc),
+                                "trace_file": str(trace_path),
+                            }
+                        )
+                        raise
+                    finally:
+                        telemetry.finish(success=bool(success) if success is not None else None)
+                        tracer.close()
+                        if result is not None:
+                            chronological_logs = collect_chronological_logs(telemetry, trace_path)
+                            entry = {
+                                "run_id": run_id,
+                                "protocol": protocol_path.name,
+                                "model": normalized,
+                                "primary_data": {
+                                    "result": result,
+                                    "observability": observability or {},
+                                    "validation": validation or {},
+                                },
+                                "chronological_logs": chronological_logs,
+                                "trace_file": str(trace_path),
+                            }
+                            writer.append(entry)
+                            all_results.append(entry)
+        finally:
+            writer.close()
+
+        out_path = result_path(run_id)
+        payload = {
+            "run_id": run_id,
+            "models": models,
+            "protocols": [p.name for p in protocol_paths],
+            "model_profiles": model_profiles,
+            "results": all_results,
+        }
+        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        print(f"Saved: {out_path}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -88,6 +88,8 @@ services:
     build:
       context: .
       dockerfile: agent/.dockerfile
+    stdin_open: true
+    tty: true
     depends_on:
       - chroma
       - redis
@@ -116,6 +118,46 @@ services:
       - keys.env
     environment:
       - AGENT_STATUS_TIME=0.2
+    networks:
+      - enet
+
+  idea-test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: agent/.dockerfile
+    depends_on:
+      - chroma
+      - redis
+      - rabbitmq
+    command: ["python", "-m", "app.idea_test_runner"]
+    env_file:
+      - .env
+      - keys.env
+    environment:
+      - AGENT_STATUS_TIME=0.2
+    volumes:
+      - ./agent/app/idea_test_results:/app/agent/app/idea_test_results
+      - ./agent/app/idea_tests:/app/agent/app/idea_tests
+    networks:
+      - enet
+
+  visit-test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: agent/.dockerfile
+    depends_on:
+      - chroma
+      - redis
+      - rabbitmq
+    command: ["python", "-m", "app.idea_test_runner"]
+    env_file:
+      - .env
+      - keys.env
+    environment:
+      - AGENT_STATUS_TIME=0.2
+      - IDEA_TEST_VISIT_ONLY=1
     networks:
       - enet
 

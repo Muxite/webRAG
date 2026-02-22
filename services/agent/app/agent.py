@@ -1,13 +1,12 @@
-import logging
 import json
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable, Any
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.tick_output import TickOutput, ActionType
-from agent.app.prompt_builder import PromptBuilder
-from agent.app.prompt_builder import build_payload
-from agent.app.observation import clean_operation
+from agent.app.prompt_builder import TickPromptBuilder, FinalPromptBuilder, ObservationBuilder
+from agent.app.idea_engine import IdeaDagEngine
+from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.connector_chroma import ConnectorChroma
 from shared.pretty_log import pretty_log
 from urllib.parse import urlparse
@@ -16,6 +15,7 @@ import logging
 import os
 from shared.models import FinalResult
 from agent.app.trace_recorder import TraceRecorder
+from agent.app.agent_io import AgentIO
 
 
 class Agent:
@@ -34,6 +34,9 @@ class Agent:
         connector_chroma: ConnectorChroma = None,
         model_name: str | None = None,
         tracer: Optional[TraceRecorder] = None,
+        agent_io: Optional[AgentIO] = None,
+        model_selector: Optional[Callable[[str, int], Optional[str]]] = None,
+        idea_dag_settings: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the agent with a mandate and tick limit.
@@ -57,6 +60,15 @@ class Agent:
         self.connector_chroma = connector_chroma
         self.model_name = model_name
         self.tracer = tracer
+        self.model_selector = model_selector
+        self.idea_dag_settings = idea_dag_settings
+
+        self.io = agent_io or AgentIO(
+            connector_llm=connector_llm,
+            connector_search=connector_search,
+            connector_http=connector_http,
+            connector_chroma=connector_chroma,
+        )
 
         self.collection_name = "agent_memory"
         self.blocked_count = 0
@@ -139,6 +151,16 @@ class Agent:
             if self.connector_llm:
                 self.connector_llm.set_model(self.model_name)
 
+    def _select_model_for_call(self, purpose: str) -> Optional[str]:
+        """
+        Select the model name for a specific call.
+        :param purpose: Label for the call context.
+        :returns: Model name or None.
+        """
+        if self.model_selector:
+            return self.model_selector(purpose, self.current_tick)
+        return self.model_name
+
     async def run(self) -> Dict:
         """
         The primary event loop of the agent.
@@ -154,6 +176,22 @@ class Agent:
         if not await self.initialize():
             return {"success": False, "error": "Initialization failed", "deliverables": []}
 
+        use_idea_dag_env = os.environ.get("AGENT_USE_IDEA_DAG", "").lower()
+        settings = self.idea_dag_settings or load_idea_dag_settings()
+        use_idea_dag = use_idea_dag_env in ("1", "true", "yes", "on")
+        if use_idea_dag_env == "":
+            use_idea_dag = bool(settings.get("enable_idea_dag", False))
+
+        if use_idea_dag:
+            engine = IdeaDagEngine(
+                io=self.io,
+                model_name=self._select_model_for_call("idea_dag"),
+                settings=settings,
+            )
+            result = await engine.run(self.mandate, max_steps=self.max_ticks)
+            result["metrics"] = self.metrics
+            return result
+
         self._logger.info(f"Agent started: {self.mandate}\n")
 
         final_payload = None
@@ -168,7 +206,7 @@ class Agent:
                     {"tick": self.current_tick, "max_ticks": self.max_ticks},
                 )
 
-            prompt_builder = PromptBuilder(
+            prompt_builder = TickPromptBuilder(
                 mandate=self.mandate,
                 short_term_summary=self.history,
 
@@ -179,7 +217,11 @@ class Agent:
                 max_ticks=self.max_ticks,
             )
             messages = prompt_builder.build_messages()
-            prompt = build_payload(messages, True)
+            prompt = self.io.build_llm_payload(
+                messages=messages,
+                json_mode=True,
+                model_name=self._select_model_for_call("tick"),
+            )
             user_message = prompt_builder._build_user_message()
             self._track_text("prompt", user_message)
             self._track_text("prompt", prompt_builder.SYSTEM_INSTRUCTIONS)
@@ -196,7 +238,7 @@ class Agent:
                 )
             pretty_log(prompt_builder.get_summary(), logger=self._logger, indents=1)
 
-            llm_response = await self.connector_llm.query_llm(prompt)
+            llm_response = await self.io.query_llm(prompt, model_name=self._select_model_for_call("tick"))
             if llm_response is None:
                 self._logger.error("LLM query failed after retries; breaking to final output.")
                 self._logger.debug(prompt)
@@ -208,7 +250,7 @@ class Agent:
                     "llm_output",
                     {"tick": self.current_tick, "content": llm_response},
                 )
-            usage = self.connector_llm.pop_last_usage()
+            usage = self.io.pop_last_llm_usage()
             if usage:
                 self.metrics["llm_calls"] += 1
                 self.metrics["llm_prompt_tokens"] += usage.get("prompt_tokens", 0)
@@ -344,7 +386,7 @@ class Agent:
                 pass
         except Exception as exc:
             self._logger.warning(f"Action failed: {action} {param} ({exc})")
-            obs = PromptBuilder.build_exception_observation(str(action), str(exc))
+            obs = ObservationBuilder.build_exception_observation(str(action), str(exc))
             self.observations += obs
             self._track_text("observations", obs)
             if "403" in str(exc) or "blocked" in str(exc).lower():
@@ -373,16 +415,16 @@ class Agent:
         """
         self.metrics["searches"] += 1
         try:
-            search_results = await self.connector_search.query_search(query, count=count)
+            search_results = await self.io.search(query, count=count)
         except Exception as exc:
             error_text = f"Search failed for '{query}': {exc}"
-            obs = PromptBuilder.build_exception_observation("search", error_text)
+            obs = ObservationBuilder.build_exception_observation("search", error_text)
             self.observations += obs
             self._track_text("observations", obs)
             return
         if search_results:
             self.metrics["search_results"] += len(search_results)
-        obs = PromptBuilder.build_web_search_observation(query, search_results)
+        obs = ObservationBuilder.build_web_search_observation(query, search_results)
         self.observations += obs
         self._track_text("observations", obs)
         if self.tracer:
@@ -399,27 +441,18 @@ class Agent:
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             self._logger.error(f"Invalid URL provided: '{url}'")
-            obs = PromptBuilder.build_invalid_url_observation(url)
+            obs = ObservationBuilder.build_invalid_url_observation(url)
             self.observations += obs
             self._track_text("observations", obs)
             return
 
-        result = await self.connector_http.request("GET", url, retries=3)
-        if result.error:
-            raise RuntimeError(f"HTTP visit failed: {url} status={result.status}")
-        resp = result.data
         try:
-            if isinstance(resp, dict):
-                text_body = json.dumps(resp)
-            else:
-                text_body = resp
-            cleaned = clean_operation(text_body)
-            summary = cleaned if cleaned else "[No main content found]"
+            summary = await self.io.visit(url)
         except Exception as e:
             self._logger.warning(f"Failed to extract body from {url}: {e}")
             summary = "[No main content found]"
 
-        obs = PromptBuilder.build_visit_observation(url, summary)
+        obs = ObservationBuilder.build_visit_observation(url, summary)
         self.observations += obs
         self._track_text("observations", obs)
         self.metrics["visits"] += 1
@@ -433,28 +466,15 @@ class Agent:
         self.metrics["cache_docs_added"] += len(documents)
         for doc in documents:
             self._track_text("cache_doc", doc)
-        prepared_metadatas: List[Dict] = []
-        for idx, doc in enumerate(documents):
-            metadata = metadatas[idx] if metadatas and idx < len(metadatas) else {}
-            if metadata is None:
-                metadata = {}
-            prepared = dict(metadata)
-            if "title" not in prepared:
-                words = doc.split()
-                prepared["title"] = " ".join(words[:8]) if words else "untitled"
-            if "topics" not in prepared:
-                prepared["topics"] = prepared.get("title", "")
-            prepared_metadatas.append(prepared)
-        await self.connector_chroma.add_to_chroma(
-            collection=self.collection_name,
-            ids=ids,
-            metadatas=prepared_metadatas,
+        await self.io.store_chroma(
             documents=documents,
+            metadatas=metadatas,
+            ids=ids,
         )
         if self.tracer:
             self.tracer.record(
                 "cache_store",
-                {"count": len(documents), "metadatas": prepared_metadatas},
+                {"count": len(documents), "metadatas": metadatas},
             )
 
     async def _retrieve_chroma(self, topics: List[str]) -> List[str]:
@@ -465,15 +485,7 @@ class Agent:
         """
         if not self.connector_chroma.chroma_api_ready or not topics:
             return []
-        results = await self.connector_chroma.query_chroma(
-            collection=self.collection_name,
-            query_texts=topics,
-            n_results=3,
-        )
-        all_docs = []
-        if results and "documents" in results:
-            for doc_list in results["documents"]:
-                all_docs.extend(doc_list)
+        all_docs = await self.io.retrieve_chroma(topics, n_results=3)
         self.metrics["retrieved_chunks"] += len(all_docs)
         for doc in all_docs:
             self._track_text("retrieved", doc)
@@ -490,20 +502,24 @@ class Agent:
         keys: final_deliverable, action_summary, success
         :return: Dictionary with final deliverable and action summary.
         """
-        final_messages = PromptBuilder.build_final_messages(
+        final_messages = FinalPromptBuilder(
             mandate=self.mandate,
             history=self.history,
             notes=self.notes,
             deliverables=self.deliverables,
             retrieved_context=self.retrieved_context,
+        ).build_messages()
+        final_prompt = self.io.build_llm_payload(
+            messages=final_messages,
+            json_mode=True,
+            model_name=self._select_model_for_call("final"),
         )
-        final_prompt = build_payload(final_messages, True)
         self.metrics["llm_inputs"].append(final_messages)
         if self.tracer:
             self.tracer.record("final_llm_input", {"messages": final_messages})
         self._logger.info("=== GENERATING FINAL OUTPUT ===")
 
-        llm_response = await self.connector_llm.query_llm(final_prompt)
+        llm_response = await self.io.query_llm(final_prompt, model_name=self._select_model_for_call("final"))
         if llm_response is None:
             self._logger.error("Final output LLM query failed.")
 
@@ -523,7 +539,7 @@ class Agent:
             self._logger.info("Final output generated successfully")
             self._track_text("llm_output", llm_response)
             self.metrics["llm_outputs"].append(llm_response)
-            usage = self.connector_llm.pop_last_usage()
+            usage = self.io.pop_last_llm_usage()
             if usage:
                 self.metrics["llm_calls"] += 1
                 self.metrics["llm_prompt_tokens"] += usage.get("prompt_tokens", 0)

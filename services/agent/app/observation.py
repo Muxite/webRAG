@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 
-# TODO benchmark BeautifulSoup vs regex vs lxml_html_clean
+
 def clean_operation(html):
     """
     Extract simplified main text content from the provided HTML.

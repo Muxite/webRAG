@@ -1,0 +1,463 @@
+import asyncio
+import json
+import os
+import re
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Any
+
+import logging
+
+from agent.app.agent_io import AgentIO
+from agent.app.connector_llm import ConnectorLLM
+from agent.app.connector_search import ConnectorSearch
+from agent.app.connector_http import ConnectorHttp
+from agent.app.connector_chroma import ConnectorChroma
+from shared.connector_config import ConnectorConfig
+from agent.app.idea_dag_settings import load_idea_dag_settings
+from agent.app.idea_engine import IdeaDagEngine
+from agent.app.idea_dag import IdeaDag
+from agent.app.idea_finalize import build_final_payload
+
+
+MODEL_CANDIDATES = [
+    "gpt-5-mini",
+    "gpt-4o",
+]
+
+MODEL_ALIASES = {
+    "gpt-5": "gpt-5",
+    "gpt-5-mini": "gpt-5-mini",
+    "gpt-5-nano": "gpt-5-nano",
+    "gpt-4o": "gpt-4o",
+}
+
+
+def normalize_model_name(model_name: str) -> str:
+    """
+    Normalize model identifiers to canonical names.
+    :param model_name: Raw model string.
+    :return: Canonical model name.
+    """
+    candidate = model_name.strip()
+    return MODEL_ALIASES.get(candidate, candidate)
+
+
+def load_models_from_env() -> List[str]:
+    """
+    Load test models from environment if present.
+    Priority: IDEA_TEST_MODELS > MODEL_NAME > default (gpt-5-mini)
+    :return: List of model names.
+    """
+    raw = os.environ.get("IDEA_TEST_MODELS", "").strip()
+    if not raw:
+        default_model = os.environ.get("MODEL_NAME", "").strip()
+        if default_model:
+            return [normalize_model_name(default_model)]
+        return [MODEL_CANDIDATES[0]]
+    parts = [normalize_model_name(p) for p in raw.split(",")]
+    return [p for p in parts if p]
+
+
+def load_test_protocol() -> List[Dict[str, Any]]:
+    """
+    Load test protocol from markdown file.
+    :return: List of test definitions.
+    """
+    protocol_path = Path(__file__).resolve().parent / "idea_test_protocol.md"
+    if not protocol_path.exists():
+        raise FileNotFoundError(f"Protocol file not found: {protocol_path}")
+    
+    content = protocol_path.read_text(encoding="utf-8")
+    tests = []
+    current_test = None
+    in_deliverables = False
+    in_criteria = False
+    
+    for line in content.split("\n"):
+        line_stripped = line.strip()
+        if line_stripped.startswith("Test "):
+            if current_test:
+                tests.append(current_test)
+            test_num = line_stripped.split(":")[0].replace("Test ", "").strip()
+            test_name = line_stripped.split(":", 1)[1].strip() if ":" in line_stripped else ""
+            current_test = {
+                "test_number": test_num,
+                "test_name": test_name,
+                "task_statement": "",
+                "required_deliverables": [],
+                "success_criteria": [],
+            }
+            in_deliverables = False
+            in_criteria = False
+        elif line_stripped.startswith("Task Statement") and current_test:
+            continue
+        elif line_stripped.startswith('"') and current_test and not current_test.get("task_statement"):
+            current_test["task_statement"] = line_stripped.strip('"')
+        elif line_stripped.startswith("Required Deliverables") and current_test:
+            in_deliverables = True
+            in_criteria = False
+            continue
+        elif line_stripped.startswith("Success Criteria") and current_test:
+            in_deliverables = False
+            in_criteria = True
+            continue
+        elif line_stripped.startswith("---") and current_test:
+            in_deliverables = False
+            in_criteria = False
+        elif line_stripped.startswith("-") and current_test:
+            item = line_stripped[1:].strip()
+            if in_criteria:
+                current_test["success_criteria"].append(item)
+            elif in_deliverables:
+                current_test["required_deliverables"].append(item)
+    
+    if current_test:
+        tests.append(current_test)
+    
+    return tests
+
+
+def extract_urls(text: str) -> List[str]:
+    """
+    Extract URLs from text.
+    :param text: Input text.
+    :return: List of URLs.
+    """
+    return re.findall(r"https?://[^\s)\\\"]+", text or "")
+
+
+async def validate_test_result(
+    test_def: Dict[str, Any],
+    result: Dict[str, Any],
+    connector_llm: ConnectorLLM,
+    model_name: str,
+) -> Dict[str, Any]:
+    """
+    Validates an agent's test result against success criteria using LLM evaluation.
+    
+    Extracts the agent's final output, sends it to an LLM along with the test's
+    success criteria, and receives a structured validation assessment.
+    
+    **What It Returns:**
+    ```python
+    {
+        "passed": bool,           # Whether test passed
+        "score": float,           # Score 0.0-1.0
+        "reasons": [str],         # Why it passed/failed
+        "missing_requirements": [str],  # What's missing
+        "urls_found": int,        # Number of URLs in output
+        "urls": [str]             # List of URLs found
+    }
+    ```
+    
+    **Parameters:**
+    - `test_def`: Test definition dict with `task_statement` and `success_criteria`
+    - `result`: Agent result dict containing `output` with `final_deliverable`
+    - `connector_llm`: LLM connector for validation queries
+    - `model_name`: Model to use for validation (e.g., "gpt-5-mini")
+    
+    **Behavior:**
+    - Handles model-specific limitations (e.g., temperature restrictions)
+    - Extracts URLs from output automatically
+    - Returns validation error dict if LLM call fails
+    """
+    output = result.get("output", {})
+    final_text = ""
+    if isinstance(output, dict):
+        final_deliverable = output.get("final_deliverable", "")
+        if isinstance(final_deliverable, dict):
+            final_text = json.dumps(final_deliverable, ensure_ascii=True)
+        elif isinstance(final_deliverable, str):
+            final_text = final_deliverable
+        elif isinstance(final_deliverable, list):
+            final_text = json.dumps(final_deliverable, ensure_ascii=True)
+        else:
+            final_text = str(final_deliverable)
+    
+    task_statement = test_def.get("task_statement", "")
+    success_criteria = test_def.get("success_criteria", [])
+    
+    validation_prompt = f"""You are validating a test result. 
+
+Task: {task_statement}
+
+Success Criteria:
+{chr(10).join(f"- {criterion}" for criterion in success_criteria)}
+
+Agent Output:
+{final_text[:2000]}
+
+Evaluate whether the agent's output meets the success criteria. Return a JSON object with:
+- "passed": boolean
+- "score": float (0.0 to 1.0)
+- "reasons": array of strings explaining why it passed or failed
+- "missing_requirements": array of strings listing what's missing
+
+Be strict but fair. The output must clearly demonstrate meeting the criteria."""
+    
+    try:
+        messages = [
+            {"role": "system", "content": "You are a test validator. Return only valid JSON."},
+            {"role": "user", "content": validation_prompt},
+        ]
+        
+        payload = connector_llm.build_payload(
+            messages=messages,
+            json_mode=True,
+            model_name=model_name,
+            temperature=0.1,
+        )
+        
+        response = await connector_llm.client.chat.completions.create(**payload)
+        content = response.choices[0].message.content
+        
+        validation_result = json.loads(content)
+        
+        urls = extract_urls(final_text)
+        validation_result["urls_found"] = len(urls)
+        validation_result["urls"] = urls[:10]
+        
+        return validation_result
+    except Exception as exc:
+        return {
+            "passed": False,
+            "score": 0.0,
+            "reasons": [f"Validation error: {str(exc)}"],
+            "missing_requirements": [],
+            "urls_found": 0,
+            "urls": [],
+        }
+
+
+async def run_idea_test(
+    test_def: Dict[str, Any],
+    model_name: str,
+    connector_llm: ConnectorLLM,
+    connector_search: ConnectorSearch,
+    connector_http: ConnectorHttp,
+    connector_chroma: ConnectorChroma,
+    idea_settings: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Executes a single test from the idea-test protocol suite.
+    
+    Runs the agent through the complete problem-solving cycle, then validates
+    the result using LLM evaluation. This is the core test execution function.
+    
+    **What It Does:**
+    1. Creates an isolated DAG with the test's task statement
+    2. Runs the engine for up to `IDEA_TEST_MAX_STEPS` steps (default: 50)
+    3. Generates final output using the merged results
+    4. Validates the output against success criteria
+    5. Returns complete test result with validation
+    
+    **What It Returns:**
+    ```python
+    {
+        "test_number": str,           # Test ID (e.g., "1")
+        "test_name": str,             # Test name (e.g., "Three Branch Search")
+        "model": str,                 # Model used
+        "duration_seconds": float,    # Execution time
+        "mandate": str,               # Task statement
+        "output": dict,               # Agent output with final_deliverable
+        "validation": dict,           # Validation result (passed, score, reasons)
+        "graph": dict                 # Complete DAG structure
+    }
+    ```
+    
+    **Parameters:**
+    - `test_def`: Test definition from protocol (has `test_number`, `test_name`, `task_statement`, `success_criteria`)
+    - `model_name`: LLM model to use (e.g., "gpt-5-mini")
+    - `connector_*`: All required service connectors
+    - `idea_settings`: DAG configuration settings
+    
+    **Important:**
+    - Each test uses an isolated ChromaDB collection (prevents data leakage)
+    - Stops early if agent completes before max_steps
+    - Validation uses separate LLM call (handles model limitations automatically)
+    """
+    connector_llm.set_model(model_name)
+    run_stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    correlation_id = f"idea_test_{test_def['test_number']}_{run_stamp}"
+    
+    agent_io = AgentIO(
+        connector_llm=connector_llm,
+        connector_search=connector_search,
+        connector_http=connector_http,
+        connector_chroma=connector_chroma,
+        collection_name=f"idea_test_{test_def['test_number']}_{run_stamp}",
+    )
+    
+    engine = IdeaDagEngine(
+        io=agent_io,
+        settings=idea_settings,
+        model_name=model_name,
+    )
+    
+    mandate = test_def.get("task_statement", "")
+    graph = IdeaDag(root_title=mandate, root_details={"mandate": mandate})
+    current_id = graph.root_id()
+    
+    started = time.time()
+    max_steps = int(os.environ.get("IDEA_TEST_MAX_STEPS", "50"))
+    
+    for step_num in range(max_steps):
+        try:
+            result_id = await engine.step(graph, current_id, step_num)
+            if result_id is None:
+                break
+            current_id = result_id
+            node = graph.get_node(current_id)
+            if node and node.status.value == "done":
+                break
+        except Exception as exc:
+            logging.error(f"Step {step_num} failed: {exc}")
+            break
+    
+    ended = time.time()
+    
+    final_node = graph.get_node(current_id)
+    if final_node:
+        output = await build_final_payload(
+            io=engine.io,
+            settings=idea_settings,
+            graph=graph,
+            mandate=mandate,
+            model_name=model_name,
+        )
+    else:
+        output = {}
+    
+    validation = await validate_test_result(test_def, {"output": output}, connector_llm, model_name)
+    
+    return {
+        "test_number": test_def["test_number"],
+        "test_name": test_def["test_name"],
+        "model": model_name,
+        "duration_seconds": round(ended - started, 2),
+        "mandate": mandate,
+        "output": output,
+        "validation": validation,
+        "graph": graph.to_dict() if hasattr(graph, "to_dict") else None,
+    }
+
+
+def result_path(test_number: str, model_name: str, run_id: str) -> Path:
+    """
+    Build a file path for storing test results.
+    :param test_number: Test number.
+    :param model_name: Model name.
+    :param run_id: Run identifier.
+    :return: Path to output file.
+    """
+    base_dir = Path(__file__).resolve().parent / "idea_test_results"
+    base_dir.mkdir(parents=True, exist_ok=True)
+    safe_test_name = test_number.replace(" ", "_").lower()
+    safe_model = model_name.replace("/", "_")
+    return base_dir / f"{run_id}_test_{safe_test_name}_{safe_model}.json"
+
+
+async def main() -> None:
+    """
+    Run idea test suite.
+    """
+    log_level = os.environ.get("IDEA_TEST_LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(
+        level=getattr(logging, log_level, logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
+    )
+    
+    models = load_models_from_env()
+    run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    tests = load_test_protocol()
+    
+    config = ConnectorConfig()
+    idea_settings = load_idea_dag_settings()
+    idea_settings["log_dag_ascii"] = False
+    idea_settings["log_dag_step_interval"] = 0
+    idea_settings["allowed_actions"] = ["search", "visit", "save"]
+    
+    connector_llm = ConnectorLLM(config)
+    connector_search = ConnectorSearch(config)
+    connector_http = ConnectorHttp(config)
+    connector_chroma = ConnectorChroma(config)
+    
+    async with connector_search, connector_http, connector_llm:
+        await connector_search.init_search_api()
+        await connector_chroma.init_chroma()
+        
+        all_results = []
+        
+        for test_def in tests:
+            test_num = test_def["test_number"]
+            test_name = test_def["test_name"]
+            print(f"\n{'='*60}")
+            print(f"Running Test {test_num}: {test_name}")
+            print(f"{'='*60}")
+            
+            for model_name in models:
+                normalized = normalize_model_name(model_name)
+                print(f"\n  Model: {normalized}")
+                
+                try:
+                    result = await run_idea_test(
+                        test_def=test_def,
+                        model_name=normalized,
+                        connector_llm=connector_llm,
+                        connector_search=connector_search,
+                        connector_http=connector_http,
+                        connector_chroma=connector_chroma,
+                        idea_settings=idea_settings,
+                    )
+                    
+                    validation = result.get("validation", {})
+                    passed = validation.get("passed", False)
+                    score = validation.get("score", 0.0)
+                    duration = result.get("duration_seconds", 0)
+                    
+                    print(f"  Duration: {duration:.2f}s")
+                    print(f"  Validation: {'PASSED' if passed else 'FAILED'} (score: {score:.2f})")
+                    
+                    if not passed:
+                        reasons = validation.get("reasons", [])
+                        if reasons:
+                            print(f"  Reasons: {', '.join(reasons[:3])}")
+                    
+                    out_path = result_path(test_num, normalized, run_id)
+                    out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+                    print(f"  Saved: {out_path}")
+                    
+                    all_results.append(result)
+                    
+                except Exception as exc:
+                    print(f"  ERROR: {exc}")
+                    import traceback
+                    traceback.print_exc()
+                    error_result = {
+                        "test_number": test_num,
+                        "test_name": test_name,
+                        "model": normalized,
+                        "error": str(exc),
+                    }
+                    out_path = result_path(test_num, normalized, run_id)
+                    out_path.write_text(json.dumps(error_result, indent=2), encoding="utf-8")
+                    all_results.append(error_result)
+        
+        summary_path = Path(__file__).resolve().parent / "idea_test_results" / f"{run_id}_summary.json"
+        summary = {
+            "run_id": run_id,
+            "models": models,
+            "tests_run": len(tests),
+            "results": all_results,
+        }
+        summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        print(f"\n{'='*60}")
+        print(f"Summary saved: {summary_path}")
+        print(f"{'='*60}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

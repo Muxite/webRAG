@@ -1,0 +1,158 @@
+{
+  "max_depth": 6,
+  "max_branching": 5,
+  "max_total_nodes": 500,
+  "enable_idea_dag": true,
+  "evaluation_strategy": "best_first",
+  "selection_strategy": "best_score",
+  "min_score_threshold": 0.0,
+  "allow_unscored_selection": true,
+  "decomposition_threshold": 0.5,
+  "merge_strategy": "concat",
+  "memoization_enabled": true,
+  "memoization_namespace": "idea_dag",
+  "max_observation_chars": 6000,
+  "max_links_per_visit": 20,
+  "grep_context_window": 80,
+  "default_search_count": 10,
+  "default_semantic_results": 3,
+  "allowed_actions": ["search", "visit", "save"],
+  "action_max_retries": 2,
+  "action_retry_backoff_steps": 1,
+  "action_timeout_seconds": 20,
+  "search_timeout_seconds": 15,
+  "visit_timeout_seconds": 20,
+  "fetch_timeout_seconds": 20,
+  "chroma_timeout_seconds": 15,
+  "llm_timeout_seconds": 60,
+  "final_timeout_seconds": 120,
+  "fallback_model": "",
+  "log_dag_ascii": true,
+  "log_dag_step_interval": 1,
+  "reasoning_effort": "high",
+  "text_verbosity": "medium",
+  "expansion_json_schema": {
+    "name": "expansion_result",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {"type": "string"},
+              "action": {"type": "string"},
+              "details": {"type": "object"}
+            },
+            "required": ["title", "action", "details"],
+            "additionalProperties": false
+          }
+        },
+        "meta": {
+          "type": "object",
+          "properties": {
+            "execute_all_children": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["candidates"],
+      "additionalProperties": false
+    }
+  },
+  "evaluation_json_schema": {
+    "name": "evaluation_result",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "rationale": {"type": "string"}
+      },
+      "required": ["score", "rationale"],
+      "additionalProperties": false
+    }
+  },
+  "evaluation_batch_json_schema": {
+    "name": "evaluation_batch_result",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "scores": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "string"},
+              "score": {"type": "number", "minimum": 0, "maximum": 1}
+            },
+            "required": ["id", "score"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["scores"],
+      "additionalProperties": false
+    }
+  },
+  "final_json_schema": {
+    "name": "final_result",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "deliverable": {"type": "string"},
+        "summary": {"type": "string"}
+      },
+      "required": ["deliverable", "summary"],
+      "additionalProperties": false
+    }
+  },
+  "expansion_system_prompt": "You are an EXPANSION function. Your ONLY job is to break problems into sub-problems. You do NOT merge - merging happens automatically.\n\nGOAL: FEWER STEPS = BETTER. 1 big step >> 2 small steps. Reward steps that break main problem into meaningful sub-problems.\n\nEXPANSION RULES:\n- Create meaningful sub-problems, not tiny steps\n- Each sub-problem should be substantial and independent\n- **SEARCHES AND VISITS ARE ALMOST ALWAYS NEEDED** - Most problems require gathering external information. Default to search/visit actions unless the problem is purely internal reasoning. Remember: search finds URLs (brief snippets), visit reads full content (complete webpage data). Many tasks explicitly require visiting to extract specific information that search snippets cannot provide.\n- Use PARALLEL mode (execute_all_children: true) when sub-problems are independent and can run simultaneously\n- Use SEQUENTIAL mode (execute_all_children: false) when steps depend on each other, when you need to process results before next step, or when exploring different approaches. Sequential allows: search → process results → visit best URLs → extract data → save findings.\n- Vector DB is automatically queried on every node - you don't need to specify it\n\nTOOLS ({allowed_actions}):\n- search: Web search. details={{query: string, intent?: string, count?: number}}. Intent queries vector DB for context. Returns title/url/description (brief snippets only). Timeout 15s. **Use search to find URLs and discover relevant pages. Search results are BRIEF OVERVIEWS only - they show title, URL, and short description snippets. They do NOT contain full page content. After searching, you MUST visit the URLs to read the actual webpage content. Search finds pages, visit reads them.**\n- visit: Fetch URL. details={{url: string, intent?: string}}. Intent queries vector DB for context. Returns text (max 6000 chars) + links (max 20). Timeout 20s. **CRITICAL: Use visit frequently and extensively! Search results only provide brief snippets (title, URL, short description) - they are NOT sufficient for detailed information. Visiting fetches the COMPLETE webpage content (up to 6000 chars), allowing you to read all text, extract specific data, find details, and understand full context. The visit action also returns a list of links found on the page - you can use these links to visit additional pages. Most tasks REQUIRE visiting pages to get actual information. ALWAYS visit URLs after searching - search finds URLs, visit reads the content. If a URL is already provided in the mandate or previous results, visit it DIRECTLY - do NOT search for it. Visiting is essential for extracting specific information, reading full articles, getting complete data, understanding detailed content, and discovering related pages via extracted links.**\n- save: Store in memory. details={{documents: [string], metadatas?: [dict]}}. Auto-chunked (800 chars, 100 overlap). Use after gathering information to preserve findings.\n\nEXECUTION PATTERNS (all valid):\n- Sequential: search → visit best results → save findings → next search\n- Parallel: Multiple independent searches/visits at once\n- Mixed: Some parallel, some sequential based on dependencies\n- Iterative: Search → visit → if insufficient, search again with refined query\n- Multi-stage: Search → filter results → visit top N → extract data → save\n- Direct visit: When URL is provided in mandate/results, visit it directly (no search needed)\n\nWHEN TO VISIT:\n- ALWAYS visit after searching (search gives snippets, visit gives full content)\n- ALWAYS visit when a URL is explicitly provided in the mandate or previous results\n- ALWAYS visit when you need detailed information, specific data, or complete content\n- Visit is REQUIRED for extracting specific information that search snippets cannot provide\n- Visit is REQUIRED for reading full articles, getting complete webpage data, understanding detailed context\n- Visit returns both content AND links - use the extracted links to discover and visit related pages\n- When visiting multiple URLs, you can visit them in parallel if they are independent\n\nINTENT FIELD:\n- For search/visit: include 'intent' in details to query vector DB for relevant context\n- Intent should describe what you're trying to learn (e.g., \"find CVE details\", \"understand vulnerability mechanism\")\n- Vector DB automatically provides both local knowledge and site/search knowledge\n\nEFFICIENCY:\n- Combine multiple related searches into one comprehensive query when possible\n- Visit multiple related URLs in parallel (use PARALLEL mode) when independent\n- Use sequential execution when you need to process results before next step\n- Prefer actions that gather more information per step\n\nCONSTRAINTS:\n- Blocked sites (blocked_sites list) won't work - use alternatives\n- Duplicates auto-deduplicated (same query/URL reused)\n- Limits: visit=6000 chars, search=10 default\n- Branch independence: each branch handles sub-problem; cross-branch via vector DB\n\nOUTPUT: You must return valid JSON in this format: {{candidates: [{{title, action, details}}], meta?: {{execute_all_children: boolean}}}}. Min 2, max {max_children} candidates. Prefer fewer, larger candidates over many small ones.",
+  "expansion_user_prompt": "Return your response as valid JSON. {{\"path\": {path_json}, \"parent_id\": \"{parent_id}\", \"parent_title\": \"{parent_title}\", \"blocked_sites\": \"{blocked_sites}\", \"errors\": \"{errors}\", \"memories\": \"{memories}\", \"event_log\": {event_log}}}",
+  "expansion_model": "",
+  "expansion_temperature": 0.4,
+  "expansion_max_tokens": null,
+  "expansion_max_context_nodes": 30,
+  "expansion_max_detail_chars": 10000,
+  "evaluation_system_prompt": "Score candidates (0-1). Know what the parent node aimed to solve (parent_goal). Reward: steps that break main problem into sub-problems, comprehensive actions, evidence-gathering via search/visit actions. **CRITICALLY reward visit actions - search only provides brief snippets (title/URL/description), visit fetches complete webpage content (up to 6000 chars). Most tasks require visiting pages to extract detailed information, read full content, and get complete data. Strongly reward search+visit sequences. When a URL is already provided, visiting it directly (without searching) is the correct approach.** Penalize: redundant steps, tiny incremental actions, no new data, skipping visit after search (search alone is insufficient - search gives snippets, visit gives full content). Prefer 1 big step over 2 small steps, but prioritize search+visit sequences when gathering external data. Return JSON: {{score: float, rationale: string}}.",
+  "evaluation_user_prompt": "{{\"path\": {path_json}, \"candidate_id\": \"{candidate_id}\", \"candidate_title\": \"{candidate_title}\", \"parent_goal\": \"{parent_goal}\"}}",
+  "evaluation_batch_system_prompt": "Score all candidates (0-1). Reward: comprehensive steps, evidence-gathering via search/visit actions, vector DB usage. **CRITICALLY reward visit actions - search only provides brief snippets (title/URL/description), visit fetches complete webpage content (up to 6000 chars). Most tasks require visiting pages to extract detailed information, read full content, and get complete data. Strongly reward search+visit sequences. When a URL is already provided, visiting it directly (without searching) is the correct approach.** Penalize: redundancy, tiny steps, skipping visit after search (search alone is insufficient - search gives snippets, visit gives full content). Prefer fewer, larger steps, but prioritize search+visit sequences when gathering external data. Return JSON: {{\"scores\": [{{\"id\": string, \"score\": float}}, ...]}}. Use the candidate's simple 'id' field (1, 2, 3, etc.) from the candidates list, not the node_id.",
+  "evaluation_batch_user_prompt": "{{\"path\": {path_json}, \"parent_id\": \"{parent_id}\", \"candidates\": {candidates_json}}}",
+  "evaluation_model": "",
+  "evaluation_temperature": 0.2,
+  "evaluation_max_tokens": null,
+  "evaluation_max_context_nodes": 30,
+  "evaluation_max_detail_chars": 10000,
+  "evaluation_batch_max_candidates": 5,
+  "best_first_global": true,
+  "allow_execute_all_children": true,
+  "final_system_prompt": "Synthesize final answer from merged results. Use only evidence from searches/visits. Include inline URL citations. If evidence missing, state explicitly - do not guess. Return JSON: {{deliverable: string, summary: string}}.",
+  "final_user_prompt": "{{\"mandate\": \"{mandate}\", \"merged\": {merged_json}}}",
+  "final_model": "",
+  "final_temperature": 0.3,
+  "final_max_tokens": null,
+  "merge_system_prompt": "Combine data from child nodes into coherent summary. This is the MERGE phase - synthesize information towards solution. Remove redundancy, extract key findings, identify patterns. Vector DB context is available. Return JSON: {{summary: string, key_findings: [string, ...]}}.",
+  "merge_user_prompt": "{{\"merged_results\": {merged_json}}}",
+  "merge_model": "",
+  "merge_temperature": 0.3,
+  "merge_max_tokens": null,
+  "merge_json_schema": {
+    "name": "merge_result",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "summary": {"type": "string"},
+        "key_findings": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "required": ["summary", "key_findings"],
+      "additionalProperties": false
+    }
+  },
+  "enable_recursive_merge": true,
+  "leaf_statuses": ["done", "skipped", "failed"],
+  "active_status": "active",
+  "pending_status": "pending"
+}

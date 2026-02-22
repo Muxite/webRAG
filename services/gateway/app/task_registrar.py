@@ -4,7 +4,7 @@ from typing import Optional
 
 from shared.storage import RedisTaskStorage, SupabaseTaskStorage
 from shared.models import TaskRequest
-from shared.message_contract import TaskState, StatusType
+from shared.message_contract import TaskState, TaskQueueState, map_status_to_task_state
 from shared.supabase_client import create_user_client
 
 
@@ -32,15 +32,10 @@ class GatewayTaskRegistrar:
         """
         if not value:
             return TaskState.IN_PROGRESS.value
-        if value in (StatusType.ACCEPTED.value, StatusType.STARTED.value, StatusType.IN_PROGRESS.value):
-            return TaskState.IN_PROGRESS.value
-        if value == StatusType.COMPLETED.value:
-            return TaskState.COMPLETED.value
-        if value == StatusType.ERROR.value:
-            return TaskState.FAILED.value
-        if value == TaskState.PENDING.value:
-            return "in_queue"
-        return value
+        task_state = map_status_to_task_state(value)
+        if task_state == TaskState.PENDING:
+            return TaskQueueState.IN_QUEUE.value
+        return task_state.value
 
     async def register_new_task(self, user_id: str, access_token: str, req: TaskRequest, correlation_id: str) -> dict:
         """
@@ -56,7 +51,7 @@ class GatewayTaskRegistrar:
             "correlation_id": correlation_id,
             "user_id": user_id,
             "mandate": req.mandate,
-            "status": "in_queue",
+            "status": TaskQueueState.IN_QUEUE.value,
             "max_ticks": int(req.max_ticks or 50),
             "tick": None,
             "result": None,
