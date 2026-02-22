@@ -36,6 +36,10 @@ class TaskState(str, Enum):
     FAILED = "failed"
 
 
+class TaskQueueState(str, Enum):
+    IN_QUEUE = "in_queue"
+
+
 class TaskEnvelope(BaseModel):
     """Standardized task message sent to workers via the input queue."""
     mandate: str
@@ -65,3 +69,31 @@ def to_dict(model: BaseModel) -> dict:
         return model.model_dump(exclude_none=True)
     except Exception:
         return model.dict(exclude_none=True)
+
+
+def map_status_to_task_state(value: Optional[object]) -> TaskState:
+    """
+    Map a worker status value into a TaskState.
+    :param value: StatusType, TaskState, or string value.
+    :returns: TaskState enum.
+    """
+    if value is None:
+        return TaskState.IN_PROGRESS
+    if isinstance(value, TaskState):
+        return value
+    if isinstance(value, StatusType):
+        if value in (StatusType.ACCEPTED, StatusType.STARTED, StatusType.IN_PROGRESS):
+            return TaskState.IN_PROGRESS
+        if value == StatusType.COMPLETED:
+            return TaskState.COMPLETED
+        if value == StatusType.ERROR:
+            return TaskState.FAILED
+        return TaskState.IN_PROGRESS
+    try:
+        status = StatusType(str(value))
+        return map_status_to_task_state(status)
+    except Exception:
+        try:
+            return TaskState(str(value))
+        except Exception:
+            return TaskState.IN_PROGRESS

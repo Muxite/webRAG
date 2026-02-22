@@ -1,0 +1,2 @@
+{"ts": 1771708391.0818446, "event": "connector_io", "payload": {"connector": "ConnectorLLM", "direction": "in", "operation": "llm_query", "payload": {"model": {"chars": 10}, "prompt_chars": 3275, "prompt_words": 452, "max_tokens": null, "max_completion_tokens": null}}}
+{"ts": 1771708391.8262281, "event": "timing", "payload": {"name": "llm_call", "duration": 0.7446816160008893, "success": false, "payload": {"model": "gpt-5-mini"}}}

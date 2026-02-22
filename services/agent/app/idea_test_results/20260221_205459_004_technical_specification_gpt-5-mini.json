@@ -1,0 +1,532 @@
+{
+  "test_metadata": {
+    "test_id": "004",
+    "test_name": "Technical Specification",
+    "difficulty_level": "4/10",
+    "category": "Technical Research"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "USB Power Delivery Revision 3.1 (PD 3.1) \u2014 key details and one manufacturer-confirmed product\n\nSpecifications (from USB-IF and supporting documentation):\n- Revision number: USB Power Delivery Revision 3.1 (PD 3.1) \u2014 officially called PD Revision 3.1 (USB-IF) [https://www.usb.org/usb-charger-pd].\n  Source: USB-IF: https://www.usb.org/usb-charger-pd\n\n- Maximum wattage: up to 240 W (PD 3.1 introduces Extended Power Range (EPR) enabling up to 240 W over a full-featured USB Type-C cable and connector). \n  Source: USB-IF announcement/page: https://www.usb.org/usb-charger-pd\n\n- Maximum voltage: PD 3.1 adds new fixed EPR voltages including 28 V, 36 V and 48 V (EPR supports bus voltages up to 48 V, enabling the 240 W capability at 5 A). \n  Sources: Tom's Hardware summary of PD 3.1 (lists 28V, 36V, 48V): https://www.tomshardware.com/peripherals/usb/the-usb-power-delivery-pd-specification-everything-you-need-to-know-about-usb-pd\n  Renesas application note referencing operation to 48 V and 5 A: https://www.renesas.com/en/document/apn/usb-c-240w-power-delivery-31-extended-power-range-protocol\n\nManufacturer-confirmed product supporting PD 3.1:\n- Example product (manufacturer documentation): Anker mentions a PD 3.1 product in its materials: \u201cAnker Charger (140W, 4-Port, PD 3.1) with USB-C Cable\u201d in Anker\u2019s PD explainer article. This is manufacturer content stating that a 140W Anker charger implements PD 3.1 (note: this product\u2019s maximum output is 140W, not the PD 3.1 maximum of 240W). \n  Source (Anker manufacturer page): https://www.anker.com/blogs/chargers/ubiquitous-charging-the-pd-charger-complete-guide\n\nNotes and evidence caveats:\n- The USB-IF page is the authoritative source that states PD Revision 3.1 and the 240 W / EPR changes (see https://www.usb.org/usb-charger-pd).\n- The added fixed voltages (28 V, 36 V, 48 V) and practical details are described in independent summaries and vendor app notes (Tom\u2019s Hardware and Renesas) that reference the PD 3.1 EPR additions (see links above).\n- A manufacturer (Anker) explicitly references a PD 3.1 product (their 140W 4-port charger) on Anker\u2019s site; this confirms commercial product support for the PD 3.1 specification. The merged search results do not include a direct product manual PDF from Anker in this set of results; the cited Anker blog is manufacturer-hosted documentation that names a PD 3.1 product (https://www.anker.com/blogs/chargers/ubiquitous-charging-the-pd-charger-complete-guide). If you want a specific product datasheet or manual (PDF) showing explicit PD 3.1/EPR 240W support from a manufacturer, that documentation was not present in the provided search results and would require an additional targeted search.",
+      "action_summary": "USB Power Delivery Revision 3.1 (PD 3.1) \u2014 Revision 3.1 adds Extended Power Range (EPR), raising maximum power to 240 W and adding fixed voltages 28 V, 36 V and 48 V (bus voltage up to 48 V). Sources: USB-IF PD page (PD 3.1 / 240W) https://www.usb.org/usb-charger-pd; Tom\u2019s Hardware (28/36/48 V) https://www.tomshardware.com/peripherals/usb/the-usb-power-delivery-pd-specification-everything-you-need-to-know-about-usb-pd; Renesas app note (48 V / 5 A reference) https://www.renesas.com/en/document/apn/usb-c-240w-power-delivery-31-extended-power-range-protocol. Manufacturer-confirmed product example: Anker cites a \"140W, 4-Port, PD 3.1\" charger on Anker\u2019s site (manufacturer documentation): https://www.anker.com/blogs/chargers/ubiquitous-charging-the-pd-charger-complete-guide. If you need a specific manufacturer datasheet showing full 240W (EPR) implementation, that exact PDF/manual was not included in the provided search results and would require further search.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "08e2a5f0-9827-43d8-8060-aa1865e6fd56",
+      "nodes": {
+        "08e2a5f0-9827-43d8-8060-aa1865e6fd56": {
+          "node_id": "08e2a5f0-9827-43d8-8060-aa1865e6fd56",
+          "title": "Find the USB-C Power Delivery 3.1 specification details: maximum wattage, maximum voltage, and revision number. Also find one product that supports this specification and confirm with the manufacturer's documentation. Provide all specifications with citation URLs.",
+          "details": {
+            "mandate": "Find the USB-C Power Delivery 3.1 specification details: maximum wattage, maximum voltage, and revision number. Also find one product that supports this specification and confirm with the manufacturer's documentation. Provide all specifications with citation URLs.",
+            "expansion_meta": {
+              "execute_all_children": true
+            },
+            "merged_results": [
+              {
+                "node_id": "d856e37b-1950-4389-ad25-fa58c2d3ecfd",
+                "title": "Locate the official USB Power Delivery 3.1 specification and authoritative summaries (capture max wattage, max voltage, and revision number)",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "Locate the official USB Power Delivery 3.1 specification and authoritative summaries (capture max wattage, max voltage, and revision number)",
+                  "intent": "find official USB-IF documentation and authoritative press releases describing USB Power Delivery Revision 3.1 (EPR) including maximum wattage and maximum voltage and the revision number",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "USB Charger (USB Power Delivery) | USB-IF",
+                      "url": "https://www.usb.org/usb-charger-pd",
+                      "description": "The USB Power Delivery (USB PD) ... 2021, the USB PD Revision 3.1 specification is a major update to enable delivering <strong>up to 240W of power over full featured USB Type-C\u00ae cable and connector</strong>...."
+                    },
+                    {
+                      "title": "The USB Power Delivery (PD) Specification \u2014 everything you need to know about USB-PD | Tom's Hardware",
+                      "url": "https://www.tomshardware.com/peripherals/usb/the-usb-power-delivery-pd-specification-everything-you-need-to-know-about-usb-pd",
+                      "description": "Released in 2021, USB PD 3.1 introduced Extended Power Range (EPR) that added three new fixed voltages. These were <strong>28V, 36V and 48V</strong>. It also saw the max power output extended to 240W when using an EPR cable."
+                    },
+                    {
+                      "title": "Introduction to PD 3.1 \u2013 the Latest USB-IF Power Delivery Specification | GraniteRiverLabs",
+                      "url": "https://www.graniteriverlabs.com/en-us/technical-blog/usb-power-delivery-specification-3-1",
+                      "description": "Table 1. Specification Supporting EPR Product Power Supply (Refer to PD 3.1 Spec) Table 2. AVS Voltage Range (Source : PD 3.1 Spec) The following two examples are offered to help readers understand Table 2 (above). For the maximum output of 140W, the following conditions must be met: SPR Fixed PDO\uff1a 5V@3A~5A \u30019V@3A~5A\u300115@3A~5A \u300120V@5A ... For an output of 144W, the following conditions must be met (see the wattage range in the second column of Table 1):"
+                    },
+                    {
+                      "title": "USB Power Delivery Specification | TrueTesting Documentation and Testing Methodology",
+                      "url": "https://documentation.truetesting.org/usbcable/specs/USB-PD.html",
+                      "description": "As of USB Power Delivery specification ... 15 V, and 20 V. Instead of six fixed profiles, power supplies may support any maximum source output power from <strong>0.5 W to 100 W</strong>. The USB Power Delivery specification revision 3.0 defines a programmable power supply (PPS) protocol that allows ..."
+                    },
+                    {
+                      "title": "USB Power Delivery 3.2 Specification Updates and Certification Test Highlights",
+                      "url": "https://www.graniteriverlabs.com/en-us/technical-blog/usb-pd-spec-3.2",
+                      "description": "AVS (Adjustable Voltage Supply) is a power supply mode introduced in USB PD 3.1/3.2, it allows the power supply (Source) to dynamically adjust the output voltage within a specific range. Unlike earlier fixed levels of 5V, 9V, 15V, and 20V, precise output voltage control can better meet safety regulations and energy efficiency certification requirements."
+                    },
+                    {
+                      "title": "A comprehensive guide to the PD 3.1 protocol.",
+                      "url": "https://minisopuru.com/blogs/news/a-comprehensive-guide-to-the-pd-3-1-protocol",
+                      "description": "As previously mentioned, the new USB PD 3.1 protocol offers increased power levels up to <strong>240 watts</strong>. In addition to this, it boasts the following features: The new 48-volt, 36-volt, and 28-volt fixed values allow for 240-watt, 180-watt, and 140-watt ..."
+                    },
+                    {
+                      "title": "USB Power Delivery | USB-IF",
+                      "url": "https://www.usb.org/document-library/usb-power-delivery",
+                      "description": "1. USB Power Delivery Specification Revision 2.0 Version 1.3 and corresponding Adopters Agreements \u00b7 2. USB Power Delivery Specification Revision 3.2 Version 1.1 and corresponding Adopters Agreement"
+                    },
+                    {
+                      "title": "PD 3.1 Protocol: Everything You Need to Know \u2013 Satechi",
+                      "url": "https://satechi.net/blogs/pd-3-1-protocol-everything-you-need-to-know",
+                      "description": "If you remember from high-school physical that volt times amps equal watts, so: ... Before this major update, the maximum power delivery of USB PD was limited to only <strong>100 watts with 20V and 5A</strong>."
+                    },
+                    {
+                      "title": "Application Note USB-C 240W Power Delivery 3.1 Extended Power Range Protocol",
+                      "url": "https://www.renesas.com/en/document/apn/usb-c-240w-power-delivery-31-extended-power-range-protocol",
+                      "description": "<strong>operates with a bus voltage up to 48V and a maximum current of 5A</strong>. ... Figure 8. USB-C PD 3.1 Extended Power Range (EPR) Charger \u00b7 Table 4. 48V, 240W Bi-Directional USB-C PD Solution \u2013 Key Components ... Table 5. 48V, 240W Bi-Directional USB-C PD Solution \u2013 Key Specifications"
+                    },
+                    {
+                      "title": "USB Power Delivery and Type-C Overview Architecture Product Portfolio Solution",
+                      "url": "https://www.st.com/content/ccc/resource/sales_and_marketing/presentation/product_presentation/group0/5a/b1/8e/6c/2b/0d/46/3c/Apec/files/APEC_2016_USB_Power.pdf/_jcr_content/translations/en.APEC_2016_USB_Power.pdf",
+                      "description": "Voltage \u00b7 Maximum \u00b7 Current \u00b7 Notes \u00b7 USB 2.0 \u00b7 5 V \u00b7 500 mA \u00b7 Default current, based on definitions in the base \u00b7 specifications \u00b7 USB 3.1 \u00b7 <strong>5 V \u00b7 900 mA</strong> \u00b7 USB BC 1.2 \u00b7 5 V \u00b7 Up to 1.5 A \u00b7 Legacy charging \u00b7 USB Type-C @ 1.5 A \u00b7 5 V \u00b7 1.5 A \u00b7"
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "732a05cc-b59f-4ec8-a500-252c51868bfd",
+                "title": "Find one commercially available product that supports USB PD 3.1 and confirm support in the manufacturer's documentation",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "Find one commercially available product that supports USB PD 3.1 and confirm support in the manufacturer's documentation",
+                  "intent": "identify a specific charger or adapter that explicitly states support for USB Power Delivery Revision 3.1 (or PD 3.1/EPR up to 240W) and retrieve the manufacturer's product/tech spec page or manual as confirmation",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "An Ultimate PD3.1 Product Buying Guide: Chargers, Cables, Chips, and More - Chargerlab",
+                      "url": "https://www.chargerlab.com/everything-you-need-to-know-about-pd3-1-chargers-cables-chips-and-more/",
+                      "description": "This chip supports USB-C 2.2 standard and PD3.1 specifications, integrating hardware-level BMC protocol and PHY. It also supports commands for obtaining manufacturer information and includes a temperature sensor specifically designed for cables. IP2133H supports EPR 240W power delivery, SOP&#x27; and SOP&#x27;&#x27; commands, USB4 80G, and is suitable for Thunderbolt 4 and Thunderbolt 3 cables."
+                    },
+                    {
+                      "title": "USB Charger (USB Power Delivery) | USB-IF",
+                      "url": "https://www.usb.org/usb-charger-pd",
+                      "description": "Announced in 2021, the USB PD Revision 3.1 specification is a major update to enable delivering up to 240W of power over full featured USB Type-C\u00ae cable and connector. Prior to this update, USB PD was limited to 100W using a solution based on 20V using USB Type-C cables rated at 5A."
+                    },
+                    {
+                      "title": "30 PD3.1 Protocol Chips and Their 11 Manufacturers: A ChargerLAB Analysis - Chargerlab",
+                      "url": "https://www.chargerlab.com/30-pd3-1-protocol-chips-and-their-11-manufacturers-a-chargerlab-analysis/",
+                      "description": "<strong>Hynetek&#x27;s HUSB251</strong> is a PD protocol chip that supports USB-C DRP. The chip supports PPS PDO and EPR PDO, and all PDOs fully comply with USB PD 3.1 Rev.1.8 specifications, including support for 28V EPR FPDO and EPR AVS."
+                    },
+                    {
+                      "title": "What Is a PD Charger? A Complete Guide - Anker US",
+                      "url": "https://www.anker.com/blogs/chargers/ubiquitous-charging-the-pd-charger-complete-guide",
+                      "description": "The charger\u2019s compact design and durable build make it a reliable, on-the-go solution for PD charging. The <strong>Anker Charger</strong> (140W, 4-Port, PD 3.1) with USB-C Cable provides fast and efficient USB Power Delivery charging for up to four devices at once."
+                    },
+                    {
+                      "title": "USB PD 3.1: Power Delivery Tailored for Modern Applications - FSP Power Solution GmbH - AC/DC Power Supply Manufacturer",
+                      "url": "https://www.fsp-ps.de/en/knowledge-215-USB-PD-3-1-for-modern-applicaitons.html",
+                      "description": "The external dongle can be used to charge a battery with a PD 3.1 adapter or the battery can be used as a power bank for portable devices. This allows you to seamlessly switch between charging a battery and powering external devices, giving your battery systems more flexibility. ... Supports USB PD3.1 with up to 200W input for battery charging and USB PD3.0 with up to 100W output for powering external devices."
+                    },
+                    {
+                      "title": "USB Type-C & USB Power Delivery ICs | TI.com",
+                      "url": "https://www.ti.com/product-category/interface/usb-ics/usb-type-power-delivery-ics/overview.html",
+                      "description": "With the ability to negotiate with any charger \u2013 not just the one provided \u2013 USB Type-C that supports USB PD gives users the flexibility to have their products powered by any adapter, enabling a better user experience. ... TIDA-050047 \u2013 Integrated USB Type-C\u00ae, USB Power Delivery and charging reference design for 2\u20134 cell batteries \u00b7 PMP41013 \u2013 Integrated USB Type-C\u00ae and USB PD bidirectional charging reference design for 1- to 5-cell batter"
+                    },
+                    {
+                      "title": "USB-C Power Delivery - Everything you need to know \u2013 Manhattan Products",
+                      "url": "https://manhattanproducts.eu/pages/usb-c-pd-charging-everything-you-need-to-know",
+                      "description": "This specification was created by the USB-IF in response to requests from laptop manufacturers for a connector that could deliver more power. The <strong>USB-C PD standard</strong> is a power delivery specification that is compatible with the USB 3.1 and USB ..."
+                    },
+                    {
+                      "title": "Understanding USB PD 3.1 vs PD 3.0 vs PD 2.0 - Cable Factory-Wandkey",
+                      "url": "https://www.wandkey.com/usb-pd-3-1-vs-pd-3-0-vs-pd-2-0/",
+                      "description": "USB-C Adapter Factories: Manufacturers are actively developing more advanced adapters that seamlessly integrate with the latest PD 3.1 standard. USB-C Charger Manufacturers: Charger manufacturers are designing chargers capable of delivering higher power levels quickly and safely to a wider range of devices. This caters to the growing demand for faster charging solutions. ... Wandkey is a MFI certified cable and charger manufacturer, supports OEM/ODM service, printing logo, customized packaging, color, length, mould etc."
+                    },
+                    {
+                      "title": "Introduction to PD 3.1 \u2013 the Latest USB-IF Power Delivery Specification | GraniteRiverLabs",
+                      "url": "https://www.graniteriverlabs.com/en-us/technical-blog/usb-power-delivery-specification-3-1",
+                      "description": "Table 4. Conditions Supporting EPR product in Shared Capacity Power Supply Mode (Refer to PD 3.1 Spec) Take the following product design as an example: The maximum total output wattage is 250W, and when the 2 ports are used alone they can support up to 160W respectively: If used independently, the specification is (5V@3A~5A, 9V@3A~5A, 15@3A~5A, 20V@5A, 28V@5A, 36V@4.44A, 15V~36V@160W). When one port is used 100W, the Equivalent PDP Rating of the other port is 150W, the power supply conditions are as follows: 5V@3A~5A, 9V@3A~5A, 15@3A~5A, 20V@5A, 28V@5A, 36V@4.16A, and 15V~36V@150W."
+                    },
+                    {
+                      "title": "USB Power Delivery",
+                      "url": "https://www.usbgear.com/usb-power-delivery.html",
+                      "description": "This charging hub provides one 140W USB Type-C PD port with EPR support 140W USB PD3.1 Single Port Type C EPR 28V capable Buck-boost DC adapter Variable voltage input range of 12 ~ 24V DC O...Read More ... Backward compatible with USB 3.0 and 1.1, the USB 3.1 Power delivery adapter is compliant with Gen1 and 2 of the USB 3.1 specification."
+                    }
+                  ]
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 2,
+              "success": 2,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "d856e37b-1950-4389-ad25-fa58c2d3ecfd",
+            "732a05cc-b59f-4ec8-a500-252c51868bfd",
+            "fb38b502-f1e2-4081-b91d-2dd2cbdc800c"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "d856e37b-1950-4389-ad25-fa58c2d3ecfd": {
+          "node_id": "d856e37b-1950-4389-ad25-fa58c2d3ecfd",
+          "title": "Locate the official USB Power Delivery 3.1 specification and authoritative summaries (capture max wattage, max voltage, and revision number)",
+          "details": {
+            "intent": "find official USB-IF documentation and authoritative press releases describing USB Power Delivery Revision 3.1 (EPR) including maximum wattage and maximum voltage and the revision number",
+            "queries": [
+              "USB Power Delivery 3.1 specification USB-IF 240W 48V revision 3.1",
+              "USB Power Delivery Revision 3.1 press release USB-IF EPR 240W 48V",
+              "USB PD 3.1 specification pdf site:usb.org \"3.1\" \"Extended Power Range\""
+            ],
+            "follow_up_visits": [
+              "Visit the official USB-IF page(s) that host the PD 3.1 announcement and spec (e.g., usb.org press release and spec download pages) to capture citation URLs and exact wording for max wattage and voltage.",
+              "If available, download or view the PDF/summary of the PD 3.1 spec to extract the precise revision number, maximum wattage (W), and maximum voltage (V)."
+            ],
+            "action": "search",
+            "parent_goal": "Find the USB-C Power Delivery 3.1 specification details: maximum wattage, maximum voltage, and revision number. Also find one product that supports this specification and confirm with the manufacturer's documentation. Provide all specifications with citation URLs.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Locate the official USB Power Delivery 3.1 specification and authoritative summaries (capture max wattage, max voltage, and revision number)",
+              "intent": "find official USB-IF documentation and authoritative press releases describing USB Power Delivery Revision 3.1 (EPR) including maximum wattage and maximum voltage and the revision number",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "USB Charger (USB Power Delivery) | USB-IF",
+                  "url": "https://www.usb.org/usb-charger-pd",
+                  "description": "The USB Power Delivery (USB PD) ... 2021, the USB PD Revision 3.1 specification is a major update to enable delivering <strong>up to 240W of power over full featured USB Type-C\u00ae cable and connector</strong>...."
+                },
+                {
+                  "title": "The USB Power Delivery (PD) Specification \u2014 everything you need to know about USB-PD | Tom's Hardware",
+                  "url": "https://www.tomshardware.com/peripherals/usb/the-usb-power-delivery-pd-specification-everything-you-need-to-know-about-usb-pd",
+                  "description": "Released in 2021, USB PD 3.1 introduced Extended Power Range (EPR) that added three new fixed voltages. These were <strong>28V, 36V and 48V</strong>. It also saw the max power output extended to 240W when using an EPR cable."
+                },
+                {
+                  "title": "Introduction to PD 3.1 \u2013 the Latest USB-IF Power Delivery Specification | GraniteRiverLabs",
+                  "url": "https://www.graniteriverlabs.com/en-us/technical-blog/usb-power-delivery-specification-3-1",
+                  "description": "Table 1. Specification Supporting EPR Product Power Supply (Refer to PD 3.1 Spec) Table 2. AVS Voltage Range (Source : PD 3.1 Spec) The following two examples are offered to help readers understand Table 2 (above). For the maximum output of 140W, the following conditions must be met: SPR Fixed PDO\uff1a 5V@3A~5A \u30019V@3A~5A\u300115@3A~5A \u300120V@5A ... For an output of 144W, the following conditions must be met (see the wattage range in the second column of Table 1):"
+                },
+                {
+                  "title": "USB Power Delivery Specification | TrueTesting Documentation and Testing Methodology",
+                  "url": "https://documentation.truetesting.org/usbcable/specs/USB-PD.html",
+                  "description": "As of USB Power Delivery specification ... 15 V, and 20 V. Instead of six fixed profiles, power supplies may support any maximum source output power from <strong>0.5 W to 100 W</strong>. The USB Power Delivery specification revision 3.0 defines a programmable power supply (PPS) protocol that allows ..."
+                },
+                {
+                  "title": "USB Power Delivery 3.2 Specification Updates and Certification Test Highlights",
+                  "url": "https://www.graniteriverlabs.com/en-us/technical-blog/usb-pd-spec-3.2",
+                  "description": "AVS (Adjustable Voltage Supply) is a power supply mode introduced in USB PD 3.1/3.2, it allows the power supply (Source) to dynamically adjust the output voltage within a specific range. Unlike earlier fixed levels of 5V, 9V, 15V, and 20V, precise output voltage control can better meet safety regulations and energy efficiency certification requirements."
+                },
+                {
+                  "title": "A comprehensive guide to the PD 3.1 protocol.",
+                  "url": "https://minisopuru.com/blogs/news/a-comprehensive-guide-to-the-pd-3-1-protocol",
+                  "description": "As previously mentioned, the new USB PD 3.1 protocol offers increased power levels up to <strong>240 watts</strong>. In addition to this, it boasts the following features: The new 48-volt, 36-volt, and 28-volt fixed values allow for 240-watt, 180-watt, and 140-watt ..."
+                },
+                {
+                  "title": "USB Power Delivery | USB-IF",
+                  "url": "https://www.usb.org/document-library/usb-power-delivery",
+                  "description": "1. USB Power Delivery Specification Revision 2.0 Version 1.3 and corresponding Adopters Agreements \u00b7 2. USB Power Delivery Specification Revision 3.2 Version 1.1 and corresponding Adopters Agreement"
+                },
+                {
+                  "title": "PD 3.1 Protocol: Everything You Need to Know \u2013 Satechi",
+                  "url": "https://satechi.net/blogs/pd-3-1-protocol-everything-you-need-to-know",
+                  "description": "If you remember from high-school physical that volt times amps equal watts, so: ... Before this major update, the maximum power delivery of USB PD was limited to only <strong>100 watts with 20V and 5A</strong>."
+                },
+                {
+                  "title": "Application Note USB-C 240W Power Delivery 3.1 Extended Power Range Protocol",
+                  "url": "https://www.renesas.com/en/document/apn/usb-c-240w-power-delivery-31-extended-power-range-protocol",
+                  "description": "<strong>operates with a bus voltage up to 48V and a maximum current of 5A</strong>. ... Figure 8. USB-C PD 3.1 Extended Power Range (EPR) Charger \u00b7 Table 4. 48V, 240W Bi-Directional USB-C PD Solution \u2013 Key Components ... Table 5. 48V, 240W Bi-Directional USB-C PD Solution \u2013 Key Specifications"
+                },
+                {
+                  "title": "USB Power Delivery and Type-C Overview Architecture Product Portfolio Solution",
+                  "url": "https://www.st.com/content/ccc/resource/sales_and_marketing/presentation/product_presentation/group0/5a/b1/8e/6c/2b/0d/46/3c/Apec/files/APEC_2016_USB_Power.pdf/_jcr_content/translations/en.APEC_2016_USB_Power.pdf",
+                  "description": "Voltage \u00b7 Maximum \u00b7 Current \u00b7 Notes \u00b7 USB 2.0 \u00b7 5 V \u00b7 500 mA \u00b7 Default current, based on definitions in the base \u00b7 specifications \u00b7 USB 3.1 \u00b7 <strong>5 V \u00b7 900 mA</strong> \u00b7 USB BC 1.2 \u00b7 5 V \u00b7 Up to 1.5 A \u00b7 Legacy charging \u00b7 USB Type-C @ 1.5 A \u00b7 5 V \u00b7 1.5 A \u00b7"
+                }
+              ]
+            }
+          },
+          "parent_id": "08e2a5f0-9827-43d8-8060-aa1865e6fd56",
+          "parent_ids": [
+            "08e2a5f0-9827-43d8-8060-aa1865e6fd56"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "732a05cc-b59f-4ec8-a500-252c51868bfd": {
+          "node_id": "732a05cc-b59f-4ec8-a500-252c51868bfd",
+          "title": "Find one commercially available product that supports USB PD 3.1 and confirm support in the manufacturer's documentation",
+          "details": {
+            "intent": "identify a specific charger or adapter that explicitly states support for USB Power Delivery Revision 3.1 (or PD 3.1/EPR up to 240W) and retrieve the manufacturer's product/tech spec page or manual as confirmation",
+            "queries": [
+              "supports USB PD 3.1 product \"PD 3.1\" \"240W\" \"manufacturer\"",
+              "USB-C 240W charger \"PD 3.1\" \"supports PD 3.1\"",
+              "site:anker.com \"PD 3.1\" OR \"Power Delivery 3.1\"",
+              "site:ugreen.com \"PD 3.1\" OR \"Power Delivery 3.1\"",
+              "site:zendure.com \"PD 3.1\" OR \"Power Delivery 3.1\"",
+              "site:satechi.net \"PD 3.1\" OR \"Power Delivery 3.1\""
+            ],
+            "follow_up_visits": [
+              "Visit the product page and product manual/spec sheet for the identified product to capture manufacturer wording that explicitly claims PD 3.1 (or 'USB Power Delivery 3.1'/'EPR'/'240W') and copy the citation URL.",
+              "If manufacturer page does not clearly state 'PD 3.1', check the downloadable product manual or tech PDF for explicit mention."
+            ],
+            "constraints": "Prefer a product page or official PDF from the manufacturer as the confirming citation (not only retailer listings or third\u2011party reviews).",
+            "action": "search",
+            "parent_goal": "Find the USB-C Power Delivery 3.1 specification details: maximum wattage, maximum voltage, and revision number. Also find one product that supports this specification and confirm with the manufacturer's documentation. Provide all specifications with citation URLs.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.9
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Find one commercially available product that supports USB PD 3.1 and confirm support in the manufacturer's documentation",
+              "intent": "identify a specific charger or adapter that explicitly states support for USB Power Delivery Revision 3.1 (or PD 3.1/EPR up to 240W) and retrieve the manufacturer's product/tech spec page or manual as confirmation",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "An Ultimate PD3.1 Product Buying Guide: Chargers, Cables, Chips, and More - Chargerlab",
+                  "url": "https://www.chargerlab.com/everything-you-need-to-know-about-pd3-1-chargers-cables-chips-and-more/",
+                  "description": "This chip supports USB-C 2.2 standard and PD3.1 specifications, integrating hardware-level BMC protocol and PHY. It also supports commands for obtaining manufacturer information and includes a temperature sensor specifically designed for cables. IP2133H supports EPR 240W power delivery, SOP&#x27; and SOP&#x27;&#x27; commands, USB4 80G, and is suitable for Thunderbolt 4 and Thunderbolt 3 cables."
+                },
+                {
+                  "title": "USB Charger (USB Power Delivery) | USB-IF",
+                  "url": "https://www.usb.org/usb-charger-pd",
+                  "description": "Announced in 2021, the USB PD Revision 3.1 specification is a major update to enable delivering up to 240W of power over full featured USB Type-C\u00ae cable and connector. Prior to this update, USB PD was limited to 100W using a solution based on 20V using USB Type-C cables rated at 5A."
+                },
+                {
+                  "title": "30 PD3.1 Protocol Chips and Their 11 Manufacturers: A ChargerLAB Analysis - Chargerlab",
+                  "url": "https://www.chargerlab.com/30-pd3-1-protocol-chips-and-their-11-manufacturers-a-chargerlab-analysis/",
+                  "description": "<strong>Hynetek&#x27;s HUSB251</strong> is a PD protocol chip that supports USB-C DRP. The chip supports PPS PDO and EPR PDO, and all PDOs fully comply with USB PD 3.1 Rev.1.8 specifications, including support for 28V EPR FPDO and EPR AVS."
+                },
+                {
+                  "title": "What Is a PD Charger? A Complete Guide - Anker US",
+                  "url": "https://www.anker.com/blogs/chargers/ubiquitous-charging-the-pd-charger-complete-guide",
+                  "description": "The charger\u2019s compact design and durable build make it a reliable, on-the-go solution for PD charging. The <strong>Anker Charger</strong> (140W, 4-Port, PD 3.1) with USB-C Cable provides fast and efficient USB Power Delivery charging for up to four devices at once."
+                },
+                {
+                  "title": "USB PD 3.1: Power Delivery Tailored for Modern Applications - FSP Power Solution GmbH - AC/DC Power Supply Manufacturer",
+                  "url": "https://www.fsp-ps.de/en/knowledge-215-USB-PD-3-1-for-modern-applicaitons.html",
+                  "description": "The external dongle can be used to charge a battery with a PD 3.1 adapter or the battery can be used as a power bank for portable devices. This allows you to seamlessly switch between charging a battery and powering external devices, giving your battery systems more flexibility. ... Supports USB PD3.1 with up to 200W input for battery charging and USB PD3.0 with up to 100W output for powering external devices."
+                },
+                {
+                  "title": "USB Type-C & USB Power Delivery ICs | TI.com",
+                  "url": "https://www.ti.com/product-category/interface/usb-ics/usb-type-power-delivery-ics/overview.html",
+                  "description": "With the ability to negotiate with any charger \u2013 not just the one provided \u2013 USB Type-C that supports USB PD gives users the flexibility to have their products powered by any adapter, enabling a better user experience. ... TIDA-050047 \u2013 Integrated USB Type-C\u00ae, USB Power Delivery and charging reference design for 2\u20134 cell batteries \u00b7 PMP41013 \u2013 Integrated USB Type-C\u00ae and USB PD bidirectional charging reference design for 1- to 5-cell batter"
+                },
+                {
+                  "title": "USB-C Power Delivery - Everything you need to know \u2013 Manhattan Products",
+                  "url": "https://manhattanproducts.eu/pages/usb-c-pd-charging-everything-you-need-to-know",
+                  "description": "This specification was created by the USB-IF in response to requests from laptop manufacturers for a connector that could deliver more power. The <strong>USB-C PD standard</strong> is a power delivery specification that is compatible with the USB 3.1 and USB ..."
+                },
+                {
+                  "title": "Understanding USB PD 3.1 vs PD 3.0 vs PD 2.0 - Cable Factory-Wandkey",
+                  "url": "https://www.wandkey.com/usb-pd-3-1-vs-pd-3-0-vs-pd-2-0/",
+                  "description": "USB-C Adapter Factories: Manufacturers are actively developing more advanced adapters that seamlessly integrate with the latest PD 3.1 standard. USB-C Charger Manufacturers: Charger manufacturers are designing chargers capable of delivering higher power levels quickly and safely to a wider range of devices. This caters to the growing demand for faster charging solutions. ... Wandkey is a MFI certified cable and charger manufacturer, supports OEM/ODM service, printing logo, customized packaging, color, length, mould etc."
+                },
+                {
+                  "title": "Introduction to PD 3.1 \u2013 the Latest USB-IF Power Delivery Specification | GraniteRiverLabs",
+                  "url": "https://www.graniteriverlabs.com/en-us/technical-blog/usb-power-delivery-specification-3-1",
+                  "description": "Table 4. Conditions Supporting EPR product in Shared Capacity Power Supply Mode (Refer to PD 3.1 Spec) Take the following product design as an example: The maximum total output wattage is 250W, and when the 2 ports are used alone they can support up to 160W respectively: If used independently, the specification is (5V@3A~5A, 9V@3A~5A, 15@3A~5A, 20V@5A, 28V@5A, 36V@4.44A, 15V~36V@160W). When one port is used 100W, the Equivalent PDP Rating of the other port is 150W, the power supply conditions are as follows: 5V@3A~5A, 9V@3A~5A, 15@3A~5A, 20V@5A, 28V@5A, 36V@4.16A, and 15V~36V@150W."
+                },
+                {
+                  "title": "USB Power Delivery",
+                  "url": "https://www.usbgear.com/usb-power-delivery.html",
+                  "description": "This charging hub provides one 140W USB Type-C PD port with EPR support 140W USB PD3.1 Single Port Type C EPR 28V capable Buck-boost DC adapter Variable voltage input range of 12 ~ 24V DC O...Read More ... Backward compatible with USB 3.0 and 1.1, the USB 3.1 Power delivery adapter is compliant with Gen1 and 2 of the USB 3.1 specification."
+                }
+              ]
+            }
+          },
+          "parent_id": "08e2a5f0-9827-43d8-8060-aa1865e6fd56",
+          "parent_ids": [
+            "08e2a5f0-9827-43d8-8060-aa1865e6fd56"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.9,
+          "memo_key": null
+        },
+        "fb38b502-f1e2-4081-b91d-2dd2cbdc800c": {
+          "node_id": "fb38b502-f1e2-4081-b91d-2dd2cbdc800c",
+          "title": "Merge: Find the USB-C Power Delivery 3.1 specification details: maximum wattage, maximum voltage, and revision number. Also find one product that supports this specification and confirm with the manufacturer's documentation. Provide all specifications with citation URLs.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "fb38b502-f1e2-4081-b91d-2dd2cbdc800c",
+              "title": "Merge: Find the USB-C Power Delivery 3.1 specification details: maximum wattage, maximum voltage, and revision number. Also find one product that supports this specification and confirm with the manufacturer's documentation. Provide all specifications with citation URLs.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.8
+            }
+          },
+          "parent_id": "08e2a5f0-9827-43d8-8060-aa1865e6fd56",
+          "parent_ids": [
+            "08e2a5f0-9827-43d8-8060-aa1865e6fd56"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.8,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 2701,
+        "words": 354,
+        "kilobytes": 2.64
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 47140,
+          "words": 5893,
+          "kilobytes": 46.04,
+          "tokens": 12776
+        },
+        "completion": {
+          "chars": 6523,
+          "words": 801,
+          "kilobytes": 6.37,
+          "tokens": 5472
+        },
+        "total_tokens": 18248
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 20,
+        "chars": 9576,
+        "words": 1300,
+        "kilobytes": 9.35
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 89.26687220900203,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 2,
+          "total_duration": 1.177977983999881,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 2,
+          "total_duration": 1.2057738020012039,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 2,
+          "total_duration": 1.4717796179975267,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "search": {
+          "count": 2,
+          "total_duration": 1.485387611995975,
+          "success_count": 2,
+          "error_count": 0
+        }
+      },
+      "events_count": 20
+    },
+    "duration_seconds": 41.44,
+    "telemetry": {
+      "correlation_id": "idea_test_004_gpt-5-mini_20260221_205459",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_205459_004_gpt-5-mini.jsonl",
+      "events_count": 20,
+      "timings_count": 12
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "specifications",
+        "passed": true,
+        "score": 1.0,
+        "has_wattage": true,
+        "has_voltage": true,
+        "has_revision": true,
+        "reason": "Specs: wattage=True, voltage=True, revision=True"
+      },
+      {
+        "check": "url_count",
+        "passed": true,
+        "score": 1.0,
+        "url_count": 8,
+        "reason": "Found 8 URLs"
+      },
+      {
+        "check": "product_manufacturer",
+        "passed": true,
+        "score": 0.5,
+        "has_product": true,
+        "has_manufacturer_url": true,
+        "reason": "Product: True, Manufacturer URL: True"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": true,
+    "overall_score": 0.8333333333333334,
+    "checks_passed": 3,
+    "total_checks": 3,
+    "pass_rate": 1.0
+  }
+}

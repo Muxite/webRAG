@@ -3,10 +3,11 @@ redis
 beautifulsoup4
 chromadb
 urllib3
-openai
+openai>=1.57.0
 supabase
 sentence-transformers
 aio-pika
 pytest
 pytest-asyncio
 pytest-repeat
+asciidag

@@ -1,0 +1,574 @@
+{
+  "test_metadata": {
+    "test_id": "016",
+    "test_name": "Topic Connection Exploration",
+    "difficulty_level": "6/10",
+    "category": "Exploration & Reasoning"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Exploration record (from the available search results)\n\n1) Start: locate the Wikipedia page for \"Machine learning\"\n- Action/result: I ran a search and found the canonical page: \"Machine learning - Wikipedia\" (search result). URL: https://en.wikipedia.org/wiki/Machine_learning\n- Why chosen: This is the required start point for the exploration.\n- Evidence (search result excerpt): \"Machine learning (ML) is a field of study in artificial intelligence concerned with the development and study of statistical algorithms that can learn from data...\" [search result for https://en.wikipedia.org/wiki/Machine_learning]\n\n2) From the search results, identify pages that likely connect Machine Learning to Neuroscience\n- Candidate: \"Neural network (machine learning) - Wikipedia\". URL: https://en.wikipedia.org/wiki/Neural_network_(machine_learning)\n  - Why chosen: The search-result description explicitly states the tie to biology: \"...a computational model inspired by the structure and functions of biological neural networks.\" This directly connects ML concepts to neuroscience concepts (biological neural networks).\n  - Evidence (search result excerpt): \"In machine learning, a neural network (NN) or neural net, also called an artificial neural network (ANN), is a computational model inspired by the structure and functions of biological neural networks...\" [search result for https://en.wikipedia.org/wiki/Neural_network_(machine_learning)]\n\n- Other search results found (less directly relevant but noted):\n  - \"Active learning (machine learning)\" \u2014 https://en.wikipedia.org/wiki/Active_learning_(machine_learning) (found in the same search results; describes an ML paradigm involving interactive querying)\n  - \"Online machine learning\" \u2014 https://en.wikipedia.org/wiki/Online_machine_learning (found in search results; describes a learning paradigm with sequential data)\n  - \"Outline of machine learning\" \u2014 https://en.wikipedia.org/wiki/Outline_of_machine_learning (overview page)\n  - Why noted: These pages were returned by the search and help map the ML landscape, but their search-result descriptions do not themselves state a neuroscience connection the way the Neural network page does.\n\n3) Attempts to open/follow links from the Machine learning page\n- Action: I attempted to fetch and follow links from the Machine learning page (to open its linked pages such as \"Artificial neural network\", \"Computational neuroscience\", \"Brain\u2013computer interface\", \"Neuroinformatics\").\n- Result: HTTP fetch attempts failed (runtime fetch errors). I could not retrieve the full Machine learning page or the full content of the linked pages during this session. Therefore I could not capture page text beyond the search-result descriptions. (Errors reported: \"HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None\" and similar for the linked pages.)\n\n4) How each link choice related to finding the connection\n- Machine learning page: chosen as the mandated start point.\n- Neural network (machine learning) page: chosen because its description explicitly names biological neural networks as the inspiration for ML neural networks\u2014this is direct evidence of conceptual overlap between machine learning and neuroscience. URL: https://en.wikipedia.org/wiki/Neural_network_(machine_learning)\n- Other ML pages found in the search (Active learning, Online machine learning, Outline): chosen to map out ML subareas; none of their search-result snippets explicitly mention neuroscience, so they were lower priority for establishing the ML\u2194Neuroscience connection.\n\n5) Identified connecting concept(s) (evidence-based)\n- Primary connecting concept (supported by available evidence): Artificial neural networks (ANNs) / neural networks. The search-result text for the Neural network (machine learning) page explicitly states that ANNs are \"a computational model inspired by the structure and functions of biological neural networks,\" which ties machine-learning models to neuroscience concepts (biological neural networks). Source: https://en.wikipedia.org/wiki/Neural_network_(machine_learning)\n\n6) Missing evidence and next steps\n- Missing evidence: I was unable to fetch the full Machine learning Wikipedia page and the full content of linked pages due to HTTP fetch failures, so I could not extract additional supporting text (for example, from pages like \"Computational neuroscience,\" \"Brain\u2013computer interface,\" or the full Machine learning article) that would further document other specific connections (computational neuroscience, brain\u2013computer interfaces, neuroinformatics, etc.). The errors encountered are documented in the exploration results.\n- Recommended next steps (to complete the exploration): open the Machine learning page and follow its in-article links for \"Artificial neural network,\" \"Computational neuroscience,\" and \"Brain\u2013computer interface,\" and capture their opening paragraphs or relevant sentences to show more explicit ties.\n\nConcise conclusion (evidence-based): From the available search results, the clearest documented connection between Machine Learning and Neuroscience is artificial neural networks: the ML concept of a neural network is explicitly described as being inspired by the structure and functions of biological neural networks (https://en.wikipedia.org/wiki/Neural_network_(machine_learning)). The full Machine learning article (https://en.wikipedia.org/wiki/Machine_learning) and related pages likely contain further connections (computational neuroscience, brain\u2013computer interfaces), but I could not fetch their full contents in this session and therefore cannot quote or cite them beyond the search-result snippets already shown.",
+      "action_summary": "I located the Wikipedia \"Machine learning\" search result (https://en.wikipedia.org/wiki/Machine_learning) and identified \"Neural network (machine learning)\" (https://en.wikipedia.org/wiki/Neural_network_(machine_learning)) from the search results; the latter's description explicitly states ANNs are inspired by biological neural networks, providing a direct ML\u2194Neuroscience link. Attempts to open the full Machine learning page and follow its internal links failed due to HTTP fetch errors, so additional supporting pages (e.g., Computational neuroscience, Brain\u2013computer interface) could not be retrieved in this session.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb",
+      "nodes": {
+        "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb": {
+          "node_id": "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb",
+          "title": "Start at a Wikipedia page about 'Machine Learning'. Explore by following links to find a connection to 'Neuroscience'. You must find at least one page that connects these two topics (e.g., neural networks, computational neuroscience, brain-computer interfaces). Document your exploration: list pages visited, explain how each link choice relates to finding the connection, and identify the connecting concept. The path should demonstrate understanding of how these fields relate.",
+          "details": {
+            "mandate": "Start at a Wikipedia page about 'Machine Learning'. Explore by following links to find a connection to 'Neuroscience'. You must find at least one page that connects these two topics (e.g., neural networks, computational neuroscience, brain-computer interfaces). Document your exploration: list pages visited, explain how each link choice relates to finding the connection, and identify the connecting concept. The path should demonstrate understanding of how these fields relate.",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "merged_results": [
+              {
+                "node_id": "9bc2d7de-582f-4454-a0e0-6abe8905c1d2",
+                "title": "Locate the Wikipedia 'Machine learning' page",
+                "status": "done",
+                "score": 0.7,
+                "evaluation": {
+                  "score": 0.7
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "Machine learning site:en.wikipedia.org",
+                  "intent": "Find the canonical Wikipedia page for 'Machine learning' so we can start exploration from that page",
+                  "vector_context": [
+                    "List of pages visited in order (Machine learning \u2192 chosen links), explanation for why each link was chosen (how it narrows the search toward neuroscience), excerpts/evidence from each visited page that show the connection, and a concise statement of the connecting concept(s) (for example: neural networks as biologically inspired models; computational neuroscience as the formal study linking brain function and computational models; brain\u2013computer interfaces as applied overlap).",
+                    "A short paragraph demonstrating understanding of how machine learning and neuroscience relate (history, mutual influence, methods transferred both ways, and practical applications)."
+                  ],
+                  "count": 5,
+                  "results": [
+                    {
+                      "title": "Machine learning - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Machine_learning",
+                      "description": "Machine learning (ML) is <strong>a field of study in artificial intelligence</strong> concerned with the development and study of statistical algorithms that can learn from data and generalize to unseen data, and thus perform tasks without explicit instructions. Within a subdiscipline in machine learning, advances ..."
+                    },
+                    {
+                      "title": "Neural network (machine learning) - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Neural_network_(machine_learning)",
+                      "description": "In machine learning, a neural network (NN) or neural net, also called an artificial neural network (ANN), is a computational model inspired by the structure and functions of biological neural networks. A neural network consists of connected units or nodes called artificial neurons, which loosely ..."
+                    },
+                    {
+                      "title": "Active learning (machine learning) - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Active_learning_(machine_learning)",
+                      "description": "Active learning is a special case of machine learning in which a learning algorithm can interactively query a human user (or some other information source), to label new data points with the desired outputs. The human user must possess knowledge/expertise in the problem domain, including the ..."
+                    },
+                    {
+                      "title": "Online machine learning - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Online_machine_learning",
+                      "description": "In computer science, online machine learning is <strong>a method of machine learning in which data becomes available in a sequential order and is used to update the best predictor for future data at each step</strong>, as opposed to batch learning techniques which generate the best predictor by learning on ..."
+                    },
+                    {
+                      "title": "Outline of machine learning - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Outline_of_machine_learning",
+                      "description": "The following outline is provided as an overview of, and topical guide to, machine learning: Machine learning (ML) is <strong>a subfield of artificial intelligence within computer science that evolved from the study of pattern recognition and computational learning theory</strong>."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "de96f20c-92d4-4cd0-baef-ffa3c0a62961",
+                "title": "Open the Machine Learning Wikipedia page and identify neuroscience\u2011relevant links",
+                "status": "failed",
+                "score": 0.95,
+                "evaluation": {
+                  "score": 0.95
+                },
+                "result": {
+                  "action": "visit",
+                  "success": false,
+                  "node_id": "de96f20c-92d4-4cd0-baef-ffa3c0a62961",
+                  "error": "HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None",
+                  "error_type": "RuntimeError",
+                  "root_cause": "HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None",
+                  "http_status": null,
+                  "traceback_summary": [
+                    "    raise RuntimeError(f\"HTTP fetch failed: {url} status={result.status}\")",
+                    "RuntimeError: HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None"
+                  ],
+                  "retryable": false,
+                  "context": {
+                    "url": "URL returned by the previous search for the Wikipedia 'Machine learning' page"
+                  },
+                  "timestamp": null,
+                  "url": "URL returned by the previous search for the Wikipedia 'Machine learning' page"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "eedb256a-5f02-4b76-833d-9ffc4f72f136",
+                "title": "Visit the selected linked Wikipedia pages (parallel)",
+                "status": "failed",
+                "score": 0.98,
+                "evaluation": {
+                  "score": 0.98
+                },
+                "result": {
+                  "action": "visit",
+                  "success": false,
+                  "node_id": "eedb256a-5f02-4b76-833d-9ffc4f72f136",
+                  "error": "HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None",
+                  "error_type": "RuntimeError",
+                  "root_cause": "HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None",
+                  "http_status": null,
+                  "traceback_summary": [
+                    "    raise RuntimeError(f\"HTTP fetch failed: {url} status={result.status}\")",
+                    "RuntimeError: HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None"
+                  ],
+                  "retryable": false,
+                  "context": {
+                    "url": "URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics)"
+                  },
+                  "timestamp": null,
+                  "url": "URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics)"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "62f36a27-cc5e-46c7-9ef4-01ef4def204c",
+                "title": "Compile and document the exploration path and identifying connection",
+                "status": "done",
+                "score": 0.92,
+                "evaluation": {
+                  "score": 0.92
+                },
+                "result": {
+                  "action": "save",
+                  "success": true,
+                  "count": 2
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 4,
+              "success": 2,
+              "failed": 2,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "9bc2d7de-582f-4454-a0e0-6abe8905c1d2",
+            "de96f20c-92d4-4cd0-baef-ffa3c0a62961",
+            "eedb256a-5f02-4b76-833d-9ffc4f72f136",
+            "62f36a27-cc5e-46c7-9ef4-01ef4def204c",
+            "eb96048a-e53f-4539-a6cd-7c47dca5c265"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "9bc2d7de-582f-4454-a0e0-6abe8905c1d2": {
+          "node_id": "9bc2d7de-582f-4454-a0e0-6abe8905c1d2",
+          "title": "Locate the Wikipedia 'Machine learning' page",
+          "details": {
+            "query": "Machine learning site:en.wikipedia.org",
+            "intent": "Find the canonical Wikipedia page for 'Machine learning' so we can start exploration from that page",
+            "count": 5,
+            "action": "search",
+            "parent_goal": "Start at a Wikipedia page about 'Machine Learning'. Explore by following links to find a connection to 'Neuroscience'. You must find at least one page that connects these two topics (e.g., neural networks, computational neuroscience, brain-computer interfaces). Document your exploration: list pages visited, explain how each link choice relates to finding the connection, and identify the connecting concept. The path should demonstrate understanding of how these fields relate.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.8
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Machine learning site:en.wikipedia.org",
+              "intent": "Find the canonical Wikipedia page for 'Machine learning' so we can start exploration from that page",
+              "vector_context": [
+                "List of pages visited in order (Machine learning \u2192 chosen links), explanation for why each link was chosen (how it narrows the search toward neuroscience), excerpts/evidence from each visited page that show the connection, and a concise statement of the connecting concept(s) (for example: neural networks as biologically inspired models; computational neuroscience as the formal study linking brain function and computational models; brain\u2013computer interfaces as applied overlap).",
+                "A short paragraph demonstrating understanding of how machine learning and neuroscience relate (history, mutual influence, methods transferred both ways, and practical applications)."
+              ],
+              "count": 5,
+              "results": [
+                {
+                  "title": "Machine learning - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Machine_learning",
+                  "description": "Machine learning (ML) is <strong>a field of study in artificial intelligence</strong> concerned with the development and study of statistical algorithms that can learn from data and generalize to unseen data, and thus perform tasks without explicit instructions. Within a subdiscipline in machine learning, advances ..."
+                },
+                {
+                  "title": "Neural network (machine learning) - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Neural_network_(machine_learning)",
+                  "description": "In machine learning, a neural network (NN) or neural net, also called an artificial neural network (ANN), is a computational model inspired by the structure and functions of biological neural networks. A neural network consists of connected units or nodes called artificial neurons, which loosely ..."
+                },
+                {
+                  "title": "Active learning (machine learning) - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Active_learning_(machine_learning)",
+                  "description": "Active learning is a special case of machine learning in which a learning algorithm can interactively query a human user (or some other information source), to label new data points with the desired outputs. The human user must possess knowledge/expertise in the problem domain, including the ..."
+                },
+                {
+                  "title": "Online machine learning - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Online_machine_learning",
+                  "description": "In computer science, online machine learning is <strong>a method of machine learning in which data becomes available in a sequential order and is used to update the best predictor for future data at each step</strong>, as opposed to batch learning techniques which generate the best predictor by learning on ..."
+                },
+                {
+                  "title": "Outline of machine learning - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Outline_of_machine_learning",
+                  "description": "The following outline is provided as an overview of, and topical guide to, machine learning: Machine learning (ML) is <strong>a subfield of artificial intelligence within computer science that evolved from the study of pattern recognition and computational learning theory</strong>."
+                }
+              ]
+            }
+          },
+          "parent_id": "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb",
+          "parent_ids": [
+            "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.8,
+          "memo_key": null
+        },
+        "de96f20c-92d4-4cd0-baef-ffa3c0a62961": {
+          "node_id": "de96f20c-92d4-4cd0-baef-ffa3c0a62961",
+          "title": "Open the Machine Learning Wikipedia page and identify neuroscience\u2011relevant links",
+          "details": {
+            "url": "URL returned by the previous search for the Wikipedia 'Machine learning' page",
+            "intent": "Read the Machine learning page, extract sections and internal links that plausibly connect to neuroscience (e.g., 'Artificial neural network', 'Biological inspiration', 'Computational neuroscience', 'Neuroinformatics', 'Brain\u2013computer interface'), and pick the most promising 2\u20134 links to follow",
+            "action": "visit",
+            "parent_goal": "Start at a Wikipedia page about 'Machine Learning'. Explore by following links to find a connection to 'Neuroscience'. You must find at least one page that connects these two topics (e.g., neural networks, computational neuroscience, brain-computer interfaces). Document your exploration: list pages visited, explain how each link choice relates to finding the connection, and identify the connecting concept. The path should demonstrate understanding of how these fields relate.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.35
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": false,
+              "node_id": "de96f20c-92d4-4cd0-baef-ffa3c0a62961",
+              "error": "HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None",
+              "error_type": "RuntimeError",
+              "root_cause": "HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None",
+              "http_status": null,
+              "traceback_summary": [
+                "    raise RuntimeError(f\"HTTP fetch failed: {url} status={result.status}\")",
+                "RuntimeError: HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None"
+              ],
+              "retryable": false,
+              "context": {
+                "url": "URL returned by the previous search for the Wikipedia 'Machine learning' page"
+              },
+              "timestamp": null,
+              "url": "URL returned by the previous search for the Wikipedia 'Machine learning' page"
+            },
+            "action_retryable": false,
+            "action_error": "HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None",
+            "action_error_details": {
+              "error": "HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None",
+              "error_type": "RuntimeError",
+              "root_cause": "HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None",
+              "http_status": null,
+              "traceback_summary": [
+                "    raise RuntimeError(f\"HTTP fetch failed: {url} status={result.status}\")",
+                "RuntimeError: HTTP fetch failed: URL returned by the previous search for the Wikipedia 'Machine learning' page status=None"
+              ]
+            }
+          },
+          "parent_id": "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb",
+          "parent_ids": [
+            "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb"
+          ],
+          "status": "failed",
+          "children": [],
+          "score": 0.35,
+          "memo_key": null
+        },
+        "eedb256a-5f02-4b76-833d-9ffc4f72f136": {
+          "node_id": "eedb256a-5f02-4b76-833d-9ffc4f72f136",
+          "title": "Visit the selected linked Wikipedia pages (parallel)",
+          "details": {
+            "url": "URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics)",
+            "intent": "Open each selected linked page to gather text showing the relationship to both machine learning and neuroscience (origin of ideas, shared methods, applications). Visit these in parallel to extract relevant connecting passages.",
+            "action": "visit",
+            "parent_goal": "Start at a Wikipedia page about 'Machine Learning'. Explore by following links to find a connection to 'Neuroscience'. You must find at least one page that connects these two topics (e.g., neural networks, computational neuroscience, brain-computer interfaces). Document your exploration: list pages visited, explain how each link choice relates to finding the connection, and identify the connecting concept. The path should demonstrate understanding of how these fields relate.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.33
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": false,
+              "node_id": "eedb256a-5f02-4b76-833d-9ffc4f72f136",
+              "error": "HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None",
+              "error_type": "RuntimeError",
+              "root_cause": "HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None",
+              "http_status": null,
+              "traceback_summary": [
+                "    raise RuntimeError(f\"HTTP fetch failed: {url} status={result.status}\")",
+                "RuntimeError: HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None"
+              ],
+              "retryable": false,
+              "context": {
+                "url": "URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics)"
+              },
+              "timestamp": null,
+              "url": "URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics)"
+            },
+            "action_retryable": false,
+            "action_error": "HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None",
+            "action_error_details": {
+              "error": "HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None",
+              "error_type": "RuntimeError",
+              "root_cause": "HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None",
+              "http_status": null,
+              "traceback_summary": [
+                "    raise RuntimeError(f\"HTTP fetch failed: {url} status={result.status}\")",
+                "RuntimeError: HTTP fetch failed: URLs of the selected linked pages identified on the Machine learning page (likely: Artificial neural network, Computational neuroscience, Brain\u2013computer interface, Neuroinformatics) status=None"
+              ]
+            }
+          },
+          "parent_id": "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb",
+          "parent_ids": [
+            "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb"
+          ],
+          "status": "failed",
+          "children": [],
+          "score": 0.33,
+          "memo_key": null
+        },
+        "62f36a27-cc5e-46c7-9ef4-01ef4def204c": {
+          "node_id": "62f36a27-cc5e-46c7-9ef4-01ef4def204c",
+          "title": "Compile and document the exploration path and identifying connection",
+          "details": {
+            "documents": [
+              "List of pages visited in order (Machine learning \u2192 chosen links), explanation for why each link was chosen (how it narrows the search toward neuroscience), excerpts/evidence from each visited page that show the connection, and a concise statement of the connecting concept(s) (for example: neural networks as biologically inspired models; computational neuroscience as the formal study linking brain function and computational models; brain\u2013computer interfaces as applied overlap).",
+              "A short paragraph demonstrating understanding of how machine learning and neuroscience relate (history, mutual influence, methods transferred both ways, and practical applications)."
+            ],
+            "metadatas": [
+              {
+                "note": "This document stores the final assembled exploration path and explanation per the user's mandate."
+              }
+            ],
+            "intent": "Produce the final deliverable: a documented path (pages visited), rationale for link choices, and the identified connecting concept demonstrating understanding of the relation between ML and neuroscience.",
+            "action": "save",
+            "parent_goal": "Start at a Wikipedia page about 'Machine Learning'. Explore by following links to find a connection to 'Neuroscience'. You must find at least one page that connects these two topics (e.g., neural networks, computational neuroscience, brain-computer interfaces). Document your exploration: list pages visited, explain how each link choice relates to finding the connection, and identify the connecting concept. The path should demonstrate understanding of how these fields relate.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.9
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "save",
+              "success": true,
+              "count": 2
+            }
+          },
+          "parent_id": "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb",
+          "parent_ids": [
+            "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.9,
+          "memo_key": null
+        },
+        "eb96048a-e53f-4539-a6cd-7c47dca5c265": {
+          "node_id": "eb96048a-e53f-4539-a6cd-7c47dca5c265",
+          "title": "Merge: Start at a Wikipedia page about 'Machine Learning'. Explore by following links to find a connection to 'Neuroscience'. You must find at least one page that connects these two topics (e.g., neural networks, computational neuroscience, brain-computer interfaces). Document your exploration: list pages visited, explain how each link choice relates to finding the connection, and identify the connecting concept. The path should demonstrate understanding of how these fields relate.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "eb96048a-e53f-4539-a6cd-7c47dca5c265",
+              "title": "Merge: Start at a Wikipedia page about 'Machine Learning'. Explore by following links to find a connection to 'Neuroscience'. You must find at least one page that connects these two topics (e.g., neural networks, computational neuroscience, brain-computer interfaces). Document your exploration: list pages visited, explain how each link choice relates to finding the connection, and identify the connecting concept. The path should demonstrate understanding of how these fields relate.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.75
+            }
+          },
+          "parent_id": "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb",
+          "parent_ids": [
+            "ccb2b2d0-307d-4d7f-990a-bb6c5d5621eb"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.75,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 5719,
+        "words": 729,
+        "kilobytes": 5.58
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 41129,
+          "words": 4996,
+          "kilobytes": 40.17,
+          "tokens": 9188
+        },
+        "completion": {
+          "chars": 9538,
+          "words": 1128,
+          "kilobytes": 9.31,
+          "tokens": 5292
+        },
+        "total_tokens": 14480
+      },
+      "chroma": {
+        "store": {
+          "count": 2,
+          "chars": 662,
+          "words": 89,
+          "kilobytes": 0.65
+        },
+        "retrieve": {
+          "count": 2,
+          "chars": 662,
+          "words": 89,
+          "kilobytes": 0.65
+        }
+      },
+      "search": {
+        "count": 5,
+        "chars": 1994,
+        "words": 259,
+        "kilobytes": 1.95
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 85.63451134401112,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 3,
+          "total_duration": 1.1481608729955042,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 3,
+          "total_duration": 1.1808618350041797,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 3,
+          "total_duration": 14.26106213300227,
+          "success_count": 1,
+          "error_count": 2
+        },
+        "chroma_add": {
+          "count": 1,
+          "total_duration": 0.5075942460025544,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "chroma_store": {
+          "count": 1,
+          "total_duration": 0.5125053790034144,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 0.6073829250017297,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 24
+    },
+    "duration_seconds": 61.83,
+    "telemetry": {
+      "correlation_id": "idea_test_016_gpt-5-mini_20260221_214711",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_214711_016_gpt-5-mini.jsonl",
+      "events_count": 24,
+      "timings_count": 16
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "start_page",
+        "passed": true,
+        "score": 1.0,
+        "reason": "ML page mentioned"
+      },
+      {
+        "check": "connection",
+        "passed": true,
+        "score": 0.5,
+        "reason": "Connection: neuro=True, connection=True"
+      },
+      {
+        "check": "path",
+        "passed": true,
+        "score": 1.0,
+        "url_count": 6,
+        "reason": "Found 6 pages in path"
+      },
+      {
+        "check": "reasoning",
+        "passed": true,
+        "score": 0.5,
+        "reason": "Reasoning: explanation=True, concept=True"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": true,
+      "score": 0.9,
+      "reasons": [
+        "The agent started at the required 'Machine learning' Wikipedia page and provided the URL.",
+        "The agent identified a clear connection to neuroscience via the 'Neural network (machine learning)' page and quoted evidence that ANNs are inspired by biological neural networks.",
+        "Link choices were explained with reasoning (why 'Neural network' was chosen and why other pages were lower priority).",
+        "The exploration demonstrates the conceptual relationship between machine learning and neuroscience (ANNs as computational models inspired by biological neural networks).",
+        "Limitations: the agent reported HTTP fetch failures and therefore did not retrieve full page contents or follow through to additional linked pages; the output also contains a truncated sentence near the end, indicating incomplete text."
+      ],
+      "details": {
+        "passed": true,
+        "score": 0.9,
+        "reasons": [
+          "The agent started at the required 'Machine learning' Wikipedia page and provided the URL.",
+          "The agent identified a clear connection to neuroscience via the 'Neural network (machine learning)' page and quoted evidence that ANNs are inspired by biological neural networks.",
+          "Link choices were explained with reasoning (why 'Neural network' was chosen and why other pages were lower priority).",
+          "The exploration demonstrates the conceptual relationship between machine learning and neuroscience (ANNs as computational models inspired by biological neural networks).",
+          "Limitations: the agent reported HTTP fetch failures and therefore did not retrieve full page contents or follow through to additional linked pages; the output also contains a truncated sentence near the end, indicating incomplete text."
+        ],
+        "connection_found": true,
+        "reasoning_quality": "Good: clear, evidence-based identification of the connecting concept and explanation of link choices. Minor issues due to fetch errors and a truncated sentence, which limited depth of the documented traversal."
+      }
+    },
+    "overall_passed": true,
+    "overall_score": 0.78,
+    "checks_passed": 5,
+    "total_checks": 5,
+    "pass_rate": 1.0
+  }
+}

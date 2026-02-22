@@ -1,0 +1,7 @@
+---
+name: oop
+description: Structure and logging convention
+---
+
+# Overview
+Follow OOP where necessary, and also follow SRP. Avoid making code with loads of logs mixed in. If its reasonable, try to have logging and observability handled by a separate class. This project aims to have agent observability largely covered by base classes on the connectors that handle input and output. 

@@ -1,0 +1,416 @@
+{
+  "test_metadata": {
+    "test_id": "012",
+    "test_name": "Wikipedia Link Collection",
+    "difficulty_level": "3/10",
+    "category": "Link Collection & Summarization"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Collected links from the Wikipedia Main Page (based only on the provided Main Page content)\n\n1) URL: https://en.wikipedia.org/wiki/Main_Page\n   Link text/title: Main Page\n   Description: \"Wikipedia, the free encyclopedia that anyone can edit.\" The Main Page displays summary information such as the number of active editors and the total number of English articles (evidence from the Main Page content) (https://en.wikipedia.org/wiki/Main_Page).\n\n2) URL: https://en.wikipedia.org/wiki/Wikipedia:Contents\n   Link text/title: Wikipedia:Contents\n   Description: No page description is present in the provided Main Page content for this link, so I cannot provide a 1\u20132 sentence summary from the evidence available (https://en.wikipedia.org/wiki/Wikipedia:Contents).\n\n3) URL: https://en.wikipedia.org/wiki/Portal:Current_events\n   Link text/title: Portal:Current events\n   Description: The Main Page shows an \"In the news\" / current-events section, but the provided Main Page content does not include a standalone description of the Portal:Current events page itself; therefore no 1\u20132 sentence summary can be given from the provided evidence (https://en.wikipedia.org/wiki/Portal:Current_events).\n\n4) URL: https://en.wikipedia.org/wiki/Special:Random\n   Link text/title: Special:Random (Random article)\n   Description: The Main Page lists a \"Random article\" link in the menu, but the provided content does not include a description of the Special:Random page; no summary can be given from the provided evidence (https://en.wikipedia.org/wiki/Special:Random).\n\n5) URL: https://en.wikipedia.org/wiki/Wikipedia:About\n   Link text/title: Wikipedia:About (About Wikipedia)\n   Description: The Main Page menu includes an \"About Wikipedia\" link, but the provided Main Page content does not include a descriptive summary of that page; I cannot provide a 1\u20132 sentence description from the available evidence (https://en.wikipedia.org/wiki/Wikipedia:About).\n\n6) URL: https://en.wikipedia.org/wiki/Wikipedia:Contact_us\n   Link text/title: Wikipedia:Contact us\n   Description: The Main Page includes a \"Contact us\" link, but the provided Main Page content does not include a description of the Contact page; therefore no summary can be provided from the evidence (https://en.wikipedia.org/wiki/Wikipedia:Contact_us).\n\n7) URL: https://en.wikipedia.org/wiki/Help:Contents\n   Link text/title: Help:Contents\n   Description: \"Help:Contents\" appears in the Main Page navigation, but the supplied Main Page content does not contain a description of that help page; no summary is available from the provided evidence (https://en.wikipedia.org/wiki/Help:Contents).\n\n8) URL: https://en.wikipedia.org/wiki/Wikipedia:Community_portal\n   Link text/title: Community portal\n   Description: The Main Page shows a link to the Community portal, but the provided content contains no description of that portal page itself, so I cannot produce a 1\u20132 sentence summary from the evidence given (https://en.wikipedia.org/wiki/Wikipedia:Community_portal).\n\n9) URL: https://en.wikipedia.org/wiki/Special:RecentChanges\n   Link text/title: Special:RecentChanges (Recent changes)\n   Description: The Main Page includes a \"Recent changes\" link in the menu, but the provided Main Page content does not include a description of the Recent changes page; no summary can be given based on the provided evidence (https://en.wikipedia.org/wiki/Special:RecentChanges).\n\n10) URL: https://en.wikipedia.org/wiki/Wikipedia:File_upload_wizard\n    Link text/title: Wikipedia:File upload wizard\n    Description: The Main Page includes an \"Upload file\" / file-upload-related link, but the provided Main Page content does not include a description of the File upload wizard page; therefore I cannot provide a 1\u20132 sentence description from the available evidence (https://en.wikipedia.org/wiki/Wikipedia:File_upload_wizard).",
+      "action_summary": "I extracted 10 links that appeared in the provided Main Page content (all URLs are the canonical Wikipedia URLs formed from the link paths present). Only the Main Page entry (item 1) had an explicit descriptive sentence in the provided content. The other nine items were present as links in the supplied Main Page content but lacked standalone descriptions in that content, so I have explicitly indicated where the evidence to produce a 1\u20132 sentence summary was missing. All citations point to the corresponding Wikipedia URLs shown above.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "0d0cfbd2-38cf-47b8-8afe-1b98fec78530",
+      "nodes": {
+        "0d0cfbd2-38cf-47b8-8afe-1b98fec78530": {
+          "node_id": "0d0cfbd2-38cf-47b8-8afe-1b98fec78530",
+          "title": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+          "details": {
+            "mandate": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "merged_results": [
+              {
+                "node_id": "98a8cc0a-5465-4d59-85c1-78f8d46e30cb",
+                "title": "Visit Wikipedia Main Page and extract candidate links",
+                "status": "done",
+                "score": 0.95,
+                "evaluation": {
+                  "score": 0.95
+                },
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://en.wikipedia.org/wiki/Main_Page",
+                  "intent": "Fetch the Wikipedia Main Page and extract a set of prominent internal links (link URL and link text). Target at least 15 notable candidate links drawn from major sections (e.g., Featured article, Did you know, In the news, On this day, Today's featured picture, current events, navigation boxes) so we can select the best 10 to describe.",
+                  "vector_context": [],
+                  "content": "Wikipedia, the free encyclopedia\nJump to content\nMain menu\nMain menu\nmove to sidebar\nhide\nNavigation\nMain page\nContents\nCurrent events\nRandom article\nAbout Wikipedia\nContact us\nContribute\nHelp\nLearn to edit\nCommunity portal\nRecent changes\nUpload file\nSpecial pages\nSearch\nSearch\nAppearance\nDonate\nCreate account\nLog in\nPersonal tools\nDonate\nCreate account\nLog in\nMain Page\nMain Page\nTalk\nEnglish\nRead\nView source\nView history\nTools\nTools\nmove to sidebar\nhide\nActions\nRead\nView source\nView history\nGeneral\nWhat links here\nRelated changes\nUpload file\nPermanent link\nPage information\nCite this page\nGet shortened URL\nDownload QR code\nPrint/export\nDownload as PDF\nPrintable version\nIn other projects\nWikimedia Commons\nWikimedia Foundation\nMediaWiki\nMeta-Wiki\nWikimedia Outreach\nMultilingual Wikisource\nWikispecies\nWikibooks\nWikidata\nWikifunctions\nWikimania\nWikinews\nWikiquote\nWikisource\nWikiversity\nWikivoyage\nWiktionary\nWikidata item\nAppearance\nmove to sidebar\nhide\nFrom Wikipedia, the free encyclopedia\nWelcome to\nWikipedia\n,\nthe\nfree\nencyclopedia\nthat\nanyone can edit\n.\n293,013\nactive editors\n7,140,806\narticles in\nEnglish\nFrom today's featured article\nShigi Qutuqu\n(\nc.\n1178\n\u2013 1260) was a high-ranking official during the early decades of the\nMongol Empire\n. The adopted son of the empire's founder\nTem\u00fcjin\n(later titled Genghis Khan) and his wife\nB\u00f6rte\n, Shigi Qutuqu played an important role in the codification of\nMongol law\n, serving with distinction as an administrator in northern China. He was brought up in Tem\u00fcjin's household and was one of the first Mongols to become literate. The\nSecret History\nexaggerates Shigi Qutuqu's role in the years after the empire's foundation, but he was nevertheless appointed to several high-ranking legal positions, in which he served during the\nMongol conquest of the Jin dynasty\n. He was the commander during the only Mongol defeat in the\nwestern campaign against Khwarazmia\n, being overcome by\nJalal al-Din\nat the 1221\nBattle of Parwan\n. Shigi Qutuqu continued his career as an official during the reign of his adopted brother\n\u00d6gedei Khan\n, Genghis's successor.\n(\nFull\u00a0article...\n)\nRecently featured:\nZhang Jingsheng\n\"Mindful\" (song)\n\u00c6lfwynn, wife of \u00c6thelstan Half-King\nArchive\nBy email\nMore featured articles\nAbout\nDid you know\u00a0...\nMike Brunson\n... that former NFL player\nMike Brunson\n(pictured)\nwas known for making banana ice cream?\n... that \"\nThere's a Hole in the City\n\" is a Nebula Award\u2013nominated short story that describes the September\u00a011 attacks alongside the \"summoned ghosts from past disasters\" in New York City?\n... that French businessman\nAndr\u00e9 Kieffer\nwas described as a \"one-man party\" and \"easily the most aggressive and controversial figure\" in the territorial assembly of Chad?\n... that only black\nGirardinus metallicus\nmales put on a courtship show, while yellow and colorless males rely on coercion?\n... that\nHermann E. Sieger\n, a Nazi Party official, was considered to be a trusted contact of the Liechtenstein government?\n... that\nthe murder of a gay man in Afghanistan\nforced his brother to flee to Turkey and his boyfriend to go into hiding due to harassment from the Taliban?\n... that the\nGroup Architects\nled strikes against traditional teaching styles at the Auckland School of Architecture in 1948, which were attended by 142 of 160 students?\n... that\nGameChat\nwas inspired by Nintendo developers' frustrations over video-conferencing software during the\nCOVID-19\npandemic?\n... that\nSukumar Barua\nchose to work as a chef instead of pursuing poetry as a career because his pay was too good?\nArchive\nStart a new article\nNominate an article\nIn the news\nJos\u00e9 Jer\u00ed\nJos\u00e9 Jer\u00ed\n(pictured)\nis removed\nas the\npresident of Peru\nby\nCongress\n, and replaced by\nJos\u00e9 Mar\u00eda Balc\u00e1zar\n.\nAmerican\ncivil rights\nleader\nJesse Jackson\ndies at the\nage of 84\n.\nThe\nNationalist Party\n, led by\nTarique Rahman\n, wins\nthe Bangladeshi general election\n.\nIn\nthe Barbadian general election\n, the\nLabour Party\nwins a third term and every seat in the\nHouse of Assembly\n.\nOngoing\n:\nRusso-Ukrainian war\ntimeline\nSudanese civil war\ntimeline\nWinter Olympics\ntimeline\nRecent deaths\n:\nAvel Gordly\nRobert Duvall\nDoug Moe\nFrederick Wiseman\nRichard Ottinger\nSemyon Gluzman\nMore current events\nNominate an article\nOn this day\nFebruary 21\nLucy Hobbs Taylor\n1828\n\u2013 The inaugural issue of the\nCherokee Phoenix\n, the first newspaper in a\nNative American\nlanguage, was published.\n1866\n\u2013\nLucy Hobbs Taylor\n(pictured)\nbecame the first woman to receive a\ndoctorate\nfrom a\ndental college\n.\n1919\n\u2013\nBavarian\nsocialist\nKurt Eisner\n, who had organized the\nGerman Revolution\nthat overthrew the\nWittelsbach monarchy\nand established Bavaria as a republic, was assassinated.\n1929\n\u2013\nNanjing decade\n: In the first battle of the\nWarlord Rebellion in northeastern Shandong\nagainst the\nNationalist government\nof China, a 24,000-strong rebel force led by\nZhang Zongchang\nwas defeated at\nZhifu\nby 7,000\nNRA\ntroops.\n1973\n\u2013 After accidentally straying into the airspace of the\nIsraeli-occupied Sinai Peninsula\n,\nLibyan Arab Airlines Flight\u00a0114\nwas shot down by two Israeli\nfighter aircraft\n, killing 108 of the 113 people on board.\nGoscombe John\n(\nb.\n1860)\nRhonda Sing\n(\nb.\n1961)\nHelen Hooven Santmyer\n(\nd.\n1986)\nMargot Fonteyn\n(\nd.\n1991)\nMore anniversaries:\nFebruary 20\nFebruary 21\nFebruary 22\nArchive\nBy email\nList of days of the year\nAbout\nToday's featured picture\nThe\nmasked trogon\n(\nTrogon personatus\n) is a species of bird in the family Trogonidae, the\ntrogons\n. Fairly common in humid highland forests in South America, mainly in the\nAndes\nand on\ntepuis\n, it is resident in Bolivia, Brazil, Colombia, Ecuador, Guyana, Peru and Venezuela. It is a mid-sized trogon, averaging 27 centimetres (11\u00a0in) in length and 56 grams (2.0\u00a0oz) in mass. Like all members of its family, it displays\nsexual dimorphism\n. The male has upperparts, head and upper chest of variously green or reddish-bronze colouring, with a red belly and lower breast, while the female is brown above, with a pinkish to red b",
+                  "content_is_truncated": true,
+                  "content_total_chars": 12215,
+                  "links": [
+                    "#bodyContent",
+                    "/wiki/Main_Page",
+                    "/wiki/Wikipedia:Contents",
+                    "/wiki/Portal:Current_events",
+                    "/wiki/Special:Random",
+                    "/wiki/Wikipedia:About",
+                    "//en.wikipedia.org/wiki/Wikipedia:Contact_us",
+                    "/wiki/Help:Contents",
+                    "/wiki/Help:Introduction",
+                    "/wiki/Wikipedia:Community_portal",
+                    "/wiki/Special:RecentChanges",
+                    "/wiki/Wikipedia:File_upload_wizard",
+                    "/wiki/Special:SpecialPages",
+                    "/wiki/Main_Page",
+                    "/wiki/Special:Search",
+                    "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en",
+                    "/w/index.php?title=Special:CreateAccount&returnto=Main+Page",
+                    "/w/index.php?title=Special:UserLogin&returnto=Main+Page",
+                    "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en",
+                    "/w/index.php?title=Special:CreateAccount&returnto=Main+Page"
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "8094601c-11b9-452d-9de9-f9998052f836",
+                "title": "Visit the selected 10 linked pages and extract titles and concise descriptions",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "think",
+                  "success": true,
+                  "node_id": "8094601c-11b9-452d-9de9-f9998052f836",
+                  "title": "Visit the selected 10 linked pages and extract titles and concise descriptions",
+                  "details": {
+                    "intent": "For each of the 10 links chosen from the main page results, visit that page and extract the canonical URL, the page title (link text/title), and a concise 1-2 sentence description summarizing what the page is about. Return structured data for all 10 pages. (URLs will be supplied from step 1.)",
+                    "urls": [],
+                    "action": "visit_multiple",
+                    "parent_goal": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+                    "is_leaf": true,
+                    "evaluation": {
+                      "score": 1.0
+                    },
+                    "action_attempts": 1,
+                    "action_max_retries": 2
+                  }
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "dde1cec6-f9cb-43cd-b408-fa08858e2ba6",
+                "title": "Compile and organize the 10 results clearly",
+                "status": "failed",
+                "score": 0.85,
+                "evaluation": {
+                  "score": 0.85
+                },
+                "result": {
+                  "action": "save",
+                  "success": false,
+                  "count": 0
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 3,
+              "success": 2,
+              "failed": 1,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "98a8cc0a-5465-4d59-85c1-78f8d46e30cb",
+            "8094601c-11b9-452d-9de9-f9998052f836",
+            "dde1cec6-f9cb-43cd-b408-fa08858e2ba6",
+            "cd22c4a5-3209-4533-8a84-5bdf990f4b7a"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "98a8cc0a-5465-4d59-85c1-78f8d46e30cb": {
+          "node_id": "98a8cc0a-5465-4d59-85c1-78f8d46e30cb",
+          "title": "Visit Wikipedia Main Page and extract candidate links",
+          "details": {
+            "url": "https://en.wikipedia.org/wiki/Main_Page",
+            "intent": "Fetch the Wikipedia Main Page and extract a set of prominent internal links (link URL and link text). Target at least 15 notable candidate links drawn from major sections (e.g., Featured article, Did you know, In the news, On this day, Today's featured picture, current events, navigation boxes) so we can select the best 10 to describe.",
+            "action": "visit",
+            "parent_goal": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.95
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://en.wikipedia.org/wiki/Main_Page",
+              "intent": "Fetch the Wikipedia Main Page and extract a set of prominent internal links (link URL and link text). Target at least 15 notable candidate links drawn from major sections (e.g., Featured article, Did you know, In the news, On this day, Today's featured picture, current events, navigation boxes) so we can select the best 10 to describe.",
+              "vector_context": [],
+              "content": "Wikipedia, the free encyclopedia\nJump to content\nMain menu\nMain menu\nmove to sidebar\nhide\nNavigation\nMain page\nContents\nCurrent events\nRandom article\nAbout Wikipedia\nContact us\nContribute\nHelp\nLearn to edit\nCommunity portal\nRecent changes\nUpload file\nSpecial pages\nSearch\nSearch\nAppearance\nDonate\nCreate account\nLog in\nPersonal tools\nDonate\nCreate account\nLog in\nMain Page\nMain Page\nTalk\nEnglish\nRead\nView source\nView history\nTools\nTools\nmove to sidebar\nhide\nActions\nRead\nView source\nView history\nGeneral\nWhat links here\nRelated changes\nUpload file\nPermanent link\nPage information\nCite this page\nGet shortened URL\nDownload QR code\nPrint/export\nDownload as PDF\nPrintable version\nIn other projects\nWikimedia Commons\nWikimedia Foundation\nMediaWiki\nMeta-Wiki\nWikimedia Outreach\nMultilingual Wikisource\nWikispecies\nWikibooks\nWikidata\nWikifunctions\nWikimania\nWikinews\nWikiquote\nWikisource\nWikiversity\nWikivoyage\nWiktionary\nWikidata item\nAppearance\nmove to sidebar\nhide\nFrom Wikipedia, the free encyclopedia\nWelcome to\nWikipedia\n,\nthe\nfree\nencyclopedia\nthat\nanyone can edit\n.\n293,013\nactive editors\n7,140,806\narticles in\nEnglish\nFrom today's featured article\nShigi Qutuqu\n(\nc.\n1178\n\u2013 1260) was a high-ranking official during the early decades of the\nMongol Empire\n. The adopted son of the empire's founder\nTem\u00fcjin\n(later titled Genghis Khan) and his wife\nB\u00f6rte\n, Shigi Qutuqu played an important role in the codification of\nMongol law\n, serving with distinction as an administrator in northern China. He was brought up in Tem\u00fcjin's household and was one of the first Mongols to become literate. The\nSecret History\nexaggerates Shigi Qutuqu's role in the years after the empire's foundation, but he was nevertheless appointed to several high-ranking legal positions, in which he served during the\nMongol conquest of the Jin dynasty\n. He was the commander during the only Mongol defeat in the\nwestern campaign against Khwarazmia\n, being overcome by\nJalal al-Din\nat the 1221\nBattle of Parwan\n. Shigi Qutuqu continued his career as an official during the reign of his adopted brother\n\u00d6gedei Khan\n, Genghis's successor.\n(\nFull\u00a0article...\n)\nRecently featured:\nZhang Jingsheng\n\"Mindful\" (song)\n\u00c6lfwynn, wife of \u00c6thelstan Half-King\nArchive\nBy email\nMore featured articles\nAbout\nDid you know\u00a0...\nMike Brunson\n... that former NFL player\nMike Brunson\n(pictured)\nwas known for making banana ice cream?\n... that \"\nThere's a Hole in the City\n\" is a Nebula Award\u2013nominated short story that describes the September\u00a011 attacks alongside the \"summoned ghosts from past disasters\" in New York City?\n... that French businessman\nAndr\u00e9 Kieffer\nwas described as a \"one-man party\" and \"easily the most aggressive and controversial figure\" in the territorial assembly of Chad?\n... that only black\nGirardinus metallicus\nmales put on a courtship show, while yellow and colorless males rely on coercion?\n... that\nHermann E. Sieger\n, a Nazi Party official, was considered to be a trusted contact of the Liechtenstein government?\n... that\nthe murder of a gay man in Afghanistan\nforced his brother to flee to Turkey and his boyfriend to go into hiding due to harassment from the Taliban?\n... that the\nGroup Architects\nled strikes against traditional teaching styles at the Auckland School of Architecture in 1948, which were attended by 142 of 160 students?\n... that\nGameChat\nwas inspired by Nintendo developers' frustrations over video-conferencing software during the\nCOVID-19\npandemic?\n... that\nSukumar Barua\nchose to work as a chef instead of pursuing poetry as a career because his pay was too good?\nArchive\nStart a new article\nNominate an article\nIn the news\nJos\u00e9 Jer\u00ed\nJos\u00e9 Jer\u00ed\n(pictured)\nis removed\nas the\npresident of Peru\nby\nCongress\n, and replaced by\nJos\u00e9 Mar\u00eda Balc\u00e1zar\n.\nAmerican\ncivil rights\nleader\nJesse Jackson\ndies at the\nage of 84\n.\nThe\nNationalist Party\n, led by\nTarique Rahman\n, wins\nthe Bangladeshi general election\n.\nIn\nthe Barbadian general election\n, the\nLabour Party\nwins a third term and every seat in the\nHouse of Assembly\n.\nOngoing\n:\nRusso-Ukrainian war\ntimeline\nSudanese civil war\ntimeline\nWinter Olympics\ntimeline\nRecent deaths\n:\nAvel Gordly\nRobert Duvall\nDoug Moe\nFrederick Wiseman\nRichard Ottinger\nSemyon Gluzman\nMore current events\nNominate an article\nOn this day\nFebruary 21\nLucy Hobbs Taylor\n1828\n\u2013 The inaugural issue of the\nCherokee Phoenix\n, the first newspaper in a\nNative American\nlanguage, was published.\n1866\n\u2013\nLucy Hobbs Taylor\n(pictured)\nbecame the first woman to receive a\ndoctorate\nfrom a\ndental college\n.\n1919\n\u2013\nBavarian\nsocialist\nKurt Eisner\n, who had organized the\nGerman Revolution\nthat overthrew the\nWittelsbach monarchy\nand established Bavaria as a republic, was assassinated.\n1929\n\u2013\nNanjing decade\n: In the first battle of the\nWarlord Rebellion in northeastern Shandong\nagainst the\nNationalist government\nof China, a 24,000-strong rebel force led by\nZhang Zongchang\nwas defeated at\nZhifu\nby 7,000\nNRA\ntroops.\n1973\n\u2013 After accidentally straying into the airspace of the\nIsraeli-occupied Sinai Peninsula\n,\nLibyan Arab Airlines Flight\u00a0114\nwas shot down by two Israeli\nfighter aircraft\n, killing 108 of the 113 people on board.\nGoscombe John\n(\nb.\n1860)\nRhonda Sing\n(\nb.\n1961)\nHelen Hooven Santmyer\n(\nd.\n1986)\nMargot Fonteyn\n(\nd.\n1991)\nMore anniversaries:\nFebruary 20\nFebruary 21\nFebruary 22\nArchive\nBy email\nList of days of the year\nAbout\nToday's featured picture\nThe\nmasked trogon\n(\nTrogon personatus\n) is a species of bird in the family Trogonidae, the\ntrogons\n. Fairly common in humid highland forests in South America, mainly in the\nAndes\nand on\ntepuis\n, it is resident in Bolivia, Brazil, Colombia, Ecuador, Guyana, Peru and Venezuela. It is a mid-sized trogon, averaging 27 centimetres (11\u00a0in) in length and 56 grams (2.0\u00a0oz) in mass. Like all members of its family, it displays\nsexual dimorphism\n. The male has upperparts, head and upper chest of variously green or reddish-bronze colouring, with a red belly and lower breast, while the female is brown above, with a pinkish to red b",
+              "content_is_truncated": true,
+              "content_total_chars": 12215,
+              "links": [
+                "#bodyContent",
+                "/wiki/Main_Page",
+                "/wiki/Wikipedia:Contents",
+                "/wiki/Portal:Current_events",
+                "/wiki/Special:Random",
+                "/wiki/Wikipedia:About",
+                "//en.wikipedia.org/wiki/Wikipedia:Contact_us",
+                "/wiki/Help:Contents",
+                "/wiki/Help:Introduction",
+                "/wiki/Wikipedia:Community_portal",
+                "/wiki/Special:RecentChanges",
+                "/wiki/Wikipedia:File_upload_wizard",
+                "/wiki/Special:SpecialPages",
+                "/wiki/Main_Page",
+                "/wiki/Special:Search",
+                "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en",
+                "/w/index.php?title=Special:CreateAccount&returnto=Main+Page",
+                "/w/index.php?title=Special:UserLogin&returnto=Main+Page",
+                "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en",
+                "/w/index.php?title=Special:CreateAccount&returnto=Main+Page"
+              ]
+            }
+          },
+          "parent_id": "0d0cfbd2-38cf-47b8-8afe-1b98fec78530",
+          "parent_ids": [
+            "0d0cfbd2-38cf-47b8-8afe-1b98fec78530"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.95,
+          "memo_key": null
+        },
+        "8094601c-11b9-452d-9de9-f9998052f836": {
+          "node_id": "8094601c-11b9-452d-9de9-f9998052f836",
+          "title": "Visit the selected 10 linked pages and extract titles and concise descriptions",
+          "details": {
+            "intent": "For each of the 10 links chosen from the main page results, visit that page and extract the canonical URL, the page title (link text/title), and a concise 1-2 sentence description summarizing what the page is about. Return structured data for all 10 pages. (URLs will be supplied from step 1.)",
+            "urls": [],
+            "action": "visit_multiple",
+            "parent_goal": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.88
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "8094601c-11b9-452d-9de9-f9998052f836",
+              "title": "Visit the selected 10 linked pages and extract titles and concise descriptions",
+              "details": {
+                "intent": "For each of the 10 links chosen from the main page results, visit that page and extract the canonical URL, the page title (link text/title), and a concise 1-2 sentence description summarizing what the page is about. Return structured data for all 10 pages. (URLs will be supplied from step 1.)",
+                "urls": [],
+                "action": "visit_multiple",
+                "parent_goal": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            }
+          },
+          "parent_id": "0d0cfbd2-38cf-47b8-8afe-1b98fec78530",
+          "parent_ids": [
+            "0d0cfbd2-38cf-47b8-8afe-1b98fec78530"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.88,
+          "memo_key": null
+        },
+        "dde1cec6-f9cb-43cd-b408-fa08858e2ba6": {
+          "node_id": "dde1cec6-f9cb-43cd-b408-fa08858e2ba6",
+          "title": "Compile and organize the 10 results clearly",
+          "details": {
+            "intent": "Format the collected data into a clear, organized output: for each of the 10 entries provide the link URL, the link text/title, and a 1-2 sentence description. Use a numbered list and ensure descriptions are concise and accurate.",
+            "action": "save",
+            "parent_goal": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.6
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "save",
+              "success": false,
+              "count": 0
+            },
+            "action_retryable": false,
+            "action_error": null,
+            "action_error_details": {
+              "error": null,
+              "error_type": null,
+              "root_cause": null,
+              "http_status": null,
+              "traceback_summary": null
+            }
+          },
+          "parent_id": "0d0cfbd2-38cf-47b8-8afe-1b98fec78530",
+          "parent_ids": [
+            "0d0cfbd2-38cf-47b8-8afe-1b98fec78530"
+          ],
+          "status": "failed",
+          "children": [],
+          "score": 0.6,
+          "memo_key": null
+        },
+        "cd22c4a5-3209-4533-8a84-5bdf990f4b7a": {
+          "node_id": "cd22c4a5-3209-4533-8a84-5bdf990f4b7a",
+          "title": "Merge: Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "cd22c4a5-3209-4533-8a84-5bdf990f4b7a",
+              "title": "Merge: Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.9
+            }
+          },
+          "parent_id": "0d0cfbd2-38cf-47b8-8afe-1b98fec78530",
+          "parent_ids": [
+            "0d0cfbd2-38cf-47b8-8afe-1b98fec78530"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.9,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 3859,
+        "words": 448,
+        "kilobytes": 3.77
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 42430,
+          "words": 4690,
+          "kilobytes": 41.44,
+          "tokens": 11907
+        },
+        "completion": {
+          "chars": 6194,
+          "words": 746,
+          "kilobytes": 6.05,
+          "tokens": 7088
+        },
+        "total_tokens": 18995
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 118.742778439002,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 1,
+          "total_duration": 0.39103132000309415,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 1,
+          "total_duration": 0.40841635900142137,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 1,
+          "total_duration": 0.3323712080018595,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 12
+    },
+    "duration_seconds": 49.86,
+    "telemetry": {
+      "correlation_id": "idea_test_012_gpt-5-mini_20260221_214711",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_214711_012_gpt-5-mini.jsonl",
+      "events_count": 12,
+      "timings_count": 7
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "link_count",
+        "passed": true,
+        "score": 1.0,
+        "url_count": 10,
+        "reason": "Found 10 Wikipedia URLs"
+      },
+      {
+        "check": "descriptions",
+        "passed": true,
+        "score": 1.0,
+        "sentence_count": 17,
+        "reason": "Found 17 descriptive sentences"
+      },
+      {
+        "check": "wikipedia_visit",
+        "passed": false,
+        "score": 0,
+        "visit_count": 0,
+        "reason": "Found 0 visit actions"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": false,
+    "overall_score": 0.6666666666666666,
+    "checks_passed": 2,
+    "total_checks": 3,
+    "pass_rate": 0.6666666666666666
+  }
+}

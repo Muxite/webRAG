@@ -1,0 +1,581 @@
+{
+  "test_metadata": {
+    "test_id": "024",
+    "test_name": "Research Document Analysis",
+    "difficulty_level": "7/10",
+    "category": "Research Document Retrieval"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "I searched for recent (2020+) academic research on \u201cmachine learning interpretability\u201d / \u201cexplainable AI\u201d and collected a set of candidate research documents (arXiv, IEEE, OpenReview). I was able to retrieve search-result metadata (title and short snippet) for each item below, including the source URL. However, an attempt to visit/fetch the full pages to extract authors, publication year, and the full stated main contributions failed (HTTP fetch failed). Therefore I cannot reliably extract authors, years, or full contributions from the documents themselves \u2014 that information is MISSING because the page visits failed. I list the candidate documents (from the search results) and the available snippet text from the search results. For each entry I mark what is missing due to the failed page visits.\n\nCandidate research documents found (search-result title + snippet + URL). Note: authors / publication year / full main contribution are NOT AVAILABLE because page visits failed during extraction.\n\n1) \"From Machine Learning to Explainable AI | IEEE Conference Publication | IEEE Xplore\"\n   - Snippet: \u201cThe success of statistical machine learning (ML) methods made the field of Artificial Intelligence (AI) so popular again, after the last AI winter. Meanwhile deep learning approaches even exceed human performance in particular tasks.\u201d\n   - URL: https://ieeexplore.ieee.org/document/8490530/\n   - Authors: NOT AVAILABLE (visit failed)\n   - Publication year: NOT AVAILABLE (visit failed)\n   - Main contribution / finding: NOT AVAILABLE (visit failed)\n\n2) \"1 Explainable AI \u2013 the Latest Advancements and New Trends\" (arXiv PDF)\n   - Snippet: \u201cHowever, a system can be transparent but not interpretable.\u201d\n   - URL: https://arxiv.org/pdf/2505.07005\n   - Authors: NOT AVAILABLE (visit failed)\n   - Publication year: NOT AVAILABLE (visit failed)\n   - Main contribution / finding: NOT AVAILABLE (visit failed)\n\n3) \"Towards Explainable AI: Interpretable Models for Complex Decision-making | IEEE Conference Publication | IEEE Xplore\"\n   - Snippet: \u201cIn the rapidly evolving landscape ... processes has become paramount. This paper addresses the critical need for transparency and interpretability in AI systems, particularly those involved ...\u201d\n   - URL: https://ieeexplore.ieee.org/document/10616500/\n   - Authors: NOT AVAILABLE (visit failed)\n   - Publication year: NOT AVAILABLE (visit failed)\n   - Main contribution / finding: NOT AVAILABLE (visit failed)\n\n4) \"A Comprehensive Perspective on Explainable AI across the Machine Learning Workflow\" (arXiv)\n   - Snippet: \u201cFrom the technical perspective, approaches such as automated machine learning (AutoML) seek to democratize AI development ... making AutoML outputs interpretable to non-experts remains an open research problem.\u201d\n   - URL: https://arxiv.org/html/2508.11529v1\n   - Authors: NOT AVAILABLE (visit failed)\n   - Publication year: NOT AVAILABLE (visit failed)\n   - Main contribution / finding: NOT AVAILABLE (visit failed)\n\n5) \"Clarifying Model Transparency: Interpretability versus Explainability in Deep Learning with MNIST and IMDB Examples\" (arXiv)\n   - Snippet: \u201cDeep Learning, Explainable AI (XAI), Model Interpretability, Prediction Explainability, Black Box Systems, Trustworthy AI, MNIST, IMDB, Case Study Analysis, Local Explanations, Global Understanding.\u201d\n   - URL: https://arxiv.org/html/2509.10929v1/\n   - Authors: NOT AVAILABLE (visit failed)\n   - Publication year: NOT AVAILABLE (visit failed)\n   - Main contribution / finding: NOT AVAILABLE (visit failed)\n\n6) \"Transparent AI: The Case for Interpretability and Explainability\" (arXiv)\n   - Snippet: \u201cConsider, for instance, a medical diagnostic tool that boasts a mere 2% error rate but offers no explanation ... Most stakeholders would hesitate to trust a system that cannot justify its decisions despite superior performance metrics.\u201d\n   - URL: https://arxiv.org/html/2507.23535v1\n   - Authors: NOT AVAILABLE (visit failed)\n   - Publication year: NOT AVAILABLE (visit failed)\n   - Main contribution / finding: NOT AVAILABLE (visit failed)\n\n7) \"LLMs for Explainable AI: A Comprehensive Survey\" (arXiv)\n   - Snippet: \u201cExplainable AI (XAI) includes methods to improve the interpretability of neural networks and other state-of-the-art AI models ...\u201d\n   - URL: https://arxiv.org/html/2504.00125v1\n   - Authors: NOT AVAILABLE (visit failed)\n   - Publication year: NOT AVAILABLE (visit failed)\n   - Main contribution / finding: NOT AVAILABLE (visit failed)\n\n8) \"Towards Unified Attribution in Explainable AI, Data-Centric AI, and Mechanistic Interpretability\" (arXiv)\n   - Snippet: \u201cNumerous interpretability methods have been developed to attribute model behavior to three key aspects: input features, training data, and internal model components ...\u201d\n   - URL: https://arxiv.org/html/2501.18887v3\n   - Authors: NOT AVAILABLE (visit failed)\n   - Publication year: NOT AVAILABLE (visit failed)\n   - Main contribution / finding: NOT AVAILABLE (visit failed)\n\n9) \"Published as a conference paper at ICLR 2025\" (OpenReview PDF)\n   - Snippet (from search result): \u201cThis section explains our proposed framework: LLM-Symbolic Programs. Section 4.1 reviews \u00b7 Neurosymbolic Learning method. Section 4.2 discusses utilizing LLM to implement interpretable\u201d\n   - URL: https://openreview.net/pdf?id=hTphfqtafO\n   - Authors: NOT AVAILABLE (visit failed)\n   - Publication year: NOT AVAILABLE (visit failed)\n   - Main contribution / finding: NOT AVAILABLE (visit failed)\n\nIMPORTANT: I attempted to visit/extract the full page contents for at least two of the sources (and planned to extract authors, year, and the main contributions). Those HTTP fetches failed, so I could not extract the required metadata (authors, publication year, full contribution statements). I will not invent or guess missing metadata \u2014 instead I report that it is missing due to the failed visits.\n\nIf you want, I can now (A) retry fetching these URLs to extract full metadata (authors, year, and contributions) if you permit another attempt, or (B) you can specify 2\u20133 particular documents from the list above you most want fully extracted and I will retry those first. If network fetch remains blocked, I can instead provide guidance on well-known, widely-cited XAI papers from 2020+ based on stored knowledge, but that would not satisfy your requirement to use only visited evidence from academic sources.",
+      "action_summary": "Summary / brief comparative synthesis (based only on the available search-result snippets above; full-text evidence unavailable due to failed page visits):\n\n- Common themes across the found documents: a strong emphasis on the difference between transparency and interpretability, interest in making black-box models (especially deep learning and LLMs) more understandable, and ongoing development of attribution methods that link model behavior to inputs, data, or internal components (see https://arxiv.org/html/2501.18887v3 and https://arxiv.org/html/2504.00125v1). Several pieces appear to be surveys or comprehensive perspectives covering the ML workflow and AutoML interpretability challenges (https://arxiv.org/html/2508.11529v1, https://arxiv.org/pdf/2505.07005).\n\n- Methodological directions implied by the snippets: (1) survey/position papers synthesizing XAI advances and trends; (2) attempts to unify attribution across inputs, data, and mechanisms; (3) proposals for interpretable or neurosymbolic frameworks (ICLR entry) and use of LLMs for interpretability; (4) discussions about trustworthiness in high-stakes domains (medical diagnostics) arguing for interpretability even when accuracy is high (https://arxiv.org/html/2507.23535v1).\n\n- Contrasts suggested by the snippets: some works focus on theoretical/terminology clarity (interpretability vs. explainability), others on practical frameworks (neurosymbolic / LLM-based interpretable programs), and others present broad surveys highlighting open problems like making AutoML outputs interpretable.\n\nCaveat: this synthesis is constrained by the fact that full-page visits failed, so I used only the search-result titles and snippets as evidence. I did not extract or assert authors, publication years, or detailed findings because those require successful page fetches. If you want full metadata and accurate main contributions, I can retry fetching the pages and extract the requested fields (title, at least one author, year, main contribution) for at least two documents as you required.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5",
+      "nodes": {
+        "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5": {
+          "node_id": "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5",
+          "title": "Find and analyze research documents about 'machine learning interpretability' or 'explainable AI' from academic sources. You must: (1) Search for recent research papers or academic articles (from 2020 onwards), (2) Visit at least 2 different research sources (arXiv, research institution websites, academic journals, or conference papers), (3) Extract from each source: the title, authors (at least one author name), publication year, and main research contribution or finding. (4) Provide a summary comparing the different research approaches or findings. Focus on actual research documents, not Wikipedia or general news articles.",
+          "details": {
+            "mandate": "Find and analyze research documents about 'machine learning interpretability' or 'explainable AI' from academic sources. You must: (1) Search for recent research papers or academic articles (from 2020 onwards), (2) Visit at least 2 different research sources (arXiv, research institution websites, academic journals, or conference papers), (3) Extract from each source: the title, authors (at least one author name), publication year, and main research contribution or finding. (4) Provide a summary comparing the different research approaches or findings. Focus on actual research documents, not Wikipedia or general news articles.",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "merged_results": [
+              {
+                "node_id": "d2cf0571-bf9f-4e6e-ad3a-f0fb2d4089e2",
+                "title": "Search for recent (2020+) academic research on \u201cmachine learning interpretability\u201d / \u201cexplainable AI\u201d",
+                "status": "done",
+                "score": 0.97,
+                "evaluation": {
+                  "score": 0.97
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "\"machine learning interpretability\" OR \"explainable AI\" 2020..2026 site:arxiv.org OR site:aclweb.org OR site:ieeexplore.ieee.org OR site:openreview.net OR \"Proceedings\" OR \"conference\" OR \"journal\"",
+                  "intent": "Find recent (2020 onward) research papers, surveys, and conference/journal articles on machine learning interpretability / explainable AI. Prefer primary research documents (arXiv, conference papers, journals, research labs). Return top candidate URLs and short descriptions. Include at least 6\u201310 promising papers from diverse sources (arXiv, conferences, journals).",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "From Machine Learning to Explainable AI | IEEE Conference Publication | IEEE Xplore",
+                      "url": "https://ieeexplore.ieee.org/document/8490530/",
+                      "description": "<strong>The success of statistical machine learning (ML) methods made the field of Artificial Intelligence (AI) so popular again, after the last AI winter</strong>. Meanwhile deep learning approaches even exceed human performance in particular tasks."
+                    },
+                    {
+                      "title": "1 Explainable AI \u2013 the Latest Advancements and New Trends",
+                      "url": "https://arxiv.org/pdf/2505.07005",
+                      "description": "However, <strong>a system can be transparent but not interpretable</strong>."
+                    },
+                    {
+                      "title": "Towards Explainable AI: Interpretable Models for Complex Decision-making | IEEE Conference Publication | IEEE Xplore",
+                      "url": "https://ieeexplore.ieee.org/document/10616500/",
+                      "description": "In the rapidly evolving landscape ... processes has become paramount. <strong>This paper addresses the critical need for transparency and interpretability in AI systems, particularly those involved</strong> ......"
+                    },
+                    {
+                      "title": "A Comprehensive Perspective on Explainable AI across the Machine Learning Workflow",
+                      "url": "https://arxiv.org/html/2508.11529v1",
+                      "description": "From the technical perspective, approaches such as automated machine learning (AutoML) seek to democratize AI development by enabling non-experts to design and deploy models without requiring deep expertise in algorithm selection, tuning, or optimization [127, 299]. From the non-expert or decision-maker\u2019s perspective, large language models (LLMs), are being trained to enable natural language human-computer interaction (HCI), thereby reducing reliance on technical intermediaries [306, 189]. Nevertheless, making AutoML outputs interpretable to non-experts remains an open research problem, as c"
+                    },
+                    {
+                      "title": "Clarifying Model Transparency: Interpretability versus Explainability in Deep Learning with MNIST and IMDB Examples",
+                      "url": "https://arxiv.org/html/2509.10929v1/",
+                      "description": "Deep Learning, Explainable AI (XAI), Model Interpretability, Prediction Explainability, Black Box Systems, Trustworthy AI, MNIST, IMDB, Case Study Analysis, Local Explanations, Global Understanding. \u2020\u2020publicationid: pubid: XXX-X-XXXX-XXXX-X/XX/$31.00 \u00a9 2026 IEEE"
+                    },
+                    {
+                      "title": "Transparent AI: The Case for Interpretability and Explainability",
+                      "url": "https://arxiv.org/html/2507.23535v1",
+                      "description": "Consider, for instance, a medical diagnostic tool that boasts a mere 2% error rate but offers no explanation of its predictions compared to a human physician whose decisions have a 15% error rate but can be fully explained. Most stakeholders would hesitate to trust a system that cannot justify its decisions despite superior performance metrics."
+                    },
+                    {
+                      "title": "LLMs for Explainable AI: A Comprehensive Survey",
+                      "url": "https://arxiv.org/html/2504.00125v1",
+                      "description": "<strong>Explainable AI (XAI) includes methods to improve the interpretability of neural networks and other state-of-the-art AI models</strong>, such as Convolutional Neural Networks (CNNs) for image recognition, Recurrent Neural Networks (RNNs) for sequence data, and Generative Adversarial Networks (GANs) for ..."
+                    },
+                    {
+                      "title": "1 A Multidisciplinary Survey and Framework for Design and",
+                      "url": "https://arxiv.org/pdf/1811.11839v4",
+                      "description": "<strong>A Multidisciplinary Survey and Framework for Explainable AI</strong> ... not limited to: interpretability, explainability, intelligibility, transparency, algorithmic decision-"
+                    },
+                    {
+                      "title": "Towards Unified Attribution in Explainable AI, Data-Centric AI, and Mechanistic Interpretability",
+                      "url": "https://arxiv.org/html/2501.18887v3",
+                      "description": "The increasing complexity of AI systems has made understanding their behavior critical. <strong>Numerous interpretability methods have been developed to attribute model behavior to three key aspects: input features, training data, and internal model components</strong>, which emerged from explainable AI, ..."
+                    },
+                    {
+                      "title": "Published as a conference paper at ICLR 2025",
+                      "url": "https://openreview.net/pdf?id=hTphfqtafO",
+                      "description": "This section explains our proposed framework: LLM-Symbolic Programs. Section 4.1 reviews \u00b7 Neurosymbolic Learning method. Section 4.2 discusses utilizing LLM to implement interpretable"
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "0b146919-92df-4b84-9d92-37ec160bd7c2",
+                "title": "Visit and extract metadata and main contribution from at least two selected research sources",
+                "status": "failed",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "visit",
+                  "success": false,
+                  "node_id": "0b146919-92df-4b84-9d92-37ec160bd7c2",
+                  "error": "HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None",
+                  "error_type": "RuntimeError",
+                  "root_cause": "HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None",
+                  "http_status": null,
+                  "traceback_summary": [
+                    "    raise RuntimeError(f\"HTTP fetch failed: {url} status={result.status}\")",
+                    "RuntimeError: HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None"
+                  ],
+                  "retryable": false,
+                  "context": {
+                    "url": "Visit and extract metadata and main contribution from at least two selected research sources"
+                  },
+                  "timestamp": null,
+                  "url": "Visit and extract metadata and main contribution from at least two selected research sources"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "d51da9a1-cac5-4dab-964f-00c2ef51c907",
+                "title": "Synthesize a concise comparative summary of the visited papers' approaches and findings",
+                "status": "done",
+                "score": 0.96,
+                "evaluation": {
+                  "score": 0.96
+                },
+                "result": {
+                  "action": "think",
+                  "success": true,
+                  "node_id": "d51da9a1-cac5-4dab-964f-00c2ef51c907",
+                  "title": "Synthesize a concise comparative summary of the visited papers' approaches and findings",
+                  "details": {
+                    "intent": "Compare the extracted papers: summarize and contrast their research approaches (method type, e.g., post-hoc attribution, inherently interpretable models, concept-based methods, evaluation protocols), key findings, strengths, limitations, and any common trends (datasets, evaluation metrics, human studies). Produce a short comparative summary that highlights differences and where research is converging or diverging.",
+                    "expected_output": "A brief comparative paragraph plus a short list of notable contrasts (method, evaluation, main contribution). Focus only on actual research documents (no Wikipedia/news).",
+                    "action": "synthesize",
+                    "parent_goal": "Find and analyze research documents about 'machine learning interpretability' or 'explainable AI' from academic sources. You must: (1) Search for recent research papers or academic articles (from 2020 onwards), (2) Visit at least 2 different research sources (arXiv, research institution websites, academic journals, or conference papers), (3) Extract from each source: the title, authors (at least one author name), publication year, and main research contribution or finding. (4) Provide a summary comparing the different research approaches or findings. Focus on actual research documents, not Wikipedia or general news articles.",
+                    "is_leaf": true,
+                    "evaluation": {
+                      "score": 0.96
+                    },
+                    "action_attempts": 1,
+                    "action_max_retries": 2
+                  }
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 3,
+              "success": 2,
+              "failed": 1,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "d2cf0571-bf9f-4e6e-ad3a-f0fb2d4089e2",
+            "0b146919-92df-4b84-9d92-37ec160bd7c2",
+            "d51da9a1-cac5-4dab-964f-00c2ef51c907",
+            "461b8873-df11-4931-b266-1f83918343cc"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "d2cf0571-bf9f-4e6e-ad3a-f0fb2d4089e2": {
+          "node_id": "d2cf0571-bf9f-4e6e-ad3a-f0fb2d4089e2",
+          "title": "Search for recent (2020+) academic research on \u201cmachine learning interpretability\u201d / \u201cexplainable AI\u201d",
+          "details": {
+            "query": "\"machine learning interpretability\" OR \"explainable AI\" 2020..2026 site:arxiv.org OR site:aclweb.org OR site:ieeexplore.ieee.org OR site:openreview.net OR \"Proceedings\" OR \"conference\" OR \"journal\"",
+            "intent": "Find recent (2020 onward) research papers, surveys, and conference/journal articles on machine learning interpretability / explainable AI. Prefer primary research documents (arXiv, conference papers, journals, research labs). Return top candidate URLs and short descriptions. Include at least 6\u201310 promising papers from diverse sources (arXiv, conferences, journals).",
+            "count": 10,
+            "action": "search",
+            "parent_goal": "Find and analyze research documents about 'machine learning interpretability' or 'explainable AI' from academic sources. You must: (1) Search for recent research papers or academic articles (from 2020 onwards), (2) Visit at least 2 different research sources (arXiv, research institution websites, academic journals, or conference papers), (3) Extract from each source: the title, authors (at least one author name), publication year, and main research contribution or finding. (4) Provide a summary comparing the different research approaches or findings. Focus on actual research documents, not Wikipedia or general news articles.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.95
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "\"machine learning interpretability\" OR \"explainable AI\" 2020..2026 site:arxiv.org OR site:aclweb.org OR site:ieeexplore.ieee.org OR site:openreview.net OR \"Proceedings\" OR \"conference\" OR \"journal\"",
+              "intent": "Find recent (2020 onward) research papers, surveys, and conference/journal articles on machine learning interpretability / explainable AI. Prefer primary research documents (arXiv, conference papers, journals, research labs). Return top candidate URLs and short descriptions. Include at least 6\u201310 promising papers from diverse sources (arXiv, conferences, journals).",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "From Machine Learning to Explainable AI | IEEE Conference Publication | IEEE Xplore",
+                  "url": "https://ieeexplore.ieee.org/document/8490530/",
+                  "description": "<strong>The success of statistical machine learning (ML) methods made the field of Artificial Intelligence (AI) so popular again, after the last AI winter</strong>. Meanwhile deep learning approaches even exceed human performance in particular tasks."
+                },
+                {
+                  "title": "1 Explainable AI \u2013 the Latest Advancements and New Trends",
+                  "url": "https://arxiv.org/pdf/2505.07005",
+                  "description": "However, <strong>a system can be transparent but not interpretable</strong>."
+                },
+                {
+                  "title": "Towards Explainable AI: Interpretable Models for Complex Decision-making | IEEE Conference Publication | IEEE Xplore",
+                  "url": "https://ieeexplore.ieee.org/document/10616500/",
+                  "description": "In the rapidly evolving landscape ... processes has become paramount. <strong>This paper addresses the critical need for transparency and interpretability in AI systems, particularly those involved</strong> ......"
+                },
+                {
+                  "title": "A Comprehensive Perspective on Explainable AI across the Machine Learning Workflow",
+                  "url": "https://arxiv.org/html/2508.11529v1",
+                  "description": "From the technical perspective, approaches such as automated machine learning (AutoML) seek to democratize AI development by enabling non-experts to design and deploy models without requiring deep expertise in algorithm selection, tuning, or optimization [127, 299]. From the non-expert or decision-maker\u2019s perspective, large language models (LLMs), are being trained to enable natural language human-computer interaction (HCI), thereby reducing reliance on technical intermediaries [306, 189]. Nevertheless, making AutoML outputs interpretable to non-experts remains an open research problem, as c"
+                },
+                {
+                  "title": "Clarifying Model Transparency: Interpretability versus Explainability in Deep Learning with MNIST and IMDB Examples",
+                  "url": "https://arxiv.org/html/2509.10929v1/",
+                  "description": "Deep Learning, Explainable AI (XAI), Model Interpretability, Prediction Explainability, Black Box Systems, Trustworthy AI, MNIST, IMDB, Case Study Analysis, Local Explanations, Global Understanding. \u2020\u2020publicationid: pubid: XXX-X-XXXX-XXXX-X/XX/$31.00 \u00a9 2026 IEEE"
+                },
+                {
+                  "title": "Transparent AI: The Case for Interpretability and Explainability",
+                  "url": "https://arxiv.org/html/2507.23535v1",
+                  "description": "Consider, for instance, a medical diagnostic tool that boasts a mere 2% error rate but offers no explanation of its predictions compared to a human physician whose decisions have a 15% error rate but can be fully explained. Most stakeholders would hesitate to trust a system that cannot justify its decisions despite superior performance metrics."
+                },
+                {
+                  "title": "LLMs for Explainable AI: A Comprehensive Survey",
+                  "url": "https://arxiv.org/html/2504.00125v1",
+                  "description": "<strong>Explainable AI (XAI) includes methods to improve the interpretability of neural networks and other state-of-the-art AI models</strong>, such as Convolutional Neural Networks (CNNs) for image recognition, Recurrent Neural Networks (RNNs) for sequence data, and Generative Adversarial Networks (GANs) for ..."
+                },
+                {
+                  "title": "1 A Multidisciplinary Survey and Framework for Design and",
+                  "url": "https://arxiv.org/pdf/1811.11839v4",
+                  "description": "<strong>A Multidisciplinary Survey and Framework for Explainable AI</strong> ... not limited to: interpretability, explainability, intelligibility, transparency, algorithmic decision-"
+                },
+                {
+                  "title": "Towards Unified Attribution in Explainable AI, Data-Centric AI, and Mechanistic Interpretability",
+                  "url": "https://arxiv.org/html/2501.18887v3",
+                  "description": "The increasing complexity of AI systems has made understanding their behavior critical. <strong>Numerous interpretability methods have been developed to attribute model behavior to three key aspects: input features, training data, and internal model components</strong>, which emerged from explainable AI, ..."
+                },
+                {
+                  "title": "Published as a conference paper at ICLR 2025",
+                  "url": "https://openreview.net/pdf?id=hTphfqtafO",
+                  "description": "This section explains our proposed framework: LLM-Symbolic Programs. Section 4.1 reviews \u00b7 Neurosymbolic Learning method. Section 4.2 discusses utilizing LLM to implement interpretable"
+                }
+              ]
+            }
+          },
+          "parent_id": "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5",
+          "parent_ids": [
+            "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.95,
+          "memo_key": null
+        },
+        "0b146919-92df-4b84-9d92-37ec160bd7c2": {
+          "node_id": "0b146919-92df-4b84-9d92-37ec160bd7c2",
+          "title": "Visit and extract metadata and main contribution from at least two selected research sources",
+          "details": {
+            "intent": "From the search results, open and read at least two different academic sources (must include at least two distinct source types, e.g., an arXiv preprint and a conference/journal paper or research institution page). For each visited source, extract: title, at least one author name, publication year, and the paper's main research contribution or finding. Aim to visit up to 4 papers to provide choice. If any URL is blocked, pick the next-best source from search results.",
+            "notes": "This step depends on the prior search results. Select papers published in 2020 or later. Prefer recent high-impact works or surveys that illustrate different approaches (e.g., feature attribution, concept-based explanations, counterfactuals, evaluation metrics for explanations, human-centered studies).",
+            "max_urls": 4,
+            "action": "visit",
+            "parent_goal": "Find and analyze research documents about 'machine learning interpretability' or 'explainable AI' from academic sources. You must: (1) Search for recent research papers or academic articles (from 2020 onwards), (2) Visit at least 2 different research sources (arXiv, research institution websites, academic journals, or conference papers), (3) Extract from each source: the title, authors (at least one author name), publication year, and main research contribution or finding. (4) Provide a summary comparing the different research approaches or findings. Focus on actual research documents, not Wikipedia or general news articles.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.05
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": false,
+              "node_id": "0b146919-92df-4b84-9d92-37ec160bd7c2",
+              "error": "HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None",
+              "error_type": "RuntimeError",
+              "root_cause": "HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None",
+              "http_status": null,
+              "traceback_summary": [
+                "    raise RuntimeError(f\"HTTP fetch failed: {url} status={result.status}\")",
+                "RuntimeError: HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None"
+              ],
+              "retryable": false,
+              "context": {
+                "url": "Visit and extract metadata and main contribution from at least two selected research sources"
+              },
+              "timestamp": null,
+              "url": "Visit and extract metadata and main contribution from at least two selected research sources"
+            },
+            "action_retryable": false,
+            "action_error": "HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None",
+            "action_error_details": {
+              "error": "HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None",
+              "error_type": "RuntimeError",
+              "root_cause": "HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None",
+              "http_status": null,
+              "traceback_summary": [
+                "    raise RuntimeError(f\"HTTP fetch failed: {url} status={result.status}\")",
+                "RuntimeError: HTTP fetch failed: Visit and extract metadata and main contribution from at least two selected research sources status=None"
+              ]
+            }
+          },
+          "parent_id": "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5",
+          "parent_ids": [
+            "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5"
+          ],
+          "status": "failed",
+          "children": [],
+          "score": 0.05,
+          "memo_key": null
+        },
+        "d51da9a1-cac5-4dab-964f-00c2ef51c907": {
+          "node_id": "d51da9a1-cac5-4dab-964f-00c2ef51c907",
+          "title": "Synthesize a concise comparative summary of the visited papers' approaches and findings",
+          "details": {
+            "intent": "Compare the extracted papers: summarize and contrast their research approaches (method type, e.g., post-hoc attribution, inherently interpretable models, concept-based methods, evaluation protocols), key findings, strengths, limitations, and any common trends (datasets, evaluation metrics, human studies). Produce a short comparative summary that highlights differences and where research is converging or diverging.",
+            "expected_output": "A brief comparative paragraph plus a short list of notable contrasts (method, evaluation, main contribution). Focus only on actual research documents (no Wikipedia/news).",
+            "action": "synthesize",
+            "parent_goal": "Find and analyze research documents about 'machine learning interpretability' or 'explainable AI' from academic sources. You must: (1) Search for recent research papers or academic articles (from 2020 onwards), (2) Visit at least 2 different research sources (arXiv, research institution websites, academic journals, or conference papers), (3) Extract from each source: the title, authors (at least one author name), publication year, and main research contribution or finding. (4) Provide a summary comparing the different research approaches or findings. Focus on actual research documents, not Wikipedia or general news articles.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.45
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "d51da9a1-cac5-4dab-964f-00c2ef51c907",
+              "title": "Synthesize a concise comparative summary of the visited papers' approaches and findings",
+              "details": {
+                "intent": "Compare the extracted papers: summarize and contrast their research approaches (method type, e.g., post-hoc attribution, inherently interpretable models, concept-based methods, evaluation protocols), key findings, strengths, limitations, and any common trends (datasets, evaluation metrics, human studies). Produce a short comparative summary that highlights differences and where research is converging or diverging.",
+                "expected_output": "A brief comparative paragraph plus a short list of notable contrasts (method, evaluation, main contribution). Focus only on actual research documents (no Wikipedia/news).",
+                "action": "synthesize",
+                "parent_goal": "Find and analyze research documents about 'machine learning interpretability' or 'explainable AI' from academic sources. You must: (1) Search for recent research papers or academic articles (from 2020 onwards), (2) Visit at least 2 different research sources (arXiv, research institution websites, academic journals, or conference papers), (3) Extract from each source: the title, authors (at least one author name), publication year, and main research contribution or finding. (4) Provide a summary comparing the different research approaches or findings. Focus on actual research documents, not Wikipedia or general news articles.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 0.96
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            }
+          },
+          "parent_id": "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5",
+          "parent_ids": [
+            "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.45,
+          "memo_key": null
+        },
+        "461b8873-df11-4931-b266-1f83918343cc": {
+          "node_id": "461b8873-df11-4931-b266-1f83918343cc",
+          "title": "Merge: Find and analyze research documents about 'machine learning interpretability' or 'explainable AI' from academic sources. You must: (1) Search for recent research papers or academic articles (from 2020 onwards), (2) Visit at least 2 different research sources (arXiv, research institution websites, academic journals, or conference papers), (3) Extract from each source: the title, authors (at least one author name), publication year, and main research contribution or finding. (4) Provide a summary comparing the different research approaches or findings. Focus on actual research documents, not Wikipedia or general news articles.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "461b8873-df11-4931-b266-1f83918343cc",
+              "title": "Merge: Find and analyze research documents about 'machine learning interpretability' or 'explainable AI' from academic sources. You must: (1) Search for recent research papers or academic articles (from 2020 onwards), (2) Visit at least 2 different research sources (arXiv, research institution websites, academic journals, or conference papers), (3) Extract from each source: the title, authors (at least one author name), publication year, and main research contribution or finding. (4) Provide a summary comparing the different research approaches or findings. Focus on actual research documents, not Wikipedia or general news articles.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.5
+            }
+          },
+          "parent_id": "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5",
+          "parent_ids": [
+            "7583bef6-2c68-46bd-bc87-dd0bdcf7d8f5"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.5,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 6396,
+        "words": 881,
+        "kilobytes": 6.25
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 47592,
+          "words": 5780,
+          "kilobytes": 46.48,
+          "tokens": 11092
+        },
+        "completion": {
+          "chars": 11283,
+          "words": 1415,
+          "kilobytes": 11.02,
+          "tokens": 6420
+        },
+        "total_tokens": 17512
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 10,
+        "chars": 3889,
+        "words": 469,
+        "kilobytes": 3.8
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 68.50276047299849,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 2,
+          "total_duration": 1.1161085499988985,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 2,
+          "total_duration": 1.1457934659993043,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 2,
+          "total_duration": 7.1424031630012905,
+          "success_count": 1,
+          "error_count": 1
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 0.6673546769961831,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 18
+    },
+    "duration_seconds": 50.15,
+    "telemetry": {
+      "correlation_id": "idea_test_024_gpt-5-mini_20260221_214711",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_214711_024_gpt-5-mini.jsonl",
+      "events_count": 18,
+      "timings_count": 11
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "research_visits",
+        "passed": false,
+        "score": 0.0,
+        "visit_count": 0,
+        "reason": "Insufficient visits"
+      },
+      {
+        "check": "research_sources",
+        "passed": true,
+        "score": 1.0,
+        "sources_found": [
+          "arxiv",
+          "research",
+          "paper",
+          "conference",
+          "academic",
+          "publication",
+          "study",
+          "pdf"
+        ],
+        "reason": "Found 8 research indicators"
+      },
+      {
+        "check": "titles",
+        "passed": true,
+        "score": 1.0,
+        "title_count": 8,
+        "reason": "Found 8 title(s)"
+      },
+      {
+        "check": "authors",
+        "passed": true,
+        "score": 1.0,
+        "author_count": 24,
+        "reason": "Found 24 author name(s)"
+      },
+      {
+        "check": "years",
+        "passed": true,
+        "score": 1.0,
+        "year_count": 3,
+        "years": [
+          "2020",
+          "2025",
+          "2020"
+        ],
+        "reason": "Found 3 recent year(s)"
+      },
+      {
+        "check": "contributions",
+        "passed": true,
+        "score": 1.0,
+        "keyword_count": 6,
+        "sentence_count": 27,
+        "reason": "Found 6 contribution keywords, 27 sentences"
+      },
+      {
+        "check": "comparison",
+        "passed": true,
+        "score": 0.5,
+        "reason": "Comparison summary found"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.15,
+      "reasons": [
+        "The agent located candidate research documents from academic sources (arXiv, IEEE), so source selection was appropriate.",
+        "No pages were actually visited (Visit actions executed: 0), so required extraction of authors, publication year, and main contributions did not occur.",
+        "Titles were listed, but authors and publication years were explicitly marked as NOT AVAILABLE for every entry.",
+        "No research contributions or findings were extracted or described due to failed page visits.",
+        "The task required visiting at least 2 research sources and extracting specific metadata and contributions; those requirements were not met.",
+        "No comparative summary of research approaches or findings was provided."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.15,
+        "reasons": [
+          "The agent located candidate research documents from academic sources (arXiv, IEEE), so source selection was appropriate.",
+          "No pages were actually visited (Visit actions executed: 0), so required extraction of authors, publication year, and main contributions did not occur.",
+          "Titles were listed, but authors and publication years were explicitly marked as NOT AVAILABLE for every entry.",
+          "No research contributions or findings were extracted or described due to failed page visits.",
+          "The task required visiting at least 2 research sources and extracting specific metadata and contributions; those requirements were not met.",
+          "No comparative summary of research approaches or findings was provided."
+        ],
+        "research_quality": "Candidate documents are relevant and from academic/research-oriented sources (arXiv, IEEE). However, the output contains only search-result snippets and URLs; the substantive research metadata and contributions were not extracted, so research quality is insufficient for the task.",
+        "academic_sources": true,
+        "comparison_quality": "None \u2014 no comparison was provided because the necessary information (authors, years, main contributions) was not retrieved."
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.70625,
+    "checks_passed": 6,
+    "total_checks": 8,
+    "pass_rate": 0.75
+  }
+}

@@ -1,0 +1,391 @@
+{
+  "test_metadata": {
+    "test_id": "003",
+    "test_name": "Multi-Query Search",
+    "difficulty_level": "2/10",
+    "category": "Information Retrieval"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "python programming \u2014 https://www.python.org/\nmachine learning \u2014 https://en.wikipedia.org/wiki/Machine_learning\ndata science \u2014 https://en.wikipedia.org/wiki/Data_science",
+      "action_summary": "These three URLs are the first webpage search results found for each query: 'python programming' \u2192 https://www.python.org/; 'machine learning' \u2192 https://en.wikipedia.org/wiki/Machine_learning; 'data science' \u2192 https://en.wikipedia.org/wiki/Data_science (sources as listed).",
+      "success": true
+    },
+    "graph": {
+      "root_id": "c2927b40-f4c4-44d4-a04a-533202630027",
+      "nodes": {
+        "c2927b40-f4c4-44d4-a04a-533202630027": {
+          "node_id": "c2927b40-f4c4-44d4-a04a-533202630027",
+          "title": "Find the first webpage result URL for each of the following search terms: 'python programming', 'machine learning', 'data science'. Return exactly 3 URLs, one for each term.",
+          "details": {
+            "mandate": "Find the first webpage result URL for each of the following search terms: 'python programming', 'machine learning', 'data science'. Return exactly 3 URLs, one for each term.",
+            "expansion_meta": {
+              "execute_all_children": true
+            },
+            "merged_results": [
+              {
+                "node_id": "823f87e3-75c0-47cc-9267-08e67b71a82f",
+                "title": "Search for the first webpage result for 'python programming'",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "python programming",
+                  "intent": "Find the top (first) web search result URL for the query 'python programming'",
+                  "vector_context": [],
+                  "count": 1,
+                  "results": [
+                    {
+                      "title": "Welcome to Python.org",
+                      "url": "https://www.python.org/",
+                      "description": "<strong>Python is a programming language that lets you work quickly and integrate systems more effectively</strong>."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "67b3d770-f9e0-4163-903b-378f9107fdc1",
+                "title": "Search for the first webpage result for 'machine learning'",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "machine learning",
+                  "intent": "Find the top (first) web search result URL for the query 'machine learning'",
+                  "vector_context": [],
+                  "count": 1,
+                  "results": [
+                    {
+                      "title": "Machine learning - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Machine_learning",
+                      "description": "Machine learning (ML) is <strong>a field of study in artificial intelligence concerned with the development and study of statistical algorithms that can learn from data and generalize to unseen data, and thus perform tasks without explicit instructions</strong>. Within a subdiscipline in machine learning, advances ..."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "83e1f77b-92ea-404c-a288-9276fc8fb5c5",
+                "title": "Search for the first webpage result for 'data science'",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "data science",
+                  "intent": "Find the top (first) web search result URL for the query 'data science'",
+                  "vector_context": [],
+                  "count": 1,
+                  "results": [
+                    {
+                      "title": "Data science - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Data_science",
+                      "description": "Data science is <strong>an interdisciplinary field focused on extracting knowledge from typically large data sets and applying the knowledge from that data to solve problems in other application domains</strong>. The field encompasses preparing data for analysis, formulating data science problems, analyzing ..."
+                    }
+                  ]
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 3,
+              "success": 3,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "823f87e3-75c0-47cc-9267-08e67b71a82f",
+            "67b3d770-f9e0-4163-903b-378f9107fdc1",
+            "83e1f77b-92ea-404c-a288-9276fc8fb5c5",
+            "45027e55-c8ae-4e9b-8f77-2a08a809fe1f"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "823f87e3-75c0-47cc-9267-08e67b71a82f": {
+          "node_id": "823f87e3-75c0-47cc-9267-08e67b71a82f",
+          "title": "Search for the first webpage result for 'python programming'",
+          "details": {
+            "query": "python programming",
+            "intent": "Find the top (first) web search result URL for the query 'python programming'",
+            "count": 1,
+            "action": "search",
+            "parent_goal": "Find the first webpage result URL for each of the following search terms: 'python programming', 'machine learning', 'data science'. Return exactly 3 URLs, one for each term.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "python programming",
+              "intent": "Find the top (first) web search result URL for the query 'python programming'",
+              "vector_context": [],
+              "count": 1,
+              "results": [
+                {
+                  "title": "Welcome to Python.org",
+                  "url": "https://www.python.org/",
+                  "description": "<strong>Python is a programming language that lets you work quickly and integrate systems more effectively</strong>."
+                }
+              ]
+            }
+          },
+          "parent_id": "c2927b40-f4c4-44d4-a04a-533202630027",
+          "parent_ids": [
+            "c2927b40-f4c4-44d4-a04a-533202630027"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "67b3d770-f9e0-4163-903b-378f9107fdc1": {
+          "node_id": "67b3d770-f9e0-4163-903b-378f9107fdc1",
+          "title": "Search for the first webpage result for 'machine learning'",
+          "details": {
+            "query": "machine learning",
+            "intent": "Find the top (first) web search result URL for the query 'machine learning'",
+            "count": 1,
+            "action": "search",
+            "parent_goal": "Find the first webpage result URL for each of the following search terms: 'python programming', 'machine learning', 'data science'. Return exactly 3 URLs, one for each term.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "machine learning",
+              "intent": "Find the top (first) web search result URL for the query 'machine learning'",
+              "vector_context": [],
+              "count": 1,
+              "results": [
+                {
+                  "title": "Machine learning - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Machine_learning",
+                  "description": "Machine learning (ML) is <strong>a field of study in artificial intelligence concerned with the development and study of statistical algorithms that can learn from data and generalize to unseen data, and thus perform tasks without explicit instructions</strong>. Within a subdiscipline in machine learning, advances ..."
+                }
+              ]
+            }
+          },
+          "parent_id": "c2927b40-f4c4-44d4-a04a-533202630027",
+          "parent_ids": [
+            "c2927b40-f4c4-44d4-a04a-533202630027"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "83e1f77b-92ea-404c-a288-9276fc8fb5c5": {
+          "node_id": "83e1f77b-92ea-404c-a288-9276fc8fb5c5",
+          "title": "Search for the first webpage result for 'data science'",
+          "details": {
+            "query": "data science",
+            "intent": "Find the top (first) web search result URL for the query 'data science'",
+            "count": 1,
+            "action": "search",
+            "parent_goal": "Find the first webpage result URL for each of the following search terms: 'python programming', 'machine learning', 'data science'. Return exactly 3 URLs, one for each term.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "data science",
+              "intent": "Find the top (first) web search result URL for the query 'data science'",
+              "vector_context": [],
+              "count": 1,
+              "results": [
+                {
+                  "title": "Data science - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Data_science",
+                  "description": "Data science is <strong>an interdisciplinary field focused on extracting knowledge from typically large data sets and applying the knowledge from that data to solve problems in other application domains</strong>. The field encompasses preparing data for analysis, formulating data science problems, analyzing ..."
+                }
+              ]
+            }
+          },
+          "parent_id": "c2927b40-f4c4-44d4-a04a-533202630027",
+          "parent_ids": [
+            "c2927b40-f4c4-44d4-a04a-533202630027"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "45027e55-c8ae-4e9b-8f77-2a08a809fe1f": {
+          "node_id": "45027e55-c8ae-4e9b-8f77-2a08a809fe1f",
+          "title": "Merge: Find the first webpage result URL for each of the following search terms: 'python programming', 'machine learning', 'data science'. Return exactly 3 URLs, one for each term.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "45027e55-c8ae-4e9b-8f77-2a08a809fe1f",
+              "title": "Merge: Find the first webpage result URL for each of the following search terms: 'python programming', 'machine learning', 'data science'. Return exactly 3 URLs, one for each term.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.2
+            }
+          },
+          "parent_id": "c2927b40-f4c4-44d4-a04a-533202630027",
+          "parent_ids": [
+            "c2927b40-f4c4-44d4-a04a-533202630027"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.2,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 168,
+        "words": 12,
+        "kilobytes": 0.16
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 17552,
+          "words": 2202,
+          "kilobytes": 17.14,
+          "tokens": 4569
+        },
+        "completion": {
+          "chars": 1381,
+          "words": 103,
+          "kilobytes": 1.35,
+          "tokens": 2001
+        },
+        "total_tokens": 6570
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 3,
+        "chars": 937,
+        "words": 116,
+        "kilobytes": 0.92
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 32.61393615500856,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 3,
+          "total_duration": 0.9748442209893255,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 3,
+          "total_duration": 0.9982887509977445,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 3,
+          "total_duration": 1.030231808006647,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "search": {
+          "count": 3,
+          "total_duration": 1.0385992720039212,
+          "success_count": 3,
+          "error_count": 0
+        }
+      },
+      "events_count": 26
+    },
+    "duration_seconds": 22.81,
+    "telemetry": {
+      "correlation_id": "idea_test_003_gpt-5-mini_20260221_214711",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_214711_003_gpt-5-mini.jsonl",
+      "events_count": 26,
+      "timings_count": 16
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "search_count",
+        "passed": true,
+        "score": 1.0,
+        "actual": 3,
+        "expected": 3,
+        "reason": "Found 3 searches"
+      },
+      {
+        "check": "url_count",
+        "passed": true,
+        "score": 1.0,
+        "url_count": 3,
+        "reason": "Found 3 URLs"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": true,
+    "overall_score": 1.0,
+    "checks_passed": 2,
+    "total_checks": 2,
+    "pass_rate": 1.0
+  }
+}

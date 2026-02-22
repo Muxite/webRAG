@@ -72,7 +72,6 @@ class TickOutput:
     def _validate_fields(self):
         """
         Detect and record any self-corrections for reporting/debugging purposes.
-        #TODO implement system to report corrections/errors back to LLM via optional key.
         """
         if not self.history_update:
             self.corrections.append("Missing history_update, defaulted to empty string.")

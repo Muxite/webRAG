@@ -1,0 +1,396 @@
+{
+  "test_metadata": {
+    "test_id": "002",
+    "test_name": "Basic Fact Retrieval",
+    "difficulty_level": "1/10",
+    "category": "Simple Information Retrieval"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "The capital city of Australia is Canberra. Source: https://www.nca.gov.au/",
+      "action_summary": "Authoritative source: the National Capital Authority (an Australian Government agency) identifies Canberra as Australia\u2019s national capital (see https://www.nca.gov.au/). The search results in the provided merge also list additional official pages (e.g., australia.gov.au) that relate to Australia\u2019s national capital.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "7fa40e8b-59af-4c7c-9004-b1eeb6897cbf",
+      "nodes": {
+        "7fa40e8b-59af-4c7c-9004-b1eeb6897cbf": {
+          "node_id": "7fa40e8b-59af-4c7c-9004-b1eeb6897cbf",
+          "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+          "details": {
+            "mandate": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "merged_results": [
+              {
+                "node_id": "4cd31c12-e0e4-488a-9ad6-6ccdec07af53",
+                "title": "Search for authoritative sources that state the capital of Australia",
+                "status": "done",
+                "score": 0.9,
+                "evaluation": {
+                  "score": 0.9
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "capital of Australia official site site:gov.au OR \"capital of Australia\" \"official\"",
+                  "intent": "Find an authoritative (preferably government) source that explicitly states the capital city of Australia",
+                  "vector_context": [],
+                  "count": 5,
+                  "results": [
+                    {
+                      "title": "National Capital Authority",
+                      "url": "https://www.nca.gov.au/",
+                      "description": "Canberra, Australia\u2019s National Capital, has a unique purpose, setting, character and symbolism, and it\u2019s important we make sure it continues to do so. ... We invite you to appreciate, celebrate and participate in the National Capital. We acknowledge the Ngunnawal people as traditional custodians of the ACT and recognise any other people or families with connection to the lands of the ACT and region."
+                    },
+                    {
+                      "title": "Australian Capital Territory (Canberra) | Study Australia",
+                      "url": "https://www.studyaustralia.gov.au/en/life-in-australia/locations-in-australia/australian-capital-territory-canberra",
+                      "description": "As Australia&#x27;s capital, Canberra boasts some of the country\u2019s preeminent educational and cultural institutions."
+                    },
+                    {
+                      "title": "Founding of Canberra | National Museum of Australia",
+                      "url": "https://www.nma.gov.au/defining-moments/resources/founding-of-canberra",
+                      "description": "In addition to these featured moments of the Defining Moments in Australian History project, the public have nominated the swearing in of Australia\u2019s first female Prime Minister by the first female Governor General, which took place in Government House at Yarralumla in 2010 as a defining moment in our history. Canberra is likely to continue rousing strong feelings. It is, after all, the seat of national government. But is also a growing place, changing through generations, and it will continue to evolve and reflect both its role as the capital of Australia and a city that many people love to call home."
+                    },
+                    {
+                      "title": "History of the National Capital | National Capital Authority",
+                      "url": "https://www.nca.gov.au/discover-and-learn/history-national-capital",
+                      "description": "Section 125 of the new Australian Constitution states that the Seat of Government will &#x27;be in the State of <strong>New South Wales</strong>, and be distant not less than one hundred miles from Sydney&#x27;. February 1902: First of several tours by Members of the House of Representatives and Senators of potential ..."
+                    },
+                    {
+                      "title": "Canberra, the Seat of Government | National Capital Authority",
+                      "url": "https://www.nca.gov.au/education/canberras-history/canberra-seat-government",
+                      "description": "As the centre of national politics, Canberra also houses the national headquarters of each of the major political parties, as well as organised national groups such as the National Farmers Federation and the Returned &amp; Services League. <strong>Canberra is not only the national capital</strong> but, as the ..."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "7c09ea57-9ca2-44bc-a1f8-29bd15c6b83f",
+                "title": "Visit an official Australian government page to confirm and extract the capital city and cite the URL",
+                "status": "done",
+                "score": 0.98,
+                "evaluation": {
+                  "score": 0.98
+                },
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://www.australia.gov.au/about-australia/our-country",
+                  "intent": "Confirm the capital city of Australia on an official government page and extract the exact phrasing and URL for citation",
+                  "vector_context": [],
+                  "content": "Find government payments and services | myGov\nSkip to main content\nBrowse\nSearch\nMenu\nHelp\nRaising kids\nLiving arrangements\nAgeing\nWork\nEducation\nHealth and disability\nHome\nFind government payments and services\nAbout myGov\nHelp using myGov\nContact us\nShare feedback\nmyGov User Audit\nRaising kids\nLiving arrangements\nAgeing\nWork\nEducation\nHealth and disability\nTerms of use\nPrivacy and security\nCopyright\nAccessibility\nLanguages",
+                  "content_is_truncated": false,
+                  "content_total_chars": 427,
+                  "links": [
+                    "#main",
+                    "/en",
+                    "/en/services",
+                    "/en/search",
+                    "/en/about/help",
+                    "/en/services/raising-kids",
+                    "/en/services/living-arrangements",
+                    "/en/services/ageing",
+                    "/en/services/work",
+                    "/en/services/education",
+                    "/en/services/health-and-disability",
+                    "/en",
+                    "/en/services/raising-kids",
+                    "/en/services/living-arrangements",
+                    "/en/services/ageing",
+                    "/en/services/work",
+                    "/en/services/education",
+                    "/en/services/health-and-disability",
+                    "/content/mygov/en/about",
+                    "/content/mygov/en/about/help"
+                  ]
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 2,
+              "success": 2,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "4cd31c12-e0e4-488a-9ad6-6ccdec07af53",
+            "7c09ea57-9ca2-44bc-a1f8-29bd15c6b83f",
+            "3bb9a427-1e4c-4469-a663-66667ca43d0e"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "4cd31c12-e0e4-488a-9ad6-6ccdec07af53": {
+          "node_id": "4cd31c12-e0e4-488a-9ad6-6ccdec07af53",
+          "title": "Search for authoritative sources that state the capital of Australia",
+          "details": {
+            "query": "capital of Australia official site site:gov.au OR \"capital of Australia\" \"official\"",
+            "intent": "Find an authoritative (preferably government) source that explicitly states the capital city of Australia",
+            "count": 5,
+            "action": "search",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.9
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "capital of Australia official site site:gov.au OR \"capital of Australia\" \"official\"",
+              "intent": "Find an authoritative (preferably government) source that explicitly states the capital city of Australia",
+              "vector_context": [],
+              "count": 5,
+              "results": [
+                {
+                  "title": "National Capital Authority",
+                  "url": "https://www.nca.gov.au/",
+                  "description": "Canberra, Australia\u2019s National Capital, has a unique purpose, setting, character and symbolism, and it\u2019s important we make sure it continues to do so. ... We invite you to appreciate, celebrate and participate in the National Capital. We acknowledge the Ngunnawal people as traditional custodians of the ACT and recognise any other people or families with connection to the lands of the ACT and region."
+                },
+                {
+                  "title": "Australian Capital Territory (Canberra) | Study Australia",
+                  "url": "https://www.studyaustralia.gov.au/en/life-in-australia/locations-in-australia/australian-capital-territory-canberra",
+                  "description": "As Australia&#x27;s capital, Canberra boasts some of the country\u2019s preeminent educational and cultural institutions."
+                },
+                {
+                  "title": "Founding of Canberra | National Museum of Australia",
+                  "url": "https://www.nma.gov.au/defining-moments/resources/founding-of-canberra",
+                  "description": "In addition to these featured moments of the Defining Moments in Australian History project, the public have nominated the swearing in of Australia\u2019s first female Prime Minister by the first female Governor General, which took place in Government House at Yarralumla in 2010 as a defining moment in our history. Canberra is likely to continue rousing strong feelings. It is, after all, the seat of national government. But is also a growing place, changing through generations, and it will continue to evolve and reflect both its role as the capital of Australia and a city that many people love to call home."
+                },
+                {
+                  "title": "History of the National Capital | National Capital Authority",
+                  "url": "https://www.nca.gov.au/discover-and-learn/history-national-capital",
+                  "description": "Section 125 of the new Australian Constitution states that the Seat of Government will &#x27;be in the State of <strong>New South Wales</strong>, and be distant not less than one hundred miles from Sydney&#x27;. February 1902: First of several tours by Members of the House of Representatives and Senators of potential ..."
+                },
+                {
+                  "title": "Canberra, the Seat of Government | National Capital Authority",
+                  "url": "https://www.nca.gov.au/education/canberras-history/canberra-seat-government",
+                  "description": "As the centre of national politics, Canberra also houses the national headquarters of each of the major political parties, as well as organised national groups such as the National Farmers Federation and the Returned &amp; Services League. <strong>Canberra is not only the national capital</strong> but, as the ..."
+                }
+              ]
+            }
+          },
+          "parent_id": "7fa40e8b-59af-4c7c-9004-b1eeb6897cbf",
+          "parent_ids": [
+            "7fa40e8b-59af-4c7c-9004-b1eeb6897cbf"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.9,
+          "memo_key": null
+        },
+        "7c09ea57-9ca2-44bc-a1f8-29bd15c6b83f": {
+          "node_id": "7c09ea57-9ca2-44bc-a1f8-29bd15c6b83f",
+          "title": "Visit an official Australian government page to confirm and extract the capital city and cite the URL",
+          "details": {
+            "url": "https://www.australia.gov.au/about-australia/our-country",
+            "intent": "Confirm the capital city of Australia on an official government page and extract the exact phrasing and URL for citation",
+            "action": "visit",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.98
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://www.australia.gov.au/about-australia/our-country",
+              "intent": "Confirm the capital city of Australia on an official government page and extract the exact phrasing and URL for citation",
+              "vector_context": [],
+              "content": "Find government payments and services | myGov\nSkip to main content\nBrowse\nSearch\nMenu\nHelp\nRaising kids\nLiving arrangements\nAgeing\nWork\nEducation\nHealth and disability\nHome\nFind government payments and services\nAbout myGov\nHelp using myGov\nContact us\nShare feedback\nmyGov User Audit\nRaising kids\nLiving arrangements\nAgeing\nWork\nEducation\nHealth and disability\nTerms of use\nPrivacy and security\nCopyright\nAccessibility\nLanguages",
+              "content_is_truncated": false,
+              "content_total_chars": 427,
+              "links": [
+                "#main",
+                "/en",
+                "/en/services",
+                "/en/search",
+                "/en/about/help",
+                "/en/services/raising-kids",
+                "/en/services/living-arrangements",
+                "/en/services/ageing",
+                "/en/services/work",
+                "/en/services/education",
+                "/en/services/health-and-disability",
+                "/en",
+                "/en/services/raising-kids",
+                "/en/services/living-arrangements",
+                "/en/services/ageing",
+                "/en/services/work",
+                "/en/services/education",
+                "/en/services/health-and-disability",
+                "/content/mygov/en/about",
+                "/content/mygov/en/about/help"
+              ]
+            }
+          },
+          "parent_id": "7fa40e8b-59af-4c7c-9004-b1eeb6897cbf",
+          "parent_ids": [
+            "7fa40e8b-59af-4c7c-9004-b1eeb6897cbf"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.98,
+          "memo_key": null
+        },
+        "3bb9a427-1e4c-4469-a663-66667ca43d0e": {
+          "node_id": "3bb9a427-1e4c-4469-a663-66667ca43d0e",
+          "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "3bb9a427-1e4c-4469-a663-66667ca43d0e",
+              "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.6
+            }
+          },
+          "parent_id": "7fa40e8b-59af-4c7c-9004-b1eeb6897cbf",
+          "parent_ids": [
+            "7fa40e8b-59af-4c7c-9004-b1eeb6897cbf"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.6,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 74,
+        "words": 9,
+        "kilobytes": 0.07
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 23296,
+          "words": 2700,
+          "kilobytes": 22.75,
+          "tokens": 5858
+        },
+        "completion": {
+          "chars": 1445,
+          "words": 153,
+          "kilobytes": 1.41,
+          "tokens": 3091
+        },
+        "total_tokens": 8949
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 5,
+        "chars": 2377,
+        "words": 320,
+        "kilobytes": 2.32
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 44.592933829990216,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 2,
+          "total_duration": 1.3702013789952616,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 2,
+          "total_duration": 1.420732398997643,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 2,
+          "total_duration": 1.1007303980004508,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 0.7086478849960258,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 18
+    },
+    "duration_seconds": 34.55,
+    "telemetry": {
+      "correlation_id": "idea_test_002_gpt-5-mini_20260221_214711",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_214711_002_gpt-5-mini.jsonl",
+      "events_count": 18,
+      "timings_count": 11
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "correct_answer",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Canberra found"
+      },
+      {
+        "check": "url_present",
+        "passed": true,
+        "score": 1.0,
+        "url_count": 1,
+        "reason": "Found 1 URL(s)"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": true,
+    "overall_score": 1.0,
+    "checks_passed": 2,
+    "total_checks": 2,
+    "pass_rate": 1.0
+  }
+}

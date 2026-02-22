@@ -1,0 +1,403 @@
+{
+  "test_metadata": {
+    "test_id": "002",
+    "test_name": "Basic Fact Retrieval",
+    "difficulty_level": "1/10",
+    "category": "Simple Information Retrieval"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "The capital city of Australia is Canberra. Source: https://www.studyaustralia.gov.au/en/life-in-australia/locations-in-australia/australian-capital-territory-canberra",
+      "action_summary": "This answer is based on the Australian government Study Australia page which identifies Canberra as the national capital: https://www.studyaustralia.gov.au/en/life-in-australia/locations-in-australia/australian-capital-territory-canberra",
+      "success": true
+    },
+    "graph": {
+      "root_id": "8c72e7f8-7807-4b78-9659-8b90f84b8d88",
+      "nodes": {
+        "8c72e7f8-7807-4b78-9659-8b90f84b8d88": {
+          "node_id": "8c72e7f8-7807-4b78-9659-8b90f84b8d88",
+          "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+          "details": {
+            "mandate": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "merged_results": [
+              {
+                "node_id": "1a1566cf-4532-47cf-8dc3-ef31e0314a14",
+                "title": "Locate an authoritative Australian government source that states the capital city of Australia",
+                "status": "done",
+                "score": 0.98,
+                "evaluation": {
+                  "score": 0.98
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "capital city of Australia Canberra site:gov.au",
+                  "intent": "find an authoritative Australian government (.gov.au) page that explicitly states the capital city of Australia",
+                  "vector_context": [],
+                  "count": 5,
+                  "results": [
+                    {
+                      "title": "Australian Capital Territory (Canberra) | Study Australia",
+                      "url": "https://www.studyaustralia.gov.au/en/life-in-australia/locations-in-australia/australian-capital-territory-canberra",
+                      "description": "The Australian Capital Territory is home to one of the nation\u2019s most significant cities - Canberra."
+                    },
+                    {
+                      "title": "Founding of Canberra | National Museum of Australia",
+                      "url": "https://www.nma.gov.au/defining-moments/resources/founding-of-canberra",
+                      "description": "On 12 March 1913 the Governor-General\u2019s wife, Lady Denman, announced that Canberra was the name of Australia\u2019s new national capital. Just as construction of the city got underway, Canberra\u2019s development was delayed by both world wars and the Great Depression."
+                    },
+                    {
+                      "title": "The Siting and Naming of Canberra | National Capital Authority",
+                      "url": "https://www.nca.gov.au/education/canberras-history/siting-and-naming-canberra",
+                      "description": "In October 1908, the Seat of Government Bill, confirming Yass-Canberra as the nation\u2019s capital, was passed by the Parliament. Surveyor Charles Scrivener was instructed to find an attractive setting for \u2018a beautiful city \u2026 embracing distinctive features \u2026 worthy of the object, not only for the present but for all time\u2019. In a bold move, the Government conducted an international competition for the design of the capital which entrants were told would be the \u2018official and social centre of Australia\u2019."
+                    },
+                    {
+                      "title": "Canberra, the Seat of Government | National Capital Authority",
+                      "url": "https://www.nca.gov.au/education/canberras-history/canberra-seat-government",
+                      "description": "As the centre of national politics, Canberra also houses the national headquarters of each of the major political parties, as well as organised national groups such as the National Farmers Federation and the Returned &amp; Services League. <strong>Canberra is not only the national capital</strong> but, as the ..."
+                    },
+                    {
+                      "title": "Establishing the nation's capital - ACT Legislative Assembly",
+                      "url": "https://www.parliament.act.gov.au/visit-and-learn/learn/resources/fs/establishing-the-nations-capital",
+                      "description": "The city\u2019s name, Canberra, was announced in 1913. It was already the area\u2019s local name, likely an English spelling of a Ngunnawal word for \u2018meeting place\u2019. Construction on the new capital began soon after it was officially named."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "05926c9f-676c-494c-a3f0-daa0a4e8d048",
+                "title": "Find an alternative authoritative source (Britannica or CIA World Factbook) confirming the capital",
+                "status": "done",
+                "score": 0.92,
+                "evaluation": {
+                  "score": 0.92
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "capital of Australia Canberra site:britannica.com OR site:cia.gov OR \"Australia\" \"capital\" \"Canberra\"",
+                  "intent": "find an alternative authoritative source (Encyclopaedia Britannica, CIA World Factbook, or similar) that confirms Canberra as Australia's capital",
+                  "vector_context": [],
+                  "count": 5,
+                  "results": [
+                    {
+                      "title": "Canberra | History, Map, Population, Climate, & Facts | Britannica",
+                      "url": "https://www.britannica.com/place/Canberra",
+                      "description": "Canberra, <strong>federal capital of the Commonwealth of Australia</strong>. It occupies part of the Australian Capital Territory, in southern Australia, and is about 150 miles (240 km) southwest of Sydney."
+                    },
+                    {
+                      "title": "Canberra - Kids | Britannica Kids | Homework Help",
+                      "url": "https://kids.britannica.com/kids/article/Canberra/345881",
+                      "description": "<strong>Canberra is the capital of the country of Australia</strong>. The city is also the center of a district called the Australian Capital Territory. Canberra lies at the foot of the Australian Alps mountain range. The Molonglo River flows through the city."
+                    },
+                    {
+                      "title": "Australian Capital Territory (A.C.T.) | Flag, Facts, Maps, & Points of Interest | Britannica",
+                      "url": "https://www.britannica.com/place/Australian-Capital-Territory",
+                      "description": "Australian Parliament House; Museum ... ... <strong>Australian Capital Territory (A.C.T.), political entity of the Commonwealth of Australia consisting of Canberra, the national and territorial capital, and surrounding land</strong>..."
+                    },
+                    {
+                      "title": "Australia | History, Cities, Population, Capital, Map, & Facts | Britannica",
+                      "url": "https://www.britannica.com/place/Australia",
+                      "description": "Australia, the smallest continent and one of the largest countries on Earth, lying between the Pacific and Indian oceans in the Southern Hemisphere. Australia\u2019s capital is Canberra, located in the southeast between the larger and more important economic and cultural centres of Sydney and Melbourne."
+                    },
+                    {
+                      "title": "Australian Capital Territory - Kids | Britannica Kids | Homework Help",
+                      "url": "https://kids.britannica.com/kids/article/Australian-Capital-Territory/487556",
+                      "description": "<strong>The Australian Capital Territory</strong> is a region in Australia that includes the country\u2019s capital city of Canberra. It is surrounded by the state of New South Wales. Geography\u2026"
+                    }
+                  ]
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 2,
+              "success": 2,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "1a1566cf-4532-47cf-8dc3-ef31e0314a14",
+            "05926c9f-676c-494c-a3f0-daa0a4e8d048",
+            "730b6e26-3d51-46df-8c25-5a74988d633c"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "1a1566cf-4532-47cf-8dc3-ef31e0314a14": {
+          "node_id": "1a1566cf-4532-47cf-8dc3-ef31e0314a14",
+          "title": "Locate an authoritative Australian government source that states the capital city of Australia",
+          "details": {
+            "query": "capital city of Australia Canberra site:gov.au",
+            "intent": "find an authoritative Australian government (.gov.au) page that explicitly states the capital city of Australia",
+            "count": 5,
+            "action": "search",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.96
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "capital city of Australia Canberra site:gov.au",
+              "intent": "find an authoritative Australian government (.gov.au) page that explicitly states the capital city of Australia",
+              "vector_context": [],
+              "count": 5,
+              "results": [
+                {
+                  "title": "Australian Capital Territory (Canberra) | Study Australia",
+                  "url": "https://www.studyaustralia.gov.au/en/life-in-australia/locations-in-australia/australian-capital-territory-canberra",
+                  "description": "The Australian Capital Territory is home to one of the nation\u2019s most significant cities - Canberra."
+                },
+                {
+                  "title": "Founding of Canberra | National Museum of Australia",
+                  "url": "https://www.nma.gov.au/defining-moments/resources/founding-of-canberra",
+                  "description": "On 12 March 1913 the Governor-General\u2019s wife, Lady Denman, announced that Canberra was the name of Australia\u2019s new national capital. Just as construction of the city got underway, Canberra\u2019s development was delayed by both world wars and the Great Depression."
+                },
+                {
+                  "title": "The Siting and Naming of Canberra | National Capital Authority",
+                  "url": "https://www.nca.gov.au/education/canberras-history/siting-and-naming-canberra",
+                  "description": "In October 1908, the Seat of Government Bill, confirming Yass-Canberra as the nation\u2019s capital, was passed by the Parliament. Surveyor Charles Scrivener was instructed to find an attractive setting for \u2018a beautiful city \u2026 embracing distinctive features \u2026 worthy of the object, not only for the present but for all time\u2019. In a bold move, the Government conducted an international competition for the design of the capital which entrants were told would be the \u2018official and social centre of Australia\u2019."
+                },
+                {
+                  "title": "Canberra, the Seat of Government | National Capital Authority",
+                  "url": "https://www.nca.gov.au/education/canberras-history/canberra-seat-government",
+                  "description": "As the centre of national politics, Canberra also houses the national headquarters of each of the major political parties, as well as organised national groups such as the National Farmers Federation and the Returned &amp; Services League. <strong>Canberra is not only the national capital</strong> but, as the ..."
+                },
+                {
+                  "title": "Establishing the nation's capital - ACT Legislative Assembly",
+                  "url": "https://www.parliament.act.gov.au/visit-and-learn/learn/resources/fs/establishing-the-nations-capital",
+                  "description": "The city\u2019s name, Canberra, was announced in 1913. It was already the area\u2019s local name, likely an English spelling of a Ngunnawal word for \u2018meeting place\u2019. Construction on the new capital began soon after it was officially named."
+                }
+              ]
+            }
+          },
+          "parent_id": "8c72e7f8-7807-4b78-9659-8b90f84b8d88",
+          "parent_ids": [
+            "8c72e7f8-7807-4b78-9659-8b90f84b8d88"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.96,
+          "memo_key": null
+        },
+        "05926c9f-676c-494c-a3f0-daa0a4e8d048": {
+          "node_id": "05926c9f-676c-494c-a3f0-daa0a4e8d048",
+          "title": "Find an alternative authoritative source (Britannica or CIA World Factbook) confirming the capital",
+          "details": {
+            "query": "capital of Australia Canberra site:britannica.com OR site:cia.gov OR \"Australia\" \"capital\" \"Canberra\"",
+            "intent": "find an alternative authoritative source (Encyclopaedia Britannica, CIA World Factbook, or similar) that confirms Canberra as Australia's capital",
+            "count": 5,
+            "action": "search",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.92
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "capital of Australia Canberra site:britannica.com OR site:cia.gov OR \"Australia\" \"capital\" \"Canberra\"",
+              "intent": "find an alternative authoritative source (Encyclopaedia Britannica, CIA World Factbook, or similar) that confirms Canberra as Australia's capital",
+              "vector_context": [],
+              "count": 5,
+              "results": [
+                {
+                  "title": "Canberra | History, Map, Population, Climate, & Facts | Britannica",
+                  "url": "https://www.britannica.com/place/Canberra",
+                  "description": "Canberra, <strong>federal capital of the Commonwealth of Australia</strong>. It occupies part of the Australian Capital Territory, in southern Australia, and is about 150 miles (240 km) southwest of Sydney."
+                },
+                {
+                  "title": "Canberra - Kids | Britannica Kids | Homework Help",
+                  "url": "https://kids.britannica.com/kids/article/Canberra/345881",
+                  "description": "<strong>Canberra is the capital of the country of Australia</strong>. The city is also the center of a district called the Australian Capital Territory. Canberra lies at the foot of the Australian Alps mountain range. The Molonglo River flows through the city."
+                },
+                {
+                  "title": "Australian Capital Territory (A.C.T.) | Flag, Facts, Maps, & Points of Interest | Britannica",
+                  "url": "https://www.britannica.com/place/Australian-Capital-Territory",
+                  "description": "Australian Parliament House; Museum ... ... <strong>Australian Capital Territory (A.C.T.), political entity of the Commonwealth of Australia consisting of Canberra, the national and territorial capital, and surrounding land</strong>..."
+                },
+                {
+                  "title": "Australia | History, Cities, Population, Capital, Map, & Facts | Britannica",
+                  "url": "https://www.britannica.com/place/Australia",
+                  "description": "Australia, the smallest continent and one of the largest countries on Earth, lying between the Pacific and Indian oceans in the Southern Hemisphere. Australia\u2019s capital is Canberra, located in the southeast between the larger and more important economic and cultural centres of Sydney and Melbourne."
+                },
+                {
+                  "title": "Australian Capital Territory - Kids | Britannica Kids | Homework Help",
+                  "url": "https://kids.britannica.com/kids/article/Australian-Capital-Territory/487556",
+                  "description": "<strong>The Australian Capital Territory</strong> is a region in Australia that includes the country\u2019s capital city of Canberra. It is surrounded by the state of New South Wales. Geography\u2026"
+                }
+              ]
+            }
+          },
+          "parent_id": "8c72e7f8-7807-4b78-9659-8b90f84b8d88",
+          "parent_ids": [
+            "8c72e7f8-7807-4b78-9659-8b90f84b8d88"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.92,
+          "memo_key": null
+        },
+        "730b6e26-3d51-46df-8c25-5a74988d633c": {
+          "node_id": "730b6e26-3d51-46df-8c25-5a74988d633c",
+          "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "730b6e26-3d51-46df-8c25-5a74988d633c",
+              "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.88
+            }
+          },
+          "parent_id": "8c72e7f8-7807-4b78-9659-8b90f84b8d88",
+          "parent_ids": [
+            "8c72e7f8-7807-4b78-9659-8b90f84b8d88"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.88,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 166,
+        "words": 9,
+        "kilobytes": 0.16
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 24596,
+          "words": 2877,
+          "kilobytes": 24.02,
+          "tokens": 6193
+        },
+        "completion": {
+          "chars": 1548,
+          "words": 139,
+          "kilobytes": 1.51,
+          "tokens": 3252
+        },
+        "total_tokens": 9445
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 10,
+        "chars": 3967,
+        "words": 500,
+        "kilobytes": 3.87
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 61.85044777600706,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 2,
+          "total_duration": 1.1386482820016681,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 2,
+          "total_duration": 1.2041205880013877,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 2,
+          "total_duration": 1.203753661000519,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "search": {
+          "count": 2,
+          "total_duration": 1.2119849219961907,
+          "success_count": 2,
+          "error_count": 0
+        }
+      },
+      "events_count": 20
+    },
+    "duration_seconds": 49.61,
+    "telemetry": {
+      "correlation_id": "idea_test_002_gpt-5-mini_20260221_195756",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_195756_002_gpt-5-mini.jsonl",
+      "events_count": 20,
+      "timings_count": 12
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "correct_answer",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Canberra found"
+      },
+      {
+        "check": "url_present",
+        "passed": true,
+        "score": 1.0,
+        "url_count": 1,
+        "reason": "Found 1 URL(s)"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": true,
+    "overall_score": 1.0,
+    "checks_passed": 2,
+    "total_checks": 2,
+    "pass_rate": 1.0
+  }
+}

@@ -1,0 +1,128 @@
+Idea Test Protocol: Progressive Complexity Suite
+
+Test 1: Conflicting Information Resolution with Citations
+Task Statement
+"Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why."
+
+Required Deliverables
+- Three distinct population figures from different source types
+- Date of data for each source
+- Direct citation URL for each source
+- Analysis of discrepancies
+- Explanation of which figure is most accurate and why
+- At least 3 distinct citations
+
+Success Criteria
+- At least 5 search actions executed
+- Three different source types identified (government, news, research)
+- Each source has population figure, date, and URL
+- Discrepancy analysis is present and coherent
+- At least 3 distinct authoritative sources cited
+- URLs are valid and accessible
+- Analysis demonstrates understanding of data reliability
+
+---
+
+Test 2: Esoteric Technical Specification
+Task Statement
+"Find the exact technical specifications for the USB-C connector's power delivery protocol version 3.1, including: maximum power wattage, voltage ranges supported, and the specific revision number of the PD specification document. Also find one real-world product that implements this exact specification and cite where the manufacturer confirms this. Provide direct links to the official specification document and the product page."
+
+Required Deliverables
+- Maximum power wattage for USB-C PD 3.1
+- Voltage ranges supported
+- Exact PD specification revision number
+- One real product implementing PD 3.1
+- Manufacturer confirmation of PD 3.1 implementation
+- Link to official specification document
+- Link to product page
+- At least 4 distinct citations
+
+Success Criteria
+- At least 6 search actions executed
+- Technical specifications are precise and accurate
+- Official specification document is cited
+- Real product is identified with manufacturer confirmation
+- All required technical details present
+- At least 4 distinct sources cited (spec doc, manufacturer, product page, technical reference)
+- Information demonstrates deep technical research
+
+---
+
+Test 3: Social Media Platform User Activity Analysis
+Task Statement
+"Go to a specific social media platform (Reddit, Twitter/X, or LinkedIn) and find a recent discussion thread (from the past 7 days) about 'quantum computing breakthroughs in 2024'. Identify: (1) The platform and specific thread URL, (2) At least 3 different users who commented, (3) What each user said (quote their key points), (4) One user's professional background if available, and (5) Any links or sources they shared. Cite the exact thread URL and quote the users accurately."
+
+Required Deliverables
+- Platform name and thread URL
+- At least 3 different usernames
+- Quoted key points from each user
+- One user's professional background
+- Links/sources shared by users
+- All information from past 7 days
+- Direct thread URL citation
+
+Success Criteria
+- At least 5 search actions executed
+- Thread is from past 7 days (date verification)
+- At least 3 distinct users identified
+- User quotes are accurate and attributed
+- Professional background found for at least one user
+- Thread URL is valid and accessible
+- Information demonstrates actual platform visit and reading
+- At least 2 distinct sources (platform thread + any shared links)
+
+---
+
+Test 4: Obscure Historical Event with Multiple Perspectives
+Task Statement
+"Find information about the 'Great Emu War' that occurred in Australia. Provide: (1) The exact year it took place, (2) The specific region/location, (3) The number of emus involved (if available), (4) The outcome and why it's considered notable, (5) A quote from a primary source (government document, newspaper article, or official record from that time period), and (6) How modern historians or researchers view this event. Cite at least one primary source and one modern analysis."
+
+Required Deliverables
+- Exact year of the event
+- Specific location/region
+- Number of emus (if documented)
+- Outcome and historical significance
+- Quote from primary source (contemporary document)
+- Modern historical perspective
+- Primary source citation
+- Modern analysis citation
+- At least 4 distinct sources
+
+Success Criteria
+- At least 7 search actions executed
+- Historical facts are accurate and specific
+- Primary source quote is from the time period
+- Modern perspective is included
+- At least one primary source cited (government/newspaper/archive)
+- At least one modern analysis cited
+- Information demonstrates research across time periods
+- At least 4 distinct sources cited
+
+---
+
+Test 5: Multi-Domain Esoteric Knowledge Synthesis
+Task Statement
+"Find and synthesize information about: (1) The exact chemical formula and IUPAC name for the compound used in non-stick cookware coatings (Teflon), (2) The name and location of the company that first commercially produced this material, (3) The year it was first used in cookware, (4) One documented health concern or controversy related to this material, including a specific study or report, and (5) A current alternative material being used and one company that manufactures cookware with this alternative. For each item, provide the specific data, a citation URL, and explain how the information connects to create a complete picture."
+
+Required Deliverables
+- Chemical formula and IUPAC name for Teflon compound
+- Original commercial producer company name and location
+- Year of first cookware use
+- Health concern with specific study/report
+- Current alternative material
+- Company manufacturing alternative cookware
+- Citation URL for each of the 5 items
+- Synthesis explaining connections
+- At least 6 distinct sources
+
+Success Criteria
+- At least 8 search actions executed
+- All 5 items have specific, accurate data
+- Chemical information is precise (formula and IUPAC name)
+- Historical information includes company and location
+- Health concern cites specific study/report
+- Alternative material and company are current/real
+- Each item has a valid citation URL
+- Synthesis demonstrates understanding of connections
+- At least 6 distinct authoritative sources cited
+- Information spans chemistry, history, health, and current products

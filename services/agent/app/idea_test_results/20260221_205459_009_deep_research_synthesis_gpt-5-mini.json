@@ -1,0 +1,859 @@
+{
+  "test_metadata": {
+    "test_id": "009",
+    "test_name": "Deep Research Synthesis",
+    "difficulty_level": "9/10",
+    "category": "Deep Research & Synthesis"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Narrative: The Piltdown Man hoax \u2014 discovery, detection, attribution, and lessons for scientific self-correction\n\n1) Original discovery claims (1912\u000213)\n- In 1912 amateur antiquarian Charles Dawson (with support from Sir Arthur Smith Woodward of the British Museum) announced the discovery of fossil material from a gravel pit near Piltdown, Sussex, presented as a new early human: Eoanthropus dawsoni, the \"Piltdown Man.\" The find was unveiled at a meeting of the Geological Society of London on 18 December 1912 and widely reported in contemporary accounts (e.g., Britannica; Natural History Museum) (sources: https://www.britannica.com/topic/Piltdown-man; https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html).  \n\n2) Why the find mattered then\n- The Piltdown remains (a fragmentary cranium and an ape-like jaw with teeth) appeared to match a then-prevalent expectation for an early human with a large braincase and primitive jaw. That morphological fit, along with Dawson\u0019s reputation as a productive local finder, led many British scientists to accept the material as genuine and important (source: https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html).  \n\n3) Scientific methods used to expose the fraud (1950s) \n- Renewed scientific testing in the late 1940s and early 1950s applied chemical and microscopic methods that were then new or newly refined. The key work was the multidisciplinary re-evaluation by Kenneth P. Oakley, Joseph S. Weiner, and Wilfrid Le Gros Clark, summarized in the 1953 report \"The Solution of the Piltdown Problem\" (Bulletin of the British Museum (Natural History), Geology, 1953). Their tests and findings included:  \n  - Fluorine absorption and nitrogen/content tests showing inconsistent and recent dates for different Piltdown pieces (fluorine dating can indicate relative burial duration) (evidence overview: https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/; historical summary: https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n  - Direct drilling/drilled sections that showed the dark brown staining on the jaw was superficial (applied after burial) whereas the cranial stains were different in character (source: https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n  - Microscopic examination of tooth surfaces that revealed file marks and cut marks: the molars had been artificially worn or \"filed\" to make them look human, and the jaw bears tool marks (source: https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html; summary of the 1953 expos\u0000E9: https://www.theguardian.com/science/2023/nov/23/piltdown-man-remains-exposed-as-fake-1953).  \n  - X-ray and chemical evidence that the jaw was from an orangutan while cranial pieces were from modern humans; parts had been artificially stained and had residues consistent with recent modification (1953 team conclusions; historical summaries: https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/; https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n- The combined, converging results led the team to conclude that the Piltdown assemblage was a deliberate forgery (primary report referenced in historical overviews: https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/; further contemporary coverage: https://www.theguardian.com/science/2023/nov/23/piltdown-man-remains-exposed-as-fake-1953).  \n\n4) Timeline (concise)\n- 1908\u00021912: Dawson reports various \"finds\" in Sussex; in 1912 he writes to Woodward about discoveries; excavation and recovery of fragments take place that year (see NHM, BBC history) (https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html; https://www.bbc.co.uk/history/ancient/archaeology/piltdown_man_01.shtml).  \n- 18 Dec 1912: Formal announcement at the Geological Society of London; subsequent publicity in 1913 (sources: https://www.britannica.com/topic/Piltdown-man).  \n- 1913\u00021930s: Piltdown accepted by many, debated by others as new hominid finds elsewhere (e.g., African fossils) increasingly conflicted with Piltdown's morphology (summary: https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n- 1949\u00021953: Oakley, Weiner, and Le Gros Clark carry out chemical and microscopic tests; in 1953 they publish the decisive demonstration that the specimens were falsified (historical overview and primary 1953 study cited in museum and history sources: https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/; https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n- 2009\u0002016: Modern re-analyses using micro-CT scanning, ancient DNA, high-precision measurements, spectroscopy and 3D microscopy further resolve details and attribution, strengthening the case for a single forger (see Royal Society Open Science 2016 and press coverage) (https://royalsocietypublishing.org/doi/10.1098/rsos.160328; https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes).  \n\n5) Identity of perpetrator(s) and motivations (what evidence shows)\n- Historical debate: Over the decades many candidates were proposed (Charles Dawson himself, Arthur Smith Woodward, Martin Hinton, Pierre Teilhard de Chardin, Arthur Conan Doyle, among others). Contemporary writers and commentators advanced various theories but consensus was lacking for decades (surveys of suspects and debate: https://www.theguardian.com/science/2012/feb/05/piltdown-man-archaeologys-greatest-hoax; https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n- Modern forensic re-examination (2016): An interdisciplinary team led by Isabelle De Groote applied modern morphological and genetic techniques to the original Piltdown collections and concluded the assemblage was most consistent with a single forger who used one orangutan specimen (for the jaw/teeth) and at least two modern human crania for the skull fragments. The team identified consistent treatment (staining, filing, repairs) across specimens, and linked specific Piltdown pieces to Dawson by provenance and to an operation feasible for a single operator. They concluded Charles Dawson is the most likely single perpetrator, though a small residual uncertainty remains and absolute proof beyond reasonable doubt is difficult because Dawson is deceased and documentary evidence is limited (Royal Society Open Science 2016; Natural History Museum summary; Science coverage) (https://royalsocietypublishing.org/doi/10.1098/rsos.160328; https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html; https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes).  \n- Motive: Historians and analysts point to a likely motive of ambition and desire for recognition. Dawson had produced many local finds and apparently sought professional validation; some accounts suggest he may have wished election to learned societies (e.g., the Royal Society) and sought to place Britain prominently in the story of human origins. Modern investigators and historians present this as the plausible motive, but admit that definitive proof of motive is inferential rather than documented (interpretive synthesis: https://www.scientificamerican.com/article/solving-the-piltdown-man-scientific-fraud/; museum/press summaries: https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html).  \n\n6) Modern scientific techniques that would have detected the forgery immediately\n- Techniques now available (and used in recent re-analyses) that would have exposed Piltdown quickly include:  \n  - Radiocarbon (C-14) dating for organic bone/teeth (would show modern age where appropriate);  \n  - Ancient DNA (aDNA) sequencing to identify species and geographic provenance of bone/teeth (recent studies showed the jaw/teeth came from an orangutan) (e.g., Royal Society Open Science, 2016; DNA/paleogenetics review) (https://royalsocietypublishing.org/doi/10.1098/rsos.160328; https://pmc.ncbi.nlm.nih.gov/articles/PMC8167392/).  \n  - Micro-CT scanning and virtual anthropology to identify internal structure, breaks, restorations and repair fillers;  \n  - Scanning electron microscopy (SEM) and high-magnification 3D microscopy to detect filing marks, tool marks and surface modification on teeth and bone;  \n  - Spectroscopic methods (e.g., FTIR, Raman) and elemental/isotopic analysis to detect unnatural staining, consolidation materials, or inconsistencies in diagenetic signatures between items recovered from the same layer;  \n  - Provenance comparisons using morphometrics against large comparative collections.  \n- These methods were applied in the 2009\u0002016 re-analyses and quickly revealed connections among specimens and signs of deliberate alteration that the early 20th-century investigators lacked the tools to recognize (sources: https://royalsocietypublishing.org/doi/10.1098/rsos.160328; https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes; https://pmc.ncbi.nlm.nih.gov/articles/PMC8167392/).  \n\n7) Impact on paleoanthropology and scientific practice\n- Immediate scientific impact: For decades Piltdown complicated interpretation of early human evolution because it supported a misleading model (large-brained, ape-jawed hominid). Discoveries elsewhere (e.g., African australopithecines, Asian Homo erectus) produced patterns inconsistent with Piltdown, but Piltdown's prestige made some scientists hesitate to reject it quickly. Historians argue Piltdown delayed acceptance of the African fossil record in some quarters and created caution about non-replicated or singular finds (historical assessment: https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/; press retrospectives: https://www.theguardian.com/science/2012/feb/05/piltdown-man-archaeologys-greatest-hoax).  \n- Long-term methodological impact: The Piltdown case stimulated the development and wider adoption of objective, reproducible laboratory-based dating and forensic techniques (fluorine dating, radiometric and chemical analyses, microscopic protocols) and reinforced the value of independent testing, cross-disciplinary checks, and skepticism about provenance. The 1953 exposure itself was notable as a multidisciplinary, evidence-focused correction (sources: https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/; https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n\n8) How the Piltdown story illustrates scientific self-correction\n- Stages of self-correction visible in the case:  \n  - Initial claim and conditional acceptance: Dawson\u0019s find matched contemporary expectations, and reputable scientists (e.g., Woodward) endorsed it, illustrating how inference from morphology and authority can produce consensus. Contemporary acceptance was provisional, given available evidence and methods (sources: https://www.britannica.com/topic/Piltdown-man; https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html).  \n  - Persistent anomalies and conflicting data: New fossil discoveries elsewhere and some skeptical commentators raised inconsistencies; anomalies accumulated (source: https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n  - Development and application of new tests: Scientists developed or refined objective chemical and microscopic analyses (fluorine, nitrogen, X-ray, microscopic wear analysis) and applied them to the Piltdown material; these independent, replicable tests undermined the original claim (Oakley, Weiner, Le Gros Clark, 1953: historical overviews: https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/; https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n  - Publication, peer review, and consensus revision: The 1953 results were published and accepted, and the scientific consensus shifted; later, more advanced techniques (CT, aDNA, spectroscopy) allowed deeper resolution and attribution (Royal Society Open Science, 2016) (https://royalsocietypublishing.org/doi/10.1098/rsos.160328).  \n- Lessons: The Piltdown saga shows that scientific knowledge is provisional and subject to correction as new methods and independent tests become available; it underscores the importance of reproducible methods, cross-disciplinary scrutiny, skepticism toward lone, high-impact claims without independent confirmation, and careful curation of provenance. It also shows that science corrects itself through accumulation of independent evidence and methods that can falsify earlier claims, even if that correction is sometimes slow where social prestige or national pride influence reception (interpretive synthesis and historical accounts: https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/; https://www.scientificamerican.com/article/solving-the-piltdown-man-scientific-fraud/).  \n\nPrimary sources and important papers/documents cited here (selected):\n- Oakley, K. P.; Weiner, J. S.; Le Gros Clark, W. E. (1953). \"The Solution of the Piltdown Problem\" (summarized in museum and history sources; the 1953 multidisciplinary report is the decisive mid-20th-century expos\u0000E9) (historical reference and discussion: https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/; broader summary: https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/).  \n- De Groote, I., et al. (2016). \"New genetic and morphological evidence suggests a single hoaxer created 'Piltdown man'\" (Royal Society Open Science). This reanalysis applied micro-CT, ancient DNA, spectroscopy and morphometrics to link specimens and point to Charles Dawson as the most likely single forger (https://royalsocietypublishing.org/doi/10.1098/rsos.160328).  \n- Natural History Museum (collection and historical summaries): https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html.  \n- Overviews and historical context (Science History Institute): https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/; and contemporary press and scholarly summaries such as Science (AAAS) coverage of recent analyses: https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes.  \n\nNotes on limits of evidence and certainty\n- Attribution to Charles Dawson is now widely regarded as most likely based on the 2016 reanalysis, provenance evidence, and Dawson's track record of suspect finds, but absolute, documentary proof (a confession or contemporaneous record explicitly documenting the fraud) is lacking; investigators therefore draw on convergent forensic and historical evidence rather than a single smoking-gun document (Royal Society Open Science 2016; NHM summary) (https://royalsocietypublishing.org/doi/10.1098/rsos.160328; https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html).  \n\nConcluding synthesis\n- Piltdown Man is a canonical case showing how scientific claims can be accepted when they match prevailing expectations and authoritative voices, and how science ultimately corrects itself when independent, reproducible methods are applied. The 1953 multidisciplinary forensic reversal and the 2009\u0002016 re-analyses demonstrate the central role of method (objective testing), replication (multiple labs and techniques), and openness to revision in scientific practice. The case also prompted methodological improvements in paleoanthropology and a more cautious, evidence-driven approach to exceptional claims.\n\nKey links used above:\n- Britannica (Piltdown Man): https://www.britannica.com/topic/Piltdown-man\n- Natural History Museum (Piltdown collections/history): https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html\n- Science History Institute (historical overview): https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/\n- Oakley/Weiner/Le Gros Clark 1953 (discussion and context): https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/\n- Royal Society Open Science (2016 reanalysis): https://royalsocietypublishing.org/doi/10.1098/rsos.160328\n- Science/AAAS coverage of the 2016 study: https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes\n- Paleogenetics review noting reanalysis: https://pmc.ncbi.nlm.nih.gov/articles/PMC8167392/\n- Press retrospectives and discussion of suspects and effects: The Guardian on Piltdown and 2016 forensic work: https://www.theguardian.com/science/2016/aug/10/forensic-examination-reveals-identity-of-piltdown-hoax-prime-suspect-charles-dawson\n\nIf you want, I can:  \n- Extract and quote key passages from the 1953 report and the 2016 Royal Society Open Science paper (provide direct quotations and page references), or  \n- Produce a short timeline handout (one-page) with dates, evidence types, and key actors, or  \n- Provide a bibliography with full citations (authors, titles, journals, years, DOIs) for the primary reports and major secondary studies cited above.",
+      "action_summary": "Charles Dawson and Arthur S. Woodward announced the Piltdown \"missing link\" in December 1912 (Eoanthropus dawsoni). The fossils were accepted by many because they fit prevailing expectations. In 1953 Kenneth Oakley, Joseph Weiner and Wilfrid Le Gros Clark used fluorine/nitrogen tests, X-rays, microscopic examination (showing filed teeth and superficial staining), and comparative anatomy to demonstrate the skull was a composite of a modern human cranium and an orangutan jaw and therefore a deliberate forgery (historical overviews: https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/; https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/). Modern re-analyses (micro-CT, aDNA, spectroscopy, 3D microscopy) published in Royal Society Open Science (2016) link the treated specimens to a single operator and identify Charles Dawson as the most likely forger, though absolute documentary proof is lacking (https://royalsocietypublishing.org/doi/10.1098/rsos.160328; https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html). The case illustrates scientific self-correction: anomalous data prompted the development and application of independent, reproducible tests that overturned a prestigious but false claim and led to stronger forensic standards in paleoanthropology (sources: https://www.britannica.com/topic/Piltdown-man; https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes).",
+      "success": true
+    },
+    "graph": {
+      "root_id": "40dfc918-c283-4d00-906f-20daa40c3ad0",
+      "nodes": {
+        "40dfc918-c283-4d00-906f-20daa40c3ad0": {
+          "node_id": "40dfc918-c283-4d00-906f-20daa40c3ad0",
+          "title": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+          "details": {
+            "mandate": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "expansion_meta": {
+              "execute_all_children": true
+            },
+            "merged_results": [
+              {
+                "node_id": "e9e0800f-0a1d-4153-937c-b8551509a8a5",
+                "title": "Collect primary historical sources and original discovery claims (1912\u20131913): Dawson, Woodward, and early publications",
+                "status": "done",
+                "score": 0.94,
+                "evaluation": {
+                  "score": 0.94
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "Piltdown Man original discovery Charles Dawson 1912 Arthur Smith Woodward 1913 Eoanthropus dawsoni Nature 'Piltdown' 'British Museum' original announcement",
+                  "intent": "find primary publications, museum records, and contemporary newspaper accounts that record the original discovery claims and immediate scientific reception",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "Piltdown Man - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                      "description": "At a meeting of the Geological Society of London on <strong>18 December 1912</strong>, Charles Dawson claimed that a workman at the Piltdown gravel pit had given him a fragment of the skull four years earlier. According to Dawson, workmen at the site discovered the skull shortly before his visit and broke it ..."
+                    },
+                    {
+                      "title": "Folklore, Belief, and the Piltdown Man Hoax | Folklife Today",
+                      "url": "https://blogs.loc.gov/folklife/2016/08/folklore-piltdown-man-hoax/",
+                      "description": "Amateur archaeologist Charles Dawson and palaeontologist Sir Arthur Smith Woodward of the British Museum (now the British Natural History Museum) announced the startling discovery of an ancient human ancestor in Sussex in <strong>December 18, 1912</strong>."
+                    },
+                    {
+                      "title": "The Problem of Piltdown Man | Science History Institute",
+                      "url": "https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/",
+                      "description": "But in the early 1900s, evolution ... \u00b7 Dawson and Woodward\u2019s finds are announced in the Illustrated London News, <strong>December 28, 1912</strong>...."
+                    },
+                    {
+                      "title": "New genetic and morphological evidence suggests a single hoaxer created \u2018Piltdown man\u2019 | Royal Society Open Science",
+                      "url": "https://royalsocietypublishing.org/doi/10.1098/rsos.160328",
+                      "description": "In <strong>December 1912</strong>, palaeontologist Arthur Smith Woodward, Keeper of Geology at the British Museum (Natural History; now the Natural History Museum), and amateur antiquarian and solicitor Charles Dawson announced the sensational discovery of a ..."
+                    },
+                    {
+                      "title": "Piltdown man | Discovery, Fossils, & Facts | Britannica",
+                      "url": "https://www.britannica.com/topic/Piltdown-man",
+                      "description": "Dawson took the specimens to Arthur Smith Woodward, keeper of the British Museum\u2019s paleontology department, who announced the find at a meeting of the Geological Society of London on <strong>December 18, 1912</strong>."
+                    },
+                    {
+                      "title": "Piltdown Man | Natural History Museum",
+                      "url": "https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html",
+                      "description": "Piltdown Man cranium and mandible as reconstructed by Dr Arthur Smith Woodward (L) and Professor Arthur Keith (R) In 1912 Charles Dawson, an amateur archaeologist claimed to have discovered the \u2018missing link\u2019 between ape and man."
+                    },
+                    {
+                      "title": "BBC - History - Ancient History in depth: Piltdown Man: Britain's Greatest Hoax",
+                      "url": "https://www.bbc.co.uk/history/ancient/archaeology/piltdown_man_01.shtml",
+                      "description": "Charles Dawson had made a name for himself by finding fossils in Sussex, and passing them on to Sir Arthur Smith Woodward at what is now the Natural History Museum, London. On <strong>14 February 1912</strong>, he wrote to Woodward with news of exciting discoveries, and that summer Woodward joined him to excavate ..."
+                    },
+                    {
+                      "title": "Piltdown Man hoax findings: Charles Dawson the likely fraudster | Natural History Museum",
+                      "url": "https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html",
+                      "description": "Between 1912 and 1914, two men ... evolutionary link between apes and humans. <strong>Palaeontologist Arthur Smith Woodward and amateur antiquarian Charles Dawson presented the skull of so-called Piltdown Man, dubbed Eoanthropus dawsoni</strong>...."
+                    },
+                    {
+                      "title": "Today in History December 18 | Piltdown Man | Britannica",
+                      "url": "https://www.britannica.com/topic/December-18-Piltdown-Man-Hoax",
+                      "description": "<strong>Woodward debuted the bones of what he believed to be a previously unknown extinct hominin</strong> (Eoanthropus dawsoni), asserting that they represented the long-sought missing evolutionary link between apes and humans."
+                    },
+                    {
+                      "title": "Charles Dawson - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Charles_Dawson",
+                      "description": "His most famous &quot;find&quot; was the <strong>1912 discovery of the Piltdown Man which was billed as the &quot;missing link&quot; between humans and other great apes</strong>. Following his death in 1916, no further &quot;discoveries&quot; were made at Piltdown."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "06bb7e8f-d0a1-4f0e-89a8-b1e451b297bb",
+                "title": "Assemble scientific investigations that exposed the hoax (methods and evidence)",
+                "status": "done",
+                "score": 0.96,
+                "evaluation": {
+                  "score": 0.96
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "1953 Piltdown fluorine test Oakley Weiner le Gros Clark Nature 1953 'Piltdown' 'fluorine dating' 'filed teeth' 'microscopic analysis' 'chemical tests' 'Weiner Oakley le Gros Clark 1953'",
+                  "intent": "locate the scientific papers and technical reports that demonstrated the Piltdown fossils were forgeries, including descriptions of tests (fluorine, nitrogen, chemical, microscopic) and the direct physical evidence",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "Kenneth Oakley - Linda Hall Library",
+                      "url": "https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/",
+                      "description": "The Piltdown I mandible, with two molars intact, photograph, plate in &quot;The solution to the Piltdown problem,\u201d by Joseph S. Weiner, Kenneth P. Oakley, Wilfrid Le Gros Clark, Bulletin of the British Museum (Natural History), Geology, vol. 2, 1953 (Linda Hall Library) In 1949, Oakley was given permission to test the Piltdown fragments, as some had suspected that the skull fragments and the jawbone were of different ages. Oakley found that they had the same level of fluorine, so they were of approximately the same age."
+                    },
+                    {
+                      "title": "The Problem of Piltdown Man | Science History Institute",
+                      "url": "https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/",
+                      "description": "<strong>By drilling into the jaw fragment, Oakley and Weiner discovered that the discoloration on the jaw, originally used as evidence of its 500,000-year age, was superficial</strong>. By contrast, the cranial fragments had a deeper, naturally occurring stain, ..."
+                    },
+                    {
+                      "title": "Today in history: November 21 - by Andrew Chapman",
+                      "url": "https://www.gethistories.com/p/today-in-history-november-21",
+                      "description": "On November 21 1953, Joseph Weiner, Kenneth Oakley and Wilfrid Le Gros Clark published \u2018<strong>The Solution of the Piltdown Problem</strong>\u2019 in the Bulletin of the British Museum (Natural History), Geology, using fluorine testing, nitrogen content, microscopic ..."
+                    },
+                    {
+                      "title": "Skullduggery: Is the Identity of the Piltdown Forger and His Methods Close to Full Exposure? - The Leakey Foundation",
+                      "url": "https://leakeyfoundation.org/skullduggery-is-the-identity-of-the-piltdown-forger-and-his-methods-close-to-full-exposure/",
+                      "description": "That very same year, Kenneth Oakley (1848), who had revived the application of the Fluorine Dating technique, applied the analysis to the Piltdown remains. The results, showing oddly low levels of Fluorine adsorption in the skull and jaw compared to the faunal remains aroused the attention of Joseph Weiner of Oxford University. He contacted Kenneth Oakley with his concerns of a possible fraud and they assembled a team of specialists from London\u2019s Natural History Museum and Oxford University to careful reexamine the remains. In 1953, in the same Burlington Hall theater were Eoanthropus was originally announced they showed the find was a cleverly assembled fake, combining a Medieval-era human skull with the jaw of an orangutan, and planted with appropriately aged fauna- all artificially stained to resemble the Piltdown gravels."
+                    },
+                    {
+                      "title": "Piltdown Man | Natural History Museum",
+                      "url": "https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html",
+                      "description": "Their results showed that the skull and jaw fragments actually came from two different species, a human and an ape, probably an orangutan. <strong>Scratches on the surfaces of the teeth, visible under the microscope, revealed that the teeth had been filed down to make them look human</strong>."
+                    },
+                    {
+                      "title": "Piltdown Man - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                      "description": "In the early 1950s, Kenneth Oakley, Wilfrid Le Gros Clark, and Joseph Weiner, scientists at the British Museum, developed a new technique for dating fossils called <strong>fluorine absorption dating</strong>."
+                    },
+                    {
+                      "title": "Piltdown Man remains exposed as fake \u2013 archive, 1953 | Archaeology | The Guardian",
+                      "url": "https://www.theguardian.com/science/2023/nov/23/piltdown-man-remains-exposed-as-fake-1953",
+                      "description": "Recent improvements in the technique of fluorine analysis made possible some of the tests which led three scientists to conclude that <strong>the mandible and canine tooth of the \u201cPiltdown skull\u201d were \u201cdeliberate fakes.\u201d</strong> The report of the three ..."
+                    },
+                    {
+                      "title": "How the Piltdown Man skull became the greatest hoax in anthropology - History Skills",
+                      "url": "https://www.historyskills.com/classroom/ancient-history/piltdown-man/",
+                      "description": "The <strong>more fluorine that was</strong> found in a bone, the longer it has thought to have been in the ground. The breakthrough happened when scientists Kenneth Oakley, Wilfrid Le Gros Clark and Joseph Weiner applied this test to the Piltdown Man remains."
+                    },
+                    {
+                      "title": "Expos\u00e9 1953-1955",
+                      "url": "http://www2.clarku.edu/~piltdown/map_expose/espose_lvl1.html",
+                      "description": "Nature (January 1979)K. P. Oakley. Piltdown man Letter to New Scientist (Nov. 1981)J. S. Weiner and the exposure of the Piltdown forgery Antiquity (1983)Committing the investigation1 fluorine analysis 2 radioactivity of elephant tooth fragment 3 examination of cricket bat - cut after fossilization (authentic ancestor would have been unable to do this, though able to cut femur bone) 4 microscope on molar occlusion \u0097 see file marks 5 hand to hold skull fragments \u0097 heavy --- jaw light 6 examination for carbon \u0097 nothing in skull, still there in bony jaw 7 x\u0097ray canine tooth -\u0097 find alloy at tip \u0097 old surface, young root Vandyke brownVIII Commentary on Expos\u00e9 Scientific and popularMichael Hammond."
+                    },
+                    {
+                      "title": "JS Weiner and the exposure of the Piltdown forgery",
+                      "url": "https://www2.clarku.edu/faculty/djoyce/piltdown/map_expose/jswein_and_expose_pilt.html",
+                      "description": "He was able to get permission to drill [48] much more bone than had previously been allowed and undertook the second set of fluorine tests. These showed exactly what Weiner had predicted: that the cranium and jaw were of different, though recent dates. Weiner acknowledges that, &#x27;Kenneth Oakley soon took the view that everything (from the Piltdown sites) was probably fraudulent and made it his business to study the eoliths, the other flints, and the so-called bone implement and he was able to prove that these had all been artificially stained and that the bone implement had been fashioned with a metal knife."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "91cfc85f-ee4b-4b6f-802b-1eaa6bdb87fa",
+                "title": "Investigate suspects, motives, and timeline of the forgery and scholarly debate about perpetrators",
+                "status": "done",
+                "score": 0.9,
+                "evaluation": {
+                  "score": 0.9
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "Who forged Piltdown Man Charles Dawson suspect evidence motives later forensic studies 'forgery suspects' 'Piltdown Dawson evidence' 'Conan Doyle' 'Teilhard de Chardin' 'Miles Russell' 'recent investigations'",
+                  "intent": "gather scholarly analyses, forensic studies, and historical investigations that assess likely perpetrator(s), proposed motives, and the evolving timeline of attribution and debate",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "Piltdown Man - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                      "description": "The focus on Dawson as the main ... Russell of Bournemouth University analysed Dawson&#x27;s antiquarian collection, and determined that <strong>at least 38 of his specimens were fakes</strong>...."
+                    },
+                    {
+                      "title": "Study reveals culprit behind Piltdown Man, one of science's most famous hoaxes | Science | AAAS",
+                      "url": "https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes",
+                      "description": "Francis Thackeray, a paleoanthropologist at the University of the Witwatersrand in Johannesburg, South Africa, says he &quot;strongly suspects&quot; Teilhard de Chardin was in on the hoax. Teilhard de Chardin was known as a bit of a prankster, he says. &quot;My view is that Teilhard [de Chardin] was an adviser to Dawson, and that the motive behind the forgery was that it was initially a joke against [Smith] Woodward,&quot; Thackeray says. &quot;It was a joke that went seriously wrong.&quot; Dawson&#x27;s calculated chicanery underscores why studying Piltdown Man is still important to modern science, De Groote says."
+                    },
+                    {
+                      "title": "Solving the Piltdown Man Scientific Fraud | Scientific American",
+                      "url": "https://www.scientificamerican.com/article/solving-the-piltdown-man-scientific-fraud/",
+                      "description": "Our own library and archival research has shown that Dawson was responsible for at least 38 forgeries (for example, the Roman inscribed tiles from Pevensey and a statuette excavated by Dawson during the late 1800s were found to be fakes too) . It has been suggested that his motive was scientific recognition and, in particular, his ambition to be elected a fellow of the Royal Society. Dawson wrote more than 50 publications but none up until Piltdown appears to have greatly furthered his career."
+                    },
+                    {
+                      "title": "Piltdown Man hoax findings: Charles Dawson the likely fraudster | Natural History Museum",
+                      "url": "https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html",
+                      "description": "New forensic methods have brought researchers a step closer to confirming the man behind an infamous scientific hoax. <strong>A suite of technological innovations have linked the fake Piltdown fossils to a single forger: amateur archaeologist Charles Dawson</strong>."
+                    },
+                    {
+                      "title": "Charles Dawson - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Charles_Dawson",
+                      "description": "<strong>Dawson claimed to have discovered a collection of fossils that have been dug up in Piltdown, Sussex, including an ape-like jawbone and a human-like skull</strong>. However, after his death, it was proven that the remains were evidently forged."
+                    },
+                    {
+                      "title": "The Problem of Piltdown Man | Science History Institute",
+                      "url": "https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/",
+                      "description": "Nevertheless, anyone even tangentially related to Piltdown Man was accused of committing the fraud. Some suggested that Woodward, with his access to zoological and historic materials, had conspired with Dawson to create this hoax. Others were convinced one of Woodward\u2019s colleagues at the British Museum had created the hoax as part of an elaborate scheme to disparage him. Another enduring theory was that Arthur Conan Doyle, yet another fossil hunter who conveniently lived in Sussex, forged and planted the fossils for Dawson to find."
+                    },
+                    {
+                      "title": "Folklore, Belief, and the Piltdown Man Hoax | Folklife Today",
+                      "url": "https://blogs.loc.gov/folklife/2016/08/folklore-piltdown-man-hoax/",
+                      "description": "So I was excited to learn that recently a group of researchers from many science disciplines led by Isabelle De Groote completed a painstaking eight-year study of the Piltdown skull, purportedly found in many pieces in Sussex, England in the early years of the twentieth century. They concluded that only one person had the ability to cobble together the skull from a fossilized human cranium and a stained orangutan jaw, place the broken fragments of that creation in a gravel pit and then orchestrate the gradual \u201cdiscovery.\u201d That person was Charles Dawson, who had named the find after himself.[1]"
+                    },
+                    {
+                      "title": "Piltdown Man: British archaeology's greatest hoax | Archaeology | The Guardian",
+                      "url": "https://www.theguardian.com/science/2012/feb/05/piltdown-man-archaeologys-greatest-hoax",
+                      "description": "Charles Dawson, the archaeological enthusiast who found the first pieces, was almost certainly involved. But many scientists still suspect he had the backing of experts who were the true guilty parties. Candidates include Arthur Conan Doyle, who played golf at Piltdown and had a grievance against scientists because of his spiritual beliefs; the Jesuit philosopher, palaeontologist and alleged practical joker Pierre Teilhard de Chardin, who lived in Sussex at the time and who actually helped Dawson dig at Piltdown; Arthur Smith Woodward, the Natural History Museum scientist, who accepted Dawson&#x27;"
+                    },
+                    {
+                      "title": "Forensic examination reveals identity of Piltdown hoax prime suspect | Archaeology | The Guardian",
+                      "url": "https://www.theguardian.com/science/2016/aug/10/forensic-examination-reveals-identity-of-piltdown-hoax-prime-suspect-charles-dawson",
+                      "description": "Over the last century, a number of possible culprits had been paraded for identification: among them Arthur Smith Woodward, the Museum expert who along with Charles Dawson announced the find; the thinker, anthropologist and French Jesuit priest Teilhard de Chardin, who joined the search; Martin Hinton, Smith Woodward\u2019s then assistant, and even Sir Arthur Conan Doyle, who lived nearby, was a member of the same archaeological society as Dawson, and published The Lost World, a novel involving pterodactyls and primitive hominids, in the year of the Piltdown find. But the latest study shows that the forgery was the work of one person, working with bones and teeth that had never been fossilised, but altered and stained to look plausible."
+                    },
+                    {
+                      "title": "New Tests: Dawson Was Piltdown Forger | Center for Inquiry",
+                      "url": "https://centerforinquiry.org/blog/new_tests_dawson_was_piltdown_forger/",
+                      "description": "After an eight-year examination, a team of researchers has concluded that the infamous Piltdown Skull hoax\u2014consisting of human skull fragments together with an ape-like jaw having two teeth\u2014was the work of a single forger: the \u201cdiscoverer\u201d and original suspect Charles Dawson. The study clears other suspects touted over the years, including the French priest Teilhard de Chardin, English paleontologist Arthur Smith Woodward, Scottish anatomist Arthur Keith, and, among others, famed Sherlock Holmes creator Arthur Conan Doyle."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "7fd0b0d7-0232-4913-b1f3-ac03b7efd90d",
+                "title": "Identify modern forensic techniques and assess impact on paleoanthropology; prepare synthesis on scientific self-correction",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "modern techniques to detect fossil forgery radiocarbon dating ancient DNA CT scanning SEM isotopic analysis impact of Piltdown on paleoanthropology 'scientific self-correction' 'history of science' 'Piltdown impact'",
+                  "intent": "find sources describing modern methods that would have detected the Piltdown forgery immediately, plus historiography and analysis of the hoax's impact on practices, standards, dating methods, and the concept of scientific self-correction",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "Piltdown Man: The scandal that delayed the study of human origins by decades | Ancient Origins",
+                      "url": "https://www.ancient-origins.net/human-origins-science/piltdown-man-scandal-delayed-study-human-origins-decades-003767",
+                      "description": "However, in the early 1950s, following the development of scientific dating methods and the discovery of new evidence, <strong>it was proved that the Piltdown man was all just a hoax</strong> \u2013 it became one of the biggest scandals in archaeological history. In 1925, a man named Raymond Dart found a fossilized ..."
+                    },
+                    {
+                      "title": "Study reveals culprit behind Piltdown Man, one of science's most famous hoaxes | Science | AAAS",
+                      "url": "https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes",
+                      "description": "In the foreground, Charles Dawson, left, and Sir Arthur Smith Woodward excavate the gravel pit outside U.K. village Piltdown.Courtesy of Isabelle De Groote \u00b7 Isabelle De Groote, a paleoanthropologist at Liverpool John Moores University in the United Kingdom, began looking into the question in 2009, applying modern scanning technology and DNA analysis to the original materials. She and colleagues compared computer tomography (CT) scans of the mandible and teeth to known ape specimens and concluded that all these pieces originated from an orangutan."
+                    },
+                    {
+                      "title": "Ancient DNA and paleogenetics: risks and potentiality - PMC",
+                      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8167392/",
+                      "description": "Recent re-evaluation of the Piltdown fossils using the latest scientific methods (DNA analyses, high-precision measurements, spectroscopy and virtual anthropology) showed that <strong>it is highly likely that a single orang-utan specimen and at least two human specimens were used to create the fake fossils</strong> ..."
+                    },
+                    {
+                      "title": "The Problem of Piltdown Man | Science History Institute",
+                      "url": "https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/",
+                      "description": "In 2009, paleoanthropologist Isabelle De Groote attempted to lay to rest the vast conspiracies by conducting computer tomography (CT) scans of the jaw and teeth. The scans revealed that the objects had been artificially altered with a consistency that suggests only one person\u2014Charles Dawson\u2014was the perpetrator. Yet scandalous versions of the Piltdown Man\u2019s story have remained popular despite efforts to settle the matter."
+                    },
+                    {
+                      "title": "How the Piltdown Man skull became the greatest hoax in anthropology - History Skills",
+                      "url": "https://www.historyskills.com/classroom/ancient-history/piltdown-man/",
+                      "description": "The breakthrough happened when scientists Kenneth Oakley, Wilfrid Le Gros Clark and Joseph Weiner applied this test to the Piltdown Man remains. A lab assistant conducting research. Source: https://pixabay.com/photos/science-lab-laboratory-research-1029385/ The other method, known as radiocarbon dating, measures the amount of carbon-14 in a chosen sample in order to work out its age."
+                    },
+                    {
+                      "title": "New genetic and morphological evidence suggests a single hoaxer created \u2018Piltdown man\u2019 | Royal Society Open Science",
+                      "url": "https://royalsocietypublishing.org/doi/10.1098/rsos.160328",
+                      "description": "Our re-evaluation of the Piltdown fossils using the latest scientific methods (DNA analyses, high-precision measurements, spectroscopy and virtual anthropology) shows that it is highly likely that a single orang-utan specimen and at least two human specimens were used to create the fake fossils. The modus operandi was found consistent throughout the assemblage (specimens are stained brown, loaded with gravel fragments and restored using filling materials), linking all specimens from the Piltdown I and Piltdown II sites to a single forger\u2014Charles Dawson."
+                    },
+                    {
+                      "title": "Skullduggery: Is the Identity of the Piltdown Forger and His Methods Close to Full Exposure? - The Leakey Foundation",
+                      "url": "https://leakeyfoundation.org/skullduggery-is-the-identity-of-the-piltdown-forger-and-his-methods-close-to-full-exposure/",
+                      "description": "This year, and 60 years since the last extensive analysis of the remains led to the discovery that the Piltdown skull was a fraud, a team of over 15 analysts \u2013 including experts in ancient DNA, radiocarbon dating and isotope studies \u2013 have been assembled by Chris Stringer of the Natural History Museum in London to re-examine the Piltdown collections using modern analytical methods."
+                    },
+                    {
+                      "title": "Piltdown Man: Infamous Fake Fossil | Live Science",
+                      "url": "https://www.livescience.com/56327-piltdown-man-hoax.html",
+                      "description": "In August 2016, De Groote and her team published &quot;New genetic and morphological evidence suggests a single hoaxes created \u2018Piltdown Man,&#x27;&quot; a study that indicated the fossils had been made by a single forger, likely Dawson, thereby solving the mystery for all but the most skeptic. &quot;Techniques such as microCT scanning, ancient DNA analyses, 3D microscopy etc., have only been available a number of years and we wanted to apply those to the study of Piltdown,&quot; she said."
+                    },
+                    {
+                      "title": "Piltdown Man: The Fact and Fantasy of the Hominid Fossil Record - Reasons to Believe",
+                      "url": "https://reasons.org/explore/blogs/the-cells-design/piltdown-man-the-fact-and-fantasy-of-the-hominid-fossil-record",
+                      "description": "These scientists applied state-of-the-art analytical techniques to the Piltdown man fossils to gain better insight into the nature of the forgery. Using DNA analysis, they determined that the orangutan jaw bone and molars from Piltdown man and Piltdown man II specimens came from the same creature that lived in Borneo."
+                    },
+                    {
+                      "title": "Piltdown Man - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                      "description": "When Dawson first said he discovered the cranium and jawbone, chemical dating techniques were primitive, meaning that there was heavy reliance on morphological comparison and expert opinions in order to classify and date artifacts and bones. Discoveries that happened after Piltdown Man, such as Australopithecus in South Africa and Homo erectus, contradicted many aspects of the Piltdown Man. These early hominid fossils showed small braincases and human jaws, which was the opposite of what Piltdown Man suggested. Despite this, Piltdown Man was treated as a different lineage for many years instead. In the decades prior to its exposure as a forgery in 1953, scientists increasingly regarded Piltdown as an enigmatic aberration, inconsistent with the path of hominid evolution as demonstrated by fossils found elsewhere."
+                    }
+                  ]
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 4,
+              "success": 4,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "e9e0800f-0a1d-4153-937c-b8551509a8a5",
+            "06bb7e8f-d0a1-4f0e-89a8-b1e451b297bb",
+            "91cfc85f-ee4b-4b6f-802b-1eaa6bdb87fa",
+            "7fd0b0d7-0232-4913-b1f3-ac03b7efd90d",
+            "71d18164-9967-43c8-aa20-318ec04c1ea6"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "e9e0800f-0a1d-4153-937c-b8551509a8a5": {
+          "node_id": "e9e0800f-0a1d-4153-937c-b8551509a8a5",
+          "title": "Collect primary historical sources and original discovery claims (1912\u20131913): Dawson, Woodward, and early publications",
+          "details": {
+            "query": "Piltdown Man original discovery Charles Dawson 1912 Arthur Smith Woodward 1913 Eoanthropus dawsoni Nature 'Piltdown' 'British Museum' original announcement",
+            "intent": "find primary publications, museum records, and contemporary newspaper accounts that record the original discovery claims and immediate scientific reception",
+            "count": 10,
+            "action": "search",
+            "parent_goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.94
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Piltdown Man original discovery Charles Dawson 1912 Arthur Smith Woodward 1913 Eoanthropus dawsoni Nature 'Piltdown' 'British Museum' original announcement",
+              "intent": "find primary publications, museum records, and contemporary newspaper accounts that record the original discovery claims and immediate scientific reception",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "Piltdown Man - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                  "description": "At a meeting of the Geological Society of London on <strong>18 December 1912</strong>, Charles Dawson claimed that a workman at the Piltdown gravel pit had given him a fragment of the skull four years earlier. According to Dawson, workmen at the site discovered the skull shortly before his visit and broke it ..."
+                },
+                {
+                  "title": "Folklore, Belief, and the Piltdown Man Hoax | Folklife Today",
+                  "url": "https://blogs.loc.gov/folklife/2016/08/folklore-piltdown-man-hoax/",
+                  "description": "Amateur archaeologist Charles Dawson and palaeontologist Sir Arthur Smith Woodward of the British Museum (now the British Natural History Museum) announced the startling discovery of an ancient human ancestor in Sussex in <strong>December 18, 1912</strong>."
+                },
+                {
+                  "title": "The Problem of Piltdown Man | Science History Institute",
+                  "url": "https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/",
+                  "description": "But in the early 1900s, evolution ... \u00b7 Dawson and Woodward\u2019s finds are announced in the Illustrated London News, <strong>December 28, 1912</strong>...."
+                },
+                {
+                  "title": "New genetic and morphological evidence suggests a single hoaxer created \u2018Piltdown man\u2019 | Royal Society Open Science",
+                  "url": "https://royalsocietypublishing.org/doi/10.1098/rsos.160328",
+                  "description": "In <strong>December 1912</strong>, palaeontologist Arthur Smith Woodward, Keeper of Geology at the British Museum (Natural History; now the Natural History Museum), and amateur antiquarian and solicitor Charles Dawson announced the sensational discovery of a ..."
+                },
+                {
+                  "title": "Piltdown man | Discovery, Fossils, & Facts | Britannica",
+                  "url": "https://www.britannica.com/topic/Piltdown-man",
+                  "description": "Dawson took the specimens to Arthur Smith Woodward, keeper of the British Museum\u2019s paleontology department, who announced the find at a meeting of the Geological Society of London on <strong>December 18, 1912</strong>."
+                },
+                {
+                  "title": "Piltdown Man | Natural History Museum",
+                  "url": "https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html",
+                  "description": "Piltdown Man cranium and mandible as reconstructed by Dr Arthur Smith Woodward (L) and Professor Arthur Keith (R) In 1912 Charles Dawson, an amateur archaeologist claimed to have discovered the \u2018missing link\u2019 between ape and man."
+                },
+                {
+                  "title": "BBC - History - Ancient History in depth: Piltdown Man: Britain's Greatest Hoax",
+                  "url": "https://www.bbc.co.uk/history/ancient/archaeology/piltdown_man_01.shtml",
+                  "description": "Charles Dawson had made a name for himself by finding fossils in Sussex, and passing them on to Sir Arthur Smith Woodward at what is now the Natural History Museum, London. On <strong>14 February 1912</strong>, he wrote to Woodward with news of exciting discoveries, and that summer Woodward joined him to excavate ..."
+                },
+                {
+                  "title": "Piltdown Man hoax findings: Charles Dawson the likely fraudster | Natural History Museum",
+                  "url": "https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html",
+                  "description": "Between 1912 and 1914, two men ... evolutionary link between apes and humans. <strong>Palaeontologist Arthur Smith Woodward and amateur antiquarian Charles Dawson presented the skull of so-called Piltdown Man, dubbed Eoanthropus dawsoni</strong>...."
+                },
+                {
+                  "title": "Today in History December 18 | Piltdown Man | Britannica",
+                  "url": "https://www.britannica.com/topic/December-18-Piltdown-Man-Hoax",
+                  "description": "<strong>Woodward debuted the bones of what he believed to be a previously unknown extinct hominin</strong> (Eoanthropus dawsoni), asserting that they represented the long-sought missing evolutionary link between apes and humans."
+                },
+                {
+                  "title": "Charles Dawson - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Charles_Dawson",
+                  "description": "His most famous &quot;find&quot; was the <strong>1912 discovery of the Piltdown Man which was billed as the &quot;missing link&quot; between humans and other great apes</strong>. Following his death in 1916, no further &quot;discoveries&quot; were made at Piltdown."
+                }
+              ]
+            }
+          },
+          "parent_id": "40dfc918-c283-4d00-906f-20daa40c3ad0",
+          "parent_ids": [
+            "40dfc918-c283-4d00-906f-20daa40c3ad0"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.94,
+          "memo_key": null
+        },
+        "06bb7e8f-d0a1-4f0e-89a8-b1e451b297bb": {
+          "node_id": "06bb7e8f-d0a1-4f0e-89a8-b1e451b297bb",
+          "title": "Assemble scientific investigations that exposed the hoax (methods and evidence)",
+          "details": {
+            "query": "1953 Piltdown fluorine test Oakley Weiner le Gros Clark Nature 1953 'Piltdown' 'fluorine dating' 'filed teeth' 'microscopic analysis' 'chemical tests' 'Weiner Oakley le Gros Clark 1953'",
+            "intent": "locate the scientific papers and technical reports that demonstrated the Piltdown fossils were forgeries, including descriptions of tests (fluorine, nitrogen, chemical, microscopic) and the direct physical evidence",
+            "count": 10,
+            "action": "search",
+            "parent_goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.96
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "1953 Piltdown fluorine test Oakley Weiner le Gros Clark Nature 1953 'Piltdown' 'fluorine dating' 'filed teeth' 'microscopic analysis' 'chemical tests' 'Weiner Oakley le Gros Clark 1953'",
+              "intent": "locate the scientific papers and technical reports that demonstrated the Piltdown fossils were forgeries, including descriptions of tests (fluorine, nitrogen, chemical, microscopic) and the direct physical evidence",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "Kenneth Oakley - Linda Hall Library",
+                  "url": "https://www.lindahall.org/about/news/scientist-of-the-day/kenneth-oakley/",
+                  "description": "The Piltdown I mandible, with two molars intact, photograph, plate in &quot;The solution to the Piltdown problem,\u201d by Joseph S. Weiner, Kenneth P. Oakley, Wilfrid Le Gros Clark, Bulletin of the British Museum (Natural History), Geology, vol. 2, 1953 (Linda Hall Library) In 1949, Oakley was given permission to test the Piltdown fragments, as some had suspected that the skull fragments and the jawbone were of different ages. Oakley found that they had the same level of fluorine, so they were of approximately the same age."
+                },
+                {
+                  "title": "The Problem of Piltdown Man | Science History Institute",
+                  "url": "https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/",
+                  "description": "<strong>By drilling into the jaw fragment, Oakley and Weiner discovered that the discoloration on the jaw, originally used as evidence of its 500,000-year age, was superficial</strong>. By contrast, the cranial fragments had a deeper, naturally occurring stain, ..."
+                },
+                {
+                  "title": "Today in history: November 21 - by Andrew Chapman",
+                  "url": "https://www.gethistories.com/p/today-in-history-november-21",
+                  "description": "On November 21 1953, Joseph Weiner, Kenneth Oakley and Wilfrid Le Gros Clark published \u2018<strong>The Solution of the Piltdown Problem</strong>\u2019 in the Bulletin of the British Museum (Natural History), Geology, using fluorine testing, nitrogen content, microscopic ..."
+                },
+                {
+                  "title": "Skullduggery: Is the Identity of the Piltdown Forger and His Methods Close to Full Exposure? - The Leakey Foundation",
+                  "url": "https://leakeyfoundation.org/skullduggery-is-the-identity-of-the-piltdown-forger-and-his-methods-close-to-full-exposure/",
+                  "description": "That very same year, Kenneth Oakley (1848), who had revived the application of the Fluorine Dating technique, applied the analysis to the Piltdown remains. The results, showing oddly low levels of Fluorine adsorption in the skull and jaw compared to the faunal remains aroused the attention of Joseph Weiner of Oxford University. He contacted Kenneth Oakley with his concerns of a possible fraud and they assembled a team of specialists from London\u2019s Natural History Museum and Oxford University to careful reexamine the remains. In 1953, in the same Burlington Hall theater were Eoanthropus was originally announced they showed the find was a cleverly assembled fake, combining a Medieval-era human skull with the jaw of an orangutan, and planted with appropriately aged fauna- all artificially stained to resemble the Piltdown gravels."
+                },
+                {
+                  "title": "Piltdown Man | Natural History Museum",
+                  "url": "https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html",
+                  "description": "Their results showed that the skull and jaw fragments actually came from two different species, a human and an ape, probably an orangutan. <strong>Scratches on the surfaces of the teeth, visible under the microscope, revealed that the teeth had been filed down to make them look human</strong>."
+                },
+                {
+                  "title": "Piltdown Man - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                  "description": "In the early 1950s, Kenneth Oakley, Wilfrid Le Gros Clark, and Joseph Weiner, scientists at the British Museum, developed a new technique for dating fossils called <strong>fluorine absorption dating</strong>."
+                },
+                {
+                  "title": "Piltdown Man remains exposed as fake \u2013 archive, 1953 | Archaeology | The Guardian",
+                  "url": "https://www.theguardian.com/science/2023/nov/23/piltdown-man-remains-exposed-as-fake-1953",
+                  "description": "Recent improvements in the technique of fluorine analysis made possible some of the tests which led three scientists to conclude that <strong>the mandible and canine tooth of the \u201cPiltdown skull\u201d were \u201cdeliberate fakes.\u201d</strong> The report of the three ..."
+                },
+                {
+                  "title": "How the Piltdown Man skull became the greatest hoax in anthropology - History Skills",
+                  "url": "https://www.historyskills.com/classroom/ancient-history/piltdown-man/",
+                  "description": "The <strong>more fluorine that was</strong> found in a bone, the longer it has thought to have been in the ground. The breakthrough happened when scientists Kenneth Oakley, Wilfrid Le Gros Clark and Joseph Weiner applied this test to the Piltdown Man remains."
+                },
+                {
+                  "title": "Expos\u00e9 1953-1955",
+                  "url": "http://www2.clarku.edu/~piltdown/map_expose/espose_lvl1.html",
+                  "description": "Nature (January 1979)K. P. Oakley. Piltdown man Letter to New Scientist (Nov. 1981)J. S. Weiner and the exposure of the Piltdown forgery Antiquity (1983)Committing the investigation1 fluorine analysis 2 radioactivity of elephant tooth fragment 3 examination of cricket bat - cut after fossilization (authentic ancestor would have been unable to do this, though able to cut femur bone) 4 microscope on molar occlusion \u0097 see file marks 5 hand to hold skull fragments \u0097 heavy --- jaw light 6 examination for carbon \u0097 nothing in skull, still there in bony jaw 7 x\u0097ray canine tooth -\u0097 find alloy at tip \u0097 old surface, young root Vandyke brownVIII Commentary on Expos\u00e9 Scientific and popularMichael Hammond."
+                },
+                {
+                  "title": "JS Weiner and the exposure of the Piltdown forgery",
+                  "url": "https://www2.clarku.edu/faculty/djoyce/piltdown/map_expose/jswein_and_expose_pilt.html",
+                  "description": "He was able to get permission to drill [48] much more bone than had previously been allowed and undertook the second set of fluorine tests. These showed exactly what Weiner had predicted: that the cranium and jaw were of different, though recent dates. Weiner acknowledges that, &#x27;Kenneth Oakley soon took the view that everything (from the Piltdown sites) was probably fraudulent and made it his business to study the eoliths, the other flints, and the so-called bone implement and he was able to prove that these had all been artificially stained and that the bone implement had been fashioned with a metal knife."
+                }
+              ]
+            }
+          },
+          "parent_id": "40dfc918-c283-4d00-906f-20daa40c3ad0",
+          "parent_ids": [
+            "40dfc918-c283-4d00-906f-20daa40c3ad0"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.96,
+          "memo_key": null
+        },
+        "91cfc85f-ee4b-4b6f-802b-1eaa6bdb87fa": {
+          "node_id": "91cfc85f-ee4b-4b6f-802b-1eaa6bdb87fa",
+          "title": "Investigate suspects, motives, and timeline of the forgery and scholarly debate about perpetrators",
+          "details": {
+            "query": "Who forged Piltdown Man Charles Dawson suspect evidence motives later forensic studies 'forgery suspects' 'Piltdown Dawson evidence' 'Conan Doyle' 'Teilhard de Chardin' 'Miles Russell' 'recent investigations'",
+            "intent": "gather scholarly analyses, forensic studies, and historical investigations that assess likely perpetrator(s), proposed motives, and the evolving timeline of attribution and debate",
+            "count": 10,
+            "action": "search",
+            "parent_goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.9
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Who forged Piltdown Man Charles Dawson suspect evidence motives later forensic studies 'forgery suspects' 'Piltdown Dawson evidence' 'Conan Doyle' 'Teilhard de Chardin' 'Miles Russell' 'recent investigations'",
+              "intent": "gather scholarly analyses, forensic studies, and historical investigations that assess likely perpetrator(s), proposed motives, and the evolving timeline of attribution and debate",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "Piltdown Man - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                  "description": "The focus on Dawson as the main ... Russell of Bournemouth University analysed Dawson&#x27;s antiquarian collection, and determined that <strong>at least 38 of his specimens were fakes</strong>...."
+                },
+                {
+                  "title": "Study reveals culprit behind Piltdown Man, one of science's most famous hoaxes | Science | AAAS",
+                  "url": "https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes",
+                  "description": "Francis Thackeray, a paleoanthropologist at the University of the Witwatersrand in Johannesburg, South Africa, says he &quot;strongly suspects&quot; Teilhard de Chardin was in on the hoax. Teilhard de Chardin was known as a bit of a prankster, he says. &quot;My view is that Teilhard [de Chardin] was an adviser to Dawson, and that the motive behind the forgery was that it was initially a joke against [Smith] Woodward,&quot; Thackeray says. &quot;It was a joke that went seriously wrong.&quot; Dawson&#x27;s calculated chicanery underscores why studying Piltdown Man is still important to modern science, De Groote says."
+                },
+                {
+                  "title": "Solving the Piltdown Man Scientific Fraud | Scientific American",
+                  "url": "https://www.scientificamerican.com/article/solving-the-piltdown-man-scientific-fraud/",
+                  "description": "Our own library and archival research has shown that Dawson was responsible for at least 38 forgeries (for example, the Roman inscribed tiles from Pevensey and a statuette excavated by Dawson during the late 1800s were found to be fakes too) . It has been suggested that his motive was scientific recognition and, in particular, his ambition to be elected a fellow of the Royal Society. Dawson wrote more than 50 publications but none up until Piltdown appears to have greatly furthered his career."
+                },
+                {
+                  "title": "Piltdown Man hoax findings: Charles Dawson the likely fraudster | Natural History Museum",
+                  "url": "https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html",
+                  "description": "New forensic methods have brought researchers a step closer to confirming the man behind an infamous scientific hoax. <strong>A suite of technological innovations have linked the fake Piltdown fossils to a single forger: amateur archaeologist Charles Dawson</strong>."
+                },
+                {
+                  "title": "Charles Dawson - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Charles_Dawson",
+                  "description": "<strong>Dawson claimed to have discovered a collection of fossils that have been dug up in Piltdown, Sussex, including an ape-like jawbone and a human-like skull</strong>. However, after his death, it was proven that the remains were evidently forged."
+                },
+                {
+                  "title": "The Problem of Piltdown Man | Science History Institute",
+                  "url": "https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/",
+                  "description": "Nevertheless, anyone even tangentially related to Piltdown Man was accused of committing the fraud. Some suggested that Woodward, with his access to zoological and historic materials, had conspired with Dawson to create this hoax. Others were convinced one of Woodward\u2019s colleagues at the British Museum had created the hoax as part of an elaborate scheme to disparage him. Another enduring theory was that Arthur Conan Doyle, yet another fossil hunter who conveniently lived in Sussex, forged and planted the fossils for Dawson to find."
+                },
+                {
+                  "title": "Folklore, Belief, and the Piltdown Man Hoax | Folklife Today",
+                  "url": "https://blogs.loc.gov/folklife/2016/08/folklore-piltdown-man-hoax/",
+                  "description": "So I was excited to learn that recently a group of researchers from many science disciplines led by Isabelle De Groote completed a painstaking eight-year study of the Piltdown skull, purportedly found in many pieces in Sussex, England in the early years of the twentieth century. They concluded that only one person had the ability to cobble together the skull from a fossilized human cranium and a stained orangutan jaw, place the broken fragments of that creation in a gravel pit and then orchestrate the gradual \u201cdiscovery.\u201d That person was Charles Dawson, who had named the find after himself.[1]"
+                },
+                {
+                  "title": "Piltdown Man: British archaeology's greatest hoax | Archaeology | The Guardian",
+                  "url": "https://www.theguardian.com/science/2012/feb/05/piltdown-man-archaeologys-greatest-hoax",
+                  "description": "Charles Dawson, the archaeological enthusiast who found the first pieces, was almost certainly involved. But many scientists still suspect he had the backing of experts who were the true guilty parties. Candidates include Arthur Conan Doyle, who played golf at Piltdown and had a grievance against scientists because of his spiritual beliefs; the Jesuit philosopher, palaeontologist and alleged practical joker Pierre Teilhard de Chardin, who lived in Sussex at the time and who actually helped Dawson dig at Piltdown; Arthur Smith Woodward, the Natural History Museum scientist, who accepted Dawson&#x27;"
+                },
+                {
+                  "title": "Forensic examination reveals identity of Piltdown hoax prime suspect | Archaeology | The Guardian",
+                  "url": "https://www.theguardian.com/science/2016/aug/10/forensic-examination-reveals-identity-of-piltdown-hoax-prime-suspect-charles-dawson",
+                  "description": "Over the last century, a number of possible culprits had been paraded for identification: among them Arthur Smith Woodward, the Museum expert who along with Charles Dawson announced the find; the thinker, anthropologist and French Jesuit priest Teilhard de Chardin, who joined the search; Martin Hinton, Smith Woodward\u2019s then assistant, and even Sir Arthur Conan Doyle, who lived nearby, was a member of the same archaeological society as Dawson, and published The Lost World, a novel involving pterodactyls and primitive hominids, in the year of the Piltdown find. But the latest study shows that the forgery was the work of one person, working with bones and teeth that had never been fossilised, but altered and stained to look plausible."
+                },
+                {
+                  "title": "New Tests: Dawson Was Piltdown Forger | Center for Inquiry",
+                  "url": "https://centerforinquiry.org/blog/new_tests_dawson_was_piltdown_forger/",
+                  "description": "After an eight-year examination, a team of researchers has concluded that the infamous Piltdown Skull hoax\u2014consisting of human skull fragments together with an ape-like jaw having two teeth\u2014was the work of a single forger: the \u201cdiscoverer\u201d and original suspect Charles Dawson. The study clears other suspects touted over the years, including the French priest Teilhard de Chardin, English paleontologist Arthur Smith Woodward, Scottish anatomist Arthur Keith, and, among others, famed Sherlock Holmes creator Arthur Conan Doyle."
+                }
+              ]
+            }
+          },
+          "parent_id": "40dfc918-c283-4d00-906f-20daa40c3ad0",
+          "parent_ids": [
+            "40dfc918-c283-4d00-906f-20daa40c3ad0"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.9,
+          "memo_key": null
+        },
+        "7fd0b0d7-0232-4913-b1f3-ac03b7efd90d": {
+          "node_id": "7fd0b0d7-0232-4913-b1f3-ac03b7efd90d",
+          "title": "Identify modern forensic techniques and assess impact on paleoanthropology; prepare synthesis on scientific self-correction",
+          "details": {
+            "query": "modern techniques to detect fossil forgery radiocarbon dating ancient DNA CT scanning SEM isotopic analysis impact of Piltdown on paleoanthropology 'scientific self-correction' 'history of science' 'Piltdown impact'",
+            "intent": "find sources describing modern methods that would have detected the Piltdown forgery immediately, plus historiography and analysis of the hoax's impact on practices, standards, dating methods, and the concept of scientific self-correction",
+            "count": 10,
+            "action": "search",
+            "parent_goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "modern techniques to detect fossil forgery radiocarbon dating ancient DNA CT scanning SEM isotopic analysis impact of Piltdown on paleoanthropology 'scientific self-correction' 'history of science' 'Piltdown impact'",
+              "intent": "find sources describing modern methods that would have detected the Piltdown forgery immediately, plus historiography and analysis of the hoax's impact on practices, standards, dating methods, and the concept of scientific self-correction",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "Piltdown Man: The scandal that delayed the study of human origins by decades | Ancient Origins",
+                  "url": "https://www.ancient-origins.net/human-origins-science/piltdown-man-scandal-delayed-study-human-origins-decades-003767",
+                  "description": "However, in the early 1950s, following the development of scientific dating methods and the discovery of new evidence, <strong>it was proved that the Piltdown man was all just a hoax</strong> \u2013 it became one of the biggest scandals in archaeological history. In 1925, a man named Raymond Dart found a fossilized ..."
+                },
+                {
+                  "title": "Study reveals culprit behind Piltdown Man, one of science's most famous hoaxes | Science | AAAS",
+                  "url": "https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes",
+                  "description": "In the foreground, Charles Dawson, left, and Sir Arthur Smith Woodward excavate the gravel pit outside U.K. village Piltdown.Courtesy of Isabelle De Groote \u00b7 Isabelle De Groote, a paleoanthropologist at Liverpool John Moores University in the United Kingdom, began looking into the question in 2009, applying modern scanning technology and DNA analysis to the original materials. She and colleagues compared computer tomography (CT) scans of the mandible and teeth to known ape specimens and concluded that all these pieces originated from an orangutan."
+                },
+                {
+                  "title": "Ancient DNA and paleogenetics: risks and potentiality - PMC",
+                  "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8167392/",
+                  "description": "Recent re-evaluation of the Piltdown fossils using the latest scientific methods (DNA analyses, high-precision measurements, spectroscopy and virtual anthropology) showed that <strong>it is highly likely that a single orang-utan specimen and at least two human specimens were used to create the fake fossils</strong> ..."
+                },
+                {
+                  "title": "The Problem of Piltdown Man | Science History Institute",
+                  "url": "https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/",
+                  "description": "In 2009, paleoanthropologist Isabelle De Groote attempted to lay to rest the vast conspiracies by conducting computer tomography (CT) scans of the jaw and teeth. The scans revealed that the objects had been artificially altered with a consistency that suggests only one person\u2014Charles Dawson\u2014was the perpetrator. Yet scandalous versions of the Piltdown Man\u2019s story have remained popular despite efforts to settle the matter."
+                },
+                {
+                  "title": "How the Piltdown Man skull became the greatest hoax in anthropology - History Skills",
+                  "url": "https://www.historyskills.com/classroom/ancient-history/piltdown-man/",
+                  "description": "The breakthrough happened when scientists Kenneth Oakley, Wilfrid Le Gros Clark and Joseph Weiner applied this test to the Piltdown Man remains. A lab assistant conducting research. Source: https://pixabay.com/photos/science-lab-laboratory-research-1029385/ The other method, known as radiocarbon dating, measures the amount of carbon-14 in a chosen sample in order to work out its age."
+                },
+                {
+                  "title": "New genetic and morphological evidence suggests a single hoaxer created \u2018Piltdown man\u2019 | Royal Society Open Science",
+                  "url": "https://royalsocietypublishing.org/doi/10.1098/rsos.160328",
+                  "description": "Our re-evaluation of the Piltdown fossils using the latest scientific methods (DNA analyses, high-precision measurements, spectroscopy and virtual anthropology) shows that it is highly likely that a single orang-utan specimen and at least two human specimens were used to create the fake fossils. The modus operandi was found consistent throughout the assemblage (specimens are stained brown, loaded with gravel fragments and restored using filling materials), linking all specimens from the Piltdown I and Piltdown II sites to a single forger\u2014Charles Dawson."
+                },
+                {
+                  "title": "Skullduggery: Is the Identity of the Piltdown Forger and His Methods Close to Full Exposure? - The Leakey Foundation",
+                  "url": "https://leakeyfoundation.org/skullduggery-is-the-identity-of-the-piltdown-forger-and-his-methods-close-to-full-exposure/",
+                  "description": "This year, and 60 years since the last extensive analysis of the remains led to the discovery that the Piltdown skull was a fraud, a team of over 15 analysts \u2013 including experts in ancient DNA, radiocarbon dating and isotope studies \u2013 have been assembled by Chris Stringer of the Natural History Museum in London to re-examine the Piltdown collections using modern analytical methods."
+                },
+                {
+                  "title": "Piltdown Man: Infamous Fake Fossil | Live Science",
+                  "url": "https://www.livescience.com/56327-piltdown-man-hoax.html",
+                  "description": "In August 2016, De Groote and her team published &quot;New genetic and morphological evidence suggests a single hoaxes created \u2018Piltdown Man,&#x27;&quot; a study that indicated the fossils had been made by a single forger, likely Dawson, thereby solving the mystery for all but the most skeptic. &quot;Techniques such as microCT scanning, ancient DNA analyses, 3D microscopy etc., have only been available a number of years and we wanted to apply those to the study of Piltdown,&quot; she said."
+                },
+                {
+                  "title": "Piltdown Man: The Fact and Fantasy of the Hominid Fossil Record - Reasons to Believe",
+                  "url": "https://reasons.org/explore/blogs/the-cells-design/piltdown-man-the-fact-and-fantasy-of-the-hominid-fossil-record",
+                  "description": "These scientists applied state-of-the-art analytical techniques to the Piltdown man fossils to gain better insight into the nature of the forgery. Using DNA analysis, they determined that the orangutan jaw bone and molars from Piltdown man and Piltdown man II specimens came from the same creature that lived in Borneo."
+                },
+                {
+                  "title": "Piltdown Man - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                  "description": "When Dawson first said he discovered the cranium and jawbone, chemical dating techniques were primitive, meaning that there was heavy reliance on morphological comparison and expert opinions in order to classify and date artifacts and bones. Discoveries that happened after Piltdown Man, such as Australopithecus in South Africa and Homo erectus, contradicted many aspects of the Piltdown Man. These early hominid fossils showed small braincases and human jaws, which was the opposite of what Piltdown Man suggested. Despite this, Piltdown Man was treated as a different lineage for many years instead. In the decades prior to its exposure as a forgery in 1953, scientists increasingly regarded Piltdown as an enigmatic aberration, inconsistent with the path of hominid evolution as demonstrated by fossils found elsewhere."
+                }
+              ]
+            }
+          },
+          "parent_id": "40dfc918-c283-4d00-906f-20daa40c3ad0",
+          "parent_ids": [
+            "40dfc918-c283-4d00-906f-20daa40c3ad0"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "71d18164-9967-43c8-aa20-318ec04c1ea6": {
+          "node_id": "71d18164-9967-43c8-aa20-318ec04c1ea6",
+          "title": "Merge: Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "71d18164-9967-43c8-aa20-318ec04c1ea6",
+              "title": "Merge: Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.88
+            }
+          },
+          "parent_id": "40dfc918-c283-4d00-906f-20daa40c3ad0",
+          "parent_ids": [
+            "40dfc918-c283-4d00-906f-20daa40c3ad0"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.88,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 17369,
+        "words": 1798,
+        "kilobytes": 16.96
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 82056,
+          "words": 10254,
+          "kilobytes": 80.13,
+          "tokens": 19384
+        },
+        "completion": {
+          "chars": 21955,
+          "words": 2255,
+          "kilobytes": 21.44,
+          "tokens": 9182
+        },
+        "total_tokens": 28566
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 40,
+        "chars": 21808,
+        "words": 2924,
+        "kilobytes": 21.3
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 139.2245887099998,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 4,
+          "total_duration": 2.6764105789916357,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 4,
+          "total_duration": 2.75299568601622,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 4,
+          "total_duration": 3.088255479997315,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "search": {
+          "count": 4,
+          "total_duration": 3.1157470230027684,
+          "success_count": 4,
+          "error_count": 0
+        }
+      },
+      "events_count": 32
+    },
+    "duration_seconds": 53.82,
+    "telemetry": {
+      "correlation_id": "idea_test_009_gpt-5-mini_20260221_205459",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_205459_009_gpt-5-mini.jsonl",
+      "events_count": 32,
+      "timings_count": 20
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "research_areas",
+        "passed": true,
+        "score": 1.0,
+        "areas_covered": 6,
+        "details": {
+          "discovery": true,
+          "exposure": true,
+          "timeline": true,
+          "perpetrator": true,
+          "modern": true,
+          "impact": true
+        },
+        "reason": "Covered 6/6 research areas"
+      },
+      {
+        "check": "synthesis",
+        "passed": true,
+        "score": 0.5,
+        "reason": "Synthesis: present=True, self-correction=True"
+      },
+      {
+        "check": "authoritative_sources",
+        "passed": true,
+        "score": 1.0,
+        "total_urls": 60,
+        "authoritative_urls": 52,
+        "reason": "Found 60 URLs (52 authoritative)"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.6,
+      "reasons": [
+        "The output covers the original discovery claims, the scientific methods used in the 1953 expos\u00e9, and a timeline of the hoax and its exposure \u2014 these sections are accurate and well summarized.",
+        "The agent output fails to identify the perpetrator(s) and their motivations in any substantive way; it only hints that modern work favors a single forger without naming or evaluating candidates.",
+        "Modern scientific techniques that would have detected the forgery 'immediately' are not clearly enumerated or explained (the output only briefly mentions modern re-analyses like micro-CT and ancient DNA, and the text is cut off), so that research area is inadequately treated.",
+        "The synthesis on scientific self-correction is only implicit (a title promising 'lessons' but little explicit narrative explaining mechanisms of self-correction such as replication, independent testing, methodological advances, and institutional change).",
+        "Source quality is mixed: the output cites reputable museum and historical summaries and references the 1953 Bulletin team, but it mostly uses secondary sources and popular summaries rather than providing full citations to primary scientific papers or the key 1953 Bulletin citation. A link is also truncated.",
+        "Historical details given (dates, tests used, conclusions about filing and orang-utan jaw) are generally accurate for the points made, but the account is incomplete and missing discussion of impact on paleoanthropology and the debate over attribution."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.6,
+        "reasons": [
+          "The output covers the original discovery claims, the scientific methods used in the 1953 expos\u00e9, and a timeline of the hoax and its exposure \u2014 these sections are accurate and well summarized.",
+          "The agent output fails to identify the perpetrator(s) and their motivations in any substantive way; it only hints that modern work favors a single forger without naming or evaluating candidates.",
+          "Modern scientific techniques that would have detected the forgery 'immediately' are not clearly enumerated or explained (the output only briefly mentions modern re-analyses like micro-CT and ancient DNA, and the text is cut off), so that research area is inadequately treated.",
+          "The synthesis on scientific self-correction is only implicit (a title promising 'lessons' but little explicit narrative explaining mechanisms of self-correction such as replication, independent testing, methodological advances, and institutional change).",
+          "Source quality is mixed: the output cites reputable museum and historical summaries and references the 1953 Bulletin team, but it mostly uses secondary sources and popular summaries rather than providing full citations to primary scientific papers or the key 1953 Bulletin citation. A link is also truncated.",
+          "Historical details given (dates, tests used, conclusions about filing and orang-utan jaw) are generally accurate for the points made, but the account is incomplete and missing discussion of impact on paleoanthropology and the debate over attribution."
+        ],
+        "all_areas_covered": false,
+        "synthesis_quality": "Weak \u2014 the narrative presents factual elements but lacks an explicit, coherent synthesis explaining how scientific self-correction operated in the Piltdown case (e.g., role of new techniques, skepticism, replication, institutional response).",
+        "source_quality": "Moderate to poor \u2014 uses several reputable secondary sources and references the decisive 1953 investigation, but omits full primary-paper citations, relies on museum and news summaries, and contains at least one truncated link.",
+        "historical_accuracy": true
+      }
+    },
+    "overall_passed": true,
+    "overall_score": 0.775,
+    "checks_passed": 3,
+    "total_checks": 4,
+    "pass_rate": 0.75
+  }
+}

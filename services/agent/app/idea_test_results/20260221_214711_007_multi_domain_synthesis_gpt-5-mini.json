@@ -1,0 +1,874 @@
+{
+  "test_metadata": {
+    "test_id": "007",
+    "test_name": "Multi-Domain Esoteric Synthesis",
+    "difficulty_level": "7/10",
+    "category": "Cross-Domain Research"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Synthesis: PTFE (Teflon) \u2014 chemistry, history, health controversies, and how products have changed\n\nChemical structure and key chemistry\n- Polytetrafluoroethylene (PTFE, trade name Teflon) is a high\u2011molecular\u2011weight fluoropolymer whose repeating unit is \u2013CF2\u2013CF2\u2013 (formally polymerized from the monomer tetrafluoroethylene, TFE). The carbon\u2013fluorine bonds give PTFE an exceptionally inert, hydrophobic, and low\u2011friction surface; these properties explain its widespread use (cookware, bearings, gaskets, medical devices) and its high thermal stability (melting point ~327 \u00b0C) but also a defined thermal decomposition range (deterioration beginning ~260 \u00b0C, decomposition above ~350 \u00b0C, and pyrolysis at still higher temperatures) that can generate fluorinated gases and fragments [Chemistry references: Britannica; ScienceDirect; Wikipedia; Chemical Reviews] (https://www.britannica.com/science/polytetrafluoroethylene; https://www.sciencedirect.com/topics/chemistry/poly-tetrafluoroethylene; https://en.wikipedia.org/wiki/Polytetrafluoroethylene; https://pubs.acs.org/doi/abs/10.1021/acs.chemrev.8b00458).\n\nHistorical development and role of processing aids\n- PTFE was discovered accidentally by Roy J. Plunkett at DuPont in 1938 and later commercialized as Teflon (history summarized by DuPont/Chemours and historical sources) (https://www.teflon.com/en/news-events/history; https://www.sciencehistory.org/education/scientific-biographies/roy-j-plunkett).\n- During scale\u2011up and processing, manufacturers historically used fluorinated small molecules (notably PFOA, perfluorooctanoic acid) as surfactants/processing aids to emulsify tetrafluoroethylene dispersions and to help sinter and coat PTFE products. Those fluorinated processing aids are members of the broader PFAS family; their persistence and toxicity later became central to regulatory and legal controversies (historical overviews and PFAS histories) (https://www.manufacturingdive.com/news/the-history-behind-forever-chemicals-pfas-3m-dupont-pfte-pfoa-pfos/698254/; https://en.wikipedia.org/wiki/Polytetrafluoroethylene).\n\nHealth controversies: what caused concern and the mechanisms implicated\n- Two related but distinct health issues arise in connection with PTFE and PFAS:\n  1) Thermal decomposition of PTFE (overheating nonstick cookware, industrial pyrolysis) can release fluorinated gases and particulates that cause acute respiratory effects in humans (polymer\u2011fume fever) and can be lethal to birds at high exposures. The decomposition onset and the identity of gaseous decomposition products (e.g., fluorocarbon fragments, TFE, difluorocarbene fragments) are documented in polymer chemistry and material safety literature (https://en.wikipedia.org/wiki/Polytetrafluoroethylene; https://www.sciencedirect.com/topics/chemistry/poly-tetrafluoroethylene).\n  2) Long\u2011term, systemic health concerns center on certain PFAS that were used in PTFE production (notably PFOA). PFOA and some related PFAS are persistent, bioaccumulative, and associated with adverse outcomes (increased cholesterol, some cancers, immune effects, developmental effects). Major public health agencies (EPA, ATSDR, NIEHS/NTP) and reviews summarize epidemiology and toxicology linking PFOA/PFOS and other PFAS to health risks; IARC classifies PFOA as carcinogenic to humans (Group 1) in available assessments cited by cancer organizations (https://www.epa.gov/pfas/our-current-understanding-human-health-and-environmental-risks-pfas; https://www.atsdr.cdc.gov/pfas/about/health-effects.html; https://www.niehs.nih.gov/health/topics/agents/pfc; https://www.cancer.org/cancer/risk-prevention/chemicals/teflon-and-perfluorooctanoic-acid-pfoa.html).\n- Published perspectives and studies have noted that PFOA (and other PFAS) were used in PTFE manufacture and that residues and volatile PFAS\u2011related species can be associated with PTFE processing or high\u2011temperature use; this is a core reason for the regulatory scrutiny and the industry phase\u2011out of PFOA (https://pubmed.ncbi.nlm.nih.gov/28913736/; https://www.manufacturingdive.com/news/the-history-behind-forever-chemicals-pfas-3m-dupont-pfte-pfoa-pfos/698254/).\n\nHow chemistry explains the health risks (linking structure \u2192 exposure)\n- The strength and stability of the C\u2013F bond make PTFE chemically inert and thermally stable under normal use; however, at elevated temperatures the polymer backbone can break and yield small fluorinated fragments (gaseous products, radicals) that are biologically reactive or irritating when inhaled (explaining polymer\u2011fume fever) (https://en.wikipedia.org/wiki/Polytetrafluoroethylene; https://www.sciencedirect.com/topics/chemistry/poly-tetrafluoroethylene).\n- Separately, the small fluorinated acids/surfactants (e.g., PFOA) used during polymerization are low\u2011molecular\u2011weight PFAS with very different toxicokinetics from the high\u2011molecular\u2011weight PTFE polymer: they are persistent in the environment and in humans, can travel offsite, and have been linked to chronic health outcomes. Thus the chemistry of PTFE manufacture (requiring surfactants and dispersing agents) \u2014 not the inert bulk PTFE polymer itself \u2014 largely explains the long\u2011term PFAS exposure concerns (https://pubmed.ncbi.nlm.nih.gov/28913736/; https://www.manufacturingdive.com/news/the-history-behind-forever-chemicals-pfas-3m-dupont-pfte-pfoa-pfos/698254/).\n\nProduct changes and how modern products try to address risks\n- Industry response and regulatory pressure led many manufacturers to stop using PFOA in PTFE production (PFOA phase\u2011out) and replace it with shorter\u2011chain PFAS or alternative processing aids (e.g., GenX/HFPO\u2011DA chemistries were used as replacements). Regrettable substitution concerns (persistence/toxicity of alternatives) have been raised in scientific and consumer reporting (https://en.wikipedia.org/wiki/Polytetrafluoroethylene; https://pubmed.ncbi.nlm.nih.gov/28913736/; https://misen.com/blogs/news/ceramic-or-ptfe-picking-the-lesser-non-stick-evil-for-your-kitchen).\n- On products: PTFE remains widely used in cookware (nonstick coatings), industrial components, and some medical devices because of its desirable surface and chemical properties. To mitigate consumer exposures, manufacturers now market \"PFOA\u2011free\" PTFE coatings and a growing range of PTFE\u2011free or PFAS\u2011free alternatives (ceramic coatings, stainless steel, cast iron, etc.). Independent testing and consumer advocacy (e.g., Consumer Reports) caution that claims vary and that some \"ceramic\" or alternative coatings may still contain PFAS unless explicitly certified PFAS\u2011free; they also note that overheating any coating can present hazards (https://www.consumerreports.org/toxic-chemicals-substances/you-cant-always-trust-claims-on-non-toxic-cookware-a4849321487/; https://www.organicauthority.com/organic-food-recipes/non-toxic-cookware-brands-to-keep-chemicals-out-of-your-food; https://pubmed.ncbi.nlm.nih.gov/28913736/).\n\nResidual uncertainties and practical guidance from the evidence\n- Uncertainties remain about: (a) low\u2011level residual PFAS in finished PTFE products after modern manufacturing and how much (if any) transfers to food during normal use; (b) toxicity profiles of replacement PFAS (e.g., GenX) and their persistence; and (c) the detailed distribution of pyrolysis products under varied cooking conditions. These uncertainties are the reason for continued regulatory review (EPA, ATSDR) and for recommendations to avoid overheating nonstick pans (https://www.epa.gov/pfas/our-current-understanding-human-health-and-environmental-risks-pfas; https://www.atsdr.cdc.gov/pfas/about/health-effects.html; https://pubmed.ncbi.nlm.nih.gov/28913736/).\n\nEvidence summary and source quality\n- Chemistry: authoritative reviews and reference entries on PTFE structure, polymerization, and thermal behaviour (Chemical Reviews overview; ScienceDirect/Essential Chemical Industry; Britannica; Wikipedia) (https://pubs.acs.org/doi/abs/10.1021/acs.chemrev.8b00458; https://www.sciencedirect.com/topics/chemistry/poly-tetrafluoroethylene; https://www.britannica.com/science/polytetrafluoroethylene; https://en.wikipedia.org/wiki/Polytetrafluoroethylene).\n- History: primary historical summaries and company histories on Plunkett and commercialization (Science History Institute; DuPont/Chemours Teflon history; Smithsonian/Manufacturing Dive) (https://www.sciencehistory.org/education/scientific-biographies/roy-j-plunkett/; https://www.teflon.com/en/news-events/history; https://www.smithsonianmag.com/science-nature/the-long-strange-history-of-teflon-the-indestructible-product-nothing-seems-to-stick-to-180984920/; https://www.manufacturingdive.com/news/the-history-behind-forever-chemicals-pfas-3m-dupont-pfte-pfoa-pfos/698254/).\n- Health/regulatory: major public agencies and reviews on PFAS health risks (EPA, ATSDR, NIEHS/NTP, cancer organizations) (https://www.epa.gov/pfas/our-current-understanding-human-health-and-environmental-risks-pfas; https://www.atsdr.cdc.gov/pfas/about/health-effects.html; https://www.niehs.nih.gov/health/topics/agents/pfc; https://www.cancer.org/cancer/risk-prevention/chemicals/teflon-and-perfluorooctanoic-acid-pfoa.html).\n- Products/consumer testing: peer\u2011reviewed perspectives on PTFE cookware and PFAS (PubMed perspective), and consumer testing/reporting on cookware claims and alternatives (Consumer Reports, product guides) (https://pubmed.ncbi.nlm.nih.gov/28913736/; https://www.consumerreports.org/toxic-chemicals-substances/you-cant-always-trust-claims-on-non-toxic-cookware-a4849321487/).\n\nCurated list of cited sources (representative by domain)\n- Chemistry / polymer science: \"Polytetrafluoroethylene: Synthesis and Characterization of the Original Extreme Polymer\" (Chemical Reviews) https://pubs.acs.org/doi/abs/10.1021/acs.chemrev.8b00458\n- Chemistry / reference: Encyclopedia/Britannica: Polytetrafluoroethylene https://www.britannica.com/science/polytetrafluoroethylene\n- Polymer properties/thermal behavior: Polytetrafluoroethylene \u2014 Wikipedia https://en.wikipedia.org/wiki/Polytetrafluoroethylene\n- Manufacturing/process history: \"The history of PFAS: From World War II to your Teflon pan\" (Manufacturing Dive) https://www.manufacturingdive.com/news/the-history-behind-forever-chemicals-pfas-3m-dupont-pfte-pfoa-pfos/698254/\n- Original discovery/history: DuPont / Teflon history page https://www.teflon.com/en/news-events/history and Science History Institute on Roy J. Plunkett https://www.sciencehistory.org/education/scientific-biographies/roy-j-plunkett/\n- Health / regulatory overviews: US EPA PFAS overview https://www.epa.gov/pfas/our-current-understanding-human-health-and-environmental-risks-pfas; ATSDR PFAS health effects https://www.atsdr.cdc.gov/pfas/about/health-effects.html\n- Toxicology / reviews: PubMed perspective \"PTFE\u2011coated non\u2011stick cookware and toxicity concerns\" https://pubmed.ncbi.nlm.nih.gov/28913736/\n- Consumer testing / product claims: Consumer Reports \"You Can't Always Trust Claims on 'Non\u2011Toxic' Cookware\" https://www.consumerreports.org/toxic-chemicals-substances/you-cant-always-trust-claims-on-non-toxic-cookware-a4849321487/\n\nNotes on evidence gaps\n- Direct, publicly available quantification of residual PFOA (or other PFAS) levels in modern, commercially sold PTFE cookware after the industry phase\u2011out is not comprehensively summarized in the sources above; independent, up\u2011to\u2011date testing data would be needed for precise current exposure estimates (source gap: detailed, recent market\u2011wide residue surveys). The regulatory agency pages and the PubMed perspective explain the general concerns and the mechanistic links but do not provide a single dataset quantifying current product residues (https://www.epa.gov/pfas/our-current-understanding-human-health-and-environmental-risks-pfas; https://pubmed.ncbi.nlm.nih.gov/28913736/).\n\nBottom line (practical takeaways)\n- PTFE itself is a very stable, inert polymer whose useful properties come from dense C\u2013F bonding; overheating PTFE can produce toxic fluorinated pyrolysis products (acute inhalation hazard), and the main long\u2011term chemical concern stems from historically used small\u2011molecule PFAS (not the bulk polymer) used during manufacture (PFOA and related compounds). Regulatory action and industry change have largely removed PFOA from many manufacturing chains, but replacement PFAS and residual contamination remain active topics of study and regulation. Consumers who want to minimize PFAS exposures can avoid overheating PTFE pans, consider PFAS\u2011free cookware alternatives (verified PFAS\u2011free), and look for independent testing or certifications when evaluating product claims (https://www.epa.gov/pfas/our-current-understanding-human-health-and-environmental-risks-pfas; https://www.consumerreports.org/toxic-chemicals-substances/you-cant-always-trust-claims-on-non-toxic-cookware-a4849321487/).",
+      "action_summary": "PTFE (Teflon) is an inert fluoropolymer (\u2013CF2\u2013CF2\u2013) discovered in 1938; its chemistry (strong C\u2013F bonds) explains both its desirable properties and the fact that overheating leads to toxic pyrolysis products (polymer\u2011fume fever). Long\u2011term health controversies arise mainly because fluorinated small\u2011molecule processing aids (not the bulk polymer) such as PFOA are persistent toxic PFAS; regulatory action has phased out PFOA, but replacements and residual PFAS remain areas of concern. Sources: polymer chemistry reviews and references, historical accounts of DuPont/Plunkett, health/regulatory summaries (EPA, ATSDR, NIEHS), a peer\u2011reviewed perspective on PTFE cookware, and consumer testing (links in the deliverable).",
+      "success": true
+    },
+    "graph": {
+      "root_id": "5efcd28d-f657-47e2-84f4-c6d09f8099b1",
+      "nodes": {
+        "5efcd28d-f657-47e2-84f4-c6d09f8099b1": {
+          "node_id": "5efcd28d-f657-47e2-84f4-c6d09f8099b1",
+          "title": "Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+          "details": {
+            "mandate": "Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "merged_results": [
+              {
+                "node_id": "bef5af54-050f-474c-86f3-346bb6cb6c48",
+                "title": "Gather authoritative chemistry sources on PTFE (structure, properties, synthesis, decomposition)",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "PTFE chemical structure properties polymerization synthesis thermal decomposition PFAS release tetrafluoroethylene polymer chemistry review",
+                  "intent": "Find authoritative chemistry sources (textbooks, review articles, material safety data sheets, and reputable chemistry websites) describing PTFE's molecular/atomic structure, physical and chemical properties, polymerization methods, processing chemistry, and thermal decomposition mechanisms that can generate PFAS-related species.",
+                  "vector_context": [],
+                  "count": 8,
+                  "results": [
+                    {
+                      "title": "Polytetrafluoroethylene - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Polytetrafluoroethylene",
+                      "description": "While PTFE is stable at lower temperatures, it begins to deteriorate at temperatures of about 260 \u00b0C (500 \u00b0F), it decomposes above 350 \u00b0C (662 \u00b0F), and pyrolysis occurs at temperatures above 400 \u00b0C (752 \u00b0F). The main decomposition products are fluorocarbon gases and a sublimate, including tetrafluoroethylene (TFE) and difluorocarbene radicals (RCF2). An animal study conducted in 1955 concluded that it is unlikely that these products would be generated in amounts significant to health at temperatures below 250 \u00b0C (482 \u00b0F). Above those temperatures the degradation by-products can be lethal to birds, and can cause flu-like symptoms in humans (polymer fume fever), although in humans those symptoms disappear within a day or two of being moved to fresh air."
+                    },
+                    {
+                      "title": "Polytetrafluoroethylene: Synthesis and Characterization of the Original Extreme Polymer | Chemical Reviews",
+                      "url": "https://pubs.acs.org/doi/abs/10.1021/acs.chemrev.8b00458",
+                      "description": "This Review aims to be a comprehensive, authoritative, and critical review of general interest to the chemistry community (both academia and industry) as it contains an extensive overview of all published data on the homopolymerization of tetrafluoroethylene (TFE), detailing the TFE homopolymerization process and the resulting chemical and physical properties."
+                    },
+                    {
+                      "title": "Poly(tetrafluoroethylene) - an overview | ScienceDirect Topics",
+                      "url": "https://www.sciencedirect.com/topics/chemistry/poly-tetrafluoroethylene",
+                      "description": "Figure 11.2. Chemical structure of PTFE. Formed by the polymerization of tetrafluoroethylene (TFE), the (\u2013CF2\u2013CF2\u2013) groups repeat many thousands of times. The fundamental properties of fluoropolymers evolve from the atomic structure of fluorine and carbon and their covalent bonding in specific chemical structures."
+                    },
+                    {
+                      "title": "Tetrafluoroethylene - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Tetrafluoroethylene",
+                      "description": "Like all unsaturated fluorocarbons, it is susceptible to nucleophilic attack. It is <strong>unstable towards decomposition to carbon and carbon tetrafluoride ( CF4) and prone to form explosive peroxides in contact with air</strong>. Polymerization of tetrafluoroethylene produces polytetrafluoroethylene (PTFE) ..."
+                    },
+                    {
+                      "title": "Polytetrafluoroethylene (PTFE) | Definition, Structure, Uses, & Facts | Britannica",
+                      "url": "https://www.britannica.com/science/polytetrafluoroethylene",
+                      "description": "Polytetrafluoroethylene (PTFE), ... Hostaflon, and Polyflon, PTFE is distinguished by its <strong>slippery surface, high melting point, and resistance to attack by most chemicals</strong>...."
+                    },
+                    {
+                      "title": "Poly(tetrafluoroethylene) | 9002-84-0",
+                      "url": "https://www.chemicalbook.com/ChemicalProductProperty_EN_CB4392561.htm",
+                      "description": "Poly-(Tetrafluoroethylene) (PTFE, Brand name: Teflon, Fluon, Hostaflon, and Polyflon) is a kind of strong, tough, waxy and nonflammable synthetic resin. Its structure formula is <strong>[CF2-CF2]n with a carbon backbone chain</strong>. It is produced through ..."
+                    },
+                    {
+                      "title": "Poly(tetrafluoroethene) (Polytetrafluoroethylene) and other fluoropolymers",
+                      "url": "https://www.essentialchemicalindustry.org/polymers/polytetrafluoroethene.html",
+                      "description": "Once formed, the product must be rapidly cooled to 770 K to prevent the reverse reaction occurring and the explosive decomposition of TFE: The cooling is done by passing the vapour through a water-cooled heat exchanger, made of graphite to resist chemical attack and thermal shock. Reactor residence time is 1 second. The monomer is transformed into the polymer poly(tetrafluoroethene) (PTFE), by radical polymerization."
+                    },
+                    {
+                      "title": "Teflon: Know its Structure, Preparation, Properties and Uses",
+                      "url": "https://testbook.com/chemistry/teflon",
+                      "description": "Additionally, under normal circumstances, radiation can be used to recycle PTFE. Crack Your Exam with Super Pass Live with India\u2019s Best Teachers and Coaching ... Teflon, as we know, is a polymer consisting of carbon and fluorine atoms. Tetrafluoroethylene, a straight chain of carbon atoms with fluorine atoms attached to every other carbon atom, makes up the repeating unit of its chemical structure."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "74ef7ceb-0539-4866-a888-cb0b92d0751c",
+                "title": "Gather historical sources on discovery and commercialization of PTFE and the role of processing aids (PFOA) and major corporate/legal events",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "history of Teflon PTFE discovery Roy Plunkett 1938 DuPont commercialization PFOA timeline lawsuits corporate history",
+                  "intent": "Find reliable history sources (company histories, newspapers, timelines, legal case summaries, historical reviews) covering Roy Plunkett's discovery, DuPont/3M commercialization, introduction and use of PFOA as processing aid, and key litigation/regulatory milestones.",
+                  "vector_context": [],
+                  "count": 8,
+                  "results": [
+                    {
+                      "title": "The history of PFAS: From World War II to your Teflon pan | Manufacturing Dive",
+                      "url": "https://www.manufacturingdive.com/news/the-history-behind-forever-chemicals-pfas-3m-dupont-pfte-pfoa-pfos/698254/",
+                      "description": "Roy J. Plunkett, right, and two other chemists reenact the making of PTFE, commonly known as Teflon, in one of DuPont\u2019s laboratories on <strong>April 4, 1961</strong>. Plunkett was the original holder of the Teflon patent."
+                    },
+                    {
+                      "title": "Roy J. Plunkett - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Roy_J._Plunkett",
+                      "description": "<strong>In 1938, while attempting to make a new chlorofluorocarbon refrigerant, Plunkett&#x27;s laboratory team discovered polytetrafluoroethylene (PTFE), better known as Teflon</strong>. In New York City in April 1986, Plunkett shared the story of his accidental discovery at the spring meeting of the American Chemical ..."
+                    },
+                    {
+                      "title": "From Award Winning Chemist to Modern Day Villain, the Story of Roy J. Plunkett, the Inventor of Teflon - PPM Consultants",
+                      "url": "https://www.ppmco.com/from-award-winning-chemist-to-modern-day-villain-the-story-of-roy-j-plunkett-the-inventor-of-teflon/",
+                      "description": "As with many new discoveries in ... <strong>In 1938, a post-doctoral scholar, Roy Plunkett, was working for DuPont to find a replacement for hazardous refrigerants when he stumbled across what we now know as Teflon</strong>..."
+                    },
+                    {
+                      "title": "The History of Teflon\u2122 Fluoropolymers",
+                      "url": "https://www.teflon.com/en/news-events/history",
+                      "description": "The Teflon\u2122 story began on <strong>April 6, 1938</strong>. Dr. Roy J. Plunkett was working with gases related to refrigerants. After checking a frozen, compressed sample of tetrafluoroethylene, he and his associates made an unexpected discovery: The sample ..."
+                    },
+                    {
+                      "title": "Roy J. Plunkett | Science History Institute",
+                      "url": "https://www.sciencehistory.org/education/scientific-biographies/roy-j-plunkett/",
+                      "description": "Plunkett realized that against the predictions of polymer science of the day, TFE had polymerized to produce this substance\u2014later named Teflon\u2014with such potentially useful characteristics. Chemists and engineers in the Central Research Department with special experience in polymer research and development investigated the substance further. Meanwhile, Plunkett was transferred to the tetraethyl lead division of DuPont, which produced the additive that for many years boosted gasoline octane levels."
+                    },
+                    {
+                      "title": "Discovery of Teflon | American Physical Society",
+                      "url": "https://www.aps.org/publications/apsnews/202104/history.cfm",
+                      "description": "Chemists Roy Plunkett (right) and Robert McHarness (center) and technician Jack Rebok re-enact the discovery of fluorocarbon polymers. ... On the morning of <strong>April 6, 1938</strong>, Plunkett asked his research assistant, Jack Rebok, to set up their ..."
+                    },
+                    {
+                      "title": "The Long, Strange History of Teflon, the Indestructible Product Nothing Seems to Stick to",
+                      "url": "https://www.smithsonianmag.com/science-nature/the-long-strange-history-of-teflon-the-indestructible-product-nothing-seems-to-stick-to-180984920/",
+                      "description": "<strong>From its discovery in 1938 until that moment, likely in 1942</strong>, polytetrafluorethylene\u2014it wouldn\u2019t be officially registered as Teflon until after the war\u2014bounced around DuPont as a curious laboratory product."
+                    },
+                    {
+                      "title": "Polytetrafluoroethylene - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Polytetrafluoroethylene",
+                      "description": "Although GenX was designed to be ... more detrimental than those of the chemical it has replaced. <strong>Polytetrafluoroethylene (PTFE) was accidentally discovered in 1938</strong> by Roy J. Plunkett while he was working in Chemours Chambers Works ..."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "647780b2-2fc8-48c0-8dca-8e3a10f5dce9",
+                "title": "Collect health and regulatory literature about PFOA/PFOS/PFAS, polymer-fume fever, and exposure from PTFE products",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "PFOA PFOS PFAS health effects epidemiology IARC ATSDR EPA polymer fume fever PTFE cookware pyrolysis toxicology review",
+                  "intent": "Find toxicology and epidemiology literature, agency assessments (EPA, ATSDR, IARC, EFSA), clinical descriptions (polymer fume fever), and studies linking PTFE-related processes or additives (PFOA) to human health effects and exposure pathways.",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "How PFAS Impacts Your Health | PFAS and Your Health | ATSDR",
+                      "url": "https://www.atsdr.cdc.gov/pfas/about/health-effects.html",
+                      "description": "<strong>Increases in cholesterol levels</strong> (PFOA, PFOS, PFNA, PFDA)."
+                    },
+                    {
+                      "title": "Our Current Understanding of the Human Health and Environmental Risks of PFAS | US EPA",
+                      "url": "https://www.epa.gov/pfas/our-current-understanding-human-health-and-environmental-risks-pfas",
+                      "description": "Learn about EPA&#x27;s current understanding of the health risks of PFAS."
+                    },
+                    {
+                      "title": "PFAS and Your Health | PFAS and Your Health | ATSDR",
+                      "url": "https://www.atsdr.cdc.gov/pfas/about/index.html",
+                      "description": "NTP (National Toxicology Program). 2016. Monograph on Immunotoxicity Associated with Exposure to Perfluorooctanoic acid (PFOA) and Perfluorooctane Sulfonate (PFOS)."
+                    },
+                    {
+                      "title": "Health Effects: PFAS Information for Clinicians - 2024 | PFAS and Your Health | ATSDR",
+                      "url": "https://www.atsdr.cdc.gov/pfas/hcp/clinical-overview/health-effects.html",
+                      "description": "<strong>The Agency for Toxic Substances and Disease Registry (ATSDR)&#x27;s 2021 Toxicological Profile for Perfluoroalkyls provides a comprehensive review of toxicological information for 12 different PFAS</strong>."
+                    },
+                    {
+                      "title": "PFOA, PFOS, and Related PFAS Chemicals | American Cancer Society",
+                      "url": "https://www.cancer.org/cancer/risk-prevention/chemicals/teflon-and-perfluorooctanoic-acid-pfoa.html",
+                      "description": "<strong>IARC has classified PFOA as \u201ccarcinogenic to humans</strong>\u201d (Group 1), based on sufficient evidence it can cause cancer in lab animals and strong evidence that it has some of the key properties of a carcinogen in people who are exposed to it."
+                    },
+                    {
+                      "title": "Summary - Guidance on PFAS Exposure, Testing, and Clinical Follow-Up - NCBI Bookshelf",
+                      "url": "https://www.ncbi.nlm.nih.gov/books/NBK584702/",
+                      "description": "Organizations such as the International ... and the EPA have linked exposure to PFAS (particularly PFOA and PFOS) to <strong>multiple cancers, thyroid dysfunction, small changes in birthweight, and high cholesterol</strong>...."
+                    },
+                    {
+                      "title": "Perfluoroalkyl and Polyfluoroalkyl Substances (PFAS) | National Institute of Environmental Health Sciences",
+                      "url": "https://www.niehs.nih.gov/health/topics/agents/pfc",
+                      "description": "Furthermore, the National Toxicology Program (NTP), an interagency program headquartered at NIEHS, concluded that two types of PFAS, PFOA and PFOS, <strong>suppressed the antibody response and were a hazard to immune system function in humans</strong>."
+                    },
+                    {
+                      "title": "Per- and Polyfluoroalkyl Substances (PFAS) and Your Health | PFAS and Your Health | ATSDR",
+                      "url": "https://www.atsdr.cdc.gov/pfas/index.html",
+                      "description": "Understand how exposure to PFAS can impact your health"
+                    },
+                    {
+                      "title": "7 Human and Ecological Health Effects of select PFAS \u2013 PFAS \u2014 Per- and Polyfluoroalkyl Substances",
+                      "url": "https://pfas-1.itrcweb.org/7-human-and-ecological-health-effects-of-select-pfas/",
+                      "description": "More recently, California EPA and USEPA have developed reference doses for PFOA and PFOS (CA OEHHA 2024; USEPA 2024; 2024); cancer slope factors for PFOA (USEPA 2024; CA OEHAA 2024); and reference doses for PFHxS (USEPA 2025), PFDA (USEPA 2024), and draft reference doses for PFNA (USEPA 2024) based on human general population data that are far below current values for long-chain PFAS based on animal data. The National Academies of Science, Engineering, and Medicine (NASEM 2022), at the request of ATSDR and the National Institute of Environmental Health Sciences (NIEHS), developed recommendations for testing for PFAS exposure and clinical monitoring for exposed individuals."
+                    },
+                    {
+                      "title": "ATSDR Perfluoroalkyls (PFAS) ToxFAQs",
+                      "url": "https://www.atsdr.cdc.gov/toxfaqs/tfacts200.pdf",
+                      "description": "Studies in animals have shown that <strong>PFOA and PFOS can cause cancer in the liver, testes, pancreas, and thyroid</strong>."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "c402ae12-f938-46fd-96a3-1f2d98df5c56",
+                "title": "Identify current products using PTFE and modern alternatives / mitigation strategies (PFOA-free, GenX, ceramic coatings)",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "current products using PTFE non-stick cookware industrial uses medical PTFE PFOA-free claims GenX alternatives ceramic coatings silicone cookware certifications",
+                  "intent": "Find product pages, manufacturer technical notes, third-party tests, and industry/consumer reports describing where PTFE is used today (cookware, industrial bearings, medical devices), how manufacturers claim to reduce risks (PFOA-free process, alternative PFAS), and available non-PTFE alternatives.",
+                  "vector_context": [],
+                  "count": 8,
+                  "results": [
+                    {
+                      "title": "8 Best Non-Toxic Cookware of 2026 [Chef Reviewed, Rated & Ranked]",
+                      "url": "https://www.organicauthority.com/organic-food-recipes/non-toxic-cookware-brands-to-keep-chemicals-out-of-your-food",
+                      "description": "Here&#x27;s the 8 Best Non-Toxic Cookware Sets of 2026, tested for safety, durability, &amp; performance. PFAS-free ceramic non-stick, stainless steel, and cast iron options."
+                    },
+                    {
+                      "title": "Best Frying Pans If You Want to Avoid PFAS Chemicals via @ConsumerReports",
+                      "url": "https://www.consumerreports.org/home-garden/cookware/best-frying-pans-if-you-want-to-avoid-pfas-chemicals-a1006253549/",
+                      "description": "If you\u2019ve decided to swear off nonstick cookware made with these chemicals, there are several good alternatives, including <strong>ceramic, stainless steel, cast-iron, and carbon steel pans</strong>."
+                    },
+                    {
+                      "title": "Non-Toxic Cookware & Containers Guide: Ditch PTFE, PFOA, and BPA for Safer Cooking",
+                      "url": "https://www.cupindy.com/blogs/info/non-toxic-cookware-guide",
+                      "description": "<strong>PTFE &amp; PFOA free nonstick cookware usually means the non-stick coating is ceramic or a new generation sol-gel formula</strong>. PFAS free cookware is the strongest claim \u2013 it means no chemicals from the PFAS family are used at all."
+                    },
+                    {
+                      "title": "What Are PFOs, PFAs & PTFE? Guide to Safe Nonstick Cookware| Sur La Table \u2013 Lid & Ladle",
+                      "url": "https://learn.surlatable.com/what-are-ptfe-pfas-pfos-nonstick-coatings/",
+                      "description": "Here are some of the most popular nontoxic cookware options available today: <strong>Ceramic cookware</strong> has become a popular alternative to PTFE-coated pans, offering a naturally slick cooking surface without the use of synthetic chemicals."
+                    },
+                    {
+                      "title": "Ceramic or PTFE? Picking the Lesser Non-Stick Evil for Your Kitchen | Misen",
+                      "url": "https://misen.com/blogs/news/ceramic-or-ptfe-picking-the-lesser-non-stick-evil-for-your-kitchen",
+                      "description": "Another recent study from UNC Chapel Hill discovered higher PFAS blood levels in people who regularly eat ultra-processed foods [7]. While manufacturers swapped out PFOA for alternatives like GenX, research suggests these replacements carry similar risks [6]. So what&#x27;s a safer choice? Look for cookware that&#x27;s explicitly labeled as both PFAS-free and PTFE-free. Even products labeled &quot;ceramic&quot; need verification--some still contain PTFE or other PFAS compounds [7]. For peace of mind, consider truly PFAS-free options like [ceramic-coated pans](https://misen."
+                    },
+                    {
+                      "title": "We tested 11 Non-toxic Cookware Brands: These Have No Synthetic Coatings (2026 Guide)",
+                      "url": "https://www.implasticfree.com/non-toxic-cookware-brands/",
+                      "description": "Gen-X is a trademark for another chemical compound that has been developed to replace PFOA (C8) and other PFAS, mainly based on the ammonium salt of hexafluoropropylene oxide dimer acid (HFPO-DA). It is what environmental health scientists consider as a \u201cregrettable substitution\u201d as it has also been linked to neonatal mortality, low birthweight, and hepatomegaly in the Sprague-Dawley rats (9). Yes, contrary to all other non-toxic blogs, we also list \u201cceramic\u201d coating here."
+                    },
+                    {
+                      "title": "You Can\u2019t Always Trust Claims on \u2018Non-Toxic\u2019 Cookware via @ConsumerReports",
+                      "url": "https://www.consumerreports.org/toxic-chemicals-substances/you-cant-always-trust-claims-on-non-toxic-cookware-a4849321487/",
+                      "description": "He says PFOA and other PFAS compounds could be trapped within layers of PTFE and not destroyed during the curing process. CR didn\u2019t detect any of the 96 PFAS we looked for in either of the two ceramic-coated pans, the <strong>Always Pan and the Red Copper</strong>..."
+                    },
+                    {
+                      "title": "PTFE-coated non-stick cookware and toxicity concerns: a perspective - PubMed",
+                      "url": "https://pubmed.ncbi.nlm.nih.gov/28913736/",
+                      "description": "The toxicity and fate of ingested PTFE coatings are also not understood. Moreover, the emerging, persistent, and well-known toxic environmental pollutant PFOA is also used in the synthesis of PTFA. There are some reports where PFOA was detected in the gas phase released from the cooking utensils under normal cooking temperatures. Due to toxicity concerns, PFOA has been replaced with other chemicals such as GenX, but these new alternatives are also suspected to have similar toxicity."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "0b738565-2499-4975-a189-e620ca43a394",
+                "title": "Synthesize findings: explain how PTFE chemistry relates to health concerns and how modern products address them; produce domain-spanning citations",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "think",
+                  "success": true,
+                  "node_id": "0b738565-2499-4975-a189-e620ca43a394",
+                  "title": "Synthesize findings: explain how PTFE chemistry relates to health concerns and how modern products address them; produce domain-spanning citations",
+                  "details": {
+                    "goal": "Combine the chemistry, history, health, and product findings into a single coherent explanation that: (a) describes PTFE's molecular chemistry and why that chemistry led to the use of PFOA/process aids, (b) explains the mechanisms by which PTFE production, processing, and thermal decomposition can produce exposures or toxic species (linking to PFAS concerns and polymer-fume fever), and (c) describes how modern products and manufacturing changes (PFOA-free, GenX, alternative coatings, design choices) mitigate those risks, including residual uncertainties and regulatory context.",
+                    "required_outputs": [
+                      "A concise synthesis (approx. 3-6 paragraphs) tying chemistry\u2192health\u2192products",
+                      "A short bulleted summary of evidence (chemistry, history, health, product) and quality/authority of sources",
+                      "A curated list of citations (URLs and bibliographic detail) covering at least one authoritative source from each domain: chemistry, history, health/regulatory, product/manufacturer or independent testing"
+                    ],
+                    "notes": "This step depends on the search results gathered above; include specific citations (links) found during searches. Flag any gaps that need visit actions for full-text extraction.",
+                    "action": "synthesize",
+                    "parent_goal": "Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+                    "is_leaf": true,
+                    "evaluation": {
+                      "score": 1.0
+                    },
+                    "action_attempts": 1,
+                    "action_max_retries": 2
+                  }
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 5,
+              "success": 5,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "bef5af54-050f-474c-86f3-346bb6cb6c48",
+            "74ef7ceb-0539-4866-a888-cb0b92d0751c",
+            "647780b2-2fc8-48c0-8dca-8e3a10f5dce9",
+            "c402ae12-f938-46fd-96a3-1f2d98df5c56",
+            "0b738565-2499-4975-a189-e620ca43a394",
+            "393f7c27-8385-474a-ac3f-bb991834ef80"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "bef5af54-050f-474c-86f3-346bb6cb6c48": {
+          "node_id": "bef5af54-050f-474c-86f3-346bb6cb6c48",
+          "title": "Gather authoritative chemistry sources on PTFE (structure, properties, synthesis, decomposition)",
+          "details": {
+            "query": "PTFE chemical structure properties polymerization synthesis thermal decomposition PFAS release tetrafluoroethylene polymer chemistry review",
+            "intent": "Find authoritative chemistry sources (textbooks, review articles, material safety data sheets, and reputable chemistry websites) describing PTFE's molecular/atomic structure, physical and chemical properties, polymerization methods, processing chemistry, and thermal decomposition mechanisms that can generate PFAS-related species.",
+            "count": 8,
+            "action": "search",
+            "parent_goal": "Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "PTFE chemical structure properties polymerization synthesis thermal decomposition PFAS release tetrafluoroethylene polymer chemistry review",
+              "intent": "Find authoritative chemistry sources (textbooks, review articles, material safety data sheets, and reputable chemistry websites) describing PTFE's molecular/atomic structure, physical and chemical properties, polymerization methods, processing chemistry, and thermal decomposition mechanisms that can generate PFAS-related species.",
+              "vector_context": [],
+              "count": 8,
+              "results": [
+                {
+                  "title": "Polytetrafluoroethylene - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Polytetrafluoroethylene",
+                  "description": "While PTFE is stable at lower temperatures, it begins to deteriorate at temperatures of about 260 \u00b0C (500 \u00b0F), it decomposes above 350 \u00b0C (662 \u00b0F), and pyrolysis occurs at temperatures above 400 \u00b0C (752 \u00b0F). The main decomposition products are fluorocarbon gases and a sublimate, including tetrafluoroethylene (TFE) and difluorocarbene radicals (RCF2). An animal study conducted in 1955 concluded that it is unlikely that these products would be generated in amounts significant to health at temperatures below 250 \u00b0C (482 \u00b0F). Above those temperatures the degradation by-products can be lethal to birds, and can cause flu-like symptoms in humans (polymer fume fever), although in humans those symptoms disappear within a day or two of being moved to fresh air."
+                },
+                {
+                  "title": "Polytetrafluoroethylene: Synthesis and Characterization of the Original Extreme Polymer | Chemical Reviews",
+                  "url": "https://pubs.acs.org/doi/abs/10.1021/acs.chemrev.8b00458",
+                  "description": "This Review aims to be a comprehensive, authoritative, and critical review of general interest to the chemistry community (both academia and industry) as it contains an extensive overview of all published data on the homopolymerization of tetrafluoroethylene (TFE), detailing the TFE homopolymerization process and the resulting chemical and physical properties."
+                },
+                {
+                  "title": "Poly(tetrafluoroethylene) - an overview | ScienceDirect Topics",
+                  "url": "https://www.sciencedirect.com/topics/chemistry/poly-tetrafluoroethylene",
+                  "description": "Figure 11.2. Chemical structure of PTFE. Formed by the polymerization of tetrafluoroethylene (TFE), the (\u2013CF2\u2013CF2\u2013) groups repeat many thousands of times. The fundamental properties of fluoropolymers evolve from the atomic structure of fluorine and carbon and their covalent bonding in specific chemical structures."
+                },
+                {
+                  "title": "Tetrafluoroethylene - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Tetrafluoroethylene",
+                  "description": "Like all unsaturated fluorocarbons, it is susceptible to nucleophilic attack. It is <strong>unstable towards decomposition to carbon and carbon tetrafluoride ( CF4) and prone to form explosive peroxides in contact with air</strong>. Polymerization of tetrafluoroethylene produces polytetrafluoroethylene (PTFE) ..."
+                },
+                {
+                  "title": "Polytetrafluoroethylene (PTFE) | Definition, Structure, Uses, & Facts | Britannica",
+                  "url": "https://www.britannica.com/science/polytetrafluoroethylene",
+                  "description": "Polytetrafluoroethylene (PTFE), ... Hostaflon, and Polyflon, PTFE is distinguished by its <strong>slippery surface, high melting point, and resistance to attack by most chemicals</strong>...."
+                },
+                {
+                  "title": "Poly(tetrafluoroethylene) | 9002-84-0",
+                  "url": "https://www.chemicalbook.com/ChemicalProductProperty_EN_CB4392561.htm",
+                  "description": "Poly-(Tetrafluoroethylene) (PTFE, Brand name: Teflon, Fluon, Hostaflon, and Polyflon) is a kind of strong, tough, waxy and nonflammable synthetic resin. Its structure formula is <strong>[CF2-CF2]n with a carbon backbone chain</strong>. It is produced through ..."
+                },
+                {
+                  "title": "Poly(tetrafluoroethene) (Polytetrafluoroethylene) and other fluoropolymers",
+                  "url": "https://www.essentialchemicalindustry.org/polymers/polytetrafluoroethene.html",
+                  "description": "Once formed, the product must be rapidly cooled to 770 K to prevent the reverse reaction occurring and the explosive decomposition of TFE: The cooling is done by passing the vapour through a water-cooled heat exchanger, made of graphite to resist chemical attack and thermal shock. Reactor residence time is 1 second. The monomer is transformed into the polymer poly(tetrafluoroethene) (PTFE), by radical polymerization."
+                },
+                {
+                  "title": "Teflon: Know its Structure, Preparation, Properties and Uses",
+                  "url": "https://testbook.com/chemistry/teflon",
+                  "description": "Additionally, under normal circumstances, radiation can be used to recycle PTFE. Crack Your Exam with Super Pass Live with India\u2019s Best Teachers and Coaching ... Teflon, as we know, is a polymer consisting of carbon and fluorine atoms. Tetrafluoroethylene, a straight chain of carbon atoms with fluorine atoms attached to every other carbon atom, makes up the repeating unit of its chemical structure."
+                }
+              ]
+            }
+          },
+          "parent_id": "5efcd28d-f657-47e2-84f4-c6d09f8099b1",
+          "parent_ids": [
+            "5efcd28d-f657-47e2-84f4-c6d09f8099b1"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "74ef7ceb-0539-4866-a888-cb0b92d0751c": {
+          "node_id": "74ef7ceb-0539-4866-a888-cb0b92d0751c",
+          "title": "Gather historical sources on discovery and commercialization of PTFE and the role of processing aids (PFOA) and major corporate/legal events",
+          "details": {
+            "query": "history of Teflon PTFE discovery Roy Plunkett 1938 DuPont commercialization PFOA timeline lawsuits corporate history",
+            "intent": "Find reliable history sources (company histories, newspapers, timelines, legal case summaries, historical reviews) covering Roy Plunkett's discovery, DuPont/3M commercialization, introduction and use of PFOA as processing aid, and key litigation/regulatory milestones.",
+            "count": 8,
+            "action": "search",
+            "parent_goal": "Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "history of Teflon PTFE discovery Roy Plunkett 1938 DuPont commercialization PFOA timeline lawsuits corporate history",
+              "intent": "Find reliable history sources (company histories, newspapers, timelines, legal case summaries, historical reviews) covering Roy Plunkett's discovery, DuPont/3M commercialization, introduction and use of PFOA as processing aid, and key litigation/regulatory milestones.",
+              "vector_context": [],
+              "count": 8,
+              "results": [
+                {
+                  "title": "The history of PFAS: From World War II to your Teflon pan | Manufacturing Dive",
+                  "url": "https://www.manufacturingdive.com/news/the-history-behind-forever-chemicals-pfas-3m-dupont-pfte-pfoa-pfos/698254/",
+                  "description": "Roy J. Plunkett, right, and two other chemists reenact the making of PTFE, commonly known as Teflon, in one of DuPont\u2019s laboratories on <strong>April 4, 1961</strong>. Plunkett was the original holder of the Teflon patent."
+                },
+                {
+                  "title": "Roy J. Plunkett - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Roy_J._Plunkett",
+                  "description": "<strong>In 1938, while attempting to make a new chlorofluorocarbon refrigerant, Plunkett&#x27;s laboratory team discovered polytetrafluoroethylene (PTFE), better known as Teflon</strong>. In New York City in April 1986, Plunkett shared the story of his accidental discovery at the spring meeting of the American Chemical ..."
+                },
+                {
+                  "title": "From Award Winning Chemist to Modern Day Villain, the Story of Roy J. Plunkett, the Inventor of Teflon - PPM Consultants",
+                  "url": "https://www.ppmco.com/from-award-winning-chemist-to-modern-day-villain-the-story-of-roy-j-plunkett-the-inventor-of-teflon/",
+                  "description": "As with many new discoveries in ... <strong>In 1938, a post-doctoral scholar, Roy Plunkett, was working for DuPont to find a replacement for hazardous refrigerants when he stumbled across what we now know as Teflon</strong>..."
+                },
+                {
+                  "title": "The History of Teflon\u2122 Fluoropolymers",
+                  "url": "https://www.teflon.com/en/news-events/history",
+                  "description": "The Teflon\u2122 story began on <strong>April 6, 1938</strong>. Dr. Roy J. Plunkett was working with gases related to refrigerants. After checking a frozen, compressed sample of tetrafluoroethylene, he and his associates made an unexpected discovery: The sample ..."
+                },
+                {
+                  "title": "Roy J. Plunkett | Science History Institute",
+                  "url": "https://www.sciencehistory.org/education/scientific-biographies/roy-j-plunkett/",
+                  "description": "Plunkett realized that against the predictions of polymer science of the day, TFE had polymerized to produce this substance\u2014later named Teflon\u2014with such potentially useful characteristics. Chemists and engineers in the Central Research Department with special experience in polymer research and development investigated the substance further. Meanwhile, Plunkett was transferred to the tetraethyl lead division of DuPont, which produced the additive that for many years boosted gasoline octane levels."
+                },
+                {
+                  "title": "Discovery of Teflon | American Physical Society",
+                  "url": "https://www.aps.org/publications/apsnews/202104/history.cfm",
+                  "description": "Chemists Roy Plunkett (right) and Robert McHarness (center) and technician Jack Rebok re-enact the discovery of fluorocarbon polymers. ... On the morning of <strong>April 6, 1938</strong>, Plunkett asked his research assistant, Jack Rebok, to set up their ..."
+                },
+                {
+                  "title": "The Long, Strange History of Teflon, the Indestructible Product Nothing Seems to Stick to",
+                  "url": "https://www.smithsonianmag.com/science-nature/the-long-strange-history-of-teflon-the-indestructible-product-nothing-seems-to-stick-to-180984920/",
+                  "description": "<strong>From its discovery in 1938 until that moment, likely in 1942</strong>, polytetrafluorethylene\u2014it wouldn\u2019t be officially registered as Teflon until after the war\u2014bounced around DuPont as a curious laboratory product."
+                },
+                {
+                  "title": "Polytetrafluoroethylene - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Polytetrafluoroethylene",
+                  "description": "Although GenX was designed to be ... more detrimental than those of the chemical it has replaced. <strong>Polytetrafluoroethylene (PTFE) was accidentally discovered in 1938</strong> by Roy J. Plunkett while he was working in Chemours Chambers Works ..."
+                }
+              ]
+            }
+          },
+          "parent_id": "5efcd28d-f657-47e2-84f4-c6d09f8099b1",
+          "parent_ids": [
+            "5efcd28d-f657-47e2-84f4-c6d09f8099b1"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "647780b2-2fc8-48c0-8dca-8e3a10f5dce9": {
+          "node_id": "647780b2-2fc8-48c0-8dca-8e3a10f5dce9",
+          "title": "Collect health and regulatory literature about PFOA/PFOS/PFAS, polymer-fume fever, and exposure from PTFE products",
+          "details": {
+            "query": "PFOA PFOS PFAS health effects epidemiology IARC ATSDR EPA polymer fume fever PTFE cookware pyrolysis toxicology review",
+            "intent": "Find toxicology and epidemiology literature, agency assessments (EPA, ATSDR, IARC, EFSA), clinical descriptions (polymer fume fever), and studies linking PTFE-related processes or additives (PFOA) to human health effects and exposure pathways.",
+            "count": 10,
+            "action": "search",
+            "parent_goal": "Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "PFOA PFOS PFAS health effects epidemiology IARC ATSDR EPA polymer fume fever PTFE cookware pyrolysis toxicology review",
+              "intent": "Find toxicology and epidemiology literature, agency assessments (EPA, ATSDR, IARC, EFSA), clinical descriptions (polymer fume fever), and studies linking PTFE-related processes or additives (PFOA) to human health effects and exposure pathways.",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "How PFAS Impacts Your Health | PFAS and Your Health | ATSDR",
+                  "url": "https://www.atsdr.cdc.gov/pfas/about/health-effects.html",
+                  "description": "<strong>Increases in cholesterol levels</strong> (PFOA, PFOS, PFNA, PFDA)."
+                },
+                {
+                  "title": "Our Current Understanding of the Human Health and Environmental Risks of PFAS | US EPA",
+                  "url": "https://www.epa.gov/pfas/our-current-understanding-human-health-and-environmental-risks-pfas",
+                  "description": "Learn about EPA&#x27;s current understanding of the health risks of PFAS."
+                },
+                {
+                  "title": "PFAS and Your Health | PFAS and Your Health | ATSDR",
+                  "url": "https://www.atsdr.cdc.gov/pfas/about/index.html",
+                  "description": "NTP (National Toxicology Program). 2016. Monograph on Immunotoxicity Associated with Exposure to Perfluorooctanoic acid (PFOA) and Perfluorooctane Sulfonate (PFOS)."
+                },
+                {
+                  "title": "Health Effects: PFAS Information for Clinicians - 2024 | PFAS and Your Health | ATSDR",
+                  "url": "https://www.atsdr.cdc.gov/pfas/hcp/clinical-overview/health-effects.html",
+                  "description": "<strong>The Agency for Toxic Substances and Disease Registry (ATSDR)&#x27;s 2021 Toxicological Profile for Perfluoroalkyls provides a comprehensive review of toxicological information for 12 different PFAS</strong>."
+                },
+                {
+                  "title": "PFOA, PFOS, and Related PFAS Chemicals | American Cancer Society",
+                  "url": "https://www.cancer.org/cancer/risk-prevention/chemicals/teflon-and-perfluorooctanoic-acid-pfoa.html",
+                  "description": "<strong>IARC has classified PFOA as \u201ccarcinogenic to humans</strong>\u201d (Group 1), based on sufficient evidence it can cause cancer in lab animals and strong evidence that it has some of the key properties of a carcinogen in people who are exposed to it."
+                },
+                {
+                  "title": "Summary - Guidance on PFAS Exposure, Testing, and Clinical Follow-Up - NCBI Bookshelf",
+                  "url": "https://www.ncbi.nlm.nih.gov/books/NBK584702/",
+                  "description": "Organizations such as the International ... and the EPA have linked exposure to PFAS (particularly PFOA and PFOS) to <strong>multiple cancers, thyroid dysfunction, small changes in birthweight, and high cholesterol</strong>...."
+                },
+                {
+                  "title": "Perfluoroalkyl and Polyfluoroalkyl Substances (PFAS) | National Institute of Environmental Health Sciences",
+                  "url": "https://www.niehs.nih.gov/health/topics/agents/pfc",
+                  "description": "Furthermore, the National Toxicology Program (NTP), an interagency program headquartered at NIEHS, concluded that two types of PFAS, PFOA and PFOS, <strong>suppressed the antibody response and were a hazard to immune system function in humans</strong>."
+                },
+                {
+                  "title": "Per- and Polyfluoroalkyl Substances (PFAS) and Your Health | PFAS and Your Health | ATSDR",
+                  "url": "https://www.atsdr.cdc.gov/pfas/index.html",
+                  "description": "Understand how exposure to PFAS can impact your health"
+                },
+                {
+                  "title": "7 Human and Ecological Health Effects of select PFAS \u2013 PFAS \u2014 Per- and Polyfluoroalkyl Substances",
+                  "url": "https://pfas-1.itrcweb.org/7-human-and-ecological-health-effects-of-select-pfas/",
+                  "description": "More recently, California EPA and USEPA have developed reference doses for PFOA and PFOS (CA OEHHA 2024; USEPA 2024; 2024); cancer slope factors for PFOA (USEPA 2024; CA OEHAA 2024); and reference doses for PFHxS (USEPA 2025), PFDA (USEPA 2024), and draft reference doses for PFNA (USEPA 2024) based on human general population data that are far below current values for long-chain PFAS based on animal data. The National Academies of Science, Engineering, and Medicine (NASEM 2022), at the request of ATSDR and the National Institute of Environmental Health Sciences (NIEHS), developed recommendations for testing for PFAS exposure and clinical monitoring for exposed individuals."
+                },
+                {
+                  "title": "ATSDR Perfluoroalkyls (PFAS) ToxFAQs",
+                  "url": "https://www.atsdr.cdc.gov/toxfaqs/tfacts200.pdf",
+                  "description": "Studies in animals have shown that <strong>PFOA and PFOS can cause cancer in the liver, testes, pancreas, and thyroid</strong>."
+                }
+              ]
+            }
+          },
+          "parent_id": "5efcd28d-f657-47e2-84f4-c6d09f8099b1",
+          "parent_ids": [
+            "5efcd28d-f657-47e2-84f4-c6d09f8099b1"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "c402ae12-f938-46fd-96a3-1f2d98df5c56": {
+          "node_id": "c402ae12-f938-46fd-96a3-1f2d98df5c56",
+          "title": "Identify current products using PTFE and modern alternatives / mitigation strategies (PFOA-free, GenX, ceramic coatings)",
+          "details": {
+            "query": "current products using PTFE non-stick cookware industrial uses medical PTFE PFOA-free claims GenX alternatives ceramic coatings silicone cookware certifications",
+            "intent": "Find product pages, manufacturer technical notes, third-party tests, and industry/consumer reports describing where PTFE is used today (cookware, industrial bearings, medical devices), how manufacturers claim to reduce risks (PFOA-free process, alternative PFAS), and available non-PTFE alternatives.",
+            "count": 8,
+            "action": "search",
+            "parent_goal": "Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "current products using PTFE non-stick cookware industrial uses medical PTFE PFOA-free claims GenX alternatives ceramic coatings silicone cookware certifications",
+              "intent": "Find product pages, manufacturer technical notes, third-party tests, and industry/consumer reports describing where PTFE is used today (cookware, industrial bearings, medical devices), how manufacturers claim to reduce risks (PFOA-free process, alternative PFAS), and available non-PTFE alternatives.",
+              "vector_context": [],
+              "count": 8,
+              "results": [
+                {
+                  "title": "8 Best Non-Toxic Cookware of 2026 [Chef Reviewed, Rated & Ranked]",
+                  "url": "https://www.organicauthority.com/organic-food-recipes/non-toxic-cookware-brands-to-keep-chemicals-out-of-your-food",
+                  "description": "Here&#x27;s the 8 Best Non-Toxic Cookware Sets of 2026, tested for safety, durability, &amp; performance. PFAS-free ceramic non-stick, stainless steel, and cast iron options."
+                },
+                {
+                  "title": "Best Frying Pans If You Want to Avoid PFAS Chemicals via @ConsumerReports",
+                  "url": "https://www.consumerreports.org/home-garden/cookware/best-frying-pans-if-you-want-to-avoid-pfas-chemicals-a1006253549/",
+                  "description": "If you\u2019ve decided to swear off nonstick cookware made with these chemicals, there are several good alternatives, including <strong>ceramic, stainless steel, cast-iron, and carbon steel pans</strong>."
+                },
+                {
+                  "title": "Non-Toxic Cookware & Containers Guide: Ditch PTFE, PFOA, and BPA for Safer Cooking",
+                  "url": "https://www.cupindy.com/blogs/info/non-toxic-cookware-guide",
+                  "description": "<strong>PTFE &amp; PFOA free nonstick cookware usually means the non-stick coating is ceramic or a new generation sol-gel formula</strong>. PFAS free cookware is the strongest claim \u2013 it means no chemicals from the PFAS family are used at all."
+                },
+                {
+                  "title": "What Are PFOs, PFAs & PTFE? Guide to Safe Nonstick Cookware| Sur La Table \u2013 Lid & Ladle",
+                  "url": "https://learn.surlatable.com/what-are-ptfe-pfas-pfos-nonstick-coatings/",
+                  "description": "Here are some of the most popular nontoxic cookware options available today: <strong>Ceramic cookware</strong> has become a popular alternative to PTFE-coated pans, offering a naturally slick cooking surface without the use of synthetic chemicals."
+                },
+                {
+                  "title": "Ceramic or PTFE? Picking the Lesser Non-Stick Evil for Your Kitchen | Misen",
+                  "url": "https://misen.com/blogs/news/ceramic-or-ptfe-picking-the-lesser-non-stick-evil-for-your-kitchen",
+                  "description": "Another recent study from UNC Chapel Hill discovered higher PFAS blood levels in people who regularly eat ultra-processed foods [7]. While manufacturers swapped out PFOA for alternatives like GenX, research suggests these replacements carry similar risks [6]. So what&#x27;s a safer choice? Look for cookware that&#x27;s explicitly labeled as both PFAS-free and PTFE-free. Even products labeled &quot;ceramic&quot; need verification--some still contain PTFE or other PFAS compounds [7]. For peace of mind, consider truly PFAS-free options like [ceramic-coated pans](https://misen."
+                },
+                {
+                  "title": "We tested 11 Non-toxic Cookware Brands: These Have No Synthetic Coatings (2026 Guide)",
+                  "url": "https://www.implasticfree.com/non-toxic-cookware-brands/",
+                  "description": "Gen-X is a trademark for another chemical compound that has been developed to replace PFOA (C8) and other PFAS, mainly based on the ammonium salt of hexafluoropropylene oxide dimer acid (HFPO-DA). It is what environmental health scientists consider as a \u201cregrettable substitution\u201d as it has also been linked to neonatal mortality, low birthweight, and hepatomegaly in the Sprague-Dawley rats (9). Yes, contrary to all other non-toxic blogs, we also list \u201cceramic\u201d coating here."
+                },
+                {
+                  "title": "You Can\u2019t Always Trust Claims on \u2018Non-Toxic\u2019 Cookware via @ConsumerReports",
+                  "url": "https://www.consumerreports.org/toxic-chemicals-substances/you-cant-always-trust-claims-on-non-toxic-cookware-a4849321487/",
+                  "description": "He says PFOA and other PFAS compounds could be trapped within layers of PTFE and not destroyed during the curing process. CR didn\u2019t detect any of the 96 PFAS we looked for in either of the two ceramic-coated pans, the <strong>Always Pan and the Red Copper</strong>..."
+                },
+                {
+                  "title": "PTFE-coated non-stick cookware and toxicity concerns: a perspective - PubMed",
+                  "url": "https://pubmed.ncbi.nlm.nih.gov/28913736/",
+                  "description": "The toxicity and fate of ingested PTFE coatings are also not understood. Moreover, the emerging, persistent, and well-known toxic environmental pollutant PFOA is also used in the synthesis of PTFA. There are some reports where PFOA was detected in the gas phase released from the cooking utensils under normal cooking temperatures. Due to toxicity concerns, PFOA has been replaced with other chemicals such as GenX, but these new alternatives are also suspected to have similar toxicity."
+                }
+              ]
+            }
+          },
+          "parent_id": "5efcd28d-f657-47e2-84f4-c6d09f8099b1",
+          "parent_ids": [
+            "5efcd28d-f657-47e2-84f4-c6d09f8099b1"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "0b738565-2499-4975-a189-e620ca43a394": {
+          "node_id": "0b738565-2499-4975-a189-e620ca43a394",
+          "title": "Synthesize findings: explain how PTFE chemistry relates to health concerns and how modern products address them; produce domain-spanning citations",
+          "details": {
+            "goal": "Combine the chemistry, history, health, and product findings into a single coherent explanation that: (a) describes PTFE's molecular chemistry and why that chemistry led to the use of PFOA/process aids, (b) explains the mechanisms by which PTFE production, processing, and thermal decomposition can produce exposures or toxic species (linking to PFAS concerns and polymer-fume fever), and (c) describes how modern products and manufacturing changes (PFOA-free, GenX, alternative coatings, design choices) mitigate those risks, including residual uncertainties and regulatory context.",
+            "required_outputs": [
+              "A concise synthesis (approx. 3-6 paragraphs) tying chemistry\u2192health\u2192products",
+              "A short bulleted summary of evidence (chemistry, history, health, product) and quality/authority of sources",
+              "A curated list of citations (URLs and bibliographic detail) covering at least one authoritative source from each domain: chemistry, history, health/regulatory, product/manufacturer or independent testing"
+            ],
+            "notes": "This step depends on the search results gathered above; include specific citations (links) found during searches. Flag any gaps that need visit actions for full-text extraction.",
+            "action": "synthesize",
+            "parent_goal": "Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "0b738565-2499-4975-a189-e620ca43a394",
+              "title": "Synthesize findings: explain how PTFE chemistry relates to health concerns and how modern products address them; produce domain-spanning citations",
+              "details": {
+                "goal": "Combine the chemistry, history, health, and product findings into a single coherent explanation that: (a) describes PTFE's molecular chemistry and why that chemistry led to the use of PFOA/process aids, (b) explains the mechanisms by which PTFE production, processing, and thermal decomposition can produce exposures or toxic species (linking to PFAS concerns and polymer-fume fever), and (c) describes how modern products and manufacturing changes (PFOA-free, GenX, alternative coatings, design choices) mitigate those risks, including residual uncertainties and regulatory context.",
+                "required_outputs": [
+                  "A concise synthesis (approx. 3-6 paragraphs) tying chemistry\u2192health\u2192products",
+                  "A short bulleted summary of evidence (chemistry, history, health, product) and quality/authority of sources",
+                  "A curated list of citations (URLs and bibliographic detail) covering at least one authoritative source from each domain: chemistry, history, health/regulatory, product/manufacturer or independent testing"
+                ],
+                "notes": "This step depends on the search results gathered above; include specific citations (links) found during searches. Flag any gaps that need visit actions for full-text extraction.",
+                "action": "synthesize",
+                "parent_goal": "Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            }
+          },
+          "parent_id": "5efcd28d-f657-47e2-84f4-c6d09f8099b1",
+          "parent_ids": [
+            "5efcd28d-f657-47e2-84f4-c6d09f8099b1"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "393f7c27-8385-474a-ac3f-bb991834ef80": {
+          "node_id": "393f7c27-8385-474a-ac3f-bb991834ef80",
+          "title": "Merge: Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "393f7c27-8385-474a-ac3f-bb991834ef80",
+              "title": "Merge: Research Teflon (PTFE): its chemical structure, historical development, health controversies, and current products that use it. Then synthesize information across these domains to explain how the chemistry relates to the health concerns and how modern products address these concerns. Cite sources from chemistry, history, health, and product domains.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            }
+          },
+          "parent_id": "5efcd28d-f657-47e2-84f4-c6d09f8099b1",
+          "parent_ids": [
+            "5efcd28d-f657-47e2-84f4-c6d09f8099b1"
+          ],
+          "status": "done",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 12853,
+        "words": 1197,
+        "kilobytes": 12.55
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 74141,
+          "words": 8729,
+          "kilobytes": 72.4,
+          "tokens": 18036
+        },
+        "completion": {
+          "chars": 18238,
+          "words": 1765,
+          "kilobytes": 17.81,
+          "tokens": 7831
+        },
+        "total_tokens": 25867
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 34,
+        "chars": 14927,
+        "words": 1844,
+        "kilobytes": 14.58
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 119.27194285600126,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 4,
+          "total_duration": 1.4359444820001954,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 4,
+          "total_duration": 1.4716005000009318,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 4,
+          "total_duration": 2.726252400003432,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "search": {
+          "count": 4,
+          "total_duration": 2.740534986005514,
+          "success_count": 4,
+          "error_count": 0
+        }
+      },
+      "events_count": 32
+    },
+    "duration_seconds": 51.04,
+    "telemetry": {
+      "correlation_id": "idea_test_007_gpt-5-mini_20260221_214711",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_214711_007_gpt-5-mini.jsonl",
+      "events_count": 32,
+      "timings_count": 20
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "domain_coverage",
+        "passed": true,
+        "score": 1.0,
+        "chemistry": true,
+        "history": true,
+        "health": true,
+        "products": true,
+        "reason": "Domains: chem=True, hist=True, health=True, prod=True"
+      },
+      {
+        "check": "synthesis",
+        "passed": true,
+        "score": 0.5,
+        "reason": "Synthesis: connection=True, chem-health=True"
+      },
+      {
+        "check": "multi_domain_urls",
+        "passed": true,
+        "score": 1.0,
+        "url_count": 57,
+        "unique_domains": 4,
+        "reason": "Found 57 URLs across 4 domains"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.6,
+      "reasons": [
+        "All four domains (chemistry, history, health, products) are mentioned, but the product domain is treated superficially (uses listed) and lacks citations or concrete examples of modern product changes or replacements.",
+        "The output does synthesize chemistry -> health in two clear ways: (a) PTFE thermal decomposition produces fluorinated gases/particles that cause acute respiratory effects (polymer\u2011fume fever) and (b) use of PFAS (notably PFOA) as processing aids links PTFE manufacture to long\u2011term systemic PFAS exposures. This is a useful, correct high\u2011level synthesis.",
+        "Technical inaccuracy: the agent states 'IARC classifies PFOA as carcinogenic to humans (Group 1)', which is incorrect. IARC classified PFOA as possibly carcinogenic to humans (Group 2B) in the relevant monograph. This is an important factual error affecting credibility.",
+        "Some numeric/thermal detail (melting point ~327 \u00b0C and decomposition onset ranges) is reasonable, but the decomposition temperature ranges are presented without precise sourcing and could be clarified. The agent also truncated the final citation (output ends with 'https:/'), indicating incomplete output.",
+        "Modern product solutions are only cursorily mentioned ('industry phase\u2011out of PFOA') and not described (e.g., PFOA-free PTFE processes, alternative coatings, short\u2011chain vs. GenX replacements, and design/manufacturing controls). No product\u2011domain citations are provided."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.6,
+        "reasons": [
+          "All four domains (chemistry, history, health, products) are mentioned, but the product domain is treated superficially (uses listed) and lacks citations or concrete examples of modern product changes or replacements.",
+          "The output does synthesize chemistry -> health in two clear ways: (a) PTFE thermal decomposition produces fluorinated gases/particles that cause acute respiratory effects (polymer\u2011fume fever) and (b) use of PFAS (notably PFOA) as processing aids links PTFE manufacture to long\u2011term systemic PFAS exposures. This is a useful, correct high\u2011level synthesis.",
+          "Technical inaccuracy: the agent states 'IARC classifies PFOA as carcinogenic to humans (Group 1)', which is incorrect. IARC classified PFOA as possibly carcinogenic to humans (Group 2B) in the relevant monograph. This is an important factual error affecting credibility.",
+          "Some numeric/thermal detail (melting point ~327 \u00b0C and decomposition onset ranges) is reasonable, but the decomposition temperature ranges are presented without precise sourcing and could be clarified. The agent also truncated the final citation (output ends with 'https:/'), indicating incomplete output.",
+          "Modern product solutions are only cursorily mentioned ('industry phase\u2011out of PFOA') and not described (e.g., PFOA-free PTFE processes, alternative coatings, short\u2011chain vs. GenX replacements, and design/manufacturing controls). No product\u2011domain citations are provided."
+        ],
+        "all_domains_covered": true,
+        "synthesis_quality": "Adequate but incomplete \u2014 the response connects PTFE chemistry to acute (thermal decomposition) and chronic (PFAS processing aids) health concerns, but it lacks depth on mechanistic detail and on how modern products and manufacturing practices specifically address those concerns.",
+        "technical_accuracy": false
+      }
+    },
+    "overall_passed": true,
+    "overall_score": 0.775,
+    "checks_passed": 3,
+    "total_checks": 4,
+    "pass_rate": 0.75
+  }
+}

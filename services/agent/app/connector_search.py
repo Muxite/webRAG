@@ -66,9 +66,20 @@ class ConnectorSearch(ConnectorHttp):
             "count": count
         }
 
+        self._record_io(
+            direction="in",
+            operation="search_query",
+            payload={"query": query, "count": count, "url": url},
+        )
         result = await self.request("GET", url, retries=3, headers=headers, params=params)
 
         if result.error:
+            self._record_io(
+                direction="out",
+                operation="search_query",
+                payload={"query": query, "count": count, "status": result.status},
+                error=str(result.data),
+            )
             raise RuntimeError(f"Search API query failed: status={result.status} data={result.data}")
 
         data = result.data
@@ -103,7 +114,13 @@ class ConnectorSearch(ConnectorHttp):
             if isinstance(data.get("web"), dict):
                 web_results = data.get("web", {}).get("results") or []
             if isinstance(web_results, list) and web_results:
-                return _collect(web_results)
+                collected = _collect(web_results)
+                self._record_io(
+                    direction="out",
+                    operation="search_query",
+                    payload={"query": query, "count": count, "results": len(collected)},
+                )
+                return collected
 
             mixed = data.get("mixed", {})
             if isinstance(mixed, dict):
@@ -112,8 +129,24 @@ class ConnectorSearch(ConnectorHttp):
                     if isinstance(value, list):
                         mixed_items.extend(_collect(value))
                 if mixed_items:
+                    self._record_io(
+                        direction="out",
+                        operation="search_query",
+                        payload={"query": query, "count": count, "results": len(mixed_items)},
+                    )
                     return mixed_items
 
+            self._record_io(
+                direction="out",
+                operation="search_query",
+                payload={"query": query, "count": count, "results": 0},
+            )
             return []
         except Exception as exc:
+            self._record_io(
+                direction="out",
+                operation="search_query",
+                payload={"query": query, "count": count},
+                error=str(exc),
+            )
             raise RuntimeError(f"Search parse failed: {data} ({exc})")

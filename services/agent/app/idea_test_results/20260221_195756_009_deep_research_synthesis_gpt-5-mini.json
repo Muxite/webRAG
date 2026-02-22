@@ -1,0 +1,882 @@
+{
+  "test_metadata": {
+    "test_id": "009",
+    "test_name": "Deep Research Synthesis",
+    "difficulty_level": "9/10",
+    "category": "Deep Research & Synthesis"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Piltdown Man: discovery, exposure, and what it teaches about scientific self-correction\n\nSummary of the original claim\n- The Piltdown fossils were presented in 1912 as the remains of an early human \u2018\u2018missing link\u2019\u2019 discovered near Piltdown, East Sussex, England. Contemporary accounts and later histories treat 1912 as the date of the claim and description of the find (see Piltdown Man overview) (https://en.wikipedia.org/wiki/Piltdown_Man).\n\nHow the forgery was exposed (methods and timeline)\n- Growing doubts about Piltdown accumulated over decades, but the decisive scientific exposure came in the early 1950s when multiple laboratory tests and anatomical re-evaluations showed the specimens were a composite forgery. Chemical and microscopic analyses in 1953 demonstrated that the skull and jaw belonged to different species and had been artificially treated to appear ancient (summary of the 1953 work) (https://www.niehs.nih.gov/research/resources/bioethics/timeline and https://en.wikipedia.org/wiki/Piltdown_Man).\n- The core lines of evidence reported in the modern accounts that exposed the fraud were: (a) comparative anatomy showing mismatch between the skull and the jaw, (b) chemical tests showing different ages and artificial staining, (c) microscopic observation of filed tooth surfaces and tool marks, and (d) fluorine/chemical dating that showed the bones were much younger than claimed. These methods and their application to Piltdown are described in historical overviews of the case (https://en.wikipedia.org/wiki/Piltdown_Man).\n\nWho did it and why (what the sources say; limits of evidence)\n- Historical summaries and the mainstream account identify Charles Dawson (the amateur antiquarian who first reported Piltdown) as the prime suspect and the most likely perpetrator of the hoax; many accounts also discuss other possible accomplices or people implicated by circumstantial evidence. However, direct, incontrovertible primary evidence proving a single perpetrator or a complete conspiracy is not supplied in the merged search results I was given to use here. The widely\u2011cited narrative that Dawson was principally responsible is discussed in general sources (https://en.wikipedia.org/wiki/Piltdown_Man).\n- Motivation is debated in the literature and includes suggestions such as personal ambition (desire for fame and to produce major finds), national pride (producing a British \u2018\u2018missing link\u2019\u2019), or a sophisticated scientific prank. The specific motivation or combination of motives is not established by the search results I have here; primary archival documents and detailed historical scholarship would be needed to make stronger claims (evidence for motives not present in provided results).\n\nModern techniques that would detect the forgery immediately\n- If Piltdown-like specimens were studied today, a suite of routinely available laboratory techniques would make detection rapid and robust. Relevant modern methods include:\n  - High-resolution CT or micro-CT scanning to show internal structure and mismatches between elements (non\u2011destructive 3\u2011D imaging) (general forensic/paleo tools overview) (https://daily.jstor.org/forensic-archaeology/ and https://www.sciencedirect.com/topics/social-sciences/forensic-archeology).\n  - Scanning electron microscopy (SEM) combined with energy-dispersive X-ray spectroscopy (EDS) to examine surface tool marks, filing patterns, and chemical residues used for staining (forensic microscopy techniques) (https://daily.jstor.org/forensic-archaeology/).\n  - Direct chemical and elemental analyses (including EDS, stable isotope checks, and trace-element profiling) to detect artificial staining or consolidation materials and to compare the relative diagenesis of different specimens (forensic and archaeological chemistry summaries) (https://daily.jstor.org/forensic-archaeology/).\n  - Radiocarbon dating (for specimens within the method\u2019s range), uranium-series dating, or other absolute chronometric methods where appropriate, to obtain independent age estimates (general forensic dating techniques; see forensic anthropology and archaeological methods) (https://www.britannica.com/science/forensic-anthropology and https://www.sciencedirect.com/topics/social-sciences/forensic-archeology).\n  - Ancient DNA (aDNA) and protein (collagen/peptide) sequencing to determine taxonomic identity of bone and tooth material, which would immediately reveal an orangutan jaw combined with human skull material if DNA/proteins survived (forensic and molecular methods overview) (https://www.intechopen.com/chapters/73372 and https://www.britannica.com/science/forensic-anthropology).\n- In short, the combination of imaging, microstructural, chemical, and molecular techniques available today would detect inconsistencies between elements and reveal artificial treatment far faster and more conclusively than mid-20th-century methods (summaries of modern forensic applications) (https://daily.jstor.org/forensic-archaeology/ and https://www.sciencedirect.com/topics/social-sciences/forensic-archeology).\n\nImpact on paleoanthropology and lessons for scientific self-correction\n- The Piltdown affair had several long-term impacts on paleoanthropology: it misdirected attention for decades toward hypotheses compatible with Piltdown\u2019s combination of features; it later promoted methodological caution, more rigorous standards for provenance and context, and the adoption of independent laboratory testing and repeated verification of extraordinary claims (historical overviews) (https://en.wikipedia.org/wiki/Piltdown_Man).\n- How the scientific community corrected the error illustrates the process of scientific self-correction:\n  1) Independent scrutiny: other researchers kept re-examining Piltdown material and comparing it with new fossil discoveries and with well-documented finds from other sites (general history of the debate) (https://en.wikipedia.org/wiki/Piltdown_Man).\n 2) Application of better tests: when more-direct chemical and microscopic methods were applied (fluorine and chemical analyses, anatomical re-evaluation, etc.), those independent tests produced results inconsistent with the Piltdown interpretation (reported in summaries of the 1953 exposure) (https://www.niehs.nih.gov/research/resources/bioethics/timeline and https://en.wikipedia.org/wiki/Piltdown_Man).\n  3) Consensus building: publication of test results, discussion in the scientific press, and replication of analyses built a consensus that Piltdown was a forgery (1953 publications and press coverage summarized in historical accounts) (https://en.wikipedia.org/wiki/Piltdown_Man).\n  4) Institutional reforms and cultural learning: the field strengthened standards for field documentation, specimen curation, and independent verification; it also became more skeptical of isolated, unpublished claims from single individuals without transparent provenance (historical syntheses) (https://en.wikipedia.org/wiki/Piltdown_Man).\n- The Piltdown story therefore shows key elements of scientific self-correction: skepticism of extraordinary claims, the central role of independent testing and replication, the value of methodological advances that allow new tests, and the community process that updates consensus when evidence accumulates (syntheses and commentaries on forensic and archaeological methods) (https://daily.jstor.org/forensic-archaeology/ and https://www.britannica.com/science/forensic-anthropology).\n\nWhat is missing from the sources I was given\n- The merged search results provided summaries and secondary syntheses (for example, the Piltdown Man overview on Wikipedia and a NIEHS timeline entry about the 1953 analyses) but did not include primary-source documents such as the original 1912 excavation reports or museum accession records, the detailed 1953 laboratory reports and original scientific papers (for example, the primary Nature papers and lab notes by the investigators who published the analyses), or archival letters and forensic lab notebooks that some historians use to reconstruct authorship and motive. Those primary documents are essential for demonstrating chain-of-evidence about who did the hoax and why; they were not present in the set of results I used (see Piltdown Man overview and NIEHS timeline) (https://en.wikipedia.org/wiki/Piltdown_Man and https://www.niehs.nih.gov/research/resources/bioethics/timeline).\n\nRecommended primary/technical sources to consult (not in the merged results supplied)\n- For a thorough, evidence-based historical reconstruction you should consult the original 1912 description(s) and the detailed 1953 analytical reports (the classic 1953 papers that reported the fluorine/chemical/microscopic results), subsequent archival work by historians of science, and modern forensic-analytical papers that re-examine the specimens. Those primary and peer\u2011reviewed sources are available in specialized journals and museum archives (note: these specific primary papers and archival links were not among the search results provided above; they should be requested from academic databases and museum archives).\n\nBottom line\n- The Piltdown affair is a canonical example of scientific error and fraud that was eventually overturned by independent testing, improved methods, and community scrutiny. Modern imaging, chemical, and molecular tools would make a similar composite forgery quickly detectable today. The episode underscores how science self-corrects: independent verification, improved methods, transparent data and context, and open critical debate lead the community to revise beliefs when evidence demands it (background sources and methodological overviews) (https://en.wikipedia.org/wiki/Piltdown_Man; https://www.niehs.nih.gov/research/resources/bioethics/timeline; https://daily.jstor.org/forensic-archaeology/; https://www.britannica.com/science/forensic-anthropology; https://www.sciencedirect.com/topics/social-sciences/forensic-archeology).\n\nIf you want, I can now:\n- Retrieve primary 1912 publications, the 1953 Nature papers and laboratory reports, and major archival treatments (museum correspondence, Dawson\u2019s letters) and annotate them; or\n- Produce a fully-cited academic-style paper integrating those primary sources and the later forensic re-analyses.\n\nKey URLs used above:\n- Piltdown Man (overview): https://en.wikipedia.org/wiki/Piltdown_Man\n- NIEHS Research Ethics Timeline (1953 chemical analyses noted): https://www.niehs.nih.gov/research/resources/bioethics/timeline\n- Forensic archaeology / role of modern forensic techniques (JSTOR Daily): https://daily.jstor.org/forensic-archaeology/\n- Forensic anthropology (general methods overview): https://www.britannica.com/science/forensic-anthropology\n- Forensic archaeology topics overview (ScienceDirect): https://www.sciencedirect.com/topics/social-sciences/forensic-archeology\n- Modern forensic/paleo methods (IntechOpen review of forensic anthropology methods): https://www.intechopen.com/chapters/73372",
+      "action_summary": "I summarized the Piltdown Man case using the provided secondary sources: discovery ca. 1912 and decisive exposure in 1953 by chemical/microscopic/anatomical tests (https://en.wikipedia.org/wiki/Piltdown_Man; https://www.niehs.nih.gov/research/resources/bioethics/timeline). The likely perpetrator most commonly named is Charles Dawson, but primary archival proofs of motive and full responsibility were not in the supplied results (evidence for definitive attribution and original 1912/1953 primary documents were missing). I listed modern techniques (CT/micro-CT, SEM/EDS, radiometric dating, aDNA/protein sequencing) that would detect such forgery (https://daily.jstor.org/forensic-archaeology/; https://www.britannica.com/science/forensic-anthropology; https://www.sciencedirect.com/topics/social-sciences/forensic-archeology), described the hoax's impact, and explained how independent testing and consensus-building illustrate scientific self-correction. If you want, I can fetch and annotate the original 1912 descriptions and the 1953 analytical papers and archival documents for direct primary-source citations.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "5e1e0a41-307f-4080-82b8-264dd400f874",
+      "nodes": {
+        "5e1e0a41-307f-4080-82b8-264dd400f874": {
+          "node_id": "5e1e0a41-307f-4080-82b8-264dd400f874",
+          "title": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+          "details": {
+            "mandate": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "expansion_meta": {
+              "execute_all_children": true
+            },
+            "merged_results": [
+              {
+                "node_id": "9e802c15-a6c4-4d51-9a50-5ec1206c1a20",
+                "title": "Gather primary discovery documents and original claims (1912 era)",
+                "status": "done",
+                "score": 0.88,
+                "evaluation": {
+                  "score": 0.88
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "Gather primary discovery documents and original claims (1912 era)",
+                  "intent": "Locate primary sources and contemporary accounts: the original papers, museum accession records, press reports, and letters describing the discovery and claims made in 1912\u20131913.",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "Primary Sources - HIST B17A: History of the United States (to 1877) - LibGuides at Bakersfield College",
+                      "url": "https://bakersfieldcollege.libguides.com/amhistory/FindingPrimarySources",
+                      "description": "This database contains contains more than 6,500 historical periodical titles documenting the life of America\u2019s people from the Colonial Era through the Civil War and Reconstruction and into the early 20th century (1684-1912)."
+                    },
+                    {
+                      "title": "Primary Documents in American History - Research Guides at Library of Congress",
+                      "url": "https://guides.loc.gov/primary-docs-am-history",
+                      "description": "Have a question? Need assistance? Use our online form to ask a librarian for help \u00b7 Chat with a librarian, Monday through Friday, 12-4pm Eastern Time (except Federal Holidays)"
+                    },
+                    {
+                      "title": "Primary Documents - HIST1105 - US History to 1877 - Home at Emmanuel College-MA",
+                      "url": "https://learningcommons.emmanuel.edu/c.php?g=1060657&p=7710990",
+                      "description": "It is an extensive resource for scholars, educators and students and is considered one of the finest archives for material on the revolutionary, early national, antebellum and civil war eras.\u201d Module 2: Civil War, Reconstruction and the Modern Era: 1860-1945 Includes documents on slavery, the Civil War, and secession."
+                    },
+                    {
+                      "title": "Finding Primary Sources - History - Library Guides at Shenandoah University",
+                      "url": "https://libguides.su.edu/history/primarysources",
+                      "description": "Primary sources are original documents or artifacts created during the time period being studied. They often include firsthand or eyewitness accounts or have an inside view of a particular event \u00b7 Original documents include <strong>advertisements, artwork, autobiographies, diaries, government documents</strong> ..."
+                    },
+                    {
+                      "title": "US Primary Sources - History - Library Guides at Lehigh University",
+                      "url": "https://libraryguides.lehigh.edu/history/usprimarysources",
+                      "description": "<strong>The U.S. Congressional Serial Set</strong> is an incomparably rich, and until this digitization, a largely untapped collection of primary source material detailing all aspects of American history. Lehigh&#x27;s Federal Depository collection has had many of these materials in print form, however the indexing ..."
+                    },
+                    {
+                      "title": "Getting Started - Finding Historical Primary Sources - Library Guides at UC Berkeley",
+                      "url": "https://guides.lib.berkeley.edu/subject-guide/163-Finding-Historical-Primary-Sources",
+                      "description": "<strong>Search the discovery tool for the 10 UC libraries</strong>: UC Library Search (guide) to find the titles and call numbers of specific items."
+                    },
+                    {
+                      "title": "Primary Sources - DocsTeach",
+                      "url": "https://docsteach.org/primary-sources/",
+                      "description": "Browse thousands of primary source documents from the National Archives to use in your history classroom or activities."
+                    },
+                    {
+                      "title": "Types of Sources and Where to Find Them: Primary Sources | History, Philosophy, and Newspaper Library | University Library | Illinois",
+                      "url": "https://www.library.illinois.edu/hpnl/tutorials/primary-sources/",
+                      "description": "For example, Black Reconstruction in America, written in 1935 by W.E.B. Du Bois, could be used as a secondary source for research about 19th-century America, since Du Bois draws on a range of government reports, biographies, and existing historical narratives in order to make a claim about the past."
+                    },
+                    {
+                      "title": "Pre-Revolution - U.S. History: Beginnings to 1877 - HIST201 - Primary Sources - Evelyn S. Field Library at Raritan Valley Community College",
+                      "url": "https://library.raritanval.edu/c.php?g=877761&p=6305124",
+                      "description": "Primary sources available in the library or on the Internet relevant to U.S. History before 1877. Primary sources from before the American Revolution"
+                    },
+                    {
+                      "title": "Primary Sources \u2013 ZSR Databases - ZSR Library",
+                      "url": "https://zsr.wfu.edu/databases/primary-sources/",
+                      "description": "<strong>Includes polemical, exegetical, and papal documents that testify to the religious and social upheavals of the 16th and 17th century Counter-Reformation era</strong>. Texts written in Latin, English, and French. Coverage: 1500-1700. ... Significant primary documents central to U.S. foreign and military ..."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "7f02f7f6-f82c-4c5a-9f4c-90af4dd57ece",
+                "title": "Assemble scientific analyses that exposed the hoax and build the exposure timeline (1940s\u20131953)",
+                "status": "done",
+                "score": 0.92,
+                "evaluation": {
+                  "score": 0.92
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "Assemble scientific analyses that exposed the hoax and build the exposure timeline (1940s\u20131953)",
+                  "intent": "Find the scientific tests (fluorine dating, chemical analysis, microscopy, anatomical reassessment) and the sequence of experiments and publications that demonstrated the Piltdown specimens were forged, with primary papers and lab reports establishing the timeline of exposure.",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "Research Ethics Timeline | National Institute of Environmental Health Sciences",
+                      "url": "https://www.niehs.nih.gov/research/resources/bioethics/timeline",
+                      "description": "<strong>Chemical analyses performed in 1953 confirmed these suspicions by showing that the skull is a combination of a human skull and orangutan jaw</strong>, which had been treated with chemicals to make them appear old."
+                    },
+                    {
+                      "title": "Piltdown Man - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                      "description": "In November 1953, <strong>Time magazine published evidence, gathered variously by Oakley, Le Gros Clark, and Weiner</strong>, proving that Piltdown Man was a forgery and demonstrating that the fossil was a composite of three distinct species. It consisted of a medieval human skull, a 500-year-old orangutan ..."
+                    },
+                    {
+                      "title": "Nazi human experimentation - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Nazi_human_experimentation",
+                      "description": "Little is known about the fate of the other victims; none are known to have applied for financial compensation after 1945. The hypothesis that circulating hormones determined or cured homosexuality was discredited by later scientific research, and hormonal exposure prior to birth became a far more influential hypothesis."
+                    },
+                    {
+                      "title": "Unethical human experimentation in the United States - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Unethical_human_experimentation_in_the_United_States",
+                      "description": "A 1997 study by the U.S. National Research Council found that it was sprayed at levels so low as not to be harmful; it said that people were normally exposed to higher levels in urban environments. To test whether or not sulfuric acid, which is used in making molasses, was harmful as a food additive, the Louisiana State Board of Health commissioned a study to feed &quot;Negro prisoners&quot; nothing but molasses for five weeks. One report stated that prisoners did not &quot;object to submitting themselves to the test, because it would not do any good if they did.&quot; A 1953 article in the medical/scientific journal Clinical Science described a medical experiment in which researchers intentionally blistered the skin on the abdomens of 41 children, who ranged in age from 8 to 14, using cantharide."
+                    },
+                    {
+                      "title": "Operation Paperclip - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Operation_Paperclip",
+                      "description": "<strong>Operation Paperclip</strong> was a secret United States intelligence program in which more than 1,600 German scientists, engineers, and technicians were taken from former Nazi Germany to the US for government employment after the end of World War II ..."
+                    },
+                    {
+                      "title": "Tuskegee Experiment: The Infamous Syphilis Study | HISTORY",
+                      "url": "https://www.history.com/articles/the-infamous-40-year-tuskegee-study",
+                      "description": "In that study, <strong>from 1946 to 1948, nearly 700 men and women\u2014prisoners, soldiers and mental patients\u2014were intentionally infected with syphilis</strong> (hundreds more people were exposed to other sexually transmitted diseases as part of the study) ..."
+                    },
+                    {
+                      "title": "Ugly past of U.S. human experiments uncovered",
+                      "url": "https://www.nbcnews.com/health/health-news/ugly-past-u-s-human-experiments-uncovered-flna1c9465329",
+                      "description": "<strong>A University of Minnesota study in the late 1940s injected 11 public service employee volunteers with malaria, then starved them for five days</strong>. Some were also subjected to hard labor, and those men lost an average of 14 pounds."
+                    },
+                    {
+                      "title": "Unethical human experimentation - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Unethical_human_experimentation",
+                      "description": "The US military paid Japanese members of Unit 731 to conduct experiments on Japanese people in Japan in 1952, with a Japanese girl dying after multiple Japanese babies were deliberately infected with E. coli bacteria at Nagoya City University Hospital by Jiro Ogawa. Japanese patients at a mental hospital were infected with scrub typhus in 1953\u20131956 with one of them killing himself to escape the torture and another 9 Japanese patients died of the typhus itself."
+                    },
+                    {
+                      "title": "United States General Accounting Office Testimony",
+                      "url": "https://www.gao.gov/assets/t-nsiad-94-266.pdf",
+                      "description": "exposed \u00b7 during \u00b7 cleanups \u00b7 at Bikini, Enewetak, and Johnston \u00b7 Atolls \u00b7 after \u00b7 nuclear \u00b7 tests \u00b7 were conducted. Some participants \u00b7 have alleged \u00b7 that \u00b7 they \u00b7 were not fully \u00b7 informed \u00b7 or did \u00b7 not understand \u00b7 the \u00b7 potential \u00b7 health \u00b7 risks \u00b7 of exposure \u00b7 to radiation. In a series \u00b7 of experiments \u00b7 conducted \u00b7 between \u00b7 the \u00b7 1940s and 196Os, the Atomic \u00b7"
+                    },
+                    {
+                      "title": "Doctors from hell: The horrific account of Nazi experiments on humans - PMC",
+                      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC1323276/",
+                      "description": "The human experiments included \u201chigh-altitude\u201d experiments in which concentration camp inmates were forced, without oxygen, into high-altitude chambers that duplicated conditions at up to 68,000 feet; removal of sections of bone, muscle, and nerves, including whole legs removed at the hips to transplant to other victims; artificial wounding and exposure to mustard gas; wounding of two limbs and treatment of one but not the other with sulfanamide antibiotics; intramuscular injection with fresh typhus; and collection of skeletons from 112 live Jewish inmates who were killed and defleshed."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "0945744c-58cf-48ba-82f2-24de9e8e237e",
+                "title": "Investigate suspects, evidence, and motivations (who did it and why?)",
+                "status": "done",
+                "score": 0.86,
+                "evaluation": {
+                  "score": 0.86
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "Investigate suspects, evidence, and motivations (who did it and why?)",
+                  "intent": "Collect historical and forensic evidence, scholarly arguments, and archival materials that attribute responsibility and discuss possible motivations (personal ambition, nationalism, prank, scientific deception). Include analyses that accept Dawson as sole hoaxer and those proposing collaborators.",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "Criminal Investigation Process, Types & Techniques | Study.com",
+                      "url": "https://study.com/academy/lesson/criminal-investigation-overview-techniques-analysis.html",
+                      "description": "Criminal investigations rely on a team of criminal justice professionals whose specialized skills can provide a comprehensive and legally sound crime investigation. Means (ability to perform the crime), motive, (reason to commit the crime), and opportunity (did the alleged suspect have the opportunity or did something make it easy for them to commit the crime) are often cited as factors that need be present for there to be a crime."
+                    },
+                    {
+                      "title": "Chapter 4: The Process of Investigation \u2013 Introduction to Criminal Investigation: Processes, Practices and Thinking",
+                      "url": "https://pressbooks.bccampus.ca/criminalinvestigation/chapter/chapter-4-the-process-of-investigation/",
+                      "description": "Investigative thinking is aimed at <strong>analyzing the information collected, developing theories of what happened, the way an event occurred, and establishing reasonable grounds to believe</strong>."
+                    },
+                    {
+                      "title": "Exploring The Criminal Investigation Process: Techniques And Procedures Explained",
+                      "url": "https://financialcrimeacademy.org/the-process-of-investigation/",
+                      "description": "This process is a cornerstone of any successful investigation, as it <strong>allows investigators to piece together the sequence of events, identify potential suspects, and understand the motives behind the crime</strong>."
+                    },
+                    {
+                      "title": "Chapter 5: Strategic Investigative Response \u2013 Introduction to Criminal Investigation: Processes, Practices and Thinking",
+                      "url": "https://pressbooks.bccampus.ca/criminalinvestigation/chapter/chapter-5-strategic-investigative-response/",
+                      "description": "Introduction to Criminal Investigation, Processes, Practices, and Thinking, as the title suggests, is a teaching text describing and segmenting criminal investigations into its component parts to illustrate the craft of criminal investigation. Delineating criminal investigation within the components of task-skills and thinking-skills, this book describes task-skills such incident response, crime scene management, evidence management, witness management, and forensic analysis, as essential foundations supporting the critical thinking-skills of offence validation and theory development for the creation of effective investigative plans aimed at forming reasonable grounds for belief."
+                    },
+                    {
+                      "title": "Criminal investigation - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Criminal_investigation",
+                      "description": "In determining the course of ... jointly known as MMO: <strong>means to commit the crime (including tools and physical capabilities) motive to commit the crime (for example, financial gain</strong> ......"
+                    },
+                    {
+                      "title": "Chapter 9: Interviewing, Questioning, and Interrogation \u2013 Introduction to Criminal Investigation: Processes, Practices and Thinking",
+                      "url": "https://pressbooks.bccampus.ca/criminalinvestigation/chapter/chapter-9-interviewing-questioning-and-interrogation/",
+                      "description": "In terms of the interrogation of suspects, this chapter examined the process of developing an interrogation plan by considering the variety of motivations that might cause a suspect to make a confession to a crime, and the additional protections afforded to youth was also discussed. In this chapter\u2019s final section, definitions and examples of hybrid ancillary offences was presented, as was the need to interrogate suspects and investigate for additional evidence in support of proving the unique elements of ancillary offences, if they have occurred."
+                    },
+                    {
+                      "title": "Chapter 5: Interviewing and Interrogation Flashcards | Quizlet",
+                      "url": "https://quizlet.com/615018328/chapter-5-interviewing-and-interrogation-flash-cards/",
+                      "description": "-The interviewer must become familiar with the facts of the case under investigation and with the victim. -To carry out the four objectives, the interrogator must learn as much as possible about the offense, the victim(s), and the suspect through the process of collecting, assessing, and analyzing data and theorizing about the motivations and thought processes of the suspect."
+                    },
+                    {
+                      "title": "Proactive crime scene response optimizes crime investigation - PMC",
+                      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10068110/",
+                      "description": "Use of the disciplines of firearms and DNA, detailed crime scene documentation, coupled with investigative interview statements coalesced to refute the suspect statements and provide a direct association to the shotgun. Additional investigation revealed additional witnesses and statements that provided the insurance money motive for the homicide, as well as refuting potential alibis to explain the presence of DNA on the shotgun."
+                    },
+                    {
+                      "title": "The Criminal Investigation Process: An In-Depth Overview | American Military University (AMU)",
+                      "url": "https://www.amu.apus.edu/area-of-study/criminal-justice/resources/the-criminal-investigation-process/",
+                      "description": "Using evidence and witness testimony, <strong>law enforcement agencies</strong> work to identify and locate suspects for further investigation. Throughout their investigations, they may also construct criminal profiles, conduct surveillance, and check databases ..."
+                    },
+                    {
+                      "title": "How Do the Police Investigate Crimes? - FindLaw",
+                      "url": "https://www.findlaw.com/criminal/criminal-law-basics/how-do-the-police-investigate-crimes.html",
+                      "description": "If the grand jury finds that there is enough evidence to bring criminal charges, there will be an arraignment. During an arraignment, the judge reads the charges to the criminal suspect. The court will then ask the suspect to enter a \u201cguilty&quot; or \u201cnot guilty&quot; plea. Police investigations are an important part of the criminal justice system."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "07703d07-5cd1-4899-903c-22d3257a01c7",
+                "title": "Identify modern forensic techniques that would have detected the forgery immediately and assess the hoax's impact on paleoanthropology; synthesize a self-correction narrative with citations",
+                "status": "done",
+                "score": 0.98,
+                "evaluation": {
+                  "score": 0.98
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "query": "Identify modern forensic techniques that would have detected the forgery immediately and assess the hoax's impact on paleoanthropology; synthesize a self-correction narrative with citations",
+                  "intent": "Compile scientific methods (CT/microCT, SEM/EDS, stable isotope, collagen or aDNA testing, U-series, radiocarbon where applicable, fluorine and nitrogen assays) that would expose the Piltdown forgery, and gather analyses on the hoax's effects on the field and how it illustrates scientific self-correction. Aim to produce a coherent, cited narrative linking primary sources, scientific papers, and historical documents.",
+                  "vector_context": [],
+                  "count": 10,
+                  "results": [
+                    {
+                      "title": "Fraud and Forgery in Paleoanthropology | Answers Research Journal",
+                      "url": "https://answersresearchjournal.org/fraud-and-forgery-in-paleoanthropology/",
+                      "description": "Dawson also used some of the same deception techniques used in perpetuation of the Piltdown hoax. All of his fossil and other finds eventually came under suspicion, causing a careful re-evaluation that proved many, if not most, of his discoveries questionable, if not outright forgeries."
+                    },
+                    {
+                      "title": "Paleoanthropology and Forensic Anthropology | Intro to Paleoanthropology Class Notes | Fiveable",
+                      "url": "https://fiveable.me/introduction-paleoanthropology/unit-14/paleoanthropology-forensic-anthropology/study-guide/LxTMy8FEMP30beiU",
+                      "description": "These techniques, including <strong>osteological analysis, isotope analysis, and DNA analysis</strong>, help identify individuals and reconstruct their lives. They provide valuable insights into age, sex, diet, and geographic origins from skeletal remains. Forensic anthropology applies these methods to modern ..."
+                    },
+                    {
+                      "title": "Chapter 1: Introduction to Forensic Anthropology \u2013 PPSC ANT 2315 Intro to Forensic Anthropology",
+                      "url": "https://pressbooks.ccconline.org/ppscant2315introtoforensicanthropology/chapter/chapter-1-introduction-to-forensic-anthropology/",
+                      "description": "This evidence includes fossilized remains (particularly fossilized bones), artifacts such as stone tools, and the contexts in which these items are found. Paleoanthropologists have made some monumental discoveries that have shaped the way we understand hominin evolution (hominin refers to humans and fossil relatives that are more similar to us than chimpanzees).1"
+                    },
+                    {
+                      "title": "Forensics Chapter 14 Flashcards | Quizlet",
+                      "url": "https://quizlet.com/259857071/forensics-chapter-14-flash-cards/",
+                      "description": "Study with Quizlet and memorize flashcards containing terms like Forensic Anthropology applies the techniques developed in paleoanthropology to:, forensic anthropology uses _____ to identify remains, After the bones are identified as human, what is recorded? and more."
+                    },
+                    {
+                      "title": "How Forensic Techniques Aid Archaeology - JSTOR Daily",
+                      "url": "https://daily.jstor.org/forensic-archaeology/",
+                      "description": "Forensic techniques such as <strong>fingerprint matching, DNA testing, and chemical residue analysis</strong> help dispel some of this uncertainty by providing concrete evidence to support or refute hypotheses."
+                    },
+                    {
+                      "title": "Forensic anthropology | Human Identification & Crime Scene Analysis | Britannica",
+                      "url": "https://www.britannica.com/science/forensic-anthropology",
+                      "description": "Forensic anthropology uses the techniques of physical anthropology to analyze skeletal, badly decomposed, or otherwise unidentified human remains to solve crimes. Forensic anthropologists can assess the age, sex, and unique features of a decedent and are invaluable in documenting trauma to the body and estimating how long a corpse has been decomposing."
+                    },
+                    {
+                      "title": "Forensic Anthropology | IntechOpen",
+                      "url": "https://www.intechopen.com/chapters/73372",
+                      "description": "If a skeleton is absolute and unharmed, these aspects can be assessed with great correctness. Using the most recent systems, sex can be established with assurance, age estimated to within about 5 years, and stature approximated with a typical deviation of about 1.5\u2033 (3.5 cm). However, forensic anthropologists are more likely to be dealing with incomplete, fragmented specimens so they must be equipped to glean as much information as probable from every bone."
+                    },
+                    {
+                      "title": "Forensic Archeology - an overview | ScienceDirect Topics",
+                      "url": "https://www.sciencedirect.com/topics/social-sciences/forensic-archeology",
+                      "description": "It was long believed that outdoor contexts too quickly degraded evidence, and were not easily sketched or mapped because there were often no good points of reference. Instead, any obvious evidence was quickly photographed and collected for lab processing. It has recently become more standard practice to use forensic anthropologists with archaeological training to assist in crime scene recovery and evidence collection."
+                    },
+                    {
+                      "title": "A History of Forensic Science: Important Inventions & Discoveries",
+                      "url": "https://www.forensicscolleges.com/blog/history-of-forensics",
+                      "description": "While that story itself might not be admissible in one of today\u2019s courtrooms, the logic underpinning its narrative is still used in contemporary forensic practice. Forensics is a broad field, pulling from several different scientific disciplines. Archimedes\u2019 bathtub discovery of how to measure volume (Eureka!) had immediate applications in detecting forgeries of gold."
+                    },
+                    {
+                      "title": "Beginner's Guide to Forensic Anthropology | American Mortuary Coolers & Equipments",
+                      "url": "https://www.mymortuarycooler.com/blogs/news/beginners-guide-to-forensic-anthropology",
+                      "description": "Modern technology improves these traditional methods. FORDISC software uses skull measurements to assess ancestry, though results need careful interpretation. Isotope analysis of bones and teeth can reveal diet and geographic origins during life. DNA analysis provides the ultimate identification tool when reference samples are available for comparison. For facilities handling these complex cases, we understand that Essential Morgue Forensic Lab Equipment must maintain optimal conditions for both immediate examination and long-term preservation of skeletal remains."
+                    }
+                  ]
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 4,
+              "success": 4,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "9e802c15-a6c4-4d51-9a50-5ec1206c1a20",
+            "7f02f7f6-f82c-4c5a-9f4c-90af4dd57ece",
+            "0945744c-58cf-48ba-82f2-24de9e8e237e",
+            "07703d07-5cd1-4899-903c-22d3257a01c7",
+            "12137146-ed33-4903-9706-42824ca4e33c"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "9e802c15-a6c4-4d51-9a50-5ec1206c1a20": {
+          "node_id": "9e802c15-a6c4-4d51-9a50-5ec1206c1a20",
+          "title": "Gather primary discovery documents and original claims (1912 era)",
+          "details": {
+            "queries": [
+              "Piltdown Man 1912 Woodward Nature cranium Dawson 'Piltdown' original announcement",
+              "Charles Dawson Piltdown discovery letter 1912 'Gray's Inn Lane' 'Piltdown' archive",
+              "Arthur Smith Woodward 1912 paper Piltdown 'cranium and mandible' Natural History Museum"
+            ],
+            "intent": "Locate primary sources and contemporary accounts: the original papers, museum accession records, press reports, and letters describing the discovery and claims made in 1912\u20131913.",
+            "count": 10,
+            "notes": "Prioritize: (a) the 1912\u20131913 publications (Nature, Quarterly Journal of the Geological Society, museum bulletins), (b) museum accession/curation records (Natural History Museum, British Museum), and (c) contemporary newspaper coverage and correspondence from Charles Dawson and A. S. Woodward.",
+            "action": "search",
+            "parent_goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.55
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Gather primary discovery documents and original claims (1912 era)",
+              "intent": "Locate primary sources and contemporary accounts: the original papers, museum accession records, press reports, and letters describing the discovery and claims made in 1912\u20131913.",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "Primary Sources - HIST B17A: History of the United States (to 1877) - LibGuides at Bakersfield College",
+                  "url": "https://bakersfieldcollege.libguides.com/amhistory/FindingPrimarySources",
+                  "description": "This database contains contains more than 6,500 historical periodical titles documenting the life of America\u2019s people from the Colonial Era through the Civil War and Reconstruction and into the early 20th century (1684-1912)."
+                },
+                {
+                  "title": "Primary Documents in American History - Research Guides at Library of Congress",
+                  "url": "https://guides.loc.gov/primary-docs-am-history",
+                  "description": "Have a question? Need assistance? Use our online form to ask a librarian for help \u00b7 Chat with a librarian, Monday through Friday, 12-4pm Eastern Time (except Federal Holidays)"
+                },
+                {
+                  "title": "Primary Documents - HIST1105 - US History to 1877 - Home at Emmanuel College-MA",
+                  "url": "https://learningcommons.emmanuel.edu/c.php?g=1060657&p=7710990",
+                  "description": "It is an extensive resource for scholars, educators and students and is considered one of the finest archives for material on the revolutionary, early national, antebellum and civil war eras.\u201d Module 2: Civil War, Reconstruction and the Modern Era: 1860-1945 Includes documents on slavery, the Civil War, and secession."
+                },
+                {
+                  "title": "Finding Primary Sources - History - Library Guides at Shenandoah University",
+                  "url": "https://libguides.su.edu/history/primarysources",
+                  "description": "Primary sources are original documents or artifacts created during the time period being studied. They often include firsthand or eyewitness accounts or have an inside view of a particular event \u00b7 Original documents include <strong>advertisements, artwork, autobiographies, diaries, government documents</strong> ..."
+                },
+                {
+                  "title": "US Primary Sources - History - Library Guides at Lehigh University",
+                  "url": "https://libraryguides.lehigh.edu/history/usprimarysources",
+                  "description": "<strong>The U.S. Congressional Serial Set</strong> is an incomparably rich, and until this digitization, a largely untapped collection of primary source material detailing all aspects of American history. Lehigh&#x27;s Federal Depository collection has had many of these materials in print form, however the indexing ..."
+                },
+                {
+                  "title": "Getting Started - Finding Historical Primary Sources - Library Guides at UC Berkeley",
+                  "url": "https://guides.lib.berkeley.edu/subject-guide/163-Finding-Historical-Primary-Sources",
+                  "description": "<strong>Search the discovery tool for the 10 UC libraries</strong>: UC Library Search (guide) to find the titles and call numbers of specific items."
+                },
+                {
+                  "title": "Primary Sources - DocsTeach",
+                  "url": "https://docsteach.org/primary-sources/",
+                  "description": "Browse thousands of primary source documents from the National Archives to use in your history classroom or activities."
+                },
+                {
+                  "title": "Types of Sources and Where to Find Them: Primary Sources | History, Philosophy, and Newspaper Library | University Library | Illinois",
+                  "url": "https://www.library.illinois.edu/hpnl/tutorials/primary-sources/",
+                  "description": "For example, Black Reconstruction in America, written in 1935 by W.E.B. Du Bois, could be used as a secondary source for research about 19th-century America, since Du Bois draws on a range of government reports, biographies, and existing historical narratives in order to make a claim about the past."
+                },
+                {
+                  "title": "Pre-Revolution - U.S. History: Beginnings to 1877 - HIST201 - Primary Sources - Evelyn S. Field Library at Raritan Valley Community College",
+                  "url": "https://library.raritanval.edu/c.php?g=877761&p=6305124",
+                  "description": "Primary sources available in the library or on the Internet relevant to U.S. History before 1877. Primary sources from before the American Revolution"
+                },
+                {
+                  "title": "Primary Sources \u2013 ZSR Databases - ZSR Library",
+                  "url": "https://zsr.wfu.edu/databases/primary-sources/",
+                  "description": "<strong>Includes polemical, exegetical, and papal documents that testify to the religious and social upheavals of the 16th and 17th century Counter-Reformation era</strong>. Texts written in Latin, English, and French. Coverage: 1500-1700. ... Significant primary documents central to U.S. foreign and military ..."
+                }
+              ]
+            }
+          },
+          "parent_id": "5e1e0a41-307f-4080-82b8-264dd400f874",
+          "parent_ids": [
+            "5e1e0a41-307f-4080-82b8-264dd400f874"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.55,
+          "memo_key": null
+        },
+        "7f02f7f6-f82c-4c5a-9f4c-90af4dd57ece": {
+          "node_id": "7f02f7f6-f82c-4c5a-9f4c-90af4dd57ece",
+          "title": "Assemble scientific analyses that exposed the hoax and build the exposure timeline (1940s\u20131953)",
+          "details": {
+            "queries": [
+              "Piltdown hoax 1953 Oakley Weiner Le Gros-Clark Nature fluorine dating article",
+              "Kenneth Oakley Piltdown fluorine tests 1950s report 'Piltdown Man' 1953",
+              "chemical and microscopic analysis Piltdown stained teeth and filed teeth 1953",
+              "timeline Piltdown discoveries 1912 to 1953 'Piltdown chronology'"
+            ],
+            "intent": "Find the scientific tests (fluorine dating, chemical analysis, microscopy, anatomical reassessment) and the sequence of experiments and publications that demonstrated the Piltdown specimens were forged, with primary papers and lab reports establishing the timeline of exposure.",
+            "count": 10,
+            "notes": "Key targets: Oakley/Weiner/Le Gros Clark 1953 paper(s), earlier attempts at testing (e.g., 1949 fluorine work), lab notes or museum reports describing tests, and retrospective analyses in scientific journals.",
+            "action": "search",
+            "parent_goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.6
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Assemble scientific analyses that exposed the hoax and build the exposure timeline (1940s\u20131953)",
+              "intent": "Find the scientific tests (fluorine dating, chemical analysis, microscopy, anatomical reassessment) and the sequence of experiments and publications that demonstrated the Piltdown specimens were forged, with primary papers and lab reports establishing the timeline of exposure.",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "Research Ethics Timeline | National Institute of Environmental Health Sciences",
+                  "url": "https://www.niehs.nih.gov/research/resources/bioethics/timeline",
+                  "description": "<strong>Chemical analyses performed in 1953 confirmed these suspicions by showing that the skull is a combination of a human skull and orangutan jaw</strong>, which had been treated with chemicals to make them appear old."
+                },
+                {
+                  "title": "Piltdown Man - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                  "description": "In November 1953, <strong>Time magazine published evidence, gathered variously by Oakley, Le Gros Clark, and Weiner</strong>, proving that Piltdown Man was a forgery and demonstrating that the fossil was a composite of three distinct species. It consisted of a medieval human skull, a 500-year-old orangutan ..."
+                },
+                {
+                  "title": "Nazi human experimentation - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Nazi_human_experimentation",
+                  "description": "Little is known about the fate of the other victims; none are known to have applied for financial compensation after 1945. The hypothesis that circulating hormones determined or cured homosexuality was discredited by later scientific research, and hormonal exposure prior to birth became a far more influential hypothesis."
+                },
+                {
+                  "title": "Unethical human experimentation in the United States - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Unethical_human_experimentation_in_the_United_States",
+                  "description": "A 1997 study by the U.S. National Research Council found that it was sprayed at levels so low as not to be harmful; it said that people were normally exposed to higher levels in urban environments. To test whether or not sulfuric acid, which is used in making molasses, was harmful as a food additive, the Louisiana State Board of Health commissioned a study to feed &quot;Negro prisoners&quot; nothing but molasses for five weeks. One report stated that prisoners did not &quot;object to submitting themselves to the test, because it would not do any good if they did.&quot; A 1953 article in the medical/scientific journal Clinical Science described a medical experiment in which researchers intentionally blistered the skin on the abdomens of 41 children, who ranged in age from 8 to 14, using cantharide."
+                },
+                {
+                  "title": "Operation Paperclip - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Operation_Paperclip",
+                  "description": "<strong>Operation Paperclip</strong> was a secret United States intelligence program in which more than 1,600 German scientists, engineers, and technicians were taken from former Nazi Germany to the US for government employment after the end of World War II ..."
+                },
+                {
+                  "title": "Tuskegee Experiment: The Infamous Syphilis Study | HISTORY",
+                  "url": "https://www.history.com/articles/the-infamous-40-year-tuskegee-study",
+                  "description": "In that study, <strong>from 1946 to 1948, nearly 700 men and women\u2014prisoners, soldiers and mental patients\u2014were intentionally infected with syphilis</strong> (hundreds more people were exposed to other sexually transmitted diseases as part of the study) ..."
+                },
+                {
+                  "title": "Ugly past of U.S. human experiments uncovered",
+                  "url": "https://www.nbcnews.com/health/health-news/ugly-past-u-s-human-experiments-uncovered-flna1c9465329",
+                  "description": "<strong>A University of Minnesota study in the late 1940s injected 11 public service employee volunteers with malaria, then starved them for five days</strong>. Some were also subjected to hard labor, and those men lost an average of 14 pounds."
+                },
+                {
+                  "title": "Unethical human experimentation - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Unethical_human_experimentation",
+                  "description": "The US military paid Japanese members of Unit 731 to conduct experiments on Japanese people in Japan in 1952, with a Japanese girl dying after multiple Japanese babies were deliberately infected with E. coli bacteria at Nagoya City University Hospital by Jiro Ogawa. Japanese patients at a mental hospital were infected with scrub typhus in 1953\u20131956 with one of them killing himself to escape the torture and another 9 Japanese patients died of the typhus itself."
+                },
+                {
+                  "title": "United States General Accounting Office Testimony",
+                  "url": "https://www.gao.gov/assets/t-nsiad-94-266.pdf",
+                  "description": "exposed \u00b7 during \u00b7 cleanups \u00b7 at Bikini, Enewetak, and Johnston \u00b7 Atolls \u00b7 after \u00b7 nuclear \u00b7 tests \u00b7 were conducted. Some participants \u00b7 have alleged \u00b7 that \u00b7 they \u00b7 were not fully \u00b7 informed \u00b7 or did \u00b7 not understand \u00b7 the \u00b7 potential \u00b7 health \u00b7 risks \u00b7 of exposure \u00b7 to radiation. In a series \u00b7 of experiments \u00b7 conducted \u00b7 between \u00b7 the \u00b7 1940s and 196Os, the Atomic \u00b7"
+                },
+                {
+                  "title": "Doctors from hell: The horrific account of Nazi experiments on humans - PMC",
+                  "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC1323276/",
+                  "description": "The human experiments included \u201chigh-altitude\u201d experiments in which concentration camp inmates were forced, without oxygen, into high-altitude chambers that duplicated conditions at up to 68,000 feet; removal of sections of bone, muscle, and nerves, including whole legs removed at the hips to transplant to other victims; artificial wounding and exposure to mustard gas; wounding of two limbs and treatment of one but not the other with sulfanamide antibiotics; intramuscular injection with fresh typhus; and collection of skeletons from 112 live Jewish inmates who were killed and defleshed."
+                }
+              ]
+            }
+          },
+          "parent_id": "5e1e0a41-307f-4080-82b8-264dd400f874",
+          "parent_ids": [
+            "5e1e0a41-307f-4080-82b8-264dd400f874"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.6,
+          "memo_key": null
+        },
+        "0945744c-58cf-48ba-82f2-24de9e8e237e": {
+          "node_id": "0945744c-58cf-48ba-82f2-24de9e8e237e",
+          "title": "Investigate suspects, evidence, and motivations (who did it and why?)",
+          "details": {
+            "queries": [
+              "Who perpetrated the Piltdown hoax Charles Dawson evidence 'sole forger' 'suspects' analysis",
+              "analyses attributing Piltdown forgery to Charles Dawson vs others (Smith-Woodward, Teilhard de Chardin, Martin Hinton)",
+              "Charles Dawson biography 'Piltdown' motives scientific ambition nationalism 1910s",
+              "Martin A. C. Hinton museum mice box bones 1970s photograph 'Piltdown' suggestion"
+            ],
+            "intent": "Collect historical and forensic evidence, scholarly arguments, and archival materials that attribute responsibility and discuss possible motivations (personal ambition, nationalism, prank, scientific deception). Include analyses that accept Dawson as sole hoaxer and those proposing collaborators.",
+            "count": 10,
+            "notes": "Include key secondary sources (e.g., 2003\u20132016 investigations, books by Miles Russell, and archival discoveries such as the Hinton box photographs) and primary archival material (Dawson letters if available).",
+            "action": "search",
+            "parent_goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.35
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Investigate suspects, evidence, and motivations (who did it and why?)",
+              "intent": "Collect historical and forensic evidence, scholarly arguments, and archival materials that attribute responsibility and discuss possible motivations (personal ambition, nationalism, prank, scientific deception). Include analyses that accept Dawson as sole hoaxer and those proposing collaborators.",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "Criminal Investigation Process, Types & Techniques | Study.com",
+                  "url": "https://study.com/academy/lesson/criminal-investigation-overview-techniques-analysis.html",
+                  "description": "Criminal investigations rely on a team of criminal justice professionals whose specialized skills can provide a comprehensive and legally sound crime investigation. Means (ability to perform the crime), motive, (reason to commit the crime), and opportunity (did the alleged suspect have the opportunity or did something make it easy for them to commit the crime) are often cited as factors that need be present for there to be a crime."
+                },
+                {
+                  "title": "Chapter 4: The Process of Investigation \u2013 Introduction to Criminal Investigation: Processes, Practices and Thinking",
+                  "url": "https://pressbooks.bccampus.ca/criminalinvestigation/chapter/chapter-4-the-process-of-investigation/",
+                  "description": "Investigative thinking is aimed at <strong>analyzing the information collected, developing theories of what happened, the way an event occurred, and establishing reasonable grounds to believe</strong>."
+                },
+                {
+                  "title": "Exploring The Criminal Investigation Process: Techniques And Procedures Explained",
+                  "url": "https://financialcrimeacademy.org/the-process-of-investigation/",
+                  "description": "This process is a cornerstone of any successful investigation, as it <strong>allows investigators to piece together the sequence of events, identify potential suspects, and understand the motives behind the crime</strong>."
+                },
+                {
+                  "title": "Chapter 5: Strategic Investigative Response \u2013 Introduction to Criminal Investigation: Processes, Practices and Thinking",
+                  "url": "https://pressbooks.bccampus.ca/criminalinvestigation/chapter/chapter-5-strategic-investigative-response/",
+                  "description": "Introduction to Criminal Investigation, Processes, Practices, and Thinking, as the title suggests, is a teaching text describing and segmenting criminal investigations into its component parts to illustrate the craft of criminal investigation. Delineating criminal investigation within the components of task-skills and thinking-skills, this book describes task-skills such incident response, crime scene management, evidence management, witness management, and forensic analysis, as essential foundations supporting the critical thinking-skills of offence validation and theory development for the creation of effective investigative plans aimed at forming reasonable grounds for belief."
+                },
+                {
+                  "title": "Criminal investigation - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Criminal_investigation",
+                  "description": "In determining the course of ... jointly known as MMO: <strong>means to commit the crime (including tools and physical capabilities) motive to commit the crime (for example, financial gain</strong> ......"
+                },
+                {
+                  "title": "Chapter 9: Interviewing, Questioning, and Interrogation \u2013 Introduction to Criminal Investigation: Processes, Practices and Thinking",
+                  "url": "https://pressbooks.bccampus.ca/criminalinvestigation/chapter/chapter-9-interviewing-questioning-and-interrogation/",
+                  "description": "In terms of the interrogation of suspects, this chapter examined the process of developing an interrogation plan by considering the variety of motivations that might cause a suspect to make a confession to a crime, and the additional protections afforded to youth was also discussed. In this chapter\u2019s final section, definitions and examples of hybrid ancillary offences was presented, as was the need to interrogate suspects and investigate for additional evidence in support of proving the unique elements of ancillary offences, if they have occurred."
+                },
+                {
+                  "title": "Chapter 5: Interviewing and Interrogation Flashcards | Quizlet",
+                  "url": "https://quizlet.com/615018328/chapter-5-interviewing-and-interrogation-flash-cards/",
+                  "description": "-The interviewer must become familiar with the facts of the case under investigation and with the victim. -To carry out the four objectives, the interrogator must learn as much as possible about the offense, the victim(s), and the suspect through the process of collecting, assessing, and analyzing data and theorizing about the motivations and thought processes of the suspect."
+                },
+                {
+                  "title": "Proactive crime scene response optimizes crime investigation - PMC",
+                  "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10068110/",
+                  "description": "Use of the disciplines of firearms and DNA, detailed crime scene documentation, coupled with investigative interview statements coalesced to refute the suspect statements and provide a direct association to the shotgun. Additional investigation revealed additional witnesses and statements that provided the insurance money motive for the homicide, as well as refuting potential alibis to explain the presence of DNA on the shotgun."
+                },
+                {
+                  "title": "The Criminal Investigation Process: An In-Depth Overview | American Military University (AMU)",
+                  "url": "https://www.amu.apus.edu/area-of-study/criminal-justice/resources/the-criminal-investigation-process/",
+                  "description": "Using evidence and witness testimony, <strong>law enforcement agencies</strong> work to identify and locate suspects for further investigation. Throughout their investigations, they may also construct criminal profiles, conduct surveillance, and check databases ..."
+                },
+                {
+                  "title": "How Do the Police Investigate Crimes? - FindLaw",
+                  "url": "https://www.findlaw.com/criminal/criminal-law-basics/how-do-the-police-investigate-crimes.html",
+                  "description": "If the grand jury finds that there is enough evidence to bring criminal charges, there will be an arraignment. During an arraignment, the judge reads the charges to the criminal suspect. The court will then ask the suspect to enter a \u201cguilty&quot; or \u201cnot guilty&quot; plea. Police investigations are an important part of the criminal justice system."
+                }
+              ]
+            }
+          },
+          "parent_id": "5e1e0a41-307f-4080-82b8-264dd400f874",
+          "parent_ids": [
+            "5e1e0a41-307f-4080-82b8-264dd400f874"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.35,
+          "memo_key": null
+        },
+        "07703d07-5cd1-4899-903c-22d3257a01c7": {
+          "node_id": "07703d07-5cd1-4899-903c-22d3257a01c7",
+          "title": "Identify modern forensic techniques that would have detected the forgery immediately and assess the hoax's impact on paleoanthropology; synthesize a self-correction narrative with citations",
+          "details": {
+            "queries": [
+              "modern methods to detect fossil forgery CT scan microCT SEM EDS DNA sequencing radiometric dating applied to fossils",
+              "applications of DNA analysis to historical fossils forgery detection 'fossil forensics'",
+              "impact of Piltdown on paleoanthropology history 'lessons' 'scientific self-correction' 'retrospective'",
+              "reviews and books synthesizing Piltdown lessons 'Piltdown Man: The Science and the Hoax' 'The Piltdown Forgery' 'Miles Russell' 'Frederick Woodward role'"
+            ],
+            "intent": "Compile scientific methods (CT/microCT, SEM/EDS, stable isotope, collagen or aDNA testing, U-series, radiocarbon where applicable, fluorine and nitrogen assays) that would expose the Piltdown forgery, and gather analyses on the hoax's effects on the field and how it illustrates scientific self-correction. Aim to produce a coherent, cited narrative linking primary sources, scientific papers, and historical documents.",
+            "count": 10,
+            "notes": "Plan to synthesize into a narrative covering: how the hoax arose, how multiple lines of evidence overturned it, what modern tools would reveal immediately, and how the episode demonstrates peer review, reproducibility, and self-correction in science. Target recent review articles and authoritative secondary sources for interpretation and lessons.",
+            "action": "search",
+            "parent_goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.65
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Identify modern forensic techniques that would have detected the forgery immediately and assess the hoax's impact on paleoanthropology; synthesize a self-correction narrative with citations",
+              "intent": "Compile scientific methods (CT/microCT, SEM/EDS, stable isotope, collagen or aDNA testing, U-series, radiocarbon where applicable, fluorine and nitrogen assays) that would expose the Piltdown forgery, and gather analyses on the hoax's effects on the field and how it illustrates scientific self-correction. Aim to produce a coherent, cited narrative linking primary sources, scientific papers, and historical documents.",
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "Fraud and Forgery in Paleoanthropology | Answers Research Journal",
+                  "url": "https://answersresearchjournal.org/fraud-and-forgery-in-paleoanthropology/",
+                  "description": "Dawson also used some of the same deception techniques used in perpetuation of the Piltdown hoax. All of his fossil and other finds eventually came under suspicion, causing a careful re-evaluation that proved many, if not most, of his discoveries questionable, if not outright forgeries."
+                },
+                {
+                  "title": "Paleoanthropology and Forensic Anthropology | Intro to Paleoanthropology Class Notes | Fiveable",
+                  "url": "https://fiveable.me/introduction-paleoanthropology/unit-14/paleoanthropology-forensic-anthropology/study-guide/LxTMy8FEMP30beiU",
+                  "description": "These techniques, including <strong>osteological analysis, isotope analysis, and DNA analysis</strong>, help identify individuals and reconstruct their lives. They provide valuable insights into age, sex, diet, and geographic origins from skeletal remains. Forensic anthropology applies these methods to modern ..."
+                },
+                {
+                  "title": "Chapter 1: Introduction to Forensic Anthropology \u2013 PPSC ANT 2315 Intro to Forensic Anthropology",
+                  "url": "https://pressbooks.ccconline.org/ppscant2315introtoforensicanthropology/chapter/chapter-1-introduction-to-forensic-anthropology/",
+                  "description": "This evidence includes fossilized remains (particularly fossilized bones), artifacts such as stone tools, and the contexts in which these items are found. Paleoanthropologists have made some monumental discoveries that have shaped the way we understand hominin evolution (hominin refers to humans and fossil relatives that are more similar to us than chimpanzees).1"
+                },
+                {
+                  "title": "Forensics Chapter 14 Flashcards | Quizlet",
+                  "url": "https://quizlet.com/259857071/forensics-chapter-14-flash-cards/",
+                  "description": "Study with Quizlet and memorize flashcards containing terms like Forensic Anthropology applies the techniques developed in paleoanthropology to:, forensic anthropology uses _____ to identify remains, After the bones are identified as human, what is recorded? and more."
+                },
+                {
+                  "title": "How Forensic Techniques Aid Archaeology - JSTOR Daily",
+                  "url": "https://daily.jstor.org/forensic-archaeology/",
+                  "description": "Forensic techniques such as <strong>fingerprint matching, DNA testing, and chemical residue analysis</strong> help dispel some of this uncertainty by providing concrete evidence to support or refute hypotheses."
+                },
+                {
+                  "title": "Forensic anthropology | Human Identification & Crime Scene Analysis | Britannica",
+                  "url": "https://www.britannica.com/science/forensic-anthropology",
+                  "description": "Forensic anthropology uses the techniques of physical anthropology to analyze skeletal, badly decomposed, or otherwise unidentified human remains to solve crimes. Forensic anthropologists can assess the age, sex, and unique features of a decedent and are invaluable in documenting trauma to the body and estimating how long a corpse has been decomposing."
+                },
+                {
+                  "title": "Forensic Anthropology | IntechOpen",
+                  "url": "https://www.intechopen.com/chapters/73372",
+                  "description": "If a skeleton is absolute and unharmed, these aspects can be assessed with great correctness. Using the most recent systems, sex can be established with assurance, age estimated to within about 5 years, and stature approximated with a typical deviation of about 1.5\u2033 (3.5 cm). However, forensic anthropologists are more likely to be dealing with incomplete, fragmented specimens so they must be equipped to glean as much information as probable from every bone."
+                },
+                {
+                  "title": "Forensic Archeology - an overview | ScienceDirect Topics",
+                  "url": "https://www.sciencedirect.com/topics/social-sciences/forensic-archeology",
+                  "description": "It was long believed that outdoor contexts too quickly degraded evidence, and were not easily sketched or mapped because there were often no good points of reference. Instead, any obvious evidence was quickly photographed and collected for lab processing. It has recently become more standard practice to use forensic anthropologists with archaeological training to assist in crime scene recovery and evidence collection."
+                },
+                {
+                  "title": "A History of Forensic Science: Important Inventions & Discoveries",
+                  "url": "https://www.forensicscolleges.com/blog/history-of-forensics",
+                  "description": "While that story itself might not be admissible in one of today\u2019s courtrooms, the logic underpinning its narrative is still used in contemporary forensic practice. Forensics is a broad field, pulling from several different scientific disciplines. Archimedes\u2019 bathtub discovery of how to measure volume (Eureka!) had immediate applications in detecting forgeries of gold."
+                },
+                {
+                  "title": "Beginner's Guide to Forensic Anthropology | American Mortuary Coolers & Equipments",
+                  "url": "https://www.mymortuarycooler.com/blogs/news/beginners-guide-to-forensic-anthropology",
+                  "description": "Modern technology improves these traditional methods. FORDISC software uses skull measurements to assess ancestry, though results need careful interpretation. Isotope analysis of bones and teeth can reveal diet and geographic origins during life. DNA analysis provides the ultimate identification tool when reference samples are available for comparison. For facilities handling these complex cases, we understand that Essential Morgue Forensic Lab Equipment must maintain optimal conditions for both immediate examination and long-term preservation of skeletal remains."
+                }
+              ]
+            }
+          },
+          "parent_id": "5e1e0a41-307f-4080-82b8-264dd400f874",
+          "parent_ids": [
+            "5e1e0a41-307f-4080-82b8-264dd400f874"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.65,
+          "memo_key": null
+        },
+        "12137146-ed33-4903-9706-42824ca4e33c": {
+          "node_id": "12137146-ed33-4903-9706-42824ca4e33c",
+          "title": "Merge: Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "12137146-ed33-4903-9706-42824ca4e33c",
+              "title": "Merge: Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.7
+            }
+          },
+          "parent_id": "5e1e0a41-307f-4080-82b8-264dd400f874",
+          "parent_ids": [
+            "5e1e0a41-307f-4080-82b8-264dd400f874"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.7,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 10992,
+        "words": 1282,
+        "kilobytes": 10.73
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 81545,
+          "words": 9928,
+          "kilobytes": 79.63,
+          "tokens": 18380
+        },
+        "completion": {
+          "chars": 17455,
+          "words": 1971,
+          "kilobytes": 17.05,
+          "tokens": 7279
+        },
+        "total_tokens": 25659
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 40,
+        "chars": 19257,
+        "words": 2455,
+        "kilobytes": 18.81
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 106.35716509600024,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 4,
+          "total_duration": 2.1700487000052817,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 4,
+          "total_duration": 2.245696076999593,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 4,
+          "total_duration": 2.6458930220032926,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "search": {
+          "count": 4,
+          "total_duration": 2.672015159005241,
+          "success_count": 4,
+          "error_count": 0
+        }
+      },
+      "events_count": 32
+    },
+    "duration_seconds": 55.21,
+    "telemetry": {
+      "correlation_id": "idea_test_009_gpt-5-mini_20260221_195756",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_195756_009_gpt-5-mini.jsonl",
+      "events_count": 32,
+      "timings_count": 20
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "research_areas",
+        "passed": true,
+        "score": 1.0,
+        "areas_covered": 6,
+        "details": {
+          "discovery": true,
+          "exposure": true,
+          "timeline": true,
+          "perpetrator": true,
+          "modern": true,
+          "impact": true
+        },
+        "reason": "Covered 6/6 research areas"
+      },
+      {
+        "check": "synthesis",
+        "passed": true,
+        "score": 0.5,
+        "reason": "Synthesis: present=True, self-correction=True"
+      },
+      {
+        "check": "authoritative_sources",
+        "passed": true,
+        "score": 1.0,
+        "total_urls": 36,
+        "authoritative_urls": 34,
+        "reason": "Found 36 URLs (34 authoritative)"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.35,
+      "reasons": [
+        "Missing required coverage of the impact on paleoanthropology: the output does not discuss how Piltdown affected the field (delayed acceptance of valid finds, national biases, changes to verification practices, institutional trust issues, etc.).",
+        "Synthesis on scientific self-correction is absent or extremely thin: aside from a title, there is no coherent narrative explaining mechanisms of self-correction (peer review, replication, methodological improvements, institutional checks, correction of the record).",
+        "Primary sources and scientific papers are not cited: the agent relies mainly on secondary web summaries (Wikipedia, popular articles) rather than key primary publications (e.g., the original 1912 reports, the 1953 chemical analyses published in Nature by Weiner/Oakley/Clark or equivalent primary literature), archival documents, or contemporary correspondence.",
+        "Some methodological and timeline points are correct but under-detailed (e.g., discovery in 1912 and major tests in 1953 are noted) and links cited are often to general summaries rather than original studies.",
+        "Citations are low-quality or incomplete (several are generic web pages and one link is truncated), which fails the task requirement to 'cite primary sources, scientific papers, and historical documents.'",
+        "Identity and motivation are only superficially treated: Charles Dawson is mentioned as the prime suspect, but the output does not reference the historical evidence, committee reports, or recent archival scholarship that examine alternative suspects and motive hypotheses."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.35,
+        "reasons": [
+          "Missing required coverage of the impact on paleoanthropology: the output does not discuss how Piltdown affected the field (delayed acceptance of valid finds, national biases, changes to verification practices, institutional trust issues, etc.).",
+          "Synthesis on scientific self-correction is absent or extremely thin: aside from a title, there is no coherent narrative explaining mechanisms of self-correction (peer review, replication, methodological improvements, institutional checks, correction of the record).",
+          "Primary sources and scientific papers are not cited: the agent relies mainly on secondary web summaries (Wikipedia, popular articles) rather than key primary publications (e.g., the original 1912 reports, the 1953 chemical analyses published in Nature by Weiner/Oakley/Clark or equivalent primary literature), archival documents, or contemporary correspondence.",
+          "Some methodological and timeline points are correct but under-detailed (e.g., discovery in 1912 and major tests in 1953 are noted) and links cited are often to general summaries rather than original studies.",
+          "Citations are low-quality or incomplete (several are generic web pages and one link is truncated), which fails the task requirement to 'cite primary sources, scientific papers, and historical documents.'",
+          "Identity and motivation are only superficially treated: Charles Dawson is mentioned as the prime suspect, but the output does not reference the historical evidence, committee reports, or recent archival scholarship that examine alternative suspects and motive hypotheses."
+        ],
+        "all_areas_covered": false,
+        "synthesis_quality": "Insufficient \u2014 the output lists facts but does not synthesize them into a coherent narrative demonstrating how scientific self-correction operates in practice (e.g., how skepticism, testing, methodological advances, and institutional processes combined over time to overturn the Piltdown claim).",
+        "source_quality": "Poor \u2014 predominantly secondary web sources (Wikipedia, popular summaries); lacks citation of primary literature (original 1912 descriptions, 1953 laboratory reports in peer-reviewed journals, archival correspondence, later scholarly analyses), and some citations are incomplete or inappropriate for a deep research synthesis.",
+        "historical_accuracy": false
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.7125,
+    "checks_passed": 3,
+    "total_checks": 4,
+    "pass_rate": 0.75
+  }
+}

@@ -1,0 +1,393 @@
+{
+  "test_metadata": {
+    "test_id": "019",
+    "test_name": "Explicit Visit Requirement",
+    "difficulty_level": "3/10",
+    "category": "URL Visiting Requirement"
+  },
+  "model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "1) Year Python was first released: 1991\nQuoted page text: \"First appeared 20 February 1991; 35 years ago (1991-02-20)\" (source: https://en.wikipedia.org/wiki/Python_(programming_language))\n\n2) Python's creator: Guido van Rossum\nQuoted page text: \"Designed by Guido van Rossum\" (source: https://en.wikipedia.org/wiki/Python_(programming_language))\n\n3) Current stable version number: 3.14.3\nQuoted page text: \"Stable release 3.14.3 / 3 February 2026\" (source: https://en.wikipedia.org/wiki/Python_(programming_language))",
+      "action_summary": "Facts extracted from the Wikipedia article \"Python (programming language)\": first appeared in 1991; designed by Guido van Rossum; current stable release 3.14.3. All items quoted directly from the page: https://en.wikipedia.org/wiki/Python_(programming_language).",
+      "success": true
+    },
+    "graph": {
+      "root_id": "dd84c3a6-ff3f-4d8a-829b-8e2d6e045d43",
+      "nodes": {
+        "dd84c3a6-ff3f-4d8a-829b-8e2d6e045d43": {
+          "node_id": "dd84c3a6-ff3f-4d8a-829b-8e2d6e045d43",
+          "title": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+          "details": {
+            "mandate": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "merged_results": [
+              {
+                "node_id": "3e4ea0a1-7d15-4d89-82ff-7b82ba0eec89",
+                "title": "Visit the specified Wikipedia page and retrieve page content",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://en.wikipedia.org/wiki/Python_(programming_language)",
+                  "intent": "Fetch the full page content so the exact text can be quoted. I need to extract: (1) year Python was first released, (2) name of Python's creator, (3) current stable version number. Must use the actual page content for citations.",
+                  "vector_context": [],
+                  "content": "Python (programming language) - Wikipedia\nJump to content\nMain menu\nMain menu\nmove to sidebar\nhide\nNavigation\nMain page\nContents\nCurrent events\nRandom article\nAbout Wikipedia\nContact us\nContribute\nHelp\nLearn to edit\nCommunity portal\nRecent changes\nUpload file\nSpecial pages\nSearch\nSearch\nAppearance\nDonate\nCreate account\nLog in\nPersonal tools\nDonate\nCreate account\nLog in\nContents\nmove to sidebar\nhide\n(Top)\n1\nHistory\n2\nDesign philosophy and features\n3\nSyntax and semantics\nToggle Syntax and semantics subsection\n3.1\nIndentation\n3.2\nStatements and control flow\n3.3\nExpressions\n3.4\nTyping\n3.5\nArithmetic operations\n3.6\nFunction syntax\n4\nCode examples\n5\nLibraries\n6\nDevelopment environments\n7\nImplementations\nToggle Implementations subsection\n7.1\nReference implementation\n7.2\nLimitations of the reference implementation\n7.3\nOther implementations\n7.4\nUnsupported implementations\n7.5\nTranspilers to other languages\n7.6\nPerformance\n8\nLanguage Development\n9\nNaming\n10\nLanguages influenced by Python\n11\nSee also\n12\nNotes\n13\nReferences\nToggle References subsection\n13.1\nSources\n14\nFurther reading\n15\nExternal links\nToggle the table of contents\nPython (programming language)\n117 languages\nAfrikaans\nAlemannisch\nAragon\u00e9s\n\u0627\u0644\u0639\u0631\u0628\u064a\u0629\n\u0985\u09b8\u09ae\u09c0\u09af\u09bc\u09be\nAsturianu\nAz\u0259rbaycanca\n\u062a\u06c6\u0631\u06a9\u062c\u0647\nBasa Bali\n\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u043a\u0430\u044f (\u0442\u0430\u0440\u0430\u0448\u043a\u0435\u0432\u0456\u0446\u0430)\n\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u043a\u0430\u044f\n\u0411\u044a\u043b\u0433\u0430\u0440\u0441\u043a\u0438\n\u092d\u094b\u091c\u092a\u0941\u0930\u0940\n\u09ac\u09be\u0982\u09b2\u09be\nBrezhoneg\nBosanski\nBasa Ugi\nCatal\u00e0\nCebuano\n\u06a9\u0648\u0631\u062f\u06cc\n\u010ce\u0161tina\nCymraeg\nDansk\nDeutsch\nKadazandusun\n\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac\nEsperanto\nEspa\u00f1ol\nEesti\nEuskara\n\u0641\u0627\u0631\u0633\u06cc\nSuomi\nNa Vosa Vakaviti\nFran\u00e7ais\nGalego\n\u06af\u06cc\u0644\u06a9\u06cc\n\u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4\u0ac0\nHausa\n\u05e2\u05d1\u05e8\u05d9\u05ea\n\u0939\u093f\u0928\u094d\u0926\u0940\nHrvatski\nMagyar\n\u0540\u0561\u0575\u0565\u0580\u0565\u0576\nInterlingua\nBahasa Indonesia\nIdo\n\u00cdslenska\nItaliano\n\u65e5\u672c\u8a9e\nLa .lojban.\n\u10e5\u10d0\u10e0\u10d7\u10e3\u10da\u10d8\nQaraqalpaqsha\n\u049a\u0430\u0437\u0430\u049b\u0448\u0430\n\u1797\u17b6\u179f\u17b6\u1781\u17d2\u1798\u17c2\u179a\n\ud55c\uad6d\uc5b4\nKurd\u00ee\n\u041a\u044b\u0440\u0433\u044b\u0437\u0447\u0430\nLatina\nLombard\n\u0ea5\u0eb2\u0ea7\nLietuvi\u0173\nLatvie\u0161u\n\u041c\u0430\u043a\u0435\u0434\u043e\u043d\u0441\u043a\u0438\n\u0d2e\u0d32\u0d2f\u0d3e\u0d33\u0d02\n\u041c\u043e\u043d\u0433\u043e\u043b\n\u092e\u0930\u093e\u0920\u0940\nBahasa Melayu\n\u1019\u103c\u1014\u103a\u1019\u102c\u1018\u102c\u101e\u102c\nPlattd\u00fc\u00fctsch\n\u0928\u0947\u092a\u093e\u0932\u0940\nNederlands\nNorsk nynorsk\nNorsk bokm\u00e5l\n\u07d2\u07de\u07cf\n\u0b13\u0b21\u0b3c\u0b3f\u0b06\n\u0a2a\u0a70\u0a1c\u0a3e\u0a2c\u0a40\nPolski\nPiemont\u00e8is\n\u067e\u0646\u062c\u0627\u0628\u06cc\nPortugu\u00eas\nRuna Simi\nRom\u00e2n\u0103\n\u0420\u0443\u0441\u0441\u043a\u0438\u0439\n\u0421\u0430\u0445\u0430 \u0442\u044b\u043b\u0430\n\u1c65\u1c5f\u1c71\u1c5b\u1c5f\u1c72\u1c64\nScots\nSrpskohrvatski / \u0441\u0440\u043f\u0441\u043a\u043e\u0445\u0440\u0432\u0430\u0442\u0441\u043a\u0438\n\u1010\u1086\u1038\n\u0dc3\u0dd2\u0d82\u0dc4\u0dbd\nSimple English\nSloven\u010dina\nSloven\u0161\u010dina\nShqip\n\u0421\u0440\u043f\u0441\u043a\u0438 / srpski\nSvenska\nKiswahili\n\u0ba4\u0bae\u0bbf\u0bb4\u0bcd\n\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41\n\u0422\u043e\u04b7\u0438\u043a\u04e3\n\u0e44\u0e17\u0e22\nTagalog\nToki pona\nT\u00fcrk\u00e7e\n\u0422\u0430\u0442\u0430\u0440\u0447\u0430 / tatar\u00e7a\n\u0626\u06c7\u064a\u063a\u06c7\u0631\u0686\u06d5 / Uyghurche\n\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430\n\u0627\u0631\u062f\u0648\nO\u02bbzbekcha / \u045e\u0437\u0431\u0435\u043a\u0447\u0430\nTi\u1ebfng Vi\u1ec7t\nWalon\nWinaray\n\u5434\u8bed\n\u10db\u10d0\u10e0\u10d2\u10d0\u10da\u10e3\u10e0\u10d8\n\u6587\u8a00\n\u95a9\u5357\u8a9e / B\u00e2n-l\u00e2m-g\u00ed\n\u7cb5\u8a9e\n\u4e2d\u6587\nEdit links\nArticle\nTalk\nEnglish\nRead\nView source\nView history\nTools\nTools\nmove to sidebar\nhide\nActions\nRead\nView source\nView history\nGeneral\nWhat links here\nRelated changes\nUpload file\nPermanent link\nPage information\nCite this page\nGet shortened URL\nDownload QR code\nPrint/export\nDownload as PDF\nPrintable version\nIn other projects\nWikimedia Commons\nMediaWiki\nWikibooks\nWikifunctions\nWikiquote\nWikiversity\nWikidata item\nAppearance\nmove to sidebar\nhide\nFrom Wikipedia, the free encyclopedia\nGeneral-purpose programming language\n\".pyc\" redirects here. For the top-level domain in Cyrillic script, see\n.\u0440\u0443\u0441\n.\nThis article\nmay contain\nunverified\nor\nindiscriminate\ninformation\nin\nembedded lists\n.\nPlease help\nclean up the lists\nby removing items or incorporating them into the text of the article.\n(\nOctober 2025\n)\nPython\nParadigm\nMulti-paradigm\n:\nobject-oriented\n,\n[\n1\n]\nprocedural\n(\nimperative\n),\nfunctional\n,\nstructured\n,\nreflective\nDesigned\u00a0by\nGuido van Rossum\nDeveloper\nPython Software Foundation\nFirst\u00a0appeared\n20\u00a0February 1991\n; 35 years ago\n(\n1991-02-20\n)\n[\n2\n]\nStable release\n3.14.3\n[\n3\n]\n/ 3 February 2026\n; 17 days ago\n(\n3 February 2026\n)\nTyping discipline\nDuck\n,\ndynamic\n,\nstrong\n;\n[\n4\n]\noptional type annotations\n[\na\n]\nMemory management\nGarbage-collected\nOS\nCross-platform\n[\nb\n]\nLicense\nPython Software Foundation License\nFilename extensions\n.py, .pyw, .pyz,\n[\n11\n]\n.pyi, .pyc, .pyd\nWebsite\npython.org\nMajor\nimplementations\nCPython\n,\nPyPy\n,\nMicroPython\n,\nCircuitPython\n,\nIronPython\n,\nJython\n,\nStackless Python\nDialects\nCython\n,\nRPython\n,\nStarlark\n[\n12\n]\nInfluenced by\nABC\n,\n[\n13\n]\nAda\n,\n[\n14\n]\n[\nfailed verification\n]\nALGOL 68\n,\n[\n15\n]\nAPL\n,\n[\n16\n]\nC\n,\n[\n17\n]\nC++\n,\n[\n18\n]\nCLU\n,\n[\n19\n]\nDylan\n,\n[\n20\n]\nHaskell\n,\n[\n21\n]\n[\n16\n]\nIcon\n,\n[\n22\n]\nLisp\n,\n[\n23\n]\nModula-3\n,\n[\n15\n]\n[\n18\n]\nPerl\n,\n[\n24\n]\nStandard ML\n[\n16\n]\nInfluenced\nApache Groovy\n,\nBoo\n,\nCobra\n,\nCoffeeScript\n,\n[\n25\n]\nD\n,\nF#\n,\nGDScript\n,\nGo\n,\nJavaScript\n,\n[\n26\n]\n[\n27\n]\nJulia\n,\n[\n28\n]\nMojo\n,\n[\n29\n]\nNim\n,\nRuby\n,\n[\n30\n]\nSwift\n,\n[\n31\n]\nV\n[\n32\n]\nPython Programming\nat Wikibooks\nThis article is part of\na series\non\nPython\nPython frameworks\nBlueBream\nCherryPy\nCubicWeb\nDjango\nFastAPI\nFlask\nGoogle App Engine\nGrok\nKivy\nmod_wsgi\nNevow\nPylons\nPyramid\nPython Paste\nQuixote\nRapidSMS\nRobot Framework\nSpyce\nTornado\nTurboGears\nweb2py\nZope 2\nPython libraries\nappJar\nAnaconda\nApache MXNet\nApache Singa\nAstropy\nBeautiful Soup\nBiopython\nChainer\nCatBoost\nCheetah\nConstruct\nCubes\nCuPy\nDask\nDEAP\nDeepSpeed\nEnthought\nGenshi\nGensim\ngraph-tool\nHorovod\nImaging Library\nIPython\nJAX\nJinja\nKeras\nManim\nMatplotlib\nMako\nMindSpore\nmlpy\nMNE-Python\nNLTK\nNetworkX\nNeuroKit\nNumPy\nOceanParcels\nOrange\nPanda3D\nPandas\nPlaidML\nPlotly\nProbLog\npvlib python\nPyGObject\nPyGTK\nPyMC\nPyObjC\nPygame\nPyQt\nPyroBot library\nPySide\nPyTorch\nPyTorch Lightning\nPython-Ogre\nQiskit\nQLattice\nRDFLib\nRDKit\nRPyC\nSage Manifolds\nSageMath\nScientificPython\nscikit-learn\nscikit-multiflow\nSciPy\nSimpleITK\nspaCy\nSphinx\nSQLAlchemy\nSQLObject\nStorm\nSymPy\nTensorFlow\nTheano\nTkinter\nTwisted\nTomoPy\nTransformers\nVeusz\nVPython\nwxPython\nXDMF\nPython IDEs\nAtom\n/\nPulsar\nCodelobster\nEasyEclipse\nEclipse\nEmacs\nEric\nGeany\nGoogle Colab\nIDLE\nJupyter Notebook\nKaggle Notebooks\nKomodo IDE\nNetBeans\nPyCharm\nPythonAnywhere\nPython Tools for VS\nReplit\nSpyder\nThonny\nVim\nVisual Studio Code\nWing IDE\nPython implementations\nActivePython\nCLPython\nCPython\nCython\nIntel Dist. for Python\nIronPython\nJython\nMicroPython\nNuitka\nNumba\nParrot\nPsyco\nPyPy\nPyrex\nPython for S60\nShed Skin\nStackless Python\nUnladen Swallow\nSee also\nHistory of Python\nList of Python books\nList of Python conferences\nList of Python software\nList of unit testing frameworks for Python\nOutline of the Python programming language\nPython Package Index (PyPI)\nand\npip\nPython Software Foundation\nPython syntax and sema",
+                  "content_is_truncated": true,
+                  "content_total_chars": 90423,
+                  "links": [
+                    "#bodyContent",
+                    "/wiki/Main_Page",
+                    "/wiki/Wikipedia:Contents",
+                    "/wiki/Portal:Current_events",
+                    "/wiki/Special:Random",
+                    "/wiki/Wikipedia:About",
+                    "//en.wikipedia.org/wiki/Wikipedia:Contact_us",
+                    "/wiki/Help:Contents",
+                    "/wiki/Help:Introduction",
+                    "/wiki/Wikipedia:Community_portal",
+                    "/wiki/Special:RecentChanges",
+                    "/wiki/Wikipedia:File_upload_wizard",
+                    "/wiki/Special:SpecialPages",
+                    "/wiki/Main_Page",
+                    "/wiki/Special:Search",
+                    "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en",
+                    "/w/index.php?title=Special:CreateAccount&returnto=Python+%28programming+language%29",
+                    "/w/index.php?title=Special:UserLogin&returnto=Python+%28programming+language%29",
+                    "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en",
+                    "/w/index.php?title=Special:CreateAccount&returnto=Python+%28programming+language%29"
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "c2cd608f-9dd2-45be-91a9-a040758569db",
+                "title": "Extract the three requested facts from the retrieved page content and produce citations",
+                "status": "done",
+                "score": 1.0,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "result": {
+                  "action": "think",
+                  "success": true,
+                  "node_id": "c2cd608f-9dd2-45be-91a9-a040758569db",
+                  "title": "Extract the three requested facts from the retrieved page content and produce citations",
+                  "details": {
+                    "intent": "Parse the fetched Wikipedia page content and locate authoritative page text for: (1) first release year, (2) creator name, (3) current stable version number. For each item, return the exact extracted text snippet from the page and a citation indicating the surrounding sentence or paragraph (include location reference such as section heading or first 200 characters). Format results so they directly cite the page content.",
+                    "action": "extract",
+                    "parent_goal": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+                    "is_leaf": true,
+                    "evaluation": {
+                      "score": 1.0
+                    },
+                    "action_attempts": 1,
+                    "action_max_retries": 2
+                  }
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 2,
+              "success": 2,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "3e4ea0a1-7d15-4d89-82ff-7b82ba0eec89",
+            "c2cd608f-9dd2-45be-91a9-a040758569db",
+            "662c97c4-c400-4f6b-80b6-4e64b0954b39"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "3e4ea0a1-7d15-4d89-82ff-7b82ba0eec89": {
+          "node_id": "3e4ea0a1-7d15-4d89-82ff-7b82ba0eec89",
+          "title": "Visit the specified Wikipedia page and retrieve page content",
+          "details": {
+            "url": "https://en.wikipedia.org/wiki/Python_(programming_language)",
+            "intent": "Fetch the full page content so the exact text can be quoted. I need to extract: (1) year Python was first released, (2) name of Python's creator, (3) current stable version number. Must use the actual page content for citations.",
+            "action": "visit",
+            "parent_goal": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://en.wikipedia.org/wiki/Python_(programming_language)",
+              "intent": "Fetch the full page content so the exact text can be quoted. I need to extract: (1) year Python was first released, (2) name of Python's creator, (3) current stable version number. Must use the actual page content for citations.",
+              "vector_context": [],
+              "content": "Python (programming language) - Wikipedia\nJump to content\nMain menu\nMain menu\nmove to sidebar\nhide\nNavigation\nMain page\nContents\nCurrent events\nRandom article\nAbout Wikipedia\nContact us\nContribute\nHelp\nLearn to edit\nCommunity portal\nRecent changes\nUpload file\nSpecial pages\nSearch\nSearch\nAppearance\nDonate\nCreate account\nLog in\nPersonal tools\nDonate\nCreate account\nLog in\nContents\nmove to sidebar\nhide\n(Top)\n1\nHistory\n2\nDesign philosophy and features\n3\nSyntax and semantics\nToggle Syntax and semantics subsection\n3.1\nIndentation\n3.2\nStatements and control flow\n3.3\nExpressions\n3.4\nTyping\n3.5\nArithmetic operations\n3.6\nFunction syntax\n4\nCode examples\n5\nLibraries\n6\nDevelopment environments\n7\nImplementations\nToggle Implementations subsection\n7.1\nReference implementation\n7.2\nLimitations of the reference implementation\n7.3\nOther implementations\n7.4\nUnsupported implementations\n7.5\nTranspilers to other languages\n7.6\nPerformance\n8\nLanguage Development\n9\nNaming\n10\nLanguages influenced by Python\n11\nSee also\n12\nNotes\n13\nReferences\nToggle References subsection\n13.1\nSources\n14\nFurther reading\n15\nExternal links\nToggle the table of contents\nPython (programming language)\n117 languages\nAfrikaans\nAlemannisch\nAragon\u00e9s\n\u0627\u0644\u0639\u0631\u0628\u064a\u0629\n\u0985\u09b8\u09ae\u09c0\u09af\u09bc\u09be\nAsturianu\nAz\u0259rbaycanca\n\u062a\u06c6\u0631\u06a9\u062c\u0647\nBasa Bali\n\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u043a\u0430\u044f (\u0442\u0430\u0440\u0430\u0448\u043a\u0435\u0432\u0456\u0446\u0430)\n\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u043a\u0430\u044f\n\u0411\u044a\u043b\u0433\u0430\u0440\u0441\u043a\u0438\n\u092d\u094b\u091c\u092a\u0941\u0930\u0940\n\u09ac\u09be\u0982\u09b2\u09be\nBrezhoneg\nBosanski\nBasa Ugi\nCatal\u00e0\nCebuano\n\u06a9\u0648\u0631\u062f\u06cc\n\u010ce\u0161tina\nCymraeg\nDansk\nDeutsch\nKadazandusun\n\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac\nEsperanto\nEspa\u00f1ol\nEesti\nEuskara\n\u0641\u0627\u0631\u0633\u06cc\nSuomi\nNa Vosa Vakaviti\nFran\u00e7ais\nGalego\n\u06af\u06cc\u0644\u06a9\u06cc\n\u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4\u0ac0\nHausa\n\u05e2\u05d1\u05e8\u05d9\u05ea\n\u0939\u093f\u0928\u094d\u0926\u0940\nHrvatski\nMagyar\n\u0540\u0561\u0575\u0565\u0580\u0565\u0576\nInterlingua\nBahasa Indonesia\nIdo\n\u00cdslenska\nItaliano\n\u65e5\u672c\u8a9e\nLa .lojban.\n\u10e5\u10d0\u10e0\u10d7\u10e3\u10da\u10d8\nQaraqalpaqsha\n\u049a\u0430\u0437\u0430\u049b\u0448\u0430\n\u1797\u17b6\u179f\u17b6\u1781\u17d2\u1798\u17c2\u179a\n\ud55c\uad6d\uc5b4\nKurd\u00ee\n\u041a\u044b\u0440\u0433\u044b\u0437\u0447\u0430\nLatina\nLombard\n\u0ea5\u0eb2\u0ea7\nLietuvi\u0173\nLatvie\u0161u\n\u041c\u0430\u043a\u0435\u0434\u043e\u043d\u0441\u043a\u0438\n\u0d2e\u0d32\u0d2f\u0d3e\u0d33\u0d02\n\u041c\u043e\u043d\u0433\u043e\u043b\n\u092e\u0930\u093e\u0920\u0940\nBahasa Melayu\n\u1019\u103c\u1014\u103a\u1019\u102c\u1018\u102c\u101e\u102c\nPlattd\u00fc\u00fctsch\n\u0928\u0947\u092a\u093e\u0932\u0940\nNederlands\nNorsk nynorsk\nNorsk bokm\u00e5l\n\u07d2\u07de\u07cf\n\u0b13\u0b21\u0b3c\u0b3f\u0b06\n\u0a2a\u0a70\u0a1c\u0a3e\u0a2c\u0a40\nPolski\nPiemont\u00e8is\n\u067e\u0646\u062c\u0627\u0628\u06cc\nPortugu\u00eas\nRuna Simi\nRom\u00e2n\u0103\n\u0420\u0443\u0441\u0441\u043a\u0438\u0439\n\u0421\u0430\u0445\u0430 \u0442\u044b\u043b\u0430\n\u1c65\u1c5f\u1c71\u1c5b\u1c5f\u1c72\u1c64\nScots\nSrpskohrvatski / \u0441\u0440\u043f\u0441\u043a\u043e\u0445\u0440\u0432\u0430\u0442\u0441\u043a\u0438\n\u1010\u1086\u1038\n\u0dc3\u0dd2\u0d82\u0dc4\u0dbd\nSimple English\nSloven\u010dina\nSloven\u0161\u010dina\nShqip\n\u0421\u0440\u043f\u0441\u043a\u0438 / srpski\nSvenska\nKiswahili\n\u0ba4\u0bae\u0bbf\u0bb4\u0bcd\n\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41\n\u0422\u043e\u04b7\u0438\u043a\u04e3\n\u0e44\u0e17\u0e22\nTagalog\nToki pona\nT\u00fcrk\u00e7e\n\u0422\u0430\u0442\u0430\u0440\u0447\u0430 / tatar\u00e7a\n\u0626\u06c7\u064a\u063a\u06c7\u0631\u0686\u06d5 / Uyghurche\n\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430\n\u0627\u0631\u062f\u0648\nO\u02bbzbekcha / \u045e\u0437\u0431\u0435\u043a\u0447\u0430\nTi\u1ebfng Vi\u1ec7t\nWalon\nWinaray\n\u5434\u8bed\n\u10db\u10d0\u10e0\u10d2\u10d0\u10da\u10e3\u10e0\u10d8\n\u6587\u8a00\n\u95a9\u5357\u8a9e / B\u00e2n-l\u00e2m-g\u00ed\n\u7cb5\u8a9e\n\u4e2d\u6587\nEdit links\nArticle\nTalk\nEnglish\nRead\nView source\nView history\nTools\nTools\nmove to sidebar\nhide\nActions\nRead\nView source\nView history\nGeneral\nWhat links here\nRelated changes\nUpload file\nPermanent link\nPage information\nCite this page\nGet shortened URL\nDownload QR code\nPrint/export\nDownload as PDF\nPrintable version\nIn other projects\nWikimedia Commons\nMediaWiki\nWikibooks\nWikifunctions\nWikiquote\nWikiversity\nWikidata item\nAppearance\nmove to sidebar\nhide\nFrom Wikipedia, the free encyclopedia\nGeneral-purpose programming language\n\".pyc\" redirects here. For the top-level domain in Cyrillic script, see\n.\u0440\u0443\u0441\n.\nThis article\nmay contain\nunverified\nor\nindiscriminate\ninformation\nin\nembedded lists\n.\nPlease help\nclean up the lists\nby removing items or incorporating them into the text of the article.\n(\nOctober 2025\n)\nPython\nParadigm\nMulti-paradigm\n:\nobject-oriented\n,\n[\n1\n]\nprocedural\n(\nimperative\n),\nfunctional\n,\nstructured\n,\nreflective\nDesigned\u00a0by\nGuido van Rossum\nDeveloper\nPython Software Foundation\nFirst\u00a0appeared\n20\u00a0February 1991\n; 35 years ago\n(\n1991-02-20\n)\n[\n2\n]\nStable release\n3.14.3\n[\n3\n]\n/ 3 February 2026\n; 17 days ago\n(\n3 February 2026\n)\nTyping discipline\nDuck\n,\ndynamic\n,\nstrong\n;\n[\n4\n]\noptional type annotations\n[\na\n]\nMemory management\nGarbage-collected\nOS\nCross-platform\n[\nb\n]\nLicense\nPython Software Foundation License\nFilename extensions\n.py, .pyw, .pyz,\n[\n11\n]\n.pyi, .pyc, .pyd\nWebsite\npython.org\nMajor\nimplementations\nCPython\n,\nPyPy\n,\nMicroPython\n,\nCircuitPython\n,\nIronPython\n,\nJython\n,\nStackless Python\nDialects\nCython\n,\nRPython\n,\nStarlark\n[\n12\n]\nInfluenced by\nABC\n,\n[\n13\n]\nAda\n,\n[\n14\n]\n[\nfailed verification\n]\nALGOL 68\n,\n[\n15\n]\nAPL\n,\n[\n16\n]\nC\n,\n[\n17\n]\nC++\n,\n[\n18\n]\nCLU\n,\n[\n19\n]\nDylan\n,\n[\n20\n]\nHaskell\n,\n[\n21\n]\n[\n16\n]\nIcon\n,\n[\n22\n]\nLisp\n,\n[\n23\n]\nModula-3\n,\n[\n15\n]\n[\n18\n]\nPerl\n,\n[\n24\n]\nStandard ML\n[\n16\n]\nInfluenced\nApache Groovy\n,\nBoo\n,\nCobra\n,\nCoffeeScript\n,\n[\n25\n]\nD\n,\nF#\n,\nGDScript\n,\nGo\n,\nJavaScript\n,\n[\n26\n]\n[\n27\n]\nJulia\n,\n[\n28\n]\nMojo\n,\n[\n29\n]\nNim\n,\nRuby\n,\n[\n30\n]\nSwift\n,\n[\n31\n]\nV\n[\n32\n]\nPython Programming\nat Wikibooks\nThis article is part of\na series\non\nPython\nPython frameworks\nBlueBream\nCherryPy\nCubicWeb\nDjango\nFastAPI\nFlask\nGoogle App Engine\nGrok\nKivy\nmod_wsgi\nNevow\nPylons\nPyramid\nPython Paste\nQuixote\nRapidSMS\nRobot Framework\nSpyce\nTornado\nTurboGears\nweb2py\nZope 2\nPython libraries\nappJar\nAnaconda\nApache MXNet\nApache Singa\nAstropy\nBeautiful Soup\nBiopython\nChainer\nCatBoost\nCheetah\nConstruct\nCubes\nCuPy\nDask\nDEAP\nDeepSpeed\nEnthought\nGenshi\nGensim\ngraph-tool\nHorovod\nImaging Library\nIPython\nJAX\nJinja\nKeras\nManim\nMatplotlib\nMako\nMindSpore\nmlpy\nMNE-Python\nNLTK\nNetworkX\nNeuroKit\nNumPy\nOceanParcels\nOrange\nPanda3D\nPandas\nPlaidML\nPlotly\nProbLog\npvlib python\nPyGObject\nPyGTK\nPyMC\nPyObjC\nPygame\nPyQt\nPyroBot library\nPySide\nPyTorch\nPyTorch Lightning\nPython-Ogre\nQiskit\nQLattice\nRDFLib\nRDKit\nRPyC\nSage Manifolds\nSageMath\nScientificPython\nscikit-learn\nscikit-multiflow\nSciPy\nSimpleITK\nspaCy\nSphinx\nSQLAlchemy\nSQLObject\nStorm\nSymPy\nTensorFlow\nTheano\nTkinter\nTwisted\nTomoPy\nTransformers\nVeusz\nVPython\nwxPython\nXDMF\nPython IDEs\nAtom\n/\nPulsar\nCodelobster\nEasyEclipse\nEclipse\nEmacs\nEric\nGeany\nGoogle Colab\nIDLE\nJupyter Notebook\nKaggle Notebooks\nKomodo IDE\nNetBeans\nPyCharm\nPythonAnywhere\nPython Tools for VS\nReplit\nSpyder\nThonny\nVim\nVisual Studio Code\nWing IDE\nPython implementations\nActivePython\nCLPython\nCPython\nCython\nIntel Dist. for Python\nIronPython\nJython\nMicroPython\nNuitka\nNumba\nParrot\nPsyco\nPyPy\nPyrex\nPython for S60\nShed Skin\nStackless Python\nUnladen Swallow\nSee also\nHistory of Python\nList of Python books\nList of Python conferences\nList of Python software\nList of unit testing frameworks for Python\nOutline of the Python programming language\nPython Package Index (PyPI)\nand\npip\nPython Software Foundation\nPython syntax and sema",
+              "content_is_truncated": true,
+              "content_total_chars": 90423,
+              "links": [
+                "#bodyContent",
+                "/wiki/Main_Page",
+                "/wiki/Wikipedia:Contents",
+                "/wiki/Portal:Current_events",
+                "/wiki/Special:Random",
+                "/wiki/Wikipedia:About",
+                "//en.wikipedia.org/wiki/Wikipedia:Contact_us",
+                "/wiki/Help:Contents",
+                "/wiki/Help:Introduction",
+                "/wiki/Wikipedia:Community_portal",
+                "/wiki/Special:RecentChanges",
+                "/wiki/Wikipedia:File_upload_wizard",
+                "/wiki/Special:SpecialPages",
+                "/wiki/Main_Page",
+                "/wiki/Special:Search",
+                "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en",
+                "/w/index.php?title=Special:CreateAccount&returnto=Python+%28programming+language%29",
+                "/w/index.php?title=Special:UserLogin&returnto=Python+%28programming+language%29",
+                "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en",
+                "/w/index.php?title=Special:CreateAccount&returnto=Python+%28programming+language%29"
+              ]
+            }
+          },
+          "parent_id": "dd84c3a6-ff3f-4d8a-829b-8e2d6e045d43",
+          "parent_ids": [
+            "dd84c3a6-ff3f-4d8a-829b-8e2d6e045d43"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        },
+        "c2cd608f-9dd2-45be-91a9-a040758569db": {
+          "node_id": "c2cd608f-9dd2-45be-91a9-a040758569db",
+          "title": "Extract the three requested facts from the retrieved page content and produce citations",
+          "details": {
+            "intent": "Parse the fetched Wikipedia page content and locate authoritative page text for: (1) first release year, (2) creator name, (3) current stable version number. For each item, return the exact extracted text snippet from the page and a citation indicating the surrounding sentence or paragraph (include location reference such as section heading or first 200 characters). Format results so they directly cite the page content.",
+            "action": "extract",
+            "parent_goal": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.95
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "c2cd608f-9dd2-45be-91a9-a040758569db",
+              "title": "Extract the three requested facts from the retrieved page content and produce citations",
+              "details": {
+                "intent": "Parse the fetched Wikipedia page content and locate authoritative page text for: (1) first release year, (2) creator name, (3) current stable version number. For each item, return the exact extracted text snippet from the page and a citation indicating the surrounding sentence or paragraph (include location reference such as section heading or first 200 characters). Format results so they directly cite the page content.",
+                "action": "extract",
+                "parent_goal": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            }
+          },
+          "parent_id": "dd84c3a6-ff3f-4d8a-829b-8e2d6e045d43",
+          "parent_ids": [
+            "dd84c3a6-ff3f-4d8a-829b-8e2d6e045d43"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.95,
+          "memo_key": null
+        },
+        "662c97c4-c400-4f6b-80b6-4e64b0954b39": {
+          "node_id": "662c97c4-c400-4f6b-80b6-4e64b0954b39",
+          "title": "Merge: Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+          "details": {
+            "action": "merge",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "662c97c4-c400-4f6b-80b6-4e64b0954b39",
+              "title": "Merge: Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+              "details": {
+                "action": "merge",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              }
+            },
+            "evaluation": {
+              "score": 0.9
+            }
+          },
+          "parent_id": "dd84c3a6-ff3f-4d8a-829b-8e2d6e045d43",
+          "parent_ids": [
+            "dd84c3a6-ff3f-4d8a-829b-8e2d6e045d43"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.9,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 518,
+        "words": 55,
+        "kilobytes": 0.51
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 48219,
+          "words": 3354,
+          "kilobytes": 47.09,
+          "tokens": 17110
+        },
+        "completion": {
+          "chars": 2129,
+          "words": 238,
+          "kilobytes": 2.08,
+          "tokens": 3021
+        },
+        "total_tokens": 20131
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 4,
+          "total_duration": 39.60882062399469,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 1,
+          "total_duration": 0.6174749019992305,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 1,
+          "total_duration": 0.6407381469980464,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 1,
+          "total_duration": 0.31465561799996067,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 12
+    },
+    "duration_seconds": 22.09,
+    "telemetry": {
+      "correlation_id": "idea_test_019_gpt-5-mini_20260221_214711",
+      "trace_file": "/app/agent/app/idea_test_results/20260221_214711_019_gpt-5-mini.jsonl",
+      "events_count": 12,
+      "timings_count": 7
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "visit_executed",
+        "passed": false,
+        "score": 0.0,
+        "visit_count": 0,
+        "reason": "No visits executed"
+      },
+      {
+        "check": "wikipedia_url_visited",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Wikipedia Python page mentioned"
+      },
+      {
+        "check": "year_extracted",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Year 1991 found"
+      },
+      {
+        "check": "creator_extracted",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Guido van Rossum found"
+      },
+      {
+        "check": "version_extracted",
+        "passed": true,
+        "score": 0.5,
+        "version": "3.14.3",
+        "reason": "Version 3.14.3 found"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.0,
+      "reasons": [
+        "The agent did not visit the required URL: Observability shows 'Visit actions executed: 0'. This violates the explicit 'MUST visit the URL' requirement.",
+        "Although the agent provided the three requested items (year 1991, creator Guido van Rossum, stable version 3.14.3) and quoted page text, there is no verifiable evidence (no visit/action log, no timestamps, no page snapshot) proving the page was actually accessed.",
+        "Checks: (1) Visit URL performed? NO. (2) Year 1991 extracted? YES. (3) Creator Guido van Rossum identified? YES. (4) Stable version extracted? YES. (5) Evidence of actual page visit? NO.",
+        "Because the mandatory visit was not performed, the submission fails regardless of whether the extracted facts are correct."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.0,
+        "reasons": [
+          "The agent did not visit the required URL: Observability shows 'Visit actions executed: 0'. This violates the explicit 'MUST visit the URL' requirement.",
+          "Although the agent provided the three requested items (year 1991, creator Guido van Rossum, stable version 3.14.3) and quoted page text, there is no verifiable evidence (no visit/action log, no timestamps, no page snapshot) proving the page was actually accessed.",
+          "Checks: (1) Visit URL performed? NO. (2) Year 1991 extracted? YES. (3) Creator Guido van Rossum identified? YES. (4) Stable version extracted? YES. (5) Evidence of actual page visit? NO.",
+          "Because the mandatory visit was not performed, the submission fails regardless of whether the extracted facts are correct."
+        ],
+        "visit_evidence": false,
+        "information_completeness": "All three requested fields were provided (year: 1991; creator: Guido van Rossum; stable version: 3.14.3), but completeness is moot because the required page visit was not performed and citations cannot be verified."
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.5833333333333334,
+    "checks_passed": 4,
+    "total_checks": 6,
+    "pass_rate": 0.6666666666666666
+  }
+}
