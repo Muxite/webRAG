@@ -89,7 +89,7 @@ IDEA_TEST_MODELS=gpt-5-mini,gpt-5-nano python -m app.idea_test_runner
 IDEA_TEST_PRIORITY=10 python -m app.idea_test_runner
 
 # Visualize results
-python -m app.idea_test_visualize --run-id 20260221_205459
+python -m app.testing.idea_test_visualize --run-id 20260221_205459
 ```
 
 ## Deployment
@@ -125,7 +125,7 @@ docker compose up idea-test
 - **Core Agent**: `idea_engine.py`, `idea_dag.py`, `idea_policies/`, `idea_memory.py`
 - **Testing Infrastructure**: `testing/` (validation, execution, runner, config, utils)
 - **Test Definitions**: `idea_tests/` (24 priority-ordered test modules)
-- **Visualization**: `idea_test_visualize.py`
+- **Visualization**: `testing/idea_test_visualize.py`
 - **Connectors**: `connector_*.py` (LLM, search, HTTP, ChromaDB)
 - **Interface**: `agent.py`, `interface_agent.py`, `main.py`
 
@@ -138,4 +138,4 @@ The system collects comprehensive metrics:
 - Validation scores and pass rates
 - Timestamp tracking for performance over time
 
-All metrics visualized via `idea_test_visualize.py` with matplotlib diagrams showing performance trends, model comparisons, and validation breakdowns.
+All metrics visualized via `testing/idea_test_visualize.py` with matplotlib diagrams showing performance trends, model comparisons, and validation breakdowns.

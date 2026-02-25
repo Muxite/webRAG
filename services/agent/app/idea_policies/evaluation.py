@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from agent.app.idea_dag import IdeaDag, IdeaNode
+if TYPE_CHECKING:
+    from agent.app.idea_dag import IdeaDag, IdeaNode
+
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import EvaluationPolicy, DetailKey
 
@@ -123,6 +125,14 @@ class LlmEvaluationPolicy(EvaluationPolicy):
             "You are an evaluation function. Score the candidate node based on the path context. "
             "Return JSON with keys: score (0-1 float) and rationale (short string)."
         )
+        planning_addendum = str(
+            self.settings.get(
+                "evaluation_planning_addendum",
+                "Reward verifiable evidence collection and concrete output fields; penalize vague plans.",
+            )
+        ).strip()
+        if planning_addendum:
+            system = f"{system}\n\n{planning_addendum}" if system else planning_addendum
         user = user_template.format(
             path_json=path_json,
             candidate_id=node.node_id,
@@ -137,10 +147,8 @@ class LlmEvaluationPolicy(EvaluationPolicy):
             },
             ensure_ascii=True,
         )
-        return [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ]
+        from agent.app.idea_policies.action_constants import PromptBuilder
+        return PromptBuilder.build_messages(system_content=system, user_content=user)
 
     def _parse_score(self, content: Optional[str]) -> tuple[float, str]:
         """
@@ -314,6 +322,14 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
             "Return JSON with key 'scores' as a list of objects: "
             "{id, score} where id is the candidate's simple identifier (1, 2, 3, etc.) and score is a 0-1 float."
         )
+        planning_addendum = str(
+            self.settings.get(
+                "evaluation_planning_addendum",
+                "Reward verifiable evidence collection and concrete output fields; penalize vague plans.",
+            )
+        ).strip()
+        if planning_addendum:
+            system = f"{system}\n\n{planning_addendum}" if system else planning_addendum
         user = user_template.format(
             path_json=path_json,
             parent_id=parent.node_id,

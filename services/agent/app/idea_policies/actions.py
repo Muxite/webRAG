@@ -5,15 +5,26 @@ import asyncio
 from enum import Enum
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, List, Set
 import uuid
+from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
 
 from bs4 import BeautifulSoup
 
-from agent.app.idea_dag import IdeaDag
+if TYPE_CHECKING:
+    from agent.app.idea_dag import IdeaDag, IdeaNode
+
 from agent.app.agent_io import AgentIO
 from agent.app.observation import clean_operation
 from agent.app.idea_policies.base import IdeaActionType, DetailKey
+from agent.app.idea_policies.action_constants import (
+    ActionResultKey,
+    PromptKey,
+    ContextKey,
+    ActionResultBuilder,
+    PromptBuilder,
+    ContextBuilder,
+)
 
 
 class LeafAction(ABC):
@@ -131,23 +142,21 @@ class LeafAction(ABC):
         tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__))
         tb_summary = tb_str.split('\n')[-3:-1] if len(tb_str.split('\n')) > 3 else []
         
-        return {
-            "action": action.value,
-            "success": False,
-            "node_id": node_id,
-            "error": error_str,
-            "error_type": error_type,
-            "root_cause": root_cause,
-            "http_status": http_status,
-            "traceback_summary": tb_summary,
-            "retryable": self._is_retryable(error),
-            "context": context or {},
-            "timestamp": None,
-        }
+        return ActionResultBuilder.failure(
+            action=action.value,
+            error=error_str,
+            error_type=error_type,
+            retryable=self._is_retryable(error),
+            node_id=node_id,
+            context=context or {},
+            root_cause=root_cause,
+            http_status=http_status,
+            traceback_summary=tb_summary,
+            timestamp=None,
+        )
 
 
 class SearchLeafAction(LeafAction):
-    """Leaf action for web search."""
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         node = None
         query = None
@@ -158,15 +167,11 @@ class SearchLeafAction(LeafAction):
             node = graph.get_node(node_id)
             if not node:
                 raise ValueError(f"Unknown node_id: {node_id}")
-            query = (
-                node.details.get(DetailKey.QUERY.value)
-                or node.details.get(DetailKey.PROMPT.value)
-                or node.title
-            )
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            query = NodeDetailsExtractor.get_query(node.details, fallback_title=node.title)
             intent = node.details.get(DetailKey.INTENT.value)
             count = int(node.details.get(DetailKey.COUNT.value, self.settings.get("default_search_count", 10)))
             
-            # Query vector DB with intent if provided
             if intent and hasattr(io, 'retrieve_chroma'):
                 try:
                     vector_context = await io.retrieve_chroma(
@@ -182,15 +187,15 @@ class SearchLeafAction(LeafAction):
             self._logger.debug(f"[SEARCH] query='{query}', intent='{intent}', count={count}")
             results = await io.search(str(query), count=count, timeout_seconds=timeout_seconds)
             self._logger.info(f"[SEARCH] {len(results) if results else 0} results for '{query[:50]}...'")
-            return {
-                "action": IdeaActionType.SEARCH.value,
-                "success": True,
-                "query": query,
-                "intent": intent,
-                "vector_context": [str(doc) for doc in vector_context] if vector_context else [],
-                "count": count,
-                "results": results or [],
-            }
+            return ActionResultBuilder.success(
+                action=IdeaActionType.SEARCH.value,
+                node_id=node_id,
+                query=query,
+                intent=intent,
+                vector_context=[str(doc) for doc in vector_context] if vector_context else [],
+                count=count,
+                results=results or [],
+            )
         except Exception as exc:
             if not query and node:
                 query = (
@@ -210,14 +215,157 @@ class SearchLeafAction(LeafAction):
                 context={DetailKey.QUERY.value: query},
             )
             if query is not None:
-                failure["query"] = query
+                failure[ActionResultKey.QUERY.value] = query
             if count is not None:
-                failure["count"] = count
+                failure[ActionResultKey.COUNT.value] = count
             return failure
 
 
 class VisitLeafAction(LeafAction):
-    """Leaf action for visiting URLs and extracting content."""
+    def _is_valid_url(self, candidate: str) -> bool:
+        if not candidate or not isinstance(candidate, str):
+            return False
+        candidate = candidate.strip()
+        return candidate.startswith(("http://", "https://"))
+    
+    def _clean_and_fix_link(self, href: str, base_url: str) -> Optional[str]:
+        """
+        Clean and fix a link, converting relative URLs to absolute.
+        Completes broken/partial links into full URLs where possible.
+        :param href: Raw href from HTML.
+        :param base_url: Base URL of the current page.
+        :return: Cleaned absolute URL or None if invalid.
+        """
+        if not href or not isinstance(href, str):
+            return None
+        
+        href = href.strip()
+        
+        if not href or href == "#" or href.startswith("#"):
+            return None
+        
+        if href.startswith(("javascript:", "mailto:", "tel:", "data:", "file:", "ftp:")):
+            return None
+        
+        if href.startswith("//"):
+            href = "https:" + href
+        
+        try:
+            absolute_url = urljoin(base_url, href)
+            parsed = urlparse(absolute_url)
+            
+            if not parsed.scheme or parsed.scheme not in ("http", "https"):
+                return None
+            
+            if not parsed.netloc:
+                parsed_base = urlparse(base_url)
+                if parsed_base.netloc:
+                    parsed = parsed._replace(netloc=parsed_base.netloc)
+                    parsed = parsed._replace(scheme=parsed_base.scheme)
+                else:
+                    return None
+            
+            cleaned_path = parsed.path.rstrip("/") if parsed.path != "/" else parsed.path
+            
+            cleaned_query = parsed.query
+            if cleaned_query:
+                query_params = parse_qs(cleaned_query, keep_blank_values=False)
+                cleaned_query = urlencode(query_params, doseq=True)
+            
+            cleaned_url = urlunparse((
+                parsed.scheme,
+                parsed.netloc.lower(),
+                cleaned_path,
+                parsed.params,
+                cleaned_query,
+                ""
+            ))
+            
+            if cleaned_url == base_url:
+                return None
+            
+            return cleaned_url
+        except Exception:
+            return None
+    
+    def _filter_and_prioritize_links(self, links: List[str], base_url: str) -> List[str]:
+        """
+        Filter, clean, and prioritize links.
+        :param links: Raw list of links.
+        :param base_url: Base URL for resolving relative links.
+        :return: Cleaned, deduplicated list of absolute URLs.
+        """
+        seen: Set[str] = set()
+        cleaned_links: List[str] = []
+        
+        for link in links:
+            cleaned = self._clean_and_fix_link(link, base_url)
+            if cleaned and cleaned not in seen:
+                seen.add(cleaned)
+                cleaned_links.append(cleaned)
+        
+        return cleaned_links
+    
+    def _attach_links_to_content(self, content: str, links: List[str], max_links: int = 20) -> str:
+        """
+        Attach links to the bottom of content for better visibility.
+        :param content: Main content text.
+        :param links: List of cleaned links.
+        :param max_links: Maximum links to attach.
+        :return: Content with links appended.
+        """
+        if not links:
+            return content
+        
+        links_to_attach = links[:max_links]
+        links_section = "\n\n--- Links found on this page ---\n"
+        for i, link in enumerate(links_to_attach, 1):
+            links_section += f"{i}. {link}\n"
+        
+        if len(links) > max_links:
+            links_section += f"\n... and {len(links) - max_links} more links (see 'links' field in action result)\n"
+        
+        return content + links_section
+    
+    def _extract_url_from_parents(self, graph: IdeaDag, node: IdeaNode, max_depth: int = 3) -> Optional[str]:
+        visited = set()
+        queue = [(node, 0)]
+        
+        while queue:
+            current, depth = queue.pop(0)
+            if depth >= max_depth or current.node_id in visited:
+                continue
+            visited.add(current.node_id)
+            
+            result = current.details.get(DetailKey.ACTION_RESULT.value)
+            if result and isinstance(result, dict):
+                action_type = result.get("action")
+
+                # Prefer URLs that already came from search results
+                if action_type == IdeaActionType.SEARCH.value:
+                    search_results = result.get("results", [])
+                    if isinstance(search_results, list):
+                        for item in search_results[:5]:
+                            if isinstance(item, dict):
+                                candidate_url = item.get("url") or item.get("link")
+                                if candidate_url and self._is_valid_url(candidate_url):
+                                    return candidate_url
+
+                # Also allow URLs from previous visit results (their links field)
+                if action_type == IdeaActionType.VISIT.value:
+                    visit_links = result.get("links", [])
+                    if isinstance(visit_links, list):
+                        for candidate_url in visit_links:
+                            if candidate_url and isinstance(candidate_url, str) and self._is_valid_url(candidate_url):
+                                return candidate_url
+            
+            if current.parent_id:
+                parent = graph.get_node(current.parent_id)
+                if parent:
+                    queue.append((parent, depth + 1))
+        
+        return None
+    
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         node = None
         url = None
@@ -227,11 +375,27 @@ class VisitLeafAction(LeafAction):
             node = graph.get_node(node_id)
             if not node:
                 raise ValueError(f"Unknown node_id: {node_id}")
-            url = (
-                node.details.get(DetailKey.URL.value)
-                or node.details.get(DetailKey.LINK.value)
-                or node.title
-            )
+            
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            url = NodeDetailsExtractor.get_url(node.details)
+            
+            if not url or not self._is_valid_url(url):
+                extracted_url = self._extract_url_from_parents(graph, node)
+                if extracted_url:
+                    url = extracted_url
+                    self._logger.info(f"[VISIT] Extracted URL from parent search results: {url[:60]}...")
+                else:
+                    error_msg = f"Visit node missing valid URL. Node title: '{node.title}'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL."
+                    self._logger.error(f"[VISIT] {error_msg}")
+                    from agent.app.idea_policies.action_constants import ErrorType
+                    return ActionResultBuilder.failure(
+                        action=IdeaActionType.VISIT.value,
+                        error=error_msg,
+                        error_type=ErrorType.INVALID_URL.value,
+                        retryable=False,
+                        url=url or node.title,
+                    )
+            
             intent = node.details.get(DetailKey.INTENT.value)
             
             if intent and hasattr(io, 'retrieve_chroma'):
@@ -248,45 +412,84 @@ class VisitLeafAction(LeafAction):
             blocked_reason = graph.is_site_blocked(str(url))
             if blocked_reason:
                 self._logger.warning(f"[VISIT] Site blocked: {url} - {blocked_reason}")
-                return {
-                    "action": IdeaActionType.VISIT.value,
-                    "success": False,
-                    "url": url,
-                    "intent": intent,
-                    "error": f"Site blocked: {blocked_reason}",
-                    "error_type": "BlockedSite",
-                    "retryable": False,
-                }
+                from agent.app.idea_policies.action_constants import ErrorType
+                return ActionResultBuilder.failure(
+                    action=IdeaActionType.VISIT.value,
+                    error=f"Site blocked: {blocked_reason}",
+                    error_type=ErrorType.BLOCKED_SITE.value,
+                    retryable=False,
+                    url=url,
+                    intent=intent,
+                )
             
             timeout_seconds = self._timeout_seconds("fetch_timeout_seconds")
             self._logger.debug(f"[VISIT] url='{url}', intent='{intent}', timeout={timeout_seconds}")
             raw_html = await io.fetch_url(str(url), timeout_seconds=timeout_seconds)
+            if not raw_html:
+                from agent.app.idea_policies.action_constants import ErrorType
+                return ActionResultBuilder.failure(
+                    action=IdeaActionType.VISIT.value,
+                    error="Failed to fetch URL - no content returned",
+                    error_type=ErrorType.NETWORK_ERROR.value,
+                    retryable=True,
+                    url=url,
+                )
             self._logger.info(f"[VISIT] {len(raw_html) if raw_html else 0} chars from {url[:60]}...")
-            cleaned = clean_operation(raw_html)
-            content_payload = self._limit_text(cleaned)
+            cleaned = clean_operation(raw_html) or ""
+            
             soup = BeautifulSoup(raw_html, "html.parser")
-            all_links = []
+            raw_links = []
+            link_contexts = {}
+            
             for tag in soup.find_all("a", href=True):
                 href = tag.get("href")
                 if href:
-                    all_links.append(href)
+                    raw_links.append(href)
+                    link_text = tag.get_text(strip=True)
+                    if link_text:
+                        link_contexts[href] = link_text[:200]
+            
+            cleaned_links = self._filter_and_prioritize_links(raw_links, str(url))
+            cleaned_link_contexts = {}
+            for raw_link in raw_links:
+                cleaned = self._clean_and_fix_link(raw_link, str(url))
+                if cleaned and raw_link in link_contexts:
+                    cleaned_link_contexts[cleaned] = link_contexts[raw_link]
+            
+            self._logger.debug(f"[VISIT] Extracted {len(raw_links)} raw links, cleaned to {len(cleaned_links)} valid absolute URLs")
             
             max_links_for_llm = int(self.settings.get("max_links_per_visit", 20))
-            links_for_llm = all_links[:max_links_for_llm]
+            links_for_llm = cleaned_links[:max_links_for_llm]
             
-            return {
-                "action": IdeaActionType.VISIT.value,
-                "success": True,
-                "url": url,
-                "intent": intent,
-                "vector_context": [str(doc) for doc in vector_context] if vector_context else [],
-                "content": content_payload.get("content"),
-                "content_is_truncated": content_payload.get("is_truncated"),
-                "content_total_chars": content_payload.get("total_chars"),
-                "content_full": cleaned,
-                "links": links_for_llm,
-                "links_full": all_links,
-            }
+            content_payload = self._limit_text(cleaned)
+            content_for_links = content_payload.get("content") or cleaned or ""
+            content_with_links = self._attach_links_to_content(
+                content_for_links,
+                links_for_llm,
+                max_links=max_links_for_llm
+            )
+            
+            if io.telemetry:
+                io.telemetry.record_document_seen(
+                    source="visit",
+                    document={"url": url, "content": content_with_links},
+                )
+            
+            return ActionResultBuilder.success(
+                action=IdeaActionType.VISIT.value,
+                url=url,
+                intent=intent,
+                vector_context=[str(doc) for doc in vector_context] if vector_context else [],
+                content=content_payload.get("content"),
+                content_is_truncated=content_payload.get("is_truncated"),
+                content_total_chars=content_payload.get("total_chars"),
+                content_full=cleaned,
+                content_with_links=content_with_links,
+                links=links_for_llm,
+                links_full=cleaned_links,
+                links_count=len(cleaned_links),
+                link_contexts=cleaned_link_contexts,
+            )
         except Exception as exc:
             if not url and node:
                 url = (
@@ -335,35 +538,56 @@ class VisitLeafAction(LeafAction):
                 context={DetailKey.URL.value: url},
             )
             if url is not None:
-                failure["url"] = url
+                failure[ActionResultKey.URL.value] = url
             if is_bot_block:
-                failure["retryable"] = False
-                failure["error"] = f"{block_reason}: {error_str}"
+                failure[ActionResultKey.RETRYABLE.value] = False
+                failure[ActionResultKey.ERROR.value] = f"{block_reason}: {error_str}"
             return failure
 
 
 class ThinkLeafAction(LeafAction):
-    """Leaf action with no external call."""
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         node = None
         try:
             node = graph.get_node(node_id)
             if not node:
                 raise ValueError(f"Unknown node_id: {node_id}")
+            
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            thinking_content = NodeDetailsExtractor.get_query(node.details, fallback_title=node.title) or ""
+            
+            if thinking_content and hasattr(io, 'store_chroma'):
+                try:
+                    doc_text = f"{node.title}\n\n{thinking_content}" if thinking_content != node.title else thinking_content
+                    metadata = {
+                        "node_id": node.node_id,
+                        "action": "think",
+                        "title": node.title[:200] if len(node.title) > 200 else node.title,
+                    }
+                    timeout_seconds = self._timeout_seconds("chroma_timeout_seconds")
+                    await io.store_chroma(
+                        documents=[doc_text],
+                        metadatas=[metadata],
+                        ids=[str(uuid.uuid4())],
+                        timeout_seconds=timeout_seconds,
+                    )
+                    self._logger.debug(f"[THINK] Saved thinking content to ChromaDB for node {node_id}")
+                except Exception as chroma_exc:
+                    self._logger.warning(f"[THINK] Failed to save to ChromaDB: {chroma_exc}")
+            
             details_copy = self._copy_details_safely(node.details)
-            return {
-                "action": IdeaActionType.THINK.value,
-                "success": True,
-                "node_id": node.node_id,
-                "title": node.title,
-                "details": details_copy,
-            }
+            return ActionResultBuilder.success(
+                action=IdeaActionType.THINK.value,
+                node_id=node.node_id,
+                title=node.title,
+                details=details_copy,
+                thinking_content=thinking_content,
+            )
         except Exception as exc:
             return self._failure(action=IdeaActionType.THINK, node_id=node_id, error=exc)
 
 
 class SaveLeafAction(LeafAction):
-    """Leaf action for saving content to ChromaDB."""
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         node = None
         try:
@@ -378,13 +602,16 @@ class SaveLeafAction(LeafAction):
             ids = [str(uuid.uuid4()) for _ in range(len(docs))]
             timeout_seconds = self._timeout_seconds("chroma_timeout_seconds")
             success = await io.store_chroma(documents=docs, metadatas=metadatas, ids=ids, timeout_seconds=timeout_seconds)
-            return {"action": IdeaActionType.SAVE.value, "success": bool(success), "count": len(docs)}
+            return ActionResultBuilder.success(
+                action=IdeaActionType.SAVE.value,
+                success=bool(success),
+                count=len(docs),
+            )
         except Exception as exc:
             return self._failure(action=IdeaActionType.SAVE, node_id=node_id, error=exc)
 
 
 class MergeLeafAction(LeafAction):
-    """Leaf action for merging child results using LLM."""
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         import json
         node = None
@@ -395,30 +622,44 @@ class MergeLeafAction(LeafAction):
             
             merged_results = node.details.get(DetailKey.MERGED_RESULTS.value) or []
             if not merged_results:
-                return {
-                    "action": IdeaActionType.MERGE.value,
-                    "success": False,
-                    "error": "No merged results to synthesize",
-                }
+                return ActionResultBuilder.failure(
+                    action=IdeaActionType.MERGE.value,
+                    error="No merged results to synthesize",
+                )
+            
+            # Compact merged results to reduce LLM payload size
+            from agent.app.idea_policies.action_constants import MergedResultsCompactor
+            max_merged_items = int(self.settings.get("max_merged_items_for_llm", 20))
+            compacted_merged = MergedResultsCompactor.compact_for_llm(merged_results, max_items=max_merged_items)
+            original_size = len(json.dumps(merged_results, ensure_ascii=True))
+            compacted_size = len(json.dumps(compacted_merged, ensure_ascii=True))
+            self._logger.debug(f"[MERGE] Compacted merged results: {original_size} -> {compacted_size} chars ({100 * compacted_size // max(original_size, 1)}%)")
             
             system_template = self.settings.get("merge_system_prompt", "")
             user_template = self.settings.get("merge_user_prompt", "")
+            planning_addendum = str(
+                self.settings.get(
+                    "merge_planning_addendum",
+                    "Preserve provenance and separate confirmed facts from open questions.",
+                )
+            ).strip()
+            if planning_addendum:
+                system_template = f"{system_template}\n\n{planning_addendum}" if system_template else planning_addendum
             
             if not system_template or not user_template:
                 self._logger.warning("No merge prompts found, using simple concatenation")
-                synthesized = json.dumps(merged_results, ensure_ascii=True)
-                return {
-                    "action": IdeaActionType.MERGE.value,
-                    "success": True,
-                    "synthesized": synthesized,
-                    "child_count": len(merged_results),
-                }
+                synthesized = json.dumps(compacted_merged, ensure_ascii=True)
+                return ActionResultBuilder.success(
+                    action=IdeaActionType.MERGE.value,
+                    synthesized=synthesized,
+                    child_count=len(merged_results),
+                )
             
-            merged_json = json.dumps(merged_results, ensure_ascii=True)
-            messages = [
-                {"role": "system", "content": system_template},
-                {"role": "user", "content": user_template.format(merged_json=merged_json)},
-            ]
+            merged_json = json.dumps(compacted_merged, ensure_ascii=True)
+            messages = PromptBuilder.build_messages(
+                system_content=system_template,
+                user_content=user_template.format(merged_json=merged_json),
+            )
             
             model_name = self.settings.get("merge_model") or self.settings.get("final_model")
             json_schema = self.settings.get("merge_json_schema")
@@ -445,30 +686,27 @@ class MergeLeafAction(LeafAction):
             )
             
             if not response:
-                return {
-                    "action": IdeaActionType.MERGE.value,
-                    "success": False,
-                    "error": "LLM returned empty response",
-                }
+                return ActionResultBuilder.failure(
+                    action=IdeaActionType.MERGE.value,
+                    error="LLM returned empty response",
+                )
             
             try:
                 synthesized_data = json.loads(response)
             except json.JSONDecodeError:
                 synthesized_data = {"summary": response}
             
-            return {
-                "action": IdeaActionType.MERGE.value,
-                "success": True,
-                "synthesized": synthesized_data,
-                "child_count": len(merged_results),
-                "raw_response": response,
-            }
+            return ActionResultBuilder.success(
+                action=IdeaActionType.MERGE.value,
+                synthesized=synthesized_data,
+                child_count=len(merged_results),
+                raw_response=response,
+            )
         except Exception as exc:
             return self._failure(action=IdeaActionType.MERGE, node_id=node_id, error=exc)
 
 
 class LeafActionRegistry:
-    """Registry for leaf action implementations."""
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         self.settings = dict(settings or {})
         self._registry = {
@@ -480,7 +718,6 @@ class LeafActionRegistry:
         }
 
     def get(self, action_type: IdeaActionType) -> LeafAction:
-        """Instantiate an action by type."""
         action_cls = self._registry.get(action_type)
         if not action_cls:
             raise ValueError(f"Unknown action type: {action_type}")
@@ -488,12 +725,4 @@ class LeafActionRegistry:
 
 
 def execute_leaf_action(action: LeafAction, graph: IdeaDag, node_id: str, io: AgentIO):
-    """
-    Execute a leaf action and return payload.
-    :param action: LeafAction instance.
-    :param graph: IdeaDag instance.
-    :param node_id: Node identifier.
-    :param io: AgentIO instance.
-    :returns: Execution payload.
-    """
     return action.execute(graph, node_id, io)

@@ -5,12 +5,12 @@ Test configuration and utilities.
 import os
 from typing import List
 from pathlib import Path
+import re
 
 MODEL_CANDIDATES = [
     "gpt-5-mini",
     "gpt-5-nano",
     "gpt-4.1-nano",
-    "gpt-4o",
 ]
 
 MODEL_ALIASES = {
@@ -18,14 +18,13 @@ MODEL_ALIASES = {
     "gpt-5-mini": "gpt-5-mini",
     "gpt-5-nano": "gpt-5-nano",
     "gpt-4.1-nano": "gpt-4.1-nano",
-    "gpt-4o": "gpt-4o",
 }
 
 VALIDATION_MODEL = "gpt-5-mini"
 
 TEST_PRIORITY_ORDER = [
-    "001", "002", "003", "019", "021", "004", "020", "012", "013", "022",
-    "005", "006", "007", "008", "009", "010", "011", "014", "015", "016",
+    "025", "014", "002", "019", "020", "009", "012", "026", "001", "021", "004", "013", "022",
+    "005", "006", "007", "008", "010", "011", "015", "016",
     "017", "018", "023", "024",
 ]
 
@@ -40,6 +39,32 @@ def normalize_model_name(model_name: str) -> str:
     return MODEL_ALIASES.get(candidate, candidate)
 
 
+def _split_model_values(raw: str) -> List[str]:
+    """
+    Split model env values into normalized tokens.
+    :param raw: Raw env string.
+    :return: Parsed model tokens.
+    """
+    text = (raw or "").strip()
+    if not text:
+        return []
+    normalized = re.sub(r"[;\n\r\t]+", ",", text)
+    parts = [part.strip() for part in normalized.split(",")]
+    if len(parts) == 1 and " " in parts[0]:
+        parts = [part.strip() for part in re.split(r"\s+", parts[0])]
+    values: List[str] = []
+    seen = set()
+    for part in parts:
+        if not part:
+            continue
+        model = normalize_model_name(part)
+        if not model or model in seen:
+            continue
+        values.append(model)
+        seen.add(model)
+    return values
+
+
 def load_models_from_env() -> List[str]:
     """
     Load test models from environment.
@@ -49,10 +74,12 @@ def load_models_from_env() -> List[str]:
     if not raw:
         default_model = os.environ.get("MODEL_NAME", "").strip()
         if default_model:
-            return [normalize_model_name(default_model)]
+            parsed_default = _split_model_values(default_model)
+            if parsed_default:
+                return parsed_default
         return [MODEL_CANDIDATES[0]]
-    parts = [normalize_model_name(p) for p in raw.split(",")]
-    return [p for p in parts if p]
+    parsed = _split_model_values(raw)
+    return parsed if parsed else [MODEL_CANDIDATES[0]]
 
 
 def extract_test_id(test_file: Path) -> str:

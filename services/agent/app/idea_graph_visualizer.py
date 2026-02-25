@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
 
+from agent.app.idea_policies.base import DetailKey
+
 
 def idea_graph_to_ascii(graph: Any) -> str:
     """
@@ -32,8 +34,8 @@ def idea_graph_data(graph: Any) -> Dict[str, Any]:
                 "status": node.get("status", ""),
                 "score": node.get("score"),
                 "memo_key": node.get("memo_key"),
-                "action": (node.get("details") or {}).get("action"),
-                "has_result": (node.get("details") or {}).get("action_result") is not None,
+                "action": (node.get("details") or {}).get(DetailKey.ACTION.value),
+                "has_result": (node.get("details") or {}).get(DetailKey.ACTION_RESULT.value) is not None,
                 "parent_ids": node.get("parent_ids") or [],
             }
         )

@@ -31,10 +31,10 @@ def get_task_statement() -> str:
 def get_required_deliverables() -> List[str]:
     """Return required deliverables."""
     return [
-        "10 distinct Wikipedia links",
+        "At least 10 distinct Wikipedia links from a visited page",
         "URL for each link",
-        "Link text/title for each",
-        "Brief description (1-2 sentences) for each",
+        "Short label for each link",
+        "One-line note for each link",
     ]
 
 
@@ -43,9 +43,37 @@ def get_success_criteria() -> List[str]:
     return [
         "At least 10 links collected",
         "All links are valid Wikipedia URLs",
-        "Descriptions provided for each link",
         "At least 1 visit action executed",
+        "At least 1 returned link is present in visited-page link evidence",
     ]
+
+
+def _visit_link_evidence(result: Dict[str, Any]) -> List[str]:
+    """
+    Extract visited-page link evidence from graph action results.
+    :param result: Test result payload.
+    :return: Collected link URLs.
+    """
+    graph = result.get("graph") or {}
+    nodes = graph.get("nodes") or {}
+    node_items = nodes.values() if isinstance(nodes, dict) else (nodes if isinstance(nodes, list) else [])
+    links: List[str] = []
+    for node in node_items:
+        if not isinstance(node, dict):
+            continue
+        details = node.get("details") or {}
+        action_result = details.get("action_result") or details.get("actionResult") or {}
+        if not isinstance(action_result, dict):
+            continue
+        if action_result.get("action") != "visit" or not action_result.get("success"):
+            continue
+        result_links = action_result.get("links") or []
+        if isinstance(result_links, list):
+            for url in result_links:
+                text = str(url or "").strip()
+                if text.startswith("http"):
+                    links.append(text)
+    return links
 
 
 def validate_link_count(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
@@ -90,9 +118,32 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
     }
 
 
+def validate_link_evidence(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate output links overlap with visited-page link evidence.
+    :param result: Test result.
+    :param observability: Observability data.
+    :return: Validation result.
+    """
+    final_text = extract_final_text(result)
+    output_urls = set(re.findall(r"https?://[^\s)\\\"]*wikipedia\.org[^\s)\\\"]*", final_text))
+    visit_links = set(url for url in _visit_link_evidence(result) if "wikipedia.org" in url.lower())
+    overlap = output_urls.intersection(visit_links)
+    passed = len(overlap) >= 1
+    return {
+        "check": "link_evidence_overlap",
+        "passed": passed,
+        "score": 1.0 if passed else 0.0,
+        "output_url_count": len(output_urls),
+        "visit_link_count": len(visit_links),
+        "overlap_count": len(overlap),
+        "reason": f"Found {len(overlap)} overlapping link(s)",
+    }
+
+
 def get_validation_functions() -> List[callable]:
     """Return validation functions."""
-    return [validate_link_count, validate_descriptions, validate_visits]
+    return [validate_link_count, validate_descriptions, validate_visits, validate_link_evidence]
 
 
 def get_llm_validation_function() -> callable:

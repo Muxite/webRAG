@@ -78,7 +78,10 @@ async def run_complete_test(
     validation_runner = test_module.validation_runner
     validation_runner.validation_model = validation_model
     
-    result = {"output": execution_result.get("output", {})}
+    result = {
+        "output": execution_result.get("output", {}),
+        "graph": execution_result.get("graph", {}),
+    }
     observability = execution_result.get("observability", {})
     
     validation_result = await validation_runner.run(

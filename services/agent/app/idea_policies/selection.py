@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from agent.app.idea_dag import IdeaDag, IdeaNode
+if TYPE_CHECKING:
+    from agent.app.idea_dag import IdeaDag, IdeaNode
+
 from agent.app.idea_policies.base import SelectionPolicy
 
 

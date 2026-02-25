@@ -136,8 +136,22 @@ services:
       - keys.env
     environment:
       - AGENT_STATUS_TIME=0.2
+      - IDEA_TEST_MODE=benchmark
+      - IDEA_TEST_MODELS=gpt-5.2,gpt-5-mini
+      - IDEA_TEST_VALIDATION_MODEL=gpt-5-mini
+      - IDEA_TEST_EXECUTION_VARIANTS=graph,sequential
+      - IDEA_TEST_TOP_N=4
+      - IDEA_TEST_RUNS=1
+      - IDEA_TEST_CONCURRENCY=3
+      - IDEA_TEST_LOG_LEVEL=INFO
+      - IDEA_TEST_VISIT_ONLY=0
+      - IDEA_TEST_MAX_STEPS=50
+      - IDEA_DAG_EXPANSION_MAX_TOKENS=8192
+      - IDEA_DAG_EVALUATION_MAX_TOKENS=4096
+      - IDEA_DAG_FINAL_MAX_TOKENS=16384
+      - IDEA_DAG_MERGE_MAX_TOKENS=8192
     volumes:
-      - ./agent/app/idea_test_results:/app/agent/app/idea_test_results
+      - ./agent/idea_test_results:/app/agent/idea_test_results
       - ./agent/app/idea_tests:/app/agent/app/idea_tests
     networks:
       - enet
@@ -151,13 +165,12 @@ services:
       - chroma
       - redis
       - rabbitmq
-    command: ["python", "-m", "app.idea_test_runner"]
+    command: ["python", "-m", "app.visit_test"]
     env_file:
       - .env
       - keys.env
     environment:
       - AGENT_STATUS_TIME=0.2
-      - IDEA_TEST_VISIT_ONLY=1
     networks:
       - enet
 

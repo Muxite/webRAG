@@ -36,14 +36,28 @@ async def build_final_payload(
     if len(merged) == 0:
         _logger.warning(f"[FINALIZE] WARNING: No merged results! This may cause empty LLM responses.")
         _logger.warning(f"[FINALIZE] Root node details keys: {list(root.details.keys()) if root else 'no root'}")
+    
+    # Compact merged results to reduce LLM payload size
+    from agent.app.idea_policies.action_constants import MergedResultsCompactor
+    max_merged_items = int(settings.get("max_merged_items_for_llm", 20))
+    compacted_merged = MergedResultsCompactor.compact_for_llm(merged, max_items=max_merged_items)
+    original_size = len(json.dumps(merged, ensure_ascii=True))
+    compacted_size = len(json.dumps(compacted_merged, ensure_ascii=True))
+    _logger.info(f"[FINALIZE] Compacted merged results: {original_size} -> {compacted_size} chars ({100 * compacted_size // max(original_size, 1)}%)")
+    
     system_template = settings.get("final_system_prompt")
     user_template = settings.get("final_user_prompt")
     if not system_template or not user_template:
         _logger.error(f"[FINALIZE] Missing prompt templates! system_template={bool(system_template)}, user_template={bool(user_template)}")
-    merged_json = json.dumps(merged, ensure_ascii=True)
+    merged_json = json.dumps(compacted_merged, ensure_ascii=True)
+    tool_runtime_clause = (
+        "Runtime capability: this agent has tool-mediated web access via search and visit actions. "
+        "Do not claim you cannot browse, cannot access the web, or need user permission to search. "
+        "Use only evidence present in merged results; if data is missing there, state what is missing without capability disclaimers."
+    )
     if system_template and user_template:
         final_messages = [
-            {"role": "system", "content": system_template},
+            {"role": "system", "content": f"{system_template}\n\n{tool_runtime_clause}"},
             {"role": "user", "content": user_template.format(mandate=mandate, merged_json=merged_json)},
         ]
     else:

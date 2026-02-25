@@ -96,6 +96,20 @@ class InterfaceAgent:
             self.logger.warning("Some dependencies not ready")
             return False
 
+    @staticmethod
+    async def _cancel_task(task: Optional[asyncio.Task]) -> None:
+        """
+        Cancel an async task and wait for cancellation.
+        :param task: Task to cancel, or None.
+        :returns: None
+        """
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
     async def start(self) -> None:
         """Connects to RabbitMQ, initializes dependencies, and starts consuming tasks."""
         if self.worker_ready:
@@ -120,39 +134,21 @@ class InterfaceAgent:
         """Stops consuming tasks and closes all connections."""
         if not self.worker_ready:
             return
-
-        if self._consumer_task:
-            self._consumer_task.cancel()
-            try:
-                await self._consumer_task
-            except asyncio.CancelledError:
-                pass
-            self._consumer_task = None
-
-        if self._heartbeat_task:
-            self._heartbeat_task.cancel()
-            try:
-                await self._heartbeat_task
-            except asyncio.CancelledError:
-                pass
-            self._heartbeat_task = None
-
+        
+        await self._cancel_task(self._consumer_task)
+        self._consumer_task = None
+        
+        await self._cancel_task(self._heartbeat_task)
+        self._heartbeat_task = None
+        
         if self._presence_task:
             self._presence.stop()
-            self._presence_task.cancel()
-            try:
-                await self._presence_task
-            except asyncio.CancelledError:
-                pass
-            self._presence_task = None
-
-        if self._waiting_task:
-            self._waiting_task.cancel()
-            try:
-                await self._waiting_task
-            except asyncio.CancelledError:
-                pass
-            self._waiting_task = None
+        
+        await self._cancel_task(self._presence_task)
+        self._presence_task = None
+        
+        await self._cancel_task(self._waiting_task)
+        self._waiting_task = None
 
         try:
             await self._state.delete_state()
@@ -227,12 +223,7 @@ class InterfaceAgent:
             except asyncio.CancelledError:
                 return
 
-        if self._waiting_task:
-            self._waiting_task.cancel()
-            try:
-                await self._waiting_task
-            except asyncio.CancelledError:
-                pass
+        await self._cancel_task(self._waiting_task)
         self._waiting_task = asyncio.create_task(_wait_and_free())
 
     async def _cancel_waiting_state(self) -> None:
@@ -241,13 +232,8 @@ class InterfaceAgent:
 
         :returns: None
         """
-        if self._waiting_task:
-            self._waiting_task.cancel()
-            try:
-                await self._waiting_task
-            except asyncio.CancelledError:
-                pass
-            self._waiting_task = None
+        await self._cancel_task(self._waiting_task)
+        self._waiting_task = None
 
     async def _test_connectivity(self) -> Dict[str, bool]:
         """
@@ -447,12 +433,7 @@ class InterfaceAgent:
             await self._publish_status(StatusType.ERROR, max_ticks=max_ticks, error=str(e))
             self._finalize_telemetry(success=False)
         finally:
-            if self._heartbeat_task:
-                self._heartbeat_task.cancel()
-                try:
-                    await self._heartbeat_task
-                except asyncio.CancelledError:
-                    pass
+            await self._cancel_task(self._heartbeat_task)
             self.agent = None
             self._clear_task_telemetry()
             self.correlation_id = None

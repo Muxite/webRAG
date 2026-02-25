@@ -8,6 +8,8 @@ import re
 from asciidag.graph import Graph
 from asciidag.node import Node
 
+from agent.app.idea_policies.base import DetailKey
+
 
 def _normalize_payload(dag: Any) -> Dict[str, Any]:
     """
@@ -44,7 +46,7 @@ def _label_for_node(node: Dict[str, Any]) -> str:
     """
     title = node.get("title") or "(untitled)"
     details = node.get("details") or {}
-    action = details.get("action")
+    action = details.get(DetailKey.ACTION.value)
     if action:
         return f"{title} ({action})"
     return str(title)
@@ -111,9 +113,11 @@ def main() -> None:
     :returns: None
     """
     try:
-        from agent.app.idea_dag import IdeaDag, IdeaNodeStatus
+        from agent.app.idea_dag import IdeaDag
+        from agent.app.idea_policies.base import IdeaNodeStatus
     except ImportError:
-        from idea_dag import IdeaDag, IdeaNodeStatus
+        from idea_dag import IdeaDag
+        from idea_policies.base import IdeaNodeStatus
 
     dag = IdeaDag(root_title="Mandate", root_details={"mandate": "Find X and Y"})
     a = dag.add_child(dag.root_id(), "Find X", details={"action": "search"}, status=IdeaNodeStatus.ACTIVE, score=0.7)

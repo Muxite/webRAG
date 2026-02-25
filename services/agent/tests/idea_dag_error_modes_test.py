@@ -7,7 +7,8 @@ import uuid
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 
-from agent.app.idea_dag import IdeaDag, IdeaNodeStatus
+from agent.app.idea_dag import IdeaDag
+from agent.app.idea_policies.base import IdeaNodeStatus
 from agent.app.idea_engine import IdeaDagEngine
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies import DetailKey, IdeaActionType

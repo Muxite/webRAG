@@ -100,7 +100,7 @@ async def run_test_execution(
     test_id = test_module.metadata.get("test_id", "unknown")
     correlation_id = f"idea_test_{test_id}_{model_name}_{run_stamp}"
     
-    results_dir = Path(__file__).resolve().parent / "idea_test_results"
+    results_dir = Path(__file__).resolve().parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
     trace_path = results_dir / f"{run_stamp}_{test_id}_{model_name}.jsonl"
     tracer = TraceRecorder(trace_path)
