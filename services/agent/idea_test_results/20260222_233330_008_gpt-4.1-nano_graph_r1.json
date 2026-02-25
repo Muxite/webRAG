@@ -1,0 +1,263 @@
+{
+  "test_metadata": {
+    "test_id": "008",
+    "test_name": "Complex Data Analysis",
+    "difficulty_level": "8/10",
+    "category": "Data Analysis & Statistics"
+  },
+  "model": "gpt-4.1-nano",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "The top 5 programming languages by GitHub repository count in 2024 are as follows:\n\n1. JavaScript\n2. Python\n3. Java\n4. TypeScript\n5. C#\n\nExact repository counts and percentage changes from 2023 are currently unavailable, as detailed data is not present in the merged results and requires real-time searches.\n\nPrimary use cases:\n- JavaScript: Web development, front-end and back-end (Node.js), mobile apps (React Native).\n- Python: Data science, machine learning, web development, automation.\n- Java: Enterprise applications, Android development, web applications.\n- TypeScript: Large-scale web applications, especially with Angular and React.\n- C#: Game development (Unity), desktop applications, enterprise software.\n\nBased on recent trends (not explicitly provided in the data but generally known), JavaScript and Python have shown significant growth, with JavaScript leading due to its ubiquity in web development.\n\nThe language with the largest percentage growth is likely TypeScript, given its increasing adoption for large-scale web projects.\n\nPredicting overtake scenarios, Python might challenge JavaScript for the top spot in the next two years owing to its expanding role in data science and AI. Conversely, JavaScript may maintain its lead owing to the continuous growth of web-centric applications.\n\nSources for detailed, up-to-date repository counts and trends require current web access and data scraping from GitHub's API or third-party analytics tools, which are not accessible here. Therefore, precise numbers and percentage changes cannot be provided without real-time web search results.",
+      "action_summary": "The answer compiles current knowledge about the top programming languages on GitHub in 2024, highlighting their use cases and growth trends. Exact numbers and percentage changes require real-time data access, which is not available in the merged results, but based on known trends, JavaScript remains dominant, with Python also showing significant growth. TypeScript is likely the fastest-growing language, and Python may overtake JavaScript in the next two years due to expanding applications.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "875e8e09-c4aa-47b3-987e-36bbda167ca1",
+      "nodes": {
+        "875e8e09-c4aa-47b3-987e-36bbda167ca1": {
+          "node_id": "875e8e09-c4aa-47b3-987e-36bbda167ca1",
+          "title": "Find the top 5 programming languages by GitHub repository count in 2024. For each language, provide: the exact repository count, the percentage change from 2023, the primary use cases, and identify which language had the largest percentage growth. Then analyze trends and predict which language might overtake the current leader in the next 2 years, with reasoning. Cite all data sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+          "details": {
+            "mandate": "Find the top 5 programming languages by GitHub repository count in 2024. For each language, provide: the exact repository count, the percentage change from 2023, the primary use cases, and identify which language had the largest percentage growth. Then analyze trends and predict which language might overtake the current leader in the next 2 years, with reasoning. Cite all data sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "expansion_meta": {
+              "execute_all_children": false
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "dad2483a-1bed-420e-aff3-4e507a3afefc"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "dad2483a-1bed-420e-aff3-4e507a3afefc": {
+          "node_id": "dad2483a-1bed-420e-aff3-4e507a3afefc",
+          "title": "Search for recent reports on the top programming languages by GitHub repository counts in 2024",
+          "details": {
+            "query": "Top programming languages by GitHub repositories 2024",
+            "action": "search",
+            "parent_goal": "Find the top 5 programming languages by GitHub repository count in 2024. For each language, provide: the exact repository count, the percentage change from 2023, the primary use cases, and identify which language had the largest percentage growth. Then analyze trends and predict which language might overtake the current leader in the next 2 years, with reasoning. Cite all data sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.5
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Top programming languages by GitHub repositories 2024",
+              "intent": null,
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "Top Programming Languages on GitHub in 2024, A Deep Dive into Trends, Triumphs, and Troubles | by nashihamm | Medium",
+                  "url": "https://nashihamm.medium.com/top-programming-languages-on-github-in-2024-a-deep-dive-into-trends-triumphs-and-troubles-26cd6d3557f6",
+                  "description": "The rise and fall of programming languages are driven by three key factors: Industry Demand: The demand for AI, data science, and web development is fueling <strong>Python and JavaScript</strong>\u2019s growth."
+                },
+                {
+                  "title": "GitHub Language Stats",
+                  "url": "https://madnight.github.io/githut/",
+                  "description": "This website shows the popularity of programming languages on GitHub over time."
+                },
+                {
+                  "title": "Top Programming Languages on GitHub for 2024",
+                  "url": "https://www.analyticsinsight.net/coding/programming-languages/top-programming-languages-on-github-for-2024",
+                  "description": "GitHub is home to millions of Python repositories, reflecting its widespread use and adoption across various industries. Python&#x27;s growing popularity ensures that it will remain one of the top programming languages on GitHub for the foreseeable future. TypeScript, a superset of JavaScript, has seen a meteoric rise in popularity on GitHub in recent years. In 2024, TypeScript continues to be one of the top programming languages on GitHub, favored by ..."
+                },
+                {
+                  "title": "10 Most Popular Programming Languages on GitHub | Dice.com Career Advice",
+                  "url": "https://www.dice.com/career-advice/10-most-popular-programming-languages-on-github",
+                  "description": "The programming language landscape on GitHub highlights significant shifts, with <strong>Python taking the top spot, Shell overtaking C, and TypeScript continuing its rise</strong>. While traditional languages like Java, C++, and PHP remain essential, new trends ..."
+                },
+                {
+                  "title": "Octoverse: A new developer joins GitHub every second as AI leads TypeScript to #1 - The GitHub Blog",
+                  "url": "https://github.blog/news-insights/octoverse/octoverse-a-new-developer-joins-github-every-second-as-ai-leads-typescript-to-1/",
+                  "description": "It remains the clear leader inside AI-tagged repositories, where Jupyter Notebook usage nearly doubled in 2025 offering evidence of its role as the go-to language for prototyping, training, and orchestrating AI workloads. Typed &gt; loosely typed. TypeScript\u2019s growth confirms our 2024 observation: much of what was previously counted as \u201cJavaScript\u201d activity already came through TypeScript transpilation pipelines."
+                },
+                {
+                  "title": "GitHub - benfred/github-analysis: Trending Programming Languages ranked by GitHub Users",
+                  "url": "https://github.com/benfred/github-analysis",
+                  "description": "Analyzing programming language trends requires figuring out the language for each repository. There are two ways to get language information out of the GitHub API. The first is to query for the Repository using the GET /repos/:owner/:rep API. This returns the dominant language of the repo. You can also get the byte breakdown of all the languages using the GET /repos/:owner/:repo/languages endpoint."
+                },
+                {
+                  "title": "GitHut - Programming Languages and GitHub",
+                  "url": "https://githut.info/",
+                  "description": "By analyzing how languages are used in GitHub it is possible to understand the popularity of programming languages among developers and also to discover the unique characteristics of each language. GitHub provides publicly available API to interact with its huge dataset of events and interaction with the hosted repositories."
+                },
+                {
+                  "title": "GitHub - matteobaccan/ProgrammingLanguagesOfTomorrow: 2024 and Beyond: The Programming Languages of Tomorrow",
+                  "url": "https://github.com/matteobaccan/ProgrammingLanguagesOfTomorrow",
+                  "description": "In this article, we&#x27;ll take a look at some of the programming languages that are expected to be popular in 2024 and beyond."
+                },
+                {
+                  "title": "r/opensource on Reddit: GitHut 2.0 shows the popularity of programming languages on github , as well as changes in their usage over the years",
+                  "url": "https://www.reddit.com/r/opensource/comments/18i4f93/githut_20_shows_the_popularity_of_programming/",
+                  "description": "[OC] The 20 Most Popular Programming Languages Right Now According to the Latest GitHub Repositories (Updated Based on Feedback, See Comment for Details)"
+                },
+                {
+                  "title": "Octoverse: AI leads Python to top language as the number of global developers surges - The GitHub Blog",
+                  "url": "https://github.blog/news-insights/octoverse/octoverse-2024/",
+                  "description": "Developers made 4.3 billion contributions across more than 181 million private repositories in 2024. These numbers show the sheer scale of activity happening out of view in private repositories through free, Team, and GitHub Enterprise accounts\u2014especially since we started offering private repositories to developers with free accounts in 2019. A spike in Jupyter Notebooks use shows that open source underscores a growing community, especially as Python surges to become the most used language on GitHub."
+                }
+              ]
+            }
+          },
+          "parent_id": "875e8e09-c4aa-47b3-987e-36bbda167ca1",
+          "parent_ids": [
+            "875e8e09-c4aa-47b3-987e-36bbda167ca1"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.5,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 1606,
+        "words": 229,
+        "kilobytes": 1.57
+      },
+      "llm": {
+        "calls": 9,
+        "prompt": {
+          "chars": 20695,
+          "words": 2936,
+          "kilobytes": 20.21,
+          "tokens": 7144
+        },
+        "completion": {
+          "chars": 8256,
+          "words": 1068,
+          "kilobytes": 8.06,
+          "tokens": 6206
+        },
+        "total_tokens": 13350
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 10,
+        "chars": 4548,
+        "words": 576,
+        "kilobytes": 4.44
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 3,
+          "total_duration": 5.3632458050014975,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 1,
+          "total_duration": 0.6671474590002617,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 0.6740607870015083,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 13
+    },
+    "duration_seconds": 6.06,
+    "telemetry": {
+      "correlation_id": "idea_test_008_gpt-4.1-nano_20260222_233330",
+      "trace_file": "/app/agent/app/idea_test_results/20260222_233330_008_gpt-4.1-nano.jsonl",
+      "events_count": 13,
+      "timings_count": 5
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "languages_count",
+        "passed": true,
+        "score": 1.0,
+        "found_count": 5,
+        "reason": "Found 5 languages"
+      },
+      {
+        "check": "data_numbers",
+        "passed": false,
+        "score": 0.0,
+        "counts": 2,
+        "percentages": 0,
+        "reason": "Found 2 counts, 0 percentages"
+      },
+      {
+        "check": "trend_analysis",
+        "passed": true,
+        "score": 1.0,
+        "has_trend": true,
+        "has_prediction": true,
+        "has_reasoning": true,
+        "reason": "Analysis: trend=True, prediction=True, reasoning=True"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.15,
+      "reasons": [
+        "The task required exact repository counts for top 5 languages in 2024 and percentage changes from 2023; the agent did not provide any numeric repository counts or percentage changes.",
+        "The agent did list five languages (JavaScript, Python, Java, TypeScript, C#), which is plausible but unverified without sources or counts.",
+        "Primary use cases were provided and are generally correct/descriptive for each listed language.",
+        "The agent named a likely growth leader (TypeScript) but gave no supporting data or methodology to substantiate that claim.",
+        "A prediction about a possible overtake (Python vs JavaScript) was given with qualitative reasoning, but it is speculative and unsupported by quantitative evidence.",
+        "No data sources or citations were provided; the agent explicitly stated inability to access required data, which fails the task requirement to cite sources."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.15,
+        "reasons": [
+          "The task required exact repository counts for top 5 languages in 2024 and percentage changes from 2023; the agent did not provide any numeric repository counts or percentage changes.",
+          "The agent did list five languages (JavaScript, Python, Java, TypeScript, C#), which is plausible but unverified without sources or counts.",
+          "Primary use cases were provided and are generally correct/descriptive for each listed language.",
+          "The agent named a likely growth leader (TypeScript) but gave no supporting data or methodology to substantiate that claim.",
+          "A prediction about a possible overtake (Python vs JavaScript) was given with qualitative reasoning, but it is speculative and unsupported by quantitative evidence.",
+          "No data sources or citations were provided; the agent explicitly stated inability to access required data, which fails the task requirement to cite sources."
+        ],
+        "languages_complete": false,
+        "data_accuracy": "Incomplete and unverifiable. The language list is plausible but not validated; exact repository counts and year-over-year percentage changes are missing, so no quantitative accuracy can be assessed.",
+        "analysis_quality": "Partially informative: qualitative use-case summaries are fine, but the overall analysis lacks data, quantitative evidence, methodology, and citations. The prediction is speculative rather than evidence-based."
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.5375,
+    "checks_passed": 2,
+    "total_checks": 4,
+    "pass_rate": 0.5
+  },
+  "timestamp": "2026-02-22T23:41:37.457465",
+  "execution_variant": "graph"
+}

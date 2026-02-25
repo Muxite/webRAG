@@ -4,7 +4,8 @@ Tests all major methods and edge cases.
 """
 import pytest
 
-from agent.app.idea_dag import IdeaDag, IdeaNode, IdeaNodeStatus
+from agent.app.idea_dag import IdeaDag, IdeaNode
+from agent.app.idea_policies.base import IdeaNodeStatus
 
 
 class TestIdeaDagCreation:

@@ -4,7 +4,8 @@ from typing import Any, Dict, Optional, List
 import hashlib
 import logging
 
-from agent.app.idea_dag import IdeaDag, IdeaNodeStatus
+from agent.app.idea_dag import IdeaDag
+from agent.app.idea_policies.base import IdeaNodeStatus
 from agent.app.agent_io import AgentIO
 from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.idea_memory import MemoryManager
@@ -17,6 +18,7 @@ from agent.app.idea_policies import (
     ScoreThresholdDecompositionPolicy,
     SimpleMergePolicy,
     LeafActionRegistry,
+    NodeDetailsExtractor,
 )
 from agent.app.idea_finalize import build_final_payload
 from agent.app.idea_branch_pair import BranchPair, find_branch_pair, get_completion_path
@@ -213,13 +215,14 @@ class IdeaDagEngine:
             return None
         
         # 1. Handle merge nodes (execute merge, progress toward root)
-        if node.details.get(DetailKey.ACTION.value) == IdeaActionType.MERGE.value:
+        if NodeDetailsExtractor.is_merge_action(node.details):
             return await self._handle_merge_node(graph, current_id, step_index, None)
         
         # 2. Handle leaf nodes (execute actions)
         # Leaf nodes are marked with IS_LEAF=True and have an action
         is_leaf = node.details.get(DetailKey.IS_LEAF.value, False)
-        has_action = node.details.get(DetailKey.ACTION.value) and node.details.get(DetailKey.ACTION.value) != IdeaActionType.MERGE.value
+        action = NodeDetailsExtractor.get_action(node.details)
+        has_action = action and not NodeDetailsExtractor.is_merge_action(node.details)
         if is_leaf or has_action:
             return await self._handle_leaf_node(graph, current_id, step_index, None)
         
@@ -232,7 +235,7 @@ class IdeaDagEngine:
         all_children_are_leaves = all(
             (child := graph.get_node(child_id)) and
             (child.details.get(DetailKey.IS_LEAF.value, False) or 
-             (child.details.get(DetailKey.ACTION.value) and child.details.get(DetailKey.ACTION.value) != IdeaActionType.MERGE.value))
+             (NodeDetailsExtractor.get_action(child.details) and not NodeDetailsExtractor.is_merge_action(child.details)))
             for child_id in node.children
         )
         all_children_complete = all(
@@ -328,7 +331,19 @@ class IdeaDagEngine:
         # Retrieve relevant memories from vector DB before expansion (split by type)
         memories = []
         if self._memory_manager:
-            query = f"{node.title} {self._current_mandate[:200]}" if hasattr(self, '_current_mandate') and self._current_mandate else node.title
+            justification = NodeDetailsExtractor.get_justification(node.details)
+            parent_goal = node.details.get(DetailKey.PARENT_GOAL.value) or ""
+            
+            query_parts = [node.title]
+            if justification:
+                query_parts.append(justification[:100])
+            if parent_goal:
+                query_parts.append(parent_goal[:100])
+            if hasattr(self, '_current_mandate') and self._current_mandate:
+                query_parts.append(self._current_mandate[:100])
+            
+            query = " ".join(query_parts)
+            
             n_internal = int(self.settings.get("expansion_max_context_nodes", 5))
             n_observations = int(self.settings.get("expansion_max_context_nodes", 5))
             split_memories = await self._memory_manager.retrieve_memories_split(
@@ -337,15 +352,19 @@ class IdeaDagEngine:
                     "title": node.title,
                     "action": node.details.get(DetailKey.ACTION.value),
                     "error": node.details.get(DetailKey.ACTION_ERROR.value),
+                    "justification": justification,
                 },
                 n_internal=n_internal,
                 n_observations=n_observations,
             )
             memories = split_memories["internal_thoughts"] + split_memories["observations"]
-            self._logger.debug(
+            self._logger.info(
                 f"[STEP {step_index}] EXPANSION: Retrieved {len(split_memories['internal_thoughts'])} internal thoughts, "
                 f"{len(split_memories['observations'])} observations from vector DB"
             )
+            if split_memories["observations"]:
+                obs_preview = "\n".join([obs[:200] for obs in split_memories["observations"][:3]])
+                self._logger.info(f"[STEP {step_index}] Observations preview:\n{obs_preview}")
         
         # Expand: break problem into sub-problems
         candidates = await self.expansion.expand(graph, node_id, memories=memories)
@@ -356,15 +375,24 @@ class IdeaDagEngine:
         max_branching = int(self.settings.get("max_branching", len(candidates)))
         graph.expand(node_id, candidates[:max_branching])
         
-        # Store parent goal in children for evaluation context
+        # Store parent goal and justification in children for evaluation context
         # Mark leaf nodes (nodes with actions) with IS_LEAF=True
         parent_goal = node.title
+        parent_justification = NodeDetailsExtractor.get_justification(node.details)
+        
         for child_id in node.children[-max_branching:]:
             child = graph.get_node(child_id)
             if child:
                 child.details[DetailKey.PARENT_GOAL.value] = parent_goal
+                if parent_justification:
+                    child.details[DetailKey.PARENT_JUSTIFICATION.value] = parent_justification
+                
+                child_justification = NodeDetailsExtractor.get_justification(child.details)
+                if not child_justification and parent_justification:
+                    child.details[DetailKey.WHY_THIS_NODE.value] = f"Parent goal: {parent_goal}. {parent_justification}"
+                
                 # Mark as leaf if it has an action (search, visit, save)
-                if child.details.get(DetailKey.ACTION.value) and child.details.get(DetailKey.ACTION.value) != IdeaActionType.MERGE.value:
+                if NodeDetailsExtractor.get_action(child.details) and not NodeDetailsExtractor.is_merge_action(child.details):
                     child.details[DetailKey.IS_LEAF.value] = True
         
         self._logger.info(f"[STEP {step_index}] EXPANSION: {len(candidates)} candidates → {min(len(candidates), max_branching)} children (total nodes: {graph.node_count()})")
@@ -445,7 +473,7 @@ class IdeaDagEngine:
             if not self._is_action_ready(child, step_index):
                 continue
             # Merge nodes don't need scores
-            if child.details.get(DetailKey.ACTION.value) == IdeaActionType.MERGE.value:
+            if NodeDetailsExtractor.is_merge_action(child.details):
                 eligible.append(child_id)
                 continue
             # Blocked nodes that are ready to retry are eligible (they already have scores from before)
@@ -532,8 +560,10 @@ class IdeaDagEngine:
                     return existing_result
         
         # Check for blocked sites (for visit actions)
-        if action_type == "visit":
-            url = node.details.get(DetailKey.URL.value) or node.details.get(DetailKey.LINK.value)
+        from agent.app.idea_policies.base import IdeaActionType
+        if action_type == IdeaActionType.VISIT.value:
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            url = NodeDetailsExtractor.get_url(node.details)
             if url:
                 blocked_reason = graph.is_site_blocked(str(url))
                 if blocked_reason:
@@ -582,8 +612,10 @@ class IdeaDagEngine:
                 result=result,
             )
         
+        from agent.app.idea_policies.action_constants import ActionResultKey
         # Mark action as executed if successful
-        if result and result.get("success"):
+        from agent.app.idea_policies.action_constants import ActionResultExtractor
+        if result and ActionResultExtractor.is_success(result):
             graph.mark_action_executed(node_id, str(action_type), node.details)
         
         return result
@@ -599,15 +631,17 @@ class IdeaDagEngine:
         node = graph.get_node(node_id)
         if not node:
             return "missing"
+        from agent.app.idea_policies.action_constants import ActionResultKey, ResultStatus
         result = node.details.get(DetailKey.ACTION_RESULT.value)
         if not isinstance(result, dict):
             node.status = IdeaNodeStatus.FAILED
-            return "failed"
-        success = bool(result.get("success"))
+            return ResultStatus.FAILED.value
+        from agent.app.idea_policies.action_constants import ActionResultExtractor, ResultStatus
+        success = ActionResultExtractor.is_success(result)
         if success:
             node.status = IdeaNodeStatus.DONE
-            return "success"
-        retryable = bool(result.get("retryable"))
+            return ResultStatus.SUCCESS.value
+        retryable = ActionResultExtractor.is_retryable(result)
         node.details[DetailKey.ACTION_RETRYABLE.value] = retryable
         attempts = int(node.details.get(DetailKey.ACTION_ATTEMPTS.value, 0))
         max_retries = int(self.settings.get("action_max_retries", 0))
@@ -619,11 +653,12 @@ class IdeaDagEngine:
             return "retry"
         
         # Store comprehensive error information for root cause analysis
-        error_info = result.get("error")
-        error_type = result.get("error_type")
-        root_cause = result.get("root_cause")
-        http_status = result.get("http_status")
-        traceback_summary = result.get("traceback_summary")
+        from agent.app.idea_policies.action_constants import ActionResultExtractor, ActionResultKey
+        error_info = ActionResultExtractor.get_error(result)
+        error_type = result.get(ActionResultKey.ERROR_TYPE.value)
+        root_cause = result.get(ActionResultKey.ROOT_CAUSE.value)
+        http_status = result.get(ActionResultKey.HTTP_STATUS.value)
+        traceback_summary = result.get(ActionResultKey.TRACEBACK_SUMMARY.value)
         
         error_details = {
             "error": error_info,
@@ -635,7 +670,7 @@ class IdeaDagEngine:
         node.details[DetailKey.ACTION_ERROR.value] = error_info
         node.details[f"{DetailKey.ACTION_ERROR.value}_details"] = error_details
         node.status = IdeaNodeStatus.FAILED
-        return "failed"
+        return ResultStatus.FAILED.value
 
     def _is_leaf_node(self, graph: IdeaDag, node, step_index: int) -> bool:
         """

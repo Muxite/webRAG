@@ -1,6 +1,7 @@
 import pytest
 
-from agent.app.idea_dag import IdeaDag, IdeaNodeStatus
+from agent.app.idea_dag import IdeaDag
+from agent.app.idea_policies.base import IdeaNodeStatus
 from agent.app.idea_engine import IdeaDagEngine
 from agent.app.idea_policies import BestScoreSelectionPolicy, SimpleMergePolicy
 from agent.app.idea_policies.base import DetailKey, ExpansionPolicy, EvaluationPolicy, DecompositionPolicy, IdeaActionType

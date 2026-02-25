@@ -1,0 +1,2 @@
+{"ts": 1771908503.2038915, "event": "timing", "payload": {"name": "llm_call", "duration": 34.33762925300016, "success": true, "payload": {"model": "gpt-5-mini"}}}
+{"ts": 1771908508.470512, "event": "timing", "payload": {"name": "llm_call", "duration": 5.264937209999971, "success": true, "payload": {"model": "gpt-5-mini"}}}

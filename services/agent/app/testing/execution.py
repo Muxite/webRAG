@@ -52,7 +52,7 @@ async def run_test_execution(
     test_id = test_module.metadata.get("test_id", "unknown")
     correlation_id = f"idea_test_{test_id}_{model_name}_{run_stamp}"
     
-    results_dir = Path(__file__).resolve().parent.parent / "idea_test_results"
+    results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
     trace_path = results_dir / f"{run_stamp}_{test_id}_{model_name}.jsonl"
     tracer = TraceRecorder(trace_path)
@@ -80,10 +80,13 @@ async def run_test_execution(
     )
     
     mandate = test_module.get_task_statement()
+    mandate_suffix = os.environ.get("IDEA_TEST_MANDATE_SUFFIX", "").strip()
+    if mandate_suffix:
+        mandate = f"{mandate}\n\n{mandate_suffix}"
     graph = IdeaDag(root_title=mandate, root_details={"mandate": mandate})
     current_id = graph.root_id()
     
-    started = time.time()
+    started = time.perf_counter()
     max_steps = int(os.environ.get("IDEA_TEST_MAX_STEPS", "50"))
     
     for step_num in range(max_steps):
@@ -98,8 +101,6 @@ async def run_test_execution(
         except Exception as exc:
             _logger.error(f"Step {step_num} failed: {exc}")
             break
-    
-    ended = time.time()
     
     final_node = graph.get_node(current_id)
     if final_node:
@@ -118,6 +119,8 @@ async def run_test_execution(
     
     observability = summarize_observability_func({"output": output}, telemetry)
     
+    ended = time.perf_counter()
+    
     try:
         if trace_path.exists():
             trace_path.unlink()
@@ -128,7 +131,7 @@ async def run_test_execution(
         "output": output,
         "graph": graph.to_dict() if hasattr(graph, "to_dict") else None,
         "observability": observability,
-        "duration_seconds": round(ended - started, 2),
+        "duration_seconds": round(max(0.0, ended - started), 2),
         "telemetry": {
             "correlation_id": correlation_id,
             "trace_file": str(trace_path),

@@ -1,0 +1,261 @@
+{
+  "test_metadata": {
+    "test_id": "022",
+    "test_name": "Technical Documentation Analysis",
+    "difficulty_level": "5/10",
+    "category": "Technical Documentation"
+  },
+  "model": "gpt-5.2",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Evidence is missing because no search/visit results were provided in the merged results.\n\nWhat I need (from official Docker documentation pages) to complete the extraction:\n1) A brief definition of what Docker is (as stated on docs.docker.com).\n2) The latest stable Docker version number (as stated on an official Docker Docs release notes / versioning page).\n3) Three key features/capabilities (as stated on official Docker Docs pages\u2014e.g., containers, image building, Compose, networking, volumes, etc.).\n4) The official installation guide link (from docs.docker.com/get-docker/ or equivalent).\n\nNo URLs were visited and no official documentation content was included in the merged results, so I cannot cite or extract the requested items yet.",
+      "action_summary": "No official Docker documentation pages (URLs/content) were provided in the merged results, so the definition, latest stable version, key features, and installation guide link cannot be extracted or cited yet.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "b6c1bd36-edb0-4017-9067-63c28e686eda",
+      "nodes": {
+        "b6c1bd36-edb0-4017-9067-63c28e686eda": {
+          "node_id": "b6c1bd36-edb0-4017-9067-63c28e686eda",
+          "title": "Search for and visit the official documentation page for 'Docker' (not Wikipedia). Extract the following information: (1) What Docker is (brief definition), (2) The latest stable version number, (3) Three key features or capabilities, (4) A link to the installation guide. You must visit the official documentation website directly.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+          "details": {
+            "mandate": "Search for and visit the official documentation page for 'Docker' (not Wikipedia). Extract the following information: (1) What Docker is (brief definition), (2) The latest stable version number, (3) Three key features or capabilities, (4) A link to the installation guide. You must visit the official documentation website directly.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "expansion_meta": {
+              "execute_all_children": false
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "992117b8-0e9d-4b7d-b25b-858fb4b2d8ea"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "992117b8-0e9d-4b7d-b25b-858fb4b2d8ea": {
+          "node_id": "992117b8-0e9d-4b7d-b25b-858fb4b2d8ea",
+          "title": "Find and verify official Docker documentation pages needed for definition, latest stable version, features, and installation guide link (search \u2192 visit \u2192 extract citations)",
+          "details": {
+            "query": "site:docs.docker.com Docker documentation what is Docker latest stable version release notes installation guide",
+            "intent": "Locate the official Docker documentation pages (docs.docker.com) that explicitly define Docker, state the latest stable version number (likely in release notes), list key features/capabilities, and provide an installation guide URL; prepare to visit and extract quoted evidence with citations.",
+            "count": 8,
+            "action": "search",
+            "parent_goal": "Search for and visit the official documentation page for 'Docker' (not Wikipedia). Extract the following information: (1) What Docker is (brief definition), (2) The latest stable version number, (3) Three key features or capabilities, (4) A link to the installation guide. You must visit the official documentation website directly.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.62
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "site:docs.docker.com Docker documentation what is Docker latest stable version release notes installation guide",
+              "intent": "Locate the official Docker documentation pages (docs.docker.com) that explicitly define Docker, state the latest stable version number (likely in release notes), list key features/capabilities, and provide an installation guide URL; prepare to visit and extract quoted evidence with citations.",
+              "vector_context": [],
+              "count": 8,
+              "results": [
+                {
+                  "title": "Engine v29 | Docker Docs",
+                  "url": "https://docs.docker.com/engine/release-notes/29/",
+                  "description": "Answers are generated based on the documentation. ... <strong>This page describes the latest changes, additions, known issues, and fixes for Docker Engine version 29.</strong> ... Deprecated and removed features, see Deprecated Engine Features."
+                },
+                {
+                  "title": "Release notes | Docker Docs",
+                  "url": "https://docs.docker.com/desktop/release-notes/",
+                  "description": "If you\u2019re seeing a security popup about a malware on com.docker.vmnetd or com.docker.socket, follow the steps documented in docker/for-mac#7527. ... You can now perform key operations such as starting, stopping, restarting, and checking the status of Docker Desktop directly from the command line (Beta). The AI Catalog in Docker Hub is available directly through Docker Desktop. ... The default disk usage limit for Docker Engine in new installations is now 1TB."
+                },
+                {
+                  "title": "Engine v24.0 | Docker Docs",
+                  "url": "https://docs.docker.com/engine/release-notes/24.0/",
+                  "description": "... For a full list of pull requests and changes in this release, refer to the relevant GitHub milestones: ... <strong>This release contains security fixes for the following CVEs affecting Docker Engine and its components</strong>."
+                },
+                {
+                  "title": "Engine v28 | Docker Docs",
+                  "url": "https://docs.docker.com/engine/release-notes/28/",
+                  "description": "Answers are generated based on the documentation. ... <strong>This page describes the latest changes, additions, known issues, and fixes for Docker Engine version 28.</strong> ... Deprecated and removed features, see Deprecated Engine Features."
+                },
+                {
+                  "title": "Install | Docker Docs",
+                  "url": "https://docs.docker.com/engine/install/",
+                  "description": "These binaries are statically linked and you can use them on any Linux distribution. Docker Engine has two types of update channels, stable and test: <strong>The stable channel gives you the latest versions released for general availability</strong>."
+                },
+                {
+                  "title": "Dockerfile release notes",
+                  "url": "https://docs.docker.com/build/buildkit/dockerfile-release-notes/",
+                  "description": "Allow skipping Dockerfile linter checks with a per-command comment #6334"
+                },
+                {
+                  "title": "Engine v26.1 | Docker Docs",
+                  "url": "https://docs.docker.com/engine/release-notes/26.1/",
+                  "description": "... <strong>This page describes the latest changes, additions, known issues, and fixes for Docker Engine version 26.1.</strong> ... Deprecated and removed features, see Deprecated Engine Features."
+                },
+                {
+                  "title": "Docker Engine 23.0 release notes",
+                  "url": "https://docs.docker.com/engine/release-notes/23.0/",
+                  "description": "<strong>This page describes the latest changes, additions, known issues, and fixes for Docker Engine version 23.0</strong>. ... Deprecated and removed features, see Deprecated Engine Features. Changes to the Engine API, see Engine API version history."
+                }
+              ]
+            }
+          },
+          "parent_id": "b6c1bd36-edb0-4017-9067-63c28e686eda",
+          "parent_ids": [
+            "b6c1bd36-edb0-4017-9067-63c28e686eda"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.62,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 745,
+        "words": 109,
+        "kilobytes": 0.73
+      },
+      "llm": {
+        "calls": 12,
+        "prompt": {
+          "chars": 53139,
+          "words": 6916,
+          "kilobytes": 51.89,
+          "tokens": 11846
+        },
+        "completion": {
+          "chars": 3065,
+          "words": 379,
+          "kilobytes": 2.99,
+          "tokens": 1745
+        },
+        "total_tokens": 13591
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 8,
+        "chars": 2566,
+        "words": 325,
+        "kilobytes": 2.51
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 3,
+          "total_duration": 8.792459421001695,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 3,
+          "total_duration": 1.4886493899994093,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 1,
+          "total_duration": 0.44391572600034124,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 3,
+          "total_duration": 2.7198277169991343,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 1.088384695998684,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "chroma_add": {
+          "count": 1,
+          "total_duration": 0.7573424729998806,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 32
+    },
+    "duration_seconds": 10.33,
+    "telemetry": {
+      "correlation_id": "idea_test_022_gpt-5.2_20260222_121816",
+      "trace_file": "/app/agent/app/idea_test_results/20260222_121816_022_gpt-5.2.jsonl",
+      "events_count": 32,
+      "timings_count": 12
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "visit_executed",
+        "passed": false,
+        "score": 0.0,
+        "visit_count": 0,
+        "reason": "No visits executed"
+      },
+      {
+        "check": "docker_docs",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Docker documentation mentioned"
+      },
+      {
+        "check": "definition",
+        "passed": true,
+        "score": 0.5,
+        "reason": "Definition found"
+      },
+      {
+        "check": "version",
+        "passed": false,
+        "score": 0.0,
+        "version": null,
+        "reason": "Version not found"
+      },
+      {
+        "check": "features",
+        "passed": false,
+        "score": 0.0,
+        "feature_count": 0,
+        "reason": "Insufficient features"
+      },
+      {
+        "check": "installation_link",
+        "passed": true,
+        "score": 0.5,
+        "reason": "Installation link found"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": false,
+    "overall_score": 0.3333333333333333,
+    "checks_passed": 3,
+    "total_checks": 6,
+    "pass_rate": 0.5
+  },
+  "timestamp": "2026-02-22T12:32:51.417155",
+  "execution_variant": "sequential"
+}

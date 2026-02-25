@@ -1,0 +1,443 @@
+{
+  "test_metadata": {
+    "test_id": "008",
+    "test_name": "Complex Data Analysis",
+    "difficulty_level": "8/10",
+    "category": "Data Analysis & Statistics"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "{\"deliverable\":\"\", \"summary\":\"\"}\n{\"deliverable\":\"I will now search authoritative sources (GitHub\u2019s official reports, GitHub Archive/Octoverse, and reputable analytics) for 2024 repository counts by language, then visit the best pages and extract exact counts and year\u2011over\u2011year percent changes. I will return the top 5 languages with: exact 2024 repo counts, percent change from 2023, primary use cases, which language had the largest percent growth, trend analysis, and a 2\u2011year prediction about potential overtaking of the leader. I will cite each source inline (visited URLs).\",\"summary\":\"Planned steps: 1) Search for 2024 GitHub repository counts by language; 2) Visit the highest\u2011quality pages (GitHub Octoverse, GitHub official stats, and other reputable aggregator pages); 3) Extract exact repo counts for 2024 and corresponding 2023 counts (to compute percent change where not provided); 4) Compile primary use cases from authoritative language docs and landscape articles; 5) Determine largest percentage growth and analyze trends; 6) Predict which language might overtake the leader in 2 years with reasoning and citations.\"}",
+      "action_summary": "",
+      "success": true
+    },
+    "graph": {
+      "root_id": "d691b85f-adcb-473d-a046-fb25e2b110d7",
+      "nodes": {
+        "d691b85f-adcb-473d-a046-fb25e2b110d7": {
+          "node_id": "d691b85f-adcb-473d-a046-fb25e2b110d7",
+          "title": "Find the top 5 programming languages by GitHub repository count in 2024. For each language, provide: the exact repository count, the percentage change from 2023, the primary use cases, and identify which language had the largest percentage growth. Then analyze trends and predict which language might overtake the current leader in the next 2 years, with reasoning. Cite all data sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+          "details": {
+            "mandate": "Find the top 5 programming languages by GitHub repository count in 2024. For each language, provide: the exact repository count, the percentage change from 2023, the primary use cases, and identify which language had the largest percentage growth. Then analyze trends and predict which language might overtake the current leader in the next 2 years, with reasoning. Cite all data sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "expansion_meta": {
+              "execute_all_children": false
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "43a84137-2211-4075-9bda-d9a57849674c"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "43a84137-2211-4075-9bda-d9a57849674c": {
+          "node_id": "43a84137-2211-4075-9bda-d9a57849674c",
+          "title": "Plan & sequential sub-problems to collect GitHub repo counts and produce analysis",
+          "details": {
+            "goal": "Find the top 5 programming languages by GitHub repository count in 2024. For each language provide: exact repo count (2024), percentage change from 2023, primary use cases, and identify largest % growth. Then analyze trends and predict which language might overtake the leader in 2 years. Cite all sources (search then visit pages to extract data).",
+            "target_facts_to_extract": [
+              "Top 5 languages by GitHub repository count in 2024 (ranked list)",
+              "Exact repository count for each language in 2024 (integer, source URL)",
+              "Repository count for the same language in 2023 (integer, source URL)",
+              "Calculated % change from 2023 \u2192 2024 for each language (show formula)",
+              "Primary use cases for each language (1\u20133 bullet points) with at least one citation each where appropriate",
+              "Which language had the largest percentage growth (with calc and citation)",
+              "Trend analysis and 2-year prediction with reasoning, citing trend indicators/sources"
+            ],
+            "measurable_output_fields": [
+              "language (string)",
+              "rank_2024 (int)",
+              "repo_count_2024 (int; source URL)",
+              "repo_count_2023 (int; source URL)",
+              "percent_change_2023_to_2024 (float %; calculation shown)",
+              "primary_use_cases (list of short phrases with 1 citation per language)",
+              "largest_percent_growth_flag (bool)",
+              "analysis_rationale (text with cited sources)"
+            ],
+            "likely_sources_to_search_and_visit": [
+              "GitHub official reports (Octoverse / annual reports / press releases) for 2023 and 2024",
+              "GitHub blog posts or language statistics pages (e.g., 'Most popular languages on GitHub 2024')",
+              "Third-party aggregated analyses (e.g., GitHub Archive, GHTorrent, GitHub API analyses, RedMonk, Stack Overflow insights) if GitHub official counts are not available",
+              "Language pages or Wikipedia for primary use cases (to cite typical uses)"
+            ],
+            "verification_steps": [
+              "Prefer GitHub official pages for repo counts. If unavailable, use multiple independent analyses (e.g., GH Archive-based posts) and note differences.",
+              "When two sources disagree, capture both counts and note which is primary source and why (methodology differences).",
+              "Show raw numbers and calculation for percentage change to make result auditable."
+            ],
+            "extraction_intent_for_searches": "Find pages that list repository counts by language for 2024 and 2023 (prefer GitHub official Octoverse or GitHub.com language stats); gather URLs for later visits to extract exact numbers.",
+            "planned_sequential_subproblems": [
+              {
+                "id": "S1",
+                "title": "Search for authoritative 2024 GitHub language repo counts",
+                "action": "search",
+                "details": {
+                  "query": "GitHub repository counts by language 2024 Octoverse 2024 'repositories by language' 2024",
+                  "intent": "find authoritative pages listing repo counts per language for 2024 (prefer GitHub official / Octoverse)"
+                }
+              },
+              {
+                "id": "V1",
+                "title": "Visit best 2024 pages from S1 and extract top-5 repo counts and source URLs",
+                "action": "visit",
+                "details": {
+                  "intent": "extract exact 2024 repo counts for top languages and save URLs; extract any methodology notes"
+                }
+              },
+              {
+                "id": "S2",
+                "title": "Search for 2023 GitHub language repo counts (same sources / yearly report)",
+                "action": "search",
+                "details": {
+                  "query": "GitHub repository counts by language 2023 'repositories by language' 2023 Octoverse 2023",
+                  "intent": "find authoritative 2023 repo counts for the same languages to compute % change"
+                }
+              },
+              {
+                "id": "V2",
+                "title": "Visit best 2023 pages from S2 and extract 2023 repo counts",
+                "action": "visit",
+                "details": {
+                  "intent": "extract exact 2023 repo counts and note source URLs and methodology"
+                }
+              },
+              {
+                "id": "C1",
+                "title": "Compute percentage changes and identify language with largest % growth",
+                "action": "think",
+                "details": {
+                  "intent": "calculate percent_change = (count_2024 - count_2023)/count_2023 * 100; determine max",
+                  "output": "table of languages with counts and percent changes, and flag for largest growth"
+                }
+              },
+              {
+                "id": "S3",
+                "title": "Gather citations describing primary use cases for each language",
+                "action": "search",
+                "details": {
+                  "query": "Python use cases, JavaScript use cases, Java use cases, TypeScript use cases, Go use cases 2024",
+                  "intent": "find authoritative or up-to-date descriptions of typical use cases to cite"
+                }
+              },
+              {
+                "id": "V3",
+                "title": "Visit language pages (official docs / Wikipedia) to extract succinct primary use cases",
+                "action": "visit",
+                "details": {
+                  "intent": "grab 1\u20133 primary use cases per language with source URLs"
+                }
+              },
+              {
+                "id": "A1",
+                "title": "Analyze trends and predict potential overtaker within 2 years",
+                "action": "think",
+                "details": {
+                  "intent": "use repo growth rates, ecosystem trends (e.g., TypeScript adoption, Rust growth, AI-related increases), industry adoption reports to argue which language could overtake the leader; cite sources gathered earlier and any additional trend articles if needed"
+                }
+              },
+              {
+                "id": "R1",
+                "title": "Prepare final report with numbers, calculations, citations, trend analysis, and prediction",
+                "action": "think",
+                "details": {
+                  "intent": "format outputs: top-5 table, percent-change calculations, largest growth identification, primary use cases with citations, trend analysis and 2-year prediction with reasoning and sources"
+                }
+              }
+            ],
+            "why_this_reduces_uncertainty": "This sequential plan ensures we (1) locate authoritative counts for both years, (2) extract raw numbers from visited pages (not just snippets), (3) compute and verify percentage changes, (4) support use-case claims with citations, and (5) base the prediction on quantifiable growth plus ecosystem signals. Using search\u2192visit for both years follows the benchmark rule and minimizes reliance on single-source snippets.",
+            "next_action_to_execute": {
+              "first_action": "S1 (search for authoritative 2024 GitHub language repo counts)",
+              "note": "After S1 returns candidate URLs, perform V1 visits to extract exact counts."
+            },
+            "action": "think",
+            "parent_goal": "Find the top 5 programming languages by GitHub repository count in 2024. For each language, provide: the exact repository count, the percentage change from 2023, the primary use cases, and identify which language had the largest percentage growth. Then analyze trends and predict which language might overtake the current leader in the next 2 years, with reasoning. Cite all data sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 1.0
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "43a84137-2211-4075-9bda-d9a57849674c",
+              "title": "Plan & sequential sub-problems to collect GitHub repo counts and produce analysis",
+              "details": {
+                "goal": "Find the top 5 programming languages by GitHub repository count in 2024. For each language provide: exact repo count (2024), percentage change from 2023, primary use cases, and identify largest % growth. Then analyze trends and predict which language might overtake the leader in 2 years. Cite all sources (search then visit pages to extract data).",
+                "target_facts_to_extract": [
+                  "Top 5 languages by GitHub repository count in 2024 (ranked list)",
+                  "Exact repository count for each language in 2024 (integer, source URL)",
+                  "Repository count for the same language in 2023 (integer, source URL)",
+                  "Calculated % change from 2023 \u2192 2024 for each language (show formula)",
+                  "Primary use cases for each language (1\u20133 bullet points) with at least one citation each where appropriate",
+                  "Which language had the largest percentage growth (with calc and citation)",
+                  "Trend analysis and 2-year prediction with reasoning, citing trend indicators/sources"
+                ],
+                "measurable_output_fields": [
+                  "language (string)",
+                  "rank_2024 (int)",
+                  "repo_count_2024 (int; source URL)",
+                  "repo_count_2023 (int; source URL)",
+                  "percent_change_2023_to_2024 (float %; calculation shown)",
+                  "primary_use_cases (list of short phrases with 1 citation per language)",
+                  "largest_percent_growth_flag (bool)",
+                  "analysis_rationale (text with cited sources)"
+                ],
+                "likely_sources_to_search_and_visit": [
+                  "GitHub official reports (Octoverse / annual reports / press releases) for 2023 and 2024",
+                  "GitHub blog posts or language statistics pages (e.g., 'Most popular languages on GitHub 2024')",
+                  "Third-party aggregated analyses (e.g., GitHub Archive, GHTorrent, GitHub API analyses, RedMonk, Stack Overflow insights) if GitHub official counts are not available",
+                  "Language pages or Wikipedia for primary use cases (to cite typical uses)"
+                ],
+                "verification_steps": [
+                  "Prefer GitHub official pages for repo counts. If unavailable, use multiple independent analyses (e.g., GH Archive-based posts) and note differences.",
+                  "When two sources disagree, capture both counts and note which is primary source and why (methodology differences).",
+                  "Show raw numbers and calculation for percentage change to make result auditable."
+                ],
+                "extraction_intent_for_searches": "Find pages that list repository counts by language for 2024 and 2023 (prefer GitHub official Octoverse or GitHub.com language stats); gather URLs for later visits to extract exact numbers.",
+                "planned_sequential_subproblems": [
+                  {
+                    "id": "S1",
+                    "title": "Search for authoritative 2024 GitHub language repo counts",
+                    "action": "search",
+                    "details": {
+                      "query": "GitHub repository counts by language 2024 Octoverse 2024 'repositories by language' 2024",
+                      "intent": "find authoritative pages listing repo counts per language for 2024 (prefer GitHub official / Octoverse)"
+                    }
+                  },
+                  {
+                    "id": "V1",
+                    "title": "Visit best 2024 pages from S1 and extract top-5 repo counts and source URLs",
+                    "action": "visit",
+                    "details": {
+                      "intent": "extract exact 2024 repo counts for top languages and save URLs; extract any methodology notes"
+                    }
+                  },
+                  {
+                    "id": "S2",
+                    "title": "Search for 2023 GitHub language repo counts (same sources / yearly report)",
+                    "action": "search",
+                    "details": {
+                      "query": "GitHub repository counts by language 2023 'repositories by language' 2023 Octoverse 2023",
+                      "intent": "find authoritative 2023 repo counts for the same languages to compute % change"
+                    }
+                  },
+                  {
+                    "id": "V2",
+                    "title": "Visit best 2023 pages from S2 and extract 2023 repo counts",
+                    "action": "visit",
+                    "details": {
+                      "intent": "extract exact 2023 repo counts and note source URLs and methodology"
+                    }
+                  },
+                  {
+                    "id": "C1",
+                    "title": "Compute percentage changes and identify language with largest % growth",
+                    "action": "think",
+                    "details": {
+                      "intent": "calculate percent_change = (count_2024 - count_2023)/count_2023 * 100; determine max",
+                      "output": "table of languages with counts and percent changes, and flag for largest growth"
+                    }
+                  },
+                  {
+                    "id": "S3",
+                    "title": "Gather citations describing primary use cases for each language",
+                    "action": "search",
+                    "details": {
+                      "query": "Python use cases, JavaScript use cases, Java use cases, TypeScript use cases, Go use cases 2024",
+                      "intent": "find authoritative or up-to-date descriptions of typical use cases to cite"
+                    }
+                  },
+                  {
+                    "id": "V3",
+                    "title": "Visit language pages (official docs / Wikipedia) to extract succinct primary use cases",
+                    "action": "visit",
+                    "details": {
+                      "intent": "grab 1\u20133 primary use cases per language with source URLs"
+                    }
+                  },
+                  {
+                    "id": "A1",
+                    "title": "Analyze trends and predict potential overtaker within 2 years",
+                    "action": "think",
+                    "details": {
+                      "intent": "use repo growth rates, ecosystem trends (e.g., TypeScript adoption, Rust growth, AI-related increases), industry adoption reports to argue which language could overtake the leader; cite sources gathered earlier and any additional trend articles if needed"
+                    }
+                  },
+                  {
+                    "id": "R1",
+                    "title": "Prepare final report with numbers, calculations, citations, trend analysis, and prediction",
+                    "action": "think",
+                    "details": {
+                      "intent": "format outputs: top-5 table, percent-change calculations, largest growth identification, primary use cases with citations, trend analysis and 2-year prediction with reasoning and sources"
+                    }
+                  }
+                ],
+                "why_this_reduces_uncertainty": "This sequential plan ensures we (1) locate authoritative counts for both years, (2) extract raw numbers from visited pages (not just snippets), (3) compute and verify percentage changes, (4) support use-case claims with citations, and (5) base the prediction on quantifiable growth plus ecosystem signals. Using search\u2192visit for both years follows the benchmark rule and minimizes reliance on single-source snippets.",
+                "next_action_to_execute": {
+                  "first_action": "S1 (search for authoritative 2024 GitHub language repo counts)",
+                  "note": "After S1 returns candidate URLs, perform V1 visits to extract exact counts."
+                },
+                "action": "think",
+                "parent_goal": "Find the top 5 programming languages by GitHub repository count in 2024. For each language, provide: the exact repository count, the percentage change from 2023, the primary use cases, and identify which language had the largest percentage growth. Then analyze trends and predict which language might overtake the current leader in the next 2 years, with reasoning. Cite all data sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 1.0
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              },
+              "thinking_content": "Plan & sequential sub-problems to collect GitHub repo counts and produce analysis"
+            }
+          },
+          "parent_id": "d691b85f-adcb-473d-a046-fb25e2b110d7",
+          "parent_ids": [
+            "d691b85f-adcb-473d-a046-fb25e2b110d7"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 1.0,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 1135,
+        "words": 159,
+        "kilobytes": 1.11
+      },
+      "llm": {
+        "calls": 1,
+        "prompt": {
+          "chars": 8951,
+          "words": 1335,
+          "kilobytes": 8.74,
+          "tokens": 0
+        },
+        "completion": {
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0,
+          "tokens": 0
+        },
+        "total_tokens": 0
+      },
+      "chroma": {
+        "store": {
+          "count": 1,
+          "chars": 81,
+          "words": 12,
+          "kilobytes": 0.08
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 3,
+          "total_duration": 47.212351736998244,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_store": {
+          "count": 1,
+          "total_duration": 0.6264375209993887,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 1
+    },
+    "duration_seconds": 47.85,
+    "telemetry": {
+      "correlation_id": "idea_test_008_gpt-5-mini_20260222_121816",
+      "trace_file": "/app/agent/app/idea_test_results/20260222_121816_008_gpt-5-mini.jsonl",
+      "events_count": 1,
+      "timings_count": 4
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "languages_count",
+        "passed": false,
+        "score": 0.0,
+        "found_count": 0,
+        "reason": "Found 0 languages"
+      },
+      {
+        "check": "data_numbers",
+        "passed": false,
+        "score": 0.5,
+        "counts": 6,
+        "percentages": 0,
+        "reason": "Found 6 counts, 0 percentages"
+      },
+      {
+        "check": "trend_analysis",
+        "passed": true,
+        "score": 0.6666666666666666,
+        "has_trend": true,
+        "has_prediction": true,
+        "has_reasoning": false,
+        "reason": "Analysis: trend=True, prediction=True, reasoning=False"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.0,
+      "reasons": [
+        "The agent output does not list any programming languages or repository counts \u2014 it only contains a plan of action.",
+        "No percentage changes from 2023 are provided.",
+        "No language is identified as the growth leader.",
+        "No trend analysis or prediction about overtaking the leader is produced.",
+        "No data sources or citations are given for any numeric claims.",
+        "The agent produced two JSON-like objects (one empty deliverable and one plan) instead of the requested completed analysis."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.0,
+        "reasons": [
+          "The agent output does not list any programming languages or repository counts \u2014 it only contains a plan of action.",
+          "No percentage changes from 2023 are provided.",
+          "No language is identified as the growth leader.",
+          "No trend analysis or prediction about overtaking the leader is produced.",
+          "No data sources or citations are given for any numeric claims.",
+          "The agent produced two JSON-like objects (one empty deliverable and one plan) instead of the requested completed analysis."
+        ],
+        "languages_complete": false,
+        "data_accuracy": "No numeric data provided; accuracy cannot be assessed.",
+        "analysis_quality": "Insufficient \u2014 only a methodology/plan was presented, with no actual analysis, results, or citations."
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.29166666666666663,
+    "checks_passed": 1,
+    "total_checks": 4,
+    "pass_rate": 0.25
+  },
+  "timestamp": "2026-02-22T12:41:51.504278",
+  "execution_variant": "sequential"
+}

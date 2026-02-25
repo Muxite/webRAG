@@ -83,6 +83,31 @@ class ConnectorLLM(ConnectorBase):
             payload["model"] = model_name.strip()
         return self._normalize_payload(payload)
 
+    def _get_max_completion_tokens_limit(self, model_name: str) -> Optional[int]:
+        """
+        Get the maximum completion tokens limit for a model.
+        :param model_name: Model identifier.
+        :returns: Maximum completion tokens or None if unknown.
+        """
+        # Model-specific limits (completion tokens)
+        limits = {
+            "gpt-5-mini": 128000,
+            "gpt-5-nano": 128000,
+            "gpt-4.1-nano": 128000,
+            "gpt-4o": 16384,  # Standard limit for gpt-4o
+        }
+        
+        # Check exact match first
+        if model_name in limits:
+            return limits[model_name]
+        
+        # Check prefix matches
+        for model_prefix, limit in limits.items():
+            if model_name.startswith(model_prefix):
+                return limit
+        
+        return None
+
     def _normalize_payload(self, payload: dict) -> dict:
         """
         Normalize payload for model-specific settings.
@@ -99,7 +124,20 @@ class ConnectorLLM(ConnectorBase):
             elif "temperature" in profile:
                 payload["temperature"] = profile["temperature"]
         if "max_tokens" in payload and payload["max_tokens"] is not None and (profile.get("use_max_completion_tokens") or model_name.startswith(("gpt-5", "gpt-4o"))):
-            payload["max_completion_tokens"] = payload.pop("max_tokens")
+            max_tokens = payload.pop("max_tokens")
+            # Cap max_tokens based on model limits
+            max_limit = self._get_max_completion_tokens_limit(model_name)
+            if max_limit and max_tokens > max_limit:
+                self.logger.warning(f"Capping max_tokens from {max_tokens} to {max_limit} for model {model_name}")
+                max_tokens = max_limit
+            payload["max_completion_tokens"] = max_tokens
+        elif "max_completion_tokens" in payload and payload["max_completion_tokens"] is not None:
+            # Also cap if max_completion_tokens is already set
+            max_tokens = payload["max_completion_tokens"]
+            max_limit = self._get_max_completion_tokens_limit(model_name)
+            if max_limit and max_tokens > max_limit:
+                self.logger.warning(f"Capping max_completion_tokens from {max_tokens} to {max_limit} for model {model_name}")
+                payload["max_completion_tokens"] = max_limit
         if "temperature" in payload and model_name.startswith(("gpt-5", "gpt-4o")) and payload["temperature"] != 1:
             payload.pop("temperature", None)
         return payload
@@ -208,11 +246,17 @@ class ConnectorLLM(ConnectorBase):
         except Exception as e:
             self.logger.debug(f"LLM client close ignored error: {e}")
 
-    async def query_llm(self, payload: dict, model_name: Optional[str] = None) -> Optional[str]:
+    async def query_llm(
+        self,
+        payload: dict,
+        model_name: Optional[str] = None,
+        timeout_seconds: Optional[float] = None,
+    ) -> Optional[str]:
         """
         Sends a chat completion request to the LLM API.
         :param payload: The properly formatted dict payload.
         :param model_name: Optional model override.
+        :param timeout_seconds: Optional timeout budget for the full query operation.
         :return: The response text content, or None if all retries failed.
         """
         if model_name and model_name.strip():
@@ -262,7 +306,7 @@ class ConnectorLLM(ConnectorBase):
             return attempt < max_attempts
 
         try:
-            content = await Retry(
+            retry_coro = Retry(
                 func=do_call,
                 max_attempts=max_attempts,
                 base_delay=base_delay,
@@ -273,6 +317,10 @@ class ConnectorLLM(ConnectorBase):
                 should_retry=should_retry,
                 raise_on_fail=True,
             ).run()
+            if timeout_seconds is not None and float(timeout_seconds) > 0:
+                content = await asyncio.wait_for(retry_coro, timeout=float(timeout_seconds))
+            else:
+                content = await retry_coro
             
             if self._telemetry and self.last_usage:
                 self._telemetry.record_llm_usage({

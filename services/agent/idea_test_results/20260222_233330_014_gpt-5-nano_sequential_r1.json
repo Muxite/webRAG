@@ -1,0 +1,287 @@
+{
+  "test_metadata": {
+    "test_id": "014",
+    "test_name": "Deep Link Exploration",
+    "difficulty_level": "5/10",
+    "category": "Deep Exploration"
+  },
+  "model": "gpt-5-nano",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "",
+      "action_summary": "",
+      "success": true
+    },
+    "graph": {
+      "root_id": "cafc4a44-2ba4-42ba-a126-4f8dfbd874ff",
+      "nodes": {
+        "cafc4a44-2ba4-42ba-a126-4f8dfbd874ff": {
+          "node_id": "cafc4a44-2ba4-42ba-a126-4f8dfbd874ff",
+          "title": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+          "details": {
+            "mandate": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer."
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "88977dfb-d245-4fad-9950-88e25f0e5792"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "88977dfb-d245-4fad-9950-88e25f0e5792": {
+          "node_id": "88977dfb-d245-4fad-9950-88e25f0e5792",
+          "title": "Plan: From a climate-change news article to three linked sources (scientific paper, government policy document, organization's position) with explicit extraction plan",
+          "details": {
+            "mandate": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path. Benchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "extraction_plan": {
+              "scientific_paper": {
+                "output_fields": [
+                  "url",
+                  "summary",
+                  "relation_to_article",
+                  "citation_details"
+                ]
+              },
+              "government_policy_document": {
+                "output_fields": [
+                  "url",
+                  "summary",
+                  "relation_to_article",
+                  "citation_details"
+                ]
+              },
+              "organization_position_statement": {
+                "output_fields": [
+                  "url",
+                  "summary",
+                  "relation_to_article",
+                  "citation_details"
+                ]
+              }
+            },
+            "exploration_path": [
+              "Search for a current climate-change news article",
+              "Open the article and scan for linked sources",
+              "Select one linked scientific paper, one policy document, and one organization position statement",
+              "Visit each selected link to extract full content and context"
+            ],
+            "verification_and_citation": "Cite and link each visited URL in the final answer; provide a clear explanation of how each source relates to the original article and how it supports or contrasts the article's claims.",
+            "action": "SEQUENTIAL: 1) Search for a current climate-change news article; 2) Open the article and identify credible linked sources; 3) Visit the identified linked sources to extract full content; 4) For each linked source, capture URL, provide a concise content summary, and explain its relation to the original article; 5) Compile an exploration path log with citations.",
+            "parent_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.92
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "88977dfb-d245-4fad-9950-88e25f0e5792",
+              "title": "Plan: From a climate-change news article to three linked sources (scientific paper, government policy document, organization's position) with explicit extraction plan",
+              "details": {
+                "mandate": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path. Benchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+                "extraction_plan": {
+                  "scientific_paper": {
+                    "output_fields": [
+                      "url",
+                      "summary",
+                      "relation_to_article",
+                      "citation_details"
+                    ]
+                  },
+                  "government_policy_document": {
+                    "output_fields": [
+                      "url",
+                      "summary",
+                      "relation_to_article",
+                      "citation_details"
+                    ]
+                  },
+                  "organization_position_statement": {
+                    "output_fields": [
+                      "url",
+                      "summary",
+                      "relation_to_article",
+                      "citation_details"
+                    ]
+                  }
+                },
+                "exploration_path": [
+                  "Search for a current climate-change news article",
+                  "Open the article and scan for linked sources",
+                  "Select one linked scientific paper, one policy document, and one organization position statement",
+                  "Visit each selected link to extract full content and context"
+                ],
+                "verification_and_citation": "Cite and link each visited URL in the final answer; provide a clear explanation of how each source relates to the original article and how it supports or contrasts the article's claims.",
+                "action": "SEQUENTIAL: 1) Search for a current climate-change news article; 2) Open the article and identify credible linked sources; 3) Visit the identified linked sources to extract full content; 4) For each linked source, capture URL, provide a concise content summary, and explain its relation to the original article; 5) Compile an exploration path log with citations.",
+                "parent_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 0.92
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              },
+              "thinking_content": "Plan: From a climate-change news article to three linked sources (scientific paper, government policy document, organization's position) with explicit extraction plan"
+            }
+          },
+          "parent_id": "cafc4a44-2ba4-42ba-a126-4f8dfbd874ff",
+          "parent_ids": [
+            "cafc4a44-2ba4-42ba-a126-4f8dfbd874ff"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.92,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "llm": {
+        "calls": 14,
+        "prompt": {
+          "chars": 70689,
+          "words": 8973,
+          "kilobytes": 69.03,
+          "tokens": 25875
+        },
+        "completion": {
+          "chars": 12121,
+          "words": 1526,
+          "kilobytes": 11.84,
+          "tokens": 12214
+        },
+        "total_tokens": 38089
+      },
+      "chroma": {
+        "store": {
+          "count": 1,
+          "chars": 166,
+          "words": 21,
+          "kilobytes": 0.16
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "chroma_add": {
+          "count": 5,
+          "total_duration": 2.605375893006567,
+          "success_count": 5,
+          "error_count": 0
+        },
+        "llm_call": {
+          "count": 3,
+          "total_duration": 38.71030206500291,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_store": {
+          "count": 1,
+          "total_duration": 0.7022513010015246,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 24
+    },
+    "duration_seconds": 39.42,
+    "telemetry": {
+      "correlation_id": "idea_test_014_gpt-5-nano_20260222_233330",
+      "trace_file": "/app/agent/app/idea_test_results/20260222_233330_014_gpt-5-nano.jsonl",
+      "events_count": 24,
+      "timings_count": 9
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "document_types",
+        "passed": false,
+        "score": 0.0,
+        "news": false,
+        "research": false,
+        "government": false,
+        "organization": false,
+        "reason": "Found 0/4 document types"
+      },
+      {
+        "check": "url_count",
+        "passed": false,
+        "score": 0.0,
+        "url_count": 0,
+        "reason": "Found 0 URLs"
+      },
+      {
+        "check": "summaries",
+        "passed": false,
+        "score": 0.0,
+        "sentence_count": 0,
+        "reason": "Found 0 summary sentences"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.0,
+      "reasons": [
+        "No agent output was provided.",
+        "No news article URL or content was given.",
+        "No research paper or study was provided.",
+        "No government policy document was provided.",
+        "No organization's position statement was provided.",
+        "No summaries were provided for any documents.",
+        "No explanations were provided linking found documents to the original article.",
+        "No exploration path was documented."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.0,
+        "reasons": [
+          "No agent output was provided.",
+          "No news article URL or content was given.",
+          "No research paper or study was provided.",
+          "No government policy document was provided.",
+          "No organization's position statement was provided.",
+          "No summaries were provided for any documents.",
+          "No explanations were provided linking found documents to the original article.",
+          "No exploration path was documented."
+        ],
+        "all_types_present": false,
+        "exploration_quality": "No exploration documented \u2014 agent output is missing, so the task could not be evaluated."
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.0,
+    "checks_passed": 0,
+    "total_checks": 4,
+    "pass_rate": 0.0
+  },
+  "timestamp": "2026-02-22T23:36:55.568218",
+  "execution_variant": "sequential"
+}

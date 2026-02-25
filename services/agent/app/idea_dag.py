@@ -5,17 +5,7 @@ from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Union
 import uuid
 
-
-class IdeaNodeStatus(str, Enum):
-    """
-    Status values for idea nodes.
-    """
-    PENDING = "pending"
-    ACTIVE = "active"
-    BLOCKED = "blocked"
-    DONE = "done"
-    SKIPPED = "skipped"
-    FAILED = "failed"
+from agent.app.idea_policies.base import DetailKey, IdeaNodeStatus
 
 
 @dataclass
@@ -536,7 +526,7 @@ class IdeaDag:
             graph._nodes[node_id] = node
             
             if node.status == IdeaNodeStatus.DONE:
-                action_type = node.details.get("action")
+                action_type = node.details.get(DetailKey.ACTION.value)
                 if action_type:
                     action_key = graph._build_action_key(str(action_type), node.details)
                     if action_key:
@@ -565,12 +555,14 @@ class IdeaDag:
         :param details: Node details dict.
         :returns: Action key or None.
         """
-        if action_type == "visit":
-            url = details.get("url") or details.get("link")
+        from agent.app.idea_policies.base import IdeaActionType
+        if action_type == IdeaActionType.VISIT.value:
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            url = NodeDetailsExtractor.get_url(details)
             if url:
                 return f"visit:{url.lower().strip()}"
-        elif action_type == "search":
-            query = details.get("query") or details.get("prompt")
+        elif action_type == IdeaActionType.SEARCH.value:
+            query = details.get(DetailKey.QUERY.value) or details.get(DetailKey.PROMPT.value)
             if query:
                 return f"search:{query.lower().strip()}"
         return None
@@ -655,16 +647,18 @@ class IdeaDag:
         
         events = []
         for node in path:
-            if node.node_id == self._root_id and not node.details.get("action"):
+            if node.node_id == self._root_id and not node.details.get(DetailKey.ACTION.value):
                 continue
             
-            action_type = node.details.get("action", "")
+            action_type = node.details.get(DetailKey.ACTION.value, "")
             status = node.status.value
-            result = node.details.get("action_result")
+            result = node.details.get(DetailKey.ACTION_RESULT.value)
             
+            from agent.app.idea_policies.action_constants import ActionResultKey
+            from agent.app.idea_policies.base import IdeaActionType
             # Determine success status
             if result and isinstance(result, dict):
-                success = result.get("success", False)
+                success = result.get(ActionResultKey.SUCCESS.value, False)
             elif status == IdeaNodeStatus.DONE.value:
                 success = True
             elif status == IdeaNodeStatus.FAILED.value:
@@ -675,28 +669,30 @@ class IdeaDag:
             # Build event summary
             event_summary = []
             if action_type:
-                if action_type == "visit":
-                    url = result.get("url") if result and isinstance(result, dict) else node.details.get("url") or node.details.get("link")
+                if action_type == IdeaActionType.VISIT.value:
+                    from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+                    url = result.get(ActionResultKey.URL.value) if result and isinstance(result, dict) else NodeDetailsExtractor.get_url(node.details)
                     if url:
                         event_summary.append(f"URL: {url[:60]}")
-                elif action_type == "search":
-                    query = result.get("query") if result and isinstance(result, dict) else node.details.get("query") or node.details.get("prompt")
+                elif action_type == IdeaActionType.SEARCH.value:
+                    from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+                    query = result.get(ActionResultKey.QUERY.value) if result and isinstance(result, dict) else NodeDetailsExtractor.get_query(node.details)
                     if query:
                         event_summary.append(f"Query: {query[:60]}")
                     if result and isinstance(result, dict):
-                        results_count = len(result.get("results", []))
+                        results_count = len(result.get(ActionResultKey.RESULTS.value, []))
                         if results_count > 0:
                             event_summary.append(f"Found {results_count} results")
-                elif action_type == "think":
+                elif action_type == IdeaActionType.THINK.value:
                     event_summary.append("Internal reasoning")
             
             # Add error if failed
             if success is False:
                 error = None
                 if result and isinstance(result, dict):
-                    error = result.get("error", "")
+                    error = result.get(ActionResultKey.ERROR.value, "")
                 if not error:
-                    error = node.details.get("action_error", "")
+                    error = node.details.get(DetailKey.ACTION_ERROR.value, "")
                 if error:
                     event_summary.append(f"Error: {error[:80]}")
             

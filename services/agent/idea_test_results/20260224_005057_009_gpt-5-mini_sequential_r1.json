@@ -1,0 +1,383 @@
+{
+  "test_metadata": {
+    "test_id": "009",
+    "test_name": "Deep Research Synthesis",
+    "difficulty_level": "9/10",
+    "category": "Deep Research & Synthesis"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "I will search primary sources, scientific papers, and historical documents about the Piltdown Man hoax, then synthesize findings into a narrative covering: original discovery claims, scientific methods used to expose the fraud, hoax timeline, suspected perpetrator(s) and motivations, modern techniques that would have exposed it immediately, and the hoax\u2019s impact on paleoanthropology and scientific self-correction. I will cite visited sources inline.\n\nProceeding to run web searches and visit authoritative pages (museum, peer-reviewed papers, primary publications, major histories).",
+      "action_summary": "Starting research: will collect primary sources (original 1912 announcement), major analyses (1953 chemical/fluorine tests), historical investigations (e.g., Oakley, Weiner), and modern assessments of motives and impact, then synthesize with citations to visited URLs.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "9f026372-a053-429a-8c29-14f43bf5e9ce",
+      "nodes": {
+        "9f026372-a053-429a-8c29-14f43bf5e9ce": {
+          "node_id": "9f026372-a053-429a-8c29-14f43bf5e9ce",
+          "title": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+          "details": {
+            "mandate": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "expansion_meta": {
+              "execute_all_children": false
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "a8aab1e2-2d3c-4e6f-b98d-b3bcde0e2e13"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "a8aab1e2-2d3c-4e6f-b98d-b3bcde0e2e13": {
+          "node_id": "a8aab1e2-2d3c-4e6f-b98d-b3bcde0e2e13",
+          "title": "Gather primary evidence and authoritative analyses on the Piltdown Man hoax (search \u2192 visit \u2192 extract \u2192 synthesize)",
+          "details": {
+            "internal_plan": "Collect primary discovery reports (1912\u20131913), the 1953 scientific papers exposing the hoax, later historical scholarship (monographs and reviews), and recent forensic / genetic re-analyses (2010s). Extract concrete dates, quotes, methods, and URLs so the final narrative can cite primary sources and peer-reviewed papers. Verify suspected perpetrator(s) against genetic and archival evidence.",
+            "target_facts": [
+              "Original discovery claims: who, when, where, what specimens were reported (skull, jaw, teeth, artifacts) and their initial interpretation",
+              "Scientific methods used to expose the forgery in 1953 (which tests, what they measured, and their results)",
+              "Precise timeline: discovery dates, important publications, challenges, 1953 exposure, later re-analyses (e.g., 1970s, 2000s, 2016)",
+              "Identity of perpetrator(s): evidence linking Charles Dawson and/or others (archival, trunk evidence, DNA/protein analyses) and motivations proposed by historians",
+              "Modern techniques that would have detected the forgery immediately (radiocarbon dating, DNA, CT scanning, elemental and protein/isotope analyses) with citations to method papers or case studies",
+              "Impact on paleoanthropology: how Piltdown affected theory, national prestige, subsequent practice, and reforms that improved scientific self-correction"
+            ],
+            "likely_sources_to_find_and_visit": [
+              {
+                "type": "Primary contemporary reports (1912\u20131913)",
+                "example_queries": [
+                  "1912 Piltdown discovery report Dawson Woodward 1913 Nature",
+                  "Eoanthropus dawsoni original description 1913"
+                ],
+                "preferred_targets": [
+                  "Nature (archive)",
+                  "Proceedings/Quarterly Journal of the Geological Society (1913)",
+                  "British Museum / Natural History Museum (specimen records)"
+                ]
+              },
+              {
+                "type": "Key 1953 scientific papers exposing the forgery",
+                "example_queries": [
+                  "Piltdown forgery 1953 fluorine Oakley Weiner Le Gros Clark Nature 1953"
+                ],
+                "preferred_targets": [
+                  "Nature (1953) papers by Oakley, Weiner, Le Gros Clark",
+                  "Follow-up reports in scientific journals"
+                ]
+              },
+              {
+                "type": "Authoritative institutional summaries and archives",
+                "example_queries": [
+                  "Natural History Museum Piltdown Man hoax history",
+                  "British Museum Piltdown Man files"
+                ],
+                "preferred_targets": [
+                  "Natural History Museum (London) Piltdown page",
+                  "British Museum / NHM archival page",
+                  "BBC History (long-form articles)"
+                ]
+              },
+              {
+                "type": "Historical monographs and books",
+                "example_queries": [
+                  "The Piltdown Forgery Joseph Weiner 1955 book",
+                  "books on Piltdown Man history and analyses"
+                ],
+                "preferred_targets": [
+                  "Weiner (1955) The Piltdown Forgery (book)",
+                  "Recent scholarly books and reviews (e.g., Miles Russell, Chris Stringer, etc.)"
+                ]
+              },
+              {
+                "type": "Recent forensic/genetic re-analyses (post-2000)",
+                "example_queries": [
+                  "2016 DNA analysis Piltdown culprit Dawson Hinton 2016 study",
+                  "Piltdown genetic analysis 2016 Nature? Journal 2016 'Piltdown' DNA"
+                ],
+                "preferred_targets": [
+                  "Peer-reviewed journal article(s) presenting DNA/chemical evidence",
+                  "Royal Society / academic press releases summarizing forensic findings"
+                ]
+              },
+              {
+                "type": "Methods sources for modern detection techniques",
+                "example_queries": [
+                  "radiocarbon dating bone collagen method detection forgeries",
+                  "CT scanning and micro-CT detection of dental filing in fossils",
+                  "ancient DNA authenticity tests contamination detection"
+                ],
+                "preferred_targets": [
+                  "Method papers in Journal of Archaeological Science, Radiocarbon, PNAS, etc."
+                ]
+              }
+            ],
+            "extraction_intent (what to pull from each visited page)": {
+              "primary_reports": "full citation (authors, year, journal), direct quotes describing the finds, specimen catalogue numbers, maps/locations, and early interpretations",
+              "1953 papers": "experimental methods (fluorine, nitrogen, X-ray, microscopic observations), numeric results, authors' conclusions, and DOI/URL",
+              "institution pages": "museum catalog entries, curator statements, photos of specimens, and archival references (e.g., Dawson correspondence)",
+              "monographs/books": "chapter citations, archival evidence presented (e.g., letters, trunk contents), author argument about perpetrator and motive",
+              "2010s forensic/genetic studies": "methods (DNA extraction, sequencing or protein analysis), findings linking specimens to individuals or species, statistical strength of evidence"
+            },
+            "measurable_output_fields (explicit items the follow-up work must produce)": [
+              "List of primary source citations (minimum: original discovery paper(s) and the 1953 Nature paper(s)) with visited URLs",
+              "Timeline table (date, event, citation) covering discovery \u2192 1953 exposure \u2192 later analyses (min 8 events)",
+              "Concise summary (1\u20132 paragraphs each) of methods used in 1953 and results with quotes and URLs",
+              "Evidence summary for suspected perpetrator(s) (Dawson, Hinton, others): archival documents, trunk contents, DNA/protein evidence, and counterarguments, with citations",
+              "List of at least 5 modern scientific techniques that would detect the hoax immediately, with short explanation and at least one citation per technique",
+              "Short synthesis (approx 500\u2013800 words) explaining how the Piltdown case illustrates scientific self-correction, with primary-source citations"
+            ],
+            "why_this_reduces_uncertainty": "Searching first identifies authoritative pages and primary documents; visiting those pages extracts direct evidence (dates, test results, quotes). This chain (search\u2192visit\u2192extract) ensures claims in the narrative are traceable to primary literature, peer-reviewed analyses, or archival material rather than secondhand summaries.",
+            "planned_execution_steps (sequential)": [
+              "1) Run the search queries listed above to locate the original 1912\u20131913 reports and the 1953 exposing papers (Nature).",
+              "2) Visit the top results for original descriptions (Nature or geological society publications) and extract citation details and specimen descriptions.",
+              "3) Visit the 1953 Nature papers by Oakley, Weiner, and Le Gros Clark; extract methods (fluorine, nitrogen, microscopy), numeric results, and authors' conclusions. Save full text snippets and DOIs/URLs.",
+              "4) Visit Natural History Museum / British Museum pages and archival sources for specimen records and curator summaries; extract images, specimen IDs, and any archival correspondence references (e.g., Dawson letters).",
+              "5) Search for and visit later historical analyses and monographs (Weiner 1955 book, modern scholarly work such as Miles Russell, Chris Stringer) to extract arguments about perpetrator(s) and motivations.",
+              "6) Search for and visit recent forensic/genetic analyses (circa 2000\u20132016) that test alleged perpetrators; extract methods and findings linking specimens to individuals (if available).",
+              "7) Search for method papers describing modern detection techniques (radiocarbon, CT, aDNA, proteomics, isotope/elemental analyses) and extract concise explanations of how each would detect a forgery like Piltdown.",
+              "8) Assemble extracted facts, create the timeline table, produce the synthesis narrative with inline citations to visited URLs and primary literature, and prepare a bibliography of primary sources and scientific papers."
+            ],
+            "next_action_suggestions_for_executor": "Begin with searches for: 'Piltdown 1912 Dawson Woodward 1913', 'Piltdown 1953 fluorine Oakley Weiner Le Gros Clark Nature', 'Natural History Museum Piltdown', and '2016 DNA analysis Piltdown Dawson Hinton'. After search results return URLs, visit the highest-priority pages (Nature 1953 papers, NHM page, Weiner 1955 summary, recent forensic study) and extract the measurable_output_fields.",
+            "constraints_and_verification_steps": [
+              "Always visit (not only rely on search snippets) for each cited claim to capture exact wording and data (per benchmark rule).",
+              "Prefer primary sources (original papers, museum records) and peer-reviewed analyses over tertiary summaries.",
+              "Where conflicting interpretations exist (e.g., identity of perpetrator), collect the main arguments and evidence for each and note strength/weakness.",
+              "Record full URLs and DOIs for every visited source to include in final citations."
+            ],
+            "action": "search",
+            "parent_goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.98
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "query": "Gather primary evidence and authoritative analyses on the Piltdown Man hoax (search \u2192 visit \u2192 extract \u2192 synthesize)",
+              "intent": null,
+              "vector_context": [],
+              "count": 10,
+              "results": [
+                {
+                  "title": "The Problem of Piltdown Man | Science History Institute",
+                  "url": "https://www.sciencehistory.org/stories/magazine/the-problem-of-piltdown-man/",
+                  "description": "Kenneth Oakley (left) and L. E. Parsons inspect the Piltdown Man jaw, 1949. ... <strong>Chemical analysis revealed that the jaw fragments had been artificially stained with iron and chromic acid to look much older than they were</strong>."
+                },
+                {
+                  "title": "Piltdown Man - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Piltdown_Man",
+                  "description": "The focus on Dawson as the main forger is supported by the accumulation of evidence regarding other archaeological hoaxes he perpetrated in the decade or two before the Piltdown discovery. <strong>The archaeologist Miles Russell of Bournemouth University analysed Dawson&#x27;s antiquarian collection, and</strong> ..."
+                },
+                {
+                  "title": "New genetic and morphological evidence suggests a single hoaxer created \u2018Piltdown man\u2019 | Royal Society Open Science",
+                  "url": "https://royalsocietypublishing.org/doi/10.1098/rsos.160328",
+                  "description": "In combination, the geometric morphometric analyses link the Piltdown I mandible and Piltdown II molar; traditional morphometrics link the mandible with the canine, and ancient DNA analysis links the canine and Piltdown II molar. Therefore, given the nature of the context, we consider it highly likely that the Piltdown hoaxer(s) used a single orang-utan specimen originating from southwest Sarawak to construct parts of both Piltdown I and II."
+                },
+                {
+                  "title": "Study reveals culprit behind Piltdown Man, one of science's most famous hoaxes | Science | AAAS",
+                  "url": "https://www.science.org/content/article/study-reveals-culprit-behind-piltdown-man-one-science-s-most-famous-hoaxes",
+                  "description": "The hoax came to light in 1953 when scientists at the University of Oxford in the United Kingdom, using the then-new technique of fluorine dating\u2014which relies on the fact that older bones absorb more fluoride from groundwater over time\u2014revealed that Piltdown Man&#x27;s bones were not all the same age. Further analysis revealed they were an amalgam of carefully carved and stained human and ape bones."
+                },
+                {
+                  "title": "(PDF) New genetic and morphological evidence suggests a single hoaxer created \u2018Piltdown man\u2019",
+                  "url": "https://www.researchgate.net/publication/306042198_New_genetic_and_morphological_evidence_suggests_a_single_hoaxer_created_'Piltdown_man'",
+                  "description": "It appeared that the (genuine) mammalian fossils had been gathered from many different localities \u00b7 before being planted in the Piltdown gravels, and the stone tools were similarly introduced, after being \u00b7 arti\ufb01cially stained to match the colour of the gravels. The \u2018cricket bat\u2019 was as bogus as the rest\u2014it had \u00b7 been carved with a steel knife, possibly from a fossil elephant bone. In spite of a series of archival and scienti\ufb01c investigations to resolve the hoax [10\u201315], our current"
+                },
+                {
+                  "title": "A Science Odyssey: People and Discoveries: Piltdown Man is revealed as fake",
+                  "url": "https://www.pbs.org/wgbh/aso/databank/entries/do53pi.html",
+                  "description": "<strong>The Piltdown fossils, including a portion of the skull, a jawbone, and a few teeth, were found in 1911 and 1912</strong>. This &quot;Piltdown Man&quot; was believed by many to be &quot;the earliest Englishman,&quot; and in fact, the missing link between apes and humans. But in 1953, the jawbone was found to be that of ..."
+                },
+                {
+                  "title": "The Piltdown Man Hoax - The Leakey Foundation",
+                  "url": "https://leakeyfoundation.org/the-piltdown-man-hoax/",
+                  "description": "Research published in 2016 by Isabelle de Groote et al. <strong>used DNA analyses, high-precision measurements, spectroscopy, and virtual anthropology to tie all of the evidence to one person</strong>."
+                },
+                {
+                  "title": "Folklore, Belief, and the Piltdown Man Hoax | Folklife Today",
+                  "url": "https://blogs.loc.gov/folklife/2016/08/folklore-piltdown-man-hoax/",
+                  "description": "Many faulty assumptions were played upon by Charles Dawson in the Piltdown man hoax and led to the failure of many to adequately question the skull, but these ideas changed as anthropology and paleontology developed during the 20th century. Today the evidence places human origins in western or southern Africa, the idea of a single line of descent has given way to a complex history of many early hominin species including some that lived at the same time, and race is understood as a phenomenon of human social behavior with no basis in human physiology."
+                },
+                {
+                  "title": "Piltdown Man | Natural History Museum",
+                  "url": "https://www.nhm.ac.uk/our-science/services/library/collections/piltdown-man.html",
+                  "description": "<strong>Smith Woodward made a reconstruction of the skull fragments, and the archaeologists hypothesised that the find indicated evidence of a human ancestor living 500,000 years ago</strong>. They announced their discovery at a Geological Society meeting in 1912. For the most part, their story was accepted ..."
+                },
+                {
+                  "title": "Piltdown man | Discovery, Fossils, & Facts | Britannica",
+                  "url": "https://www.britannica.com/topic/Piltdown-man",
+                  "description": "A reexamination of the Piltdown remains, which included spectroscopy and DNA analysis, strongly suggested that the fabricated remains were made by <strong>combining the bones of a single orangutan and no fewer than two human specimens</strong>."
+                }
+              ]
+            }
+          },
+          "parent_id": "9f026372-a053-429a-8c29-14f43bf5e9ce",
+          "parent_ids": [
+            "9f026372-a053-429a-8c29-14f43bf5e9ce"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.98,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 586,
+        "words": 77,
+        "kilobytes": 0.57
+      },
+      "llm": {
+        "calls": 5,
+        "prompt": {
+          "chars": 21140,
+          "words": 2900,
+          "kilobytes": 20.64,
+          "tokens": 7845
+        },
+        "completion": {
+          "chars": 13636,
+          "words": 1572,
+          "kilobytes": 13.32,
+          "tokens": 5642
+        },
+        "total_tokens": 13487
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 10,
+        "chars": 4933,
+        "words": 667,
+        "kilobytes": 4.82
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "chroma_query": {
+          "count": 2,
+          "total_duration": 1.0655104140000162,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 1,
+          "total_duration": 0.7340795970000045,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "llm_call": {
+          "count": 3,
+          "total_duration": 64.03009091300004,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 1.2069221680000055,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 15
+    },
+    "duration_seconds": 65.25,
+    "telemetry": {
+      "correlation_id": "idea_test_009_gpt-5-mini_20260224_005057",
+      "trace_file": "/app/agent/app/idea_test_results/20260224_005057_009_gpt-5-mini.jsonl",
+      "events_count": 15,
+      "timings_count": 7
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "research_areas",
+        "passed": true,
+        "score": 0.8333333333333334,
+        "areas_covered": 5,
+        "details": {
+          "discovery": false,
+          "exposure": true,
+          "timeline": true,
+          "perpetrator": true,
+          "modern": true,
+          "impact": true
+        },
+        "reason": "Covered 5/6 research areas"
+      },
+      {
+        "check": "synthesis",
+        "passed": false,
+        "score": 0.5,
+        "reason": "Synthesis: present=True, self-correction=False"
+      },
+      {
+        "check": "authoritative_sources",
+        "passed": false,
+        "score": 0.0,
+        "total_urls": 0,
+        "authoritative_urls": 0,
+        "reason": "Found 0 URLs (0 authoritative)"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.18,
+      "reasons": [
+        "The agent output is a plan/intention to perform research rather than the completed research synthesis requested.",
+        "No synthesis or narrative is provided, so the core deliverable (coherent narrative explaining scientific self-correction) is missing.",
+        "No primary sources, scientific papers, or historical documents are actually cited\u2014agent only stated it will cite sources.",
+        "Because no substantive content is provided, the six specified research areas are not actually addressed in detail and cannot be validated for accuracy.",
+        "The output therefore fails to meet the task requirements despite listing the topics it intends to cover."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.18,
+        "reasons": [
+          "The agent output is a plan/intention to perform research rather than the completed research synthesis requested.",
+          "No synthesis or narrative is provided, so the core deliverable (coherent narrative explaining scientific self-correction) is missing.",
+          "No primary sources, scientific papers, or historical documents are actually cited\u2014agent only stated it will cite sources.",
+          "Because no substantive content is provided, the six specified research areas are not actually addressed in detail and cannot be validated for accuracy.",
+          "The output therefore fails to meet the task requirements despite listing the topics it intends to cover."
+        ],
+        "all_areas_covered": false,
+        "synthesis_quality": "Absent \u2014 agent provided only an outline/statement of intent; no narrative or synthesis to evaluate.",
+        "source_quality": "None \u2014 no citations or visited sources are provided in the output.",
+        "historical_accuracy": false
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.37833333333333335,
+    "checks_passed": 1,
+    "total_checks": 4,
+    "pass_rate": 0.25
+  },
+  "timestamp": "2026-02-24T00:56:56.047663",
+  "execution_variant": "sequential"
+}

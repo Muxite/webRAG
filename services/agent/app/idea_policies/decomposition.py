@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from agent.app.idea_dag import IdeaDag
+if TYPE_CHECKING:
+    from agent.app.idea_dag import IdeaDag
+
 from agent.app.idea_policies.base import DecompositionPolicy
 
 
 class ScoreThresholdDecompositionPolicy(DecompositionPolicy):
     """
-    Decompose when score is below a threshold and depth is allowed.
+    Decompose when score is below a threshold.
     :param settings: Settings dictionary.
     :returns: ScoreThresholdDecompositionPolicy instance.
     """
@@ -32,14 +34,12 @@ class ScoreThresholdDecompositionPolicy(DecompositionPolicy):
             return False
         
         threshold = float(self.settings.get("decomposition_threshold", 0.5))
-        max_depth = int(self.settings.get("max_depth", 6))
-        depth = graph.depth(node_id)
         score = node.score if node.score is not None else 0.0
         
         # Prefer decomposition when score is low (problem not well understood)
         # But avoid over-decomposition - prefer fewer, larger steps
-        # Only decompose if we're not too deep and the problem needs breaking down
-        should_decompose = depth < max_depth and score < threshold
+        # No depth limit - decompose based on score threshold only
+        should_decompose = score < threshold
         
         # If node already has children that are complete, don't decompose further
         # Let merging happen instead

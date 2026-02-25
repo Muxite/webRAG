@@ -1,0 +1,352 @@
+{
+  "test_metadata": {
+    "test_id": "006",
+    "test_name": "Obscure Historical Event",
+    "difficulty_level": "6/10",
+    "category": "Historical Research"
+  },
+  "model": "gpt-5-nano",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "",
+      "action_summary": "",
+      "success": true
+    },
+    "graph": {
+      "root_id": "eda6b91a-0339-417d-94b7-441386158a63",
+      "nodes": {
+        "eda6b91a-0339-417d-94b7-441386158a63": {
+          "node_id": "eda6b91a-0339-417d-94b7-441386158a63",
+          "title": "Research the 'Great Emu War' of Australia. Find primary source documents or historical records, modern analysis of the event, and quote at least one passage from a historical document or contemporary news article about it. Provide URLs to all sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+          "details": {
+            "mandate": "Research the 'Great Emu War' of Australia. Find primary source documents or historical records, modern analysis of the event, and quote at least one passage from a historical document or contemporary news article about it. Provide URLs to all sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "expansion_meta": {
+              "execute_all_children": true
+            }
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "7def64a6-37ca-4b9a-95d4-f580ea258185"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "7def64a6-37ca-4b9a-95d4-f580ea258185": {
+          "node_id": "7def64a6-37ca-4b9a-95d4-f580ea258185",
+          "title": "Plan: Gather primary sources and modern analyses on the Great Emu War (1932) with quotes and URLs",
+          "details": {
+            "mandate": "Research the 'Great Emu War' of Australia. Find primary source documents or historical records, modern analysis of the event, and quote at least one passage from a historical document or contemporary news article about it. Provide URLs to all sources. Benchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "extraction_intent": {
+              "primary_sources": true,
+              "contemporary_news": true,
+              "modern_analyses": true,
+              "quotes_required": true
+            },
+            "target_subproblems": [
+              {
+                "title": "Identify primary source documents and contemporaneous reporting (1932) with URLs",
+                "description": "Locate newspaper reports from 1932 (e.g., Trove-indexed Australian papers), official government records, and military notes related to the Emu War; extract citation details and direct quotes where possible."
+              },
+              {
+                "title": "Identify modern analyses and reputable summaries",
+                "description": "Find trusted secondary sources such as encyclopedia entries, scholarly articles, and institutional histories that discuss the event, its context, and historiographical interpretations."
+              },
+              {
+                "title": "Extract quotes with attribution",
+                "description": "From primary sources or contemporary news articles, pull at least one verbatim quote with citation (author, date, source title) and context for that quote."
+              },
+              {
+                "title": "Compile complete source list with URLs",
+                "description": "Create a verifiable bibliography of all sources found, including type (primary/secondary), title, author, date, and a URL to the exact page read."
+              }
+            ],
+            "extraction_plan": {
+              "step1": "Search for terms: 'Great Emu War', 'Emu War 1932 primary source', 'Emu War newspaper 1932', 'Australian War Memorial Emu War', 'Trove emu war 1932'",
+              "step2": "Visit top 5\u20138 results to read full content and locate quotes and factual details",
+              "step3": "Record quotes with source, date, author (if available), and context",
+              "step4": "Compile sources with titles and URLs; categorize by primary source vs modern analysis",
+              "step5": "Provide citations in a consistent format and prepare a short extractable quote set"
+            },
+            "deliverables": {
+              "quotes": [
+                {
+                  "source_title": "",
+                  "source_url": "",
+                  "quote_text": "",
+                  "quote_context": "",
+                  "date": "",
+                  "type": "primary_source"
+                }
+              ],
+              "sources": [
+                {
+                  "title": "",
+                  "url": "",
+                  "type": "primary_source"
+                },
+                {
+                  "title": "",
+                  "url": "",
+                  "type": "contemporary_news"
+                },
+                {
+                  "title": "",
+                  "url": "",
+                  "type": "modern_analysis"
+                }
+              ]
+            },
+            "verification": {
+              "criteria": [
+                "Quote is verbatim from the source with attribution",
+                "URL points to the exact source page",
+                "Source types include primary sources and modern analyses",
+                "Total sources found >= 5"
+              ]
+            },
+            "notes": [
+              "Prioritize accessible sources (e.g., Trove, Australian War Memorial, Britannica) to minimize access barriers and ensure quotes can be verified."
+            ],
+            "action": "Execute a two-stage information gathering: 1) search for primary sources and modern analyses; 2) visit the top results to extract exact quotes and compile full citations with URLs.",
+            "parent_goal": "Research the 'Great Emu War' of Australia. Find primary source documents or historical records, modern analysis of the event, and quote at least one passage from a historical document or contemporary news article about it. Provide URLs to all sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.95
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "7def64a6-37ca-4b9a-95d4-f580ea258185",
+              "title": "Plan: Gather primary sources and modern analyses on the Great Emu War (1932) with quotes and URLs",
+              "details": {
+                "mandate": "Research the 'Great Emu War' of Australia. Find primary source documents or historical records, modern analysis of the event, and quote at least one passage from a historical document or contemporary news article about it. Provide URLs to all sources. Benchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+                "extraction_intent": {
+                  "primary_sources": true,
+                  "contemporary_news": true,
+                  "modern_analyses": true,
+                  "quotes_required": true
+                },
+                "target_subproblems": [
+                  {
+                    "title": "Identify primary source documents and contemporaneous reporting (1932) with URLs",
+                    "description": "Locate newspaper reports from 1932 (e.g., Trove-indexed Australian papers), official government records, and military notes related to the Emu War; extract citation details and direct quotes where possible."
+                  },
+                  {
+                    "title": "Identify modern analyses and reputable summaries",
+                    "description": "Find trusted secondary sources such as encyclopedia entries, scholarly articles, and institutional histories that discuss the event, its context, and historiographical interpretations."
+                  },
+                  {
+                    "title": "Extract quotes with attribution",
+                    "description": "From primary sources or contemporary news articles, pull at least one verbatim quote with citation (author, date, source title) and context for that quote."
+                  },
+                  {
+                    "title": "Compile complete source list with URLs",
+                    "description": "Create a verifiable bibliography of all sources found, including type (primary/secondary), title, author, date, and a URL to the exact page read."
+                  }
+                ],
+                "extraction_plan": {
+                  "step1": "Search for terms: 'Great Emu War', 'Emu War 1932 primary source', 'Emu War newspaper 1932', 'Australian War Memorial Emu War', 'Trove emu war 1932'",
+                  "step2": "Visit top 5\u20138 results to read full content and locate quotes and factual details",
+                  "step3": "Record quotes with source, date, author (if available), and context",
+                  "step4": "Compile sources with titles and URLs; categorize by primary source vs modern analysis",
+                  "step5": "Provide citations in a consistent format and prepare a short extractable quote set"
+                },
+                "deliverables": {
+                  "quotes": [
+                    {
+                      "source_title": "",
+                      "source_url": "",
+                      "quote_text": "",
+                      "quote_context": "",
+                      "date": "",
+                      "type": "primary_source"
+                    }
+                  ],
+                  "sources": [
+                    {
+                      "title": "",
+                      "url": "",
+                      "type": "primary_source"
+                    },
+                    {
+                      "title": "",
+                      "url": "",
+                      "type": "contemporary_news"
+                    },
+                    {
+                      "title": "",
+                      "url": "",
+                      "type": "modern_analysis"
+                    }
+                  ]
+                },
+                "verification": {
+                  "criteria": [
+                    "Quote is verbatim from the source with attribution",
+                    "URL points to the exact source page",
+                    "Source types include primary sources and modern analyses",
+                    "Total sources found >= 5"
+                  ]
+                },
+                "notes": [
+                  "Prioritize accessible sources (e.g., Trove, Australian War Memorial, Britannica) to minimize access barriers and ensure quotes can be verified."
+                ],
+                "action": "Execute a two-stage information gathering: 1) search for primary sources and modern analyses; 2) visit the top results to extract exact quotes and compile full citations with URLs.",
+                "parent_goal": "Research the 'Great Emu War' of Australia. Find primary source documents or historical records, modern analysis of the event, and quote at least one passage from a historical document or contemporary news article about it. Provide URLs to all sources.\n\nBenchmark rule: when external evidence is needed, run search then visit the best URLs. Visit pages to extract concrete details and cite visited URLs in the final answer.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 0.95
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              },
+              "thinking_content": "Plan: Gather primary sources and modern analyses on the Great Emu War (1932) with quotes and URLs"
+            }
+          },
+          "parent_id": "eda6b91a-0339-417d-94b7-441386158a63",
+          "parent_ids": [
+            "eda6b91a-0339-417d-94b7-441386158a63"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.95,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "llm": {
+        "calls": 4,
+        "prompt": {
+          "chars": 19356,
+          "words": 2656,
+          "kilobytes": 18.9,
+          "tokens": 7198
+        },
+        "completion": {
+          "chars": 4558,
+          "words": 609,
+          "kilobytes": 4.45,
+          "tokens": 2087
+        },
+        "total_tokens": 9285
+      },
+      "chroma": {
+        "store": {
+          "count": 1,
+          "chars": 97,
+          "words": 17,
+          "kilobytes": 0.09
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 3,
+          "total_duration": 48.523764883000695,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_store": {
+          "count": 1,
+          "total_duration": 0.6302228980002837,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 4
+    },
+    "duration_seconds": 49.16,
+    "telemetry": {
+      "correlation_id": "idea_test_006_gpt-5-nano_20260222_121816",
+      "trace_file": "/app/agent/app/idea_test_results/20260222_121816_006_gpt-5-nano.jsonl",
+      "events_count": 4,
+      "timings_count": 4
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "event_identification",
+        "passed": false,
+        "score": 0.0,
+        "reason": "Event checks: emu=False, war=False, australia=False, 1932=False"
+      },
+      {
+        "check": "historical_quote",
+        "passed": false,
+        "score": 0,
+        "quote_count": 0,
+        "reason": "Found 0 quotes"
+      },
+      {
+        "check": "source_urls",
+        "passed": false,
+        "score": 0.0,
+        "url_count": 0,
+        "historical_urls": 0,
+        "reason": "Found 0 URLs (0 historical)"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.0,
+      "reasons": [
+        "No agent output was provided to evaluate.",
+        "No primary source or historical record was mentioned.",
+        "No modern analysis was included.",
+        "No passage was quoted and no URLs were given.",
+        "Because the agent output is missing, the event description cannot be confirmed as correct."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.0,
+        "reasons": [
+          "No agent output was provided to evaluate.",
+          "No primary source or historical record was mentioned.",
+          "No modern analysis was included.",
+          "No passage was quoted and no URLs were given.",
+          "Because the agent output is missing, the event description cannot be confirmed as correct."
+        ],
+        "has_primary_source": false,
+        "has_modern_analysis": false,
+        "event_correct": false
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.0,
+    "checks_passed": 0,
+    "total_checks": 4,
+    "pass_rate": 0.0
+  },
+  "timestamp": "2026-02-22T12:38:05.282687",
+  "execution_variant": "sequential"
+}

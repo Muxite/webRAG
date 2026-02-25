@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from agent.app.idea_dag import IdeaDag, IdeaNode
+if TYPE_CHECKING:
+    from agent.app.idea_dag import IdeaDag, IdeaNode
+
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import ExpansionPolicy, DetailKey, IdeaActionType
 from agent.app.idea_dag_settings import load_idea_dag_settings
@@ -80,6 +82,61 @@ class LlmExpansionPolicy(ExpansionPolicy):
             self._logger.error(f"[EXPANSION] Exception during expansion: {e}", exc_info=True)
             return []
 
+    def _enhance_details_with_inline_links(self, details: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Enhance node details by adding inline link formatting for visit actions.
+        Links are shown next to their context text for easy association.
+        :param details: Original node details dictionary.
+        :returns: Enhanced details with inline links formatted.
+        """
+        from agent.app.idea_policies.action_constants import ActionResultKey
+        enhanced = dict(details)
+        
+        action_result = details.get(DetailKey.ACTION_RESULT.value)
+        if not isinstance(action_result, dict):
+            return enhanced
+        
+        action = action_result.get(ActionResultKey.ACTION.value)
+        if action != IdeaActionType.VISIT.value:
+            return enhanced
+        
+        success = action_result.get(ActionResultKey.SUCCESS.value, False)
+        if not success:
+            return enhanced
+        
+        links = action_result.get(ActionResultKey.LINKS.value) or action_result.get(ActionResultKey.LINKS_FULL.value) or []
+        if not isinstance(links, list) or len(links) == 0:
+            return enhanced
+        
+        link_contexts = action_result.get(ActionResultKey.LINK_CONTEXTS.value) or {}
+        max_links_to_show = int(self.settings.get("max_links_per_visit", 20))
+        links_to_show = links[:max_links_to_show]
+        
+        inline_links_section = []
+        for link_url in links_to_show:
+            if not isinstance(link_url, str) or not link_url.startswith(("http://", "https://")):
+                continue
+            
+            context_text = ""
+            if isinstance(link_contexts, dict) and link_url in link_contexts:
+                context = link_contexts[link_url]
+                if isinstance(context, str) and context.strip():
+                    context_text = context.strip()[:150]
+            
+            if context_text:
+                inline_links_section.append(f"{context_text} [link: {link_url}]")
+            else:
+                inline_links_section.append(f"[link: {link_url}]")
+        
+        if inline_links_section:
+            enhanced_action_result = dict(action_result)
+            enhanced_action_result["_links_inline"] = "\n".join(inline_links_section)
+            if len(links) > max_links_to_show:
+                enhanced_action_result["_links_inline"] += f"\n... and {len(links) - max_links_to_show} more links (see 'links' field for full list)"
+            enhanced[DetailKey.ACTION_RESULT.value] = enhanced_action_result
+        
+        return enhanced
+    
     def _build_messages(self, graph: IdeaDag, node: IdeaNode, memories: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, str]]:
         """
         Build expansion prompt messages.
@@ -92,9 +149,11 @@ class LlmExpansionPolicy(ExpansionPolicy):
         max_children = int(self.settings.get("max_branching", 5))
         path = graph.path_to_root(node.node_id)
         path = path[:max_nodes]
+        
         serialized = []
         for entry in path:
-            details_text = _safe_serialize_details(entry.details)
+            enhanced_details = self._enhance_details_with_inline_links(entry.details)
+            details_text = _safe_serialize_details(enhanced_details)
             if len(details_text) > max_detail_chars:
                 details_text = details_text[:max_detail_chars]
             serialized.append(
@@ -136,6 +195,14 @@ class LlmExpansionPolicy(ExpansionPolicy):
             allowed_actions=allowed_actions,
             max_children=max_children,
         ) if system_template else ""
+        planning_addendum = str(
+            self.settings.get(
+                "expansion_planning_addendum",
+                "Before producing candidates, build an internal plan with target facts, source strategy, and verification steps.",
+            )
+        ).strip()
+        if planning_addendum:
+            system = f"{system}\n\n{planning_addendum}" if system else planning_addendum
         user = user_template.format(
             path_json=path_json,
             parent_id=node.node_id,
@@ -156,10 +223,8 @@ class LlmExpansionPolicy(ExpansionPolicy):
             },
             ensure_ascii=True,
         )
-        return [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ]
+        from agent.app.idea_policies.action_constants import PromptBuilder
+        return PromptBuilder.build_messages(system_content=system, user_content=user)
 
     def _parse_candidates(self, content: Optional[str]) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
@@ -185,12 +250,18 @@ class LlmExpansionPolicy(ExpansionPolicy):
         for candidate in candidates:
             if not isinstance(candidate, dict):
                 continue
-            action = candidate.get("action")
+            action = candidate.get(DetailKey.ACTION.value)
             title = candidate.get("title") or ""
             details = candidate.get("details") or {}
             if action:
                 details = dict(details)
                 details[DetailKey.ACTION.value] = action
+            
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            justification = NodeDetailsExtractor.get_justification(candidate)
+            if justification:
+                details[DetailKey.JUSTIFICATION.value] = str(justification)
+            
             cleaned.append(
                 {
                     "title": str(title),

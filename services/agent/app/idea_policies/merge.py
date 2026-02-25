@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from agent.app.idea_dag import IdeaDag, IdeaNodeStatus
-from agent.app.idea_policies.base import MergePolicy, DetailKey, IdeaActionType
+if TYPE_CHECKING:
+    from agent.app.idea_dag import IdeaDag
+
+from agent.app.idea_policies.base import MergePolicy, DetailKey, IdeaActionType, IdeaNodeStatus
 
 
 class SimpleMergePolicy(MergePolicy):
@@ -50,7 +52,8 @@ class SimpleMergePolicy(MergePolicy):
             if not child:
                 continue
             # Check if child is a merge node that's already done
-            if child.details.get(DetailKey.ACTION.value) == IdeaActionType.MERGE.value:
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            if NodeDetailsExtractor.is_merge_action(child.details):
                 if child.status == IdeaNodeStatus.DONE:
                     continue
                 # If merge node failed, still consider it "ready" to merge
@@ -79,7 +82,8 @@ class SimpleMergePolicy(MergePolicy):
         # Check if merge node already exists
         for child_id in node.children:
             child = graph.get_node(child_id)
-            if child and child.details.get(DetailKey.ACTION.value) == IdeaActionType.MERGE.value:
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            if child and NodeDetailsExtractor.is_merge_action(child.details):
                 return False
         
         # Check if all children are ready
@@ -99,14 +103,21 @@ class SimpleMergePolicy(MergePolicy):
         # First, merge the children results into parent
         self.merge(graph, parent_id)
         
-        # Create merge node
+        # Create merge node with parent justification
         merge_title = f"Merge: {parent.title}"
+        from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+        parent_justification = NodeDetailsExtractor.get_justification(parent.details)
+        merge_details = {
+            DetailKey.ACTION.value: IdeaActionType.MERGE.value,
+        }
+        if parent_justification:
+            merge_details[DetailKey.PARENT_JUSTIFICATION.value] = parent_justification
+            merge_details[DetailKey.WHY_THIS_NODE.value] = f"Merge results from children to synthesize findings for: {parent.title}. {parent_justification}"
+        
         merge_node = graph.add_child(
             parent_id=parent_id,
             title=merge_title,
-            details={
-                DetailKey.ACTION.value: IdeaActionType.MERGE.value,
-            },
+            details=merge_details,
             status=IdeaNodeStatus.PENDING,
             score=None,
         )
@@ -139,9 +150,12 @@ class SimpleMergePolicy(MergePolicy):
                 continue
             
             # For merge nodes, use their synthesized result
-            if child.details.get(DetailKey.ACTION.value) == IdeaActionType.MERGE.value:
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            if NodeDetailsExtractor.is_merge_action(child.details):
                 result = child.details.get(DetailKey.ACTION_RESULT.value)
-                if result and result.get("success"):
+                from agent.app.idea_policies.action_constants import ActionResultKey
+                from agent.app.idea_policies.action_constants import ActionResultExtractor
+                if result and ActionResultExtractor.is_success(result):
                     # Extract synthesized content from merge result
                     synthesized = result.get("synthesized", {})
                     merged.append(

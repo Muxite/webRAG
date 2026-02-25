@@ -11,7 +11,8 @@ merges always progress toward completion (toward the root).
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-from agent.app.idea_dag import IdeaDag, IdeaNode, IdeaNodeStatus
+from agent.app.idea_dag import IdeaDag, IdeaNode
+from agent.app.idea_policies.base import IdeaNodeStatus
 from agent.app.idea_policies.base import DetailKey, IdeaActionType
 
 
@@ -147,7 +148,8 @@ def find_branch_pair(graph: IdeaDag, node_id: str) -> Optional[BranchPair]:
         return None
     
     # If this is a merge node, find its expansion node (parent)
-    if node.details.get(DetailKey.ACTION.value) == IdeaActionType.MERGE.value:
+    from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+    if NodeDetailsExtractor.is_merge_action(node.details):
         # Merge nodes have parent_ids pointing to the children they merge
         # The expansion node is the parent of those children
         if node.parent_ids:
@@ -162,7 +164,7 @@ def find_branch_pair(graph: IdeaDag, node_id: str) -> Optional[BranchPair]:
     if node.children:
         for child_id in node.children:
             child = graph.get_node(child_id)
-            if child and child.details.get(DetailKey.ACTION.value) == IdeaActionType.MERGE.value:
+            if child and NodeDetailsExtractor.is_merge_action(child.details):
                 return BranchPair(expansion_node_id=node_id, merge_node_id=child_id, graph=graph)
         
         # No merge node yet, but this is an expansion node
@@ -176,7 +178,7 @@ def find_branch_pair(graph: IdeaDag, node_id: str) -> Optional[BranchPair]:
             if parent.children:
                 for child_id in parent.children:
                     child = graph.get_node(child_id)
-                    if child and child.details.get(DetailKey.ACTION.value) == IdeaActionType.MERGE.value:
+                    if child and NodeDetailsExtractor.is_merge_action(child.details):
                         return BranchPair(expansion_node_id=node.parent_id, merge_node_id=child_id, graph=graph)
             
             # Parent is expansion node, no merge node yet

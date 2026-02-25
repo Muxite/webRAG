@@ -1,6 +1,7 @@
 import random
 
-from agent.app.idea_dag import IdeaDag, IdeaNodeStatus
+from agent.app.idea_dag import IdeaDag
+from agent.app.idea_policies.base import IdeaNodeStatus
 
 
 def test_idea_dag_random_ops():

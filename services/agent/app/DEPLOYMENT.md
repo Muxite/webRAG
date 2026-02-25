@@ -49,7 +49,7 @@ docker compose up idea-test
 ```bash
 cd services/agent/app
 python -m app.idea_test_runner
-python -m app.idea_test_visualize
+python -m app.testing.idea_test_visualize
 ```
 
 ## Production Considerations
