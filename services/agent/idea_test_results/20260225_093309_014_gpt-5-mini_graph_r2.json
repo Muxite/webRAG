@@ -1,0 +1,739 @@
+{
+  "test_metadata": {
+    "test_id": "014",
+    "test_name": "Deep Link Exploration",
+    "difficulty_level": "5/10",
+    "category": "Deep Exploration"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "I attempted the mandated exploration but could not complete it because the merged tool results lack the concrete URLs and outbound-link data needed to follow the chain from a news article to a research paper, a government policy document, and an organization position statement. What I did and what failed:\n\n1) Search step: succeeded. Query used: \"recent news article climate change links to study government policy organisation position statement\" (intent: find recent reputable news articles that include outbound links to studies, policy docs, and/or position statements). The merged results show the search action completed (status: done). No article URL or candidate list was returned in the merged results.\n\n2) Visit selected news article: failed. Error from merged results: \"Visit node missing valid URL. Node title: 'Visit the selected news article (use the top relevant search result)'. Details should contain 'url' or 'lin...\" (truncated). Because the visit action did not receive a concrete URL, I could not open the article or read its outbound links.\n\n3) Visit linked research paper / study: failed. Error: \"Visit node missing valid URL. Node title: 'Visit the linked scientific research paper or study (from the article's outbound links)'. Details should contain 'url'...\" (truncated).\n\n4) Visit linked government policy document: failed. Error: \"Visit node missing valid URL. Node title: 'Visit the linked government policy document (from the article's outbound links)'. Details should contain 'u...\" (truncated).\n\n5) Visit linked organization's position statement: failed. Error: \"Visit node missing valid URL. Node title: 'Visit the linked organization's position statement (from the article's outbound links)'. Details should cont...\" (truncated).\n\nWhat is missing (exactly what I need to complete the task):\n- The URL of the selected news article (or a list of candidate news-article URLs). The search step in the merged results did not return a usable article URL to visit.\n- For the selected article: the outbound links (or the article content) listing links to a scientific research paper/study, a government policy document, and an organization position statement. The visit attempts failed because no outbound-link data or URLs were provided.\n\nHow I would proceed if you want me to finish this now (two options):\nA) I can re-run the search and select a news article, then follow its outbound links to retrieve the study, policy doc, and position statement and produce the requested summaries and relation explanations (I will include URL citations). If you want that, say \"Yes \u2014 search and follow links now.\" or just ask me to proceed.\nB) If you already have a specific news-article URL (or its text with links), paste it here; I will follow its links and produce the three requested items with summaries, relationships to the article, and an exploration path.\n\nBecause the merged results do not include the actual URLs or outbound-link data, I cannot truthfully produce the requested summaries or URL citations from evidence. If you want me to continue immediately, I can run the search and visits now and produce the full deliverable with citations.",
+      "action_summary": "Search was executed but subsequent visit actions failed because the merged results did not include a valid news-article URL or the article's outbound links. To complete the task I need either permission to re-run the search now (so I can select an article and follow its links) or a specific news-article URL (or its content) to analyze. The merged results\u2019 error messages show \"Visit node missing valid URL\" for each follow-up visit.",
+      "success": true
+    },
+    "graph": {
+      "root_id": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+      "nodes": {
+        "de21b3bc-2a2c-441f-8565-1f100e3f4825": {
+          "node_id": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+          "title": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+          "details": {
+            "mandate": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "merged_results": [
+              {
+                "node_id": "7a1fdf7a-a684-4333-8bae-7e810d60c612",
+                "title": "Search for a recent news article about climate change that links to research, policy, and organizational positions",
+                "status": "done",
+                "score": 0.18,
+                "evaluation": {
+                  "score": 0.18
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "node_id": "7a1fdf7a-a684-4333-8bae-7e810d60c612",
+                  "query": "recent news article climate change links to study government policy organisation position statement \"climate change\" \"study\" \"policy\" \"position statement\"",
+                  "intent": "Find 4\u20136 candidate news articles (major news outlets) about climate change that include outbound links to (a) at least one scientific paper or study, (b) at least one government policy document, and/or (c) at least one organization's position statement. Prioritize articles published within the last 2 years and from reputable publishers (BBC, NYT, The Guardian, Washington Post, Reuters, AP).",
+                  "vector_context": [
+                    "Select best news article and plan link-following (analysis of search results to choose one article to visit)"
+                  ],
+                  "count": 6,
+                  "results": []
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "c0d8184e-eaaa-4c89-9bcc-e78d526e9e58",
+                "title": "Visit the selected news article (use the top relevant search result)",
+                "status": "failed",
+                "score": 0.2,
+                "evaluation": {
+                  "score": 0.2
+                },
+                "result": {
+                  "action": "visit",
+                  "success": false,
+                  "error": "Visit node missing valid URL. Node title: 'Visit the selected news article (use the top relevant search result)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+                  "retryable": false,
+                  "error_type": "InvalidURL",
+                  "url": "{{search_results[0].url}}"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "41609c35-90a4-4e7b-a815-254c5baf1a2d",
+                "title": "Visit the linked scientific research paper or study (from the article's outbound links)",
+                "status": "failed",
+                "score": 0.17,
+                "evaluation": {
+                  "score": 0.17
+                },
+                "result": {
+                  "action": "visit",
+                  "success": false,
+                  "error": "Visit node missing valid URL. Node title: 'Visit the linked scientific research paper or study (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+                  "retryable": false,
+                  "error_type": "InvalidURL",
+                  "url": "{{selected_article.outbound_links[?classification=='research' || anchor_text_contains('study')].url}}"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "d24da6ac-5566-4d9e-a9d0-84b7a90512f2",
+                "title": "Visit the linked government policy document (from the article's outbound links)",
+                "status": "failed",
+                "score": 0.16,
+                "evaluation": {
+                  "score": 0.16
+                },
+                "result": {
+                  "action": "visit",
+                  "success": false,
+                  "error": "Visit node missing valid URL. Node title: 'Visit the linked government policy document (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+                  "retryable": false,
+                  "error_type": "InvalidURL",
+                  "url": "{{selected_article.outbound_links[?classification=='policy' || url_contains('gov')].url}}"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "1dfb350b-6ede-444e-9ef0-c56f4f1c5175",
+                "title": "Visit the linked organization's position statement (from the article's outbound links)",
+                "status": "failed",
+                "score": 0.15,
+                "evaluation": {
+                  "score": 0.15
+                },
+                "result": {
+                  "action": "visit",
+                  "success": false,
+                  "error": "Visit node missing valid URL. Node title: 'Visit the linked organization's position statement (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+                  "retryable": false,
+                  "error_type": "InvalidURL",
+                  "url": "{{selected_article.outbound_links[?classification=='organization' || anchor_text_contains('statement') || anchor_text_contains('position')].url}}"
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 5,
+              "success": 1,
+              "failed": 4,
+              "blocked": 0,
+              "skipped": 0
+            },
+            "goal_achieved": true
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "7a1fdf7a-a684-4333-8bae-7e810d60c612",
+            "c0d8184e-eaaa-4c89-9bcc-e78d526e9e58",
+            "41609c35-90a4-4e7b-a815-254c5baf1a2d",
+            "d24da6ac-5566-4d9e-a9d0-84b7a90512f2",
+            "1dfb350b-6ede-444e-9ef0-c56f4f1c5175",
+            "4c5d4706-463a-4a50-ac2b-6a8c5fb22a4c"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "7a1fdf7a-a684-4333-8bae-7e810d60c612": {
+          "node_id": "7a1fdf7a-a684-4333-8bae-7e810d60c612",
+          "title": "Search for a recent news article about climate change that links to research, policy, and organizational positions",
+          "details": {
+            "query": "recent news article climate change links to study government policy organisation position statement \"climate change\" \"study\" \"policy\" \"position statement\"",
+            "intent": "Find 4\u20136 candidate news articles (major news outlets) about climate change that include outbound links to (a) at least one scientific paper or study, (b) at least one government policy document, and/or (c) at least one organization's position statement. Prioritize articles published within the last 2 years and from reputable publishers (BBC, NYT, The Guardian, Washington Post, Reuters, AP).",
+            "count": 6,
+            "target_facts": [
+              "URL and publisher of a news article about climate change",
+              "Does the article include outbound links? (list of outbound link URLs and anchor text)",
+              "Publication date and author (to verify recency and credibility)"
+            ],
+            "verification_steps": [
+              "Confirm article is from a reputable news outlet (check domain/branding).",
+              "Confirm article content pertains to climate change (text snippets, headline).",
+              "Record outbound links present on the article page and classify each link as research paper, government policy, or organization statement where possible from the link text."
+            ],
+            "measurable_output_fields": [
+              "search_results: [{title, url, publisher, date_snippet, outbound_link_count, impression_of_relevance}]"
+            ],
+            "rationale": "This search is required to locate the starting news article and produce the exact URL(s) that subsequent visit steps will consume. It reduces uncertainty by returning candidate articles so we can pick one that actually links to the three target resource types.",
+            "action": "search",
+            "provides_data": {
+              "type": "urls_from_search"
+            },
+            "parent_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "original_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.18
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "node_id": "7a1fdf7a-a684-4333-8bae-7e810d60c612",
+              "query": "recent news article climate change links to study government policy organisation position statement \"climate change\" \"study\" \"policy\" \"position statement\"",
+              "intent": "Find 4\u20136 candidate news articles (major news outlets) about climate change that include outbound links to (a) at least one scientific paper or study, (b) at least one government policy document, and/or (c) at least one organization's position statement. Prioritize articles published within the last 2 years and from reputable publishers (BBC, NYT, The Guardian, Washington Post, Reuters, AP).",
+              "vector_context": [
+                "Select best news article and plan link-following (analysis of search results to choose one article to visit)"
+              ],
+              "count": 6,
+              "results": []
+            }
+          },
+          "parent_id": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+          "parent_ids": [
+            "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.18,
+          "memo_key": null
+        },
+        "c0d8184e-eaaa-4c89-9bcc-e78d526e9e58": {
+          "node_id": "c0d8184e-eaaa-4c89-9bcc-e78d526e9e58",
+          "title": "Visit the selected news article (use the top relevant search result)",
+          "details": {
+            "url": "{{search_results[0].url}}",
+            "intent": "Open the selected news article to extract full text, publication metadata, and the set of outbound links (anchor text + URLs). Identify which outbound links point to (a) scientific research papers or studies, (b) government policy documents, and (c) organization position statements. Produce exact URLs to follow.",
+            "target_facts": [
+              "Article title, author, publication date, and full HTML/text content (first 6000 chars at minimum).",
+              "List of outbound links found in the article with anchor text and exact URLs (_links_inline style).",
+              "Initial classification of each outbound link into research/policy/organization/other."
+            ],
+            "extraction_plan": [
+              "Fetch the article page HTML and extract the headline, byline, date, and article body (first 6000 chars).",
+              "Scan the article body and sidebar for hyperlinks; collect exact URL strings and anchor text for each link (these will be used verbatim in subsequent visit nodes).",
+              "For each outbound link, attempt quick classification using anchor text and surrounding sentence (e.g., contains 'study', 'research', 'paper' -> research; 'department', 'gov', 'strategy', 'policy' -> government; 'position', 'statement', 'policy brief', 'press release' -> organization)."
+            ],
+            "measurable_output_fields": [
+              "article_metadata: {title, author, date, publisher}",
+              "article_excerpt: first_6000_chars",
+              "outbound_links: [{anchor_text, url, preliminary_classification}]"
+            ],
+            "rationale": "We must visit the news article to obtain exact outbound link URLs (the system's visit requirement). Those exact URLs are necessary to reliably retrieve the scientific paper, policy document, and organization statement in follow-up visits. This step reduces uncertainty by producing the authoritative source links.",
+            "action": "visit",
+            "parent_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "original_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.2
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": false,
+              "error": "Visit node missing valid URL. Node title: 'Visit the selected news article (use the top relevant search result)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+              "retryable": false,
+              "error_type": "InvalidURL",
+              "url": "{{search_results[0].url}}"
+            },
+            "action_retryable": false,
+            "action_error": "Visit node missing valid URL. Node title: 'Visit the selected news article (use the top relevant search result)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+            "action_error_details": {
+              "error": "Visit node missing valid URL. Node title: 'Visit the selected news article (use the top relevant search result)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+              "error_type": "InvalidURL",
+              "root_cause": null,
+              "http_status": null,
+              "traceback_summary": null
+            }
+          },
+          "parent_id": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+          "parent_ids": [
+            "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+          ],
+          "status": "failed",
+          "children": [],
+          "score": 0.2,
+          "memo_key": null
+        },
+        "41609c35-90a4-4e7b-a815-254c5baf1a2d": {
+          "node_id": "41609c35-90a4-4e7b-a815-254c5baf1a2d",
+          "title": "Visit the linked scientific research paper or study (from the article's outbound links)",
+          "details": {
+            "url": "{{selected_article.outbound_links[?classification=='research' || anchor_text_contains('study')].url}}",
+            "intent": "Open the research paper or study linked from the news article to extract title, authors, abstract/summary, publication date, DOI (if present), and main findings/conclusions relevant to the news article.",
+            "target_facts": [
+              "Paper title, authors, journal/preprint server, DOI/identifier, publication date.",
+              "Abstract or summary (first 6000 chars if needed) and explicit statements of findings or conclusions.",
+              "Whether the paper is peer-reviewed (journal) or a preprint, and any funding/conflict disclosures."
+            ],
+            "extraction_plan": [
+              "Fetch the paper page (publisher/journal/preprint) and extract bibliographic metadata (title, authors, journal, DOI).",
+              "Extract the abstract and any summary paragraphs or conclusions that the news article cited.",
+              "Note any specific data/figures referenced in the news article (e.g., temperature projections, model results) and capture relevant sentences."
+            ],
+            "measurable_output_fields": [
+              "paper_metadata: {title, authors, journal_or_server, DOI, date}",
+              "paper_abstract_excerpt: first_6000_chars_or_abstract",
+              "paper_key_findings: [{quote_snippet, page/section}]"
+            ],
+            "rationale": "Visiting the original research verifies what the news article reports, allows us to quote primary findings, and assess whether the article accurately represents the study. Using the exact URL obtained from the article ensures we open the same research resource the journalist relied on.",
+            "action": "visit",
+            "parent_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "original_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.17
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": false,
+              "error": "Visit node missing valid URL. Node title: 'Visit the linked scientific research paper or study (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+              "retryable": false,
+              "error_type": "InvalidURL",
+              "url": "{{selected_article.outbound_links[?classification=='research' || anchor_text_contains('study')].url}}"
+            },
+            "action_retryable": false,
+            "action_error": "Visit node missing valid URL. Node title: 'Visit the linked scientific research paper or study (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+            "action_error_details": {
+              "error": "Visit node missing valid URL. Node title: 'Visit the linked scientific research paper or study (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+              "error_type": "InvalidURL",
+              "root_cause": null,
+              "http_status": null,
+              "traceback_summary": null
+            }
+          },
+          "parent_id": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+          "parent_ids": [
+            "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+          ],
+          "status": "failed",
+          "children": [],
+          "score": 0.17,
+          "memo_key": null
+        },
+        "d24da6ac-5566-4d9e-a9d0-84b7a90512f2": {
+          "node_id": "d24da6ac-5566-4d9e-a9d0-84b7a90512f2",
+          "title": "Visit the linked government policy document (from the article's outbound links)",
+          "details": {
+            "url": "{{selected_article.outbound_links[?classification=='policy' || url_contains('gov')].url}}",
+            "intent": "Open the government policy document referenced or linked in the news article to extract title, issuing agency, date, scope, and key policy measures or targets mentioned in the article.",
+            "target_facts": [
+              "Policy document title, issuing government/agency, publication or update date.",
+              "Executive summary or key policy targets (e.g., emissions target years, mitigation/adaptation measures).",
+              "Any implementation timelines, legal status (draft vs enacted), or links to supporting evidence."
+            ],
+            "extraction_plan": [
+              "Fetch the government page or PDF and extract metadata (title, agency, date) and the executive summary or key sections describing policy commitments.",
+              "Capture direct quotes or bullet points that match claims made in the news article.",
+              "Note whether the document is a strategy, law/regulation, guidance, press release, or consultation paper."
+            ],
+            "measurable_output_fields": [
+              "policy_metadata: {title, agency, date, doc_type}",
+              "policy_key_points: [{quote_snippet, section}]",
+              "policy_status: {draft|final|law|guidance}"
+            ],
+            "rationale": "Examining the government document verifies the policy claims in the article (e.g., targets, timelines). It provides authoritative context and reduces the risk of relying solely on the journalist's paraphrase.",
+            "action": "visit",
+            "parent_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "original_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.16
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": false,
+              "error": "Visit node missing valid URL. Node title: 'Visit the linked government policy document (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+              "retryable": false,
+              "error_type": "InvalidURL",
+              "url": "{{selected_article.outbound_links[?classification=='policy' || url_contains('gov')].url}}"
+            },
+            "action_retryable": false,
+            "action_error": "Visit node missing valid URL. Node title: 'Visit the linked government policy document (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+            "action_error_details": {
+              "error": "Visit node missing valid URL. Node title: 'Visit the linked government policy document (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+              "error_type": "InvalidURL",
+              "root_cause": null,
+              "http_status": null,
+              "traceback_summary": null
+            }
+          },
+          "parent_id": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+          "parent_ids": [
+            "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+          ],
+          "status": "failed",
+          "children": [],
+          "score": 0.16,
+          "memo_key": null
+        },
+        "1dfb350b-6ede-444e-9ef0-c56f4f1c5175": {
+          "node_id": "1dfb350b-6ede-444e-9ef0-c56f4f1c5175",
+          "title": "Visit the linked organization's position statement (from the article's outbound links)",
+          "details": {
+            "url": "{{selected_article.outbound_links[?classification=='organization' || anchor_text_contains('statement') || anchor_text_contains('position')].url}}",
+            "intent": "Open the organization (NGO/industry/body) position statement or press release linked in the article to extract the organization's stance, recommended actions, and any critiques or support related to the news topic.",
+            "target_facts": [
+              "Organization name, document/statement title, date, and URL.",
+              "The explicit position or recommendations (bullet points or key quotes).",
+              "Whether the organization provides evidence or cites research supporting its position."
+            ],
+            "extraction_plan": [
+              "Fetch the statement or press release page, extract the headline, publication date, and full statement content (first 6000 chars).",
+              "Identify key claims, recommendations, or criticisms and capture exact quotes to relate back to the article.",
+              "Record any referenced studies or policy calls cited by the organization."
+            ],
+            "measurable_output_fields": [
+              "org_statement: {organization, title, date, excerpt}",
+              "org_key_positions: [{quote_snippet, recommendation_or_critique}]",
+              "org_references: [urls_or_citations_if_present]"
+            ],
+            "rationale": "Visiting the organization's original position statement lets us see the exact framing and evidence they present and compare it to how the news article summarized or used that position.",
+            "action": "visit",
+            "parent_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "original_goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "goal": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.15
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": false,
+              "error": "Visit node missing valid URL. Node title: 'Visit the linked organization's position statement (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+              "retryable": false,
+              "error_type": "InvalidURL",
+              "url": "{{selected_article.outbound_links[?classification=='organization' || anchor_text_contains('statement') || anchor_text_contains('position')].url}}"
+            },
+            "action_retryable": false,
+            "action_error": "Visit node missing valid URL. Node title: 'Visit the linked organization's position statement (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+            "action_error_details": {
+              "error": "Visit node missing valid URL. Node title: 'Visit the linked organization's position statement (from the article's outbound links)'. Details should contain 'url' or 'link' field with a valid HTTP/HTTPS URL.",
+              "error_type": "InvalidURL",
+              "root_cause": null,
+              "http_status": null,
+              "traceback_summary": null
+            }
+          },
+          "parent_id": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+          "parent_ids": [
+            "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+          ],
+          "status": "failed",
+          "children": [],
+          "score": 0.15,
+          "memo_key": null
+        },
+        "4c5d4706-463a-4a50-ac2b-6a8c5fb22a4c": {
+          "node_id": "4c5d4706-463a-4a50-ac2b-6a8c5fb22a4c",
+          "title": "Merge: Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+          "details": {
+            "action": "merge"
+          },
+          "parent_id": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+          "parent_ids": [
+            "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+          ],
+          "status": "pending",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 3175,
+        "words": 496,
+        "kilobytes": 3.1
+      },
+      "llm": {
+        "calls": 2,
+        "prompt": {
+          "chars": 4287,
+          "words": 624,
+          "kilobytes": 4.19,
+          "tokens": 864
+        },
+        "completion": {
+          "chars": 1784,
+          "words": 167,
+          "kilobytes": 1.74,
+          "tokens": 2308
+        },
+        "total_tokens": 3172
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 1,
+          "chars": 108,
+          "words": 17,
+          "kilobytes": 0.11
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "llm_call": {
+          "count": 3,
+          "total_duration": 111.47451481499593,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 1,
+          "total_duration": 0.8055141000004369,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 0.6234787199937273,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 2
+    },
+    "duration_seconds": 112.93,
+    "telemetry": {
+      "correlation_id": "idea_test_014_gpt-5-mini_20260225_093309",
+      "trace_file": "/app/agent/idea_test_results/20260225_093309_014_gpt-5-mini.jsonl",
+      "events_count": 2,
+      "timings_count": 5
+    },
+    "graph_visualization": {
+      "ascii": "*-------.   Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.\n|\\ \\ \\ \\ \\  \n* | | | | | Search for a recent news article about climate change that links to research, policy, and organizational positions\n / / / / /  \n* | | | | Visit the selected news article (use the top relevant search result)\n / / / /  \n* | | | Visit the linked scientific research paper or study (from the article's outbound links)\n / / /  \n* | | Visit the linked government policy document (from the article's outbound links)\n / /  \n* | Visit the linked organization's position statement (from the article's outbound links)\n /  \n* Merge: Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.\n",
+      "graph_data": {
+        "nodes": [
+          {
+            "id": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+            "title": "Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "status": "active",
+            "score": null,
+            "memo_key": null,
+            "action": null,
+            "has_result": false,
+            "parent_ids": []
+          },
+          {
+            "id": "7a1fdf7a-a684-4333-8bae-7e810d60c612",
+            "title": "Search for a recent news article about climate change that links to research, policy, and organizational positions",
+            "status": "done",
+            "score": 0.18,
+            "memo_key": null,
+            "action": "search",
+            "has_result": true,
+            "parent_ids": [
+              "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+            ]
+          },
+          {
+            "id": "c0d8184e-eaaa-4c89-9bcc-e78d526e9e58",
+            "title": "Visit the selected news article (use the top relevant search result)",
+            "status": "failed",
+            "score": 0.2,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+            ]
+          },
+          {
+            "id": "41609c35-90a4-4e7b-a815-254c5baf1a2d",
+            "title": "Visit the linked scientific research paper or study (from the article's outbound links)",
+            "status": "failed",
+            "score": 0.17,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+            ]
+          },
+          {
+            "id": "d24da6ac-5566-4d9e-a9d0-84b7a90512f2",
+            "title": "Visit the linked government policy document (from the article's outbound links)",
+            "status": "failed",
+            "score": 0.16,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+            ]
+          },
+          {
+            "id": "1dfb350b-6ede-444e-9ef0-c56f4f1c5175",
+            "title": "Visit the linked organization's position statement (from the article's outbound links)",
+            "status": "failed",
+            "score": 0.15,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+            ]
+          },
+          {
+            "id": "4c5d4706-463a-4a50-ac2b-6a8c5fb22a4c",
+            "title": "Merge: Start at a news article about climate change (find one via search). From that article, follow links to find: (1) a scientific research paper or study, (2) a government policy document, and (3) an organization's position statement. For each, provide the URL, a summary of the content, and explain how it relates to the original article. Document your exploration path.",
+            "status": "pending",
+            "score": null,
+            "memo_key": null,
+            "action": "merge",
+            "has_result": false,
+            "parent_ids": [
+              "de21b3bc-2a2c-441f-8565-1f100e3f4825"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+            "to": "7a1fdf7a-a684-4333-8bae-7e810d60c612"
+          },
+          {
+            "from": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+            "to": "c0d8184e-eaaa-4c89-9bcc-e78d526e9e58"
+          },
+          {
+            "from": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+            "to": "41609c35-90a4-4e7b-a815-254c5baf1a2d"
+          },
+          {
+            "from": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+            "to": "d24da6ac-5566-4d9e-a9d0-84b7a90512f2"
+          },
+          {
+            "from": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+            "to": "1dfb350b-6ede-444e-9ef0-c56f4f1c5175"
+          },
+          {
+            "from": "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+            "to": "4c5d4706-463a-4a50-ac2b-6a8c5fb22a4c"
+          }
+        ]
+      },
+      "analysis": {
+        "total_nodes": 7,
+        "action_counts": {
+          "search": 1,
+          "visit": 4,
+          "merge": 1
+        },
+        "think_count": 0,
+        "think_ratio": 0.0,
+        "other_action_count": 7,
+        "action_diversity": 3,
+        "unique_titles": 7,
+        "duplicate_title_count": 0,
+        "think_nodes": [],
+        "issues": [
+          {
+            "severity": "medium",
+            "type": "similar_long_titles",
+            "message": "Found 1 pairs of nodes with very similar long titles (likely merge/repetition)",
+            "recommendation": "Review merge nodes - they may be duplicating the root node's mandate unnecessarily",
+            "examples": [
+              {
+                "title_preview": "start at a news article about climate change (find one via search). from that article, follow links to find: (1) a scientific research paper or study,...",
+                "node_ids": [
+                  "de21b3bc-2a2c-441f-8565-1f100e3f4825",
+                  "4c5d4706-463a-4a50-ac2b-6a8c5fb22a4c"
+                ]
+              }
+            ]
+          }
+        ],
+        "issue_count": 1
+      }
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "document_types",
+        "passed": true,
+        "score": 1.0,
+        "news": true,
+        "research": true,
+        "government": true,
+        "organization": true,
+        "reason": "Found 4/4 document types"
+      },
+      {
+        "check": "url_count",
+        "passed": false,
+        "score": 0.0,
+        "url_count": 0,
+        "reason": "Found 0 URLs"
+      },
+      {
+        "check": "summaries",
+        "passed": true,
+        "score": 1.0,
+        "sentence_count": 28,
+        "reason": "Found 28 summary sentences"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.2,
+      "reasons": [
+        "The agent did not produce the required deliverables: no URLs, no summaries, and no explanations linking found documents to the original article.",
+        "Search step reported as completed but returned no usable article URL or candidate list, so the agent could not visit an article or follow outbound links.",
+        "All subsequent visit actions failed due to missing URLs; therefore the scientific paper, government policy document, and organization position statement were not retrieved or summarized.",
+        "The agent did correctly document its attempted steps and the specific errors encountered, and offered clear next-step options to complete the task."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.2,
+        "reasons": [
+          "The agent did not produce the required deliverables: no URLs, no summaries, and no explanations linking found documents to the original article.",
+          "Search step reported as completed but returned no usable article URL or candidate list, so the agent could not visit an article or follow outbound links.",
+          "All subsequent visit actions failed due to missing URLs; therefore the scientific paper, government policy document, and organization position statement were not retrieved or summarized.",
+          "The agent did correctly document its attempted steps and the specific errors encountered, and offered clear next-step options to complete the task."
+        ],
+        "all_types_present": false,
+        "exploration_quality": "Partial. The agent provided a clear account of attempted actions and precise failure messages, but did not retrieve or summarize any of the required documents or provide the exploration path with working URLs. To complete the task it needs either permission to re-run the search and follow links or a specific news-article URL (or article content) to work from."
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.55,
+    "checks_passed": 2,
+    "total_checks": 4,
+    "pass_rate": 0.5
+  },
+  "timestamp": "2026-02-25T09:39:51.975768",
+  "execution_variant": "graph"
+}

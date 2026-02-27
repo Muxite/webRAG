@@ -210,11 +210,19 @@ class MemoryManager:
             links_list = links or []
             link_contexts_dict = link_contexts or {}
             
+            source_url = None
+            if metadata and "source_url" in metadata:
+                source_url = metadata["source_url"]
+            elif metadata and "url" in metadata:
+                source_url = metadata["url"]
+            
             for i, chunk in enumerate(chunks):
                 chunk_id = f"{node_id}_{i:02d}"
                 chunk_metadata = dict(base_metadata)
                 chunk_metadata["chunk_index"] = str(i)
                 chunk_metadata["total_chunks"] = str(len(chunks))
+                if source_url:
+                    chunk_metadata["source_url"] = source_url[:500]
                 
                 chunk_with_links = chunk
                 from agent.app.idea_policies.base import IdeaActionType
@@ -329,7 +337,12 @@ class MemoryManager:
         
         compact_metadata = {"step_type": "node_result"}
         if action_type == IdeaActionType.VISIT.value and result.get(ActionResultKey.URL.value):
-            compact_metadata["url"] = result.get(ActionResultKey.URL.value)[:200]
+            url = result.get(ActionResultKey.URL.value)[:200]
+            compact_metadata["url"] = url
+            compact_metadata["source_url"] = url
+            urls_visited = result.get("urls_visited", [])
+            if urls_visited and isinstance(urls_visited, list):
+                compact_metadata["urls_visited"] = ",".join([u[:200] for u in urls_visited[:10]])
             links_full = result.get("links_full", [])
             links_count = len(links_full) if links_full else len(result.get("links", []))
             if links_count > 0:

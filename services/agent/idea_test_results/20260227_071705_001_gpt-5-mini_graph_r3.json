@@ -1,0 +1,1965 @@
+{
+  "test_metadata": {
+    "test_id": "001",
+    "test_name": "Conflicting Information Resolution",
+    "difficulty_level": "3/10",
+    "category": "Data Verification & Analysis",
+    "estimated_complexity": "Requires 3+ sources, discrepancy analysis, reasoning"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Task: Find current population of San Francisco from three authoritative sources (government, news outlet, research institution) and report population figure, date of the data, and direct citation URL for each; then identify discrepancies and say which is most likely accurate and why.\n\nWhat the merged results contain (evidence available to use):\n\n1) Candidate government source (search result):\n   - Label: City/County of San Francisco \u2014 Population and Migration page (search result)\n   - URL: https://www.sf.gov/data--san-francisco-population-and-migration\n   - Extracted evidence: Only the URL and page title snippet appear in the merged results; no population figure or date was provided in the merged results content.\n\n2) Other SF.gov search snippet in merged results:\n   - Label: SF.gov \u2014 Child and young adult population by age and race\n   - URL: https://www.sf.gov/data--child-and-young-adult-population-age-and-race\n   - Extracted evidence: Only the URL and title appear in merged results; no population figure or date was provided in the merged results content.\n\n3) Pages actually visited in the merged results (these are Australian Bureau of Statistics pages \u2014 not relevant to San Francisco):\n   - URL A: https://www.abs.gov.au/statistics/people/population/population-census/latest-release\n   - URL B: https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary\n   - URL C: https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep\n   - Extracted evidence: The merged results contain page titles, link lists, and navigation for these ABS pages, but they do not provide any San Francisco population figures or dates.\n\nWhat is missing (explicitly):\n- The merged results do NOT contain any explicit population figure for the City and County of San Francisco from any source.\n- The merged results do NOT contain the date of any San Francisco population estimate from a government source (e.g., SF.gov, U.S. Census Bureau, California Department of Finance).\n- The merged results do NOT contain any article from a major news outlet (San Francisco Chronicle, New York Times, Washington Post, etc.) that provides a San Francisco population figure and date.\n- The merged results do NOT contain any report from a research institution or think tank (e.g., PPIC, Pew Research, Brookings) that states a current population number for San Francisco, nor dates for such data.\n\nURLs found in the merged results (listed explicitly, in order of appearance in merged results):\n1. https://www.sf.gov/data--san-francisco-population-and-migration\n2. https://www.sf.gov/data--child-and-young-adult-population-age-and-race\n3. https://www.abs.gov.au/statistics/people/population/population-census/latest-release\n4. https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary\n5. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep\n\nNotes on relevance and gaps:\n- URL #1 (sf.gov/data--san-francisco-population-and-migration) appears to be the appropriate government source to obtain an official City/County population figure, but the merged results only include the link/title; the content with the actual population number and date was not retrieved in these merged results.\n- URLs #3\u2013#5 are pages on the Australian Bureau of Statistics (ABS). They are present in the merged results because the visit actions opened them, but they do not contain San Francisco population data. They are therefore not useful for answering the mandate.\n\nConclusion based on merged-results evidence:\n- I cannot produce the requested population figures, dates, or the required three direct citations for San Francisco because those specific data items are missing from the merged results provided.\n\nRecommended next step (I can perform this if you want):\n- I can fetch the current San Francisco population figures (with dates and direct URLs) from three authoritative sources you prefer (e.g., 1) government: U.S. Census Bureau QuickFacts or SF Planning / SF.gov; 2) news outlet: San Francisco Chronicle or NYT; 3) research institution: PPIC, Brookings, or Pew). If you want me to proceed, tell me which news outlet and which research institution you prefer, or I can pick widely-recognized ones and return the requested comparison.\n\nCitations for the evidence I actually have in merged results (these do not contain the SF population figures):\n- https://www.sf.gov/data--san-francisco-population-and-migration\n- https://www.sf.gov/data--child-and-young-adult-population-age-and-race\n- https://www.abs.gov.au/statistics/people/population/population-census/latest-release\n- https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary\n- https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+      "action_summary": "Merged-results did not include any San Francisco population numbers or dates. The search returned an SF.gov population page URL (https://www.sf.gov/data--san-francisco-population-and-migration) but its content with the figure/date was not present in the merged results. The visited pages in the merged results are Australian Bureau of Statistics pages (not relevant). I cannot complete the mandate with the provided evidence. If you want, I can run fresh lookups on SF.gov, the U.S. Census Bureau, a news outlet (e.g., SF Chronicle) and a research institution (e.g., PPIC) and return the three population figures, dates, URLs, discrepancies, and an assessment of which is most accurate.",
+      "success": true,
+      "goal_achieved": true,
+      "has_failures": false
+    },
+    "graph": {
+      "root_id": "ac82dce7-9027-48ef-907c-e127fab7316c",
+      "nodes": {
+        "ac82dce7-9027-48ef-907c-e127fab7316c": {
+          "node_id": "ac82dce7-9027-48ef-907c-e127fab7316c",
+          "title": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+          "details": {
+            "mandate": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "memo_namespace": "idea_dag:9b31587a80",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "original_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "merged_results": [
+              {
+                "node_id": "5f448ff2-8c17-41e6-84ca-f59fee65ab7d",
+                "title": "Search for authoritative sources reporting San Francisco population (government, news outlet, research institution)",
+                "status": "done",
+                "score": 0.18,
+                "evaluation": {
+                  "score": 0.18
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "node_id": "5f448ff2-8c17-41e6-84ca-f59fee65ab7d",
+                  "query": "San Francisco population 2023 2024 official estimate site:sf.gov OR \"San Francisco\" \"population\" \"estimate\" OR \"U.S. Census\" OR \"California Department of Finance\" OR \"American Community Survey\" OR \"San Francisco Chronicle\" OR \"New York Times\" OR \"Pew Research\" OR \"Brookings\" OR \"PPIC\"",
+                  "intent": "Locate one authoritative government source, one major news outlet article, and one research institution report that state a current population figure for the City and County of San Francisco. Return URLs/snippets for each candidate source.",
+                  "vector_context": [
+                    "Synthesize findings and identify discrepancies; determine most likely accurate population figure"
+                  ],
+                  "count": 20,
+                  "results": [
+                    {
+                      "title": "San Francisco Population and Migration",
+                      "url": "https://www.sf.gov/data--san-francisco-population-and-migration",
+                      "description": "We cannot provide a description for this page right now"
+                    },
+                    {
+                      "title": "Child and young adult population by age and race | SF.gov",
+                      "url": "https://www.sf.gov/data--child-and-young-adult-population-age-and-race",
+                      "description": "Over the decade, the age 0-24 population share decreased steadily from 22.8% to <strong>20.2% of the total San Francisco population</strong>. ... Data source: U.S. Census Bureau, Vintage 2020 Population Estimates."
+                    },
+                    {
+                      "title": "Census 2020 | SF.gov",
+                      "url": "https://www.sf.gov/information--census-2020",
+                      "description": "SF COUNTS reached <strong>over 800,000</strong> San Francisco residents."
+                    },
+                    {
+                      "title": "Demographics and health maps | SF.gov",
+                      "url": "https://www.sf.gov/demographics-and-health-maps",
+                      "description": "This map includes information about the current share of population by race and ethnicity by block group in San Francisco. It includes data for Latino/a/e/x, American Indian and Alaska Native, Native Hawaiian and Pacific Islander, Black, Asian, and other races based on the 2020 Decennial Census."
+                    },
+                    {
+                      "title": "2024 Point-in-Time Count | SF.gov",
+                      "url": "https://www.sf.gov/reports--september-2024--2024-point-time-count",
+                      "description": "San Francisco sheltered over half of its Hispanic or Latine population, 52% of the Hispanic or Latine population were in shelters on the night of the PIT count up from 36% in 2022. People who identify as Asian or Asian American remain underrepresented in the Homeless population. People who identify as Black, African American or African or who identify as Hispanic or Latine are overrepresented in the homeless population. 28% of survey respondents identify as LGBTQ+. This is not a significant change from prior years."
+                    },
+                    {
+                      "title": "About the census | SF.gov",
+                      "url": "https://www.sf.gov/information--about-census",
+                      "description": "The federal government uses census data to see how much money San Francisco gets for social services and community programs."
+                    },
+                    {
+                      "title": "Poverty in San Francisco | SF.gov",
+                      "url": "https://www.sf.gov/data--poverty-san-francisco",
+                      "description": "Data lag: The American Communities Survey data are typically updated in September every year and reflect the previous calendar year. That is, <strong>2023 data will be not available until the Fall of 2024</strong>."
+                    },
+                    {
+                      "title": "Preliminary Data Set |1 San Francisco Department of Public Health",
+                      "url": "https://media.api.sf.gov/documents/Preliminary_Data_Set_0.pdf",
+                      "description": "Source: U.S. Census Bureau, 2017-2021 American Community Survey 5-Year Estimates"
+                    },
+                    {
+                      "title": "Informational Maps | SF.gov",
+                      "url": "https://www.sf.gov/resource--2021--informational-maps",
+                      "description": "Informational and demographic maps of San Francisco"
+                    },
+                    {
+                      "title": "COVID-19 population characteristics | SF.gov",
+                      "url": "https://www.sf.gov/data--covid-19-population-characteristics",
+                      "description": "San Francisco population estimates are from the 2022 5-year American Community Survey."
+                    },
+                    {
+                      "title": "City Survey | SF.gov",
+                      "url": "https://www.sf.gov/city-survey",
+                      "description": "City Survey data dashboards \u00b7 View the 2023 City Survey summary report online or download the PDF of the report"
+                    },
+                    {
+                      "title": "San Francisco Department of Public Health Population Health Division",
+                      "url": "https://media.api.sf.gov/documents/2024_SF_CHA_Final_GJR0sJZ.pdf",
+                      "description": "10 | San Francisco Department of Public Health | Population Health Division | Community Health Assessment 2024 \u00b7 The focus groups, surveys, and key informant interviews"
+                    },
+                    {
+                      "title": "2023 City Survey Results | SF.gov",
+                      "url": "https://www.sf.gov/reports--april-2023--2023-city-survey-results",
+                      "description": "The City Survey objectively assesses San Francisco residents\u2019 use of and satisfaction with various city services every few years. The 2023 survey is the first since 2019 due to the COVID-19 pandemic. The 2023 City Survey is the 18th survey conducted."
+                    },
+                    {
+                      "title": "Informational Maps | San Francisco",
+                      "url": "https://sf.gov/resource/2021/informational-maps",
+                      "description": "Informational and demographic maps of San Francisco"
+                    },
+                    {
+                      "title": "2023 City Survey Results | San Francisco",
+                      "url": "https://sf.gov/reports/april-2023/2023-city-survey-results",
+                      "description": "The City Survey objectively assesses San Francisco residents\u2019 use of and satisfaction with various city services every few years. The 2023 survey is the first since 2019 due to the COVID-19 pandemic. The 2023 City Survey is the 18th survey conducted."
+                    },
+                    {
+                      "title": "Annual Performance Report | SF.gov",
+                      "url": "https://sf.gov/reports/november-2024/annual-performance-report",
+                      "description": "DPH estimates that <strong>about 5,400 Healthy SF enrollees were impacted</strong>, contributing to the drop in total enrollees at the close of FY24. Safety Net programs and policies reduce the effects of poverty by providing support to those in need. The San Francisco Human Service Agency (HSA) administers ..."
+                    },
+                    {
+                      "title": "2024 San Francisco Point-in-Time Count Research Notes",
+                      "url": "https://media.api.sf.gov/documents/2024-San-Francisco-Point-in-Time-Count-Research-Notes-1_pBRTkFe.pdf",
+                      "description": "March 2024 survey conducted by SF HOT teams. Vehicle multipliers for cars, RVs, and vans were derived \u00b7 from observed results captured in the Survey 123 smartphone app. ... San Francisco has experienced an increase in individuals living in vehicles in recent years."
+                    },
+                    {
+                      "title": "San Francisco 2024 Homelessness Point-In-Time Count",
+                      "url": "https://media.api.sf.gov/documents/2024_San_Francisco_Point-in-Time_Count_Report_8_13_24.pdf",
+                      "description": "We cannot provide a description for this page right now"
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "92f1680b-6623-49cc-a580-732eed81f329",
+                "title": "Visit the government source (city/state/federal) that provides San Francisco population",
+                "status": "done",
+                "score": 0.16,
+                "evaluation": {
+                  "score": 0.16
+                },
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://www.abs.gov.au/statistics/people/population/population-census/latest-release",
+                  "urls_visited": [
+                    "https://www.abs.gov.au/statistics/people/population/population-census/latest-release"
+                  ],
+                  "intent": "Open the primary government page (from search results) and extract the official population figure, the date of that estimate, and the exact URL for citation.",
+                  "vector_context": [],
+                  "content": "=== https://www.abs.gov.au/statistics/people/population/population-census/latest-release ===\nhttps://www.abs.gov.au/about/staff-login-options",
+                  "content_is_truncated": false,
+                  "content_total_chars": 141,
+                  "content_full": "=== https://www.abs.gov.au/statistics/people/population/population-census/latest-release ===\nhttps://www.abs.gov.au/about/staff-login-options",
+                  "content_with_links": "=== https://www.abs.gov.au/statistics/people/population/population-census/latest-release ===\nhttps://www.abs.gov.au/about/staff-login-options\n\n--- Links found on this page ---\n1. https://www.abs.gov.au/\n2. https://www.abs.gov.au/statistics\n3. https://www.abs.gov.au/census\n4. https://www.abs.gov.au/participate-survey\n5. https://www.abs.gov.au/about\n6. https://www.abs.gov.au/statistics/people\n7. https://www.abs.gov.au/statistics/people/population\n8. https://www.abs.gov.au/statistics/people/population/population-census\n9. https://www.abs.gov.au/statistics/people/population/population-census/2021\n10. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep\n11. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u\n12. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp\n13. https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary\n14. https://www.abs.gov.au/articles/back-my-day-comparing-millennials-earlier-generations\n15. https://www.abs.gov.au/articles/same-sex-couples-living-together-australia\n16. https://www.abs.gov.au/articles/non-binary-sex-2021-census\n17. https://www.abs.gov.au/articles/analysis-non-binary-sex-responses\n18. https://www.abs.gov.au/census/census-media-hub/news/census-stories\n19. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population\n20. https://www.abs.gov.au/statistics/people/population/population-census/2021/Population%20data%20summary.xlsx\n",
+                  "links": [
+                    "https://www.abs.gov.au/",
+                    "https://www.abs.gov.au/statistics",
+                    "https://www.abs.gov.au/census",
+                    "https://www.abs.gov.au/participate-survey",
+                    "https://www.abs.gov.au/about",
+                    "https://www.abs.gov.au/statistics/people",
+                    "https://www.abs.gov.au/statistics/people/population",
+                    "https://www.abs.gov.au/statistics/people/population/population-census",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp",
+                    "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary",
+                    "https://www.abs.gov.au/articles/back-my-day-comparing-millennials-earlier-generations",
+                    "https://www.abs.gov.au/articles/same-sex-couples-living-together-australia",
+                    "https://www.abs.gov.au/articles/non-binary-sex-2021-census",
+                    "https://www.abs.gov.au/articles/analysis-non-binary-sex-responses",
+                    "https://www.abs.gov.au/census/census-media-hub/news/census-stories",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021/Population%20data%20summary.xlsx"
+                  ],
+                  "links_full": [
+                    "https://www.abs.gov.au/",
+                    "https://www.abs.gov.au/statistics",
+                    "https://www.abs.gov.au/census",
+                    "https://www.abs.gov.au/participate-survey",
+                    "https://www.abs.gov.au/about",
+                    "https://www.abs.gov.au/statistics/people",
+                    "https://www.abs.gov.au/statistics/people/population",
+                    "https://www.abs.gov.au/statistics/people/population/population-census",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp",
+                    "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary",
+                    "https://www.abs.gov.au/articles/back-my-day-comparing-millennials-earlier-generations",
+                    "https://www.abs.gov.au/articles/same-sex-couples-living-together-australia",
+                    "https://www.abs.gov.au/articles/non-binary-sex-2021-census",
+                    "https://www.abs.gov.au/articles/analysis-non-binary-sex-responses",
+                    "https://www.abs.gov.au/census/census-media-hub/news/census-stories",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021/Population%20data%20summary.xlsx",
+                    "https://www.abs.gov.au/statistics/people/people-and-communities/snapshot-australia/2021",
+                    "https://www.abs.gov.au/census/find-census-data/search-by-area",
+                    "https://www.abs.gov.au/census/find-census-data/census-data-tools",
+                    "https://www.abs.gov.au/media-centre/media-releases/2021-census-fewer-australians-working-40-hours-or-more-week",
+                    "https://www4.abs.gov.au/web/survey.nsf/contactform",
+                    "https://www.abs.gov.au/statistics/microdata-tablebuilder/available-microdata-tablebuilder",
+                    "https://www.abs.gov.au/release-calendar",
+                    "https://www.abs.gov.au/databyregion",
+                    "https://www.abs.gov.au/statistics/statistical-geography",
+                    "https://www.abs.gov.au/statistics/microdata-tablebuilder",
+                    "https://dataexplorer.abs.gov.au/",
+                    "https://www.abs.gov.au/about/data-services/data-integration",
+                    "https://www.abs.gov.au/about/data-services/consultancy-services",
+                    "https://www.abs.gov.au/statistics/understanding-statistics",
+                    "https://www.abs.gov.au/welcome-new-abs-website",
+                    "https://www.abs.gov.au/about/abs-careers",
+                    "https://www.abs.gov.au/media-centre",
+                    "https://www.abs.gov.au/how-cite-abs-sources",
+                    "https://consult.abs.gov.au",
+                    "https://www.abs.gov.au/about/contact-us",
+                    "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure",
+                    "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6",
+                    "https://www.facebook.com/absstats",
+                    "https://www.instagram.com/absstats",
+                    "https://twitter.com/ABSStats",
+                    "https://www.linkedin.com/company/absstats",
+                    "https://www.youtube.com/@AustralianBureauOfStatistics",
+                    "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer",
+                    "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs",
+                    "https://www.abs.gov.au/about/staff-login-options"
+                  ],
+                  "links_count": 50,
+                  "link_contexts": {
+                    "https://www.abs.gov.au/": "Home",
+                    "https://www.abs.gov.au/statistics": "Topics",
+                    "https://www.abs.gov.au/census": "Census",
+                    "https://www.abs.gov.au/participate-survey": "Participating in a survey",
+                    "https://www.abs.gov.au/about": "About",
+                    "https://www.abs.gov.au/statistics/people": "People",
+                    "https://www.abs.gov.au/statistics/people/population": "Australia's population",
+                    "https://www.abs.gov.au/statistics/people/population/population-census": "Population: Census",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021": "Print",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep": "AGEP",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u": "usual residence",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp": "SEXP",
+                    "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary": "Australia: Aboriginal and Torres Strait Islander population summary",
+                    "https://www.abs.gov.au/articles/back-my-day-comparing-millennials-earlier-generations": "Released20 October 2022\u201cBack in my day\u201d \u2013 comparing Millennials with earlier generationsView article",
+                    "https://www.abs.gov.au/articles/same-sex-couples-living-together-australia": "Released02 December 2022Same-sex couples living together in AustraliaView article",
+                    "https://www.abs.gov.au/articles/non-binary-sex-2021-census": "Non-binary sex in the 2021 Census",
+                    "https://www.abs.gov.au/articles/analysis-non-binary-sex-responses": "Released27 September 2022Analysis of non-binary sex responsesView article",
+                    "https://www.abs.gov.au/census/census-media-hub/news/census-stories": "Census stories",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population": "2021 Census dictionary: Population",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021/Population%20data%20summary.xlsx": "Downloadxlsx[56.49 KB]",
+                    "https://www.abs.gov.au/statistics/people/people-and-communities/snapshot-australia/2021": "Snapshot of Australia",
+                    "https://www.abs.gov.au/census/find-census-data/search-by-area": "Search Census data",
+                    "https://www.abs.gov.au/census/find-census-data/census-data-tools": "Census data tools",
+                    "https://www.abs.gov.au/media-centre/media-releases/2021-census-fewer-australians-working-40-hours-or-more-week": "Release date and time12 October 20222021 Census: Fewer Australians working 40 hours or more per weekView media release",
+                    "https://www4.abs.gov.au/web/survey.nsf/contactform": "Request dataWe can provide customised data to meet your requirementsRequest a quote",
+                    "https://www.abs.gov.au/statistics/microdata-tablebuilder/available-microdata-tablebuilder": "Microdata and TableBuilderWe can provide access to detailed, customisable data on selected topicsView available Microdata and TableBuilder",
+                    "https://www.abs.gov.au/release-calendar": "Latest and future releases",
+                    "https://www.abs.gov.au/databyregion": "Data by region",
+                    "https://www.abs.gov.au/statistics/statistical-geography": "Statistical geography",
+                    "https://www.abs.gov.au/statistics/microdata-tablebuilder": "Microdata and TableBuilder",
+                    "https://dataexplorer.abs.gov.au/": "Data explorer",
+                    "https://www.abs.gov.au/about/data-services/data-integration": "Data integration",
+                    "https://www.abs.gov.au/about/data-services/consultancy-services": "Request data",
+                    "https://www.abs.gov.au/statistics/understanding-statistics": "Understanding statistics",
+                    "https://www.abs.gov.au/welcome-new-abs-website": "About our website",
+                    "https://www.abs.gov.au/about/abs-careers": "Work with us",
+                    "https://www.abs.gov.au/media-centre": "Media centre",
+                    "https://www.abs.gov.au/how-cite-abs-sources": "Citing ABS",
+                    "https://consult.abs.gov.au": "Consultation hub",
+                    "https://www.abs.gov.au/about/contact-us": "Contact us",
+                    "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure": "Security vulnerability disclosure",
+                    "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6": "Provide feedbackHelp us shape our website",
+                    "https://www.facebook.com/absstats": "Facebook",
+                    "https://www.instagram.com/absstats": "Instagram",
+                    "https://twitter.com/ABSStats": "X (formerly Twitter)",
+                    "https://www.linkedin.com/company/absstats": "LinkedIn",
+                    "https://www.youtube.com/@AustralianBureauOfStatistics": "YouTube",
+                    "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer": "Accessibility",
+                    "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs": "Privacy",
+                    "https://www.abs.gov.au/about/staff-login-options": "Staff login"
+                  },
+                  "page_title": "https://www.abs.gov.au/statistics/people/population/population-census/latest-release: Population: Census, 2021 | Australian Bureau of Statistics",
+                  "h1_text": "https://www.abs.gov.au/statistics/people/population/population-census/latest-release: Population: Census",
+                  "sites_visited": 1
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "e461c5ff-3da1-4d08-9dfd-0a184cbb4be0",
+                "title": "Visit a major news outlet article reporting San Francisco population",
+                "status": "done",
+                "score": 0.15,
+                "evaluation": {
+                  "score": 0.15
+                },
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary",
+                  "intent": "Retrieve the news article that cites a population figure for San Francisco, extract the figure, the date of the data and publication, and the article URL.",
+                  "content": "https://www.abs.gov.au/about/staff-login-options",
+                  "content_is_truncated": false,
+                  "content_total_chars": 48,
+                  "content_full": "https://www.abs.gov.au/about/staff-login-options",
+                  "content_with_links": "https://www.abs.gov.au/about/staff-login-options\n\n--- Links found on this page ---\n1. https://www.abs.gov.au/\n2. https://www.abs.gov.au/statistics\n3. https://www.abs.gov.au/census\n4. https://www.abs.gov.au/participate-survey\n5. https://www.abs.gov.au/about\n6. https://www.abs.gov.au/articles\n7. https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/aboriginal-and-torres-strait-islander-people-census/2021\n8. https://www.abs.gov.au/statistics/people/population/population-census/2021\n9. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u\n10. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-status-ingp\n11. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep\n12. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d\n13. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/p\n14. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families/household-composition-hhcd\n15. https://www.pc.gov.au/closing-the-gap-data/dashboard/socioeconomic/outcome-area9\n16. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/housing-suitability-hosd\n17. https://meteor.aihw.gov.au/content/386254\n18. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/tenure-type-tend\n19. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/rent-weekly-dollar-values-rntd\n20. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/mortgage-repayments-monthly-dollar-values-mred\n",
+                  "links": [
+                    "https://www.abs.gov.au/",
+                    "https://www.abs.gov.au/statistics",
+                    "https://www.abs.gov.au/census",
+                    "https://www.abs.gov.au/participate-survey",
+                    "https://www.abs.gov.au/about",
+                    "https://www.abs.gov.au/articles",
+                    "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/aboriginal-and-torres-strait-islander-people-census/2021",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-status-ingp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/p",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families/household-composition-hhcd",
+                    "https://www.pc.gov.au/closing-the-gap-data/dashboard/socioeconomic/outcome-area9",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/housing-suitability-hosd",
+                    "https://meteor.aihw.gov.au/content/386254",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/tenure-type-tend",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/rent-weekly-dollar-values-rntd",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/mortgage-repayments-monthly-dollar-values-mred"
+                  ],
+                  "links_full": [
+                    "https://www.abs.gov.au/",
+                    "https://www.abs.gov.au/statistics",
+                    "https://www.abs.gov.au/census",
+                    "https://www.abs.gov.au/participate-survey",
+                    "https://www.abs.gov.au/about",
+                    "https://www.abs.gov.au/articles",
+                    "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/aboriginal-and-torres-strait-islander-people-census/2021",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-status-ingp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/p",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families/household-composition-hhcd",
+                    "https://www.pc.gov.au/closing-the-gap-data/dashboard/socioeconomic/outcome-area9",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/housing-suitability-hosd",
+                    "https://meteor.aihw.gov.au/content/386254",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/tenure-type-tend",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/rent-weekly-dollar-values-rntd",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/mortgage-repayments-monthly-dollar-values-mred",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/whether-reported-using-aboriginal-andor-torres-strait-islander-language-home-lngp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/income-and-work/equivalised-total-household-income-weekly-hied",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-household-indicator-ingdwtd",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training/highest-year-school-completed-hscp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training/type-educational-institution-attending-typp",
+                    "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/national-aboriginal-and-torres-strait-islander-health-survey/latest-release",
+                    "https://www.abs.gov.au/statistics/detailed-methodology-information/information-papers/comparing-abs-long-term-health-conditions-data-sources",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health/type-long-term-health-condition-lthp",
+                    "https://www.ahuri.edu.au/research/brief/understanding-demand-sharing-indigenous-households",
+                    "https://www.abs.gov.au/tags/2021-census-articles",
+                    "https://www.abs.gov.au/release-calendar",
+                    "https://www.abs.gov.au/databyregion",
+                    "https://www.abs.gov.au/statistics/statistical-geography",
+                    "https://www.abs.gov.au/statistics/microdata-tablebuilder",
+                    "https://dataexplorer.abs.gov.au/",
+                    "https://www.abs.gov.au/about/data-services/data-integration",
+                    "https://www.abs.gov.au/about/data-services/consultancy-services",
+                    "https://www.abs.gov.au/statistics/understanding-statistics",
+                    "https://www.abs.gov.au/welcome-new-abs-website",
+                    "https://www.abs.gov.au/about/abs-careers",
+                    "https://www.abs.gov.au/media-centre",
+                    "https://www.abs.gov.au/how-cite-abs-sources",
+                    "https://consult.abs.gov.au",
+                    "https://www.abs.gov.au/about/contact-us",
+                    "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure",
+                    "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6",
+                    "https://www.facebook.com/absstats",
+                    "https://www.instagram.com/absstats",
+                    "https://twitter.com/ABSStats",
+                    "https://www.linkedin.com/company/absstats",
+                    "https://www.youtube.com/@AustralianBureauOfStatistics",
+                    "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer",
+                    "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs",
+                    "https://www.abs.gov.au/about/staff-login-options"
+                  ],
+                  "links_count": 55,
+                  "link_contexts": {
+                    "https://www.abs.gov.au/": "Home",
+                    "https://www.abs.gov.au/statistics": "Topics",
+                    "https://www.abs.gov.au/census": "Census",
+                    "https://www.abs.gov.au/participate-survey": "Participating in a survey",
+                    "https://www.abs.gov.au/about": "About",
+                    "https://www.abs.gov.au/articles": "Articles",
+                    "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/aboriginal-and-torres-strait-islander-people-census/2021": "data downloads on the Aboriginal and Torres Strait Islander people: Census",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021": "Population: Census, 2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u": "usual residence",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-status-ingp": "INGP",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep": "AGEP",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d": "dwelling",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/p": "place of enumeration",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families/household-composition-hhcd": "HHCD",
+                    "https://www.pc.gov.au/closing-the-gap-data/dashboard/socioeconomic/outcome-area9": "National Agreement on Closing the Gap",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/housing-suitability-hosd": "Housing suitability",
+                    "https://meteor.aihw.gov.au/content/386254": "Canadian National Occupancy Standard",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/tenure-type-tend": "TEND",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/rent-weekly-dollar-values-rntd": "RNTD",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/mortgage-repayments-monthly-dollar-values-mred": "MRED",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/whether-reported-using-aboriginal-andor-torres-strait-islander-language-home-lngp": "LNGP",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/income-and-work/equivalised-total-household-income-weekly-hied": "HIED",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-household-indicator-ingdwtd": "INGDWTD",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training/highest-year-school-completed-hscp": "HSCP",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp": "SEXP",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training/type-educational-institution-attending-typp": "TYPP",
+                    "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/national-aboriginal-and-torres-strait-islander-health-survey/latest-release": "National Aboriginal and Torres Strait Islander Health Survey",
+                    "https://www.abs.gov.au/statistics/detailed-methodology-information/information-papers/comparing-abs-long-term-health-conditions-data-sources": "Comparing ABS long-term health conditions data sources",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health/type-long-term-health-condition-lthp": "LTHP",
+                    "https://www.ahuri.edu.au/research/brief/understanding-demand-sharing-indigenous-households": "Understanding 'demand sharing' of Indigenous households",
+                    "https://www.abs.gov.au/tags/2021-census-articles": "2021 Census articles",
+                    "https://www.abs.gov.au/release-calendar": "Latest and future releases",
+                    "https://www.abs.gov.au/databyregion": "Data by region",
+                    "https://www.abs.gov.au/statistics/statistical-geography": "Statistical geography",
+                    "https://www.abs.gov.au/statistics/microdata-tablebuilder": "Microdata and TableBuilder",
+                    "https://dataexplorer.abs.gov.au/": "Data explorer",
+                    "https://www.abs.gov.au/about/data-services/data-integration": "Data integration",
+                    "https://www.abs.gov.au/about/data-services/consultancy-services": "Request data",
+                    "https://www.abs.gov.au/statistics/understanding-statistics": "Understanding statistics",
+                    "https://www.abs.gov.au/welcome-new-abs-website": "About our website",
+                    "https://www.abs.gov.au/about/abs-careers": "Work with us",
+                    "https://www.abs.gov.au/media-centre": "Media centre",
+                    "https://www.abs.gov.au/how-cite-abs-sources": "Citing ABS",
+                    "https://consult.abs.gov.au": "Consultation hub",
+                    "https://www.abs.gov.au/about/contact-us": "Contact us",
+                    "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure": "Security vulnerability disclosure",
+                    "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6": "Provide feedbackHelp us shape our website",
+                    "https://www.facebook.com/absstats": "Facebook",
+                    "https://www.instagram.com/absstats": "Instagram",
+                    "https://twitter.com/ABSStats": "X (formerly Twitter)",
+                    "https://www.linkedin.com/company/absstats": "LinkedIn",
+                    "https://www.youtube.com/@AustralianBureauOfStatistics": "YouTube",
+                    "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer": "Accessibility",
+                    "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs": "Privacy",
+                    "https://www.abs.gov.au/about/staff-login-options": "Staff login"
+                  },
+                  "page_title": "Australia: Aboriginal and Torres Strait Islander population summary | Australian Bureau of Statistics",
+                  "h1_text": "Australia: Aboriginal and Torres Strait Islander population summary",
+                  "source_url": "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "097d7f1c-7b2f-4299-8e28-d51b0905d786",
+                "title": "Visit a research institution or think tank report that states San Francisco population",
+                "status": "done",
+                "score": 0.15,
+                "evaluation": {
+                  "score": 0.15
+                },
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+                  "intent": "Open a report or data brief from a research institution that lists San Francisco population; extract number, data date, and URL.",
+                  "content": "https://www.abs.gov.au/about/staff-login-options",
+                  "content_is_truncated": false,
+                  "content_total_chars": 48,
+                  "content_full": "https://www.abs.gov.au/about/staff-login-options",
+                  "content_with_links": "https://www.abs.gov.au/about/staff-login-options\n\n--- Links found on this page ---\n1. https://www.abs.gov.au/\n2. https://www.abs.gov.au/statistics\n3. https://www.abs.gov.au/census\n4. https://www.abs.gov.au/participate-survey\n5. https://www.abs.gov.au/about\n6. https://www.abs.gov.au/census/guide-census-data\n7. https://www.abs.gov.au/census/guide-census-data/census-dictionary\n8. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021\n9. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic\n10. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population\n11. https://www.abs.gov.au/book/export/27266/print\n12. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/whats-new-2021\n13. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-index\n14. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples\n15. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/cultural-diversity\n16. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/disability-and-carers\n17. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training\n18. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health\n19. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families\n20. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing\n",
+                  "links": [
+                    "https://www.abs.gov.au/",
+                    "https://www.abs.gov.au/statistics",
+                    "https://www.abs.gov.au/census",
+                    "https://www.abs.gov.au/participate-survey",
+                    "https://www.abs.gov.au/about",
+                    "https://www.abs.gov.au/census/guide-census-data",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population",
+                    "https://www.abs.gov.au/book/export/27266/print",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/whats-new-2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-index",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/cultural-diversity",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/disability-and-carers",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing"
+                  ],
+                  "links_full": [
+                    "https://www.abs.gov.au/",
+                    "https://www.abs.gov.au/statistics",
+                    "https://www.abs.gov.au/census",
+                    "https://www.abs.gov.au/participate-survey",
+                    "https://www.abs.gov.au/about",
+                    "https://www.abs.gov.au/census/guide-census-data",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population",
+                    "https://www.abs.gov.au/book/export/27266/print",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/whats-new-2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-index",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/cultural-diversity",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/disability-and-carers",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/income-and-work",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/location",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-ten-year-groups-age10p",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-five-year-groups-age5p",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/imputation-flag-age-ifagep",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/imputation-flag-sex-ifsexp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/number-children-ever-born-tisp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/number-children-ever-born-ranges-tisrp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/form-type-ftcp",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/service-australian-defence-force",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/transport",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/unpaid-work-and-care",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/national-reporting-indicators",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/downloads",
+                    "https://www.abs.gov.au/ausstats/abs@.nsf/Latestproducts/2901.0Main%20Features12016?tabname=Summary&prodno=2901.0&issue=2016",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/i",
+                    "https://www.abs.gov.au/census/guide-census-data/census-methodology/2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/v",
+                    "https://www.abs.gov.au/statistics/people/population",
+                    "https://www.abs.gov.au/statistics/people/people-and-communities",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                    "https://www.abs.gov.au/release-calendar",
+                    "https://www.abs.gov.au/databyregion",
+                    "https://www.abs.gov.au/statistics/statistical-geography",
+                    "https://www.abs.gov.au/statistics/microdata-tablebuilder",
+                    "https://dataexplorer.abs.gov.au/",
+                    "https://www.abs.gov.au/about/data-services/data-integration",
+                    "https://www.abs.gov.au/about/data-services/consultancy-services",
+                    "https://www.abs.gov.au/statistics/understanding-statistics",
+                    "https://www.abs.gov.au/welcome-new-abs-website",
+                    "https://www.abs.gov.au/about/abs-careers",
+                    "https://www.abs.gov.au/media-centre",
+                    "https://www.abs.gov.au/how-cite-abs-sources",
+                    "https://consult.abs.gov.au",
+                    "https://www.abs.gov.au/about/contact-us",
+                    "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure",
+                    "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6",
+                    "https://www.facebook.com/absstats",
+                    "https://www.instagram.com/absstats",
+                    "https://twitter.com/ABSStats",
+                    "https://www.linkedin.com/company/absstats",
+                    "https://www.youtube.com/@AustralianBureauOfStatistics",
+                    "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer",
+                    "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs",
+                    "https://www.abs.gov.au/about/staff-login-options"
+                  ],
+                  "links_count": 68,
+                  "link_contexts": {
+                    "https://www.abs.gov.au/": "Home",
+                    "https://www.abs.gov.au/statistics": "Topics",
+                    "https://www.abs.gov.au/census": "Census",
+                    "https://www.abs.gov.au/participate-survey": "Participating in a survey",
+                    "https://www.abs.gov.au/about": "About",
+                    "https://www.abs.gov.au/census/guide-census-data": "Guide to Census data",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary": "View all releases",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021": "Census of Population and Housing: Census dictionary, 2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic": "Variables by topic",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population": "Up",
+                    "https://www.abs.gov.au/book/export/27266/print": "Print all pages",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/whats-new-2021": "What's new for 2021",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-index": "Variables index",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples": "Aboriginal and Torres Strait Islander peoples",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/cultural-diversity": "Cultural diversity",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/disability-and-carers": "Disability and carers",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training": "Education and training",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health": "Health",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families": "Household and families",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing": "Housing",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/income-and-work": "Income and work",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/location": "Location",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-ten-year-groups-age10p": "(AGE10P)",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-five-year-groups-age5p": "Previous pageAge in five year groups (AGE5P)",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/imputation-flag-age-ifagep": "Next pageImputation flag for age (IFAGEP)",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/imputation-flag-sex-ifsexp": "Imputation flag for sex (IFSEXP)",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp": "Sex (SEXP)",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/number-children-ever-born-tisp": "Number of children ever born (TISP)",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/number-children-ever-born-ranges-tisrp": "Number of children ever born (ranges) (TISRP)",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/form-type-ftcp": "Form type (FTCP)",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/service-australian-defence-force": "Service with the Australian Defence Force",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/transport": "Transport",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/unpaid-work-and-care": "Unpaid work and care",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/national-reporting-indicators": "National reporting indicators",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary": "Glossary",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/downloads": "Downloads",
+                    "https://www.abs.gov.au/ausstats/abs@.nsf/Latestproducts/2901.0Main%20Features12016?tabname=Summary&prodno=2901.0&issue=2016": "Census of Population and Housing: Census Dictionary, 2016Archive releaseReference Period 2016",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/i": "Imputation",
+                    "https://www.abs.gov.au/census/guide-census-data/census-methodology/2021": "Census Methodology",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d": "Derivation",
+                    "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/v": "Visitors to Australia",
+                    "https://www.abs.gov.au/statistics/people/population": "Population",
+                    "https://www.abs.gov.au/statistics/people/people-and-communities": "People and communities",
+                    "https://www.abs.gov.au/statistics/people/population/population-census/2021": "Population: Census",
+                    "https://www.abs.gov.au/release-calendar": "Latest and future releases",
+                    "https://www.abs.gov.au/databyregion": "Data by region",
+                    "https://www.abs.gov.au/statistics/statistical-geography": "Statistical geography",
+                    "https://www.abs.gov.au/statistics/microdata-tablebuilder": "Microdata and TableBuilder",
+                    "https://dataexplorer.abs.gov.au/": "Data explorer",
+                    "https://www.abs.gov.au/about/data-services/data-integration": "Data integration",
+                    "https://www.abs.gov.au/about/data-services/consultancy-services": "Request data",
+                    "https://www.abs.gov.au/statistics/understanding-statistics": "Understanding statistics",
+                    "https://www.abs.gov.au/welcome-new-abs-website": "About our website",
+                    "https://www.abs.gov.au/about/abs-careers": "Work with us",
+                    "https://www.abs.gov.au/media-centre": "Media centre",
+                    "https://www.abs.gov.au/how-cite-abs-sources": "Citing ABS",
+                    "https://consult.abs.gov.au": "Consultation hub",
+                    "https://www.abs.gov.au/about/contact-us": "Contact us",
+                    "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure": "Security vulnerability disclosure",
+                    "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6": "Provide feedbackHelp us shape our website",
+                    "https://www.facebook.com/absstats": "Facebook",
+                    "https://www.instagram.com/absstats": "Instagram",
+                    "https://twitter.com/ABSStats": "X (formerly Twitter)",
+                    "https://www.linkedin.com/company/absstats": "LinkedIn",
+                    "https://www.youtube.com/@AustralianBureauOfStatistics": "YouTube",
+                    "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer": "Accessibility",
+                    "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs": "Privacy",
+                    "https://www.abs.gov.au/about/staff-login-options": "Staff login"
+                  },
+                  "page_title": "Age (AGEP) | Australian Bureau of Statistics",
+                  "h1_text": "Age (AGEP)",
+                  "source_url": "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "978f8dd6-5039-450c-a05f-1532f0c4d209",
+                "title": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+                "status": "done",
+                "score": 0.2,
+                "evaluation": {
+                  "score": 0.2
+                },
+                "result": {
+                  "action": "think",
+                  "success": true,
+                  "node_id": "978f8dd6-5039-450c-a05f-1532f0c4d209",
+                  "title": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+                  "details": {
+                    "intent": "After the visit nodes return extracted population numbers and metadata, compare the three figures, compute absolute and percentage differences, assess source reliability (recency, primary vs secondary, method), and recommend which figure is most likely accurate with rationale.",
+                    "required_inputs_from_children": [
+                      "Each child visit must provide: population_value, data_date, publication_date, methodology_note, citation_url"
+                    ],
+                    "analysis_plan": [
+                      "Normalize numbers (remove commas, ensure numeric type).",
+                      "Compute differences: news vs gov, research vs gov, news vs research (absolute and percent).",
+                      "Assess recency: prefer the source with the most recent data_date that is based on primary government datasets (CA DOF or recent ACS estimates or Census).",
+                      "Assess method: prefer direct government estimates over secondary reporting unless the secondary cites a more recent primary source.",
+                      "Note any potential reasons for discrepancy (different reference years, 1-year vs 5-year ACS, population definitions)."
+                    ],
+                    "measurable_output_fields": [
+                      "government_source: {population_value, data_date, publication_date, url}",
+                      "news_source: {population_value, data_date, publication_date, url}",
+                      "research_source: {population_value, data_date, publication_date, url}",
+                      "discrepancies: list of differences with absolute and percent differences",
+                      "recommended_value: numeric and rationale explaining why (e.g., 'government estimate from CA DOF 2023 is most reliable because...')"
+                    ],
+                    "verification_steps": [
+                      "If one source cites a primary dataset different from others, follow that citation (if available) and note it.",
+                      "Flag cases where sources quote the same underlying primary data (which would mean no real discrepancy).",
+                      "If results remain ambiguous, recommend the most recent primary government dataset (specify dataset: Census/ACS/CA DOF) and note any caveats."
+                    ],
+                    "why_this_node": "A post-extraction synthesis is necessary to convert raw extracted numbers into a clear answer about discrepancies and accuracy ranking.",
+                    "action": "think",
+                    "goal": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+                    "original_goal": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+                    "parent_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+                    "is_leaf": true,
+                    "evaluation": {
+                      "score": 0.2
+                    },
+                    "action_attempts": 1,
+                    "action_max_retries": 2
+                  },
+                  "thinking_content": "Synthesize findings and identify discrepancies; determine most likely accurate population figure"
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 5,
+              "success": 5,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            },
+            "goal_achieved": true
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "5f448ff2-8c17-41e6-84ca-f59fee65ab7d",
+            "92f1680b-6623-49cc-a580-732eed81f329",
+            "e461c5ff-3da1-4d08-9dfd-0a184cbb4be0",
+            "097d7f1c-7b2f-4299-8e28-d51b0905d786",
+            "978f8dd6-5039-450c-a05f-1532f0c4d209",
+            "ced318d1-41eb-4e43-8cd9-48dee5cff152"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "5f448ff2-8c17-41e6-84ca-f59fee65ab7d": {
+          "node_id": "5f448ff2-8c17-41e6-84ca-f59fee65ab7d",
+          "title": "Search for authoritative sources reporting San Francisco population (government, news outlet, research institution)",
+          "details": {
+            "query": "San Francisco population 2023 2024 official estimate site:sf.gov OR \"San Francisco\" \"population\" \"estimate\" OR \"U.S. Census\" OR \"California Department of Finance\" OR \"American Community Survey\" OR \"San Francisco Chronicle\" OR \"New York Times\" OR \"Pew Research\" OR \"Brookings\" OR \"PPIC\"",
+            "intent": "Locate one authoritative government source, one major news outlet article, and one research institution report that state a current population figure for the City and County of San Francisco. Return URLs/snippets for each candidate source.",
+            "count": 20,
+            "target_facts": [
+              "Exact population figure reported",
+              "Date of the data or publication (explicit year/month/day if available)",
+              "Exact source name and URL",
+              "Methodology mention (e.g., US Census decennial, ACS estimate, CA DOF estimate, city estimate, or journalist summary)"
+            ],
+            "verification_steps": [
+              "Prefer sources that cite primary data (US Census, ACS, California Dept. of Finance, San Francisco government)",
+              "Record the publication date and the data date (e.g., '2023 estimate' vs publication in 2024)",
+              "Capture any note about methodology (1-year vs 5-year ACS, estimate vs decennial count)",
+              "Save top 3 candidate URLs (one for each required category) for follow-up visits"
+            ],
+            "extraction_plan": "Return snippets that include the quoted population number and the URL so the subsequent visit node(s) can fetch the full page and extract authoritative fields.",
+            "why_this_node": "A focused search is required to produce the exact URLs that visit nodes will consume. This reduces uncertainty about source provenance and ensures we inspect primary citations rather than relying on memory.",
+            "action": "search",
+            "goal": "Search for authoritative sources reporting San Francisco population (government, news outlet, research institution)",
+            "original_goal": "Search for authoritative sources reporting San Francisco population (government, news outlet, research institution)",
+            "provides_data": {
+              "type": "urls_from_search"
+            },
+            "parent_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.8
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "node_id": "5f448ff2-8c17-41e6-84ca-f59fee65ab7d",
+              "query": "San Francisco population 2023 2024 official estimate site:sf.gov OR \"San Francisco\" \"population\" \"estimate\" OR \"U.S. Census\" OR \"California Department of Finance\" OR \"American Community Survey\" OR \"San Francisco Chronicle\" OR \"New York Times\" OR \"Pew Research\" OR \"Brookings\" OR \"PPIC\"",
+              "intent": "Locate one authoritative government source, one major news outlet article, and one research institution report that state a current population figure for the City and County of San Francisco. Return URLs/snippets for each candidate source.",
+              "vector_context": [
+                "Synthesize findings and identify discrepancies; determine most likely accurate population figure"
+              ],
+              "count": 20,
+              "results": [
+                {
+                  "title": "San Francisco Population and Migration",
+                  "url": "https://www.sf.gov/data--san-francisco-population-and-migration",
+                  "description": "We cannot provide a description for this page right now"
+                },
+                {
+                  "title": "Child and young adult population by age and race | SF.gov",
+                  "url": "https://www.sf.gov/data--child-and-young-adult-population-age-and-race",
+                  "description": "Over the decade, the age 0-24 population share decreased steadily from 22.8% to <strong>20.2% of the total San Francisco population</strong>. ... Data source: U.S. Census Bureau, Vintage 2020 Population Estimates."
+                },
+                {
+                  "title": "Census 2020 | SF.gov",
+                  "url": "https://www.sf.gov/information--census-2020",
+                  "description": "SF COUNTS reached <strong>over 800,000</strong> San Francisco residents."
+                },
+                {
+                  "title": "Demographics and health maps | SF.gov",
+                  "url": "https://www.sf.gov/demographics-and-health-maps",
+                  "description": "This map includes information about the current share of population by race and ethnicity by block group in San Francisco. It includes data for Latino/a/e/x, American Indian and Alaska Native, Native Hawaiian and Pacific Islander, Black, Asian, and other races based on the 2020 Decennial Census."
+                },
+                {
+                  "title": "2024 Point-in-Time Count | SF.gov",
+                  "url": "https://www.sf.gov/reports--september-2024--2024-point-time-count",
+                  "description": "San Francisco sheltered over half of its Hispanic or Latine population, 52% of the Hispanic or Latine population were in shelters on the night of the PIT count up from 36% in 2022. People who identify as Asian or Asian American remain underrepresented in the Homeless population. People who identify as Black, African American or African or who identify as Hispanic or Latine are overrepresented in the homeless population. 28% of survey respondents identify as LGBTQ+. This is not a significant change from prior years."
+                },
+                {
+                  "title": "About the census | SF.gov",
+                  "url": "https://www.sf.gov/information--about-census",
+                  "description": "The federal government uses census data to see how much money San Francisco gets for social services and community programs."
+                },
+                {
+                  "title": "Poverty in San Francisco | SF.gov",
+                  "url": "https://www.sf.gov/data--poverty-san-francisco",
+                  "description": "Data lag: The American Communities Survey data are typically updated in September every year and reflect the previous calendar year. That is, <strong>2023 data will be not available until the Fall of 2024</strong>."
+                },
+                {
+                  "title": "Preliminary Data Set |1 San Francisco Department of Public Health",
+                  "url": "https://media.api.sf.gov/documents/Preliminary_Data_Set_0.pdf",
+                  "description": "Source: U.S. Census Bureau, 2017-2021 American Community Survey 5-Year Estimates"
+                },
+                {
+                  "title": "Informational Maps | SF.gov",
+                  "url": "https://www.sf.gov/resource--2021--informational-maps",
+                  "description": "Informational and demographic maps of San Francisco"
+                },
+                {
+                  "title": "COVID-19 population characteristics | SF.gov",
+                  "url": "https://www.sf.gov/data--covid-19-population-characteristics",
+                  "description": "San Francisco population estimates are from the 2022 5-year American Community Survey."
+                },
+                {
+                  "title": "City Survey | SF.gov",
+                  "url": "https://www.sf.gov/city-survey",
+                  "description": "City Survey data dashboards \u00b7 View the 2023 City Survey summary report online or download the PDF of the report"
+                },
+                {
+                  "title": "San Francisco Department of Public Health Population Health Division",
+                  "url": "https://media.api.sf.gov/documents/2024_SF_CHA_Final_GJR0sJZ.pdf",
+                  "description": "10 | San Francisco Department of Public Health | Population Health Division | Community Health Assessment 2024 \u00b7 The focus groups, surveys, and key informant interviews"
+                },
+                {
+                  "title": "2023 City Survey Results | SF.gov",
+                  "url": "https://www.sf.gov/reports--april-2023--2023-city-survey-results",
+                  "description": "The City Survey objectively assesses San Francisco residents\u2019 use of and satisfaction with various city services every few years. The 2023 survey is the first since 2019 due to the COVID-19 pandemic. The 2023 City Survey is the 18th survey conducted."
+                },
+                {
+                  "title": "Informational Maps | San Francisco",
+                  "url": "https://sf.gov/resource/2021/informational-maps",
+                  "description": "Informational and demographic maps of San Francisco"
+                },
+                {
+                  "title": "2023 City Survey Results | San Francisco",
+                  "url": "https://sf.gov/reports/april-2023/2023-city-survey-results",
+                  "description": "The City Survey objectively assesses San Francisco residents\u2019 use of and satisfaction with various city services every few years. The 2023 survey is the first since 2019 due to the COVID-19 pandemic. The 2023 City Survey is the 18th survey conducted."
+                },
+                {
+                  "title": "Annual Performance Report | SF.gov",
+                  "url": "https://sf.gov/reports/november-2024/annual-performance-report",
+                  "description": "DPH estimates that <strong>about 5,400 Healthy SF enrollees were impacted</strong>, contributing to the drop in total enrollees at the close of FY24. Safety Net programs and policies reduce the effects of poverty by providing support to those in need. The San Francisco Human Service Agency (HSA) administers ..."
+                },
+                {
+                  "title": "2024 San Francisco Point-in-Time Count Research Notes",
+                  "url": "https://media.api.sf.gov/documents/2024-San-Francisco-Point-in-Time-Count-Research-Notes-1_pBRTkFe.pdf",
+                  "description": "March 2024 survey conducted by SF HOT teams. Vehicle multipliers for cars, RVs, and vans were derived \u00b7 from observed results captured in the Survey 123 smartphone app. ... San Francisco has experienced an increase in individuals living in vehicles in recent years."
+                },
+                {
+                  "title": "San Francisco 2024 Homelessness Point-In-Time Count",
+                  "url": "https://media.api.sf.gov/documents/2024_San_Francisco_Point-in-Time_Count_Report_8_13_24.pdf",
+                  "description": "We cannot provide a description for this page right now"
+                }
+              ]
+            }
+          },
+          "parent_id": "ac82dce7-9027-48ef-907c-e127fab7316c",
+          "parent_ids": [
+            "ac82dce7-9027-48ef-907c-e127fab7316c"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.8,
+          "memo_key": null
+        },
+        "92f1680b-6623-49cc-a580-732eed81f329": {
+          "node_id": "92f1680b-6623-49cc-a580-732eed81f329",
+          "title": "Visit the government source (city/state/federal) that provides San Francisco population",
+          "details": {
+            "link_idea": "official government estimate for San Francisco population (e.g., San Francisco City & County, California Department of Finance population estimates, or U.S. Census/ACS page)",
+            "link_count": 1,
+            "intent": "Open the primary government page (from search results) and extract the official population figure, the date of that estimate, and the exact URL for citation.",
+            "target_facts": [
+              "population_value: numeric (e.g., 874,961)",
+              "data_date: date or year of estimate",
+              "publication_date: page publish/update date (if shown)",
+              "methodology_note: whether it's Census/ACS/CA-DOF/city estimate and any notes"
+            ],
+            "extraction_plan": [
+              "Locate the population number(s) on the page text, infobox, or headline.",
+              "Find any parenthetical or footnote indicating the data date (e.g., '2023 estimate' or 'ACS 2022 1-year') and capture it.",
+              "Capture the page's canonical URL for citation and any explicit source references (e.g., 'based on American Community Survey').",
+              "Record metadata like last-updated date if present."
+            ],
+            "verification_steps": [
+              "Confirm the page is an official government domain (e.g., sf.gov, census.gov, or ca.gov).",
+              "Cross-check whether the page itself cites a primary dataset (Census/ACS/CA DOF).",
+              "If multiple population numbers are present (e.g., city vs metro), ensure we extract the figure specifically for 'City and County of San Francisco'."
+            ],
+            "why_this_node": "Government sources are usually the most authoritative for population counts; extracting this will give a baseline for comparison.",
+            "action": "visit",
+            "goal": "Visit the government source (city/state/federal) that provides San Francisco population",
+            "original_goal": "Visit the government source (city/state/federal) that provides San Francisco population",
+            "parent_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.18
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "h1_text": "Population: Census",
+            "page_title": "Population: Census, 2021 | Australian Bureau of Statistics",
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://www.abs.gov.au/statistics/people/population/population-census/latest-release",
+              "urls_visited": [
+                "https://www.abs.gov.au/statistics/people/population/population-census/latest-release"
+              ],
+              "intent": "Open the primary government page (from search results) and extract the official population figure, the date of that estimate, and the exact URL for citation.",
+              "vector_context": [],
+              "content": "=== https://www.abs.gov.au/statistics/people/population/population-census/latest-release ===\nhttps://www.abs.gov.au/about/staff-login-options",
+              "content_is_truncated": false,
+              "content_total_chars": 141,
+              "content_full": "=== https://www.abs.gov.au/statistics/people/population/population-census/latest-release ===\nhttps://www.abs.gov.au/about/staff-login-options",
+              "content_with_links": "=== https://www.abs.gov.au/statistics/people/population/population-census/latest-release ===\nhttps://www.abs.gov.au/about/staff-login-options\n\n--- Links found on this page ---\n1. https://www.abs.gov.au/\n2. https://www.abs.gov.au/statistics\n3. https://www.abs.gov.au/census\n4. https://www.abs.gov.au/participate-survey\n5. https://www.abs.gov.au/about\n6. https://www.abs.gov.au/statistics/people\n7. https://www.abs.gov.au/statistics/people/population\n8. https://www.abs.gov.au/statistics/people/population/population-census\n9. https://www.abs.gov.au/statistics/people/population/population-census/2021\n10. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep\n11. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u\n12. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp\n13. https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary\n14. https://www.abs.gov.au/articles/back-my-day-comparing-millennials-earlier-generations\n15. https://www.abs.gov.au/articles/same-sex-couples-living-together-australia\n16. https://www.abs.gov.au/articles/non-binary-sex-2021-census\n17. https://www.abs.gov.au/articles/analysis-non-binary-sex-responses\n18. https://www.abs.gov.au/census/census-media-hub/news/census-stories\n19. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population\n20. https://www.abs.gov.au/statistics/people/population/population-census/2021/Population%20data%20summary.xlsx\n",
+              "links": [
+                "https://www.abs.gov.au/",
+                "https://www.abs.gov.au/statistics",
+                "https://www.abs.gov.au/census",
+                "https://www.abs.gov.au/participate-survey",
+                "https://www.abs.gov.au/about",
+                "https://www.abs.gov.au/statistics/people",
+                "https://www.abs.gov.au/statistics/people/population",
+                "https://www.abs.gov.au/statistics/people/population/population-census",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp",
+                "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary",
+                "https://www.abs.gov.au/articles/back-my-day-comparing-millennials-earlier-generations",
+                "https://www.abs.gov.au/articles/same-sex-couples-living-together-australia",
+                "https://www.abs.gov.au/articles/non-binary-sex-2021-census",
+                "https://www.abs.gov.au/articles/analysis-non-binary-sex-responses",
+                "https://www.abs.gov.au/census/census-media-hub/news/census-stories",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021/Population%20data%20summary.xlsx"
+              ],
+              "links_full": [
+                "https://www.abs.gov.au/",
+                "https://www.abs.gov.au/statistics",
+                "https://www.abs.gov.au/census",
+                "https://www.abs.gov.au/participate-survey",
+                "https://www.abs.gov.au/about",
+                "https://www.abs.gov.au/statistics/people",
+                "https://www.abs.gov.au/statistics/people/population",
+                "https://www.abs.gov.au/statistics/people/population/population-census",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp",
+                "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary",
+                "https://www.abs.gov.au/articles/back-my-day-comparing-millennials-earlier-generations",
+                "https://www.abs.gov.au/articles/same-sex-couples-living-together-australia",
+                "https://www.abs.gov.au/articles/non-binary-sex-2021-census",
+                "https://www.abs.gov.au/articles/analysis-non-binary-sex-responses",
+                "https://www.abs.gov.au/census/census-media-hub/news/census-stories",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021/Population%20data%20summary.xlsx",
+                "https://www.abs.gov.au/statistics/people/people-and-communities/snapshot-australia/2021",
+                "https://www.abs.gov.au/census/find-census-data/search-by-area",
+                "https://www.abs.gov.au/census/find-census-data/census-data-tools",
+                "https://www.abs.gov.au/media-centre/media-releases/2021-census-fewer-australians-working-40-hours-or-more-week",
+                "https://www4.abs.gov.au/web/survey.nsf/contactform",
+                "https://www.abs.gov.au/statistics/microdata-tablebuilder/available-microdata-tablebuilder",
+                "https://www.abs.gov.au/release-calendar",
+                "https://www.abs.gov.au/databyregion",
+                "https://www.abs.gov.au/statistics/statistical-geography",
+                "https://www.abs.gov.au/statistics/microdata-tablebuilder",
+                "https://dataexplorer.abs.gov.au/",
+                "https://www.abs.gov.au/about/data-services/data-integration",
+                "https://www.abs.gov.au/about/data-services/consultancy-services",
+                "https://www.abs.gov.au/statistics/understanding-statistics",
+                "https://www.abs.gov.au/welcome-new-abs-website",
+                "https://www.abs.gov.au/about/abs-careers",
+                "https://www.abs.gov.au/media-centre",
+                "https://www.abs.gov.au/how-cite-abs-sources",
+                "https://consult.abs.gov.au",
+                "https://www.abs.gov.au/about/contact-us",
+                "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure",
+                "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6",
+                "https://www.facebook.com/absstats",
+                "https://www.instagram.com/absstats",
+                "https://twitter.com/ABSStats",
+                "https://www.linkedin.com/company/absstats",
+                "https://www.youtube.com/@AustralianBureauOfStatistics",
+                "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer",
+                "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs",
+                "https://www.abs.gov.au/about/staff-login-options"
+              ],
+              "links_count": 50,
+              "link_contexts": {
+                "https://www.abs.gov.au/": "Home",
+                "https://www.abs.gov.au/statistics": "Topics",
+                "https://www.abs.gov.au/census": "Census",
+                "https://www.abs.gov.au/participate-survey": "Participating in a survey",
+                "https://www.abs.gov.au/about": "About",
+                "https://www.abs.gov.au/statistics/people": "People",
+                "https://www.abs.gov.au/statistics/people/population": "Australia's population",
+                "https://www.abs.gov.au/statistics/people/population/population-census": "Population: Census",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021": "Print",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep": "AGEP",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u": "usual residence",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp": "SEXP",
+                "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary": "Australia: Aboriginal and Torres Strait Islander population summary",
+                "https://www.abs.gov.au/articles/back-my-day-comparing-millennials-earlier-generations": "Released20 October 2022\u201cBack in my day\u201d \u2013 comparing Millennials with earlier generationsView article",
+                "https://www.abs.gov.au/articles/same-sex-couples-living-together-australia": "Released02 December 2022Same-sex couples living together in AustraliaView article",
+                "https://www.abs.gov.au/articles/non-binary-sex-2021-census": "Non-binary sex in the 2021 Census",
+                "https://www.abs.gov.au/articles/analysis-non-binary-sex-responses": "Released27 September 2022Analysis of non-binary sex responsesView article",
+                "https://www.abs.gov.au/census/census-media-hub/news/census-stories": "Census stories",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population": "2021 Census dictionary: Population",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021/Population%20data%20summary.xlsx": "Downloadxlsx[56.49 KB]",
+                "https://www.abs.gov.au/statistics/people/people-and-communities/snapshot-australia/2021": "Snapshot of Australia",
+                "https://www.abs.gov.au/census/find-census-data/search-by-area": "Search Census data",
+                "https://www.abs.gov.au/census/find-census-data/census-data-tools": "Census data tools",
+                "https://www.abs.gov.au/media-centre/media-releases/2021-census-fewer-australians-working-40-hours-or-more-week": "Release date and time12 October 20222021 Census: Fewer Australians working 40 hours or more per weekView media release",
+                "https://www4.abs.gov.au/web/survey.nsf/contactform": "Request dataWe can provide customised data to meet your requirementsRequest a quote",
+                "https://www.abs.gov.au/statistics/microdata-tablebuilder/available-microdata-tablebuilder": "Microdata and TableBuilderWe can provide access to detailed, customisable data on selected topicsView available Microdata and TableBuilder",
+                "https://www.abs.gov.au/release-calendar": "Latest and future releases",
+                "https://www.abs.gov.au/databyregion": "Data by region",
+                "https://www.abs.gov.au/statistics/statistical-geography": "Statistical geography",
+                "https://www.abs.gov.au/statistics/microdata-tablebuilder": "Microdata and TableBuilder",
+                "https://dataexplorer.abs.gov.au/": "Data explorer",
+                "https://www.abs.gov.au/about/data-services/data-integration": "Data integration",
+                "https://www.abs.gov.au/about/data-services/consultancy-services": "Request data",
+                "https://www.abs.gov.au/statistics/understanding-statistics": "Understanding statistics",
+                "https://www.abs.gov.au/welcome-new-abs-website": "About our website",
+                "https://www.abs.gov.au/about/abs-careers": "Work with us",
+                "https://www.abs.gov.au/media-centre": "Media centre",
+                "https://www.abs.gov.au/how-cite-abs-sources": "Citing ABS",
+                "https://consult.abs.gov.au": "Consultation hub",
+                "https://www.abs.gov.au/about/contact-us": "Contact us",
+                "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure": "Security vulnerability disclosure",
+                "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6": "Provide feedbackHelp us shape our website",
+                "https://www.facebook.com/absstats": "Facebook",
+                "https://www.instagram.com/absstats": "Instagram",
+                "https://twitter.com/ABSStats": "X (formerly Twitter)",
+                "https://www.linkedin.com/company/absstats": "LinkedIn",
+                "https://www.youtube.com/@AustralianBureauOfStatistics": "YouTube",
+                "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer": "Accessibility",
+                "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs": "Privacy",
+                "https://www.abs.gov.au/about/staff-login-options": "Staff login"
+              },
+              "page_title": "https://www.abs.gov.au/statistics/people/population/population-census/latest-release: Population: Census, 2021 | Australian Bureau of Statistics",
+              "h1_text": "https://www.abs.gov.au/statistics/people/population/population-census/latest-release: Population: Census",
+              "sites_visited": 1
+            },
+            "provides_data": {
+              "type": "urls_from_visit"
+            }
+          },
+          "parent_id": "ac82dce7-9027-48ef-907c-e127fab7316c",
+          "parent_ids": [
+            "ac82dce7-9027-48ef-907c-e127fab7316c"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.18,
+          "memo_key": null
+        },
+        "e461c5ff-3da1-4d08-9dfd-0a184cbb4be0": {
+          "node_id": "e461c5ff-3da1-4d08-9dfd-0a184cbb4be0",
+          "title": "Visit a major news outlet article reporting San Francisco population",
+          "details": {
+            "link_idea": "major news outlet article reporting San Francisco population (e.g., San Francisco Chronicle, New York Times, Reuters, LA Times)",
+            "link_count": 1,
+            "intent": "Retrieve the news article that cites a population figure for San Francisco, extract the figure, the date of the data and publication, and the article URL.",
+            "target_facts": [
+              "population_value: numeric as presented in the article",
+              "data_date: which year/date the article says the data is from (if stated)",
+              "publication_date: article publish date",
+              "source_cited: whether the article cites Census, ACS, state, or city data"
+            ],
+            "extraction_plan": [
+              "Find the paragraph or summary where the population number is quoted.",
+              "Identify the article's publication date and any in-text citations to data sources.",
+              "Capture direct quote or sentence linking the number to a data source.",
+              "Save the exact URL for citation."
+            ],
+            "verification_steps": [
+              "Confirm the outlet is a recognized news organization.",
+              "Check whether the news article cites a primary source and capture that citation for cross-checking.",
+              "Note if the article uses an older data series (e.g., quoting 2020 census) vs a more recent estimate."
+            ],
+            "why_this_node": "News articles often summarize official estimates but may use different datasets or simplify; extracting details will reveal potential reasons for discrepancies.",
+            "action": "visit",
+            "goal": "Visit a major news outlet article reporting San Francisco population",
+            "original_goal": "Visit a major news outlet article reporting San Francisco population",
+            "parent_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.18
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary",
+              "intent": "Retrieve the news article that cites a population figure for San Francisco, extract the figure, the date of the data and publication, and the article URL.",
+              "content": "https://www.abs.gov.au/about/staff-login-options",
+              "content_is_truncated": false,
+              "content_total_chars": 48,
+              "content_full": "https://www.abs.gov.au/about/staff-login-options",
+              "content_with_links": "https://www.abs.gov.au/about/staff-login-options\n\n--- Links found on this page ---\n1. https://www.abs.gov.au/\n2. https://www.abs.gov.au/statistics\n3. https://www.abs.gov.au/census\n4. https://www.abs.gov.au/participate-survey\n5. https://www.abs.gov.au/about\n6. https://www.abs.gov.au/articles\n7. https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/aboriginal-and-torres-strait-islander-people-census/2021\n8. https://www.abs.gov.au/statistics/people/population/population-census/2021\n9. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u\n10. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-status-ingp\n11. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep\n12. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d\n13. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/p\n14. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families/household-composition-hhcd\n15. https://www.pc.gov.au/closing-the-gap-data/dashboard/socioeconomic/outcome-area9\n16. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/housing-suitability-hosd\n17. https://meteor.aihw.gov.au/content/386254\n18. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/tenure-type-tend\n19. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/rent-weekly-dollar-values-rntd\n20. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/mortgage-repayments-monthly-dollar-values-mred\n",
+              "links": [
+                "https://www.abs.gov.au/",
+                "https://www.abs.gov.au/statistics",
+                "https://www.abs.gov.au/census",
+                "https://www.abs.gov.au/participate-survey",
+                "https://www.abs.gov.au/about",
+                "https://www.abs.gov.au/articles",
+                "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/aboriginal-and-torres-strait-islander-people-census/2021",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-status-ingp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/p",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families/household-composition-hhcd",
+                "https://www.pc.gov.au/closing-the-gap-data/dashboard/socioeconomic/outcome-area9",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/housing-suitability-hosd",
+                "https://meteor.aihw.gov.au/content/386254",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/tenure-type-tend",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/rent-weekly-dollar-values-rntd",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/mortgage-repayments-monthly-dollar-values-mred"
+              ],
+              "links_full": [
+                "https://www.abs.gov.au/",
+                "https://www.abs.gov.au/statistics",
+                "https://www.abs.gov.au/census",
+                "https://www.abs.gov.au/participate-survey",
+                "https://www.abs.gov.au/about",
+                "https://www.abs.gov.au/articles",
+                "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/aboriginal-and-torres-strait-islander-people-census/2021",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-status-ingp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/p",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families/household-composition-hhcd",
+                "https://www.pc.gov.au/closing-the-gap-data/dashboard/socioeconomic/outcome-area9",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/housing-suitability-hosd",
+                "https://meteor.aihw.gov.au/content/386254",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/tenure-type-tend",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/rent-weekly-dollar-values-rntd",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/mortgage-repayments-monthly-dollar-values-mred",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/whether-reported-using-aboriginal-andor-torres-strait-islander-language-home-lngp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/income-and-work/equivalised-total-household-income-weekly-hied",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-household-indicator-ingdwtd",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training/highest-year-school-completed-hscp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training/type-educational-institution-attending-typp",
+                "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/national-aboriginal-and-torres-strait-islander-health-survey/latest-release",
+                "https://www.abs.gov.au/statistics/detailed-methodology-information/information-papers/comparing-abs-long-term-health-conditions-data-sources",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health/type-long-term-health-condition-lthp",
+                "https://www.ahuri.edu.au/research/brief/understanding-demand-sharing-indigenous-households",
+                "https://www.abs.gov.au/tags/2021-census-articles",
+                "https://www.abs.gov.au/release-calendar",
+                "https://www.abs.gov.au/databyregion",
+                "https://www.abs.gov.au/statistics/statistical-geography",
+                "https://www.abs.gov.au/statistics/microdata-tablebuilder",
+                "https://dataexplorer.abs.gov.au/",
+                "https://www.abs.gov.au/about/data-services/data-integration",
+                "https://www.abs.gov.au/about/data-services/consultancy-services",
+                "https://www.abs.gov.au/statistics/understanding-statistics",
+                "https://www.abs.gov.au/welcome-new-abs-website",
+                "https://www.abs.gov.au/about/abs-careers",
+                "https://www.abs.gov.au/media-centre",
+                "https://www.abs.gov.au/how-cite-abs-sources",
+                "https://consult.abs.gov.au",
+                "https://www.abs.gov.au/about/contact-us",
+                "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure",
+                "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6",
+                "https://www.facebook.com/absstats",
+                "https://www.instagram.com/absstats",
+                "https://twitter.com/ABSStats",
+                "https://www.linkedin.com/company/absstats",
+                "https://www.youtube.com/@AustralianBureauOfStatistics",
+                "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer",
+                "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs",
+                "https://www.abs.gov.au/about/staff-login-options"
+              ],
+              "links_count": 55,
+              "link_contexts": {
+                "https://www.abs.gov.au/": "Home",
+                "https://www.abs.gov.au/statistics": "Topics",
+                "https://www.abs.gov.au/census": "Census",
+                "https://www.abs.gov.au/participate-survey": "Participating in a survey",
+                "https://www.abs.gov.au/about": "About",
+                "https://www.abs.gov.au/articles": "Articles",
+                "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/aboriginal-and-torres-strait-islander-people-census/2021": "data downloads on the Aboriginal and Torres Strait Islander people: Census",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021": "Population: Census, 2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/u": "usual residence",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-status-ingp": "INGP",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep": "AGEP",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d": "dwelling",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/p": "place of enumeration",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families/household-composition-hhcd": "HHCD",
+                "https://www.pc.gov.au/closing-the-gap-data/dashboard/socioeconomic/outcome-area9": "National Agreement on Closing the Gap",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/housing-suitability-hosd": "Housing suitability",
+                "https://meteor.aihw.gov.au/content/386254": "Canadian National Occupancy Standard",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/tenure-type-tend": "TEND",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/rent-weekly-dollar-values-rntd": "RNTD",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing/mortgage-repayments-monthly-dollar-values-mred": "MRED",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/whether-reported-using-aboriginal-andor-torres-strait-islander-language-home-lngp": "LNGP",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/income-and-work/equivalised-total-household-income-weekly-hied": "HIED",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples/indigenous-household-indicator-ingdwtd": "INGDWTD",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training/highest-year-school-completed-hscp": "HSCP",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp": "SEXP",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training/type-educational-institution-attending-typp": "TYPP",
+                "https://www.abs.gov.au/statistics/people/aboriginal-and-torres-strait-islander-peoples/national-aboriginal-and-torres-strait-islander-health-survey/latest-release": "National Aboriginal and Torres Strait Islander Health Survey",
+                "https://www.abs.gov.au/statistics/detailed-methodology-information/information-papers/comparing-abs-long-term-health-conditions-data-sources": "Comparing ABS long-term health conditions data sources",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health/type-long-term-health-condition-lthp": "LTHP",
+                "https://www.ahuri.edu.au/research/brief/understanding-demand-sharing-indigenous-households": "Understanding 'demand sharing' of Indigenous households",
+                "https://www.abs.gov.au/tags/2021-census-articles": "2021 Census articles",
+                "https://www.abs.gov.au/release-calendar": "Latest and future releases",
+                "https://www.abs.gov.au/databyregion": "Data by region",
+                "https://www.abs.gov.au/statistics/statistical-geography": "Statistical geography",
+                "https://www.abs.gov.au/statistics/microdata-tablebuilder": "Microdata and TableBuilder",
+                "https://dataexplorer.abs.gov.au/": "Data explorer",
+                "https://www.abs.gov.au/about/data-services/data-integration": "Data integration",
+                "https://www.abs.gov.au/about/data-services/consultancy-services": "Request data",
+                "https://www.abs.gov.au/statistics/understanding-statistics": "Understanding statistics",
+                "https://www.abs.gov.au/welcome-new-abs-website": "About our website",
+                "https://www.abs.gov.au/about/abs-careers": "Work with us",
+                "https://www.abs.gov.au/media-centre": "Media centre",
+                "https://www.abs.gov.au/how-cite-abs-sources": "Citing ABS",
+                "https://consult.abs.gov.au": "Consultation hub",
+                "https://www.abs.gov.au/about/contact-us": "Contact us",
+                "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure": "Security vulnerability disclosure",
+                "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6": "Provide feedbackHelp us shape our website",
+                "https://www.facebook.com/absstats": "Facebook",
+                "https://www.instagram.com/absstats": "Instagram",
+                "https://twitter.com/ABSStats": "X (formerly Twitter)",
+                "https://www.linkedin.com/company/absstats": "LinkedIn",
+                "https://www.youtube.com/@AustralianBureauOfStatistics": "YouTube",
+                "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer": "Accessibility",
+                "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs": "Privacy",
+                "https://www.abs.gov.au/about/staff-login-options": "Staff login"
+              },
+              "page_title": "Australia: Aboriginal and Torres Strait Islander population summary | Australian Bureau of Statistics",
+              "h1_text": "Australia: Aboriginal and Torres Strait Islander population summary",
+              "source_url": "https://www.abs.gov.au/articles/australia-aboriginal-and-torres-strait-islander-population-summary"
+            },
+            "provides_data": {
+              "type": "urls_from_visit"
+            }
+          },
+          "parent_id": "ac82dce7-9027-48ef-907c-e127fab7316c",
+          "parent_ids": [
+            "ac82dce7-9027-48ef-907c-e127fab7316c"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.18,
+          "memo_key": null
+        },
+        "097d7f1c-7b2f-4299-8e28-d51b0905d786": {
+          "node_id": "097d7f1c-7b2f-4299-8e28-d51b0905d786",
+          "title": "Visit a research institution or think tank report that states San Francisco population",
+          "details": {
+            "link_idea": "research institution or think tank report about California or urban populations that includes San Francisco population (e.g., Public Policy Institute of California, Brookings, Pew Research Center)",
+            "link_count": 1,
+            "intent": "Open a report or data brief from a research institution that lists San Francisco population; extract number, data date, and URL.",
+            "target_facts": [
+              "population_value: numeric",
+              "data_date: stated year or dataset",
+              "publication_date: date of report or brief",
+              "methodology_note: how the institution derived the number (e.g., used ACS 1-year/5-year, state estimates)"
+            ],
+            "extraction_plan": [
+              "Locate the population figure within the report (table, text, or executive summary).",
+              "Record any citations or methodology notes that indicate the underlying dataset and estimate method.",
+              "Capture the exact report URL for citation."
+            ],
+            "verification_steps": [
+              "Ensure the institution is a recognized research body with transparent methodology.",
+              "Note whether the institution uses raw government data (Census/ACS/CA-DOF) or its own modeling.",
+              "Record any differences in how the figure is labeled (estimate vs. count)."
+            ],
+            "why_this_node": "Research institutions often re-process government data or model population trends; their figure may differ due to methodology and should be compared carefully.",
+            "action": "visit",
+            "goal": "Visit a research institution or think tank report that states San Francisco population",
+            "original_goal": "Visit a research institution or think tank report that states San Francisco population",
+            "parent_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.17
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep",
+              "intent": "Open a report or data brief from a research institution that lists San Francisco population; extract number, data date, and URL.",
+              "content": "https://www.abs.gov.au/about/staff-login-options",
+              "content_is_truncated": false,
+              "content_total_chars": 48,
+              "content_full": "https://www.abs.gov.au/about/staff-login-options",
+              "content_with_links": "https://www.abs.gov.au/about/staff-login-options\n\n--- Links found on this page ---\n1. https://www.abs.gov.au/\n2. https://www.abs.gov.au/statistics\n3. https://www.abs.gov.au/census\n4. https://www.abs.gov.au/participate-survey\n5. https://www.abs.gov.au/about\n6. https://www.abs.gov.au/census/guide-census-data\n7. https://www.abs.gov.au/census/guide-census-data/census-dictionary\n8. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021\n9. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic\n10. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population\n11. https://www.abs.gov.au/book/export/27266/print\n12. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/whats-new-2021\n13. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-index\n14. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples\n15. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/cultural-diversity\n16. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/disability-and-carers\n17. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training\n18. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health\n19. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families\n20. https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing\n",
+              "links": [
+                "https://www.abs.gov.au/",
+                "https://www.abs.gov.au/statistics",
+                "https://www.abs.gov.au/census",
+                "https://www.abs.gov.au/participate-survey",
+                "https://www.abs.gov.au/about",
+                "https://www.abs.gov.au/census/guide-census-data",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population",
+                "https://www.abs.gov.au/book/export/27266/print",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/whats-new-2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-index",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/cultural-diversity",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/disability-and-carers",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing"
+              ],
+              "links_full": [
+                "https://www.abs.gov.au/",
+                "https://www.abs.gov.au/statistics",
+                "https://www.abs.gov.au/census",
+                "https://www.abs.gov.au/participate-survey",
+                "https://www.abs.gov.au/about",
+                "https://www.abs.gov.au/census/guide-census-data",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population",
+                "https://www.abs.gov.au/book/export/27266/print",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/whats-new-2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-index",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/cultural-diversity",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/disability-and-carers",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/income-and-work",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/location",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-ten-year-groups-age10p",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-five-year-groups-age5p",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/imputation-flag-age-ifagep",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/imputation-flag-sex-ifsexp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/number-children-ever-born-tisp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/number-children-ever-born-ranges-tisrp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/form-type-ftcp",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/service-australian-defence-force",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/transport",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/unpaid-work-and-care",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/national-reporting-indicators",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/downloads",
+                "https://www.abs.gov.au/ausstats/abs@.nsf/Latestproducts/2901.0Main%20Features12016?tabname=Summary&prodno=2901.0&issue=2016",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/i",
+                "https://www.abs.gov.au/census/guide-census-data/census-methodology/2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/v",
+                "https://www.abs.gov.au/statistics/people/population",
+                "https://www.abs.gov.au/statistics/people/people-and-communities",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021",
+                "https://www.abs.gov.au/release-calendar",
+                "https://www.abs.gov.au/databyregion",
+                "https://www.abs.gov.au/statistics/statistical-geography",
+                "https://www.abs.gov.au/statistics/microdata-tablebuilder",
+                "https://dataexplorer.abs.gov.au/",
+                "https://www.abs.gov.au/about/data-services/data-integration",
+                "https://www.abs.gov.au/about/data-services/consultancy-services",
+                "https://www.abs.gov.au/statistics/understanding-statistics",
+                "https://www.abs.gov.au/welcome-new-abs-website",
+                "https://www.abs.gov.au/about/abs-careers",
+                "https://www.abs.gov.au/media-centre",
+                "https://www.abs.gov.au/how-cite-abs-sources",
+                "https://consult.abs.gov.au",
+                "https://www.abs.gov.au/about/contact-us",
+                "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure",
+                "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6",
+                "https://www.facebook.com/absstats",
+                "https://www.instagram.com/absstats",
+                "https://twitter.com/ABSStats",
+                "https://www.linkedin.com/company/absstats",
+                "https://www.youtube.com/@AustralianBureauOfStatistics",
+                "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer",
+                "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs",
+                "https://www.abs.gov.au/about/staff-login-options"
+              ],
+              "links_count": 68,
+              "link_contexts": {
+                "https://www.abs.gov.au/": "Home",
+                "https://www.abs.gov.au/statistics": "Topics",
+                "https://www.abs.gov.au/census": "Census",
+                "https://www.abs.gov.au/participate-survey": "Participating in a survey",
+                "https://www.abs.gov.au/about": "About",
+                "https://www.abs.gov.au/census/guide-census-data": "Guide to Census data",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary": "View all releases",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021": "Census of Population and Housing: Census dictionary, 2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic": "Variables by topic",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population": "Up",
+                "https://www.abs.gov.au/book/export/27266/print": "Print all pages",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/whats-new-2021": "What's new for 2021",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-index": "Variables index",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/aboriginal-and-torres-strait-islander-peoples": "Aboriginal and Torres Strait Islander peoples",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/cultural-diversity": "Cultural diversity",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/disability-and-carers": "Disability and carers",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/education-and-training": "Education and training",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/health": "Health",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/household-and-families": "Household and families",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/housing": "Housing",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/income-and-work": "Income and work",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/location": "Location",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-ten-year-groups-age10p": "(AGE10P)",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-five-year-groups-age5p": "Previous pageAge in five year groups (AGE5P)",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/imputation-flag-age-ifagep": "Next pageImputation flag for age (IFAGEP)",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/imputation-flag-sex-ifsexp": "Imputation flag for sex (IFSEXP)",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/sex-sexp": "Sex (SEXP)",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/number-children-ever-born-tisp": "Number of children ever born (TISP)",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/number-children-ever-born-ranges-tisrp": "Number of children ever born (ranges) (TISRP)",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/form-type-ftcp": "Form type (FTCP)",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/service-australian-defence-force": "Service with the Australian Defence Force",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/transport": "Transport",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/unpaid-work-and-care": "Unpaid work and care",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/national-reporting-indicators": "National reporting indicators",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary": "Glossary",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/downloads": "Downloads",
+                "https://www.abs.gov.au/ausstats/abs@.nsf/Latestproducts/2901.0Main%20Features12016?tabname=Summary&prodno=2901.0&issue=2016": "Census of Population and Housing: Census Dictionary, 2016Archive releaseReference Period 2016",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/i": "Imputation",
+                "https://www.abs.gov.au/census/guide-census-data/census-methodology/2021": "Census Methodology",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/d": "Derivation",
+                "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/glossary/v": "Visitors to Australia",
+                "https://www.abs.gov.au/statistics/people/population": "Population",
+                "https://www.abs.gov.au/statistics/people/people-and-communities": "People and communities",
+                "https://www.abs.gov.au/statistics/people/population/population-census/2021": "Population: Census",
+                "https://www.abs.gov.au/release-calendar": "Latest and future releases",
+                "https://www.abs.gov.au/databyregion": "Data by region",
+                "https://www.abs.gov.au/statistics/statistical-geography": "Statistical geography",
+                "https://www.abs.gov.au/statistics/microdata-tablebuilder": "Microdata and TableBuilder",
+                "https://dataexplorer.abs.gov.au/": "Data explorer",
+                "https://www.abs.gov.au/about/data-services/data-integration": "Data integration",
+                "https://www.abs.gov.au/about/data-services/consultancy-services": "Request data",
+                "https://www.abs.gov.au/statistics/understanding-statistics": "Understanding statistics",
+                "https://www.abs.gov.au/welcome-new-abs-website": "About our website",
+                "https://www.abs.gov.au/about/abs-careers": "Work with us",
+                "https://www.abs.gov.au/media-centre": "Media centre",
+                "https://www.abs.gov.au/how-cite-abs-sources": "Citing ABS",
+                "https://consult.abs.gov.au": "Consultation hub",
+                "https://www.abs.gov.au/about/contact-us": "Contact us",
+                "https://www.abs.gov.au/about/legislation-and-policy/security-vulnerability-disclosure": "Security vulnerability disclosure",
+                "https://surveys.hotjar.com/c5c2f239-3e58-40fe-914f-14b8d82c6fa6": "Provide feedbackHelp us shape our website",
+                "https://www.facebook.com/absstats": "Facebook",
+                "https://www.instagram.com/absstats": "Instagram",
+                "https://twitter.com/ABSStats": "X (formerly Twitter)",
+                "https://www.linkedin.com/company/absstats": "LinkedIn",
+                "https://www.youtube.com/@AustralianBureauOfStatistics": "YouTube",
+                "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer": "Accessibility",
+                "https://www.abs.gov.au/about/legislation-and-policy/privacy/privacy-abs": "Privacy",
+                "https://www.abs.gov.au/about/staff-login-options": "Staff login"
+              },
+              "page_title": "Age (AGEP) | Australian Bureau of Statistics",
+              "h1_text": "Age (AGEP)",
+              "source_url": "https://www.abs.gov.au/census/guide-census-data/census-dictionary/2021/variables-topic/population/age-agep"
+            },
+            "provides_data": {
+              "type": "urls_from_visit"
+            }
+          },
+          "parent_id": "ac82dce7-9027-48ef-907c-e127fab7316c",
+          "parent_ids": [
+            "ac82dce7-9027-48ef-907c-e127fab7316c"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.17,
+          "memo_key": null
+        },
+        "978f8dd6-5039-450c-a05f-1532f0c4d209": {
+          "node_id": "978f8dd6-5039-450c-a05f-1532f0c4d209",
+          "title": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+          "details": {
+            "intent": "After the visit nodes return extracted population numbers and metadata, compare the three figures, compute absolute and percentage differences, assess source reliability (recency, primary vs secondary, method), and recommend which figure is most likely accurate with rationale.",
+            "required_inputs_from_children": [
+              "Each child visit must provide: population_value, data_date, publication_date, methodology_note, citation_url"
+            ],
+            "analysis_plan": [
+              "Normalize numbers (remove commas, ensure numeric type).",
+              "Compute differences: news vs gov, research vs gov, news vs research (absolute and percent).",
+              "Assess recency: prefer the source with the most recent data_date that is based on primary government datasets (CA DOF or recent ACS estimates or Census).",
+              "Assess method: prefer direct government estimates over secondary reporting unless the secondary cites a more recent primary source.",
+              "Note any potential reasons for discrepancy (different reference years, 1-year vs 5-year ACS, population definitions)."
+            ],
+            "measurable_output_fields": [
+              "government_source: {population_value, data_date, publication_date, url}",
+              "news_source: {population_value, data_date, publication_date, url}",
+              "research_source: {population_value, data_date, publication_date, url}",
+              "discrepancies: list of differences with absolute and percent differences",
+              "recommended_value: numeric and rationale explaining why (e.g., 'government estimate from CA DOF 2023 is most reliable because...')"
+            ],
+            "verification_steps": [
+              "If one source cites a primary dataset different from others, follow that citation (if available) and note it.",
+              "Flag cases where sources quote the same underlying primary data (which would mean no real discrepancy).",
+              "If results remain ambiguous, recommend the most recent primary government dataset (specify dataset: Census/ACS/CA DOF) and note any caveats."
+            ],
+            "why_this_node": "A post-extraction synthesis is necessary to convert raw extracted numbers into a clear answer about discrepancies and accuracy ranking.",
+            "action": "think",
+            "goal": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+            "original_goal": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+            "parent_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.86
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "978f8dd6-5039-450c-a05f-1532f0c4d209",
+              "title": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+              "details": {
+                "intent": "After the visit nodes return extracted population numbers and metadata, compare the three figures, compute absolute and percentage differences, assess source reliability (recency, primary vs secondary, method), and recommend which figure is most likely accurate with rationale.",
+                "required_inputs_from_children": [
+                  "Each child visit must provide: population_value, data_date, publication_date, methodology_note, citation_url"
+                ],
+                "analysis_plan": [
+                  "Normalize numbers (remove commas, ensure numeric type).",
+                  "Compute differences: news vs gov, research vs gov, news vs research (absolute and percent).",
+                  "Assess recency: prefer the source with the most recent data_date that is based on primary government datasets (CA DOF or recent ACS estimates or Census).",
+                  "Assess method: prefer direct government estimates over secondary reporting unless the secondary cites a more recent primary source.",
+                  "Note any potential reasons for discrepancy (different reference years, 1-year vs 5-year ACS, population definitions)."
+                ],
+                "measurable_output_fields": [
+                  "government_source: {population_value, data_date, publication_date, url}",
+                  "news_source: {population_value, data_date, publication_date, url}",
+                  "research_source: {population_value, data_date, publication_date, url}",
+                  "discrepancies: list of differences with absolute and percent differences",
+                  "recommended_value: numeric and rationale explaining why (e.g., 'government estimate from CA DOF 2023 is most reliable because...')"
+                ],
+                "verification_steps": [
+                  "If one source cites a primary dataset different from others, follow that citation (if available) and note it.",
+                  "Flag cases where sources quote the same underlying primary data (which would mean no real discrepancy).",
+                  "If results remain ambiguous, recommend the most recent primary government dataset (specify dataset: Census/ACS/CA DOF) and note any caveats."
+                ],
+                "why_this_node": "A post-extraction synthesis is necessary to convert raw extracted numbers into a clear answer about discrepancies and accuracy ranking.",
+                "action": "think",
+                "goal": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+                "original_goal": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+                "parent_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 0.2
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              },
+              "thinking_content": "Synthesize findings and identify discrepancies; determine most likely accurate population figure"
+            }
+          },
+          "parent_id": "ac82dce7-9027-48ef-907c-e127fab7316c",
+          "parent_ids": [
+            "ac82dce7-9027-48ef-907c-e127fab7316c"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.86,
+          "memo_key": null
+        },
+        "ced318d1-41eb-4e43-8cd9-48dee5cff152": {
+          "node_id": "ced318d1-41eb-4e43-8cd9-48dee5cff152",
+          "title": "Merge: Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+          "details": {
+            "action": "merge",
+            "goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "original_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "ced318d1-41eb-4e43-8cd9-48dee5cff152",
+              "title": "Merge: Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+              "details": {
+                "action": "merge",
+                "goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+                "original_goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              },
+              "thinking_content": "Merge: Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why."
+            }
+          },
+          "parent_id": "ac82dce7-9027-48ef-907c-e127fab7316c",
+          "parent_ids": [
+            "ac82dce7-9027-48ef-907c-e127fab7316c"
+          ],
+          "status": "done",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 4925,
+        "words": 595,
+        "kilobytes": 4.81
+      },
+      "llm": {
+        "calls": 6,
+        "prompt": {
+          "chars": 32926,
+          "words": 3371,
+          "kilobytes": 32.15,
+          "tokens": 8688
+        },
+        "completion": {
+          "chars": 13973,
+          "words": 1703,
+          "kilobytes": 13.65,
+          "tokens": 7336
+        },
+        "total_tokens": 16024
+      },
+      "chroma": {
+        "store": {
+          "count": 2,
+          "chars": 461,
+          "words": 66,
+          "kilobytes": 0.45
+        },
+        "retrieve": {
+          "count": 1,
+          "chars": 96,
+          "words": 11,
+          "kilobytes": 0.09
+        }
+      },
+      "search": {
+        "count": 18,
+        "chars": 4992,
+        "words": 625,
+        "kilobytes": 4.88
+      },
+      "visit": {
+        "count": 3,
+        "chars": 4998,
+        "words": 144,
+        "kilobytes": 4.88
+      },
+      "timings": {
+        "chroma_query": {
+          "count": 2,
+          "total_duration": 0.9593479450049927,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "llm_call": {
+          "count": 4,
+          "total_duration": 142.7785473299955,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 4,
+          "total_duration": 1.794991051996476,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_store": {
+          "count": 2,
+          "total_duration": 0.9360023370027193,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 0.6931696559986449,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 10
+    },
+    "duration_seconds": 177.13,
+    "telemetry": {
+      "correlation_id": "idea_test_001_gpt-5-mini_20260227_071705",
+      "trace_file": "/app/agent/idea_test_results/20260227_071705_001_gpt-5-mini.jsonl",
+      "events_count": 10,
+      "timings_count": 13
+    },
+    "graph_visualization": {
+      "ascii": "*-------.   Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.\n|\\ \\ \\ \\ \\  \n* | | | | | Search for authoritative sources reporting San Francisco population (government, news outlet, research institution)\n / / / / /  \n* | | | | Visit the government source (city/state/federal) that provides San Francisco population\n / / / /  \n* | | | Visit a major news outlet article reporting San Francisco population\n / / /  \n* | | Visit a research institution or think tank report that states San Francisco population\n / /  \n* | Synthesize findings and identify discrepancies; determine most likely accurate population figure\n /  \n* Merge: Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.\n",
+      "graph_data": {
+        "nodes": [
+          {
+            "id": "ac82dce7-9027-48ef-907c-e127fab7316c",
+            "title": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "status": "active",
+            "score": null,
+            "memo_key": null,
+            "action": null,
+            "has_result": false,
+            "parent_ids": []
+          },
+          {
+            "id": "5f448ff2-8c17-41e6-84ca-f59fee65ab7d",
+            "title": "Search for authoritative sources reporting San Francisco population (government, news outlet, research institution)",
+            "status": "done",
+            "score": 0.8,
+            "memo_key": null,
+            "action": "search",
+            "has_result": true,
+            "parent_ids": [
+              "ac82dce7-9027-48ef-907c-e127fab7316c"
+            ]
+          },
+          {
+            "id": "92f1680b-6623-49cc-a580-732eed81f329",
+            "title": "Visit the government source (city/state/federal) that provides San Francisco population",
+            "status": "done",
+            "score": 0.18,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "ac82dce7-9027-48ef-907c-e127fab7316c"
+            ]
+          },
+          {
+            "id": "e461c5ff-3da1-4d08-9dfd-0a184cbb4be0",
+            "title": "Visit a major news outlet article reporting San Francisco population",
+            "status": "done",
+            "score": 0.18,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "ac82dce7-9027-48ef-907c-e127fab7316c"
+            ]
+          },
+          {
+            "id": "097d7f1c-7b2f-4299-8e28-d51b0905d786",
+            "title": "Visit a research institution or think tank report that states San Francisco population",
+            "status": "done",
+            "score": 0.17,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "ac82dce7-9027-48ef-907c-e127fab7316c"
+            ]
+          },
+          {
+            "id": "978f8dd6-5039-450c-a05f-1532f0c4d209",
+            "title": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+            "status": "done",
+            "score": 0.86,
+            "memo_key": null,
+            "action": "think",
+            "has_result": true,
+            "parent_ids": [
+              "ac82dce7-9027-48ef-907c-e127fab7316c"
+            ]
+          },
+          {
+            "id": "ced318d1-41eb-4e43-8cd9-48dee5cff152",
+            "title": "Merge: Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+            "status": "done",
+            "score": null,
+            "memo_key": null,
+            "action": "merge",
+            "has_result": true,
+            "parent_ids": [
+              "ac82dce7-9027-48ef-907c-e127fab7316c"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "ac82dce7-9027-48ef-907c-e127fab7316c",
+            "to": "5f448ff2-8c17-41e6-84ca-f59fee65ab7d"
+          },
+          {
+            "from": "ac82dce7-9027-48ef-907c-e127fab7316c",
+            "to": "92f1680b-6623-49cc-a580-732eed81f329"
+          },
+          {
+            "from": "ac82dce7-9027-48ef-907c-e127fab7316c",
+            "to": "e461c5ff-3da1-4d08-9dfd-0a184cbb4be0"
+          },
+          {
+            "from": "ac82dce7-9027-48ef-907c-e127fab7316c",
+            "to": "097d7f1c-7b2f-4299-8e28-d51b0905d786"
+          },
+          {
+            "from": "ac82dce7-9027-48ef-907c-e127fab7316c",
+            "to": "978f8dd6-5039-450c-a05f-1532f0c4d209"
+          },
+          {
+            "from": "ac82dce7-9027-48ef-907c-e127fab7316c",
+            "to": "ced318d1-41eb-4e43-8cd9-48dee5cff152"
+          }
+        ]
+      },
+      "analysis": {
+        "total_nodes": 7,
+        "action_counts": {
+          "search": 1,
+          "visit": 3,
+          "think": 1,
+          "merge": 1
+        },
+        "think_count": 1,
+        "think_ratio": 0.14285714285714285,
+        "other_action_count": 6,
+        "action_diversity": 4,
+        "unique_titles": 7,
+        "duplicate_title_count": 0,
+        "think_nodes": [
+          {
+            "node_id": "978f8dd6-5039-450c-a05f-1532f0c4d209",
+            "title": "Synthesize findings and identify discrepancies; determine most likely accurate population figure",
+            "status": "done"
+          }
+        ],
+        "issues": [
+          {
+            "severity": "medium",
+            "type": "similar_long_titles",
+            "message": "Found 1 pairs of nodes with very similar long titles (likely merge/repetition)",
+            "recommendation": "Review merge nodes - they may be duplicating the root node's mandate unnecessarily",
+            "examples": [
+              {
+                "title_preview": "find the current population of san francisco as reported by three different authoritative sources (government, news outlet, and research institution)....",
+                "node_ids": [
+                  "ac82dce7-9027-48ef-907c-e127fab7316c",
+                  "ced318d1-41eb-4e43-8cd9-48dee5cff152"
+                ]
+              }
+            ]
+          }
+        ],
+        "issue_count": 1
+      }
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "search_actions",
+        "passed": true,
+        "score": 1.0,
+        "actual": 18,
+        "expected": 5,
+        "reason": "Found 18 search actions, expected at least 5"
+      },
+      {
+        "check": "source_types",
+        "passed": true,
+        "score": 1.0,
+        "government": true,
+        "news": true,
+        "research": true,
+        "reason": "Found 3 source types (gov: True, news: True, research: True)"
+      },
+      {
+        "check": "data_completeness",
+        "passed": true,
+        "score": 1.0,
+        "has_population": true,
+        "has_dates": true,
+        "has_urls": true,
+        "url_count": 15,
+        "reason": "Data completeness: population=True, dates=True, urls=True (15 URLs found)"
+      },
+      {
+        "check": "discrepancy_analysis",
+        "passed": true,
+        "score": 0.6666666666666666,
+        "has_discrepancy": false,
+        "has_explanation": true,
+        "has_assessment": true,
+        "reason": "Analysis quality: discrepancy=False, explanation=True, assessment=True"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.15,
+      "reasons": [
+        "No explicit population figures for San Francisco were provided from any source.",
+        "No dates for population estimates were provided.",
+        "No news outlet or research institution sources were cited \u2014 only SF.gov snippets and unrelated ABS (Australia) pages were present.",
+        "No discrepancy analysis or assessment of which figure is most likely accurate was produced.",
+        "Although multiple URLs were listed, they did not supply the required data for the task (San Francisco population figures and dates)."
+      ],
+      "missing_requirements": [
+        "Population figures for the City and County of San Francisco from three sources",
+        "Date of the data for each population figure",
+        "At least one news outlet source with a population figure and date",
+        "At least one research institution source with a population figure and date",
+        "Coherent discrepancy analysis comparing the three sources",
+        "Identification of which figure is most likely accurate and justification"
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.15,
+        "reasons": [
+          "No explicit population figures for San Francisco were provided from any source.",
+          "No dates for population estimates were provided.",
+          "No news outlet or research institution sources were cited \u2014 only SF.gov snippets and unrelated ABS (Australia) pages were present.",
+          "No discrepancy analysis or assessment of which figure is most likely accurate was produced.",
+          "Although multiple URLs were listed, they did not supply the required data for the task (San Francisco population figures and dates)."
+        ],
+        "missing_requirements": [
+          "Population figures for the City and County of San Francisco from three sources",
+          "Date of the data for each population figure",
+          "At least one news outlet source with a population figure and date",
+          "At least one research institution source with a population figure and date",
+          "Coherent discrepancy analysis comparing the three sources",
+          "Identification of which figure is most likely accurate and justification"
+        ],
+        "source_verification": {
+          "government_source": false,
+          "news_source": false,
+          "research_source": false,
+          "valid_urls": 5
+        },
+        "data_completeness": {
+          "all_figures": false,
+          "all_dates": false,
+          "all_urls": true
+        },
+        "analysis_quality": {
+          "discrepancies_identified": false,
+          "explanation_provided": false,
+          "accuracy_assessed": false
+        }
+      }
+    },
+    "overall_passed": true,
+    "overall_score": 0.7633333333333333,
+    "checks_passed": 4,
+    "total_checks": 5,
+    "pass_rate": 0.8
+  },
+  "timestamp": "2026-02-27T08:14:11.938139",
+  "execution_variant": "graph"
+}

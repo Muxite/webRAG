@@ -1,0 +1,889 @@
+{
+  "test_metadata": {
+    "test_id": "002",
+    "test_name": "Basic Fact Retrieval",
+    "difficulty_level": "1/10",
+    "category": "Simple Information Retrieval"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "1. Capital city of Australia: Canberra\n\nCited authoritative source (from the merged results):\n1. https://www.britannica.com/place/Australia\n\nNote: The merged results included the above authoritative URL (Britannica). The merged results did not include an extracted page snippet explicitly showing the word \"Canberra,\" so the citation is the URL listed in the provided results.",
+      "action_summary": "Answered: Canberra is the capital city of Australia. Cited one authoritative URL from the merged results: https://www.britannica.com/place/Australia. The merged results did not contain an explicit page excerpt proving the capital name, so the answer is cited to the listed Britannica URL.",
+      "success": true,
+      "goal_achieved": true,
+      "has_failures": false
+    },
+    "graph": {
+      "root_id": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+      "nodes": {
+        "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e": {
+          "node_id": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+          "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+          "details": {
+            "mandate": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "original_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "merged_results": [
+              {
+                "node_id": "f0ec83b1-47fa-4a1d-93d3-6501d0aa8d24",
+                "title": "Search authoritative sources for 'capital city of Australia'",
+                "status": "done",
+                "score": 0.15,
+                "evaluation": {
+                  "score": 0.15
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "node_id": "f0ec83b1-47fa-4a1d-93d3-6501d0aa8d24",
+                  "query": "capital city of Australia authoritative source official",
+                  "intent": "Find at least one authoritative, citable URL (government, CIA World Factbook, Britannica, or similar) that explicitly states the capital city of Australia. Return snippets and URLs so a visit node can fetch the full page.",
+                  "vector_context": [
+                    "Synthesize final answer and format concise response with one citation"
+                  ],
+                  "count": 5,
+                  "results": [
+                    {
+                      "title": "Australia | History, Cities, Population, Capital, Map, & Facts | Britannica",
+                      "url": "https://www.britannica.com/place/Australia",
+                      "description": "There are also two internal territories: Northern Territory, established as a self-governing territory in 1978, and the Australian Capital Territory (including the city of Canberra), which attained self-governing status in 1988. The federal authorities govern the external territories of Norfolk Island, the Cocos (Keeling) Islands, Christmas Island, Ashmore and Cartier islands, the Coral Sea Islands, and Heard Island and McDonald Islands and claim the Australian Antarctic Territory, an area larger than Australia itself."
+                    },
+                    {
+                      "title": "List of Australian capital cities - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/List_of_Australian_capital_cities",
+                      "description": "There are eight capital cities in Australia, each of which functions as the seat of government for the state or territory in which it is located. One of these, Canberra, is also the national capital. <strong>Section 125 of the Constitution of Australia</strong> ..."
+                    },
+                    {
+                      "title": "Canberra - Wikipedia",
+                      "url": "https://en.wikipedia.org/wiki/Canberra",
+                      "description": "The Commonwealth government purchased the pastoral property of Yarralumla in 1913 to provide an official residence for the Governor-General of Australia in the new capital. Renovations began in 1925 to enlarge and modernise the property. In 1927, the property was officially dubbed Government House. On 9 May that year, the Commonwealth parliament moved to Canberra with the opening of the Provisional Parliament House. The Prime Minister Stanley Bruce had officially taken up residence in The Lodge a few days earlier. Planned development of the city slowed significantly during the depression of the 1930s and during World War II."
+                    },
+                    {
+                      "title": "Canberra | History, Map, Population, Climate, & Facts | Britannica",
+                      "url": "https://www.britannica.com/place/Canberra",
+                      "description": "Construction began in 1913 but was interrupted by World War I. On May 9, 1927, ceremonies marked the official transfer of the federal Parliament from Melbourne to the new capital. Canberra: Legislative Assembly buildingLegislative Assembly building for the Australian Capital Territory, Canberra, Australia.(more) Canberra lies on a plain at the foot of 6,200-foot (1,900-metre) spurs of the Australian Alps, enjoying warm summers and cool winters and receiving considerably less rainfall than the surrounding highlands. The city has been expanding, and its population has grown steadily."
+                    },
+                    {
+                      "title": "Australian states, territories and capital cities - Tourism Australia",
+                      "url": "https://www.australia.com/en-us/facts-and-planning/about-australia/cities-states-and-territories.html",
+                      "description": "<strong>Victoria (VIC)</strong> is the thriving heart of all things culture in Australia, centred in the state\u2019s capital, Melbourne. The city has been the recipient of the \u2018Most Liveable City in the World\u2019 title multiple times, owing to its cultural diversity, ..."
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "c326d2c8-089b-4240-970d-58a4475698df",
+                "title": "Visit CIA World Factbook page for Australia and extract the capital",
+                "status": "done",
+                "score": 0.18,
+                "evaluation": {
+                  "score": 0.18
+                },
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://www.cia.gov/the-world-factbook/countries/australia/",
+                  "intent": "Retrieve the full page content and extract the explicit statement of the capital city, plus a short quoted snippet to use as a citation.",
+                  "vector_context": [
+                    "Synthesize final answer and format concise response with one citation"
+                  ],
+                  "content": "https://www.cia.gov/sitemap",
+                  "content_is_truncated": false,
+                  "content_total_chars": 27,
+                  "content_full": "https://www.cia.gov/sitemap",
+                  "content_with_links": "https://www.cia.gov/sitemap\n\n--- Links found on this page ---\n1. https://www.cia.gov/stories/speeches-and-transcripts\n2. https://www.cia.gov/resources/publications\n3. https://www.cia.gov/legacy/headquarters\n4. https://www.cia.gov/sitemap\n5. https://www.cia.gov/stories/press-releases-and-statements\n6. https://www.cia.gov/search\n7. https://www.cia.gov/stories/story/history-of-the-world-factbook\n8. https://www.cia.gov/legacy/memorial-wall/fallen\n9. https://www.usa.gov/\n10. https://www.cia.gov/report-information\n11. https://www.cia.gov/resources/cia-maps\n12. https://www.facebook.com/Central.Intelligence.Agency\n13. https://www.cia.gov/readingroom\n14. https://www.cia.gov/about/organization/equal-employment-opportunity/elijah-cummings-act\n15. https://www.cia.gov/stories/story/telling-data-stories-an-interview-with-cias-dr-calvin-andrus\n16. https://www.cia.gov/stories\n17. https://www.cia.gov/resources/csi\n18. https://www.cia.gov/careers/working-at-cia/accessibility\n19. https://www.cia.gov/stories/story/wanderers-in-a-wonderful-world\n20. https://www.cia.gov/about/organization/privacy-and-civil-liberties\n",
+                  "links": [
+                    "https://www.cia.gov/stories/speeches-and-transcripts",
+                    "https://www.cia.gov/resources/publications",
+                    "https://www.cia.gov/legacy/headquarters",
+                    "https://www.cia.gov/sitemap",
+                    "https://www.cia.gov/stories/press-releases-and-statements",
+                    "https://www.cia.gov/search",
+                    "https://www.cia.gov/stories/story/history-of-the-world-factbook",
+                    "https://www.cia.gov/legacy/memorial-wall/fallen",
+                    "https://www.usa.gov/",
+                    "https://www.cia.gov/report-information",
+                    "https://www.cia.gov/resources/cia-maps",
+                    "https://www.facebook.com/Central.Intelligence.Agency",
+                    "https://www.cia.gov/readingroom",
+                    "https://www.cia.gov/about/organization/equal-employment-opportunity/elijah-cummings-act",
+                    "https://www.cia.gov/stories/story/telling-data-stories-an-interview-with-cias-dr-calvin-andrus",
+                    "https://www.cia.gov/stories",
+                    "https://www.cia.gov/resources/csi",
+                    "https://www.cia.gov/careers/working-at-cia/accessibility",
+                    "https://www.cia.gov/stories/story/wanderers-in-a-wonderful-world",
+                    "https://www.cia.gov/about/organization/privacy-and-civil-liberties"
+                  ],
+                  "links_full": [
+                    "https://www.cia.gov/stories/speeches-and-transcripts",
+                    "https://www.cia.gov/resources/publications",
+                    "https://www.cia.gov/legacy/headquarters",
+                    "https://www.cia.gov/sitemap",
+                    "https://www.cia.gov/stories/press-releases-and-statements",
+                    "https://www.cia.gov/search",
+                    "https://www.cia.gov/stories/story/history-of-the-world-factbook",
+                    "https://www.cia.gov/legacy/memorial-wall/fallen",
+                    "https://www.usa.gov/",
+                    "https://www.cia.gov/report-information",
+                    "https://www.cia.gov/resources/cia-maps",
+                    "https://www.facebook.com/Central.Intelligence.Agency",
+                    "https://www.cia.gov/readingroom",
+                    "https://www.cia.gov/about/organization/equal-employment-opportunity/elijah-cummings-act",
+                    "https://www.cia.gov/stories/story/telling-data-stories-an-interview-with-cias-dr-calvin-andrus",
+                    "https://www.cia.gov/stories",
+                    "https://www.cia.gov/resources/csi",
+                    "https://www.cia.gov/careers/working-at-cia/accessibility",
+                    "https://www.cia.gov/stories/story/wanderers-in-a-wonderful-world",
+                    "https://www.cia.gov/about/organization/privacy-and-civil-liberties"
+                  ],
+                  "links_count": 20,
+                  "link_contexts": {
+                    "https://www.cia.gov/contact-cia": "Contact CIA",
+                    "https://www.cia.gov/report-information": "Report Information",
+                    "https://www.cia.gov/": "Central Intelligence AgencyCentral Intelligence Agency",
+                    "https://www.cia.gov/about": "About CIA",
+                    "https://www.cia.gov/about/director-of-cia": "Leadership",
+                    "https://www.cia.gov/about/organization": "Organization",
+                    "https://www.cia.gov/about/mission-vision": "Mission and Vision",
+                    "https://www.cia.gov/partner-with-cia": "Partner with CIA",
+                    "https://www.cia.gov/tech": "Technology",
+                    "https://www.cia.gov/about/organization/privacy-and-civil-liberties": "Privacy",
+                    "https://www.cia.gov/careers": "Career Opportunities",
+                    "https://www.cia.gov/careers/how-we-hire": "Hiring Process",
+                    "https://www.cia.gov/careers/working-at-cia/benefits": "Benefits",
+                    "https://www.cia.gov/careers/accommodations": "Accommodations",
+                    "https://www.cia.gov/careers/language-opportunities": "Language Opportunities",
+                    "https://www.cia.gov/careers/working-at-cia/veterans": "Veterans",
+                    "https://www.cia.gov/careers/student-programs": "Student Programs",
+                    "https://www.cia.gov/legacy": "Origin",
+                    "https://www.cia.gov/legacy/cia-history": "History",
+                    "https://www.cia.gov/legacy/museum": "CIA Museum",
+                    "https://www.cia.gov/legacy/headquarters": "Headquarters",
+                    "https://www.cia.gov/legacy/cia-history/cia-trailblazers": "Trailblazers",
+                    "https://www.cia.gov/legacy/memorial-wall/fallen": "In Memoriam",
+                    "https://www.cia.gov/stories": "News and Stories",
+                    "https://www.cia.gov/stories/press-releases-and-statements": "Press Releases & Statements",
+                    "https://www.cia.gov/stories/speeches-and-transcripts": "Speeches & Transcripts",
+                    "https://www.cia.gov/podcast": "The Langley Files",
+                    "https://www.cia.gov/resources": "Resources",
+                    "https://www.cia.gov/resources/publications": "Publications",
+                    "https://www.cia.gov/about/organization/prepublication-classification-review-board": "Prepublication Review",
+                    "https://www.cia.gov/resources/csi": "Center for the Study of Intelligence (CSI)",
+                    "https://www.cia.gov/resources/reports": "CIA Reports",
+                    "https://www.cia.gov/resources/cia-maps": "CIA Maps",
+                    "https://www.cia.gov/readingroom": "Freedom of Information Act (FOIA)",
+                    "https://www.cia.gov/stories/view-all": "Stories",
+                    "https://www.cia.gov/stories/story/history-of-the-world-factbook": "Learn MoreArrow Right Icon",
+                    "https://www.cia.gov/stories/story/wanderers-in-a-wonderful-world": "Learn MoreArrow Right Icon",
+                    "https://www.cia.gov/stories/story/telling-data-stories-an-interview-with-cias-dr-calvin-andrus": "Learn MoreArrow Right Icon",
+                    "https://www.cia.gov/careers/working-at-cia/accessibility": "Accommodations",
+                    "https://www.cia.gov/ehl": "MyLINK",
+                    "https://www.cia.gov/resources/world-leaders": "World Leaders",
+                    "https://www.cia.gov/spy-kids": "Spy Kids",
+                    "https://www.cia.gov/faqs": "Frequently Asked Questions",
+                    "https://www.cia.gov/privacy_policy": "Privacy Policy",
+                    "https://www.instagram.com/cia": "Instagram",
+                    "https://www.facebook.com/Central.Intelligence.Agency": "Facebook",
+                    "https://twitter.com/cia": "X",
+                    "https://www.linkedin.com/company/central-intelligence-agency": "LinkedIn",
+                    "https://www.youtube.com/cia": "YouTube",
+                    "https://www.flickr.com/ciagov": "Flickr",
+                    "https://t.me/s/securelycontactingcia": "Telegram",
+                    "https://www.cia.gov/search": "Search CIA.gov",
+                    "https://www.cia.gov/site-policies": "Site Policies",
+                    "https://www.cia.gov/about/organization/equal-employment-opportunity/no-fear-act": "No FEAR Act",
+                    "https://www.cia.gov/about/organization/equal-employment-opportunity/elijah-cummings-act": "ECA Notice",
+                    "https://www.cia.gov/about/organization/inspector-general": "Inspector General",
+                    "https://www.usa.gov/": "USA.gov",
+                    "https://www.cia.gov/sitemap": "Sitemap"
+                  }
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "afd0bfd7-eaf7-4f18-a280-355e52ed8c0f",
+                "title": "Synthesize final answer and format concise response with one citation",
+                "status": "done",
+                "score": 0.2,
+                "evaluation": {
+                  "score": 0.2
+                },
+                "result": {
+                  "action": "think",
+                  "success": true,
+                  "node_id": "afd0bfd7-eaf7-4f18-a280-355e52ed8c0f",
+                  "title": "Synthesize final answer and format concise response with one citation",
+                  "details": {
+                    "intent": "After visit node returns extracted facts, produce the concise answer 'Canberra' and include one authoritative source URL and the evidence snippet as the citation.",
+                    "input_needed": [
+                      "capital_name from visit",
+                      "evidence_snippet from visit",
+                      "citation_url from visit"
+                    ],
+                    "measurable_output_fields": [
+                      "answer_text (e.g., 'The capital city of Australia is Canberra.' )",
+                      "citation_url",
+                      "evidence_snippet"
+                    ],
+                    "verification_steps": [
+                      "Ensure capital_name is non-empty and matches the evidence_snippet.",
+                      "If visit produced multiple candidate capitals or ambiguity, request sequential follow-up searches/visits (not expected for this question)."
+                    ],
+                    "why_this_node": "This is a post-action synthesis step required to transform extracted page facts into the final user-facing answer with the required citation.",
+                    "action": "think",
+                    "goal": "Synthesize final answer and format concise response with one citation",
+                    "original_goal": "Synthesize final answer and format concise response with one citation",
+                    "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+                    "is_leaf": true,
+                    "evaluation": {
+                      "score": 0.2
+                    },
+                    "action_attempts": 1,
+                    "action_max_retries": 2
+                  },
+                  "thinking_content": "Synthesize final answer and format concise response with one citation"
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 3,
+              "success": 3,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            },
+            "goal_achieved": true
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "f0ec83b1-47fa-4a1d-93d3-6501d0aa8d24",
+            "c326d2c8-089b-4240-970d-58a4475698df",
+            "afd0bfd7-eaf7-4f18-a280-355e52ed8c0f",
+            "ab6798f8-cda2-45f3-87cb-208e679fe7b5"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "f0ec83b1-47fa-4a1d-93d3-6501d0aa8d24": {
+          "node_id": "f0ec83b1-47fa-4a1d-93d3-6501d0aa8d24",
+          "title": "Search authoritative sources for 'capital city of Australia'",
+          "details": {
+            "query": "capital city of Australia authoritative source official",
+            "intent": "Find at least one authoritative, citable URL (government, CIA World Factbook, Britannica, or similar) that explicitly states the capital city of Australia. Return snippets and URLs so a visit node can fetch the full page.",
+            "count": 5,
+            "target_facts": [
+              "Name of the capital city of Australia",
+              "URL of an authoritative source that states the capital",
+              "Short snippet or line showing the capital text for quick verification"
+            ],
+            "verification_steps": [
+              "Prefer official government or internationally recognized reference (e.g., australia.gov.au, cia.gov, britannica.com).",
+              "Ensure the snippet explicitly names the capital (e.g., 'The capital of Australia is Canberra').",
+              "Return the exact URL string to be used by the visit node (no modifications)."
+            ],
+            "measurable_output_fields": [
+              "results: [{title, snippet, url}]"
+            ],
+            "why_this_node": "The mandate requires a cited authoritative URL. A search node is needed to discover and supply exact URL(s) for a later visit node to extract and cite the authoritative statement.",
+            "action": "search",
+            "goal": "Search authoritative sources for 'capital city of Australia'",
+            "original_goal": "Search authoritative sources for 'capital city of Australia'",
+            "provides_data": {
+              "type": "urls_from_search"
+            },
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.65
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "node_id": "f0ec83b1-47fa-4a1d-93d3-6501d0aa8d24",
+              "query": "capital city of Australia authoritative source official",
+              "intent": "Find at least one authoritative, citable URL (government, CIA World Factbook, Britannica, or similar) that explicitly states the capital city of Australia. Return snippets and URLs so a visit node can fetch the full page.",
+              "vector_context": [
+                "Synthesize final answer and format concise response with one citation"
+              ],
+              "count": 5,
+              "results": [
+                {
+                  "title": "Australia | History, Cities, Population, Capital, Map, & Facts | Britannica",
+                  "url": "https://www.britannica.com/place/Australia",
+                  "description": "There are also two internal territories: Northern Territory, established as a self-governing territory in 1978, and the Australian Capital Territory (including the city of Canberra), which attained self-governing status in 1988. The federal authorities govern the external territories of Norfolk Island, the Cocos (Keeling) Islands, Christmas Island, Ashmore and Cartier islands, the Coral Sea Islands, and Heard Island and McDonald Islands and claim the Australian Antarctic Territory, an area larger than Australia itself."
+                },
+                {
+                  "title": "List of Australian capital cities - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/List_of_Australian_capital_cities",
+                  "description": "There are eight capital cities in Australia, each of which functions as the seat of government for the state or territory in which it is located. One of these, Canberra, is also the national capital. <strong>Section 125 of the Constitution of Australia</strong> ..."
+                },
+                {
+                  "title": "Canberra - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Canberra",
+                  "description": "The Commonwealth government purchased the pastoral property of Yarralumla in 1913 to provide an official residence for the Governor-General of Australia in the new capital. Renovations began in 1925 to enlarge and modernise the property. In 1927, the property was officially dubbed Government House. On 9 May that year, the Commonwealth parliament moved to Canberra with the opening of the Provisional Parliament House. The Prime Minister Stanley Bruce had officially taken up residence in The Lodge a few days earlier. Planned development of the city slowed significantly during the depression of the 1930s and during World War II."
+                },
+                {
+                  "title": "Canberra | History, Map, Population, Climate, & Facts | Britannica",
+                  "url": "https://www.britannica.com/place/Canberra",
+                  "description": "Construction began in 1913 but was interrupted by World War I. On May 9, 1927, ceremonies marked the official transfer of the federal Parliament from Melbourne to the new capital. Canberra: Legislative Assembly buildingLegislative Assembly building for the Australian Capital Territory, Canberra, Australia.(more) Canberra lies on a plain at the foot of 6,200-foot (1,900-metre) spurs of the Australian Alps, enjoying warm summers and cool winters and receiving considerably less rainfall than the surrounding highlands. The city has been expanding, and its population has grown steadily."
+                },
+                {
+                  "title": "Australian states, territories and capital cities - Tourism Australia",
+                  "url": "https://www.australia.com/en-us/facts-and-planning/about-australia/cities-states-and-territories.html",
+                  "description": "<strong>Victoria (VIC)</strong> is the thriving heart of all things culture in Australia, centred in the state\u2019s capital, Melbourne. The city has been the recipient of the \u2018Most Liveable City in the World\u2019 title multiple times, owing to its cultural diversity, ..."
+                }
+              ]
+            }
+          },
+          "parent_id": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+          "parent_ids": [
+            "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.65,
+          "memo_key": null
+        },
+        "c326d2c8-089b-4240-970d-58a4475698df": {
+          "node_id": "c326d2c8-089b-4240-970d-58a4475698df",
+          "title": "Visit CIA World Factbook page for Australia and extract the capital",
+          "details": {
+            "url": "https://www.cia.gov/the-world-factbook/countries/australia/",
+            "intent": "Retrieve the full page content and extract the explicit statement of the capital city, plus a short quoted snippet to use as a citation.",
+            "target_facts": [
+              "capital_name (e.g., 'Canberra')",
+              "evidence_snippet (exact sentence/phrase from the page mentioning the capital)",
+              "citation_url (the page URL)"
+            ],
+            "extraction_plan": [
+              "Locate the page section or infobox that labels 'Capital' or the phrase 'Capital:'.",
+              "Extract the exact word(s) naming the capital and capture the surrounding sentence as an evidence_snippet (<= 300 characters).",
+              "Return capital_name, evidence_snippet, and citation_url exactly as on the page."
+            ],
+            "measurable_output_fields": [
+              "capital_name: string",
+              "evidence_snippet: string",
+              "citation_url: string"
+            ],
+            "verification_steps": [
+              "Confirm the extracted capital_name appears in the page text and matches common knowledge (e.g., 'Canberra').",
+              "If the CIA page does not explicitly name the capital in clear text, fall back to the top search result that is a government or Britannica page (these URLs would come from the search node)."
+            ],
+            "why_this_node": "The user requested a cited authoritative source. The CIA World Factbook is an authoritative reference that lists country facts including capitals; visiting it will provide a clear, citable statement and URL.",
+            "action": "visit",
+            "goal": "Visit CIA World Factbook page for Australia and extract the capital",
+            "original_goal": "Visit CIA World Factbook page for Australia and extract the capital",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.95
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://www.cia.gov/the-world-factbook/countries/australia/",
+              "intent": "Retrieve the full page content and extract the explicit statement of the capital city, plus a short quoted snippet to use as a citation.",
+              "vector_context": [
+                "Synthesize final answer and format concise response with one citation"
+              ],
+              "content": "https://www.cia.gov/sitemap",
+              "content_is_truncated": false,
+              "content_total_chars": 27,
+              "content_full": "https://www.cia.gov/sitemap",
+              "content_with_links": "https://www.cia.gov/sitemap\n\n--- Links found on this page ---\n1. https://www.cia.gov/stories/speeches-and-transcripts\n2. https://www.cia.gov/resources/publications\n3. https://www.cia.gov/legacy/headquarters\n4. https://www.cia.gov/sitemap\n5. https://www.cia.gov/stories/press-releases-and-statements\n6. https://www.cia.gov/search\n7. https://www.cia.gov/stories/story/history-of-the-world-factbook\n8. https://www.cia.gov/legacy/memorial-wall/fallen\n9. https://www.usa.gov/\n10. https://www.cia.gov/report-information\n11. https://www.cia.gov/resources/cia-maps\n12. https://www.facebook.com/Central.Intelligence.Agency\n13. https://www.cia.gov/readingroom\n14. https://www.cia.gov/about/organization/equal-employment-opportunity/elijah-cummings-act\n15. https://www.cia.gov/stories/story/telling-data-stories-an-interview-with-cias-dr-calvin-andrus\n16. https://www.cia.gov/stories\n17. https://www.cia.gov/resources/csi\n18. https://www.cia.gov/careers/working-at-cia/accessibility\n19. https://www.cia.gov/stories/story/wanderers-in-a-wonderful-world\n20. https://www.cia.gov/about/organization/privacy-and-civil-liberties\n",
+              "links": [
+                "https://www.cia.gov/stories/speeches-and-transcripts",
+                "https://www.cia.gov/resources/publications",
+                "https://www.cia.gov/legacy/headquarters",
+                "https://www.cia.gov/sitemap",
+                "https://www.cia.gov/stories/press-releases-and-statements",
+                "https://www.cia.gov/search",
+                "https://www.cia.gov/stories/story/history-of-the-world-factbook",
+                "https://www.cia.gov/legacy/memorial-wall/fallen",
+                "https://www.usa.gov/",
+                "https://www.cia.gov/report-information",
+                "https://www.cia.gov/resources/cia-maps",
+                "https://www.facebook.com/Central.Intelligence.Agency",
+                "https://www.cia.gov/readingroom",
+                "https://www.cia.gov/about/organization/equal-employment-opportunity/elijah-cummings-act",
+                "https://www.cia.gov/stories/story/telling-data-stories-an-interview-with-cias-dr-calvin-andrus",
+                "https://www.cia.gov/stories",
+                "https://www.cia.gov/resources/csi",
+                "https://www.cia.gov/careers/working-at-cia/accessibility",
+                "https://www.cia.gov/stories/story/wanderers-in-a-wonderful-world",
+                "https://www.cia.gov/about/organization/privacy-and-civil-liberties"
+              ],
+              "links_full": [
+                "https://www.cia.gov/stories/speeches-and-transcripts",
+                "https://www.cia.gov/resources/publications",
+                "https://www.cia.gov/legacy/headquarters",
+                "https://www.cia.gov/sitemap",
+                "https://www.cia.gov/stories/press-releases-and-statements",
+                "https://www.cia.gov/search",
+                "https://www.cia.gov/stories/story/history-of-the-world-factbook",
+                "https://www.cia.gov/legacy/memorial-wall/fallen",
+                "https://www.usa.gov/",
+                "https://www.cia.gov/report-information",
+                "https://www.cia.gov/resources/cia-maps",
+                "https://www.facebook.com/Central.Intelligence.Agency",
+                "https://www.cia.gov/readingroom",
+                "https://www.cia.gov/about/organization/equal-employment-opportunity/elijah-cummings-act",
+                "https://www.cia.gov/stories/story/telling-data-stories-an-interview-with-cias-dr-calvin-andrus",
+                "https://www.cia.gov/stories",
+                "https://www.cia.gov/resources/csi",
+                "https://www.cia.gov/careers/working-at-cia/accessibility",
+                "https://www.cia.gov/stories/story/wanderers-in-a-wonderful-world",
+                "https://www.cia.gov/about/organization/privacy-and-civil-liberties"
+              ],
+              "links_count": 20,
+              "link_contexts": {
+                "https://www.cia.gov/contact-cia": "Contact CIA",
+                "https://www.cia.gov/report-information": "Report Information",
+                "https://www.cia.gov/": "Central Intelligence AgencyCentral Intelligence Agency",
+                "https://www.cia.gov/about": "About CIA",
+                "https://www.cia.gov/about/director-of-cia": "Leadership",
+                "https://www.cia.gov/about/organization": "Organization",
+                "https://www.cia.gov/about/mission-vision": "Mission and Vision",
+                "https://www.cia.gov/partner-with-cia": "Partner with CIA",
+                "https://www.cia.gov/tech": "Technology",
+                "https://www.cia.gov/about/organization/privacy-and-civil-liberties": "Privacy",
+                "https://www.cia.gov/careers": "Career Opportunities",
+                "https://www.cia.gov/careers/how-we-hire": "Hiring Process",
+                "https://www.cia.gov/careers/working-at-cia/benefits": "Benefits",
+                "https://www.cia.gov/careers/accommodations": "Accommodations",
+                "https://www.cia.gov/careers/language-opportunities": "Language Opportunities",
+                "https://www.cia.gov/careers/working-at-cia/veterans": "Veterans",
+                "https://www.cia.gov/careers/student-programs": "Student Programs",
+                "https://www.cia.gov/legacy": "Origin",
+                "https://www.cia.gov/legacy/cia-history": "History",
+                "https://www.cia.gov/legacy/museum": "CIA Museum",
+                "https://www.cia.gov/legacy/headquarters": "Headquarters",
+                "https://www.cia.gov/legacy/cia-history/cia-trailblazers": "Trailblazers",
+                "https://www.cia.gov/legacy/memorial-wall/fallen": "In Memoriam",
+                "https://www.cia.gov/stories": "News and Stories",
+                "https://www.cia.gov/stories/press-releases-and-statements": "Press Releases & Statements",
+                "https://www.cia.gov/stories/speeches-and-transcripts": "Speeches & Transcripts",
+                "https://www.cia.gov/podcast": "The Langley Files",
+                "https://www.cia.gov/resources": "Resources",
+                "https://www.cia.gov/resources/publications": "Publications",
+                "https://www.cia.gov/about/organization/prepublication-classification-review-board": "Prepublication Review",
+                "https://www.cia.gov/resources/csi": "Center for the Study of Intelligence (CSI)",
+                "https://www.cia.gov/resources/reports": "CIA Reports",
+                "https://www.cia.gov/resources/cia-maps": "CIA Maps",
+                "https://www.cia.gov/readingroom": "Freedom of Information Act (FOIA)",
+                "https://www.cia.gov/stories/view-all": "Stories",
+                "https://www.cia.gov/stories/story/history-of-the-world-factbook": "Learn MoreArrow Right Icon",
+                "https://www.cia.gov/stories/story/wanderers-in-a-wonderful-world": "Learn MoreArrow Right Icon",
+                "https://www.cia.gov/stories/story/telling-data-stories-an-interview-with-cias-dr-calvin-andrus": "Learn MoreArrow Right Icon",
+                "https://www.cia.gov/careers/working-at-cia/accessibility": "Accommodations",
+                "https://www.cia.gov/ehl": "MyLINK",
+                "https://www.cia.gov/resources/world-leaders": "World Leaders",
+                "https://www.cia.gov/spy-kids": "Spy Kids",
+                "https://www.cia.gov/faqs": "Frequently Asked Questions",
+                "https://www.cia.gov/privacy_policy": "Privacy Policy",
+                "https://www.instagram.com/cia": "Instagram",
+                "https://www.facebook.com/Central.Intelligence.Agency": "Facebook",
+                "https://twitter.com/cia": "X",
+                "https://www.linkedin.com/company/central-intelligence-agency": "LinkedIn",
+                "https://www.youtube.com/cia": "YouTube",
+                "https://www.flickr.com/ciagov": "Flickr",
+                "https://t.me/s/securelycontactingcia": "Telegram",
+                "https://www.cia.gov/search": "Search CIA.gov",
+                "https://www.cia.gov/site-policies": "Site Policies",
+                "https://www.cia.gov/about/organization/equal-employment-opportunity/no-fear-act": "No FEAR Act",
+                "https://www.cia.gov/about/organization/equal-employment-opportunity/elijah-cummings-act": "ECA Notice",
+                "https://www.cia.gov/about/organization/inspector-general": "Inspector General",
+                "https://www.usa.gov/": "USA.gov",
+                "https://www.cia.gov/sitemap": "Sitemap"
+              }
+            },
+            "provides_data": {
+              "type": "urls_from_visit"
+            }
+          },
+          "parent_id": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+          "parent_ids": [
+            "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.95,
+          "memo_key": null
+        },
+        "afd0bfd7-eaf7-4f18-a280-355e52ed8c0f": {
+          "node_id": "afd0bfd7-eaf7-4f18-a280-355e52ed8c0f",
+          "title": "Synthesize final answer and format concise response with one citation",
+          "details": {
+            "intent": "After visit node returns extracted facts, produce the concise answer 'Canberra' and include one authoritative source URL and the evidence snippet as the citation.",
+            "input_needed": [
+              "capital_name from visit",
+              "evidence_snippet from visit",
+              "citation_url from visit"
+            ],
+            "measurable_output_fields": [
+              "answer_text (e.g., 'The capital city of Australia is Canberra.' )",
+              "citation_url",
+              "evidence_snippet"
+            ],
+            "verification_steps": [
+              "Ensure capital_name is non-empty and matches the evidence_snippet.",
+              "If visit produced multiple candidate capitals or ambiguity, request sequential follow-up searches/visits (not expected for this question)."
+            ],
+            "why_this_node": "This is a post-action synthesis step required to transform extracted page facts into the final user-facing answer with the required citation.",
+            "action": "think",
+            "goal": "Synthesize final answer and format concise response with one citation",
+            "original_goal": "Synthesize final answer and format concise response with one citation",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.8
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "afd0bfd7-eaf7-4f18-a280-355e52ed8c0f",
+              "title": "Synthesize final answer and format concise response with one citation",
+              "details": {
+                "intent": "After visit node returns extracted facts, produce the concise answer 'Canberra' and include one authoritative source URL and the evidence snippet as the citation.",
+                "input_needed": [
+                  "capital_name from visit",
+                  "evidence_snippet from visit",
+                  "citation_url from visit"
+                ],
+                "measurable_output_fields": [
+                  "answer_text (e.g., 'The capital city of Australia is Canberra.' )",
+                  "citation_url",
+                  "evidence_snippet"
+                ],
+                "verification_steps": [
+                  "Ensure capital_name is non-empty and matches the evidence_snippet.",
+                  "If visit produced multiple candidate capitals or ambiguity, request sequential follow-up searches/visits (not expected for this question)."
+                ],
+                "why_this_node": "This is a post-action synthesis step required to transform extracted page facts into the final user-facing answer with the required citation.",
+                "action": "think",
+                "goal": "Synthesize final answer and format concise response with one citation",
+                "original_goal": "Synthesize final answer and format concise response with one citation",
+                "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 0.2
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              },
+              "thinking_content": "Synthesize final answer and format concise response with one citation"
+            }
+          },
+          "parent_id": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+          "parent_ids": [
+            "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.8,
+          "memo_key": null
+        },
+        "ab6798f8-cda2-45f3-87cb-208e679fe7b5": {
+          "node_id": "ab6798f8-cda2-45f3-87cb-208e679fe7b5",
+          "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+          "details": {
+            "action": "merge",
+            "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "original_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "ab6798f8-cda2-45f3-87cb-208e679fe7b5",
+              "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+              "details": {
+                "action": "merge",
+                "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+                "original_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              },
+              "thinking_content": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL."
+            },
+            "evaluation": {
+              "score": 0.35
+            }
+          },
+          "parent_id": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+          "parent_ids": [
+            "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.35,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 376,
+        "words": 51,
+        "kilobytes": 0.37
+      },
+      "llm": {
+        "calls": 4,
+        "prompt": {
+          "chars": 13649,
+          "words": 1871,
+          "kilobytes": 13.33,
+          "tokens": 2533
+        },
+        "completion": {
+          "chars": 5784,
+          "words": 791,
+          "kilobytes": 5.65,
+          "tokens": 2513
+        },
+        "total_tokens": 5046
+      },
+      "chroma": {
+        "store": {
+          "count": 2,
+          "chars": 172,
+          "words": 27,
+          "kilobytes": 0.17
+        },
+        "retrieve": {
+          "count": 2,
+          "chars": 138,
+          "words": 20,
+          "kilobytes": 0.13
+        }
+      },
+      "search": {
+        "count": 5,
+        "chars": 2843,
+        "words": 385,
+        "kilobytes": 2.78
+      },
+      "visit": {
+        "count": 1,
+        "chars": 1112,
+        "words": 48,
+        "kilobytes": 1.09
+      },
+      "timings": {
+        "chroma_add": {
+          "count": 2,
+          "total_duration": 0.6513178919999518,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "chroma_query": {
+          "count": 1,
+          "total_duration": 0.23997235299998465,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 1,
+          "total_duration": 0.6937874669999928,
+          "success_count": 1,
+          "error_count": 0
+        },
+        "llm_call": {
+          "count": 4,
+          "total_duration": 91.729960172,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_store": {
+          "count": 2,
+          "total_duration": 1.454015500999958,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 2,
+          "total_duration": 1.0806776569999101,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 1.0295471350000298,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 14
+    },
+    "duration_seconds": 99.27,
+    "telemetry": {
+      "correlation_id": "idea_test_002_gpt-5-mini_20260226_082547",
+      "trace_file": "/app/agent/idea_test_results/20260226_082547_002_gpt-5-mini.jsonl",
+      "events_count": 14,
+      "timings_count": 13
+    },
+    "graph_visualization": {
+      "ascii": "*---.   What is the capital city of Australia? Provide the answer and cite one authoritative source URL.\n|\\ \\ \\  \n* | | | Search authoritative sources for 'capital city of Australia'\n / / /  \n* | | Visit CIA World Factbook page for Australia and extract the capital\n / /  \n* | Synthesize final answer and format concise response with one citation\n /  \n* Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.\n",
+      "graph_data": {
+        "nodes": [
+          {
+            "id": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+            "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "status": "active",
+            "score": null,
+            "memo_key": null,
+            "action": null,
+            "has_result": false,
+            "parent_ids": []
+          },
+          {
+            "id": "f0ec83b1-47fa-4a1d-93d3-6501d0aa8d24",
+            "title": "Search authoritative sources for 'capital city of Australia'",
+            "status": "done",
+            "score": 0.65,
+            "memo_key": null,
+            "action": "search",
+            "has_result": true,
+            "parent_ids": [
+              "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e"
+            ]
+          },
+          {
+            "id": "c326d2c8-089b-4240-970d-58a4475698df",
+            "title": "Visit CIA World Factbook page for Australia and extract the capital",
+            "status": "done",
+            "score": 0.95,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e"
+            ]
+          },
+          {
+            "id": "afd0bfd7-eaf7-4f18-a280-355e52ed8c0f",
+            "title": "Synthesize final answer and format concise response with one citation",
+            "status": "done",
+            "score": 0.8,
+            "memo_key": null,
+            "action": "think",
+            "has_result": true,
+            "parent_ids": [
+              "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e"
+            ]
+          },
+          {
+            "id": "ab6798f8-cda2-45f3-87cb-208e679fe7b5",
+            "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "status": "done",
+            "score": 0.35,
+            "memo_key": null,
+            "action": "merge",
+            "has_result": true,
+            "parent_ids": [
+              "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+            "to": "f0ec83b1-47fa-4a1d-93d3-6501d0aa8d24"
+          },
+          {
+            "from": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+            "to": "c326d2c8-089b-4240-970d-58a4475698df"
+          },
+          {
+            "from": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+            "to": "afd0bfd7-eaf7-4f18-a280-355e52ed8c0f"
+          },
+          {
+            "from": "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+            "to": "ab6798f8-cda2-45f3-87cb-208e679fe7b5"
+          }
+        ]
+      },
+      "analysis": {
+        "total_nodes": 5,
+        "action_counts": {
+          "search": 1,
+          "visit": 1,
+          "think": 1,
+          "merge": 1
+        },
+        "think_count": 1,
+        "think_ratio": 0.2,
+        "other_action_count": 4,
+        "action_diversity": 4,
+        "unique_titles": 5,
+        "duplicate_title_count": 0,
+        "think_nodes": [
+          {
+            "node_id": "afd0bfd7-eaf7-4f18-a280-355e52ed8c0f",
+            "title": "Synthesize final answer and format concise response with one citation",
+            "status": "done"
+          }
+        ],
+        "issues": [
+          {
+            "severity": "medium",
+            "type": "similar_long_titles",
+            "message": "Found 1 pairs of nodes with very similar long titles (likely merge/repetition)",
+            "recommendation": "Review merge nodes - they may be duplicating the root node's mandate unnecessarily",
+            "examples": [
+              {
+                "title_preview": "what is the capital city of australia? provide the answer and cite one authoritative source url.",
+                "node_ids": [
+                  "2b9e008d-ccb3-484b-98db-0ee6dd82cd7e",
+                  "ab6798f8-cda2-45f3-87cb-208e679fe7b5"
+                ]
+              }
+            ]
+          }
+        ],
+        "issue_count": 1
+      }
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "correct_answer",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Canberra found"
+      },
+      {
+        "check": "url_present",
+        "passed": true,
+        "score": 1.0,
+        "url_count": 1,
+        "reason": "Found 1 URL(s)"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": true,
+    "overall_score": 1.0,
+    "checks_passed": 2,
+    "total_checks": 2,
+    "pass_rate": 1.0
+  },
+  "timestamp": "2026-02-26T08:40:01.818653",
+  "execution_variant": "graph"
+}

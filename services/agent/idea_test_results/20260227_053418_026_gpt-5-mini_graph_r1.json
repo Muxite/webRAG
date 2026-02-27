@@ -1,0 +1,941 @@
+{
+  "test_metadata": {
+    "test_id": "026",
+    "test_name": "Deterministic Page Facts",
+    "difficulty_level": "1/10",
+    "category": "Deterministic Retrieval"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Results (extracted from the provided visit results):\n\n1) Exact H1 text from https://example.com\n   - H1 text (exact, character-for-character): \"Example Domain\"\n\n2) Exact domain of the external link from https://example.com\n   - External link (full URL found on the page): https://iana.org/domains/example\n   - Domain (exact): iana.org\n\n3) One URL citation for each visited page (in order)\n   1. https://example.com\n   2. https://www.iana.org/domains/reserved\n\nEvidence: values above come from the provided visit results for each page (see the URLs listed in section 3).",
+      "action_summary": "Extracted H1 \"Example Domain\" from https://example.com; identified the page's external link https://iana.org/domains/example and its domain iana.org; provided one URL citation each for https://example.com and https://www.iana.org/domains/reserved (all values taken from the provided visit results).",
+      "success": false,
+      "goal_achieved": false,
+      "has_failures": false
+    },
+    "graph": {
+      "root_id": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+      "nodes": {
+        "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3": {
+          "node_id": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+          "title": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+          "details": {
+            "mandate": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "memo_namespace": "idea_dag:725ab7b389",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "original_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "merged_results": [
+              {
+                "node_id": "f4772588-5e60-4c04-88e6-ee22fe858516",
+                "title": "Visit https://example.com and extract exact H1, external link URL & domain, and page citation",
+                "status": "done",
+                "score": 0.18,
+                "evaluation": {
+                  "score": 0.18
+                },
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://example.com",
+                  "intent": "Fetch the full HTML of https://example.com and extract (1) the exact H1 text (character-for-character), (2) the exact full URL of the external link on the page and its exact domain, and (3) the page citation (the visited URL).",
+                  "content": "https://iana.org/domains/example",
+                  "content_is_truncated": false,
+                  "content_total_chars": 32,
+                  "content_full": "https://iana.org/domains/example",
+                  "content_with_links": "https://iana.org/domains/example\n\n--- Links found on this page ---\n1. https://iana.org/domains/example\n",
+                  "links": [
+                    "https://iana.org/domains/example"
+                  ],
+                  "links_full": [
+                    "https://iana.org/domains/example"
+                  ],
+                  "links_count": 1,
+                  "link_contexts": {
+                    "https://iana.org/domains/example": "Learn more"
+                  },
+                  "page_title": "Example Domain",
+                  "h1_text": "Example Domain",
+                  "source_url": "https://example.com"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "d8fbe8f2-23f3-49e5-bd63-f0dcf67ccf79",
+                "title": "Visit https://www.iana.org/domains/reserved and capture one URL citation for the page",
+                "status": "done",
+                "score": 0.16,
+                "evaluation": {
+                  "score": 0.16
+                },
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://www.iana.org/domains/reserved",
+                  "intent": "Fetch the full page to produce one URL citation for this visited page (the user requested a citation for each visited page). Also capture the H1 or title for verification.",
+                  "content": "https://www.icann.org/privacy/tos",
+                  "content_is_truncated": false,
+                  "content_total_chars": 33,
+                  "content_full": "https://www.icann.org/privacy/tos",
+                  "content_with_links": "https://www.icann.org/privacy/tos\n\n--- Links found on this page ---\n1. https://www.iana.org/\n2. https://www.iana.org/domains\n3. https://www.iana.org/protocols\n4. https://www.iana.org/numbers\n5. https://www.iana.org/about\n6. https://www.iana.org/go/rfc2606\n7. https://www.iana.org/go/rfc6761\n8. http://www.icann.org/topics/idn\n9. http://www.icann.org/\n10. https://www.iana.org/domains/root/db/xn--kgbechtv.html\n11. https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html\n12. https://www.iana.org/domains/root/db/xn--0zwm56d.html\n13. https://www.iana.org/domains/root/db/xn--g6w251d.html\n14. https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html\n15. https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html\n16. https://www.iana.org/domains/root/db/xn--jxalpdlp.html\n17. https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html\n18. https://www.iana.org/domains/root/db/xn--deba0ad.html\n19. https://www.iana.org/domains/root/db/xn--zckzah.html\n20. https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html\n",
+                  "links": [
+                    "https://www.iana.org/",
+                    "https://www.iana.org/domains",
+                    "https://www.iana.org/protocols",
+                    "https://www.iana.org/numbers",
+                    "https://www.iana.org/about",
+                    "https://www.iana.org/go/rfc2606",
+                    "https://www.iana.org/go/rfc6761",
+                    "http://www.icann.org/topics/idn",
+                    "http://www.icann.org/",
+                    "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                    "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                    "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                    "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                    "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                    "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                    "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                    "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                    "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                    "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                    "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html"
+                  ],
+                  "links_full": [
+                    "https://www.iana.org/",
+                    "https://www.iana.org/domains",
+                    "https://www.iana.org/protocols",
+                    "https://www.iana.org/numbers",
+                    "https://www.iana.org/about",
+                    "https://www.iana.org/go/rfc2606",
+                    "https://www.iana.org/go/rfc6761",
+                    "http://www.icann.org/topics/idn",
+                    "http://www.icann.org/",
+                    "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                    "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                    "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                    "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                    "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                    "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                    "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                    "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                    "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                    "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                    "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html",
+                    "http://www.icann.org/en/registries/agreements.htm",
+                    "https://www.iana.org/assignments/special-use-domain-names",
+                    "https://www.iana.org/domains/root",
+                    "https://www.iana.org/domains/root/db",
+                    "https://www.iana.org/domains/root/files",
+                    "https://www.iana.org/domains/root/manage",
+                    "https://www.iana.org/domains/root/help",
+                    "https://www.iana.org/domains/root/servers",
+                    "https://www.iana.org/domains/int",
+                    "https://www.iana.org/domains/int/manage",
+                    "https://www.iana.org/domains/int/policy",
+                    "https://www.iana.org/domains/arpa",
+                    "https://www.iana.org/domains/idn-tables",
+                    "https://www.iana.org/help/idn-repository-procedure",
+                    "https://www.iana.org/dnssec",
+                    "https://www.iana.org/dnssec/files",
+                    "https://www.iana.org/dnssec/ceremonies",
+                    "https://www.iana.org/dnssec/procedures",
+                    "https://www.iana.org/dnssec/tcrs",
+                    "https://www.iana.org/abuse",
+                    "https://www.iana.org/time-zones",
+                    "https://www.iana.org/news",
+                    "https://www.iana.org/performance",
+                    "https://www.iana.org/about/excellence",
+                    "https://www.iana.org/archive",
+                    "https://www.iana.org/contact",
+                    "https://pti.icann.org",
+                    "https://www.icann.org/",
+                    "https://www.icann.org/privacy/policy",
+                    "https://www.icann.org/privacy/tos"
+                  ],
+                  "links_count": 50,
+                  "link_contexts": {
+                    "https://www.iana.org/domains": "Domain\u00a0Names",
+                    "https://www.iana.org/protocols": "Protocol Registries",
+                    "https://www.iana.org/numbers": "Number\u00a0Resources",
+                    "https://www.iana.org/about": "About\u00a0Us",
+                    "https://www.iana.org/go/rfc2606": "RFC 2606",
+                    "https://www.iana.org/go/rfc6761": "Special-Use Domain Names",
+                    "http://www.icann.org/topics/idn": "IDN Evaluation",
+                    "http://www.icann.org/": "ICANN",
+                    "https://www.iana.org/domains/root/db/xn--kgbechtv.html": "XN--KGBECHTV",
+                    "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html": "XN--HGBK6AJ7F53BBA",
+                    "https://www.iana.org/domains/root/db/xn--0zwm56d.html": "XN--0ZWM56D",
+                    "https://www.iana.org/domains/root/db/xn--g6w251d.html": "XN--G6W251D",
+                    "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html": "XN--80AKHBYKNJ4F",
+                    "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html": "XN--11B5BS3A9AJ6G",
+                    "https://www.iana.org/domains/root/db/xn--jxalpdlp.html": "XN--JXALPDLP",
+                    "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html": "XN--9T4B11YI5A",
+                    "https://www.iana.org/domains/root/db/xn--deba0ad.html": "XN--DEBA0AD",
+                    "https://www.iana.org/domains/root/db/xn--zckzah.html": "XN--ZCKZAH",
+                    "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html": "XN--HLCJ6AYA9ESC7A",
+                    "http://www.icann.org/en/registries/agreements.htm": "contractual limitations",
+                    "https://www.iana.org/assignments/special-use-domain-names": "Special-Use Domain Names",
+                    "https://www.iana.org/domains/root": "Root Zone Registry",
+                    "https://www.iana.org/domains/root/db": "Root Database",
+                    "https://www.iana.org/domains/root/files": "Hint and Zone Files",
+                    "https://www.iana.org/domains/root/manage": "Change Requests",
+                    "https://www.iana.org/domains/root/help": "Instructions & Guides",
+                    "https://www.iana.org/domains/root/servers": "Root Servers",
+                    "https://www.iana.org/domains/int": ".INT Registry",
+                    "https://www.iana.org/domains/int/manage": "Register/modify an .INT domain",
+                    "https://www.iana.org/domains/int/policy": "Eligibility",
+                    "https://www.iana.org/domains/arpa": ".ARPA Registry",
+                    "https://www.iana.org/domains/idn-tables": "IDN Repository",
+                    "https://www.iana.org/help/idn-repository-procedure": "Submit a table",
+                    "https://www.iana.org/dnssec": "Overview",
+                    "https://www.iana.org/dnssec/files": "Trust Anchors and Rollovers",
+                    "https://www.iana.org/dnssec/ceremonies": "Key Signing Ceremonies",
+                    "https://www.iana.org/dnssec/procedures": "Policies & Procedures",
+                    "https://www.iana.org/dnssec/tcrs": "Community Representatives",
+                    "https://www.iana.org/abuse": "Abuse Information",
+                    "https://www.iana.org/time-zones": "Time Zone Database",
+                    "https://www.iana.org/news": "News",
+                    "https://www.iana.org/performance": "Performance",
+                    "https://www.iana.org/about/excellence": "Excellence",
+                    "https://www.iana.org/archive": "Archive",
+                    "https://www.iana.org/contact": "Contact Us",
+                    "https://pti.icann.org": "Public Technical Identifiers",
+                    "https://www.icann.org/": "ICANN",
+                    "https://www.icann.org/privacy/policy": "Privacy Policy",
+                    "https://www.icann.org/privacy/tos": "Terms of Service"
+                  },
+                  "page_title": "IANA-managed Reserved Domains",
+                  "h1_text": "IANA-managed Reserved Domains",
+                  "source_url": "https://www.iana.org/domains/reserved"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "1fbfa3f8-60e1-42df-b357-9201930d7958",
+                "title": "Aggregate results, verify extracted values, and format final response",
+                "status": "done",
+                "score": 0.2,
+                "evaluation": {
+                  "score": 0.2
+                },
+                "result": {
+                  "action": "think",
+                  "success": true,
+                  "node_id": "1fbfa3f8-60e1-42df-b357-9201930d7958",
+                  "title": "Aggregate results, verify extracted values, and format final response",
+                  "details": {
+                    "intent": "After the two visits complete, merge their outputs into the final structured result required by the user: (1) exact H1 text from example.com, (2) exact domain of the external link from example.com, and (3) one URL citation for each visited page. Perform final verification against the raw extracted HTML snippets to ensure fidelity.",
+                    "target_facts": [
+                      {
+                        "name": "final_example_h1",
+                        "type": "string",
+                        "description": "Verified exact H1 text returned to the user."
+                      },
+                      {
+                        "name": "final_example_external_domain",
+                        "type": "string",
+                        "description": "Verified exact domain of the external link from example.com."
+                      },
+                      {
+                        "name": "final_citation_example",
+                        "type": "string",
+                        "description": "Citation URL for example.com."
+                      },
+                      {
+                        "name": "final_citation_iana",
+                        "type": "string",
+                        "description": "Citation URL for the IANA reserved page."
+                      }
+                    ],
+                    "aggregation_plan": "1) Receive extracted facts from both visit nodes. 2) Verify H1 appears in raw HTML snippet returned by the example.com visit; ensure character-for-character match. 3) Verify external link href exists in raw HTML and parse domain. 4) Prepare final minimal response containing exactly the four required fields and the two citations. 5) If any verification fails, include a short diagnostic describing the mismatch and include the raw snippet as evidence.",
+                    "why_this_step": "Combining and verifying results after tool visits ensures accuracy and produces the exact outputs the user requested. The think step is intentionally post-action to respect the data-flow requirements.",
+                    "action": "think",
+                    "goal": "Aggregate results, verify extracted values, and format final response",
+                    "original_goal": "Aggregate results, verify extracted values, and format final response",
+                    "parent_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+                    "is_leaf": true,
+                    "evaluation": {
+                      "score": 0.2
+                    },
+                    "action_attempts": 1,
+                    "action_max_retries": 2
+                  },
+                  "thinking_content": "Aggregate results, verify extracted values, and format final response"
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 3,
+              "success": 3,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            },
+            "goal_achieved": false
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "f4772588-5e60-4c04-88e6-ee22fe858516",
+            "d8fbe8f2-23f3-49e5-bd63-f0dcf67ccf79",
+            "1fbfa3f8-60e1-42df-b357-9201930d7958",
+            "b7a2e37d-2324-42ca-a252-3857faae3722"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "f4772588-5e60-4c04-88e6-ee22fe858516": {
+          "node_id": "f4772588-5e60-4c04-88e6-ee22fe858516",
+          "title": "Visit https://example.com and extract exact H1, external link URL & domain, and page citation",
+          "details": {
+            "optional_url": "https://example.com",
+            "intent": "Fetch the full HTML of https://example.com and extract (1) the exact H1 text (character-for-character), (2) the exact full URL of the external link on the page and its exact domain, and (3) the page citation (the visited URL).",
+            "target_facts": [
+              {
+                "name": "example_h1_exact",
+                "type": "string",
+                "description": "Exact H1 text from the page, no trimming or paraphrasing."
+              },
+              {
+                "name": "example_external_full_url",
+                "type": "string",
+                "description": "Exact full URL (href) of the external link found on the page."
+              },
+              {
+                "name": "example_external_domain",
+                "type": "string",
+                "description": "Exact domain component of the external link (e.g., example.org)."
+              },
+              {
+                "name": "example_page_citation",
+                "type": "string",
+                "description": "One URL citation for the visited page (should be https://example.com)."
+              }
+            ],
+            "extraction_plan": "1) Download the page HTML. 2) Locate the first H1 element and capture its inner text exactly as-is (including spacing). 3) Find anchor (<a>) elements with hrefs; identify the external link(s) (hrefs whose domain differs from example.com). If multiple, choose the first external link in source order and capture the exact href string. 4) Parse the href to extract the exact domain (preserve punycode/port if present) for example_external_domain. 5) Return the visited page URL as example_page_citation.",
+            "verification_steps": "Confirm the H1 value appears in the HTML in an <h1> tag. Confirm the external link's href value appears verbatim in the page HTML and that its domain is correctly parsed. If any element is missing, record exact diagnostic (e.g., 'H1 not found').",
+            "why_this_step": "The mandate explicitly requires visiting example.com and returning exact elements that must be read from the live page. A direct visit is the authoritative source and avoids guessing from memory.",
+            "link_count": 1,
+            "action": "visit",
+            "goal": "Visit https://example.com and extract exact H1, external link URL & domain, and page citation",
+            "original_goal": "Visit https://example.com and extract exact H1, external link URL & domain, and page citation",
+            "url": "https://example.com",
+            "parent_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.9
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://example.com",
+              "intent": "Fetch the full HTML of https://example.com and extract (1) the exact H1 text (character-for-character), (2) the exact full URL of the external link on the page and its exact domain, and (3) the page citation (the visited URL).",
+              "content": "https://iana.org/domains/example",
+              "content_is_truncated": false,
+              "content_total_chars": 32,
+              "content_full": "https://iana.org/domains/example",
+              "content_with_links": "https://iana.org/domains/example\n\n--- Links found on this page ---\n1. https://iana.org/domains/example\n",
+              "links": [
+                "https://iana.org/domains/example"
+              ],
+              "links_full": [
+                "https://iana.org/domains/example"
+              ],
+              "links_count": 1,
+              "link_contexts": {
+                "https://iana.org/domains/example": "Learn more"
+              },
+              "page_title": "Example Domain",
+              "h1_text": "Example Domain",
+              "source_url": "https://example.com"
+            },
+            "provides_data": {
+              "type": "urls_from_visit"
+            }
+          },
+          "parent_id": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+          "parent_ids": [
+            "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.9,
+          "memo_key": null
+        },
+        "d8fbe8f2-23f3-49e5-bd63-f0dcf67ccf79": {
+          "node_id": "d8fbe8f2-23f3-49e5-bd63-f0dcf67ccf79",
+          "title": "Visit https://www.iana.org/domains/reserved and capture one URL citation for the page",
+          "details": {
+            "optional_url": "https://www.iana.org/domains/reserved",
+            "intent": "Fetch the full page to produce one URL citation for this visited page (the user requested a citation for each visited page). Also capture the H1 or title for verification.",
+            "target_facts": [
+              {
+                "name": "iana_page_citation",
+                "type": "string",
+                "description": "One URL citation for the visited IANA page (should be https://www.iana.org/domains/reserved)."
+              },
+              {
+                "name": "iana_h1_or_title",
+                "type": "string",
+                "description": "H1 text or page title for verification (optional, helps validate the visit)."
+              }
+            ],
+            "extraction_plan": "1) Download the page HTML. 2) Return the visited URL as iana_page_citation. 3) Attempt to extract the first H1; if absent, extract the <title> content as iana_h1_or_title. Provide the exact text found.",
+            "verification_steps": "Confirm the returned citation matches the visited URL. Confirm H1/title text exists in page HTML; if not, note absence.",
+            "why_this_step": "The user explicitly named this URL and requested a citation for each visited page. Visiting is required to provide an authoritative citation and optional verification text.",
+            "link_count": 1,
+            "action": "visit",
+            "goal": "Visit https://www.iana.org/domains/reserved and capture one URL citation for the page",
+            "original_goal": "Visit https://www.iana.org/domains/reserved and capture one URL citation for the page",
+            "url": "https://www.iana.org/domains/reserved",
+            "parent_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.85
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://www.iana.org/domains/reserved",
+              "intent": "Fetch the full page to produce one URL citation for this visited page (the user requested a citation for each visited page). Also capture the H1 or title for verification.",
+              "content": "https://www.icann.org/privacy/tos",
+              "content_is_truncated": false,
+              "content_total_chars": 33,
+              "content_full": "https://www.icann.org/privacy/tos",
+              "content_with_links": "https://www.icann.org/privacy/tos\n\n--- Links found on this page ---\n1. https://www.iana.org/\n2. https://www.iana.org/domains\n3. https://www.iana.org/protocols\n4. https://www.iana.org/numbers\n5. https://www.iana.org/about\n6. https://www.iana.org/go/rfc2606\n7. https://www.iana.org/go/rfc6761\n8. http://www.icann.org/topics/idn\n9. http://www.icann.org/\n10. https://www.iana.org/domains/root/db/xn--kgbechtv.html\n11. https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html\n12. https://www.iana.org/domains/root/db/xn--0zwm56d.html\n13. https://www.iana.org/domains/root/db/xn--g6w251d.html\n14. https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html\n15. https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html\n16. https://www.iana.org/domains/root/db/xn--jxalpdlp.html\n17. https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html\n18. https://www.iana.org/domains/root/db/xn--deba0ad.html\n19. https://www.iana.org/domains/root/db/xn--zckzah.html\n20. https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html\n",
+              "links": [
+                "https://www.iana.org/",
+                "https://www.iana.org/domains",
+                "https://www.iana.org/protocols",
+                "https://www.iana.org/numbers",
+                "https://www.iana.org/about",
+                "https://www.iana.org/go/rfc2606",
+                "https://www.iana.org/go/rfc6761",
+                "http://www.icann.org/topics/idn",
+                "http://www.icann.org/",
+                "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html"
+              ],
+              "links_full": [
+                "https://www.iana.org/",
+                "https://www.iana.org/domains",
+                "https://www.iana.org/protocols",
+                "https://www.iana.org/numbers",
+                "https://www.iana.org/about",
+                "https://www.iana.org/go/rfc2606",
+                "https://www.iana.org/go/rfc6761",
+                "http://www.icann.org/topics/idn",
+                "http://www.icann.org/",
+                "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html",
+                "http://www.icann.org/en/registries/agreements.htm",
+                "https://www.iana.org/assignments/special-use-domain-names",
+                "https://www.iana.org/domains/root",
+                "https://www.iana.org/domains/root/db",
+                "https://www.iana.org/domains/root/files",
+                "https://www.iana.org/domains/root/manage",
+                "https://www.iana.org/domains/root/help",
+                "https://www.iana.org/domains/root/servers",
+                "https://www.iana.org/domains/int",
+                "https://www.iana.org/domains/int/manage",
+                "https://www.iana.org/domains/int/policy",
+                "https://www.iana.org/domains/arpa",
+                "https://www.iana.org/domains/idn-tables",
+                "https://www.iana.org/help/idn-repository-procedure",
+                "https://www.iana.org/dnssec",
+                "https://www.iana.org/dnssec/files",
+                "https://www.iana.org/dnssec/ceremonies",
+                "https://www.iana.org/dnssec/procedures",
+                "https://www.iana.org/dnssec/tcrs",
+                "https://www.iana.org/abuse",
+                "https://www.iana.org/time-zones",
+                "https://www.iana.org/news",
+                "https://www.iana.org/performance",
+                "https://www.iana.org/about/excellence",
+                "https://www.iana.org/archive",
+                "https://www.iana.org/contact",
+                "https://pti.icann.org",
+                "https://www.icann.org/",
+                "https://www.icann.org/privacy/policy",
+                "https://www.icann.org/privacy/tos"
+              ],
+              "links_count": 50,
+              "link_contexts": {
+                "https://www.iana.org/domains": "Domain\u00a0Names",
+                "https://www.iana.org/protocols": "Protocol Registries",
+                "https://www.iana.org/numbers": "Number\u00a0Resources",
+                "https://www.iana.org/about": "About\u00a0Us",
+                "https://www.iana.org/go/rfc2606": "RFC 2606",
+                "https://www.iana.org/go/rfc6761": "Special-Use Domain Names",
+                "http://www.icann.org/topics/idn": "IDN Evaluation",
+                "http://www.icann.org/": "ICANN",
+                "https://www.iana.org/domains/root/db/xn--kgbechtv.html": "XN--KGBECHTV",
+                "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html": "XN--HGBK6AJ7F53BBA",
+                "https://www.iana.org/domains/root/db/xn--0zwm56d.html": "XN--0ZWM56D",
+                "https://www.iana.org/domains/root/db/xn--g6w251d.html": "XN--G6W251D",
+                "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html": "XN--80AKHBYKNJ4F",
+                "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html": "XN--11B5BS3A9AJ6G",
+                "https://www.iana.org/domains/root/db/xn--jxalpdlp.html": "XN--JXALPDLP",
+                "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html": "XN--9T4B11YI5A",
+                "https://www.iana.org/domains/root/db/xn--deba0ad.html": "XN--DEBA0AD",
+                "https://www.iana.org/domains/root/db/xn--zckzah.html": "XN--ZCKZAH",
+                "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html": "XN--HLCJ6AYA9ESC7A",
+                "http://www.icann.org/en/registries/agreements.htm": "contractual limitations",
+                "https://www.iana.org/assignments/special-use-domain-names": "Special-Use Domain Names",
+                "https://www.iana.org/domains/root": "Root Zone Registry",
+                "https://www.iana.org/domains/root/db": "Root Database",
+                "https://www.iana.org/domains/root/files": "Hint and Zone Files",
+                "https://www.iana.org/domains/root/manage": "Change Requests",
+                "https://www.iana.org/domains/root/help": "Instructions & Guides",
+                "https://www.iana.org/domains/root/servers": "Root Servers",
+                "https://www.iana.org/domains/int": ".INT Registry",
+                "https://www.iana.org/domains/int/manage": "Register/modify an .INT domain",
+                "https://www.iana.org/domains/int/policy": "Eligibility",
+                "https://www.iana.org/domains/arpa": ".ARPA Registry",
+                "https://www.iana.org/domains/idn-tables": "IDN Repository",
+                "https://www.iana.org/help/idn-repository-procedure": "Submit a table",
+                "https://www.iana.org/dnssec": "Overview",
+                "https://www.iana.org/dnssec/files": "Trust Anchors and Rollovers",
+                "https://www.iana.org/dnssec/ceremonies": "Key Signing Ceremonies",
+                "https://www.iana.org/dnssec/procedures": "Policies & Procedures",
+                "https://www.iana.org/dnssec/tcrs": "Community Representatives",
+                "https://www.iana.org/abuse": "Abuse Information",
+                "https://www.iana.org/time-zones": "Time Zone Database",
+                "https://www.iana.org/news": "News",
+                "https://www.iana.org/performance": "Performance",
+                "https://www.iana.org/about/excellence": "Excellence",
+                "https://www.iana.org/archive": "Archive",
+                "https://www.iana.org/contact": "Contact Us",
+                "https://pti.icann.org": "Public Technical Identifiers",
+                "https://www.icann.org/": "ICANN",
+                "https://www.icann.org/privacy/policy": "Privacy Policy",
+                "https://www.icann.org/privacy/tos": "Terms of Service"
+              },
+              "page_title": "IANA-managed Reserved Domains",
+              "h1_text": "IANA-managed Reserved Domains",
+              "source_url": "https://www.iana.org/domains/reserved"
+            },
+            "provides_data": {
+              "type": "urls_from_visit"
+            }
+          },
+          "parent_id": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+          "parent_ids": [
+            "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.85,
+          "memo_key": null
+        },
+        "1fbfa3f8-60e1-42df-b357-9201930d7958": {
+          "node_id": "1fbfa3f8-60e1-42df-b357-9201930d7958",
+          "title": "Aggregate results, verify extracted values, and format final response",
+          "details": {
+            "intent": "After the two visits complete, merge their outputs into the final structured result required by the user: (1) exact H1 text from example.com, (2) exact domain of the external link from example.com, and (3) one URL citation for each visited page. Perform final verification against the raw extracted HTML snippets to ensure fidelity.",
+            "target_facts": [
+              {
+                "name": "final_example_h1",
+                "type": "string",
+                "description": "Verified exact H1 text returned to the user."
+              },
+              {
+                "name": "final_example_external_domain",
+                "type": "string",
+                "description": "Verified exact domain of the external link from example.com."
+              },
+              {
+                "name": "final_citation_example",
+                "type": "string",
+                "description": "Citation URL for example.com."
+              },
+              {
+                "name": "final_citation_iana",
+                "type": "string",
+                "description": "Citation URL for the IANA reserved page."
+              }
+            ],
+            "aggregation_plan": "1) Receive extracted facts from both visit nodes. 2) Verify H1 appears in raw HTML snippet returned by the example.com visit; ensure character-for-character match. 3) Verify external link href exists in raw HTML and parse domain. 4) Prepare final minimal response containing exactly the four required fields and the two citations. 5) If any verification fails, include a short diagnostic describing the mismatch and include the raw snippet as evidence.",
+            "why_this_step": "Combining and verifying results after tool visits ensures accuracy and produces the exact outputs the user requested. The think step is intentionally post-action to respect the data-flow requirements.",
+            "action": "think",
+            "goal": "Aggregate results, verify extracted values, and format final response",
+            "original_goal": "Aggregate results, verify extracted values, and format final response",
+            "parent_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.55
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "1fbfa3f8-60e1-42df-b357-9201930d7958",
+              "title": "Aggregate results, verify extracted values, and format final response",
+              "details": {
+                "intent": "After the two visits complete, merge their outputs into the final structured result required by the user: (1) exact H1 text from example.com, (2) exact domain of the external link from example.com, and (3) one URL citation for each visited page. Perform final verification against the raw extracted HTML snippets to ensure fidelity.",
+                "target_facts": [
+                  {
+                    "name": "final_example_h1",
+                    "type": "string",
+                    "description": "Verified exact H1 text returned to the user."
+                  },
+                  {
+                    "name": "final_example_external_domain",
+                    "type": "string",
+                    "description": "Verified exact domain of the external link from example.com."
+                  },
+                  {
+                    "name": "final_citation_example",
+                    "type": "string",
+                    "description": "Citation URL for example.com."
+                  },
+                  {
+                    "name": "final_citation_iana",
+                    "type": "string",
+                    "description": "Citation URL for the IANA reserved page."
+                  }
+                ],
+                "aggregation_plan": "1) Receive extracted facts from both visit nodes. 2) Verify H1 appears in raw HTML snippet returned by the example.com visit; ensure character-for-character match. 3) Verify external link href exists in raw HTML and parse domain. 4) Prepare final minimal response containing exactly the four required fields and the two citations. 5) If any verification fails, include a short diagnostic describing the mismatch and include the raw snippet as evidence.",
+                "why_this_step": "Combining and verifying results after tool visits ensures accuracy and produces the exact outputs the user requested. The think step is intentionally post-action to respect the data-flow requirements.",
+                "action": "think",
+                "goal": "Aggregate results, verify extracted values, and format final response",
+                "original_goal": "Aggregate results, verify extracted values, and format final response",
+                "parent_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+                "is_leaf": true,
+                "evaluation": {
+                  "score": 0.2
+                },
+                "action_attempts": 1,
+                "action_max_retries": 2
+              },
+              "thinking_content": "Aggregate results, verify extracted values, and format final response"
+            }
+          },
+          "parent_id": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+          "parent_ids": [
+            "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.55,
+          "memo_key": null
+        },
+        "b7a2e37d-2324-42ca-a252-3857faae3722": {
+          "node_id": "b7a2e37d-2324-42ca-a252-3857faae3722",
+          "title": "Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+          "details": {
+            "action": "merge",
+            "goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "original_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "think",
+              "success": true,
+              "node_id": "b7a2e37d-2324-42ca-a252-3857faae3722",
+              "title": "Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+              "details": {
+                "action": "merge",
+                "goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+                "original_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+                "action_attempts": 1,
+                "action_max_retries": 2
+              },
+              "thinking_content": "Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page."
+            },
+            "evaluation": {
+              "score": 0.65
+            }
+          },
+          "parent_id": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+          "parent_ids": [
+            "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.65,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 569,
+        "words": 76,
+        "kilobytes": 0.56
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 29763,
+          "words": 3595,
+          "kilobytes": 29.07,
+          "tokens": 7694
+        },
+        "completion": {
+          "chars": 6485,
+          "words": 788,
+          "kilobytes": 6.33,
+          "tokens": 5682
+        },
+        "total_tokens": 13376
+      },
+      "chroma": {
+        "store": {
+          "count": 2,
+          "chars": 300,
+          "words": 41,
+          "kilobytes": 0.29
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 2,
+        "chars": 1121,
+        "words": 58,
+        "kilobytes": 1.09
+      },
+      "timings": {
+        "chroma_query": {
+          "count": 4,
+          "total_duration": 1.810037484006898,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "llm_call": {
+          "count": 4,
+          "total_duration": 76.60539294798946,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 2,
+          "total_duration": 0.9678085630002897,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 2,
+          "total_duration": 0.5756232920030016,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "chroma_add": {
+          "count": 6,
+          "total_duration": 3.991208251005446,
+          "success_count": 6,
+          "error_count": 0
+        },
+        "chroma_store": {
+          "count": 2,
+          "total_duration": 0.796807122991595,
+          "success_count": 2,
+          "error_count": 0
+        }
+      },
+      "events_count": 32
+    },
+    "duration_seconds": 83.13,
+    "telemetry": {
+      "correlation_id": "idea_test_026_gpt-5-mini_20260227_053418",
+      "trace_file": "/app/agent/idea_test_results/20260227_053418_026_gpt-5-mini.jsonl",
+      "events_count": 32,
+      "timings_count": 20
+    },
+    "graph_visualization": {
+      "ascii": "*---.   Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.\n|\\ \\ \\  \n* | | | Visit https://example.com and extract exact H1, external link URL & domain, and page citation\n / / /  \n* | | Visit https://www.iana.org/domains/reserved and capture one URL citation for the page\n / /  \n* | Aggregate results, verify extracted values, and format final response\n /  \n* Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.\n",
+      "graph_data": {
+        "nodes": [
+          {
+            "id": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+            "title": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "status": "active",
+            "score": null,
+            "memo_key": null,
+            "action": null,
+            "has_result": false,
+            "parent_ids": []
+          },
+          {
+            "id": "f4772588-5e60-4c04-88e6-ee22fe858516",
+            "title": "Visit https://example.com and extract exact H1, external link URL & domain, and page citation",
+            "status": "done",
+            "score": 0.9,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3"
+            ]
+          },
+          {
+            "id": "d8fbe8f2-23f3-49e5-bd63-f0dcf67ccf79",
+            "title": "Visit https://www.iana.org/domains/reserved and capture one URL citation for the page",
+            "status": "done",
+            "score": 0.85,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3"
+            ]
+          },
+          {
+            "id": "1fbfa3f8-60e1-42df-b357-9201930d7958",
+            "title": "Aggregate results, verify extracted values, and format final response",
+            "status": "done",
+            "score": 0.55,
+            "memo_key": null,
+            "action": "think",
+            "has_result": true,
+            "parent_ids": [
+              "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3"
+            ]
+          },
+          {
+            "id": "b7a2e37d-2324-42ca-a252-3857faae3722",
+            "title": "Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "status": "done",
+            "score": 0.65,
+            "memo_key": null,
+            "action": "merge",
+            "has_result": true,
+            "parent_ids": [
+              "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+            "to": "f4772588-5e60-4c04-88e6-ee22fe858516"
+          },
+          {
+            "from": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+            "to": "d8fbe8f2-23f3-49e5-bd63-f0dcf67ccf79"
+          },
+          {
+            "from": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+            "to": "1fbfa3f8-60e1-42df-b357-9201930d7958"
+          },
+          {
+            "from": "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+            "to": "b7a2e37d-2324-42ca-a252-3857faae3722"
+          }
+        ]
+      },
+      "analysis": {
+        "total_nodes": 5,
+        "action_counts": {
+          "visit": 2,
+          "think": 1,
+          "merge": 1
+        },
+        "think_count": 1,
+        "think_ratio": 0.2,
+        "other_action_count": 4,
+        "action_diversity": 3,
+        "unique_titles": 5,
+        "duplicate_title_count": 0,
+        "think_nodes": [
+          {
+            "node_id": "1fbfa3f8-60e1-42df-b357-9201930d7958",
+            "title": "Aggregate results, verify extracted values, and format final response",
+            "status": "done"
+          }
+        ],
+        "issues": [
+          {
+            "severity": "medium",
+            "type": "similar_long_titles",
+            "message": "Found 1 pairs of nodes with very similar long titles (likely merge/repetition)",
+            "recommendation": "Review merge nodes - they may be duplicating the root node's mandate unnecessarily",
+            "examples": [
+              {
+                "title_preview": "visit https://example.com and https://www.iana.org/domains/reserved. return: (1) the exact h1 text from example.com, (2) the exact domain of the exter...",
+                "node_ids": [
+                  "b1dd9620-f452-4a16-8d37-e4f1a99ad4f3",
+                  "b7a2e37d-2324-42ca-a252-3857faae3722"
+                ]
+              }
+            ]
+          }
+        ],
+        "issue_count": 1
+      }
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "visit_count",
+        "passed": true,
+        "score": 1.0,
+        "visit_count": 2,
+        "reason": "Found 2 visit(s)"
+      },
+      {
+        "check": "example_domain_text",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Found deterministic text 'Example Domain'"
+      },
+      {
+        "check": "known_urls",
+        "passed": true,
+        "score": 1.0,
+        "has_example": true,
+        "has_iana_reserved": true,
+        "reason": "known URLs present: example=True, iana_reserved=True"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": true,
+    "overall_score": 1.0,
+    "checks_passed": 3,
+    "total_checks": 3,
+    "pass_rate": 1.0
+  },
+  "timestamp": "2026-02-27T05:42:11.895812",
+  "execution_variant": "graph"
+}

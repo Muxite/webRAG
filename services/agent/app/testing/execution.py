@@ -52,6 +52,13 @@ async def run_test_execution(
     test_id = test_module.metadata.get("test_id", "unknown")
     correlation_id = f"idea_test_{test_id}_{model_name}_{run_stamp}"
     
+    report_verbosity = int(os.environ.get("IDEA_TEST_REPORT_VERBOSITY", "1"))
+    if report_verbosity >= 3:
+        connector_llm.set_full_capture(True)
+        connector_search.set_full_capture(True)
+        connector_http.set_full_capture(True)
+        connector_chroma.set_full_capture(True)
+    
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
     trace_path = results_dir / f"{run_stamp}_{test_id}_{model_name}.jsonl"
@@ -83,7 +90,19 @@ async def run_test_execution(
     mandate_suffix = os.environ.get("IDEA_TEST_MANDATE_SUFFIX", "").strip()
     if mandate_suffix:
         mandate = f"{mandate}\n\n{mandate_suffix}"
-    graph = IdeaDag(root_title=mandate, root_details={"mandate": mandate})
+    
+    # Initialize memory manager and mandate context (mirrors engine.run())
+    import hashlib
+    namespace = f"idea_dag:{hashlib.sha256(mandate.encode('utf-8')).hexdigest()[:10]}"
+    engine.settings["memo_namespace"] = namespace
+    engine._current_mandate = mandate
+    from agent.app.idea_memory import MemoryManager
+    engine._memory_manager = MemoryManager(
+        connector_chroma=connector_chroma,
+        namespace=namespace,
+    )
+    
+    graph = IdeaDag(root_title=mandate, root_details={"mandate": mandate, "memo_namespace": namespace})
     current_id = graph.root_id()
     
     started = time.perf_counter()
@@ -93,13 +112,20 @@ async def run_test_execution(
         try:
             result_id = await engine.step(graph, current_id, step_num)
             if result_id is None:
+                _logger.warning(f"Step {step_num} returned None, stopping execution")
+                # Emergency: if root has no children after step 0, expansion completely failed
+                if step_num == 0:
+                    root = graph.get_node(graph.root_id())
+                    if root and not root.children:
+                        _logger.error("ROOT EXPANSION FAILED on step 0 - no children created")
                 break
             current_id = result_id
             node = graph.get_node(current_id)
-            if node and node.status.value == "done":
+            if node and node.status.value == "done" and current_id == graph.root_id():
+                # Only break if the ROOT node is done (all work complete)
                 break
         except Exception as exc:
-            _logger.error(f"Step {step_num} failed: {exc}")
+            _logger.error(f"Step {step_num} failed: {exc}", exc_info=True)
             break
     
     final_node = graph.get_node(current_id)
@@ -117,7 +143,14 @@ async def run_test_execution(
     telemetry.finish(success=output.get("success", False))
     tracer.close()
     
+    if report_verbosity >= 3:
+        connector_llm.set_full_capture(False)
+        connector_search.set_full_capture(False)
+        connector_http.set_full_capture(False)
+        connector_chroma.set_full_capture(False)
+    
     observability = summarize_observability_func({"output": output}, telemetry)
+    telemetry_summary = telemetry.summary()
     
     ended = time.perf_counter()
     
@@ -138,4 +171,5 @@ async def run_test_execution(
             "events_count": len(telemetry.events),
             "timings_count": len(telemetry.timings),
         },
+        "telemetry_raw": telemetry_summary,
     }

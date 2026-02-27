@@ -48,6 +48,13 @@ Merge Node (Synthesize results)
 - **Automatic Retrieval**: Top N internal thoughts + Top M observations on every node
 - **Semantic Search**: Vector DB queried with intent for relevant context
 
+### Final Synthesis
+
+Before final LLM synthesis, merged results are compacted to manage token limits:
+- **Action-aware content preservation**: 1500 chars for visits (preserves infobox facts), 400 for others
+- **Action-aware link preservation**: Up to 20 links for visits (enables link collection tasks)
+- Large fields (`content_full`, `content_with_links`, `links_full`) are removed
+
 ## Testing Infrastructure
 
 ### Test System

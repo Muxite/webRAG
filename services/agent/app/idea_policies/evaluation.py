@@ -24,6 +24,71 @@ def _safe_serialize_details(details: Dict[str, Any]) -> str:
         return json.dumps({"error": f"Serialization failed: {str(e)}"}, ensure_ascii=True)
 
 
+class EvaluationWeights:
+    """
+    Numerical weights and penalties applied to node evaluation scores.
+    Values are loaded from idea_dag_settings.json so they can be tuned without code changes.
+    :param settings: Settings dictionary.
+    :returns: EvaluationWeights instance.
+    """
+
+    def __init__(
+        self,
+        no_action_result_base_score: float = 0.1,
+        no_action_result_score_cap: float = 0.2,
+        search_weight: float = 1.0,
+        visit_weight: float = 1.0,
+        think_weight: float = 1.0,
+        save_weight: float = 1.0,
+        default_weight: float = 1.0,
+    ):
+        self.no_action_result_base_score = float(no_action_result_base_score)
+        self.no_action_result_score_cap = float(no_action_result_score_cap)
+        self.search_weight = float(search_weight)
+        self.visit_weight = float(visit_weight)
+        self.think_weight = float(think_weight)
+        self.save_weight = float(save_weight)
+        self.default_weight = float(default_weight)
+
+    @classmethod
+    def from_settings(cls, settings: Optional[Dict[str, Any]]) -> "EvaluationWeights":
+        """
+        Construct EvaluationWeights from settings.
+        :param settings: Settings dictionary.
+        :returns: EvaluationWeights instance.
+        """
+        settings = settings or {}
+        return cls(
+            no_action_result_base_score=settings.get("evaluation_no_action_result_base_score", 0.1),
+            no_action_result_score_cap=settings.get("evaluation_no_action_result_score_cap", 0.2),
+            search_weight=settings.get("evaluation_weight_search", 1.0),
+            visit_weight=settings.get("evaluation_weight_visit", 1.0),
+            think_weight=settings.get("evaluation_weight_think", 1.0),
+            save_weight=settings.get("evaluation_weight_save", 1.0),
+            default_weight=settings.get("evaluation_weight_default", 1.0),
+        )
+
+    def apply_action_weight(self, action: Optional[str], score: float) -> float:
+        """
+        Apply per-action weight to a raw score.
+        :param action: Action type string.
+        :param score: Raw score value.
+        :returns: Weighted score.
+        """
+        if not action:
+            return score * self.default_weight
+        action_lower = str(action).lower()
+        if action_lower == "search":
+            return score * self.search_weight
+        if action_lower == "visit":
+            return score * self.visit_weight
+        if action_lower == "think":
+            return score * self.think_weight
+        if action_lower == "save":
+            return score * self.save_weight
+        return score * self.default_weight
+
+
 class LlmEvaluationPolicy(EvaluationPolicy):
     """
     LLM-driven evaluation policy for scoring nodes.
@@ -36,10 +101,12 @@ class LlmEvaluationPolicy(EvaluationPolicy):
         super().__init__(settings=settings)
         self.io = io
         self.model_name = model_name
+        self.weights = EvaluationWeights.from_settings(settings)
 
     async def evaluate(self, graph: IdeaDag, node_id: str) -> float:
         """
         Score a node based on graph context using an LLM.
+        Penalizes nodes without action results if they have actions.
         :param graph: IdeaDag instance.
         :param node_id: Node identifier.
         :returns: Score value.
@@ -47,6 +114,27 @@ class LlmEvaluationPolicy(EvaluationPolicy):
         node = graph.get_node(node_id)
         if not node:
             return 0.0
+        
+        from agent.app.idea_policies.action_constants import NodeDetailsExtractor, ActionResultKey
+        from agent.app.idea_policies.base import IdeaActionType
+        
+        action = NodeDetailsExtractor.get_action(node.details)
+        has_action = action and not NodeDetailsExtractor.is_merge_action(node.details)
+        has_result = node.details.get(DetailKey.ACTION_RESULT.value) is not None
+        
+        if has_action and not has_result:
+            action_result = node.details.get(DetailKey.ACTION_RESULT.value)
+            if action_result is None:
+                self._logger.warning(f"[EVALUATION] Node {node_id} has action '{action}' but no result - penalizing score")
+                penalty_score = float(self.weights.no_action_result_base_score)
+                graph.evaluate(node_id, penalty_score)
+                node.details[DetailKey.EVALUATION.value] = {
+                    "score": penalty_score,
+                    "rationale": "Action not executed - missing action_result",
+                    "penalty": "no_action_result",
+                }
+                return penalty_score
+        
         messages = self._build_messages(graph, node)
         model_name = self.model_name or self.settings.get("evaluation_model")
         json_schema = self.settings.get("evaluation_json_schema")
@@ -72,10 +160,18 @@ class LlmEvaluationPolicy(EvaluationPolicy):
             )
             self._logger.debug(f"[EVALUATION] LLM response: {content[:200] if content else 'None'}...")
             score, rationale = self._parse_score(content)
-            self._logger.debug(f"[EVALUATION] Node {node_id} scored: {score}")
-            graph.evaluate(node_id, score)
-            node.details[DetailKey.EVALUATION.value] = {"score": score, "rationale": rationale}
-            return score
+
+            if has_action and not has_result:
+                score = min(score, float(self.weights.no_action_result_score_cap))
+                rationale = f"{rationale} [PENALTY: action not executed]"
+
+            weighted_score = self.weights.apply_action_weight(action, score)
+            weighted_score = self._clamp(weighted_score)
+
+            self._logger.debug(f"[EVALUATION] Node {node_id} scored: {weighted_score}")
+            graph.evaluate(node_id, weighted_score)
+            node.details[DetailKey.EVALUATION.value] = {"score": weighted_score, "rationale": rationale}
+            return weighted_score
         except Exception as exc:
             self._logger.error(f"[EVALUATION] Exception during evaluation: {exc}", exc_info=True)
             node.details[DetailKey.EVALUATION.value] = {"error": str(exc)}
@@ -191,6 +287,7 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
         self.io = io
         self.model_name = model_name
         self._logger = logging.getLogger(self.__class__.__name__)
+        self.weights = EvaluationWeights.from_settings(settings)
 
     async def evaluate(self, graph: IdeaDag, node_id: str) -> float:
         """
@@ -246,6 +343,28 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
             self._logger.debug(f"[EVALUATION_BATCH] Parsed {len(scores)} scores")
             if not scores and content:
                 self._logger.warning(f"[EVALUATION_BATCH] Failed to parse scores from response. Content length: {len(content)}, Content: {content[:1000]}")
+            
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+            for node_id in candidate_ids:
+                node = graph.get_node(node_id)
+                if not node:
+                    continue
+
+                action = NodeDetailsExtractor.get_action(node.details)
+                has_action = action and not NodeDetailsExtractor.is_merge_action(node.details)
+                has_result = node.details.get(DetailKey.ACTION_RESULT.value) is not None
+
+                if has_action and not has_result:
+                    if node_id in scores:
+                        scores[node_id] = min(scores[node_id], float(self.weights.no_action_result_score_cap))
+                    else:
+                        scores[node_id] = float(self.weights.no_action_result_base_score)
+                        self._logger.warning(f"[EVALUATION_BATCH] Node {node_id} has action '{action}' but no result - penalizing to base score")
+
+                if node_id in scores:
+                    scores[node_id] = self.weights.apply_action_weight(action, scores[node_id])
+                    scores[node_id] = self._clamp(scores[node_id])
+
             for node_id, score in scores.items():
                 node = graph.get_node(node_id)
                 if not node:

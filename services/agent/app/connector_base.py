@@ -17,6 +17,7 @@ class ConnectorBase:
         self.config = connector_config
         self.logger = logging.getLogger(name or self.__class__.__name__)
         self._telemetry = None
+        self._full_capture = False
 
     def set_telemetry(self, telemetry: Optional[Any]) -> None:
         """
@@ -32,6 +33,15 @@ class ConnectorBase:
         :returns: None
         """
         self._telemetry = None
+
+    def set_full_capture(self, enabled: bool) -> None:
+        """
+        Enable or disable full payload capture for verbose reporting.
+
+        When enabled, _record_io stores raw payloads instead of summarized ones.
+        :param enabled: True to capture full payloads.
+        """
+        self._full_capture = bool(enabled)
 
     def _record_event(self, event: str, payload: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -64,11 +74,12 @@ class ConnectorBase:
         """
         if self._telemetry is None:
             return
+        raw = payload or {}
         entry = {
             "connector": self.logger.name,
             "direction": direction,
             "operation": operation,
-            "payload": self._summarize_payload(payload or {}),
+            "payload": raw if self._full_capture else self._summarize_payload(raw),
         }
         if error:
             entry["error"] = error

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import time
 from typing import Any, Dict, List, Optional
 
@@ -9,6 +10,8 @@ from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.observation import clean_operation
 from agent.app.telemetry import TelemetrySession
+
+_logger = logging.getLogger(__name__)
 
 
 class AgentIO:
@@ -519,7 +522,7 @@ class AgentIO:
                 for doc_list in internal_results["documents"]:
                     internal_thoughts.extend(doc_list)
         except Exception as exc:
-            self._logger.warning(f"Failed to retrieve internal thoughts: {exc}")
+            _logger.warning(f"Failed to retrieve internal thoughts: {exc}")
         
         try:
             observation_results = await self._with_timeout(
@@ -535,7 +538,7 @@ class AgentIO:
                 for doc_list in observation_results["documents"]:
                     observations.extend(doc_list)
         except Exception as exc:
-            self._logger.warning(f"Failed to retrieve observations: {exc}")
+            _logger.warning(f"Failed to retrieve observations: {exc}")
         
         if self.telemetry:
             self.telemetry.record_chroma_retrieve(

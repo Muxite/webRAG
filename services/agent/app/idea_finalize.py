@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 from agent.app.idea_dag import IdeaDag
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import DetailKey
+from agent.app.idea_policies.action_constants import NodeDetailsExtractor
 from agent.app.prompt_builder import FinalPromptBuilder
 
 _logger = logging.getLogger(__name__)
@@ -106,12 +107,34 @@ async def build_final_payload(
     _logger.debug(f"[FINALIZE] LLM response: {response[:500] if response else 'None'}...")
     if not response:
         return {"final_deliverable": "", "action_summary": "", "success": False}
+    
     try:
         data = json.loads(response)
+        deliverable = data.get("deliverable", "")
+        action_summary = data.get("summary", "")
+        
+        goal_achieved = False
+        if root:
+            goal_achieved = root.details.get(DetailKey.GOAL_ACHIEVED.value, False)
+            if not goal_achieved:
+                merge_nodes = [n for n in graph.iter_depth_first() if NodeDetailsExtractor.is_merge_action(n.details)]
+                for merge_node in merge_nodes:
+                    if merge_node.details.get(DetailKey.GOAL_ACHIEVED.value, False):
+                        goal_achieved = True
+                        break
+        
+        failed_nodes = [n for n in graph.iter_depth_first() if n.status.value == "failed"]
+        has_critical_failures = len(failed_nodes) > 0
+        
+        success = goal_achieved and not has_critical_failures and bool(deliverable.strip())
+        
         return {
-            "final_deliverable": data.get("deliverable", ""),
-            "action_summary": data.get("summary", ""),
-            "success": True,
+            "final_deliverable": deliverable,
+            "action_summary": action_summary,
+            "success": success,
+            "goal_achieved": goal_achieved,
+            "has_failures": has_critical_failures,
         }
-    except Exception:
-        return {"final_deliverable": response, "action_summary": "", "success": True}
+    except Exception as e:
+        _logger.warning(f"[FINALIZE] Failed to parse response: {e}")
+        return {"final_deliverable": response, "action_summary": "", "success": False}

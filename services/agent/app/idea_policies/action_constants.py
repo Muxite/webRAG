@@ -331,6 +331,14 @@ class MergedResultsCompactor:
         Compact merged results by removing large fields and keeping only essential info.
         Removes content_full, content_with_links, links_full, and other large fields.
         
+        Content truncation is action-aware:
+        - VISIT actions: Up to 3000 characters preserved (to retain infobox-style facts like dates, versions, creators)
+        - Other actions: Up to 400 characters preserved
+        
+        Link preservation is action-aware:
+        - VISIT actions: Up to 20 links preserved (to satisfy link collection tasks requiring 10+ links)
+        - All actions: Up to 5 links in links_sample for debugging/inspection
+        
         :param merged_results: Full merged results list.
         :param max_items: Maximum number of items to include (truncate if more).
         :returns: Compacted merged results.
@@ -366,20 +374,29 @@ class MergedResultsCompactor:
                     compact_result["query"] = result.get("prompt")
                 
                 # Keep only truncated content (not content_full or content_with_links)
-                # Try to get meaningful content snippet, not just truncated start
+                # Try to get meaningful content snippet, not just truncated start.
+                # For VISIT actions, we allow a larger snippet so infobox-style facts
+                # (dates, names, versions) are not truncated away.
                 content = result.get("content", "")
                 if content:
-                    max_content_chars = 200  # Keep content very short
+                    # Use a larger window for visits, smaller for other actions
+                    action_type = str(result.get("action", "")).lower()
+                    if action_type == "visit":
+                        max_content_chars = 4000
+                    else:
+                        max_content_chars = 400
                     if len(content) > max_content_chars:
-                        # Try to get a more meaningful snippet if content looks like URLs/links
-                        if content.startswith("http") and "\n" not in content[:100]:
-                            # Looks like just URLs, skip content field
-                            pass
-                        else:
-                            # Get first meaningful chunk
-                            compact_result["content"] = content[:max_content_chars].strip() + "...[truncated]"
+                        compact_result["content"] = content[:max_content_chars].strip() + "...[truncated]"
                     else:
                         compact_result["content"] = content
+                
+                # Preserve lightweight page structure hints for visits (if present)
+                if result.get("h1_text"):
+                    compact_result["h1_text"] = str(result.get("h1_text"))[:500]
+                if result.get("page_title"):
+                    compact_result["page_title"] = str(result.get("page_title"))[:500]
+                if result.get("source_url"):
+                    compact_result["source_url"] = result.get("source_url")
                 
                 # Keep only summary of results, not full list
                 results_list = result.get("results", [])
@@ -394,11 +411,17 @@ class MergedResultsCompactor:
                         for r in results_list[:2]
                     ]
                 
-                # Keep only essential links info (count and sample, not full list)
+                # Keep links info. For VISIT actions, keep more links so
+                # downstream tasks (e.g. link collection) can reach their quotas.
                 links = result.get("links", [])
                 if isinstance(links, list) and len(links) > 0:
                     compact_result["links_count"] = len(links)
-                    compact_result["links_sample"] = links[:3]  # Only first 3
+                    action_type = str(result.get("action", "")).lower()
+                    if action_type == "visit":
+                        # Keep up to 20 links for visits (enough to satisfy "collect 10 links" tasks)
+                        compact_result["links"] = links[:20]
+                    # Always expose a small sample for debugging/inspection
+                    compact_result["links_sample"] = links[: min(len(links), 5)]
                 
                 # Keep error info if present (truncated)
                 if result.get("error"):

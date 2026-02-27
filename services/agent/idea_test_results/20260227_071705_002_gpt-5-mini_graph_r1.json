@@ -1,0 +1,406 @@
+{
+  "test_metadata": {
+    "test_id": "002",
+    "test_name": "Basic Fact Retrieval",
+    "difficulty_level": "1/10",
+    "category": "Simple Information Retrieval"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "I cannot provide the requested answer and citation because the merged results contain no evidence to extract from. Required items missing:\n\n1. Requested fact (label): \"Capital city of Australia\" \u2014 MISSING in the merged results.\n2. Requested citation (label): \"One authoritative source URL that states the capital\" \u2014 MISSING in the merged results.\n\nNo URLs or source content were provided, so I cannot extract or cite an authoritative source. Next steps you can choose:\n- I can perform a web search now and return the capital plus one authoritative URL (for example from the Australian Government site, the Australian Bureau of Statistics, or Encyclopaedia Britannica).\n- Or you can supply a source URL for me to cite.\n\nPlease tell me which option you prefer.",
+      "action_summary": "Merged results were empty, so the answer (capital city of Australia) and the required authoritative source URL are both missing. I can perform a web search and provide the answer with a citation, or you can supply a source URL for me to use.",
+      "success": false,
+      "goal_achieved": false,
+      "has_failures": false
+    },
+    "graph": {
+      "root_id": "289d673a-e20e-4c4b-aaaa-c70fc3426c69",
+      "nodes": {
+        "289d673a-e20e-4c4b-aaaa-c70fc3426c69": {
+          "node_id": "289d673a-e20e-4c4b-aaaa-c70fc3426c69",
+          "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+          "details": {
+            "mandate": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "memo_namespace": "idea_dag:548a63a98e",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "original_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL."
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "8e1322f4-c955-4794-a2be-3b8096f1aa54",
+            "a6edccd4-8d11-498c-bc70-8845a578d6a3",
+            "44845e8c-32f3-47bf-b136-ecbf05a7bcfc"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "8e1322f4-c955-4794-a2be-3b8096f1aa54": {
+          "node_id": "8e1322f4-c955-4794-a2be-3b8096f1aa54",
+          "title": "Search for authoritative sources that state the capital of Australia",
+          "details": {
+            "query": "capital of Australia official site Canberra site:.gov.au OR \"capital of Australia\" \"Canberra\"",
+            "intent": "Find authoritative, citable sources (prefer Australian government sites, national archives, or major reference works) that explicitly state the capital city of Australia.",
+            "count": 5,
+            "target_facts": [
+              "Name of the capital city of Australia (expected: Canberra)",
+              "Authoritative source URL(s) that explicitly state the capital"
+            ],
+            "likely_sources": [
+              "Australian Government websites (e.g., australia.gov.au, national archives)",
+              "Encyclopaedia Britannica",
+              "CIA World Factbook",
+              "Official Parliament or government information pages"
+            ],
+            "verification_steps": [
+              "Confirm at least one Australian government (.gov.au) page explicitly naming the capital.",
+              "Cross-check with one additional major reference (Britannica or CIA World Factbook) if available."
+            ],
+            "extraction_plan": "Return top search snippets that explicitly state the capital and their exact source URLs. Provide at least 1-3 candidate URLs prioritized by government domains and major reference works.",
+            "measurable_output_fields": [
+              "snippets: array of {text_snippet, url}",
+              "candidate_urls: array of URLs (ordered by authority)"
+            ],
+            "rationale": "A focused search produces concrete URLs for the visit node to fetch full authoritative text. This reduces uncertainty by locating primary authoritative sources rather than relying on model memory.",
+            "action": "search",
+            "goal": "Search for authoritative sources that state the capital of Australia",
+            "original_goal": "Search for authoritative sources that state the capital of Australia",
+            "provides_data": {
+              "type": "urls_from_search"
+            },
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.2
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "node_id": "8e1322f4-c955-4794-a2be-3b8096f1aa54",
+              "query": "capital of Australia official site Canberra site:.gov.au OR \"capital of Australia\" \"Canberra\"",
+              "intent": "Find authoritative, citable sources (prefer Australian government sites, national archives, or major reference works) that explicitly state the capital city of Australia.",
+              "vector_context": [],
+              "count": 5,
+              "results": []
+            }
+          },
+          "parent_id": "289d673a-e20e-4c4b-aaaa-c70fc3426c69",
+          "parent_ids": [
+            "289d673a-e20e-4c4b-aaaa-c70fc3426c69"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.2,
+          "memo_key": null
+        },
+        "a6edccd4-8d11-498c-bc70-8845a578d6a3": {
+          "node_id": "a6edccd4-8d11-498c-bc70-8845a578d6a3",
+          "title": "Visit the top authoritative result and extract the capital city and citation",
+          "details": {
+            "link_idea": "Official Australian government page or other authoritative page that explicitly states 'Canberra' is the capital of Australia",
+            "link_count": 1,
+            "intent": "Open the highest-priority URL produced by the search and extract the explicit statement of the capital city, capture the exact source URL for citation, and copy an exact phrase (quote) if present.",
+            "target_facts": [
+              "capital_city: exact name as written on the authoritative page",
+              "source_url: exact URL to cite",
+              "quote_snippet: short exact text from the page stating the capital (if present)",
+              "page_title: title of visited page"
+            ],
+            "extraction_plan": "Use the URL(s) from the search results. Visit the selected page, locate the sentence or boxed fact that states the capital, extract and return: (1) the capital city name (string), (2) the exact URL (string), (3) the exact quoted sentence/phrase (string), and (4) the page title (string). Save any outbound link references found on the page in the link store as per system behavior.",
+            "measurable_output_fields": [
+              "capital_city",
+              "source_url",
+              "quote_snippet",
+              "page_title"
+            ],
+            "verification_steps": [
+              "Ensure the extracted text explicitly names the capital (e.g., 'The capital of Australia is Canberra').",
+              "Prefer a .gov.au domain or other high-authority domain for the final citation."
+            ],
+            "rationale": "Visiting the authoritative page provides the verifiable evidence and exact URL needed to cite the claim in the final answer. This prevents relying on memory and supplies a direct quote for citation.",
+            "action": "visit",
+            "goal": "Visit the top authoritative result and extract the capital city and citation",
+            "original_goal": "Visit the top authoritative result and extract the capital city and citation",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.2
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2
+          },
+          "parent_id": "289d673a-e20e-4c4b-aaaa-c70fc3426c69",
+          "parent_ids": [
+            "289d673a-e20e-4c4b-aaaa-c70fc3426c69"
+          ],
+          "status": "active",
+          "children": [],
+          "score": 0.2,
+          "memo_key": null
+        },
+        "44845e8c-32f3-47bf-b136-ecbf05a7bcfc": {
+          "node_id": "44845e8c-32f3-47bf-b136-ecbf05a7bcfc",
+          "title": "Synthesize final answer and verify citation",
+          "details": {
+            "intent": "Using the extracted facts from the visit node, produce a concise final answer naming the capital city and include one authoritative source URL as a citation. Verify the capital matches expected value and that the chosen URL is authoritative.",
+            "input_requirements": [
+              "capital_city (from visit)",
+              "source_url (from visit)",
+              "quote_snippet (from visit)"
+            ],
+            "output_fields": [
+              "final_answer_text (e.g., 'The capital city of Australia is Canberra. [citation]')",
+              "citation_url",
+              "verification_note (which sources were used and whether they agree)"
+            ],
+            "verification_steps": [
+              "Confirm the capital_city equals 'Canberra' (case-insensitive).",
+              "Confirm source_url is present and belongs to an authoritative domain (prefer .gov.au, britannica.com, cia.gov, etc.).",
+              "If visit returned an unexpected or ambiguous result, flag for re-check (would trigger another search/visit)."
+            ],
+            "measurable_output_fields": [
+              "final_answer_text",
+              "citation_url",
+              "verification_note"
+            ],
+            "rationale": "This synthesizing step turns extracted evidence into the requested answer+citation and performs a final consistency check before returning the result.",
+            "action": "think",
+            "goal": "Synthesize final answer and verify citation",
+            "original_goal": "Synthesize final answer and verify citation",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.2
+            }
+          },
+          "parent_id": "289d673a-e20e-4c4b-aaaa-c70fc3426c69",
+          "parent_ids": [
+            "289d673a-e20e-4c4b-aaaa-c70fc3426c69"
+          ],
+          "status": "pending",
+          "children": [],
+          "score": 0.2,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 758,
+        "words": 124,
+        "kilobytes": 0.74
+      },
+      "llm": {
+        "calls": 11,
+        "prompt": {
+          "chars": 54727,
+          "words": 6040,
+          "kilobytes": 53.44,
+          "tokens": 7175
+        },
+        "completion": {
+          "chars": 14915,
+          "words": 1884,
+          "kilobytes": 14.57,
+          "tokens": 8293
+        },
+        "total_tokens": 15468
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "chroma_query": {
+          "count": 39,
+          "total_duration": 17.22566765001102,
+          "success_count": 39,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 11,
+          "total_duration": 8.901596115996654,
+          "success_count": 11,
+          "error_count": 0
+        },
+        "chroma_add": {
+          "count": 18,
+          "total_duration": 206.55597383902204,
+          "success_count": 18,
+          "error_count": 0
+        },
+        "llm_call": {
+          "count": 3,
+          "total_duration": 186.49980590599444,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_retrieve": {
+          "count": 2,
+          "total_duration": 0.8687854929958121,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 0.2890458210022189,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "events_count": 151
+    },
+    "duration_seconds": 242.54,
+    "telemetry": {
+      "correlation_id": "idea_test_002_gpt-5-mini_20260227_071705",
+      "trace_file": "/app/agent/idea_test_results/20260227_071705_002_gpt-5-mini.jsonl",
+      "events_count": 151,
+      "timings_count": 74
+    },
+    "graph_visualization": {
+      "ascii": "*-.   What is the capital city of Australia? Provide the answer and cite one authoritative source URL.\n|\\ \\  \n* | | Search for authoritative sources that state the capital of Australia\n / /  \n* | Visit the top authoritative result and extract the capital city and citation\n /  \n* Synthesize final answer and verify citation\n",
+      "graph_data": {
+        "nodes": [
+          {
+            "id": "289d673a-e20e-4c4b-aaaa-c70fc3426c69",
+            "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "status": "active",
+            "score": null,
+            "memo_key": null,
+            "action": null,
+            "has_result": false,
+            "parent_ids": []
+          },
+          {
+            "id": "8e1322f4-c955-4794-a2be-3b8096f1aa54",
+            "title": "Search for authoritative sources that state the capital of Australia",
+            "status": "done",
+            "score": 0.2,
+            "memo_key": null,
+            "action": "search",
+            "has_result": true,
+            "parent_ids": [
+              "289d673a-e20e-4c4b-aaaa-c70fc3426c69"
+            ]
+          },
+          {
+            "id": "a6edccd4-8d11-498c-bc70-8845a578d6a3",
+            "title": "Visit the top authoritative result and extract the capital city and citation",
+            "status": "active",
+            "score": 0.2,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": false,
+            "parent_ids": [
+              "289d673a-e20e-4c4b-aaaa-c70fc3426c69"
+            ]
+          },
+          {
+            "id": "44845e8c-32f3-47bf-b136-ecbf05a7bcfc",
+            "title": "Synthesize final answer and verify citation",
+            "status": "pending",
+            "score": 0.2,
+            "memo_key": null,
+            "action": "think",
+            "has_result": false,
+            "parent_ids": [
+              "289d673a-e20e-4c4b-aaaa-c70fc3426c69"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "289d673a-e20e-4c4b-aaaa-c70fc3426c69",
+            "to": "8e1322f4-c955-4794-a2be-3b8096f1aa54"
+          },
+          {
+            "from": "289d673a-e20e-4c4b-aaaa-c70fc3426c69",
+            "to": "a6edccd4-8d11-498c-bc70-8845a578d6a3"
+          },
+          {
+            "from": "289d673a-e20e-4c4b-aaaa-c70fc3426c69",
+            "to": "44845e8c-32f3-47bf-b136-ecbf05a7bcfc"
+          }
+        ]
+      },
+      "analysis": {
+        "total_nodes": 4,
+        "action_counts": {
+          "search": 1,
+          "visit": 1,
+          "think": 1
+        },
+        "think_count": 1,
+        "think_ratio": 0.25,
+        "other_action_count": 3,
+        "action_diversity": 3,
+        "unique_titles": 4,
+        "duplicate_title_count": 0,
+        "think_nodes": [
+          {
+            "node_id": "44845e8c-32f3-47bf-b136-ecbf05a7bcfc",
+            "title": "Synthesize final answer and verify citation",
+            "status": "pending"
+          }
+        ],
+        "issues": [],
+        "issue_count": 0
+      }
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "correct_answer",
+        "passed": false,
+        "score": 0.0,
+        "reason": "Canberra not found"
+      },
+      {
+        "check": "url_present",
+        "passed": false,
+        "score": 0,
+        "url_count": 0,
+        "reason": "No URLs found"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": false,
+    "overall_score": 0.0,
+    "checks_passed": 0,
+    "total_checks": 2,
+    "pass_rate": 0.0
+  },
+  "timestamp": "2026-02-27T07:31:40.357631",
+  "execution_variant": "graph"
+}

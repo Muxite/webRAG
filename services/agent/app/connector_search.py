@@ -1,3 +1,4 @@
+import time
 from agent.app.connector_http import ConnectorHttp
 from shared.connector_config import ConnectorConfig
 from typing import Optional, Dict, List
@@ -71,9 +72,17 @@ class ConnectorSearch(ConnectorHttp):
             operation="search_query",
             payload={"query": query, "count": count, "url": url},
         )
+        search_started = time.perf_counter()
         result = await self.request("GET", url, retries=3, headers=headers, params=params)
 
         if result.error:
+            self._record_timing(
+                name="search_query",
+                started_at=search_started,
+                success=False,
+                payload={"query": query, "count": count, "status": result.status},
+                error=str(result.data),
+            )
             self._record_io(
                 direction="out",
                 operation="search_query",
@@ -115,6 +124,12 @@ class ConnectorSearch(ConnectorHttp):
                 web_results = data.get("web", {}).get("results") or []
             if isinstance(web_results, list) and web_results:
                 collected = _collect(web_results)
+                self._record_timing(
+                    name="search_query",
+                    started_at=search_started,
+                    success=True,
+                    payload={"query": query, "results": len(collected)},
+                )
                 self._record_io(
                     direction="out",
                     operation="search_query",
@@ -129,6 +144,12 @@ class ConnectorSearch(ConnectorHttp):
                     if isinstance(value, list):
                         mixed_items.extend(_collect(value))
                 if mixed_items:
+                    self._record_timing(
+                        name="search_query",
+                        started_at=search_started,
+                        success=True,
+                        payload={"query": query, "results": len(mixed_items)},
+                    )
                     self._record_io(
                         direction="out",
                         operation="search_query",
@@ -136,6 +157,12 @@ class ConnectorSearch(ConnectorHttp):
                     )
                     return mixed_items
 
+            self._record_timing(
+                name="search_query",
+                started_at=search_started,
+                success=True,
+                payload={"query": query, "results": 0},
+            )
             self._record_io(
                 direction="out",
                 operation="search_query",
@@ -143,6 +170,13 @@ class ConnectorSearch(ConnectorHttp):
             )
             return []
         except Exception as exc:
+            self._record_timing(
+                name="search_query",
+                started_at=search_started,
+                success=False,
+                payload={"query": query},
+                error=str(exc),
+            )
             self._record_io(
                 direction="out",
                 operation="search_query",
