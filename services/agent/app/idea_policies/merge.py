@@ -84,6 +84,9 @@ class SimpleMergePolicy(MergePolicy):
             child = graph.get_node(child_id)
             from agent.app.idea_policies.action_constants import NodeDetailsExtractor
             if child and NodeDetailsExtractor.is_merge_action(child.details):
+                # If existing merge node indicates skip, don't create another
+                if child.details.get("merge_should_skip", False):
+                    return False
                 return False
         
         # Check if all children are ready
@@ -213,6 +216,13 @@ class SimpleMergePolicy(MergePolicy):
         node.details[DetailKey.MERGED_RESULTS.value] = self._sanitize_data(merged)
         node.details[DetailKey.MERGE_SUMMARY.value] = merge_summary
         
+        # Validate goal achievement if this is a merge node
+        goal_achieved = self._validate_goal_achievement(graph, node, merged)
+        node.details[DetailKey.GOAL_ACHIEVED.value] = goal_achieved
+        
+        if not goal_achieved and success_count > 0:
+            self._logger.warning(f"[MERGE] Goal not fully achieved for node {node_id} - may need additional work")
+        
         # Propagate failure state to parent if all children failed
         if failed_count > 0 and success_count == 0 and blocked_count == 0:
             if node.status == IdeaNodeStatus.ACTIVE:
@@ -225,4 +235,42 @@ class SimpleMergePolicy(MergePolicy):
             if parent:
                 self.merge(graph, node.parent_id, recursive=True)
         
-        return {"merged": merged, "summary": merge_summary}
+        return {"merged": merged, "summary": merge_summary, "goal_achieved": goal_achieved}
+    
+    def _validate_goal_achievement(self, graph: IdeaDag, node: IdeaNode, merged_results: List[Dict[str, Any]]) -> bool:
+        """
+        Validate if the original goal was achieved based on merged results.
+        :param graph: IdeaDag instance.
+        :param node: Node to validate.
+        :param merged_results: List of merged child results.
+        :returns: True if goal appears to be achieved.
+        """
+        original_goal = node.details.get(DetailKey.GOAL.value) or node.details.get(DetailKey.ORIGINAL_GOAL.value) or node.details.get(DetailKey.INTENT.value)
+        if not original_goal:
+            return True
+        
+        from agent.app.idea_policies.action_constants import ActionResultKey
+        
+        has_relevant_content = False
+        for result_item in merged_results:
+            result = result_item.get("result")
+            if not isinstance(result, dict):
+                continue
+            
+            content = result.get(ActionResultKey.CONTENT.value) or ""
+            query = result.get(ActionResultKey.QUERY.value) or ""
+            results = result.get(ActionResultKey.RESULTS.value) or []
+            
+            if content and original_goal.lower() in content.lower():
+                has_relevant_content = True
+                break
+            
+            if query and original_goal.lower() in query.lower():
+                has_relevant_content = True
+                break
+            
+            if isinstance(results, list) and len(results) > 0:
+                has_relevant_content = True
+                break
+        
+        return has_relevant_content

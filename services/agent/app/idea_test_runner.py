@@ -4,12 +4,12 @@ Idea Test Runner - Parallel execution with multi-model support.
 Environment Variables:
 - IDEA_TEST_MODE: "default" or "benchmark" (benchmark defaults: 3 models, top 8 tests, 3 runs, concurrency 3)
 - IDEA_TEST_TOP_N: Number of top-priority tests to run (0 = all)
+- IDEA_TEST_IDS: Comma-separated list of specific test IDs to run (e.g., "019,012,014,025") - overrides IDEA_TEST_TOP_N
 - IDEA_TEST_RUNS: Repeats per test/model pair
 - IDEA_TEST_CONCURRENCY: Max parallel task executions
 - IDEA_TEST_MODELS: Comma-separated execution models (default: MODEL_NAME or gpt-5-mini)
 - IDEA_TEST_EXECUTION_VARIANTS: Execution styles to run ("graph", "sequential", or comma-separated list)
 - IDEA_TEST_LOG_LEVEL: Logging level (default: INFO)
-- IDEA_TEST_VISIT_ONLY: Set to "1", "true", or "yes" to run only visit test
 
 Legacy aliases still supported:
 - IDEA_TEST_PRIORITY -> IDEA_TEST_TOP_N
@@ -27,7 +27,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 
 import logging
 
@@ -49,6 +49,7 @@ from agent.app.testing.config import (
 )
 from agent.app.testing.utils import summarize_observability
 from agent.app.idea_graph_analyzer import add_graph_visualization
+from agent.app.testing.report import TestReportGenerator, Verbosity
 
 
 async def preflight_check_llm(connector_llm: ConnectorLLM, model_name: str) -> bool:
@@ -351,14 +352,26 @@ def extract_test_id(test_file: Path) -> str:
     return ""
 
 
-def filter_test_files_by_priority(test_files: List[Path], priority_count: int = 0) -> List[Path]:
+def filter_test_files_by_priority(test_files: List[Path], priority_count: int = 0, specific_ids: Optional[List[str]] = None) -> List[Path]:
     """
-    Filter test files by priority order.
+    Filter test files by priority order or specific test IDs.
     :param test_files: List of test file paths.
-    :param priority_count: Number of priority tests to run (0 = all).
+    :param priority_count: Number of priority tests to run (0 = all, ignored if specific_ids provided).
+    :param specific_ids: Optional list of specific test IDs to run (e.g., ["019", "012"]).
     :return: Filtered list of test files in priority order.
     """
     test_id_to_file = {extract_test_id(f): f for f in test_files}
+    
+    if specific_ids:
+        filtered = []
+        for test_id in specific_ids:
+            test_id = test_id.strip()
+            if test_id in test_id_to_file:
+                filtered.append(test_id_to_file[test_id])
+            else:
+                logging.warning(f"Test ID {test_id} not found, skipping")
+        logging.info(f"Specific test mode: Running {len(filtered)} specified tests: {[extract_test_id(f) for f in filtered]}")
+        return filtered
     
     if priority_count == 0:
         ordered = []
@@ -426,7 +439,20 @@ async def run_single_test(
         result = add_graph_visualization(result)
         
         out_path = results_dir / f"{run_id}_{test_id}_{normalized}_{execution_variant}_r{repeat_index}.json"
-        out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+        
+        report_verbosity = _env_int("IDEA_TEST_REPORT_VERBOSITY", [], 1)
+        reporter = TestReportGenerator(verbosity=report_verbosity)
+        telemetry_raw = result.get("execution", {}).get("telemetry_raw")
+        report = reporter.generate(result, telemetry_data=telemetry_raw)
+        reporter.print_console(report)
+        if report_verbosity >= Verbosity.STANDARD:
+            reporter.save(report, out_path)
+        
+        if report_verbosity < Verbosity.FULL:
+            execution = result.get("execution", {})
+            execution.pop("telemetry_raw", None)
+        
+        out_path.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
         
         validation = result.get("validation", {})
         passed = validation.get("overall_passed", False)
@@ -452,17 +478,99 @@ async def run_single_test(
         }
 
 
+def _print_run_summary(all_results: List[Dict[str, Any]], run_id: str, priority_count: int) -> None:
+    """
+    Print a consolidated summary table of all test results to the console.
+
+    :param all_results: List of all test result dicts.
+    :param run_id: Run identifier.
+    :param priority_count: Number of priority tests (0=all).
+    """
+    sep = "=" * 80
+    logging.info(f"\n{sep}")
+    logging.info(f"  RUN SUMMARY: {run_id}")
+    logging.info(sep)
+    logging.info(f"  {'Test':>6}  {'Model':>14}  {'Variant':>10}  {'Pass':>5}  {'Score':>6}  {'Visits':>6}  {'Nodes':>6}  {'Time':>7}")
+    logging.info(f"  {'------':>6}  {'--------------':>14}  {'----------':>10}  {'-----':>5}  {'------':>6}  {'------':>6}  {'------':>6}  {'-------':>7}")
+
+    total_passed = 0
+    total_tests = 0
+    total_score = 0.0
+
+    for r in all_results:
+        meta = r.get("test_metadata", {})
+        test_id = meta.get("test_id", "???")
+        model = r.get("model", "?")
+        variant = r.get("execution_variant", "?")
+        val = r.get("validation", {})
+        passed = val.get("overall_passed", False)
+        score = val.get("overall_score", 0.0)
+        exec_data = r.get("execution", {})
+        obs = exec_data.get("observability", {})
+        visit_count = obs.get("visit", {}).get("count", 0)
+        graph = exec_data.get("graph", {})
+        node_count = len(graph.get("nodes", {}))
+        duration = exec_data.get("duration_seconds", 0)
+
+        icon = "  OK" if passed else "FAIL"
+        logging.info(
+            f"  {test_id:>6}  {model:>14}  {variant:>10}  {icon:>5}  {score:>6.2f}  {visit_count:>6}  {node_count:>6}  {duration:>6.1f}s"
+        )
+        total_tests += 1
+        total_score += score
+        if passed:
+            total_passed += 1
+
+    avg_score = total_score / total_tests if total_tests > 0 else 0.0
+    logging.info(sep)
+    logging.info(f"  Passed: {total_passed}/{total_tests}  Avg Score: {avg_score:.2f}")
+    logging.info(f"  Priority mode: {priority_count} tests (0 = all)")
+
+    aggregated_timings: Dict[str, Dict[str, Any]] = {}
+    for r in all_results:
+        obs = r.get("execution", {}).get("observability", {})
+        for name, stats in obs.get("timings", {}).items():
+            if name not in aggregated_timings:
+                aggregated_timings[name] = {
+                    "count": 0,
+                    "total_duration": 0.0,
+                    "min_duration": float("inf"),
+                    "max_duration": 0.0,
+                }
+            agg = aggregated_timings[name]
+            agg["count"] += stats.get("count", 0)
+            agg["total_duration"] += stats.get("total_duration", 0)
+            agg["min_duration"] = min(agg["min_duration"], stats.get("min_duration", float("inf")))
+            agg["max_duration"] = max(agg["max_duration"], stats.get("max_duration", 0))
+    for agg in aggregated_timings.values():
+        if agg["min_duration"] == float("inf"):
+            agg["min_duration"] = 0.0
+        agg["avg_duration"] = round(agg["total_duration"] / agg["count"], 4) if agg["count"] > 0 else 0.0
+        agg["total_duration"] = round(agg["total_duration"], 4)
+        agg["min_duration"] = round(agg["min_duration"], 4)
+        agg["max_duration"] = round(agg["max_duration"], 4)
+
+    if aggregated_timings:
+        from agent.app.testing.report import _render_timing_bar_chart
+        logging.info("")
+        logging.info("  Aggregate Connector Timings Across All Tests:")
+        for name, stats in sorted(aggregated_timings.items()):
+            logging.info(
+                f"    {name:>16}: avg={stats['avg_duration']:.3f}s  "
+                f"min={stats['min_duration']:.3f}s  max={stats['max_duration']:.3f}s  "
+                f"count={stats['count']}  total={stats['total_duration']:.2f}s"
+            )
+        chart_lines = _render_timing_bar_chart(aggregated_timings, title="Avg Duration (all tests)")
+        for line in chart_lines:
+            logging.info(line)
+
+    logging.info(sep)
+
+
 async def main() -> None:
     """Run idea test suite with parallel execution."""
-    visit_test_mode = os.environ.get("IDEA_TEST_VISIT_ONLY", "").strip().lower() in ("1", "true", "yes")
     mode_env = os.environ.get("IDEA_TEST_MODE", "").strip().lower()
     benchmark_mode = mode_env == "benchmark" or _is_enabled(os.environ.get("IDEA_TEST_BENCHMARK_MODE", ""))
-    
-    if visit_test_mode:
-        from agent.app.visit_test import main as visit_test_main
-        success = await visit_test_main()
-        exit(0 if success else 1)
-        return
     
     log_level = os.environ.get("IDEA_TEST_LOG_LEVEL", "INFO").upper()
     logging.basicConfig(
@@ -488,7 +596,23 @@ async def main() -> None:
     priority_count = _env_int("IDEA_TEST_TOP_N", ["IDEA_TEST_PRIORITY", "IDEA_TEST_BENCHMARK_THIRD_COUNT"], default_top_n)
     repeats = max(1, _env_int("IDEA_TEST_RUNS", ["IDEA_TEST_REPEATS"], default_runs))
     max_parallel = max(1, _env_int("IDEA_TEST_CONCURRENCY", ["IDEA_TEST_MAX_PARALLEL"], default_concurrency))
-    execution_variants = _parse_execution_variants(os.environ.get("IDEA_TEST_EXECUTION_VARIANTS", "graph"))
+    specific_test_ids = None
+    test_ids_env = os.environ.get("IDEA_TEST_IDS", "").strip()
+    if test_ids_env:
+        specific_test_ids = [tid.strip() for tid in test_ids_env.split(",") if tid.strip()]
+        logging.info(f"Filtering to specific test IDs: {specific_test_ids}")
+    
+    execution_variants_env = os.environ.get("IDEA_TEST_EXECUTION_VARIANTS", "graph")
+    execution_variants = _parse_execution_variants(execution_variants_env)
+    
+    if specific_test_ids:
+        if "sequential" in execution_variants:
+            execution_variants = [v for v in execution_variants if v != "sequential"]
+            logging.info(f"IDEA_TEST_IDS set - removing sequential variant, only running: {execution_variants}")
+        if not execution_variants:
+            execution_variants = ["graph"]
+            logging.info(f"IDEA_TEST_IDS set - defaulting to graph mode only")
+    
     if benchmark_mode:
         max_parallel = min(max_parallel, 3)
     
@@ -496,7 +620,7 @@ async def main() -> None:
     if benchmark_mode:
         test_files = select_benchmark_test_files(all_test_files, target_count=priority_count)
     else:
-        test_files = filter_test_files_by_priority(all_test_files, priority_count=priority_count)
+        test_files = filter_test_files_by_priority(all_test_files, priority_count=priority_count, specific_ids=specific_test_ids)
     
     if not test_files:
         logging.error("No test files found after filtering")
@@ -506,7 +630,9 @@ async def main() -> None:
     logging.info(f"Mode: {'benchmark' if benchmark_mode else 'default'}")
     logging.info(f"Models: {', '.join(models)}")
     logging.info(f"Validation model: {validation_model}")
-    logging.info(f"Execution variants: {', '.join(execution_variants)}")
+    logging.info(f"Execution variants: {', '.join(execution_variants)} ({len(execution_variants)} variant(s))")
+    if specific_test_ids:
+        logging.info(f"Test ID filter active: {specific_test_ids} - sequential variants disabled")
     logging.info(f"Top N tests: {priority_count} (0 means all)")
     logging.info(f"Max parallel: {max_parallel}")
     logging.info(f"Repeats: {repeats}")
@@ -536,16 +662,17 @@ async def main() -> None:
         
         logging.info("Warming up ChromaDB to pre-install embedding models...")
         try:
-            warmup_collection = await connector_chroma.get_or_create_collection("_warmup_test")
+            warmup_collection_name = "warmup_test"
+            warmup_collection = await connector_chroma.get_or_create_collection(warmup_collection_name)
             if warmup_collection:
                 await connector_chroma.add_to_chroma(
-                    collection="_warmup_test",
+                    collection=warmup_collection_name,
                     ids=["warmup_1"],
                     metadatas=[{"type": "warmup"}],
                     documents=["ChromaDB warmup document to trigger model installation"],
                 )
                 await connector_chroma.query_chroma(
-                    collection="_warmup_test",
+                    collection=warmup_collection_name,
                     query_texts=["warmup query"],
                     n_results=1,
                 )
@@ -644,12 +771,9 @@ async def main() -> None:
             "results": all_results,
             "timestamp": datetime.utcnow().isoformat(),
         }
-        summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
-        logging.info(f"\n{'='*70}")
-        logging.info(f"Summary saved: {summary_path.name}")
-        logging.info(f"Priority mode: {priority_count} tests (0 = all)")
-        logging.info(f"Total results: {len(all_results)}")
-        logging.info(f"{'='*70}")
+        summary_path.write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")
+        
+        _print_run_summary(all_results, run_id, priority_count)
 
 
 if __name__ == "__main__":

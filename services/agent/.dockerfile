@@ -22,9 +22,14 @@ COPY shared /app/shared
 RUN pip install --no-cache-dir /app/shared
 
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" && \
-    python -c "import os; print('Model cache location:', os.environ.get('SENTENCE_TRANSFORMERS_HOME', 'default'))" && \
-    find /root/.cache -name '*MiniLM*' -type d | head -5 && \
-    echo "Embedding model all-MiniLM-L6-v2 pre-downloaded"
+    echo "SentenceTransformers model pre-downloaded"
+
+RUN python -c "\
+from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2; \
+ef = ONNXMiniLM_L6_V2(); \
+ef(['warmup']); \
+print('ChromaDB ONNX embedding model pre-downloaded')" && \
+    find /root/.cache -name '*MiniLM*' -type d | head -5
 
 COPY agent /app/agent
 

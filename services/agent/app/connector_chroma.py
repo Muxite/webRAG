@@ -100,6 +100,43 @@ class ConnectorChroma(ConnectorBase):
             self.logger.error(f"Failed to create/get collection '{collection}': {e}")
             return None
 
+    async def delete_collection(self, collection: str) -> bool:
+        """
+        Delete a ChromaDB collection if it exists.
+        :param collection: Name of the collection to delete.
+        :returns: True on success, False otherwise.
+        """
+        if not await self._ensure_ready():
+            self.logger.warning("ChromaDB not ready.")
+            return False
+        try:
+            if self._chroma is None:
+                self.logger.warning("ChromaDB client not initialized.")
+                return False
+            self._chroma.delete_collection(name=collection)
+            return True
+        except Exception as e:
+            self.logger.warning(f"Failed to delete collection '{collection}': {e}")
+            return False
+    
+    async def list_collections(self) -> List[str]:
+        """
+        List all collection names in ChromaDB.
+        :returns: List of collection names.
+        """
+        if not await self._ensure_ready():
+            self.logger.warning("ChromaDB not ready.")
+            return []
+        try:
+            if self._chroma is None:
+                self.logger.warning("ChromaDB client not initialized.")
+                return []
+            collections = self._chroma.list_collections()
+            return [col.name for col in collections] if collections else []
+        except Exception as e:
+            self.logger.warning(f"Failed to list collections: {e}")
+            return []
+
     async def add_to_chroma(
         self,
         collection: str,

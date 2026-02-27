@@ -1,4 +1,5 @@
 import asyncio
+import time
 from typing import Optional
 from openai import AsyncOpenAI, APIError, APIStatusError
 from shared.connector_config import ConnectorConfig
@@ -214,7 +215,11 @@ class ConnectorLLM(ConnectorBase):
         if not stripped_content:
             if finish_reason == "length":
                 self.logger.warning(f"Response truncated (model={model_name}). Consider increasing max_completion_tokens.")
+                raise RuntimeError(f"LLM returned empty/whitespace content (model={model_name}, finish_reason={finish_reason})")
             raise RuntimeError(f"LLM returned empty/whitespace content (model={model_name}, finish_reason={finish_reason})")
+        
+        if finish_reason == "length":
+            self.logger.warning(f"Response truncated (model={model_name}). Content length: {len(stripped_content)}. Consider increasing max_completion_tokens.")
         
         return stripped_content
 
@@ -282,6 +287,7 @@ class ConnectorLLM(ConnectorBase):
         base_delay = max(1.0, float(self.config.default_delay))
         jitter = float(self.config.jitter_seconds or 0.0)
         started_at = asyncio.get_event_loop().time()
+        perf_started = time.perf_counter()
 
         async def do_call() -> Optional[str]:
             safe_payload = self._simplify_payload(payload)
@@ -329,6 +335,12 @@ class ConnectorLLM(ConnectorBase):
                     "duration": max(0.0, asyncio.get_event_loop().time() - started_at),
                 })
             
+            self._record_timing(
+                name="llm_call",
+                started_at=perf_started,
+                success=True,
+                payload={"model": model_name, "completion_chars": len(content)},
+            )
             self._record_io(
                 direction="out",
                 operation="llm_query",
@@ -348,6 +360,13 @@ class ConnectorLLM(ConnectorBase):
                     "error": str(e),
                     "duration": max(0.0, asyncio.get_event_loop().time() - started_at),
                 })
+            self._record_timing(
+                name="llm_call",
+                started_at=perf_started,
+                success=False,
+                payload={"model": model_name},
+                error=str(e),
+            )
             self.logger.error(f"LLM query failed (model={model_name}): {e}")
             self._record_io(
                 direction="out",

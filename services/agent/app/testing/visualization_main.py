@@ -10,16 +10,9 @@ from .visualization_plots import (
     plot_validation_scores,
     plot_pass_rates,
     plot_execution_metrics,
-    plot_validation_breakdown,
-    plot_difficulty_vs_performance,
     plot_token_efficiency,
     plot_time_vs_score,
-    plot_model_comparison,
-    plot_check_success_rates,
-    plot_observability_timeline,
-    plot_score_distributions,
     plot_tokens_and_actions_dual_axis,
-    plot_specific_validation_checks,
     plot_comprehensive_performance,
 )
 from .visualization_summary import calculate_summary_stats, print_summary
@@ -64,6 +57,7 @@ def generate_all_plots(results_dir: Path, output_dir: Optional[Path] = None, run
     print(f"Models: {len(models)} ({', '.join(sorted(models))})")
     print(f"Variants: {len(variants)} ({', '.join(sorted(variants))})")
     
+    # Core plot set: performance, efficiency, and key execution metrics.
     plot_validation_scores(results, output_dir)
     print("[OK] validation_scores.png")
     
@@ -73,36 +67,16 @@ def generate_all_plots(results_dir: Path, output_dir: Optional[Path] = None, run
     plot_execution_metrics(results, output_dir)
     print("[OK] execution_metrics.png")
     
-    plot_validation_breakdown(results, output_dir)
-    print("[OK] validation_breakdown.png")
-    
-    plot_difficulty_vs_performance(results, output_dir)
-    print("[OK] difficulty_vs_performance.png")
-    
     plot_token_efficiency(results, output_dir)
     print("[OK] token_efficiency.png")
     
     plot_time_vs_score(results, output_dir)
     print("[OK] time_vs_score.png")
     
-    plot_model_comparison(results, output_dir)
-    print("[OK] model_comparison.png")
-    
-    plot_check_success_rates(results, output_dir)
-    print("[OK] check_success_rates.png")
-    
-    plot_observability_timeline(results, output_dir)
-    print("[OK] observability_timeline.png")
-    
-    plot_score_distributions(results, output_dir)
-    print("[OK] score_distributions.png")
-    
     plot_tokens_and_actions_dual_axis(results, output_dir)
     print("[OK] tokens_and_actions_dual_axis.png")
     
-    plot_specific_validation_checks(results, output_dir)
-    print("[OK] specific_validation_checks.png")
-    
+    # Comprehensive performance figure set (distributions, correlations, summary).
     plot_comprehensive_performance(results, output_dir)
     print("[OK] comprehensive_distributions.png")
     print("[OK] comprehensive_correlations.png")
@@ -172,7 +146,9 @@ Examples:
     
     results_dir = Path(args.results_dir)
     if not results_dir.is_absolute():
-        results_dir = Path(__file__).resolve().parent.parent / args.results_dir
+        # Resolve results directory relative to the agent root (../.. from this file)
+        # This matches where idea_test_runner and execution write: agent/idea_test_results
+        results_dir = Path(__file__).resolve().parent.parent.parent / args.results_dir
     
     if not results_dir.exists():
         print(f"Error: Results directory not found: {results_dir}")

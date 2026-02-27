@@ -101,21 +101,42 @@ def summarize_observability(result: Dict[str, Any], telemetry) -> Dict[str, Any]
             visit_words += count_words(content)
     
     timings_summary = {}
+    timings_per_call = []
     for timing in telemetry.timings:
         name = timing.get("name", "unknown")
+        duration = timing.get("duration", 0.0)
+        success = timing.get("success", False)
         if name not in timings_summary:
             timings_summary[name] = {
                 "count": 0,
                 "total_duration": 0.0,
+                "avg_duration": 0.0,
+                "min_duration": float("inf"),
+                "max_duration": 0.0,
                 "success_count": 0,
                 "error_count": 0,
             }
-        timings_summary[name]["count"] += 1
-        timings_summary[name]["total_duration"] += timing.get("duration", 0.0)
-        if timing.get("success"):
-            timings_summary[name]["success_count"] += 1
+        entry = timings_summary[name]
+        entry["count"] += 1
+        entry["total_duration"] += duration
+        entry["avg_duration"] = round(entry["total_duration"] / entry["count"], 4)
+        entry["min_duration"] = min(entry["min_duration"], duration)
+        entry["max_duration"] = max(entry["max_duration"], duration)
+        if success:
+            entry["success_count"] += 1
         else:
-            timings_summary[name]["error_count"] += 1
+            entry["error_count"] += 1
+        timings_per_call.append({
+            "name": name,
+            "duration": round(duration, 4),
+            "success": success,
+        })
+    for entry in timings_summary.values():
+        if entry["min_duration"] == float("inf"):
+            entry["min_duration"] = 0.0
+        entry["total_duration"] = round(entry["total_duration"], 4)
+        entry["min_duration"] = round(entry["min_duration"], 4)
+        entry["max_duration"] = round(entry["max_duration"], 4)
     
     return {
         "final_output": {
@@ -166,5 +187,6 @@ def summarize_observability(result: Dict[str, Any], telemetry) -> Dict[str, Any]
             "kilobytes": round(visit_chars / 1024, 2),
         },
         "timings": timings_summary,
+        "timings_per_call": timings_per_call,
         "events_count": len(telemetry.events),
     }

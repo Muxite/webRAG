@@ -12,6 +12,12 @@
   "memoization_namespace": "idea_dag",
   "max_observation_chars": 6000,
   "max_links_per_visit": 20,
+  "visit_link_query_top_k": 10,
+  "visit_link_selection_model": "",
+  "visit_max_sites_per_action": 20,
+  "document_chunk_threshold": 10000,
+  "document_chunk_size": 2000,
+  "document_chunk_overlap": 200,
   "max_available_links_for_expansion": 50,
   "grep_context_window": 80,
   "default_search_count": 10,
@@ -153,15 +159,16 @@
       "additionalProperties": false
     }
   },
-  "expansion_system_prompt": "Break problems into sub-problems. Create 2-{max_children} candidate nodes with action types: {allowed_actions}.\n\nRules:\n- Fewer, larger steps > many small steps\n- Include planning in node details, not separate think nodes\n- Search finds URLs (snippets), visit reads full content (6000 chars)\n- Use PARALLEL (execute_all_children: true) for independent tasks\n- Use SEQUENTIAL (execute_all_children: false) when steps depend on each other\n- Include justification/rationale in details explaining why node is needed\n- Vector DB auto-queried on every node\n\nTools:\n- search: details={{query, intent?, count?, target_facts?, verification_steps?}}. Returns snippets only.\n- visit: details={{url, intent?, target_facts?, extraction_plan?}}. Returns full content + links. Extract URL from search results, not title.\n- think: Only for post-action insights, not planning\n- save: Store findings in memory\n\nIMPORTANT - Using Links from Previous Visits:\n- In visit action results, look for the '_links_inline' field which shows links next to their text: \"Link text [link: https://example.com]\"\n- When you want to visit a link, create a visit candidate with: action=\"visit\", details={{url: \"<exact URL from [link: ...]>\"}}\n- Copy the exact URL from the [link: ...] format - do not modify or construct URLs\n- The title should clearly state what data you expect, e.g. \"Get data from <link text or URL domain>\"\n- You can visit multiple links in parallel if they are independent\n\nOutput: JSON {{candidates: [{{title, action, details}}], meta?: {{execute_all_children: boolean}}}}",
+  "expansion_system_prompt": "Break problems into sub-problems. Create 2-{max_children} candidate nodes with action types: {allowed_actions}.\n\nDATA FLOW RULES:\n- Data flows UPWARD through the graph: child nodes execute → results merge → parent receives data\n- Nodes that need data from siblings MUST be executed SEQUENTIALLY after the data source\n- Search nodes PRODUCE URLs → Visit nodes CONSUME URLs → This creates a dependency chain\n- The graph structure enforces this: visit nodes cannot execute until their URL source (search/visit) completes\n- Use PARALLEL (execute_all_children: true) ONLY when nodes are truly independent (no data sharing)\n- Use SEQUENTIAL (execute_all_children: false) when steps depend on each other - this is the DEFAULT\n\nRules:\n- Fewer, larger steps > many small steps\n- Include planning in node details, not separate think nodes\n- Search finds URLs (snippets), visit reads full content (6000 chars)\n- Include justification/rationale in details explaining why node is needed\n- Vector DB auto-queried on every node\n\nMANDATORY TOOL USE:\n- If the mandate requires visiting URLs, finding information, or gathering data, you MUST create search/visit nodes\n- Do NOT skip tool use and guess answers from pre-trained knowledge\n- Every data-gathering task MUST have at least one search or visit action\n- Think nodes are for reflection AFTER actions, not for skipping tool use\n\nTools:\n- search: details={{query, intent?, count?, target_facts?, verification_steps?}}. Returns snippets with URLs.\n- visit: details={{optional_url?: \"<exact URL string>\", link_count?: <number>, link_idea?: \"<short description>\", intent?, target_facts?, extraction_plan?}}. Returns full content + links.\n  * optional_url: If provided, this URL is visited first. If successful and link_count=1, done.\n  * link_count: Number of links to visit (default: 1, max: 20). If >1, system queries Chroma for links matching link_idea.\n  * link_idea: Short description of what kind of link is wanted (e.g., \"Python documentation\", \"Wikipedia article about X\"). Used for semantic search across stored links.\n  * If optional_url fails or link_count>1, system queries Chroma collections (links_*) for best matches, then uses lightweight LLM to select top B links.\n  * All links from visited pages are stored in Chroma (links_{{base_url_hash}}) for future semantic search.\n  * Can visit multiple sites in one action (up to visit_max_sites_per_action).\n- think: Only for post-action insights, not planning\n- save: Store findings in memory\n\nCRITICAL - Visit Action Requirements:\n- For single URL visits: details={{optional_url: \"<exact URL>\"}} or details={{url: \"<exact URL>\"}} (backward compatible)\n- For semantic link discovery: details={{link_idea: \"<what you want>\", link_count: <N>}}\n- For hybrid: details={{optional_url: \"<try this first>\", link_idea: \"<fallback search>\", link_count: <N>}}\n- Find URLs in previous visit results: look for '_links_inline' field showing \"Link text [link: https://example.com]\"\n- Copy the EXACT URL from [link: ...] - never construct, guess, or modify URLs\n- Example single: {{\"title\": \"Get Python release info\", \"action\": \"visit\", \"details\": {{\"optional_url\": \"https://en.wikipedia.org/wiki/Python_(programming_language)\"}}}}\n- Example multi: {{\"title\": \"Find 3 Python tutorials\", \"action\": \"visit\", \"details\": {{\"link_idea\": \"Python programming tutorial\", \"link_count\": 3}}}}\n\nOutput: JSON {{candidates: [{{title, action, details}}], meta?: {{execute_all_children: boolean}}}}",
   "expansion_user_prompt": "Return your response as valid JSON. {{\"path\": {path_json}, \"parent_id\": \"{parent_id}\", \"parent_title\": \"{parent_title}\", \"blocked_sites\": \"{blocked_sites}\", \"errors\": \"{errors}\", \"memories\": \"{memories}\", \"event_log\": {event_log}}}",
   "expansion_model": "",
   "expansion_temperature": 0.4,
-  "expansion_max_tokens": 262144,
+  "expansion_max_tokens": 8192,
   "expansion_max_context_nodes": 5,
   "expansion_max_detail_chars": 2000,
+  "expansion_timeout_seconds": 180,
   "expansion_planning_addendum": "Before producing candidates, build an internal plan that identifies target facts, likely sources, and verification steps. Every candidate should include concrete extraction intent, measurable output fields, and a clear reason why this step reduces uncertainty. Prefer candidates that produce verifiable evidence over narrative-only steps.",
-  "evaluation_system_prompt": "Score candidates (0-1). Reward: breaking problems into sub-problems, evidence-gathering (search+visit), comprehensive actions. Penalize: redundancy, tiny steps, skipping visit after search. Prefer larger steps but prioritize search+visit sequences. Return JSON: {{score: float, rationale: string}}.",
+  "evaluation_system_prompt": "Score candidates (0-1). Reward: breaking problems into sub-problems, evidence-gathering (search+visit), comprehensive actions. Penalize: redundancy, tiny steps, skipping visit after search. CRITICAL: Nodes with actions (search/visit) that have no action_result must be scored ≤0.2 - they represent unexecuted work. Prefer larger steps but prioritize search+visit sequences. Return JSON: {{score: float, rationale: string}}.",
   "evaluation_user_prompt": "{{\"path\": {path_json}, \"candidate_id\": \"{candidate_id}\", \"candidate_title\": \"{candidate_title}\", \"parent_goal\": \"{parent_goal}\"}}",
   "evaluation_batch_system_prompt": "Score all candidates (0-1). Reward: comprehensive steps, evidence-gathering (search+visit). Penalize: redundancy, tiny steps, skipping visit after search. Return JSON: {{\"scores\": [{{\"id\": string, \"score\": float}}, ...]}}. Use candidate 'id' (1,2,3...) not node_id.",
   "evaluation_batch_user_prompt": "{{\"path\": {path_json}, \"parent_id\": \"{parent_id}\", \"candidates\": {candidates_json}}}",
@@ -170,19 +177,26 @@
   "evaluation_max_tokens": 65536,
   "evaluation_max_context_nodes": 5,
   "evaluation_max_detail_chars": 2000,
-  "evaluation_planning_addendum": "Prefer candidates that: (1) gather verifiable evidence, (2) define explicit output fields, (3) include source validation or cross-checking, and (4) reduce hallucination risk. Penalize vague steps without concrete evidence collection plans.",
+  "evaluation_planning_addendum": "Prefer candidates that: (1) gather verifiable evidence, (2) define explicit output fields, (3) include source validation or cross-checking, and (4) reduce hallucination risk. Penalize vague steps without concrete evidence collection plans. MANDATORY: If a node has an action (search/visit) but no action_result, score it ≤0.2 - it represents incomplete/unexecuted work.",
   "evaluation_batch_max_candidates": 5,
+  "evaluation_no_action_result_base_score": 0.1,
+  "evaluation_no_action_result_score_cap": 0.2,
+  "evaluation_weight_search": 1.0,
+  "evaluation_weight_visit": 1.0,
+  "evaluation_weight_think": 1.0,
+  "evaluation_weight_save": 1.0,
+  "evaluation_weight_default": 1.0,
   "best_first_global": true,
   "allow_execute_all_children": true,
-  "final_system_prompt": "Synthesize final answer from merged results. Use only evidence provided. Include URL citations. If evidence is missing, state what's missing. Return JSON: {{deliverable: string, summary: string}}.",
+  "final_system_prompt": "Synthesize final answer from merged results. Use only evidence provided. Include URL citations. If evidence is missing, state what's missing. Return JSON: {{deliverable: string, summary: string}}.\n\nCRITICAL EXTRACTION REQUIREMENTS:\n- If the mandate asks for specific facts (dates, names, versions, numbers), extract and explicitly list each one in the deliverable with clear labels\n- If the mandate asks for URLs or links, list them explicitly in order with full URLs\n- If the mandate asks for a chain or sequence, show the order clearly (e.g., \"1. URL1 -> 2. URL2 -> 3. URL3\")\n- For visit-based tasks: extract facts directly from visit results, not from general knowledge\n- Include exact values found (e.g., \"1991\" not \"early 1990s\", \"Guido van Rossum\" not \"the creator\")\n- For adjacency/chain verification: explicitly show which URL links to which (e.g., \"URL[i] contains link to URL[i+1]\")\n- Format clearly: use numbered lists, bullet points, or structured sections to make extracted facts easy to identify",
   "final_user_prompt": "{{\"mandate\": \"{mandate}\", \"merged\": {merged_json}}}",
   "final_model": "",
   "final_temperature": 0.3,
   "final_max_tokens": 262144,
   "max_merged_items_for_llm": 15,
-  "merge_system_prompt": "Combine data from child nodes into coherent summary. Remove redundancy, extract key findings. Return JSON: {{summary: string, key_findings: [string, ...]}}.",
-  "merge_planning_addendum": "Produce a synthesis that preserves provenance. Include what is confirmed, what is uncertain, and what additional evidence would close gaps. Prefer concise factual bullets that map claims to source evidence.",
-  "merge_user_prompt": "{{\"merged_results\": {merged_json}}}",
+  "merge_system_prompt": "Combine data from child nodes into coherent summary. Remove redundancy, extract key findings. Evaluate if the original goal/intent has been achieved. Return JSON: {{summary: string, key_findings: [string, ...], goal_achieved: boolean, goal_evaluation: string, missing_requirements: [string, ...]}}.",
+  "merge_planning_addendum": "Produce a synthesis that preserves provenance. Include what is confirmed, what is uncertain, and what additional evidence would close gaps. Prefer concise factual bullets that map claims to source evidence. CRITICAL: Evaluate goal achievement based on the original intent/reason the branch was created - not just whether keywords appear in the text, but whether the actual objective has been met.",
+  "merge_user_prompt": "{{\"merged_results\": {merged_json}, \"original_goal\": \"{original_goal}\", \"parent_intent\": \"{parent_intent}\", \"parent_justification\": \"{parent_justification}\"}}",
   "merge_model": "",
   "merge_temperature": 0.3,
   "merge_max_tokens": 131072,
@@ -199,11 +213,24 @@
           "items": {
             "type": "string"
           }
+        },
+        "goal_achieved": {
+          "type": "boolean"
+        },
+        "goal_evaluation": {
+          "type": "string"
+        },
+        "missing_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
         "summary",
-        "key_findings"
+        "key_findings",
+        "goal_achieved"
       ],
       "additionalProperties": false
     }
