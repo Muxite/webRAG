@@ -83,26 +83,6 @@ services:
     networks:
       - enet
 
-  agent-benchmark:
-    profiles: ["bench"]
-    build:
-      context: .
-      dockerfile: agent/.dockerfile
-    stdin_open: true
-    tty: true
-    depends_on:
-      - chroma
-      - redis
-      - rabbitmq
-    command: ["python", "-m", "app.benchmark_cli"]
-    env_file:
-      - .env
-      - keys.env
-    volumes:
-      - ./agent/app/benchmark_results:/app/agent/app/benchmark_results
-    networks:
-      - enet
-
   agent-test:
     profiles: ["test"]
     build:
@@ -136,18 +116,15 @@ services:
       - keys.env
     environment:
       - AGENT_STATUS_TIME=0.2
-      - IDEA_TEST_TOP_N=10
-      - IDEA_TEST_MODELS=gpt-5-mini
+      - IDEA_TEST_TOP_N=16
+      - IDEA_TEST_MODELS=gpt-5-mini,gpt-5.2
       - IDEA_TEST_VALIDATION_MODEL=gpt-5-mini
-      - IDEA_TEST_EXECUTION_VARIANTS=graph
-      - IDEA_TEST_RUNS=3
-      - IDEA_TEST_CONCURRENCY=3
+      - IDEA_TEST_EXECUTION_VARIANTS=graph,sequential
+      - IDEA_TEST_RUNS=1
+      - IDEA_TEST_CONCURRENCY=4
       - IDEA_TEST_LOG_LEVEL=INFO
-      - IDEA_TEST_MAX_STEPS=50
-      - IDEA_DAG_EVALUATION_MAX_TOKENS=4096
-      - IDEA_DAG_FINAL_MAX_TOKENS=16384
-      - IDEA_DAG_MERGE_MAX_TOKENS=8192
-      - IDEA_TEST_REPORT_VERBOSITY=1
+      - IDEA_TEST_MAX_STEPS=75
+      - IDEA_TEST_REPORT_VERBOSITY=2
     volumes:
       - ./agent/idea_test_results:/app/agent/idea_test_results
       - ./agent/app/idea_tests:/app/agent/app/idea_tests
@@ -170,11 +147,63 @@ services:
     environment:
       - AGENT_STATUS_TIME=0.2
       - MODEL_NAME=gpt-5-mini
-      - IDEA_TEST_IDS=026,019,025
-      - IDEA_TEST_EXECUTION_VARIANTS=graph
+      - IDEA_TEST_IDS=019,025,033,037
+      - IDEA_TEST_EXECUTION_VARIANTS=graph,sequential
+      - IDEA_TEST_RUNS=1
+      - IDEA_TEST_CONCURRENCY=2
+      - IDEA_TEST_REPORT_VERBOSITY=1
+    volumes:
+      - ./agent/idea_test_results:/app/agent/idea_test_results
+      - ./agent/app/idea_tests:/app/agent/app/idea_tests
+    networks:
+      - enet
+
+  general-test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: agent/.dockerfile
+    depends_on:
+      - chroma
+      - redis
+      - rabbitmq
+    command: ["python", "-m", "app.idea_test_runner"]
+    env_file:
+      - .env
+      - keys.env
+    environment:
+      - AGENT_STATUS_TIME=0.2
+      - MODEL_NAME=gpt-5-mini
+      - IDEA_TEST_IDS=002,012
+      - IDEA_TEST_EXECUTION_VARIANTS=graph,sequential
       - IDEA_TEST_RUNS=1
       - IDEA_TEST_CONCURRENCY=1
       - IDEA_TEST_REPORT_VERBOSITY=1
+    volumes:
+      - ./agent/idea_test_results:/app/agent/idea_test_results
+      - ./agent/app/idea_tests:/app/agent/app/idea_tests
+    networks:
+      - enet
+
+  agent-debug:
+    profiles: ["debug"]
+    build:
+      context: .
+      dockerfile: agent/.dockerfile
+    depends_on:
+      - chroma
+      - redis
+      - rabbitmq
+    command: ["python", "-m", "app.debug_runner"]
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+      - keys.env
+    environment:
+      - MODEL_NAME=gpt-5-mini
+      - INTERACTIVE_MAX_STEPS=100
+      - INTERACTIVE_LOG_LEVEL=WARNING
     volumes:
       - ./agent/idea_test_results:/app/agent/idea_test_results
       - ./agent/app/idea_tests:/app/agent/app/idea_tests

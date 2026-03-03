@@ -70,7 +70,11 @@
                 },
                 {
                     "name": "MODEL_NAME",
-                    "value": "gpt-4o"
+                    "value": "gpt-5-mini"
+                },
+                {
+                    "name": "AGENT_USE_IDEA_DAG",
+                    "value": "true"
                 },
                 {
                     "name": "RABBITMQ_URL",
@@ -172,6 +176,6 @@
     "requiresCompatibilities": [
         "FARGATE"
     ],
-    "cpu": "256",
-    "memory": "512"
+    "cpu": "1024",
+    "memory": "2048"
 }

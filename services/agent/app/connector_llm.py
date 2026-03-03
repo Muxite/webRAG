@@ -94,8 +94,10 @@ class ConnectorLLM(ConnectorBase):
         limits = {
             "gpt-5-mini": 128000,
             "gpt-5-nano": 128000,
+            "gpt-5.2": 128000,
+            "gpt-5": 128000,
             "gpt-4.1-nano": 128000,
-            "gpt-4o": 16384,  # Standard limit for gpt-4o
+            "gpt-4o": 16384,
         }
         
         # Check exact match first

@@ -7,6 +7,8 @@ openai>=1.57.0
 supabase
 sentence-transformers
 aio-pika
+undetected-chromedriver
+selenium
 pytest
 pytest-asyncio
 pytest-repeat

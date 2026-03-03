@@ -136,6 +136,7 @@ async def run_test_execution(
             graph=graph,
             mandate=mandate,
             model_name=model_name,
+            memory_manager=engine._memory_manager,
         )
     else:
         output = {}

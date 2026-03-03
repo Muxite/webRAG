@@ -14,15 +14,29 @@ from .visualization_plots import (
     plot_time_vs_score,
     plot_tokens_and_actions_dual_axis,
     plot_comprehensive_performance,
+    plot_cost_analysis,
+    plot_graph_vs_sequential,
+    plot_model_head_to_head,
+    plot_score_heatmap,
+    plot_executive_dashboard,
+    plot_token_breakdown,
+    plot_action_effectiveness,
+    plot_per_test_model_comparison,
+    plot_graph_structure,
+    plot_data_coverage,
+    plot_cost_efficiency_frontier,
 )
+from .visualization_core import generate_core_plots
 from .visualization_summary import calculate_summary_stats, print_summary
 
-def generate_all_plots(results_dir: Path, output_dir: Optional[Path] = None, run_id_filter: Optional[str] = None):
+def generate_all_plots(results_dir: Path, output_dir: Optional[Path] = None,
+                       run_id_filter: Optional[str] = None, core_only: bool = False):
     """
-    Generate all visualization plots from test results.
+    Generate visualization plots from test results.
     :param results_dir: Directory containing test result JSON files.
     :param output_dir: Output directory (defaults to results_dir/plots or results_dir/plots_{run_id}).
     :param run_id_filter: Optional run ID to filter by.
+    :param core_only: When True, only produce the 4 consolidated core images.
     """
     if output_dir is None:
         if run_id_filter:
@@ -56,8 +70,16 @@ def generate_all_plots(results_dir: Path, output_dir: Optional[Path] = None, run
     print(f"Tests: {len(test_ids)} ({', '.join(sorted(test_ids))})")
     print(f"Models: {len(models)} ({', '.join(sorted(models))})")
     print(f"Variants: {len(variants)} ({', '.join(sorted(variants))})")
-    
-    # Core plot set: performance, efficiency, and key execution metrics.
+
+    print("\n--- Core Plots (4 consolidated images) ---")
+    generate_core_plots(results, output_dir)
+
+    if core_only:
+        summary_stats = calculate_summary_stats(results)
+        print_summary(summary_stats)
+        return
+
+    print("\n--- Detailed Plots ---")
     plot_validation_scores(results, output_dir)
     print("[OK] validation_scores.png")
     
@@ -76,12 +98,54 @@ def generate_all_plots(results_dir: Path, output_dir: Optional[Path] = None, run
     plot_tokens_and_actions_dual_axis(results, output_dir)
     print("[OK] tokens_and_actions_dual_axis.png")
     
-    # Comprehensive performance figure set (distributions, correlations, summary).
     plot_comprehensive_performance(results, output_dir)
     print("[OK] comprehensive_distributions.png")
     print("[OK] comprehensive_correlations.png")
     print("[OK] comprehensive_summary.png")
     
+    plot_cost_analysis(results, output_dir)
+    print("[OK] cost_analysis.png")
+
+    # --- New advanced plots ---
+    try:
+        plot_graph_vs_sequential(results, output_dir)
+        print("[OK] graph_vs_sequential.png")
+    except Exception:
+        print("[SKIP] graph_vs_sequential.png (need both graph+sequential data)")
+
+    try:
+        plot_model_head_to_head(results, output_dir)
+        print("[OK] model_head_to_head.png")
+    except Exception:
+        print("[SKIP] model_head_to_head.png (need 2+ models)")
+
+    plot_score_heatmap(results, output_dir)
+    print("[OK] score_heatmap.png")
+
+    plot_executive_dashboard(results, output_dir)
+    print("[OK] executive_dashboard.png")
+
+    plot_token_breakdown(results, output_dir)
+    print("[OK] token_breakdown.png")
+
+    plot_action_effectiveness(results, output_dir)
+    print("[OK] action_effectiveness.png")
+
+    plot_per_test_model_comparison(results, output_dir)
+    print("[OK] per_test_model_comparison.png")
+
+    plot_graph_structure(results, output_dir)
+    print("[OK] graph_structure.png")
+
+    plot_data_coverage(results, output_dir)
+    print("[OK] data_coverage.png")
+
+    try:
+        plot_cost_efficiency_frontier(results, output_dir)
+        print("[OK] cost_efficiency_frontier.png")
+    except Exception:
+        print("[SKIP] cost_efficiency_frontier.png (need cost data)")
+
     print(f"\nAll plots saved to: {output_dir}")
     
     summary_stats = calculate_summary_stats(results)
@@ -141,6 +205,11 @@ Examples:
         action="store_true",
         help="List available run IDs and exit",
     )
+    parser.add_argument(
+        "--core-only",
+        action="store_true",
+        help="Only generate the 4 core summary images (skip detailed plots)",
+    )
     
     args = parser.parse_args()
     
@@ -186,4 +255,5 @@ Examples:
         if not output_dir.is_absolute():
             output_dir = Path(__file__).resolve().parent / args.output_dir
     
-    generate_all_plots(results_dir, output_dir, run_id_filter=run_id_filter)
+    generate_all_plots(results_dir, output_dir, run_id_filter=run_id_filter,
+                       core_only=args.core_only)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import asyncio
-from enum import Enum
 import json
 import logging
 import re
@@ -29,22 +28,18 @@ from agent.app.idea_policies.action_constants import (
 
 
 class LeafAction(ABC):
-    """Base class for leaf node actions."""
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         self.settings = dict(settings or {})
         self._logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
-        """Execute a leaf node action."""
         raise NotImplementedError()
 
     def _max_observation_chars(self) -> int:
-        """Return max observation size."""
-        return int(self.settings.get("max_observation_chars", 6000))
+        return int(self.settings.get("max_observation_chars", 100000))
 
     def _timeout_seconds(self, key: str) -> Optional[float]:
-        """Return timeout value from settings."""
         value = self.settings.get(key)
         if value is None:
             value = self.settings.get("action_timeout_seconds")
@@ -56,7 +51,6 @@ class LeafAction(ABC):
             return None
 
     def _is_retryable(self, error: Exception) -> bool:
-        """Check if error should be retried."""
         if isinstance(error, (asyncio.TimeoutError, TimeoutError)):
             return True
         message = str(error)
@@ -84,7 +78,6 @@ class LeafAction(ABC):
         return False
 
     def _limit_text(self, text: str) -> Dict[str, Any]:
-        """Limit text to max observation chars."""
         max_chars = self._max_observation_chars()
         raw = text or ""
         if len(raw) <= max_chars:
@@ -97,7 +90,6 @@ class LeafAction(ABC):
 
     @staticmethod
     def _copy_details_safely(details: Dict[str, Any]) -> Dict[str, Any]:
-        """Create safe copy of node details (primitives only)."""
         if not isinstance(details, dict):
             return {}
         
@@ -125,7 +117,6 @@ class LeafAction(ABC):
         error: Exception,
         context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Build failure payload with error tracking."""
         import traceback
         
         error_str = str(error)
@@ -173,17 +164,6 @@ class SearchLeafAction(LeafAction):
             intent = node.details.get(DetailKey.INTENT.value)
             count = int(node.details.get(DetailKey.COUNT.value, self.settings.get("default_search_count", 10)))
             
-            if intent and hasattr(io, 'retrieve_chroma'):
-                try:
-                    vector_context = await io.retrieve_chroma(
-                        topics=[str(intent)],
-                        n_results=3,
-                        timeout_seconds=self._timeout_seconds("chroma_timeout_seconds"),
-                    )
-                    self._logger.debug(f"[SEARCH] Retrieved {len(vector_context)} vector DB results for intent: {intent[:50]}")
-                except Exception as vec_exc:
-                    self._logger.warning(f"[SEARCH] Vector DB query failed: {vec_exc}")
-            
             chunk_content = node.details.get(DetailKey.CHUNK_CONTENT.value)
             if chunk_content:
                 self._logger.info(f"[SEARCH] Chunk-based search: searching within chunk {node.details.get(DetailKey.CHUNK_INDEX.value, '?')}/{node.details.get(DetailKey.TOTAL_CHUNKS.value, '?')}")
@@ -228,13 +208,6 @@ class SearchLeafAction(LeafAction):
             return failure
     
     def _search_in_chunk(self, chunk_content: str, query: str, max_results: int) -> List[Dict[str, Any]]:
-        """
-        Search for query terms within a document chunk.
-        :param chunk_content: Chunk text to search.
-        :param query: Search query.
-        :param max_results: Maximum number of results.
-        :returns: List of search results with snippets.
-        """
         import re
         
         query_terms = re.findall(r'\b\w+\b', query.lower())
@@ -280,13 +253,6 @@ class VisitLeafAction(LeafAction):
         return candidate.startswith(("http://", "https://"))
     
     def _clean_and_fix_link(self, href: str, base_url: str) -> Optional[str]:
-        """
-        Clean and fix a link, converting relative URLs to absolute.
-        Completes broken/partial links into full URLs where possible.
-        :param href: Raw href from HTML.
-        :param base_url: Base URL of the current page.
-        :return: Cleaned absolute URL or None if invalid.
-        """
         if not href or not isinstance(href, str):
             return None
         
@@ -340,12 +306,6 @@ class VisitLeafAction(LeafAction):
             return None
     
     def _filter_and_prioritize_links(self, links: List[str], base_url: str) -> List[str]:
-        """
-        Filter, clean, and prioritize links.
-        :param links: Raw list of links.
-        :param base_url: Base URL for resolving relative links.
-        :return: Cleaned, deduplicated list of absolute URLs.
-        """
         seen: Set[str] = set()
         cleaned_links: List[str] = []
         
@@ -358,13 +318,6 @@ class VisitLeafAction(LeafAction):
         return cleaned_links
     
     def _attach_links_to_content(self, content: str, links: List[str], max_links: int = 20) -> str:
-        """
-        Attach links to the bottom of content for better visibility.
-        :param content: Main content text.
-        :param links: List of cleaned links.
-        :param max_links: Maximum links to attach.
-        :return: Content with links appended.
-        """
         if not links:
             return content
         
@@ -379,13 +332,6 @@ class VisitLeafAction(LeafAction):
         return content + links_section
 
     def _extract_url_from_parents(self, graph: IdeaDag, node: IdeaNode, max_depth: int = 3) -> Optional[str]:
-        """
-        Extract URL from parent nodes, prioritizing relevant links based on node context.
-        :param graph: IdeaDag instance.
-        :param node: Current node needing a URL.
-        :param max_depth: Maximum depth to search.
-        :returns: Best matching URL or None.
-        """
         visited = set()
         queue = [(node, 0)]
         
@@ -471,13 +417,6 @@ class VisitLeafAction(LeafAction):
         return None
     
     def _extract_url_from_think_node(self, graph: IdeaDag, node: IdeaNode) -> Optional[str]:
-        """
-        Extract URL from a think node that was supposed to select a URL.
-        Checks if this visit node depends on a think node via REQUIRES_DATA.
-        :param graph: IdeaDag instance.
-        :param node: Current visit node.
-        :returns: Extracted URL or None.
-        """
         from agent.app.idea_policies.base import DetailKey
         from agent.app.idea_policies.action_constants import ActionResultKey
         
@@ -511,17 +450,6 @@ class VisitLeafAction(LeafAction):
         return None
     
     def _extract_url_from_sibling_results(self, graph: IdeaDag, node: IdeaNode) -> Optional[str]:
-        """
-        Extract a URL from completed sibling node results.
-        
-        In a sequential execution, earlier siblings may have visited pages and
-        produced links. This method searches those sibling results for URLs
-        that match the current node's intent/title, enabling chained visits.
-        
-        :param graph: IdeaDag instance.
-        :param node: Current visit node.
-        :returns: Best matching URL from sibling results or None.
-        """
         import re
         
         # Find parent to get siblings
@@ -604,15 +532,6 @@ class VisitLeafAction(LeafAction):
         link_contexts: Dict[str, str],
         io: AgentIO,
     ) -> bool:
-        """
-        Store all links from a visited page in a Chroma collection for later semantic search.
-        Collection name: links_{base_url_hash}
-        :param base_url: Base URL of the visited page.
-        :param links: List of cleaned absolute URLs.
-        :param link_contexts: Mapping of URL -> anchor text.
-        :param io: Agent IO instance.
-        :returns: True if stored successfully.
-        """
         if not links or not getattr(io, "connector_chroma", None):
             return False
         
@@ -665,14 +584,6 @@ class VisitLeafAction(LeafAction):
         io: AgentIO,
         top_k: int = 10,
     ) -> List[str]:
-        """
-        Query Chroma for links matching the link_idea concept.
-        Searches across all link collections (links_*).
-        :param link_idea: Short description of what kind of link is wanted.
-        :param io: Agent IO instance.
-        :param top_k: Maximum number of links to return.
-        :returns: List of URLs (best matches first).
-        """
         if not link_idea or not getattr(io, "connector_chroma", None):
             return []
         
@@ -738,15 +649,6 @@ class VisitLeafAction(LeafAction):
         link_count: int,
         io: AgentIO,
     ) -> List[str]:
-        """
-        Use lightweight LLM call to select top B links from candidates.
-        This is part of the same node, not a separate think/expand node.
-        :param link_idea: Original idea of what link is wanted.
-        :param candidate_urls: List of candidate URLs to choose from.
-        :param link_count: Number of links to select.
-        :param io: Agent IO instance.
-        :returns: Selected URLs.
-        """
         if not candidate_urls or link_count <= 0:
             return []
         
@@ -803,15 +705,6 @@ class VisitLeafAction(LeafAction):
         io: AgentIO,
         intent: Optional[str] = None,
     ) -> Tuple[Optional[Dict[str, Any]], List[str], Dict[str, str]]:
-        """
-        Visit a single page and extract content, links, and metadata.
-        :param url: URL to visit.
-        :param graph: IdeaDag instance.
-        :param node: Current node.
-        :param io: Agent IO instance.
-        :param intent: Optional intent for vector context.
-        :returns: Tuple of (result_dict, cleaned_links, cleaned_link_contexts).
-        """
         from agent.app.idea_policies.action_constants import ErrorType
         
         blocked_reason = graph.is_site_blocked(str(url))
@@ -871,9 +764,9 @@ class VisitLeafAction(LeafAction):
         cleaned_links = self._filter_and_prioritize_links(raw_links, str(url))
         cleaned_link_contexts = {}
         for raw_link in raw_links:
-            cleaned = self._clean_and_fix_link(raw_link, str(url))
-            if cleaned and raw_link in link_contexts:
-                cleaned_link_contexts[cleaned] = link_contexts[raw_link]
+            fixed_link = self._clean_and_fix_link(raw_link, str(url))
+            if fixed_link and raw_link in link_contexts:
+                cleaned_link_contexts[fixed_link] = link_contexts[raw_link]
         
         await self._store_links_in_chroma(str(url), cleaned_links, cleaned_link_contexts, io)
         
@@ -924,17 +817,6 @@ class VisitLeafAction(LeafAction):
             from agent.app.idea_policies.action_constants import ErrorType
             
             intent = node.details.get(DetailKey.INTENT.value)
-            
-            if intent and hasattr(io, 'retrieve_chroma'):
-                try:
-                    vector_context = await io.retrieve_chroma(
-                        topics=[str(intent)],
-                        n_results=3,
-                        timeout_seconds=self._timeout_seconds("chroma_timeout_seconds"),
-                    )
-                    self._logger.debug(f"[VISIT] Retrieved {len(vector_context)} vector DB results for intent: {intent[:50]}")
-                except Exception as vec_exc:
-                    self._logger.warning(f"[VISIT] Vector DB query failed: {vec_exc}")
             
             link_count = node.details.get("link_count")
             if link_count is None:
@@ -1097,8 +979,8 @@ class VisitLeafAction(LeafAction):
                 urls_visited=urls_to_visit,
                 intent=intent,
                 vector_context=[str(doc) for doc in vector_context] if vector_context else [],
-                content=combined_content_text[:6000] if len(combined_content_text) > 6000 else combined_content_text,
-                content_is_truncated=len(combined_content_text) > 6000,
+                content=combined_content_text[:self._max_observation_chars()] if len(combined_content_text) > self._max_observation_chars() else combined_content_text,
+                content_is_truncated=len(combined_content_text) > self._max_observation_chars(),
                 content_total_chars=len(combined_content_text),
                 content_full=combined_content_text,
                 content_with_links=content_with_links,
@@ -1111,8 +993,9 @@ class VisitLeafAction(LeafAction):
                 sites_visited=len(visited_results),
             )
         except Exception as exc:
-            if not url and node:
-                url = (
+            resolved_url = optional_url if optional_url else None
+            if not resolved_url and node:
+                resolved_url = (
                     node.details.get(DetailKey.URL.value)
                     or node.details.get(DetailKey.LINK.value)
                     or node.title
@@ -1147,18 +1030,18 @@ class VisitLeafAction(LeafAction):
                     block_reason = reason
                     break
             
-            if is_bot_block and url:
-                graph.mark_site_blocked(str(url), block_reason or "Bot blocking detected")
-                self._logger.warning(f"[VISIT] Marking site as blocked: {url} - {block_reason}")
+            if is_bot_block and resolved_url:
+                graph.mark_site_blocked(str(resolved_url), block_reason or "Bot blocking detected")
+                self._logger.warning(f"[VISIT] Marking site as blocked: {resolved_url} - {block_reason}")
             
             failure = self._failure(
                 action=IdeaActionType.VISIT,
                 node_id=node_id,
                 error=exc,
-                context={DetailKey.URL.value: url},
+                context={DetailKey.URL.value: resolved_url},
             )
-            if url is not None:
-                failure[ActionResultKey.URL.value] = url
+            if resolved_url is not None:
+                failure[ActionResultKey.URL.value] = resolved_url
             if is_bot_block:
                 failure[ActionResultKey.RETRYABLE.value] = False
                 failure[ActionResultKey.ERROR.value] = f"{block_reason}: {error_str}"
@@ -1167,13 +1050,6 @@ class VisitLeafAction(LeafAction):
 
 class ThinkLeafAction(LeafAction):
     def _extract_url_from_parent_result(self, graph: IdeaDag, node: IdeaNode) -> Optional[str]:
-        """
-        Extract URL from parent node's action result if this think node is meant to select a URL.
-        Looks for URLs in parent visit/search results based on node intent.
-        :param graph: IdeaDag instance.
-        :param node: Current think node.
-        :returns: Extracted URL or None.
-        """
         from agent.app.idea_policies.action_constants import ActionResultKey
         from agent.app.idea_policies.base import DetailKey
         
@@ -1308,7 +1184,20 @@ class SaveLeafAction(LeafAction):
             if docs is None:
                 doc = node.details.get(DetailKey.DOCUMENT.value)
                 docs = [doc] if doc else []
-            metadatas = node.details.get(DetailKey.METADATAS.value) or [{} for _ in range(len(docs))]
+            if not docs:
+                intent = node.details.get(DetailKey.INTENT.value) or ""
+                title = node.title or ""
+                fallback_text = f"{title}\n{intent}".strip()
+                if fallback_text:
+                    docs = [fallback_text]
+                    self._logger.info(f"[SAVE] No documents provided, constructed from title/intent ({len(fallback_text)} chars)")
+                else:
+                    return ActionResultBuilder.success(
+                        action=IdeaActionType.SAVE.value,
+                        success=True,
+                        count=0,
+                    )
+            metadatas = node.details.get(DetailKey.METADATAS.value) or [{"node_id": node_id, "action": "save", "title": node.title[:200]} for _ in range(len(docs))]
             ids = [str(uuid.uuid4()) for _ in range(len(docs))]
             timeout_seconds = self._timeout_seconds("chroma_timeout_seconds")
             success = await io.store_chroma(documents=docs, metadatas=metadatas, ids=ids, timeout_seconds=timeout_seconds)
@@ -1337,14 +1226,6 @@ class MergeLeafAction(LeafAction):
                     error="No merged results to synthesize",
                 )
             
-            # Compact merged results to reduce LLM payload size
-            from agent.app.idea_policies.action_constants import MergedResultsCompactor
-            max_merged_items = int(self.settings.get("max_merged_items_for_llm", 20))
-            compacted_merged = MergedResultsCompactor.compact_for_llm(merged_results, max_items=max_merged_items)
-            original_size = len(json.dumps(merged_results, ensure_ascii=True))
-            compacted_size = len(json.dumps(compacted_merged, ensure_ascii=True))
-            self._logger.debug(f"[MERGE] Compacted merged results: {original_size} -> {compacted_size} chars ({100 * compacted_size // max(original_size, 1)}%)")
-            
             system_template = self.settings.get("merge_system_prompt", "")
             user_template = self.settings.get("merge_user_prompt", "")
             planning_addendum = str(
@@ -1358,7 +1239,7 @@ class MergeLeafAction(LeafAction):
             
             if not system_template or not user_template:
                 self._logger.warning("No merge prompts found, using simple concatenation")
-                synthesized = json.dumps(compacted_merged, ensure_ascii=True)
+                synthesized = json.dumps(merged_results, ensure_ascii=True)
                 return ActionResultBuilder.success(
                     action=IdeaActionType.MERGE.value,
                     synthesized=synthesized,
@@ -1379,7 +1260,29 @@ class MergeLeafAction(LeafAction):
                     if not parent_justification:
                         parent_justification = parent.details.get(DetailKey.JUSTIFICATION.value) or parent.details.get(DetailKey.PARENT_JUSTIFICATION.value) or ""
             
-            merged_json = json.dumps(compacted_merged, ensure_ascii=True)
+            # Compact merged results to prevent token overflow
+            # Strip large content fields (raw page content is in visit_content for finalize)
+            compacted = []
+            for mr in merged_results:
+                if isinstance(mr, dict):
+                    c = {}
+                    for k, v in mr.items():
+                        if k in ("content", "content_full", "content_with_links", "links_full", "link_contexts", "_links_inline"):
+                            if k == "content" and isinstance(v, str):
+                                c[k] = v[:2000] + "..." if len(v) > 2000 else v
+                            continue
+                        elif isinstance(v, str) and len(v) > 5000:
+                            c[k] = v[:5000] + "..."
+                        else:
+                            c[k] = v
+                    compacted.append(c)
+                else:
+                    compacted.append(mr)
+            merged_json = json.dumps(compacted, ensure_ascii=True)
+            # Hard cap at 100k chars
+            if len(merged_json) > 100000:
+                merged_json = merged_json[:100000] + "... ]"
+                self._logger.warning(f"[MERGE] merged_json truncated to 100k chars")
             user_content = user_template.format(
                 merged_json=merged_json,
                 original_goal=original_goal or "",

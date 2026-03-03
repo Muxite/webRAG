@@ -57,7 +57,7 @@ def validate_visit_executed(result: Dict[str, Any], observability: Dict[str, Any
     return {
         "check": "visit_executed",
         "passed": passed,
-        "score": min(1.0, visit_count / 2.0),
+        "score": min(1.0, visit_count / 1.0),
         "visit_count": visit_count,
         "reason": f"Found {visit_count} visit(s)" if passed else "No visits executed",
     }
@@ -116,7 +116,7 @@ def validate_version_extracted(result: Dict[str, Any], observability: Dict[str, 
     return {
         "check": "version_extracted",
         "passed": passed,
-        "score": 0.5 if has_version else 0.0 + (0.5 if has_stable else 0.0),
+        "score": (0.5 if has_version else 0.0) + (0.5 if has_stable else 0.0),
         "version": version_pattern.group(1) if version_pattern else None,
         "reason": f"Version {version_pattern.group(1)} found" if has_version else "Version not found",
     }

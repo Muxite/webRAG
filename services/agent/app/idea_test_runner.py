@@ -114,31 +114,38 @@ async def preflight_check_llm(connector_llm: ConnectorLLM, model_name: str) -> b
 
 
 TEST_PRIORITY_ORDER = [
-    "025",  # Wikipedia Link Chain Game (2/10) - Priority 1 (easy link-following)
-    "014",  # Deep Link Exploration (5/10) - Priority 2 (harder link-following)
-    "002",  # Basic Fact Retrieval (1/10) - Priority 3
+    "026",  # Deterministic Page Facts (1/10) - Priority 1 (baseline easy)
+    "002",  # Basic Fact Retrieval (1/10) - Priority 2 (baseline easy)
+    "025",  # Wikipedia Link Chain Game (2/10) - Priority 3 (easy link-following)
     "019",  # Explicit Visit Requirement (3/10) - Priority 4
-    "020",  # GitHub Repository Analysis (4/10) - Priority 5
-    "009",  # Deep Research Synthesis (9/10) - Priority 6
-    "012",  # Wikipedia Link Collection (3/10) - Priority 7
-    "026",  # Deterministic Page Facts (1/10) - Priority 8
-    "001",  # Conflicting Information (3/10) - Priority 9
-    "021",  # News Article Extraction (3/10) - Priority 10
-    "004",  # Technical Specification (4/10) - Priority 11
-    "013",  # Wikipedia Exploration (4/10) - Priority 12
-    "022",  # Technical Documentation (5/10) - Priority 13
-    "005",  # Social Media Analysis (5/10) - Priority 14
-    "006",  # Obscure Historical Event (6/10) - Priority 15
-    "007",  # Multi-Domain Synthesis (7/10) - Priority 16
-    "008",  # Complex Data Analysis (8/10) - Priority 17
-    "010",  # Extreme Synthesis (10/10) - Priority 18
-    "011",  # Advanced Reasoning (9/10) - Priority 19
-    "015",  # Multi-Page Synthesis (6/10) - Priority 20
-    "016",  # Topic Connection Exploration (6/10) - Priority 21
-    "017",  # Recursive Link Analysis (7/10) - Priority 22
-    "018",  # Cross-Domain Exploration (7/10) - Priority 23
-    "023",  # Sequential Data Gathering (6/10) - Priority 24
-    "024",  # Research Document Analysis (7/10) - Priority 25
+    "033",  # Dual-Niche Comparison (5/10) - Priority 5 (branching: 2-way)
+    "034",  # Laundry-List Multi-Topic Extraction (6/10) - Priority 6 (branching: 6-way fan-out)
+    "035",  # Cross-Domain Niche Synthesis (7/10) - Priority 7 (branching: 3-way diverge-converge)
+    "036",  # Adversarial Compare-and-Contrast (8/10) - Priority 8 (branching: 4-way + essay)
+    "037",  # Five-Topic Convergence Challenge (9/10) - Priority 9 (branching: 5-way convergence)
+    "038",  # Eight-Source Fact Matrix (9/10) - Priority 10 (branching: 8-way parallel extraction)
+    "039",  # Multi-Branch Claim Verification (10/10) - Priority 11 (4-branch search+visit+verdict)
+    "014",  # Deep Link Exploration (5/10) - Priority 12
+    "020",  # GitHub Repository Analysis (4/10) - Priority 11
+    "009",  # Deep Research Synthesis (9/10) - Priority 12
+    "012",  # Wikipedia Link Collection (3/10) - Priority 13
+    "001",  # Conflicting Information (3/10) - Priority 14
+    "021",  # News Article Extraction (3/10) - Priority 15
+    "004",  # Technical Specification (4/10) - Priority 16
+    "013",  # Wikipedia Exploration (4/10) - Priority 17
+    "022",  # Technical Documentation (5/10) - Priority 18
+    "005",  # Social Media Analysis (5/10) - Priority 19
+    "006",  # Obscure Historical Event (6/10) - Priority 20
+    "007",  # Multi-Domain Synthesis (7/10) - Priority 21
+    "008",  # Complex Data Analysis (8/10) - Priority 22
+    "010",  # Extreme Synthesis (10/10) - Priority 23
+    "011",  # Advanced Reasoning (9/10) - Priority 24
+    "015",  # Multi-Page Synthesis (6/10) - Priority 25
+    "016",  # Topic Connection Exploration (6/10) - Priority 26
+    "017",  # Recursive Link Analysis (7/10) - Priority 27
+    "018",  # Cross-Domain Exploration (7/10) - Priority 28
+    "023",  # Sequential Data Gathering (6/10) - Priority 29
+    "024",  # Research Document Analysis (7/10) - Priority 30
 ]
 
 
@@ -230,15 +237,21 @@ def _variant_settings(base_settings: Dict[str, Any], variant: str) -> Dict[str, 
     """
     settings = dict(base_settings)
     if variant == "sequential":
-        settings["max_branching"] = 1
         settings["allow_execute_all_children"] = False
         settings["best_first_global"] = False
-        settings["evaluation_batch_max_candidates"] = 1
+        settings["sequential_prune_siblings"] = True
+
+        settings["max_total_nodes"] = min(int(settings.get("max_total_nodes", 500)), 80)
+        settings["max_observation_chars"] = min(int(settings.get("max_observation_chars", 100000)), 40000)
+        settings["max_links_per_visit"] = min(int(settings.get("max_links_per_visit", 20)), 5)
+
+        settings["got_dynamic_beam_enabled"] = False
+
         system_prompt = str(settings.get("expansion_system_prompt", "")).strip()
         if system_prompt:
             settings["expansion_system_prompt"] = (
                 system_prompt
-                + "\n\nSEQUENTIAL MODE RULE: create exactly one candidate per expansion step."
+                + "\n\nSEQUENTIAL MODE: Propose multiple candidates. Only the highest-scoring one will be selected."
             )
     return settings
 
@@ -526,6 +539,54 @@ def _print_run_summary(all_results: List[Dict[str, Any]], run_id: str, priority_
     logging.info(f"  Passed: {total_passed}/{total_tests}  Avg Score: {avg_score:.2f}")
     logging.info(f"  Priority mode: {priority_count} tests (0 = all)")
 
+    from collections import defaultdict
+    mv_scores: Dict[str, list] = defaultdict(list)
+    mv_passed: Dict[str, int] = defaultdict(int)
+    mv_count: Dict[str, int] = defaultdict(int)
+    for r in all_results:
+        model = r.get("model", "?")
+        variant = r.get("execution_variant", "?")
+        key = f"{model} [{variant}]"
+        val = r.get("validation", {})
+        score = val.get("overall_score", 0.0)
+        mv_scores[key].append(score)
+        mv_count[key] += 1
+        if val.get("overall_passed", False):
+            mv_passed[key] += 1
+
+    if mv_count:
+        logging.info("")
+        logging.info("  Per Model+Variant Breakdown:")
+        logging.info(f"  {'System':>30}  {'Runs':>4}  {'Pass%':>6}  {'Avg':>6}  {'Med':>6}  {'Min':>6}  {'Max':>6}")
+        logging.info(f"  {'-'*30:>30}  {'----':>4}  {'-----':>6}  {'-----':>6}  {'-----':>6}  {'-----':>6}  {'-----':>6}")
+        ranked = sorted(mv_count.keys(), key=lambda k: sum(mv_scores[k]) / len(mv_scores[k]), reverse=True)
+        for key in ranked:
+            n = mv_count[key]
+            sc = mv_scores[key]
+            import numpy as np
+            avg = np.mean(sc)
+            med = np.median(sc)
+            mn = np.min(sc)
+            mx = np.max(sc)
+            pr = mv_passed[key] / n if n > 0 else 0
+            logging.info(f"  {key:>30}  {n:>4}  {pr:>5.1%}  {avg:>6.3f}  {med:>6.3f}  {mn:>6.3f}  {mx:>6.3f}")
+
+        graph_keys = [k for k in ranked if "[graph]" in k]
+        seq_keys = [k for k in ranked if "[sequential]" in k]
+        if graph_keys:
+            best_g = graph_keys[0]
+            g_avg = sum(mv_scores[best_g]) / len(mv_scores[best_g])
+            logging.info(f"\n  >>> BEST GRAPH: {best_g} (avg {g_avg:.3f})")
+        if seq_keys:
+            best_s = seq_keys[0]
+            s_avg = sum(mv_scores[best_s]) / len(mv_scores[best_s])
+            logging.info(f"  >>> BEST SEQUENTIAL: {best_s} (avg {s_avg:.3f})")
+        if graph_keys and seq_keys:
+            g_avg = sum(mv_scores[graph_keys[0]]) / len(mv_scores[graph_keys[0]])
+            s_avg = sum(mv_scores[seq_keys[0]]) / len(mv_scores[seq_keys[0]])
+            winner = graph_keys[0] if g_avg >= s_avg else seq_keys[0]
+            logging.info(f"  >>> OVERALL BEST: {winner}")
+
     aggregated_timings: Dict[str, Dict[str, Any]] = {}
     for r in all_results:
         obs = r.get("execution", {}).get("observability", {})
@@ -605,14 +666,6 @@ async def main() -> None:
     execution_variants_env = os.environ.get("IDEA_TEST_EXECUTION_VARIANTS", "graph")
     execution_variants = _parse_execution_variants(execution_variants_env)
     
-    if specific_test_ids:
-        if "sequential" in execution_variants:
-            execution_variants = [v for v in execution_variants if v != "sequential"]
-            logging.info(f"IDEA_TEST_IDS set - removing sequential variant, only running: {execution_variants}")
-        if not execution_variants:
-            execution_variants = ["graph"]
-            logging.info(f"IDEA_TEST_IDS set - defaulting to graph mode only")
-    
     if benchmark_mode:
         max_parallel = min(max_parallel, 3)
     
@@ -632,7 +685,7 @@ async def main() -> None:
     logging.info(f"Validation model: {validation_model}")
     logging.info(f"Execution variants: {', '.join(execution_variants)} ({len(execution_variants)} variant(s))")
     if specific_test_ids:
-        logging.info(f"Test ID filter active: {specific_test_ids} - sequential variants disabled")
+        logging.info(f"Test ID filter active: {specific_test_ids}")
     logging.info(f"Top N tests: {priority_count} (0 means all)")
     logging.info(f"Max parallel: {max_parallel}")
     logging.info(f"Repeats: {repeats}")
@@ -643,7 +696,7 @@ async def main() -> None:
     idea_settings = load_idea_dag_settings()
     idea_settings["log_dag_ascii"] = False
     idea_settings["log_dag_step_interval"] = 0
-    idea_settings["allowed_actions"] = ["search", "visit", "save", "think"]
+    idea_settings["allowed_actions"] = ["search", "visit", "save", "think", "merge"]
     if benchmark_mode:
         visit_prompt_suffix = (
             " Benchmark rule: when external evidence is needed, run search then visit the best URLs. "

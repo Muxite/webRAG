@@ -1,3 +1,5 @@
+import asyncio
+import math
 import time
 from typing import Optional, List, Dict, Any
 import chromadb
@@ -9,8 +11,16 @@ from agent.app.connector_base import ConnectorBase
 
 class ConnectorChroma(ConnectorBase):
     """
-    Manages a connection to ChromaDB and exposes common operations.
+    ChromaDB connector using the native ``AsyncHttpClient``.
+
+    All methods are truly async and non-blocking.  The connection is lazily
+    initialized on first use and retried automatically if ChromaDB is
+    temporarily unavailable.
+
+    :param connector_config: Shared connector configuration with chroma_url.
     """
+
+    PARALLEL_BATCH_SIZE = 50
 
     def __init__(self, connector_config: ConnectorConfig):
         super().__init__(connector_config)
@@ -18,34 +28,26 @@ class ConnectorChroma(ConnectorBase):
         self.chroma_api_ready = False
 
     async def _try_init_chroma(self) -> bool:
-        """
-        Single attempt to initialize HttpClient and heartbeat Chroma.
-        :return bool: True on success, False on failure.
-        """
+        """Attempt to connect to ChromaDB via AsyncHttpClient and verify heartbeat."""
         chroma_url = self.config.chroma_url
         if not chroma_url:
             self.logger.warning("Chroma URL not set")
             return False
-
         try:
             raw = chroma_url.replace("http://", "").replace("https://", "")
             parts = raw.split(":")
-
             host = parts[0]
             port = int(parts[1]) if len(parts) > 1 and parts[1] else 8000
-
-            self._chroma = chromadb.HttpClient(
+            self._chroma = await chromadb.AsyncHttpClient(
                 host=host,
                 port=port,
                 ssl=False,
                 settings=Settings(anonymized_telemetry=False),
             )
-
-            self._chroma.heartbeat()
-            self.logger.info("ChromaDB OPERATIONAL")
+            await self._chroma.heartbeat()
+            self.logger.info("ChromaDB OPERATIONAL (async)")
             self.chroma_api_ready = True
             return True
-
         except Exception as e:
             self.logger.warning(f"ChromaDB connection failed: {e}")
             self.chroma_api_ready = False
@@ -53,8 +55,8 @@ class ConnectorChroma(ConnectorBase):
 
     async def init_chroma(self) -> bool:
         """
-        Initialize or verify the ChromaDB connection. Sets self.chroma_api_ready.
-        :return bool: True on success, False on failure.
+        Initialize or verify the ChromaDB connection.
+        :returns: True if ready.
         """
         if self.chroma_api_ready:
             return True
@@ -71,67 +73,54 @@ class ConnectorChroma(ConnectorBase):
         return success
 
     async def _ensure_ready(self) -> bool:
-        """
-        Ensure ChromaDB is initialized.
-        :returns: True if ready, False otherwise.
-        """
+        """Ensure ChromaDB is initialized before any operation."""
         if self.chroma_api_ready:
             return True
         return await self.init_chroma()
 
     async def get_or_create_collection(self, collection: str) -> Any:
         """
-        Create a ChromaDB collection or get it if it already exists.
-        Uses default embedding function (all-MiniLM-L6-v2) for efficiency.
-        :param collection: Name of the collection to create or get.
-        :return chromadb.Collection: ChromaDB collection object.
+        Get or create a named collection. Uses default embedding (all-MiniLM-L6-v2).
+        :param collection: Collection name.
+        :returns: ChromaDB collection object, or None on failure.
         """
         if not await self._ensure_ready():
             self.logger.warning("ChromaDB not ready.")
             return None
         try:
-            # ChromaDB uses all-MiniLM-L6-v2 by default, which is efficient
-            # No need to specify embedding function - uses default
-            coll = self._chroma.get_or_create_collection(
-                name=collection,
-            )
-            return coll
+            return await self._chroma.get_or_create_collection(name=collection)
         except Exception as e:
             self.logger.error(f"Failed to create/get collection '{collection}': {e}")
             return None
 
     async def delete_collection(self, collection: str) -> bool:
         """
-        Delete a ChromaDB collection if it exists.
-        :param collection: Name of the collection to delete.
-        :returns: True on success, False otherwise.
+        Delete a collection by name.
+        :param collection: Collection name.
+        :returns: True if deleted.
         """
         if not await self._ensure_ready():
-            self.logger.warning("ChromaDB not ready.")
             return False
         try:
             if self._chroma is None:
-                self.logger.warning("ChromaDB client not initialized.")
                 return False
-            self._chroma.delete_collection(name=collection)
+            await self._chroma.delete_collection(name=collection)
             return True
         except Exception as e:
             self.logger.warning(f"Failed to delete collection '{collection}': {e}")
             return False
-    
+
     async def list_collections(self) -> List[str]:
         """
-        List all collection names in ChromaDB.
-        :returns: List of collection names.
+        List all collection names.
+        :returns: List of collection name strings.
         """
         if not await self._ensure_ready():
-            self.logger.warning("ChromaDB not ready.")
             return []
         try:
             if self._chroma is None:
-                self.logger.warning("ChromaDB client not initialized.")
                 return []
-            collections = self._chroma.list_collections()
+            collections = await self._chroma.list_collections()
             return [col.name for col in collections] if collections else []
         except Exception as e:
             self.logger.warning(f"Failed to list collections: {e}")
@@ -142,42 +131,34 @@ class ConnectorChroma(ConnectorBase):
         collection: str,
         ids: List[str],
         metadatas: List[Dict[str, Any]],
-        documents: List[str]
+        documents: List[str],
     ) -> bool:
         """
-        Add documents to a ChromaDB collection.
-        :param collection: ChromaDB collection name.
-        :param ids: List of unique IDs for each document.
-        :param metadatas: List of metadata dicts for each document.
-        :param documents: List of document texts.
-        :return bool: True on success, False on failure.
+        Add documents to a collection.
+        :param collection: Target collection name.
+        :param ids: Unique IDs for each document.
+        :param metadatas: Metadata dicts per document.
+        :param documents: Document text strings.
+        :returns: True on success.
         """
         if not await self._ensure_ready():
-            self.logger.warning("ChromaDB not ready.")
             return False
+        started_at = time.perf_counter()
         try:
             coll = await self.get_or_create_collection(collection)
             sanitized_metadatas = [self._sanitize_metadata(m) for m in metadatas]
-            started_at = time.perf_counter()
             self._record_io(
                 direction="in",
                 operation="chroma_add",
                 payload={"collection": collection, "count": len(documents)},
             )
-            coll.add(
-                ids=ids,
-                metadatas=sanitized_metadatas,
-                documents=documents,
-            )
+            await coll.add(ids=ids, metadatas=sanitized_metadatas, documents=documents)
             self._record_timing(
-                name="chroma_add",
-                started_at=started_at,
-                success=True,
+                name="chroma_add", started_at=started_at, success=True,
                 payload={"collection": collection, "count": len(documents)},
             )
             self._record_io(
-                direction="out",
-                operation="chroma_add",
+                direction="out", operation="chroma_add",
                 payload={"collection": collection, "count": len(documents), "success": True},
             )
             return True
@@ -185,19 +166,72 @@ class ConnectorChroma(ConnectorBase):
             self.logger.error(f"Failed to add to collection '{collection}': {e}")
             self.chroma_api_ready = False
             self._record_timing(
-                name="chroma_add",
-                started_at=started_at,
-                success=False,
+                name="chroma_add", started_at=started_at, success=False,
                 payload={"collection": collection, "count": len(documents)},
                 error=str(e),
             )
             self._record_io(
-                direction="out",
-                operation="chroma_add",
+                direction="out", operation="chroma_add",
                 payload={"collection": collection, "count": len(documents), "success": False},
                 error=str(e),
             )
             return False
+
+    async def add_to_chroma_parallel(
+        self,
+        collection: str,
+        ids: List[str],
+        metadatas: List[Dict[str, Any]],
+        documents: List[str],
+        batch_size: Optional[int] = None,
+    ) -> bool:
+        """
+        Add documents in parallel batches using asyncio.gather.
+
+        Splits the input into chunks of ``batch_size`` and stores them
+        concurrently.  Falls back to a single ``add_to_chroma`` call
+        when the total count is at or below the batch size.
+
+        :param collection: Target collection name.
+        :param ids: Unique IDs for each document.
+        :param metadatas: Metadata dicts per document.
+        :param documents: Document text strings.
+        :param batch_size: Documents per batch (default PARALLEL_BATCH_SIZE).
+        :returns: True if all batches succeeded.
+        """
+        if not documents:
+            return False
+        bs = batch_size or self.PARALLEL_BATCH_SIZE
+        total = len(documents)
+        if total <= bs:
+            return await self.add_to_chroma(collection, ids, metadatas, documents)
+
+        n_batches = math.ceil(total / bs)
+        tasks = []
+        for i in range(n_batches):
+            start = i * bs
+            end = start + bs
+            tasks.append(
+                self.add_to_chroma(
+                    collection=collection,
+                    ids=ids[start:end],
+                    metadatas=metadatas[start:end],
+                    documents=documents[start:end],
+                )
+            )
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        failures = 0
+        for r in results:
+            if isinstance(r, Exception):
+                self.logger.error(f"Parallel chroma batch failed: {r}")
+                failures += 1
+            elif not r:
+                failures += 1
+        if failures:
+            self.logger.warning(
+                f"add_to_chroma_parallel: {failures}/{n_batches} batch(es) failed"
+            )
+        return failures == 0
 
     async def query_chroma(
         self,
@@ -207,41 +241,32 @@ class ConnectorChroma(ConnectorBase):
         where: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Query a ChromaDB collection for nearest neighbors.
-        :param collection: ChromaDB collection name.
-        :param query_texts: List of query texts.
-        :param n_results: Number of results to return.
-        :param where: Optional where clause for metadata filtering (e.g., {"memory_type": "observation"}).
-        :return List of results, or None on failure.
+        Query a collection for nearest neighbors.
+        :param collection: Collection name.
+        :param query_texts: Query strings.
+        :param n_results: Max results per query.
+        :param where: Optional metadata filter.
+        :returns: ChromaDB result dict or None on failure.
         """
         if not await self._ensure_ready():
-            self.logger.warning("ChromaDB not ready.")
             return None
-
+        started_at = time.perf_counter()
         try:
             coll = await self.get_or_create_collection(collection)
-            started_at = time.perf_counter()
             self._record_io(
-                direction="in",
-                operation="chroma_query",
+                direction="in", operation="chroma_query",
                 payload={"collection": collection, "queries": len(query_texts), "n_results": n_results, "where": where},
             )
-            query_kwargs = {
-                "query_texts": query_texts,
-                "n_results": n_results,
-            }
+            query_kwargs: Dict[str, Any] = {"query_texts": query_texts, "n_results": n_results}
             if where:
                 query_kwargs["where"] = where
-            results = coll.query(**query_kwargs)
+            results = await coll.query(**query_kwargs)
             self._record_timing(
-                name="chroma_query",
-                started_at=started_at,
-                success=True,
+                name="chroma_query", started_at=started_at, success=True,
                 payload={"collection": collection, "queries": len(query_texts)},
             )
             self._record_io(
-                direction="out",
-                operation="chroma_query",
+                direction="out", operation="chroma_query",
                 payload={"collection": collection, "queries": len(query_texts), "success": True},
             )
             return results
@@ -249,15 +274,12 @@ class ConnectorChroma(ConnectorBase):
             self.logger.error(f"ChromaDB query failed for collection {collection}: {e}")
             self.chroma_api_ready = False
             self._record_timing(
-                name="chroma_query",
-                started_at=started_at,
-                success=False,
+                name="chroma_query", started_at=started_at, success=False,
                 payload={"collection": collection, "queries": len(query_texts)},
                 error=str(e),
             )
             self._record_io(
-                direction="out",
-                operation="chroma_query",
+                direction="out", operation="chroma_query",
                 payload={"collection": collection, "queries": len(query_texts), "success": False},
                 error=str(e),
             )
@@ -266,9 +288,9 @@ class ConnectorChroma(ConnectorBase):
     @staticmethod
     def _sanitize_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Ensure all metadata values are ChromaDB compatible types.
-        :param metadata: Metadata dict to sanitize.
-        :return Dict of sanitized metadata.
+        Coerce metadata values to ChromaDB-compatible types (str, int, float, bool).
+        :param metadata: Raw metadata dict.
+        :returns: Sanitized metadata dict.
         """
         sanitized = {}
         for key, value in metadata.items():

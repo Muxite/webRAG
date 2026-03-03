@@ -31,9 +31,11 @@ if __name__ == "__main__":
     mod_data = _load_module("visualization_data", _testing_dir / "visualization_data.py")
     mod_summary = _load_module("visualization_summary", _testing_dir / "visualization_summary.py")
     mod_plots = _load_module("visualization_plots", _testing_dir / "visualization_plots.py")
+    mod_core = _load_module("visualization_core", _testing_dir / "visualization_core.py")
     mod_main = _load_module("visualization_main", _testing_dir / "visualization_main.py")
     
     generate_all_plots = mod_main.generate_all_plots
+    generate_core_plots = mod_core.generate_core_plots
     main = mod_main.main
     load_test_results = mod_data.load_test_results
     list_available_runs = mod_data.list_available_runs
@@ -54,12 +56,25 @@ if __name__ == "__main__":
     plot_tokens_and_actions_dual_axis = mod_plots.plot_tokens_and_actions_dual_axis
     plot_specific_validation_checks = mod_plots.plot_specific_validation_checks
     plot_comprehensive_performance = mod_plots.plot_comprehensive_performance
+    plot_cost_analysis = mod_plots.plot_cost_analysis
+    plot_graph_vs_sequential = mod_plots.plot_graph_vs_sequential
+    plot_model_head_to_head = mod_plots.plot_model_head_to_head
+    plot_score_heatmap = mod_plots.plot_score_heatmap
+    plot_executive_dashboard = mod_plots.plot_executive_dashboard
+    plot_token_breakdown = mod_plots.plot_token_breakdown
+    plot_action_effectiveness = mod_plots.plot_action_effectiveness
+    plot_per_test_model_comparison = mod_plots.plot_per_test_model_comparison
+    plot_graph_structure = mod_plots.plot_graph_structure
+    plot_data_coverage = mod_plots.plot_data_coverage
+    plot_cost_efficiency_frontier = mod_plots.plot_cost_efficiency_frontier
     _system_label = mod_helpers._system_label
     _format_tokens = mod_helpers._format_tokens
     _get_system_colors = mod_helpers._get_system_colors
     _get_difficulty_colormap = mod_helpers._get_difficulty_colormap
+    _extract_graph_metrics = mod_helpers._extract_graph_metrics
 else:
     from .visualization_main import generate_all_plots, main
+    from .visualization_core import generate_core_plots
     from .visualization_data import load_test_results, list_available_runs, extract_run_id_from_filename
     from .visualization_summary import calculate_summary_stats, print_summary
     from .visualization_plots import (
@@ -77,16 +92,29 @@ else:
         plot_tokens_and_actions_dual_axis,
         plot_specific_validation_checks,
         plot_comprehensive_performance,
+        plot_cost_analysis,
+        plot_graph_vs_sequential,
+        plot_model_head_to_head,
+        plot_score_heatmap,
+        plot_executive_dashboard,
+        plot_token_breakdown,
+        plot_action_effectiveness,
+        plot_per_test_model_comparison,
+        plot_graph_structure,
+        plot_data_coverage,
+        plot_cost_efficiency_frontier,
     )
     from .visualization_helpers import (
         _system_label,
         _format_tokens,
         _get_system_colors,
         _get_difficulty_colormap,
+        _extract_graph_metrics,
     )
 
 __all__ = [
     "generate_all_plots",
+    "generate_core_plots",
     "main",
     "load_test_results",
     "list_available_runs",
@@ -107,10 +135,22 @@ __all__ = [
     "plot_tokens_and_actions_dual_axis",
     "plot_specific_validation_checks",
     "plot_comprehensive_performance",
+    "plot_cost_analysis",
+    "plot_graph_vs_sequential",
+    "plot_model_head_to_head",
+    "plot_score_heatmap",
+    "plot_executive_dashboard",
+    "plot_token_breakdown",
+    "plot_action_effectiveness",
+    "plot_per_test_model_comparison",
+    "plot_graph_structure",
+    "plot_data_coverage",
+    "plot_cost_efficiency_frontier",
     "_system_label",
     "_format_tokens",
     "_get_system_colors",
     "_get_difficulty_colormap",
+    "_extract_graph_metrics",
 ]
 
 if __name__ == "__main__":

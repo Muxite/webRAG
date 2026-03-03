@@ -20,7 +20,6 @@ from agent.app.idea_policies.action_constants import (
     ContextBuilder,
     NodeDetailsExtractor,
     ActionResultExtractor,
-    MergedResultsCompactor,
 )
 from agent.app.idea_policies.actions import (
     LeafAction,
@@ -57,7 +56,6 @@ __all__ = [
     "ContextBuilder",
     "NodeDetailsExtractor",
     "ActionResultExtractor",
-    "MergedResultsCompactor",
     "LeafAction",
     "SearchLeafAction",
     "VisitLeafAction",

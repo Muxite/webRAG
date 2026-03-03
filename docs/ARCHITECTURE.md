@@ -3,10 +3,24 @@
 ## Components
 - `frontend/`: React UI with Supabase auth and task history
 - `services/gateway/`: FastAPI gateway, task intake, Supabase sync
-- `services/agent/`: Worker that executes the reasoning loop
+- `services/agent/`: Graph-of-Thought reasoning agent with web crawling and RAG
 - `services/shared/`: Connectors and storage helpers
 - `services/metrics/`: QueueDepth publisher
 - `services/lambda_autoscaling/`: ECS autoscaler
+
+## Agent Internals
+
+The agent uses a **Graph-of-Thought (GoT)** execution model:
+
+1. Tasks decompose into 2–5 parallel subproblems via LLM expansion.
+2. Each subproblem executes an action: `search`, `visit`, `save`, or `think`.
+3. Results merge upward through the DAG into a final deliverable.
+4. Dynamic beam width, deduplication, and pruning optimize exploration.
+5. Bot-protected sites are handled by an `undetected-chromedriver` fallback.
+
+Two execution modes: `graph` (parallel, 90.6% pass rate) and `sequential` (depth-first baseline, 46.9% pass rate).
+
+See [Agent Architecture](../services/agent/app/AGENT_ARCHITECTURE.md) for full details.
 
 ## Message Flow
 1. Client submits task to `gateway /tasks` with JWT
@@ -20,7 +34,7 @@
 ## Queues and Stores
 - RabbitMQ: `agent.mandates` (tasks), `agent.status` (status updates)
 - Redis: task status, worker presence (with TTL), worker state and versions
-- ChromaDB: long-term context storage
+- ChromaDB: long-term context storage (observations, thoughts, links)
 - Supabase: authenticated task history and quotas
 
 ## Status and Worker State
@@ -36,4 +50,5 @@
 ## Failure Handling
 - Connector readiness checks before consuming tasks
 - Retry helpers around external services
+- Browser fallback for bot-blocked HTTP requests (403/401)
 - Graceful shutdown for agent and connectors

@@ -11,17 +11,15 @@ from shared.pretty_log import pretty_log_print
 logging.basicConfig(level=logging.INFO)
 
 MODEL_CANDIDATES = [
-    "gpt-5", 
+    "gpt-5.2",
     "gpt-5-mini",
-    "gpt-5-nano", 
-    "gpt-4o", 
+    "gpt-5-nano",
 ]
 
 MODEL_ALIASES = {
-    "gpt-5": "gpt-5",
+    "gpt-5.2": "gpt-5.2",
     "gpt-5-mini": "gpt-5-mini",
     "gpt-5-nano": "gpt-5-nano",
-    "gpt-4o": "gpt-4o",
 }
 
 

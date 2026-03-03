@@ -8,13 +8,14 @@ from pathlib import Path
 import re
 
 MODEL_CANDIDATES = [
+    "gpt-5.2",
     "gpt-5-mini",
     "gpt-5-nano",
-    "gpt-4.1-nano",
 ]
 
 MODEL_ALIASES = {
     "gpt-5": "gpt-5",
+    "gpt-5.2": "gpt-5.2",
     "gpt-5-mini": "gpt-5-mini",
     "gpt-5-nano": "gpt-5-nano",
     "gpt-4.1-nano": "gpt-4.1-nano",

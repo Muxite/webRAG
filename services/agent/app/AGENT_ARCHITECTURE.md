@@ -1,151 +1,183 @@
-# IdeaDAG Agent Architecture
+# Agent Architecture
 
-DAG-based reasoning system implementing Graph of Thoughts (GoT) for complex problem-solving.
+## Overview
 
-## Core Principles
+The agent implements a **Graph-of-Thought (GoT)** execution model. A controller (`IdeaDagEngine`) builds a directed acyclic graph of thought nodes, decomposes tasks into subproblems, executes leaf actions (search, visit, think, save), and merges results upward. Two execution modes are supported: `graph` (parallel branching) and `sequential` (generate-many-keep-one, depth-first).
 
-1. **Expansion-Merge Pair Pattern**: Every branch follows Expansion → [Layers] → Merge
-2. **Fewer Steps = Better**: 1 big step >> 2 small steps
-3. **Separation of Concerns**: Expansion only expands, merge only merges
-4. **Automatic Vector DB**: ChromaDB queried automatically on every node
-5. **Memory Type Split**: Internal thoughts vs observations for granular context
-6. **Intent-Driven Actions**: Search/visit use intent to query vector DB
-7. **Data Flow Enforcement**: Sequential execution when dependencies exist
-8. **Goal Validation**: Merge nodes check if original goals were achieved
+## Core Operations
+
+| Operation | Class | What It Does |
+|---|---|---|
+| **Generate** | `LlmExpansionPolicy` | Decomposes a parent node into 2–5 child subproblems via LLM |
+| **Score** | `LlmBatchEvaluationPolicy` | Rates candidates 0–1 in a single LLM call; best-first selection |
+| **Aggregate** | `SimpleMergePolicy` | Synthesizes child results via LLM; propagates upward to root |
 
 ## Node Types
 
-### Expansion Node
-- Breaks problems into sub-problems
-- Creates children with actions (search, visit, save)
-- Vector DB provides context automatically
-- Propagates original goals to children
+| Type | Description |
+|---|---|
+| Expansion | No action. Decomposes into children via LLM. |
+| Leaf | Executes one action: `search`, `visit`, `save`, `think`. |
+| Merge | Synthesizes child results upward. |
 
-### Leaf Node
-- Executes actions: search, visit, save
-- Marked with `IS_LEAF=True` or `action` field
-- Results stored in vector DB automatically
-- Large documents trigger chunking sub-problems
+## Leaf Actions
 
-### Merge Node
-- Synthesizes results from completed children
-- Always progresses toward root
-- Uses LLM to combine results into coherent summary
-- Validates goal achievement against original goal
+| Action | Input | Output |
+|---|---|---|
+| `search` | Query string | Title/URL/snippet results |
+| `visit` | URL or semantic link query | Full page content + discovered links |
+| `think` | Parent context | Internal reasoning |
+| `save` | Documents | Stored in ChromaDB memory |
+| `merge` | Child results | LLM synthesis |
 
-## Execution Flow
+## Execution Modes
 
-1. **Root**: Initial problem, vector DB queried for context
-2. **Expansion**: Break into sub-problems (parallel or sequential)
-3. **Intermediate Layers**: Can have recursive expansion-merge pairs
-4. **Leaf Execution**: Actions gather evidence (search, visit, save)
-5. **Document Chunking**: Large documents (>10K chars) split into chunk-based search sub-problems
-6. **Chunk Search**: Search within document chunks for specific content
-7. **Merge**: Synthesize results, validate goals, progress toward root
-8. **Completion**: Final synthesis at root
+### Graph (parallel branching)
 
-## Document Chunking System
+1. Expand node into 2–5 candidates via LLM.
+2. Dynamic beam width adapts branching to score quality.
+3. Score all children; select best via best-first global selection.
+4. Execute leaf actions in parallel where children are independent.
+5. Merge results propagate upward recursively.
 
-### When Chunking Occurs
-- Visit action returns document > threshold (default: 10K chars)
-- System automatically creates chunk sub-problems
-- Each chunk becomes a search node with chunk content
+### Sequential (generate-many, keep-one)
 
-### Chunk Configuration
-- **Chunk Size**: 2000 chars (default)
-- **Chunk Overlap**: 200 chars (default)
-- **Threshold**: 10000 chars (default)
+1. Expand node into 2–5 candidates (same LLM call as graph).
+2. Score all candidates in a batch evaluation.
+3. Select the highest-scoring candidate; mark all siblings as `SKIPPED` (`sequential_prune_siblings`).
+4. Proceed depth-first into the selected child only.
+5. Resource caps enforced: 80 max nodes, 40k observation chars, 5 links per visit.
 
-### Chunk-Based Search
-- Search nodes with `CHUNK_CONTENT` search within chunk text
-- Term matching and snippet extraction
-- Can run in parallel for independent chunks
-- Sequential when chunk dependencies exist
+Sequential generates the same candidates as graph but explores a single path, making it structurally inferior on tasks requiring parallel information gathering.
 
-## Goal Tracking System
+## Execution Loop
 
-### Goal Propagation
-- Original goals stored in `GOAL` and `ORIGINAL_GOAL` detail keys
-- Goals propagated from parent to children during expansion
-- Goals tracked through entire problem-solving process
+1. Create root node from mandate; initialize `MemoryManager` and `GoTOperations`.
+2. **Main loop** (while steps < max_steps):
+   - Expand node if no children.
+   - Score children; select best via best-first global selection (graph) or prune-and-pick (sequential).
+   - Execute leaf action or trigger merge when all children complete.
+   - Merge results propagate upward recursively.
+3. **Final synthesis**: merged results + execution trail + raw visit content + ChromaDB context → LLM → deliverable.
 
-### Goal Validation
-- Merge nodes check if original goal appears in synthesized content
-- `GOAL_ACHIEVED` flag stored in merge results
-- Warnings logged when goals not fully achieved
+## GoT Mechanics
 
-## Sequential vs Parallel Execution
+| Feature | Setting | Description |
+|---|---|---|
+| Thought embedding | `got_embed_on_create = true` | All nodes embedded in ChromaDB at creation |
+| Deduplication | `got_dedup_enabled = true` | Rejects candidates with >0.85 similarity |
+| Dynamic beam | `got_dynamic_beam_enabled = true` | Branching adapts to scores (min 2, max 5) |
+| Pruning | `got_prune_enabled = true` | Removes nodes scoring <0.15 when graph >6 nodes |
+| Improve | `got_improve_enabled = false` | Disabled for efficiency |
+| Backtracking | `got_backtrack_enabled = false` | Disabled for efficiency |
 
-### Parallel Execution
-- Independent chunks from same document
-- Independent actions with no data dependencies
-- Set via `execute_all_children: true` in expansion meta
+## Data Flow
 
-### Sequential Execution
-- When data dependencies exist (visit needs URL from search)
-- When chunk dependencies exist (chunk depends on previous chunk)
-- System automatically detects and enforces sequential order
-- Default when dependencies detected
+```
+Mandate → Root
+  ├─ Generate → [Search, Visit, Think, Save] children
+  │   ├─ Search → URLs + snippets
+  │   ├─ Visit → Full page content + links → ChromaDB
+  │   ├─ Think → Internal reasoning → ChromaDB
+  │   └─ Save → Store findings → ChromaDB
+  └─ Merge → Synthesize children → Parent result
+      └─ Final LLM → Deliverable
+```
 
-## Memory System
+## Connectors
 
-### Memory Types
+| Connector | Layer | Description |
+|---|---|---|
+| `ConnectorLLM` | Low-level | OpenAI API interaction (chat completions) |
+| `ConnectorSearch` | Low-level | Brave Search API queries |
+| `ConnectorHttp` | Low-level | aiohttp page fetching with retry and status handling |
+| `ConnectorBrowser` | Low-level | undetected-chromedriver fallback for bot-protected sites |
+| `ConnectorChroma` | Low-level | ChromaDB connection, add/query operations |
+| `AgentIO` | High-level | Unified interface wrapping all connectors with fallback logic and telemetry |
 
-- **Internal Thoughts**: Agent reasoning (`think`, `save`, merge summaries)
-- **Observations**: External data (search results, visited pages)
+### Browser Fallback
 
-### Retrieval Strategy
+`AgentIO.visit()` and `AgentIO.fetch_url()` first attempt the request via `ConnectorHttp` (aiohttp). If the response is 401/403 or indicates bot blocking, the request is automatically retried through `ConnectorBrowser` (headless Chrome via undetected-chromedriver). The browser is lazily initialized on first use and runs Selenium calls in a thread pool to avoid blocking the async event loop.
 
-- Top N internal thoughts + Top M observations per node
-- Semantic search with intent for relevant context
-- Automatic chunking and storage after actions
+## Memory
 
-## Vector Database Integration
+`MemoryManager` stores content in ChromaDB with two memory types:
 
-- **Automatic Querying**: Every node queries ChromaDB for context
-- **Intent Field**: Search/visit actions can specify intent for targeted retrieval
-- **Memory Classification**: Metadata includes `memory_type` (internal_thought/observation)
-- **Namespace Isolation**: Test runs use unique namespaces
+| Type | Source | Used For |
+|---|---|---|
+| `observation` | Search/visit results | RAG context during expansion and final synthesis |
+| `internal_thought` | Think/save actions | Internal reasoning context |
 
-## Actions
+Content is chunked (800 chars, 100 overlap) with sentence-boundary splitting.
 
-- **search**: Web search with query and optional intent (or chunk-based search)
-- **visit**: Fetch URL content with optional intent
-- **save**: Store in memory (auto-chunked)
-- **merge**: Synthesize child results with goal validation
+## Link System
 
-## Evaluation Weights And Penalties
+Visit actions store discovered links in per-URL ChromaDB collections. Subsequent visit actions query these collections semantically to find relevant links without re-visiting pages.
 
-Evaluation prefers certain behaviors and can be tuned via numeric settings in `idea_dag_settings.json`:
+## Observability
 
-- **Unexecuted Action Penalties**:
-  - `evaluation_no_action_result_base_score`: Base score assigned when a node has an action but no `action_result`
-  - `evaluation_no_action_result_score_cap`: Maximum score cap for nodes with missing `action_result` even if the LLM suggests a higher score
+Telemetry is layered through base classes so action code stays clean:
 
-- **Per-Action Weights**:
-  - `evaluation_weight_search`, `evaluation_weight_visit`, `evaluation_weight_think`, `evaluation_weight_save`, `evaluation_weight_default`
-  - Applied as multiplicative factors on raw LLM scores, then clamped into `[0,1]`
-  - Allow the system to prefer or de-emphasize specific action types without changing prompts
+| Layer | Mechanism | Data |
+|---|---|---|
+| `ConnectorBase` | `_record_timing()`, `_record_io()` | Every external call: duration, status, payload size |
+| `AgentIO` | Method-level telemetry | Visit/search/store/retrieve with fallback tracking |
+| `IdeaDagEngine` | Structured logging | Step index, node type, candidate counts, merge results |
+| `GoTOperations` | Event logging | Embedding, dedup hits, beam width, prune events |
+| `MemoryManager` | Operation logging | Chunk counts, retrieval results, namespace isolation |
+| Test Runner | JSON output | Per-test: score, pass/fail, cost, tokens, duration, graph depth/branching/nodes |
 
-## Final Synthesis and Compaction
+## Models
 
-Before merged results are sent to the final LLM synthesis step, they are compacted via `MergedResultsCompactor` to manage token limits while preserving essential information:
+| Model | Input $/M | Output $/M |
+|---|---|---|
+| gpt-5.2 | $1.75 | $14.00 |
+| gpt-5-mini | $0.25 | $2.00 |
+| gpt-5-nano | $0.05 | $0.40 |
 
-- **Content Truncation**: Action-aware preservation (1500 chars for visits, 400 for others) ensures infobox-style facts remain available
-- **Link Preservation**: Visit actions preserve up to 20 links to satisfy link collection requirements
-- **Large Field Removal**: `content_full`, `content_with_links`, `links_full` are removed to reduce token usage
+## Key Limits
 
-## Failure Handling
+| Parameter | Value |
+|---|---|
+| `max_observation_chars` | 100,000 |
+| `document_chunk_threshold` | 200,000 |
+| `final_max_tokens` | 120,000 |
+| `merge_max_tokens` | 100,000 |
+| `expansion_max_tokens` | 8,192 |
+| `evaluation_max_tokens` | 16,384 |
 
-- Detailed error tracking with stack traces
-- Retry mechanisms with exponential backoff
-- Blocked site detection and cooldown
-- Root cause analysis in error details
+## File Map
 
-## Logging and Debugging
+| File | Responsibility |
+|---|---|
+| `idea_engine.py` | DAG traversal, step loop, merge gating, sequential prune |
+| `idea_dag.py` | Node/edge data structure |
+| `idea_policies/` | Expansion, evaluation, selection, merge, actions |
+| `idea_memory.py` | ChromaDB read/write with chunking |
+| `agent_io.py` | Unified connector interface (LLM, search, HTTP, browser, Chroma) |
+| `got_operations.py` | Embedding, dedup, beam width, pruning |
+| `connector_llm.py` | LLM API interaction |
+| `connector_search.py` | Brave Search API |
+| `connector_http.py` | aiohttp HTTP fetching |
+| `connector_browser.py` | undetected-chromedriver fallback |
+| `connector_chroma.py` | ChromaDB connection and operations |
+| `connector_base.py` | Base class with timing/IO telemetry |
+| `idea_finalize.py` | Final synthesis and deliverable building |
+| `idea_dag_settings.json` | All tunable parameters |
+| `idea_test_runner.py` | Test orchestration with variant settings |
+| `testing/` | Visualization, summary, helpers, core plots |
 
-- **LLM Inputs**: Full messages logged before LLM calls
-- **LLM Outputs**: Full responses logged after LLM calls
-- **Expansion**: Detailed logging of prompt sizes, token estimates, timeouts
-- **Merge**: Goal validation results logged
-- **Test Results**: Saved to `agent/idea_test_results/` directory (auto-created)
+## Connector Glossary
+
+| Method | Layer | Description |
+|---|---|---|
+| `ConnectorChroma.add_to_chroma` | Low-level | Adds documents to a ChromaDB collection |
+| `ConnectorChroma.query_chroma` | Low-level | Queries ChromaDB for nearest neighbors |
+| `ConnectorHttp.request` | Low-level | HTTP GET/POST with retry logic |
+| `ConnectorBrowser.fetch_page` | Low-level | Headless Chrome page fetch |
+| `ConnectorSearch.query_search` | Low-level | Sends query to Brave Search API |
+| `AgentIO.visit` | High-level | HTTP fetch with browser fallback + telemetry |
+| `AgentIO.fetch_url` | High-level | URL fetch with browser fallback + telemetry |
+| `AgentIO.search` | High-level | Wraps `query_search` + document tracking + telemetry |
+| `AgentIO.store_chroma` | High-level | Wraps `add_to_chroma` + metadata prep + telemetry |
+| `AgentIO.retrieve_chroma` | High-level | Wraps `query_chroma` + result parsing + telemetry |

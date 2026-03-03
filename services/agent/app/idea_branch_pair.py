@@ -2,7 +2,7 @@
 Expansion-Merge Pair Abstraction
 
 Every branch in the DAG follows the pattern:
-  Expansion Node → [Layers of nodes] → Merge Node
+  Expansion Node -> [Layers of nodes] -> Merge Node
 
 This module provides abstractions to make this pattern explicit and ensure
 merges always progress toward completion (toward the root).
@@ -12,8 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 from agent.app.idea_dag import IdeaDag, IdeaNode
-from agent.app.idea_policies.base import IdeaNodeStatus
-from agent.app.idea_policies.base import DetailKey, IdeaActionType
+from agent.app.idea_policies.base import DetailKey, IdeaActionType, IdeaNodeStatus
 
 
 class BranchPair:
@@ -22,15 +21,11 @@ class BranchPair:
     
     Structure:
       expansion_node (creates sub-problems)
-        ↓
+        |
       [intermediate layers - can have their own expansion-merge pairs]
-        ↓
+        |
       merge_node (combines results toward completion)
     
-    :param expansion_node_id: Node that expands (breaks into sub-problems).
-    :param merge_node_id: Node that merges (combines results).
-    :param graph: IdeaDag instance.
-    :returns: BranchPair instance.
     """
     
     def __init__(self, expansion_node_id: str, merge_node_id: Optional[str], graph: IdeaDag):
@@ -42,7 +37,6 @@ class BranchPair:
     def expansion_node(self) -> Optional[IdeaNode]:
         """
         Get the expansion node.
-        :returns: Expansion node or None.
         """
         return self.graph.get_node(self.expansion_node_id)
     
@@ -50,7 +44,6 @@ class BranchPair:
     def merge_node(self) -> Optional[IdeaNode]:
         """
         Get the merge node.
-        :returns: Merge node or None.
         """
         if not self.merge_node_id:
             return None
@@ -59,7 +52,6 @@ class BranchPair:
     def is_complete(self) -> bool:
         """
         Check if the pair is complete (merge node exists and is done).
-        :returns: True if complete.
         """
         if not self.merge_node_id:
             return False
@@ -71,7 +63,6 @@ class BranchPair:
     def needs_expansion(self) -> bool:
         """
         Check if expansion node needs to expand (has no children or should decompose).
-        :returns: True if needs expansion.
         """
         expansion_node = self.expansion_node
         if not expansion_node:
@@ -98,7 +89,6 @@ class BranchPair:
     def needs_merge(self) -> bool:
         """
         Check if children are ready to merge.
-        :returns: True if ready to merge.
         """
         expansion_node = self.expansion_node
         if not expansion_node or not expansion_node.children:
@@ -116,7 +106,6 @@ class BranchPair:
     def get_intermediate_nodes(self) -> List[str]:
         """
         Get all nodes between expansion and merge (the layers).
-        :returns: List of intermediate node IDs.
         """
         expansion_node = self.expansion_node
         if not expansion_node or not expansion_node.children:
@@ -139,9 +128,6 @@ def find_branch_pair(graph: IdeaDag, node_id: str) -> Optional[BranchPair]:
     If node is a merge node, finds its expansion node (parent).
     If node is intermediate, finds the pair it belongs to.
     
-    :param graph: IdeaDag instance.
-    :param node_id: Node identifier.
-    :returns: BranchPair or None.
     """
     node = graph.get_node(node_id)
     if not node:
@@ -193,9 +179,6 @@ def get_completion_path(graph: IdeaDag, node_id: str) -> List[str]:
     
     This represents the merge chain that will eventually reach the root.
     
-    :param graph: IdeaDag instance.
-    :param node_id: Starting node identifier.
-    :returns: List of node IDs from node to root (for merging).
     """
     path = []
     current_id = node_id
