@@ -98,14 +98,14 @@ async def test_llm_preflight():
                             print(f"  - {child.title[:60]}...")
             
             if node and len(node.children) > 0:
-                print("\n✓ Preflight test PASSED - Expansion worked!")
+                print("\n[OK] Preflight test PASSED - Expansion worked!")
                 return True
             else:
-                print("\n✗ Preflight test FAILED - No children created")
+                print("\n[FAIL] Preflight test FAILED - No children created")
                 return False
                 
     except Exception as exc:
-        print(f"\n✗ Preflight test FAILED with exception: {exc}")
+        print(f"\n[FAIL] Preflight test FAILED with exception: {exc}")
         import traceback
         traceback.print_exc()
         return False

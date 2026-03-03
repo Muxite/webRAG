@@ -23,6 +23,7 @@ from agent.app.agent import Agent
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
+from agent.app.connector_browser import ConnectorBrowser
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
@@ -50,6 +51,7 @@ class InterfaceAgent:
         self.connector_search = ConnectorSearch(self.config)
         self.connector_http = ConnectorHttp(self.config)
         self.connector_chroma = ConnectorChroma(self.config)
+        self.connector_browser = ConnectorBrowser(self.config)
         
         self._consumer_task: Optional[asyncio.Task] = None
         self._heartbeat_task: Optional[asyncio.Task] = None
@@ -100,8 +102,6 @@ class InterfaceAgent:
     async def _cancel_task(task: Optional[asyncio.Task]) -> None:
         """
         Cancel an async task and wait for cancellation.
-        :param task: Task to cancel, or None.
-        :returns: None
         """
         if task:
             task.cancel()
@@ -160,7 +160,6 @@ class InterfaceAgent:
         except Exception as e:
             self.logger.warning(f"Error disconnecting RabbitMQ: {e}")
 
-        # Close shared HTTP connectors (they were initialized in _initialize_dependencies)
         try:
             await self.connector_search.__aexit__(None, None, None)
         except Exception as e:
@@ -173,6 +172,10 @@ class InterfaceAgent:
             await self.connector_llm.__aexit__(None, None, None)
         except Exception as e:
             self.logger.debug(f"Error closing connector_llm: {e}")
+        try:
+            await self.connector_browser.close()
+        except Exception as e:
+            self.logger.debug(f"Error closing connector_browser: {e}")
 
         self.worker_ready = False
         self.logger.info("InterfaceAgent stopped")
@@ -181,7 +184,6 @@ class InterfaceAgent:
         """
         Compute TTL for working/free state updates.
 
-        :returns: TTL seconds
         """
         return int(max(self.config.status_time * 3, 60))
 
@@ -189,7 +191,6 @@ class InterfaceAgent:
         """
         Duration to remain in waiting state before switching to free.
 
-        :returns: Waiting duration in seconds
         """
         return int(os.environ.get("AGENT_IDLE_WAIT_SECONDS", "360"))
 
@@ -197,9 +198,6 @@ class InterfaceAgent:
         """
         Update worker state in Redis with TTL.
 
-        :param state: State value
-        :param ttl_seconds: Optional TTL override
-        :returns: None
         """
         ttl = ttl_seconds if ttl_seconds is not None else self._working_ttl_seconds()
         try:
@@ -211,7 +209,6 @@ class InterfaceAgent:
         """
         Transition to waiting state, then free after the wait window.
 
-        :returns: None
         """
         wait_seconds = self._waiting_seconds()
         await self._set_worker_state("waiting", ttl_seconds=wait_seconds + 60)
@@ -230,7 +227,6 @@ class InterfaceAgent:
         """
         Cancel waiting timer when new work starts.
 
-        :returns: None
         """
         await self._cancel_task(self._waiting_task)
         self._waiting_task = None
@@ -239,7 +235,6 @@ class InterfaceAgent:
         """
         Test connectivity to all required services.
         
-        :returns: Dictionary with connectivity status for each service.
         """
         connectivity = {
             "rabbitmq": False,
@@ -337,10 +332,10 @@ class InterfaceAgent:
             await asyncio.sleep(skip_delay_seconds)
             
             result_msg = f"SKIP MODE: {status_msg}\n"
-            result_msg += f"RabbitMQ: {'✓' if connectivity['rabbitmq'] else '✗'}\n"
-            result_msg += f"Redis: {'✓' if connectivity['redis'] else '✗'}\n"
-            result_msg += f"Chroma: {'✓' if connectivity['chroma'] else '✗'}\n"
-            result_msg += f"External API: {'✓' if connectivity['external_api'] else '✗'}\n"
+            result_msg += f"RabbitMQ: {'[OK]' if connectivity['rabbitmq'] else '[FAIL]'}\n"
+            result_msg += f"Redis: {'[OK]' if connectivity['redis'] else '[FAIL]'}\n"
+            result_msg += f"Chroma: {'[OK]' if connectivity['chroma'] else '[FAIL]'}\n"
+            result_msg += f"External API: {'[OK]' if connectivity['external_api'] else '[FAIL]'}\n"
             
             completion = CompletionResult(
                 correlation_id=self.correlation_id,
@@ -379,6 +374,7 @@ class InterfaceAgent:
                 connector_search=self.connector_search,
                 connector_http=self.connector_http,
                 connector_chroma=self.connector_chroma,
+                connector_browser=self.connector_browser,
                 telemetry=self._telemetry,
                 collection_name=f"agent_memory_{self.correlation_id or 'unknown'}",
             )
@@ -389,6 +385,7 @@ class InterfaceAgent:
                 connector_search=self.connector_search,
                 connector_http=self.connector_http,
                 connector_chroma=self.connector_chroma,
+                connector_browser=self.connector_browser,
                 agent_io=agent_io,
             )
             async with self.agent:
@@ -443,7 +440,6 @@ class InterfaceAgent:
     def _build_telemetry(self) -> Optional[TelemetrySession]:
         """
         Build a telemetry session when tracking is enabled.
-        :returns: TelemetrySession or None.
         """
         if not self.config.enable_tracking:
             return None
@@ -463,8 +459,6 @@ class InterfaceAgent:
     def _finalize_telemetry(self, success: Optional[bool] = None) -> None:
         """
         Finalize telemetry if enabled.
-        :param success: Optional success flag.
-        :returns: None
         """
         if self._telemetry:
             self._telemetry.finish(success=success)
@@ -472,7 +466,6 @@ class InterfaceAgent:
     def _clear_task_telemetry(self) -> None:
         """
         Clear telemetry from connectors after a task finishes.
-        :returns: None
         """
         if self.connector_llm:
             self.connector_llm.clear_telemetry()
@@ -482,6 +475,8 @@ class InterfaceAgent:
             self.connector_http.clear_telemetry()
         if self.connector_chroma:
             self.connector_chroma.clear_telemetry()
+        if self.connector_browser:
+            self.connector_browser.clear_telemetry()
         self._telemetry = None
 
     async def _publish_status(self, status_type: StatusType, **kwargs) -> None:

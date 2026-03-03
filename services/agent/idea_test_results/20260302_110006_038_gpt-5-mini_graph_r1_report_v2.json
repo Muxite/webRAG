@@ -1,0 +1,647 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "038",
+    "test_name": "Eight-Source Fact Matrix",
+    "passed": true,
+    "score": 0.9,
+    "ascii_graph": "*-------------.   Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL\n|\\ \\ \\ \\ \\ \\ \\ \\  \n* | | | | | | | | Visit Wikipedia \u2014 Great Wall of China\n / / / / / / / /  \n* | | | | | | | Visit Wikipedia \u2014 CRISPR gene editing\n / / / / / / /  \n* | | | | | | Visit Wikipedia \u2014 Mariana Trench\n / / / / / /  \n* | | | | | Visit Wikipedia \u2014 Voyager 1\n / / / / /  \n* | | | | Visit Wikipedia \u2014 Rosetta Stone\n / / / /  \n* | | | Visit https://en.wikipedia.org/wiki/Penicillin\n / / /  \n* | | Visit https://en.wikipedia.org/wiki/Aurora_(astronomy)\n / /  \n* | Visit https://en.wikipedia.org/wiki/Enigma_machine\n /  \n* Merge: Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL\n"
+  },
+  "node_table": [
+    {
+      "node_id": "baa8fbca-743c-4503-bbd2-90275d833f71",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL"
+    },
+    {
+      "node_id": "0525d171-9df7-4c91-a974-63daa416c609",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Wikipedia \u2014 Great Wall of China"
+    },
+    {
+      "node_id": "54695cf6-904b-47f4-8766-48a6ee6c3404",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Wikipedia \u2014 CRISPR gene editing"
+    },
+    {
+      "node_id": "7b108ee6-30fe-43c5-80ee-f2c2767c8b2c",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Wikipedia \u2014 Mariana Trench"
+    },
+    {
+      "node_id": "ccf30434-7050-4bf8-bc90-5cbd23f6e322",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Wikipedia \u2014 Voyager 1"
+    },
+    {
+      "node_id": "bbd23e9c-7690-4a90-a3ac-b95f9f195771",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Wikipedia \u2014 Rosetta Stone"
+    },
+    {
+      "node_id": "2e2b4b04-9461-48ec-a22c-0e022a1eda1c",
+      "action": "visit",
+      "status": "failed",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Penicillin"
+    },
+    {
+      "node_id": "618c79b7-6bcf-4ef7-8c7c-22562748f909",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Aurora_(astronomy)"
+    },
+    {
+      "node_id": "1a715346-9668-413e-9e8e-6d8f5b811b57",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Enigma_machine"
+    },
+    {
+      "node_id": "2be7714d-d7f4-4aa3-9394-aa5da9f9772c",
+      "action": "merge",
+      "status": "blocked",
+      "score": null,
+      "title": "Merge: Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": true,
+      "score": 0.875,
+      "visit_count": 7,
+      "reason": "Found 7 visit(s) (target >=6)"
+    },
+    {
+      "check": "fact_extraction",
+      "passed": true,
+      "score": 0.875,
+      "correct": 14,
+      "total": 16,
+      "details": {
+        "Great Wall of China": [
+          "True",
+          "True"
+        ],
+        "CRISPR gene editing": [
+          "True",
+          "True"
+        ],
+        "Mariana Trench": [
+          "True",
+          "True"
+        ],
+        "Voyager 1": [
+          "True",
+          "True"
+        ],
+        "Rosetta Stone": [
+          "True",
+          "True"
+        ],
+        "Penicillin": [
+          "False",
+          "False"
+        ],
+        "Aurora (astronomy)": [
+          "True",
+          "True"
+        ],
+        "Enigma machine": [
+          "True",
+          "True"
+        ]
+      },
+      "reason": "14/16 facts correct"
+    },
+    {
+      "check": "structured_table",
+      "passed": true,
+      "score": 1.0,
+      "pipe_rows": 10,
+      "topics_in_table": 8,
+      "reason": "table_rows=10, topics_in_table=8/8"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "cited": 8,
+      "total": 8,
+      "details": {
+        "Great Wall of China": true,
+        "CRISPR gene editing": true,
+        "Mariana Trench": true,
+        "Voyager 1": true,
+        "Rosetta Stone": true,
+        "Penicillin": true,
+        "Aurora (astronomy)": true,
+        "Enigma machine": true
+      },
+      "reason": "8/8 URLs cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 14359,
+      "words": 2177,
+      "kilobytes": 14.02
+    },
+    "llm": {
+      "calls": 1,
+      "prompt": {
+        "chars": 11482,
+        "words": 1358,
+        "kilobytes": 11.21,
+        "tokens": 0
+      },
+      "completion": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "total_tokens": 0
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 7,
+      "chars": 433537,
+      "words": 70069,
+      "kilobytes": 423.38
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 22,
+        "total_duration": 9.7967,
+        "avg_duration": 0.4453,
+        "min_duration": 0.2694,
+        "max_duration": 2.0917,
+        "success_count": 22,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 3,
+        "total_duration": 259.2664,
+        "avg_duration": 86.4221,
+        "min_duration": 74.0918,
+        "max_duration": 95.1178,
+        "success_count": 2,
+        "error_count": 1
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.371,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5438,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8418,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.61,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3675,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3517,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3391,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3445,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.0917,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3818,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2849,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.317,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2885,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.283,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2821,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2866,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.35,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2904,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2694,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2813,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3003,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3203,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 90.0567,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 74.0918,
+        "success": false
+      },
+      {
+        "name": "llm_call",
+        "duration": 95.1178,
+        "success": true
+      }
+    ],
+    "events_count": 45
+  },
+  "node_index": {
+    "baa8fbca-743c-4503-bbd2-90275d833f71": {
+      "node_id": "baa8fbca-743c-4503-bbd2-90275d833f71",
+      "title": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "0525d171-9df7-4c91-a974-63daa416c609",
+        "54695cf6-904b-47f4-8766-48a6ee6c3404",
+        "7b108ee6-30fe-43c5-80ee-f2c2767c8b2c",
+        "ccf30434-7050-4bf8-bc90-5cbd23f6e322",
+        "bbd23e9c-7690-4a90-a3ac-b95f9f195771",
+        "2e2b4b04-9461-48ec-a22c-0e022a1eda1c",
+        "618c79b7-6bcf-4ef7-8c7c-22562748f909",
+        "1a715346-9668-413e-9e8e-6d8f5b811b57",
+        "2be7714d-d7f4-4aa3-9394-aa5da9f9772c"
+      ],
+      "parent_ids": [],
+      "goal": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL"
+    },
+    "0525d171-9df7-4c91-a974-63daa416c609": {
+      "node_id": "0525d171-9df7-4c91-a974-63daa416c609",
+      "title": "Visit Wikipedia \u2014 Great Wall of China",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "baa8fbca-743c-4503-bbd2-90275d833f71"
+      ],
+      "goal": "Visit Wikipedia \u2014 Great Wall of China",
+      "result_success": true,
+      "result_content_preview": "\"Great Wall\" redirects here. For other uses, see\nGreat Wall (disambiguation)\n.\n\"\u9577\u57ce\" redirects here. For place in South Korea, see\nJangseong County\n.\nGreat Wall of China\n\u842c\u91cc\u9577\u57ce / \u4e07\u91cc\u957f\u57ce\nThe\nMing dynasty\nGreat Wall at\nJinshanling\nMap of all the wall constructions\nGeneral information\nType\nFortification\nLocation\nChina\nCoordinates\n40\u00b041\u2032N\n117\u00b014\u2032E\n\ufeff / \ufeff\n40.68\u00b0N 117.23\u00b0E\n\ufeff /\n40.68; 117.23\nUNESCO World Heritage Site\nOfficial\u00a0name\nThe Great Wall\nLocation\nAsia-Pacific\nCriteria\nCultural: i, ii, iii, iv, vi\nRe",
+      "result_source_url": "https://en.wikipedia.org/wiki/Great_Wall_of_China"
+    },
+    "54695cf6-904b-47f4-8766-48a6ee6c3404": {
+      "node_id": "54695cf6-904b-47f4-8766-48a6ee6c3404",
+      "title": "Visit Wikipedia \u2014 CRISPR gene editing",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "baa8fbca-743c-4503-bbd2-90275d833f71"
+      ],
+      "goal": "Visit Wikipedia \u2014 CRISPR gene editing",
+      "result_success": true,
+      "result_content_preview": "CRISPR gene editing\n(\n/\n\u02c8\nk\nr\n\u026a\ns\np\n\u0259\nr\n/\n; pronounced like \"crisper\"; an abbreviation for \"clustered regularly interspaced short palindromic repeats\") is a\ngenetic engineering\ntechnique in\nmolecular biology\nby which the\ngenomes\nof living organisms may be modified. It is based on a simplified version of the bacterial\nCRISPR\n-\nCas9\nantiviral defense system. By delivering the Cas9\nnuclease\ncomplexed with a synthetic\nguide RNA\n(gRNA) into a cell, the cell's genome can be cut at a desired location, ",
+      "result_source_url": "https://en.wikipedia.org/wiki/CRISPR_gene_editing"
+    },
+    "7b108ee6-30fe-43c5-80ee-f2c2767c8b2c": {
+      "node_id": "7b108ee6-30fe-43c5-80ee-f2c2767c8b2c",
+      "title": "Visit Wikipedia \u2014 Mariana Trench",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "baa8fbca-743c-4503-bbd2-90275d833f71"
+      ],
+      "goal": "Visit Wikipedia \u2014 Mariana Trench",
+      "result_success": true,
+      "result_content_preview": "\"Marianas Trench\" redirects here. For the Canadian band, see\nMarianas Trench (band)\n.\nMariana Trench\nMariana Trench\nCoordinates\n11\u00b021\u2032N\n142\u00b012\u2032E\n\ufeff / \ufeff\n11.350\u00b0N 142.200\u00b0E\n\ufeff /\n11.350; 142.200\nType\nOceanic trench\nOcean/sea sources\nPacific Ocean\nManaging agency\nUnited States\nNorthern Mariana Islands\n(U.S.)\nGuam\n(U.S.)\nMax. length\n2,550\u00a0km (1,580\u00a0mi)\nMax. width\n69\u00a0km (43\u00a0mi)\nMax. depth\n10,984\u00a0\u00b1\u00a025 metres (36,037\u00a0\u00b1\u00a082\u00a0ft; 6,006\u00a0\u00b1\u00a014 fathoms; 6.825\u00a0\u00b1\u00a00.016\u00a0mi) (\nChallenger Deep\n)\nLocation\nInteractive m",
+      "result_source_url": "https://en.wikipedia.org/wiki/Mariana_Trench"
+    },
+    "ccf30434-7050-4bf8-bc90-5cbd23f6e322": {
+      "node_id": "ccf30434-7050-4bf8-bc90-5cbd23f6e322",
+      "title": "Visit Wikipedia \u2014 Voyager 1",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "baa8fbca-743c-4503-bbd2-90275d833f71"
+      ],
+      "goal": "Visit Wikipedia \u2014 Voyager 1",
+      "result_success": true,
+      "result_content_preview": "For other uses, see\nVoyager 1 (disambiguation)\n.\nVoyager 1\nArtist's rendering of the\nVoyager\nspacecraft\nMission type\nOuter planetary, heliosphere, and interstellar medium exploration\nOperator\nNASA\n/\nJet Propulsion Laboratory\nCOSPAR ID\n1977-084A\nSATCAT\nno.\n10321\nWebsite\nscience\n.nasa\n.gov\n/mission\n/voyager\n/\nMission duration\n48\u00a0years, 5\u00a0months, 24\u00a0days\nelapsed\nPlanetary mission: 3\u00a0years, 3\u00a0months, 9\u00a0days\nInterstellar mission: 45\u00a0years, 2\u00a0months, 16\u00a0days elapsed\nSpacecraft properties\nSpacecraft ty",
+      "result_source_url": "https://en.wikipedia.org/wiki/Voyager_1"
+    },
+    "bbd23e9c-7690-4a90-a3ac-b95f9f195771": {
+      "node_id": "bbd23e9c-7690-4a90-a3ac-b95f9f195771",
+      "title": "Visit Wikipedia \u2014 Rosetta Stone",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "baa8fbca-743c-4503-bbd2-90275d833f71"
+      ],
+      "goal": "Visit Wikipedia \u2014 Rosetta Stone",
+      "result_success": true,
+      "result_content_preview": "This article is about the stone itself. For its text, see\nRosetta Stone decree\n. For other uses, see\nRosetta Stone (disambiguation)\n.\nRosetta Stone\nThe Rosetta Stone on display\nin the\nBritish Museum\n, London\nMaterial\nGranodiorite\nSize\n1,123\u00a0mm \u00d7\u00a0757\u00a0mm \u00d7\u00a0284\u00a0mm (44.2\u00a0in \u00d7\u00a029.8\u00a0in \u00d7\u00a011.2\u00a0in)\nWriting\nAncient Egyptian hieroglyphs\n,\nDemotic script\n, and\nGreek script\nCreated\n196 BC\nDiscovered\n1799\nnear\nRosetta\n, Nile Delta, Egypt\nDiscovered by\nPierre-Fran\u00e7ois Bouchard\nPresent location\nBritish Museum\n",
+      "result_source_url": "https://en.wikipedia.org/wiki/Rosetta_Stone"
+    },
+    "2e2b4b04-9461-48ec-a22c-0e022a1eda1c": {
+      "node_id": "2e2b4b04-9461-48ec-a22c-0e022a1eda1c",
+      "title": "Visit https://en.wikipedia.org/wiki/Penicillin",
+      "action": "visit",
+      "status": "failed",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "baa8fbca-743c-4503-bbd2-90275d833f71"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Penicillin",
+      "result_success": false,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "618c79b7-6bcf-4ef7-8c7c-22562748f909": {
+      "node_id": "618c79b7-6bcf-4ef7-8c7c-22562748f909",
+      "title": "Visit https://en.wikipedia.org/wiki/Aurora_(astronomy)",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "baa8fbca-743c-4503-bbd2-90275d833f71"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Aurora_(astronomy)",
+      "result_success": true,
+      "result_content_preview": "Several terms  redirect here. For other uses, see\nAurora (disambiguation)\n,\nAurora Borealis (disambiguation)\n,\nAurora Australis (disambiguation)\n,\nNorthern Lights (disambiguation)\n, and\nSouthern Lights (disambiguation)\n.\nImages of auroras from across the world, including those with rarer red and blue lights\nAn\naurora\n(\npl.\naurorae\nor\nauroras\n)\nis a natural light display in\nEarth\n's sky, predominantly observed in\nhigh-latitude regions\naround the\nArctic\nand\nAntarctic\n. The terms\nnorthern lights\n(\n",
+      "result_source_url": "https://en.wikipedia.org/wiki/Aurora_(astronomy)"
+    },
+    "1a715346-9668-413e-9e8e-6d8f5b811b57": {
+      "node_id": "1a715346-9668-413e-9e8e-6d8f5b811b57",
+      "title": "Visit https://en.wikipedia.org/wiki/Enigma_machine",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "baa8fbca-743c-4503-bbd2-90275d833f71"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Enigma_machine",
+      "result_success": true,
+      "result_content_preview": "The\nEnigma machine\nis a\ncipher\ndevice developed and used in the early- to mid-20th century to protect\ncommercial\n, diplomatic, and military communication. It was employed extensively by\nNazi Germany\nduring\nWorld War II\n, in all branches of the\nGerman military\n. The Enigma machine was considered so secure that it was used to encipher the most top-secret messages.\nThe Enigma has an electromechanical\nrotor mechanism\nthat scrambles the 26 letters of the Latin alphabet. In typical use, one person ent",
+      "result_source_url": "https://en.wikipedia.org/wiki/Enigma_machine"
+    },
+    "2be7714d-d7f4-4aa3-9394-aa5da9f9772c": {
+      "node_id": "2be7714d-d7f4-4aa3-9394-aa5da9f9772c",
+      "title": "Merge: Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL",
+      "action": "merge",
+      "status": "blocked",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "baa8fbca-743c-4503-bbd2-90275d833f71"
+      ],
+      "goal": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL",
+      "result_success": false,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Below I present the requested fact matrix (one row per topic). For each extracted fact I (a) cite the Wikipedia URL used, and (b) provide a verbatim quote from the RAW VISIT CONTENT showing the fact was taken from that page. If a requested fact could not be extracted from the provided RAW VISIT CONTENT, I state exactly what is missing.\n\nDetailed findings (verbatim evidence + citation) \u2014 one topic per section:\n\n1) Great Wall of China\n- Fact A \u2014 Total length:\n  - Verbatim quote(s) from the page: \"Size 21,196.18 km (13,170.70 mi)\" and \"spanning 21,196.18 km (13,170.70 mi) in total.\"\n  - Source (URL): https://en.wikipedia.org/wiki/Great_Wall_of_China\n\n- Fact B \u2014 Dynasty that built the most famous sections:\n  - Verbatim quote from the page: \"the best-known sections were built by the Ming dynasty (1368\u20131644).\"\n  - Source (URL): https://en.wikipedia.org/wiki/Great_Wall_of_China\n\n2) CRISPR gene editing\n- Fact A \u2014 Protein used as molecular \"scissors\":\n  - Verbatim quote from the page: \"By delivering the Cas9 nuclease complexed with a synthetic guide RNA (gRNA) into a cell, the cell's genome can be cut at a desired location...\"\n  - Source (URL): https://en.wikipedia.org/wiki/CRISPR_gene_editing\n\n- Fact B \u2014 The year CRISPR was first used to edit mammalian cells (as stated on this page):\n  - Finding from RAW VISIT CONTENT: The provided RAW VISIT CONTENT for the CRISPR page includes clear statements that Cas9 is used to cut genomes and discusses the discovery/publication timeline (e.g., identification of CRISPR\u2013Cas9 in 2012 and patent and commercialization milestones), but the page text in the provided RAW VISIT CONTENT does NOT contain an explicit, verbatim statement of \"the year CRISPR was first used to edit mammalian cells.\" The page does include statements showing CRISPR\u2013Cas9 enabled editing in eukaryotic cells, for example: \"Cas9, derived from the bacterial species Streptococcus pyogenes, has facilitated targeted genomic modification in eukaryotic cells by enabling a reliable method of creating a targeted break...\" but it does not state a single explicit year for \"first used to edit mammalian cells\" in the RAW content supplied here.\n  - Verbatim quote(s) demonstrating what is present (but not the explicit year): \"Cas9, derived from the bacterial species Streptococcus pyogenes, has facilitated targeted genomic modification in eukaryotic cells by enabling a reliable method of creating a targeted break at a specific location as designated by the crRNA and tracrRNA guide strands.\" \n  - Source (URL): https://en.wikipedia.org/wiki/CRISPR_gene_editing\n  - Conclusion: The page (in the RAW VISIT CONTENT provided) does not contain an explicit single-line statement giving \"the year CRISPR was first used to edit mammalian cells.\" Therefore I could not extract that specific year from the RAW VISIT CONTENT supplied. If you want, I can (a) fetch the page again and search the live page for an explicit year statement or (b) provide the widely-cited year from the primary literature (with citation) outside the RAW content you provided.\n\n3) Mariana Trench\n- Fact A \u2014 Maximum depth:\n  - Verbatim quote from the page: \"Max. depth 10,984 \u00b1 25 metres (36,037 \u00b1 82 ft; 6,006 \u00b1 14 fathoms; 6.825 \u00b1 0.016 mi) (Challenger Deep)\" and \"The maximum known depth is 10,984 \u00b1 25 metres (36,037 \u00b1 82 ft; 6,006 \u00b1 14 fathoms; 6.825 \u00b1 0.016 mi) at the southern end of a small slot-shaped valley in its floor known as the Challenger Deep.\"\n  - Source (URL): https://en.wikipedia.org/wiki/Mariana_Trench\n\n- Fact B \u2014 Name of the deepest point:\n  - Verbatim quote from the page: \"...known as the Challenger Deep.\" (from the sentence above) and elsewhere the page references \"the deepest part of the trench... the Challenger Deep.\"\n  - Source (URL): https://en.wikipedia.org/wiki/Mariana_Trench\n\n4) Voyager 1\n- Fact A \u2014 Launch year:\n  - Verbatim quote from the page: \"Voyager 1 is a space probe launched by NASA on September 5, 1977, as part of the Voyager program...\" (shows launch date and year 1977)\n  - Source (URL): https://en.wikipedia.org/wiki/Voyager_1\n\n- Fact B \u2014 Boundary it crossed to enter interstellar space:\n  - Verbatim quote from the page: \"Voyager 1 crossed the heliopause and entered interstellar space on August 25, 2012, making it the first spacecraft to do so.\" (identifies the boundary as the \"heliopause\")\n  - Source (URL): https://en.wikipedia.org/wiki/Voyager_1\n\n5) Rosetta Stone\n- Fact A \u2014 The three scripts on the stone:\n  - Verbatim quote from the page (infobox and description): \"Writing Ancient Egyptian hieroglyphs, Demotic script, and Greek script\" and \"It bears three inscriptions: the top register in Ancient Egyptian hieroglyphs, the second in the Egyptian Demotic script, and the third in Ancient Greek.\"\n  - Source (URL): https://en.wikipedia.org/wiki/Rosetta_Stone\n\n- Fact B \u2014 Year it was discovered:\n  - Verbatim quote from the page: \"Discovered 1799 near Rosetta, Nile Delta, Egypt\" and the rediscovery section: \"It was found there in July 1799 by French army officer Pierre-Fran\u00e7ois Bouchard during France's invasion of Egypt.\"\n  - Source (URL): https://en.wikipedia.org/wiki/Rosetta_Stone\n\n6) Penicillin\n- Requested extracts: (a) who discovered penicillin and (b) the year it was discovered.\n- Issue / what is missing: The visit to the Penicillin Wikipedia page failed in the provided execution data. The MERGED/EXECUTION TRAIL shows the visit node for https://en.wikipedia.org/wiki/Penicillin returned an error: \"HTTP fetch failed: https://en.wikipedia.org/wiki/Penicillin status=None\". Because the RAW VISIT CONTENT for the Penicillin page is NOT present in the materials you gave me, I cannot supply verbatim quotes from the Penicillin Wikipedia page here.\n  - Evidence of the failure (from the execution trail / merge data): the visit action result: {\"action\": \"visit\", \"success\": false, \"error\": \"HTTP fetch failed: https://en.wikipedia.org/wiki/Penicillin status=None\"} and the node shows the same URL.\n  - Source URL (attempted): https://en.wikipedia.org/wiki/Penicillin\n- Conclusion: I was unable to extract the requested facts from the Penicillin page because the page fetch failed in the provided run. If you would like, I can re-fetch that specific page and extract the facts with verbatim quotes from the RAW content.\n\n7) Aurora (astronomy)\n- Fact A \u2014 Scientific name for the northern lights:\n  - Verbatim quote from the page: \"The terms northern lights (aurora borealis) and southern lights (aurora australis) are used in the Northern and Southern Hemispheres respectively.\" This identifies the scientific/Latinized term as \"aurora borealis\" for the northern lights.\n  - Source (URL): https://en.wikipedia.org/wiki/Aurora_(astronomy)\n\n- Fact B \u2014 What causes auroras (solar particles interacting with ...):\n  - Verbatim quote from the page: \"Auroras are the result of disturbances in the Earth's magnetosphere caused by enhanced speeds of solar wind from coronal holes and coronal mass ejections. These disturbances alter the trajectories of charged particles in the magnetospheric plasma. These particles, mainly electrons and protons, precipitate into the upper atmosphere (thermosphere/exosphere). The resulting ionization and excitation of atmospheric constituents emit light of varying colour and complexity.\" (this directly states the cause: solar-wind-related charged particles interacting with Earth's magnetosphere and upper atmosphere)\n  - Source (URL): https://en.wikipedia.org/wiki/Aurora_(astronomy)\n\n8) Enigma machine\n- Fact A \u2014 Who led the British effort to crack Enigma:\n  - Finding from RAW VISIT CONTENT provided: The Enigma machine page in the RAW VISIT CONTENT (that was supplied) clearly states that the Enigma was used extensively by Nazi Germany during World War II. However, in the portion of the RAW VISIT CONTENT included in the run, I could not locate a clear, verbatim line naming the single person who \"led the British effort to crack Enigma\" (such as a sentence explicitly naming \"Alan Turing led the British effort...\"). Because the requirement is to provide verbatim quotes from the RAW VISIT CONTENT, I cannot assert a quoted name for this field from the provided content. (The page does include extensive material on Allied cryptanalysis, Bletchley Park, and the contributions of Alan Turing and others in the full live article, but that explicit named-quotation is not available in the RAW content shown to me here.)\n  - Source (URL): https://en.wikipedia.org/wiki/Enigma_machine\n  - Conclusion: The supplied RAW VISIT CONTENT did not contain a clear verbatim sentence that I can quote which states who \"led the British effort to crack Enigma.\" I therefore leave this item as \"NOT EXTRACTED from supplied RAW CONTENT\" and can re-fetch the page and extract the precise quoted sentence on request.\n\n- Fact B \u2014 The war in which Enigma was used:\n  - Verbatim quote from the page: \"It was employed extensively by Nazi Germany during World War II, in all branches of the German military.\" (this directly answers the question: World War II)\n  - Source (URL): https://en.wikipedia.org/wiki/Enigma_machine\n\n\nFinal requested MARKDOWN TABLE (Topic | Fact A | Fact B | Source URL)\n\nNotes: For each cell I put the extracted fact (or an explicit statement that the fact could not be extracted from the provided RAW VISIT CONTENT). Each row's Source URL is the Wikipedia page visited (or attempted). Verbatim quotes and additional context are given above for traceability.\n\n| Topic | Fact A | Fact B | Source URL |\n|---|---|---|---|\n| Great Wall of China | 21,196.18 km (13,170.70 mi) \u2014 verbatim: \"Size 21,196.18 km (13,170.70 mi)\" | Ming dynasty \u2014 verbatim: \"the best-known sections were built by the Ming dynasty (1368\u20131644).\" | https://en.wikipedia.org/wiki/Great_Wall_of_China |\n| CRISPR gene editing | Cas9 nuclease \u2014 verbatim: \"By delivering the Cas9 nuclease complexed with a synthetic guide RNA (gRNA) into a cell...\" | NOT EXTRACTED (the provided RAW VISIT CONTENT does not contain an explicit verbatim statement of \"the year CRISPR was first used to edit mammalian cells\") \u2014 available page URL: https://en.wikipedia.org/wiki/CRISPR_gene_editing |\n| Mariana Trench | 10,984 \u00b1 25 metres (36,037 \u00b1 82 ft) \u2014 verbatim: \"Max. depth 10,984 \u00b1 25 metres (36,037 \u00b1 82 ft; ... ) (Challenger Deep)\" | Challenger Deep \u2014 verbatim includes: \"...known as the Challenger Deep.\" | https://en.wikipedia.org/wiki/Mariana_Trench |\n| Voyager 1 | Launch year 1977 \u2014 verbatim: \"Voyager 1 is a space probe launched by NASA on September 5, 1977...\" | Crossed the heliopause (entered interstellar space) \u2014 verbatim: \"Voyager 1 crossed the heliopause and entered interstellar space on August 25, 2012...\" | https://en.wikipedia.org/wiki/Voyager_1 |\n| Rosetta Stone | Three scripts: Ancient Egyptian hieroglyphs; Demotic script; Greek script \u2014 verbatim: \"Writing Ancient Egyptian hieroglyphs, Demotic script, and Greek script\" | Discovered 1799 \u2014 verbatim: \"Discovered 1799 near Rosetta, Nile Delta, Egypt\" | https://en.wikipedia.org/wiki/Rosetta_Stone |\n| Penicillin | NOT EXTRACTED \u2014 page fetch failed in provided run; RAW VISIT CONTENT not available to quote | NOT EXTRACTED \u2014 page fetch failed in provided run; RAW VISIT CONTENT not available to quote | https://en.wikipedia.org/wiki/Penicillin (visit failed in this run) |\n| Aurora (astronomy) | \"aurora borealis\" (northern lights) \u2014 verbatim: \"The terms northern lights (aurora borealis) ... are used...\" | Caused by solar-wind-related charged particles interacting with Earth's magnetosphere/upper atmosphere \u2014 verbatim: \"Auroras are the result of disturbances in the Earth's magnetosphere caused by enhanced speeds of solar wind from coronal holes and coronal mass ejections... These particles, mainly electrons and protons, precipitate into the upper atmosphere... The resulting ionization and excitation of atmospheric constituents emit light...\" | https://en.wikipedia.org/wiki/Aurora_(astronomy) |\n| Enigma machine | NOT EXTRACTED (the supplied RAW VISIT CONTENT in this run does not contain a clear verbatim sentence naming who \"led the British effort to crack Enigma\" that I can quote) | Used in World War II \u2014 verbatim: \"It was employed extensively by Nazi Germany during World War II, in all branches of the German military.\" | https://en.wikipedia.org/wiki/Enigma_machine |\n\n\nSummary (short):\n- I visited seven of the eight Wikipedia pages successfully and extracted verbatim quotes for most requested facts. The pages and quotes are cited above.\n- The Penicillin page fetch FAILED in this run (HTTP fetch failed) so I could not extract or quote the requested facts for Penicillin (who discovered it and the year) from the RAW VISIT CONTENT \u2014 the attempted URL was https://en.wikipedia.org/wiki/Penicillin and the run recorded the error.\n- On the CRISPR page the protein used as molecular \"scissors\" (Cas9 nuclease) is explicitly stated and quoted above. The specific requested line \"the year CRISPR was first used to edit mammalian cells\" was not present as an explicit verbatim statement in the supplied RAW VISIT CONTENT; therefore I did not invent or infer a year \u2014 I reported that the explicit year statement was not extractable from the provided content. I can re-check the live page and extract the exact sentence if you want.\n- On the Enigma page the war (World War II) is explicitly present and quoted above. The supplied RAW VISIT CONTENT in this run did not include a direct verbatim quote naming the single person who \"led the British effort to crack Enigma\" that I could use to satisfy the mandate's requirement to include verbatim evidence; therefore I reported that item as NOT EXTRACTED from the provided RAW content. I can re-fetch and extract the precise named quotation (for example, references to Alan Turing and Bletchley Park) on request.\n\nIf you want me to (choose one or more):\n- Re-fetch https://en.wikipedia.org/wiki/Penicillin and extract the requested facts with verbatim quotes; and/or\n- Re-visit https://en.wikipedia.org/wiki/CRISPR_gene_editing and search specifically for any sentence that explicitly states the year CRISPR was first used to edit mammalian cells, and quote it; and/or\n- Re-fetch https://en.wikipedia.org/wiki/Enigma_machine and extract a verbatim quote that names who led the British effort to crack Enigma (if present),\nI will do so and return updated quotes and an updated table.\n\n",
+    "action_summary": "I visited the eight Wikipedia pages (one visit failed: Penicillin). For each topic I extracted the requested facts when they were present in the provided RAW VISIT CONTENT and included verbatim quotes plus the page URL. Missing items: (a) Penicillin \u2014 page fetch failed so facts could not be quoted; (b) CRISPR \u2014 the page shows Cas9 as the molecular scissors, but the provided RAW content did not contain an explicit verbatim statement of the single year when CRISPR was first used to edit mammalian cells; (c) Enigma \u2014 the page explicitly states Enigma was used during World War II, but the provided RAW content did not include a clear verbatim sentence naming who \"led the British effort to crack Enigma,\" so that specific item was not extracted. I can re-fetch any pages requested and extract the missing verbatim quotes on demand.",
+    "success": false,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.371,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5438,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8418,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.61,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3675,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3517,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3391,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3445,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.0917,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3818,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2849,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.317,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2885,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.283,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2821,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2866,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.35,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2904,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2694,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2813,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3003,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3203,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 90.0567,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 74.0918,
+      "success": false
+    },
+    {
+      "name": "llm_call",
+      "duration": 95.1178,
+      "success": true
+    }
+  ]
+}

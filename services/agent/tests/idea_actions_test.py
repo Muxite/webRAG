@@ -2,12 +2,14 @@ import os
 import pytest
 
 from agent.app.idea_dag import IdeaDag
+from agent.app.idea_policies.base import DetailKey, IdeaActionType
 from agent.app.idea_policies.actions import (
     SearchLeafAction,
     VisitLeafAction,
     SaveLeafAction,
     ThinkLeafAction,
 )
+from agent.app.idea_policies.action_constants import ActionResultKey
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
@@ -16,10 +18,17 @@ from shared.connector_config import ConnectorConfig
 
 
 class FakeIO:
+    """
+    Minimal IO stub for unit tests.
+    Provides search, fetch_url, visit, store_chroma, retrieve_chroma.
+    """
+
     def __init__(self):
         self.last_search = None
         self.last_visit = None
         self.last_save = None
+        self.telemetry = None
+        self.connector_chroma = None
 
     async def search(self, query: str, count: int = 10, timeout_seconds=None):
         self.last_search = {"query": query, "count": count}
@@ -42,6 +51,12 @@ class FakeIO:
 
     async def retrieve_chroma(self, topics, n_results: int = 3, timeout_seconds=None):
         return ["Doc A", "Doc B"]
+
+    def build_llm_payload(self, **kwargs):
+        return {}
+
+    async def query_llm_with_fallback(self, payload, **kwargs):
+        return None
 
 
 class DummyLLM:
@@ -118,14 +133,32 @@ async def test_search_action():
     finally:
         if cleanup:
             await cleanup()
-    assert payload["action"] == "search"
-    assert payload["query"] == "fish"
-    assert payload["count"] == 2
-    assert len(payload["results"]) == 2
+    assert payload[ActionResultKey.ACTION.value] == IdeaActionType.SEARCH.value
+    assert payload[ActionResultKey.QUERY.value] == "fish"
+    assert payload[ActionResultKey.COUNT.value] == 2
+    assert len(payload[ActionResultKey.RESULTS.value]) == 2
+    assert payload[ActionResultKey.SUCCESS.value] is True
 
 
 @pytest.mark.asyncio
-async def test_visit_action():
+async def test_search_action_uses_title_as_fallback_query():
+    """When no query is provided, the node title is used as the search query."""
+    graph = IdeaDag(root_title="root")
+    node = graph.add_child(graph.root_id(), "search for cats", details={})
+    io, cleanup = await _get_io(require_search=True)
+    action = SearchLeafAction()
+    try:
+        payload = await action.execute(graph, node.node_id, io)
+    finally:
+        if cleanup:
+            await cleanup()
+    assert payload[ActionResultKey.SUCCESS.value] is True
+    assert payload[ActionResultKey.QUERY.value] == "search for cats"
+
+
+@pytest.mark.asyncio
+async def test_visit_action_with_url():
+    """Visit action with explicit url in details."""
     graph = IdeaDag(root_title="root")
     node = graph.add_child(graph.root_id(), "visit", details={"url": "https://example.com"})
     io, cleanup = await _get_io()
@@ -135,9 +168,49 @@ async def test_visit_action():
     finally:
         if cleanup:
             await cleanup()
-    assert payload["action"] == "visit"
-    assert payload["url"] == "https://example.com"
+    assert payload[ActionResultKey.ACTION.value] == IdeaActionType.VISIT.value
+    assert payload[ActionResultKey.URL.value] == "https://example.com"
     assert "links" in payload
+
+
+@pytest.mark.asyncio
+async def test_visit_action_with_optional_url():
+    """Visit action using optional_url (the preferred field name)."""
+    graph = IdeaDag(root_title="root")
+    node = graph.add_child(
+        graph.root_id(),
+        "visit",
+        details={"optional_url": "https://example.com", "link_count": 1},
+    )
+    io, cleanup = await _get_io()
+    action = VisitLeafAction(settings={"max_links_per_visit": 3, "max_observation_chars": 10})
+    try:
+        payload = await action.execute(graph, node.node_id, io)
+    finally:
+        if cleanup:
+            await cleanup()
+    assert payload[ActionResultKey.ACTION.value] == IdeaActionType.VISIT.value
+    assert payload[ActionResultKey.URL.value] == "https://example.com"
+    assert payload[ActionResultKey.SUCCESS.value] is True
+
+
+@pytest.mark.asyncio
+async def test_visit_action_returns_content_fields():
+    """Visit result contains content, content_full, links, page metadata."""
+    graph = IdeaDag(root_title="root")
+    node = graph.add_child(graph.root_id(), "visit", details={"url": "https://example.com"})
+    io, cleanup = await _get_io()
+    action = VisitLeafAction(settings={"max_links_per_visit": 3, "max_observation_chars": 100000})
+    try:
+        payload = await action.execute(graph, node.node_id, io)
+    finally:
+        if cleanup:
+            await cleanup()
+    assert payload[ActionResultKey.SUCCESS.value] is True
+    assert ActionResultKey.CONTENT.value in payload
+    assert "content_full" in payload
+    assert "links" in payload
+    assert "links_count" in payload
 
 
 @pytest.mark.asyncio
@@ -155,9 +228,9 @@ async def test_save_action():
     finally:
         if cleanup:
             await cleanup()
-    assert payload["action"] == "save"
-    assert payload["count"] == 1
-    assert payload["success"] is True
+    assert payload[ActionResultKey.ACTION.value] == IdeaActionType.SAVE.value
+    assert payload[ActionResultKey.COUNT.value] == 1
+    assert payload[ActionResultKey.SUCCESS.value] is True
     if hasattr(io, "last_save"):
         assert io.last_save is not None
 
@@ -173,5 +246,43 @@ async def test_think_action():
     finally:
         if cleanup:
             await cleanup()
-    assert payload["action"] == "think"
-    assert payload["node_id"] == node.node_id
+    assert payload[ActionResultKey.ACTION.value] == IdeaActionType.THINK.value
+    assert payload[ActionResultKey.NODE_ID.value] == node.node_id
+    assert payload[ActionResultKey.SUCCESS.value] is True
+
+
+@pytest.mark.asyncio
+async def test_search_action_failure_returns_retryable():
+    """A search action that fails should return a failure result with retryable info."""
+    graph = IdeaDag(root_title="root")
+    node = graph.add_child(graph.root_id(), "search", details={"query": "fish"})
+
+    class FailingIO(FakeIO):
+        async def search(self, query, count=10, timeout_seconds=None):
+            raise RuntimeError("Network error")
+
+    io = FailingIO()
+    action = SearchLeafAction()
+    payload = await action.execute(graph, node.node_id, io)
+    assert payload[ActionResultKey.SUCCESS.value] is False
+    assert ActionResultKey.ERROR.value in payload
+    assert payload[ActionResultKey.QUERY.value] == "fish"
+
+
+@pytest.mark.asyncio
+async def test_visit_action_clears_placeholder_urls():
+    """Placeholder URLs like '<chosen_next_url>' should be cleared, not visited."""
+    graph = IdeaDag(root_title="root")
+    node = graph.add_child(
+        graph.root_id(),
+        "visit",
+        details={"optional_url": "<chosen_next_url from search>"},
+    )
+    io, cleanup = await _get_io()
+    action = VisitLeafAction(settings={"max_links_per_visit": 1, "max_observation_chars": 10})
+    try:
+        payload = await action.execute(graph, node.node_id, io)
+    finally:
+        if cleanup:
+            await cleanup()
+    assert payload[ActionResultKey.ACTION.value] == IdeaActionType.VISIT.value

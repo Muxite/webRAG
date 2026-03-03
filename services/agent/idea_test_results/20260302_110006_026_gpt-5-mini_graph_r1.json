@@ -1,0 +1,932 @@
+{
+  "test_metadata": {
+    "test_id": "026",
+    "test_name": "Deterministic Page Facts",
+    "difficulty_level": "1/10",
+    "category": "Deterministic Retrieval"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Results\n\n1) Exact H1 text from https://example.com\n\n- Extraction: Example Domain\n- Verbatim quote from the page (RAW VISIT CONTENT): \"Example Domain\"\n- Source / citation: https://example.com\n\n2) Exact domain of the external link from https://example.com\n\n- Extraction (exact domain): iana.org\n- Verbatim evidence that the page contains link text: \"Learn more\" (from the example.com RAW VISIT CONTENT). Quote: \"Learn more\" (https://example.com)\n- Verbatim evidence showing the external link URL found by the visit/scan: \"https://iana.org/domains/example\" (from the visit record for https://example.com)\n  - Quote from the visit record: \"links\": [\"https://iana.org/domains/example\"] (source: visit result for https://example.com)\n- Source / citation for the link target: https://iana.org/domains/example\n\n3) One URL citation for each visited page\n\n- https://example.com (page visited; H1 and page text quoted above)\n- https://www.iana.org/domains/reserved (IANA Reserved Domains page visited)\n\nSupporting verbatim quotes from the RAW VISIT CONTENT (primary evidence)\n\n- From https://example.com (RAW VISIT CONTENT):\n  \"Example Domain\n  Example Domain\n  This domain is for use in documentation examples without needing permission. Avoid use in operations.\n  Learn more\"\n  (https://example.com)\n\n- From https://www.iana.org/domains/reserved (RAW VISIT CONTENT):\n  \"IANA-managed Reserved Domains\"\n  (https://www.iana.org/domains/reserved)\n\n- Also from the IANA page (showing example domains mention) (RAW VISIT CONTENT):\n  \"As described in\n  RFC 2606\n  and\n  RFC 6761\n  ,\n   a number of domains such as\n  example.com\n  and\n  example.org\n  are maintained for documentation purposes. These domains may be used as illustrative\n   examples in documents without prior coordination with us. They are \n   not available for registration or transfer.\"\n  (https://www.iana.org/domains/reserved)\n\nNotes on evidence used\n\n- The H1 text \"Example Domain\" was taken directly from the example.com RAW VISIT CONTENT (see quote above) and is cited to https://example.com.\n- The presence of a link labeled \"Learn more\" is shown in the example.com RAW VISIT CONTENT (see quote above). The visit record for https://example.com lists the external link URL exactly as \"https://iana.org/domains/example\", from which the link's domain is iana.org. Both the example.com visit record and the link target URL are cited above.\n- The IANA reserved page visit and its title / supporting text are quoted directly from the RAW VISIT CONTENT for https://www.iana.org/domains/reserved and are cited to that URL.\n\nAll factual claims above are supported by the quoted raw page content and the visit record link list. URL citations for every claim are provided inline above.",
+      "action_summary": "Returned: (1) H1 from https://example.com is exactly \"Example Domain\" (quoted from the page); (2) the external link on example.com points to https://iana.org/domains/example, so the exact domain is \"iana.org\" (visit record: \"https://iana.org/domains/example\" and the example.com page shows the link text \"Learn more\"); (3) URL citations: https://example.com and https://www.iana.org/domains/reserved (both quoted). All quotations and citations provided.",
+      "success": true,
+      "goal_achieved": true,
+      "has_failures": false
+    },
+    "graph": {
+      "root_id": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+      "nodes": {
+        "ba5f1dac-5296-42ad-ab04-78b63b624f12": {
+          "node_id": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+          "title": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+          "details": {
+            "mandate": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "memo_namespace": "idea_dag:725ab7b389",
+            "expansion_meta": {
+              "execute_all_children": true
+            },
+            "goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "original_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "merged_results": [
+              {
+                "node_id": "f8762d7f-bda1-4877-b11c-628b0d0f9cec",
+                "title": "Visit https://example.com and extract H1, external link domain, and citation",
+                "status": "done",
+                "score": null,
+                "evaluation": null,
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://example.com",
+                  "intent": null,
+                  "content": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+                  "content_is_truncated": false,
+                  "content_total_chars": 142,
+                  "content_full": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+                  "content_with_links": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more\n\n--- Links found on this page ---\n1. https://iana.org/domains/example\n",
+                  "links": [
+                    "https://iana.org/domains/example"
+                  ],
+                  "links_full": [
+                    "https://iana.org/domains/example"
+                  ],
+                  "links_count": 1,
+                  "link_contexts": {
+                    "https://iana.org/domains/example": "Learn more"
+                  },
+                  "page_title": "Example Domain",
+                  "h1_text": "Example Domain",
+                  "source_url": "https://example.com"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "c6662e22-84c9-441b-966a-0e744f08e5c8",
+                "title": "Visit https://www.iana.org/domains/reserved and produce one URL citation",
+                "status": "done",
+                "score": null,
+                "evaluation": null,
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://www.iana.org/domains/reserved",
+                  "intent": null,
+                  "content": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were temporarily delegated by IANA for the\nIDN Evaluation\nbeing conducted by\nICANN\n.\nDomain\nDomain (A-label)\nLanguage\nScript\n\u0625\u062e\u062a\u0628\u0627\u0631\nXN--KGBECHTV\nArabic\nArabic\n\u0622\u0632\u0645\u0627\u06cc\u0634\u06cc\nXN--HGBK6AJ7F53BBA\nPersian\nArabic\n\u6d4b\u8bd5\nXN--0ZWM56D\nChinese\nHan (Simplified variant)\n\u6e2c\u8a66\nXN--G6W251D\nChinese\nHan (Traditional variant)\n\u0438\u0441\u043f\u044b\u0442\u0430\u043d\u0438\u0435\nXN--80AKHBYKNJ4F\nRussian\nCyrillic\n\u092a\u0930\u0940\u0915\u094d\u0937\u093e\nXN--11B5BS3A9AJ6G\nHindi\nDevanagari (Nagari)\n\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae\nXN--JXALPDLP\nGreek, Modern (1453-)\nGreek\n\ud14c\uc2a4\ud2b8\nXN--9T4B11YI5A\nKorean\nHangul (Hang\u016dl, Hangeul)\n\u05d8\u05e2\u05e1\u05d8\nXN--DEBA0AD\nYiddish\nHebrew\n\u30c6\u30b9\u30c8\nXN--ZCKZAH\nJapanese\nKatakana\n\u0baa\u0bb0\u0bbf\u0b9f\u0bcd\u0b9a\u0bc8\nXN--HLCJ6AYA9ESC7A\nTamil\nTamil\nPolicy-reserved domains\nWe act as both the registrant and registrar for a select number of domains\n\t\twhich have been reserved under policy grounds. These exclusions are\n\t\ttypically indicated in either technical standards (RFC documents),\n\t\tor\ncontractual limitations\n.\nDomains which are described as registered to IANA or ICANN on policy\n\t\tgrounds are not available for registration or transfer, with the exception\n\t\tof\ncountry-name\n.info\ndomains. These domains are available for release\n\t\tby the ICANN Governmental Advisory Committee Secretariat.\nOther Special-Use Domains\nThere is additionally a\nSpecial-Use Domain Names\nregistry documenting special-use domains designated by technical standards. For further information, see\nSpecial-Use Domain Names\n(RFC 6761).",
+                  "content_is_truncated": false,
+                  "content_total_chars": 1856,
+                  "content_full": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were temporarily delegated by IANA for the\nIDN Evaluation\nbeing conducted by\nICANN\n.\nDomain\nDomain (A-label)\nLanguage\nScript\n\u0625\u062e\u062a\u0628\u0627\u0631\nXN--KGBECHTV\nArabic\nArabic\n\u0622\u0632\u0645\u0627\u06cc\u0634\u06cc\nXN--HGBK6AJ7F53BBA\nPersian\nArabic\n\u6d4b\u8bd5\nXN--0ZWM56D\nChinese\nHan (Simplified variant)\n\u6e2c\u8a66\nXN--G6W251D\nChinese\nHan (Traditional variant)\n\u0438\u0441\u043f\u044b\u0442\u0430\u043d\u0438\u0435\nXN--80AKHBYKNJ4F\nRussian\nCyrillic\n\u092a\u0930\u0940\u0915\u094d\u0937\u093e\nXN--11B5BS3A9AJ6G\nHindi\nDevanagari (Nagari)\n\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae\nXN--JXALPDLP\nGreek, Modern (1453-)\nGreek\n\ud14c\uc2a4\ud2b8\nXN--9T4B11YI5A\nKorean\nHangul (Hang\u016dl, Hangeul)\n\u05d8\u05e2\u05e1\u05d8\nXN--DEBA0AD\nYiddish\nHebrew\n\u30c6\u30b9\u30c8\nXN--ZCKZAH\nJapanese\nKatakana\n\u0baa\u0bb0\u0bbf\u0b9f\u0bcd\u0b9a\u0bc8\nXN--HLCJ6AYA9ESC7A\nTamil\nTamil\nPolicy-reserved domains\nWe act as both the registrant and registrar for a select number of domains\n\t\twhich have been reserved under policy grounds. These exclusions are\n\t\ttypically indicated in either technical standards (RFC documents),\n\t\tor\ncontractual limitations\n.\nDomains which are described as registered to IANA or ICANN on policy\n\t\tgrounds are not available for registration or transfer, with the exception\n\t\tof\ncountry-name\n.info\ndomains. These domains are available for release\n\t\tby the ICANN Governmental Advisory Committee Secretariat.\nOther Special-Use Domains\nThere is additionally a\nSpecial-Use Domain Names\nregistry documenting special-use domains designated by technical standards. For further information, see\nSpecial-Use Domain Names\n(RFC 6761).",
+                  "content_with_links": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were temporarily delegated by IANA for the\nIDN Evaluation\nbeing conducted by\nICANN\n.\nDomain\nDomain (A-label)\nLanguage\nScript\n\u0625\u062e\u062a\u0628\u0627\u0631\nXN--KGBECHTV\nArabic\nArabic\n\u0622\u0632\u0645\u0627\u06cc\u0634\u06cc\nXN--HGBK6AJ7F53BBA\nPersian\nArabic\n\u6d4b\u8bd5\nXN--0ZWM56D\nChinese\nHan (Simplified variant)\n\u6e2c\u8a66\nXN--G6W251D\nChinese\nHan (Traditional variant)\n\u0438\u0441\u043f\u044b\u0442\u0430\u043d\u0438\u0435\nXN--80AKHBYKNJ4F\nRussian\nCyrillic\n\u092a\u0930\u0940\u0915\u094d\u0937\u093e\nXN--11B5BS3A9AJ6G\nHindi\nDevanagari (Nagari)\n\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae\nXN--JXALPDLP\nGreek, Modern (1453-)\nGreek\n\ud14c\uc2a4\ud2b8\nXN--9T4B11YI5A\nKorean\nHangul (Hang\u016dl, Hangeul)\n\u05d8\u05e2\u05e1\u05d8\nXN--DEBA0AD\nYiddish\nHebrew\n\u30c6\u30b9\u30c8\nXN--ZCKZAH\nJapanese\nKatakana\n\u0baa\u0bb0\u0bbf\u0b9f\u0bcd\u0b9a\u0bc8\nXN--HLCJ6AYA9ESC7A\nTamil\nTamil\nPolicy-reserved domains\nWe act as both the registrant and registrar for a select number of domains\n\t\twhich have been reserved under policy grounds. These exclusions are\n\t\ttypically indicated in either technical standards (RFC documents),\n\t\tor\ncontractual limitations\n.\nDomains which are described as registered to IANA or ICANN on policy\n\t\tgrounds are not available for registration or transfer, with the exception\n\t\tof\ncountry-name\n.info\ndomains. These domains are available for release\n\t\tby the ICANN Governmental Advisory Committee Secretariat.\nOther Special-Use Domains\nThere is additionally a\nSpecial-Use Domain Names\nregistry documenting special-use domains designated by technical standards. For further information, see\nSpecial-Use Domain Names\n(RFC 6761).\n\n--- Links found on this page ---\n1. https://www.iana.org/\n2. https://www.iana.org/domains\n3. https://www.iana.org/protocols\n4. https://www.iana.org/numbers\n5. https://www.iana.org/about\n6. https://www.iana.org/go/rfc2606\n7. https://www.iana.org/go/rfc6761\n8. http://www.icann.org/topics/idn\n9. http://www.icann.org/\n10. https://www.iana.org/domains/root/db/xn--kgbechtv.html\n11. https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html\n12. https://www.iana.org/domains/root/db/xn--0zwm56d.html\n13. https://www.iana.org/domains/root/db/xn--g6w251d.html\n14. https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html\n15. https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html\n16. https://www.iana.org/domains/root/db/xn--jxalpdlp.html\n17. https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html\n18. https://www.iana.org/domains/root/db/xn--deba0ad.html\n19. https://www.iana.org/domains/root/db/xn--zckzah.html\n20. https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html\n",
+                  "links": [
+                    "https://www.iana.org/",
+                    "https://www.iana.org/domains",
+                    "https://www.iana.org/protocols",
+                    "https://www.iana.org/numbers",
+                    "https://www.iana.org/about",
+                    "https://www.iana.org/go/rfc2606",
+                    "https://www.iana.org/go/rfc6761",
+                    "http://www.icann.org/topics/idn",
+                    "http://www.icann.org/",
+                    "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                    "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                    "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                    "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                    "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                    "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                    "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                    "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                    "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                    "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                    "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html"
+                  ],
+                  "links_full": [
+                    "https://www.iana.org/",
+                    "https://www.iana.org/domains",
+                    "https://www.iana.org/protocols",
+                    "https://www.iana.org/numbers",
+                    "https://www.iana.org/about",
+                    "https://www.iana.org/go/rfc2606",
+                    "https://www.iana.org/go/rfc6761",
+                    "http://www.icann.org/topics/idn",
+                    "http://www.icann.org/",
+                    "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                    "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                    "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                    "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                    "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                    "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                    "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                    "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                    "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                    "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                    "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html",
+                    "http://www.icann.org/en/registries/agreements.htm",
+                    "https://www.iana.org/assignments/special-use-domain-names",
+                    "https://www.iana.org/domains/root",
+                    "https://www.iana.org/domains/root/db",
+                    "https://www.iana.org/domains/root/files",
+                    "https://www.iana.org/domains/root/manage",
+                    "https://www.iana.org/domains/root/help",
+                    "https://www.iana.org/domains/root/servers",
+                    "https://www.iana.org/domains/int",
+                    "https://www.iana.org/domains/int/manage",
+                    "https://www.iana.org/domains/int/policy",
+                    "https://www.iana.org/domains/arpa",
+                    "https://www.iana.org/domains/idn-tables",
+                    "https://www.iana.org/help/idn-repository-procedure",
+                    "https://www.iana.org/dnssec",
+                    "https://www.iana.org/dnssec/files",
+                    "https://www.iana.org/dnssec/ceremonies",
+                    "https://www.iana.org/dnssec/procedures",
+                    "https://www.iana.org/dnssec/tcrs",
+                    "https://www.iana.org/abuse",
+                    "https://www.iana.org/time-zones",
+                    "https://www.iana.org/news",
+                    "https://www.iana.org/performance",
+                    "https://www.iana.org/about/excellence",
+                    "https://www.iana.org/archive",
+                    "https://www.iana.org/contact",
+                    "https://pti.icann.org",
+                    "https://www.icann.org/",
+                    "https://www.icann.org/privacy/policy",
+                    "https://www.icann.org/privacy/tos"
+                  ],
+                  "links_count": 50,
+                  "link_contexts": {
+                    "https://www.iana.org/domains": "Domain\u00a0Names",
+                    "https://www.iana.org/protocols": "Protocol Registries",
+                    "https://www.iana.org/numbers": "Number\u00a0Resources",
+                    "https://www.iana.org/about": "About\u00a0Us",
+                    "https://www.iana.org/go/rfc2606": "RFC 2606",
+                    "https://www.iana.org/go/rfc6761": "Special-Use Domain Names",
+                    "http://www.icann.org/topics/idn": "IDN Evaluation",
+                    "http://www.icann.org/": "ICANN",
+                    "https://www.iana.org/domains/root/db/xn--kgbechtv.html": "XN--KGBECHTV",
+                    "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html": "XN--HGBK6AJ7F53BBA",
+                    "https://www.iana.org/domains/root/db/xn--0zwm56d.html": "XN--0ZWM56D",
+                    "https://www.iana.org/domains/root/db/xn--g6w251d.html": "XN--G6W251D",
+                    "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html": "XN--80AKHBYKNJ4F",
+                    "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html": "XN--11B5BS3A9AJ6G",
+                    "https://www.iana.org/domains/root/db/xn--jxalpdlp.html": "XN--JXALPDLP",
+                    "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html": "XN--9T4B11YI5A",
+                    "https://www.iana.org/domains/root/db/xn--deba0ad.html": "XN--DEBA0AD",
+                    "https://www.iana.org/domains/root/db/xn--zckzah.html": "XN--ZCKZAH",
+                    "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html": "XN--HLCJ6AYA9ESC7A",
+                    "http://www.icann.org/en/registries/agreements.htm": "contractual limitations",
+                    "https://www.iana.org/assignments/special-use-domain-names": "Special-Use Domain Names",
+                    "https://www.iana.org/domains/root": "Root Zone Registry",
+                    "https://www.iana.org/domains/root/db": "Root Database",
+                    "https://www.iana.org/domains/root/files": "Hint and Zone Files",
+                    "https://www.iana.org/domains/root/manage": "Change Requests",
+                    "https://www.iana.org/domains/root/help": "Instructions & Guides",
+                    "https://www.iana.org/domains/root/servers": "Root Servers",
+                    "https://www.iana.org/domains/int": ".INT Registry",
+                    "https://www.iana.org/domains/int/manage": "Register/modify an .INT domain",
+                    "https://www.iana.org/domains/int/policy": "Eligibility",
+                    "https://www.iana.org/domains/arpa": ".ARPA Registry",
+                    "https://www.iana.org/domains/idn-tables": "IDN Repository",
+                    "https://www.iana.org/help/idn-repository-procedure": "Submit a table",
+                    "https://www.iana.org/dnssec": "Overview",
+                    "https://www.iana.org/dnssec/files": "Trust Anchors and Rollovers",
+                    "https://www.iana.org/dnssec/ceremonies": "Key Signing Ceremonies",
+                    "https://www.iana.org/dnssec/procedures": "Policies & Procedures",
+                    "https://www.iana.org/dnssec/tcrs": "Community Representatives",
+                    "https://www.iana.org/abuse": "Abuse Information",
+                    "https://www.iana.org/time-zones": "Time Zone Database",
+                    "https://www.iana.org/news": "News",
+                    "https://www.iana.org/performance": "Performance",
+                    "https://www.iana.org/about/excellence": "Excellence",
+                    "https://www.iana.org/archive": "Archive",
+                    "https://www.iana.org/contact": "Contact Us",
+                    "https://pti.icann.org": "Public Technical Identifiers",
+                    "https://www.icann.org/": "ICANN",
+                    "https://www.icann.org/privacy/policy": "Privacy Policy",
+                    "https://www.icann.org/privacy/tos": "Terms of Service"
+                  },
+                  "page_title": "IANA-managed Reserved Domains",
+                  "h1_text": "IANA-managed Reserved Domains",
+                  "source_url": "https://www.iana.org/domains/reserved"
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 2,
+              "success": 2,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            },
+            "goal_achieved": true
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "done",
+          "children": [
+            "f8762d7f-bda1-4877-b11c-628b0d0f9cec",
+            "c6662e22-84c9-441b-966a-0e744f08e5c8",
+            "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "f8762d7f-bda1-4877-b11c-628b0d0f9cec": {
+          "node_id": "f8762d7f-bda1-4877-b11c-628b0d0f9cec",
+          "title": "Visit https://example.com and extract H1, external link domain, and citation",
+          "details": {
+            "optional_url": "https://example.com",
+            "extraction_intent": "Fetch the page HTML and extract (1) the exact text content of the primary H1 element on the page, (2) the exact domain (hostname only, e.g. example.org) of the external link found on the page (the 'Learn more' link), and (3) a single URL citation for this visited page (the exact URL visited).",
+            "output_fields": [
+              {
+                "name": "h1_text",
+                "type": "string",
+                "description": "The exact text content of the first/top-level <h1> element on https://example.com"
+              },
+              {
+                "name": "external_link_domain",
+                "type": "string",
+                "description": "The exact domain/hostname of the external link on the page (no scheme, no path), e.g. 'iana.org'"
+              },
+              {
+                "name": "page_citation_url",
+                "type": "string",
+                "description": "A single URL citation for the visited page (the exact URL visited)"
+              }
+            ],
+            "why": "Directly visiting the exact URL given ensures we capture the page's live H1 text and the actual external link, eliminating uncertainty from search snippets or cached summaries.",
+            "action": "visit",
+            "goal": "Visit https://example.com and extract H1, external link domain, and citation",
+            "original_goal": "Visit https://example.com and extract H1, external link domain, and citation",
+            "parent_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "is_leaf": true,
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://example.com",
+              "intent": null,
+              "content": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+              "content_is_truncated": false,
+              "content_total_chars": 142,
+              "content_full": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+              "content_with_links": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more\n\n--- Links found on this page ---\n1. https://iana.org/domains/example\n",
+              "links": [
+                "https://iana.org/domains/example"
+              ],
+              "links_full": [
+                "https://iana.org/domains/example"
+              ],
+              "links_count": 1,
+              "link_contexts": {
+                "https://iana.org/domains/example": "Learn more"
+              },
+              "page_title": "Example Domain",
+              "h1_text": "Example Domain",
+              "source_url": "https://example.com"
+            },
+            "provides_data": {
+              "type": "urls_from_visit"
+            }
+          },
+          "parent_id": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+          "parent_ids": [
+            "ba5f1dac-5296-42ad-ab04-78b63b624f12"
+          ],
+          "status": "done",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        },
+        "c6662e22-84c9-441b-966a-0e744f08e5c8": {
+          "node_id": "c6662e22-84c9-441b-966a-0e744f08e5c8",
+          "title": "Visit https://www.iana.org/domains/reserved and produce one URL citation",
+          "details": {
+            "optional_url": "https://www.iana.org/domains/reserved",
+            "extraction_intent": "Fetch the page and return one URL citation for this visited page (the exact URL visited). Optionally capture the page title if available for verification.",
+            "output_fields": [
+              {
+                "name": "page_citation_url",
+                "type": "string",
+                "description": "A single URL citation for the visited page (the exact URL visited)"
+              },
+              {
+                "name": "page_title",
+                "type": "string",
+                "description": "Optional: the visible page title or H1 for verification (if present)"
+              }
+            ],
+            "why": "User explicitly requested a citation for this IANA page; visiting the exact URL ensures the returned citation is authoritative and exact.",
+            "action": "visit",
+            "goal": "Visit https://www.iana.org/domains/reserved and produce one URL citation",
+            "original_goal": "Visit https://www.iana.org/domains/reserved and produce one URL citation",
+            "parent_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "is_leaf": true,
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://www.iana.org/domains/reserved",
+              "intent": null,
+              "content": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were temporarily delegated by IANA for the\nIDN Evaluation\nbeing conducted by\nICANN\n.\nDomain\nDomain (A-label)\nLanguage\nScript\n\u0625\u062e\u062a\u0628\u0627\u0631\nXN--KGBECHTV\nArabic\nArabic\n\u0622\u0632\u0645\u0627\u06cc\u0634\u06cc\nXN--HGBK6AJ7F53BBA\nPersian\nArabic\n\u6d4b\u8bd5\nXN--0ZWM56D\nChinese\nHan (Simplified variant)\n\u6e2c\u8a66\nXN--G6W251D\nChinese\nHan (Traditional variant)\n\u0438\u0441\u043f\u044b\u0442\u0430\u043d\u0438\u0435\nXN--80AKHBYKNJ4F\nRussian\nCyrillic\n\u092a\u0930\u0940\u0915\u094d\u0937\u093e\nXN--11B5BS3A9AJ6G\nHindi\nDevanagari (Nagari)\n\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae\nXN--JXALPDLP\nGreek, Modern (1453-)\nGreek\n\ud14c\uc2a4\ud2b8\nXN--9T4B11YI5A\nKorean\nHangul (Hang\u016dl, Hangeul)\n\u05d8\u05e2\u05e1\u05d8\nXN--DEBA0AD\nYiddish\nHebrew\n\u30c6\u30b9\u30c8\nXN--ZCKZAH\nJapanese\nKatakana\n\u0baa\u0bb0\u0bbf\u0b9f\u0bcd\u0b9a\u0bc8\nXN--HLCJ6AYA9ESC7A\nTamil\nTamil\nPolicy-reserved domains\nWe act as both the registrant and registrar for a select number of domains\n\t\twhich have been reserved under policy grounds. These exclusions are\n\t\ttypically indicated in either technical standards (RFC documents),\n\t\tor\ncontractual limitations\n.\nDomains which are described as registered to IANA or ICANN on policy\n\t\tgrounds are not available for registration or transfer, with the exception\n\t\tof\ncountry-name\n.info\ndomains. These domains are available for release\n\t\tby the ICANN Governmental Advisory Committee Secretariat.\nOther Special-Use Domains\nThere is additionally a\nSpecial-Use Domain Names\nregistry documenting special-use domains designated by technical standards. For further information, see\nSpecial-Use Domain Names\n(RFC 6761).",
+              "content_is_truncated": false,
+              "content_total_chars": 1856,
+              "content_full": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were temporarily delegated by IANA for the\nIDN Evaluation\nbeing conducted by\nICANN\n.\nDomain\nDomain (A-label)\nLanguage\nScript\n\u0625\u062e\u062a\u0628\u0627\u0631\nXN--KGBECHTV\nArabic\nArabic\n\u0622\u0632\u0645\u0627\u06cc\u0634\u06cc\nXN--HGBK6AJ7F53BBA\nPersian\nArabic\n\u6d4b\u8bd5\nXN--0ZWM56D\nChinese\nHan (Simplified variant)\n\u6e2c\u8a66\nXN--G6W251D\nChinese\nHan (Traditional variant)\n\u0438\u0441\u043f\u044b\u0442\u0430\u043d\u0438\u0435\nXN--80AKHBYKNJ4F\nRussian\nCyrillic\n\u092a\u0930\u0940\u0915\u094d\u0937\u093e\nXN--11B5BS3A9AJ6G\nHindi\nDevanagari (Nagari)\n\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae\nXN--JXALPDLP\nGreek, Modern (1453-)\nGreek\n\ud14c\uc2a4\ud2b8\nXN--9T4B11YI5A\nKorean\nHangul (Hang\u016dl, Hangeul)\n\u05d8\u05e2\u05e1\u05d8\nXN--DEBA0AD\nYiddish\nHebrew\n\u30c6\u30b9\u30c8\nXN--ZCKZAH\nJapanese\nKatakana\n\u0baa\u0bb0\u0bbf\u0b9f\u0bcd\u0b9a\u0bc8\nXN--HLCJ6AYA9ESC7A\nTamil\nTamil\nPolicy-reserved domains\nWe act as both the registrant and registrar for a select number of domains\n\t\twhich have been reserved under policy grounds. These exclusions are\n\t\ttypically indicated in either technical standards (RFC documents),\n\t\tor\ncontractual limitations\n.\nDomains which are described as registered to IANA or ICANN on policy\n\t\tgrounds are not available for registration or transfer, with the exception\n\t\tof\ncountry-name\n.info\ndomains. These domains are available for release\n\t\tby the ICANN Governmental Advisory Committee Secretariat.\nOther Special-Use Domains\nThere is additionally a\nSpecial-Use Domain Names\nregistry documenting special-use domains designated by technical standards. For further information, see\nSpecial-Use Domain Names\n(RFC 6761).",
+              "content_with_links": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were temporarily delegated by IANA for the\nIDN Evaluation\nbeing conducted by\nICANN\n.\nDomain\nDomain (A-label)\nLanguage\nScript\n\u0625\u062e\u062a\u0628\u0627\u0631\nXN--KGBECHTV\nArabic\nArabic\n\u0622\u0632\u0645\u0627\u06cc\u0634\u06cc\nXN--HGBK6AJ7F53BBA\nPersian\nArabic\n\u6d4b\u8bd5\nXN--0ZWM56D\nChinese\nHan (Simplified variant)\n\u6e2c\u8a66\nXN--G6W251D\nChinese\nHan (Traditional variant)\n\u0438\u0441\u043f\u044b\u0442\u0430\u043d\u0438\u0435\nXN--80AKHBYKNJ4F\nRussian\nCyrillic\n\u092a\u0930\u0940\u0915\u094d\u0937\u093e\nXN--11B5BS3A9AJ6G\nHindi\nDevanagari (Nagari)\n\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae\nXN--JXALPDLP\nGreek, Modern (1453-)\nGreek\n\ud14c\uc2a4\ud2b8\nXN--9T4B11YI5A\nKorean\nHangul (Hang\u016dl, Hangeul)\n\u05d8\u05e2\u05e1\u05d8\nXN--DEBA0AD\nYiddish\nHebrew\n\u30c6\u30b9\u30c8\nXN--ZCKZAH\nJapanese\nKatakana\n\u0baa\u0bb0\u0bbf\u0b9f\u0bcd\u0b9a\u0bc8\nXN--HLCJ6AYA9ESC7A\nTamil\nTamil\nPolicy-reserved domains\nWe act as both the registrant and registrar for a select number of domains\n\t\twhich have been reserved under policy grounds. These exclusions are\n\t\ttypically indicated in either technical standards (RFC documents),\n\t\tor\ncontractual limitations\n.\nDomains which are described as registered to IANA or ICANN on policy\n\t\tgrounds are not available for registration or transfer, with the exception\n\t\tof\ncountry-name\n.info\ndomains. These domains are available for release\n\t\tby the ICANN Governmental Advisory Committee Secretariat.\nOther Special-Use Domains\nThere is additionally a\nSpecial-Use Domain Names\nregistry documenting special-use domains designated by technical standards. For further information, see\nSpecial-Use Domain Names\n(RFC 6761).\n\n--- Links found on this page ---\n1. https://www.iana.org/\n2. https://www.iana.org/domains\n3. https://www.iana.org/protocols\n4. https://www.iana.org/numbers\n5. https://www.iana.org/about\n6. https://www.iana.org/go/rfc2606\n7. https://www.iana.org/go/rfc6761\n8. http://www.icann.org/topics/idn\n9. http://www.icann.org/\n10. https://www.iana.org/domains/root/db/xn--kgbechtv.html\n11. https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html\n12. https://www.iana.org/domains/root/db/xn--0zwm56d.html\n13. https://www.iana.org/domains/root/db/xn--g6w251d.html\n14. https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html\n15. https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html\n16. https://www.iana.org/domains/root/db/xn--jxalpdlp.html\n17. https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html\n18. https://www.iana.org/domains/root/db/xn--deba0ad.html\n19. https://www.iana.org/domains/root/db/xn--zckzah.html\n20. https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html\n",
+              "links": [
+                "https://www.iana.org/",
+                "https://www.iana.org/domains",
+                "https://www.iana.org/protocols",
+                "https://www.iana.org/numbers",
+                "https://www.iana.org/about",
+                "https://www.iana.org/go/rfc2606",
+                "https://www.iana.org/go/rfc6761",
+                "http://www.icann.org/topics/idn",
+                "http://www.icann.org/",
+                "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html"
+              ],
+              "links_full": [
+                "https://www.iana.org/",
+                "https://www.iana.org/domains",
+                "https://www.iana.org/protocols",
+                "https://www.iana.org/numbers",
+                "https://www.iana.org/about",
+                "https://www.iana.org/go/rfc2606",
+                "https://www.iana.org/go/rfc6761",
+                "http://www.icann.org/topics/idn",
+                "http://www.icann.org/",
+                "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html",
+                "http://www.icann.org/en/registries/agreements.htm",
+                "https://www.iana.org/assignments/special-use-domain-names",
+                "https://www.iana.org/domains/root",
+                "https://www.iana.org/domains/root/db",
+                "https://www.iana.org/domains/root/files",
+                "https://www.iana.org/domains/root/manage",
+                "https://www.iana.org/domains/root/help",
+                "https://www.iana.org/domains/root/servers",
+                "https://www.iana.org/domains/int",
+                "https://www.iana.org/domains/int/manage",
+                "https://www.iana.org/domains/int/policy",
+                "https://www.iana.org/domains/arpa",
+                "https://www.iana.org/domains/idn-tables",
+                "https://www.iana.org/help/idn-repository-procedure",
+                "https://www.iana.org/dnssec",
+                "https://www.iana.org/dnssec/files",
+                "https://www.iana.org/dnssec/ceremonies",
+                "https://www.iana.org/dnssec/procedures",
+                "https://www.iana.org/dnssec/tcrs",
+                "https://www.iana.org/abuse",
+                "https://www.iana.org/time-zones",
+                "https://www.iana.org/news",
+                "https://www.iana.org/performance",
+                "https://www.iana.org/about/excellence",
+                "https://www.iana.org/archive",
+                "https://www.iana.org/contact",
+                "https://pti.icann.org",
+                "https://www.icann.org/",
+                "https://www.icann.org/privacy/policy",
+                "https://www.icann.org/privacy/tos"
+              ],
+              "links_count": 50,
+              "link_contexts": {
+                "https://www.iana.org/domains": "Domain\u00a0Names",
+                "https://www.iana.org/protocols": "Protocol Registries",
+                "https://www.iana.org/numbers": "Number\u00a0Resources",
+                "https://www.iana.org/about": "About\u00a0Us",
+                "https://www.iana.org/go/rfc2606": "RFC 2606",
+                "https://www.iana.org/go/rfc6761": "Special-Use Domain Names",
+                "http://www.icann.org/topics/idn": "IDN Evaluation",
+                "http://www.icann.org/": "ICANN",
+                "https://www.iana.org/domains/root/db/xn--kgbechtv.html": "XN--KGBECHTV",
+                "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html": "XN--HGBK6AJ7F53BBA",
+                "https://www.iana.org/domains/root/db/xn--0zwm56d.html": "XN--0ZWM56D",
+                "https://www.iana.org/domains/root/db/xn--g6w251d.html": "XN--G6W251D",
+                "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html": "XN--80AKHBYKNJ4F",
+                "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html": "XN--11B5BS3A9AJ6G",
+                "https://www.iana.org/domains/root/db/xn--jxalpdlp.html": "XN--JXALPDLP",
+                "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html": "XN--9T4B11YI5A",
+                "https://www.iana.org/domains/root/db/xn--deba0ad.html": "XN--DEBA0AD",
+                "https://www.iana.org/domains/root/db/xn--zckzah.html": "XN--ZCKZAH",
+                "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html": "XN--HLCJ6AYA9ESC7A",
+                "http://www.icann.org/en/registries/agreements.htm": "contractual limitations",
+                "https://www.iana.org/assignments/special-use-domain-names": "Special-Use Domain Names",
+                "https://www.iana.org/domains/root": "Root Zone Registry",
+                "https://www.iana.org/domains/root/db": "Root Database",
+                "https://www.iana.org/domains/root/files": "Hint and Zone Files",
+                "https://www.iana.org/domains/root/manage": "Change Requests",
+                "https://www.iana.org/domains/root/help": "Instructions & Guides",
+                "https://www.iana.org/domains/root/servers": "Root Servers",
+                "https://www.iana.org/domains/int": ".INT Registry",
+                "https://www.iana.org/domains/int/manage": "Register/modify an .INT domain",
+                "https://www.iana.org/domains/int/policy": "Eligibility",
+                "https://www.iana.org/domains/arpa": ".ARPA Registry",
+                "https://www.iana.org/domains/idn-tables": "IDN Repository",
+                "https://www.iana.org/help/idn-repository-procedure": "Submit a table",
+                "https://www.iana.org/dnssec": "Overview",
+                "https://www.iana.org/dnssec/files": "Trust Anchors and Rollovers",
+                "https://www.iana.org/dnssec/ceremonies": "Key Signing Ceremonies",
+                "https://www.iana.org/dnssec/procedures": "Policies & Procedures",
+                "https://www.iana.org/dnssec/tcrs": "Community Representatives",
+                "https://www.iana.org/abuse": "Abuse Information",
+                "https://www.iana.org/time-zones": "Time Zone Database",
+                "https://www.iana.org/news": "News",
+                "https://www.iana.org/performance": "Performance",
+                "https://www.iana.org/about/excellence": "Excellence",
+                "https://www.iana.org/archive": "Archive",
+                "https://www.iana.org/contact": "Contact Us",
+                "https://pti.icann.org": "Public Technical Identifiers",
+                "https://www.icann.org/": "ICANN",
+                "https://www.icann.org/privacy/policy": "Privacy Policy",
+                "https://www.icann.org/privacy/tos": "Terms of Service"
+              },
+              "page_title": "IANA-managed Reserved Domains",
+              "h1_text": "IANA-managed Reserved Domains",
+              "source_url": "https://www.iana.org/domains/reserved"
+            },
+            "provides_data": {
+              "type": "urls_from_visit"
+            }
+          },
+          "parent_id": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+          "parent_ids": [
+            "ba5f1dac-5296-42ad-ab04-78b63b624f12"
+          ],
+          "status": "done",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        },
+        "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45": {
+          "node_id": "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45",
+          "title": "Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+          "details": {
+            "action": "merge",
+            "merged_results": [
+              {
+                "node_id": "f8762d7f-bda1-4877-b11c-628b0d0f9cec",
+                "title": "Visit https://example.com and extract H1, external link domain, and citation",
+                "status": "done",
+                "score": null,
+                "evaluation": null,
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://example.com",
+                  "intent": null,
+                  "content": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+                  "content_is_truncated": false,
+                  "content_total_chars": 142,
+                  "content_full": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+                  "content_with_links": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more\n\n--- Links found on this page ---\n1. https://iana.org/domains/example\n",
+                  "links": [
+                    "https://iana.org/domains/example"
+                  ],
+                  "links_full": [
+                    "https://iana.org/domains/example"
+                  ],
+                  "links_count": 1,
+                  "link_contexts": {
+                    "https://iana.org/domains/example": "Learn more"
+                  },
+                  "page_title": "Example Domain",
+                  "h1_text": "Example Domain",
+                  "source_url": "https://example.com"
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "c6662e22-84c9-441b-966a-0e744f08e5c8",
+                "title": "Visit https://www.iana.org/domains/reserved and produce one URL citation",
+                "status": "done",
+                "score": null,
+                "evaluation": null,
+                "result": {
+                  "action": "visit",
+                  "success": true,
+                  "url": "https://www.iana.org/domains/reserved",
+                  "intent": null,
+                  "content": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were temporarily delegated by IANA for the\nIDN Evaluation\nbeing conducted by\nICANN\n.\nDomain\nDomain (A-label)\nLanguage\nScript\n\u0625\u062e\u062a\u0628\u0627\u0631\nXN--KGBECHTV\nArabic\nArabic\n\u0622\u0632\u0645\u0627\u06cc\u0634\u06cc\nXN--HGBK6AJ7F53BBA\nPersian\nArabic\n\u6d4b\u8bd5\nXN--0ZWM56D\nChinese\nHan (Simplified variant)\n\u6e2c\u8a66\nXN--G6W251D\nChinese\nHan (Traditional variant)\n\u0438\u0441\u043f\u044b\u0442\u0430\u043d\u0438\u0435\nXN--80AKHBYKNJ4F\nRussian\nCyrillic\n\u092a\u0930\u0940\u0915\u094d\u0937\u093e\nXN--11B5BS3A9AJ6G\nHindi\nDevanagari (Nagari)\n\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae\nXN--JXALPDLP\nGreek, Modern (1453-)\nGreek\n\ud14c\uc2a4\ud2b8\nXN--9T4B11YI5A\nKorean\nHangul (Hang\u016dl, Hangeul)\n\u05d8\u05e2\u05e1\u05d8\nXN--DEBA0AD\nYiddish\nHebrew\n\u30c6\u30b9\u30c8\nXN--ZCKZAH\nJapanese\nKatakana\n\u0baa\u0bb0\u0bbf\u0b9f\u0bcd\u0b9a\u0bc8\nXN--HLCJ6AYA9ESC7A\nTamil\nTamil\nPolicy-reserved domains\nWe act as both the registrant and registrar for a select number of domains\n\t\twhich have been reserved under policy grounds. These exclusions are\n\t\ttypically indicated in either technical standards (RFC documents),\n\t\tor\ncontractual limitations\n.\nDomains which are described as registered to IANA or ICANN on policy\n\t\tgrounds are not available for registration or transfer, with the exception\n\t\tof\ncountry-name\n.info\ndomains. These domains are available for release\n\t\tby the ICANN Governmental Advisory Committee Secretariat.\nOther Special-Use Domains\nThere is additionally a\nSpecial-Use Domain Names\nregistry documenting special-use domains designated by technical standards. For further information, see\nSpecial-Use Domain Names\n(RFC 6761).",
+                  "content_is_truncated": false,
+                  "content_total_chars": 1856,
+                  "content_full": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were temporarily delegated by IANA for the\nIDN Evaluation\nbeing conducted by\nICANN\n.\nDomain\nDomain (A-label)\nLanguage\nScript\n\u0625\u062e\u062a\u0628\u0627\u0631\nXN--KGBECHTV\nArabic\nArabic\n\u0622\u0632\u0645\u0627\u06cc\u0634\u06cc\nXN--HGBK6AJ7F53BBA\nPersian\nArabic\n\u6d4b\u8bd5\nXN--0ZWM56D\nChinese\nHan (Simplified variant)\n\u6e2c\u8a66\nXN--G6W251D\nChinese\nHan (Traditional variant)\n\u0438\u0441\u043f\u044b\u0442\u0430\u043d\u0438\u0435\nXN--80AKHBYKNJ4F\nRussian\nCyrillic\n\u092a\u0930\u0940\u0915\u094d\u0937\u093e\nXN--11B5BS3A9AJ6G\nHindi\nDevanagari (Nagari)\n\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae\nXN--JXALPDLP\nGreek, Modern (1453-)\nGreek\n\ud14c\uc2a4\ud2b8\nXN--9T4B11YI5A\nKorean\nHangul (Hang\u016dl, Hangeul)\n\u05d8\u05e2\u05e1\u05d8\nXN--DEBA0AD\nYiddish\nHebrew\n\u30c6\u30b9\u30c8\nXN--ZCKZAH\nJapanese\nKatakana\n\u0baa\u0bb0\u0bbf\u0b9f\u0bcd\u0b9a\u0bc8\nXN--HLCJ6AYA9ESC7A\nTamil\nTamil\nPolicy-reserved domains\nWe act as both the registrant and registrar for a select number of domains\n\t\twhich have been reserved under policy grounds. These exclusions are\n\t\ttypically indicated in either technical standards (RFC documents),\n\t\tor\ncontractual limitations\n.\nDomains which are described as registered to IANA or ICANN on policy\n\t\tgrounds are not available for registration or transfer, with the exception\n\t\tof\ncountry-name\n.info\ndomains. These domains are available for release\n\t\tby the ICANN Governmental Advisory Committee Secretariat.\nOther Special-Use Domains\nThere is additionally a\nSpecial-Use Domain Names\nregistry documenting special-use domains designated by technical standards. For further information, see\nSpecial-Use Domain Names\n(RFC 6761).",
+                  "content_with_links": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were temporarily delegated by IANA for the\nIDN Evaluation\nbeing conducted by\nICANN\n.\nDomain\nDomain (A-label)\nLanguage\nScript\n\u0625\u062e\u062a\u0628\u0627\u0631\nXN--KGBECHTV\nArabic\nArabic\n\u0622\u0632\u0645\u0627\u06cc\u0634\u06cc\nXN--HGBK6AJ7F53BBA\nPersian\nArabic\n\u6d4b\u8bd5\nXN--0ZWM56D\nChinese\nHan (Simplified variant)\n\u6e2c\u8a66\nXN--G6W251D\nChinese\nHan (Traditional variant)\n\u0438\u0441\u043f\u044b\u0442\u0430\u043d\u0438\u0435\nXN--80AKHBYKNJ4F\nRussian\nCyrillic\n\u092a\u0930\u0940\u0915\u094d\u0937\u093e\nXN--11B5BS3A9AJ6G\nHindi\nDevanagari (Nagari)\n\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae\nXN--JXALPDLP\nGreek, Modern (1453-)\nGreek\n\ud14c\uc2a4\ud2b8\nXN--9T4B11YI5A\nKorean\nHangul (Hang\u016dl, Hangeul)\n\u05d8\u05e2\u05e1\u05d8\nXN--DEBA0AD\nYiddish\nHebrew\n\u30c6\u30b9\u30c8\nXN--ZCKZAH\nJapanese\nKatakana\n\u0baa\u0bb0\u0bbf\u0b9f\u0bcd\u0b9a\u0bc8\nXN--HLCJ6AYA9ESC7A\nTamil\nTamil\nPolicy-reserved domains\nWe act as both the registrant and registrar for a select number of domains\n\t\twhich have been reserved under policy grounds. These exclusions are\n\t\ttypically indicated in either technical standards (RFC documents),\n\t\tor\ncontractual limitations\n.\nDomains which are described as registered to IANA or ICANN on policy\n\t\tgrounds are not available for registration or transfer, with the exception\n\t\tof\ncountry-name\n.info\ndomains. These domains are available for release\n\t\tby the ICANN Governmental Advisory Committee Secretariat.\nOther Special-Use Domains\nThere is additionally a\nSpecial-Use Domain Names\nregistry documenting special-use domains designated by technical standards. For further information, see\nSpecial-Use Domain Names\n(RFC 6761).\n\n--- Links found on this page ---\n1. https://www.iana.org/\n2. https://www.iana.org/domains\n3. https://www.iana.org/protocols\n4. https://www.iana.org/numbers\n5. https://www.iana.org/about\n6. https://www.iana.org/go/rfc2606\n7. https://www.iana.org/go/rfc6761\n8. http://www.icann.org/topics/idn\n9. http://www.icann.org/\n10. https://www.iana.org/domains/root/db/xn--kgbechtv.html\n11. https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html\n12. https://www.iana.org/domains/root/db/xn--0zwm56d.html\n13. https://www.iana.org/domains/root/db/xn--g6w251d.html\n14. https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html\n15. https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html\n16. https://www.iana.org/domains/root/db/xn--jxalpdlp.html\n17. https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html\n18. https://www.iana.org/domains/root/db/xn--deba0ad.html\n19. https://www.iana.org/domains/root/db/xn--zckzah.html\n20. https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html\n",
+                  "links": [
+                    "https://www.iana.org/",
+                    "https://www.iana.org/domains",
+                    "https://www.iana.org/protocols",
+                    "https://www.iana.org/numbers",
+                    "https://www.iana.org/about",
+                    "https://www.iana.org/go/rfc2606",
+                    "https://www.iana.org/go/rfc6761",
+                    "http://www.icann.org/topics/idn",
+                    "http://www.icann.org/",
+                    "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                    "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                    "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                    "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                    "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                    "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                    "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                    "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                    "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                    "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                    "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html"
+                  ],
+                  "links_full": [
+                    "https://www.iana.org/",
+                    "https://www.iana.org/domains",
+                    "https://www.iana.org/protocols",
+                    "https://www.iana.org/numbers",
+                    "https://www.iana.org/about",
+                    "https://www.iana.org/go/rfc2606",
+                    "https://www.iana.org/go/rfc6761",
+                    "http://www.icann.org/topics/idn",
+                    "http://www.icann.org/",
+                    "https://www.iana.org/domains/root/db/xn--kgbechtv.html",
+                    "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html",
+                    "https://www.iana.org/domains/root/db/xn--0zwm56d.html",
+                    "https://www.iana.org/domains/root/db/xn--g6w251d.html",
+                    "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html",
+                    "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html",
+                    "https://www.iana.org/domains/root/db/xn--jxalpdlp.html",
+                    "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html",
+                    "https://www.iana.org/domains/root/db/xn--deba0ad.html",
+                    "https://www.iana.org/domains/root/db/xn--zckzah.html",
+                    "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html",
+                    "http://www.icann.org/en/registries/agreements.htm",
+                    "https://www.iana.org/assignments/special-use-domain-names",
+                    "https://www.iana.org/domains/root",
+                    "https://www.iana.org/domains/root/db",
+                    "https://www.iana.org/domains/root/files",
+                    "https://www.iana.org/domains/root/manage",
+                    "https://www.iana.org/domains/root/help",
+                    "https://www.iana.org/domains/root/servers",
+                    "https://www.iana.org/domains/int",
+                    "https://www.iana.org/domains/int/manage",
+                    "https://www.iana.org/domains/int/policy",
+                    "https://www.iana.org/domains/arpa",
+                    "https://www.iana.org/domains/idn-tables",
+                    "https://www.iana.org/help/idn-repository-procedure",
+                    "https://www.iana.org/dnssec",
+                    "https://www.iana.org/dnssec/files",
+                    "https://www.iana.org/dnssec/ceremonies",
+                    "https://www.iana.org/dnssec/procedures",
+                    "https://www.iana.org/dnssec/tcrs",
+                    "https://www.iana.org/abuse",
+                    "https://www.iana.org/time-zones",
+                    "https://www.iana.org/news",
+                    "https://www.iana.org/performance",
+                    "https://www.iana.org/about/excellence",
+                    "https://www.iana.org/archive",
+                    "https://www.iana.org/contact",
+                    "https://pti.icann.org",
+                    "https://www.icann.org/",
+                    "https://www.icann.org/privacy/policy",
+                    "https://www.icann.org/privacy/tos"
+                  ],
+                  "links_count": 50,
+                  "link_contexts": {
+                    "https://www.iana.org/domains": "Domain\u00a0Names",
+                    "https://www.iana.org/protocols": "Protocol Registries",
+                    "https://www.iana.org/numbers": "Number\u00a0Resources",
+                    "https://www.iana.org/about": "About\u00a0Us",
+                    "https://www.iana.org/go/rfc2606": "RFC 2606",
+                    "https://www.iana.org/go/rfc6761": "Special-Use Domain Names",
+                    "http://www.icann.org/topics/idn": "IDN Evaluation",
+                    "http://www.icann.org/": "ICANN",
+                    "https://www.iana.org/domains/root/db/xn--kgbechtv.html": "XN--KGBECHTV",
+                    "https://www.iana.org/domains/root/db/xn--hgbk6aj7f53bba.html": "XN--HGBK6AJ7F53BBA",
+                    "https://www.iana.org/domains/root/db/xn--0zwm56d.html": "XN--0ZWM56D",
+                    "https://www.iana.org/domains/root/db/xn--g6w251d.html": "XN--G6W251D",
+                    "https://www.iana.org/domains/root/db/xn--80akhbyknj4f.html": "XN--80AKHBYKNJ4F",
+                    "https://www.iana.org/domains/root/db/xn--11b5bs3a9aj6g.html": "XN--11B5BS3A9AJ6G",
+                    "https://www.iana.org/domains/root/db/xn--jxalpdlp.html": "XN--JXALPDLP",
+                    "https://www.iana.org/domains/root/db/xn--9t4b11yi5a.html": "XN--9T4B11YI5A",
+                    "https://www.iana.org/domains/root/db/xn--deba0ad.html": "XN--DEBA0AD",
+                    "https://www.iana.org/domains/root/db/xn--zckzah.html": "XN--ZCKZAH",
+                    "https://www.iana.org/domains/root/db/xn--hlcj6aya9esc7a.html": "XN--HLCJ6AYA9ESC7A",
+                    "http://www.icann.org/en/registries/agreements.htm": "contractual limitations",
+                    "https://www.iana.org/assignments/special-use-domain-names": "Special-Use Domain Names",
+                    "https://www.iana.org/domains/root": "Root Zone Registry",
+                    "https://www.iana.org/domains/root/db": "Root Database",
+                    "https://www.iana.org/domains/root/files": "Hint and Zone Files",
+                    "https://www.iana.org/domains/root/manage": "Change Requests",
+                    "https://www.iana.org/domains/root/help": "Instructions & Guides",
+                    "https://www.iana.org/domains/root/servers": "Root Servers",
+                    "https://www.iana.org/domains/int": ".INT Registry",
+                    "https://www.iana.org/domains/int/manage": "Register/modify an .INT domain",
+                    "https://www.iana.org/domains/int/policy": "Eligibility",
+                    "https://www.iana.org/domains/arpa": ".ARPA Registry",
+                    "https://www.iana.org/domains/idn-tables": "IDN Repository",
+                    "https://www.iana.org/help/idn-repository-procedure": "Submit a table",
+                    "https://www.iana.org/dnssec": "Overview",
+                    "https://www.iana.org/dnssec/files": "Trust Anchors and Rollovers",
+                    "https://www.iana.org/dnssec/ceremonies": "Key Signing Ceremonies",
+                    "https://www.iana.org/dnssec/procedures": "Policies & Procedures",
+                    "https://www.iana.org/dnssec/tcrs": "Community Representatives",
+                    "https://www.iana.org/abuse": "Abuse Information",
+                    "https://www.iana.org/time-zones": "Time Zone Database",
+                    "https://www.iana.org/news": "News",
+                    "https://www.iana.org/performance": "Performance",
+                    "https://www.iana.org/about/excellence": "Excellence",
+                    "https://www.iana.org/archive": "Archive",
+                    "https://www.iana.org/contact": "Contact Us",
+                    "https://pti.icann.org": "Public Technical Identifiers",
+                    "https://www.icann.org/": "ICANN",
+                    "https://www.icann.org/privacy/policy": "Privacy Policy",
+                    "https://www.icann.org/privacy/tos": "Terms of Service"
+                  },
+                  "page_title": "IANA-managed Reserved Domains",
+                  "h1_text": "IANA-managed Reserved Domains",
+                  "source_url": "https://www.iana.org/domains/reserved"
+                },
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 2,
+              "success": 2,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 0
+            },
+            "goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "original_goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "goal_achieved": true,
+            "goal_evaluation": "All requested outputs were produced and can be verified in the child node results: (1) the exact H1 from example.com is provided and matches the h1_text field; (2) the external link on example.com is present in links_full and its domain was extracted as iana.org; (3) each visited page has an explicit URL citation in its source_url field. The objective (not just keyword presence but the actual required values) is satisfied.",
+            "action_result": {
+              "action": "merge",
+              "success": true,
+              "synthesized": {
+                "summary": "Both pages were visited and the requested items were extracted. From https://example.com the exact H1 is \"Example Domain\" and the single external link found is to https://iana.org/domains/example (domain: iana.org). One URL citation was recorded for each visited page: https://example.com and https://www.iana.org/domains/reserved. Evidence comes from the visit results returned for each node.",
+                "key_findings": [
+                  "Exact H1 text from https://example.com: \"Example Domain\" (source: node f8762d7f-bda1-4877-b11c-628b0d0f9cec, source_url: https://example.com, field: h1_text)",
+                  "External link found on https://example.com: https://iana.org/domains/example \u2014 domain extracted: \"iana.org\" (source: node f8762d7f-bda1-4877-b11c-628b0d0f9cec, field: links_full)",
+                  "One URL citation for each visited page: https://example.com (source: node f8762d7f-bda1-4877-b11c-628b0d0f9cec, source_url) and https://www.iana.org/domains/reserved (source: node c6662e22-84c9-441b-966a-0e744f08e5c8, source_url)",
+                  "IANA page H1/title (additional provenance): \"IANA-managed Reserved Domains\" (source: node c6662e22-84c9-441b-966a-0e744f08e5c8, field: h1_text/page_title)"
+                ],
+                "goal_achieved": true,
+                "goal_evaluation": "All requested outputs were produced and can be verified in the child node results: (1) the exact H1 from example.com is provided and matches the h1_text field; (2) the external link on example.com is present in links_full and its domain was extracted as iana.org; (3) each visited page has an explicit URL citation in its source_url field. The objective (not just keyword presence but the actual required values) is satisfied.",
+                "missing_requirements": []
+              },
+              "child_count": 2,
+              "raw_response": "{\"summary\":\"Both pages were visited and the requested items were extracted. From https://example.com the exact H1 is \\\"Example Domain\\\" and the single external link found is to https://iana.org/domains/example (domain: iana.org). One URL citation was recorded for each visited page: https://example.com and https://www.iana.org/domains/reserved. Evidence comes from the visit results returned for each node.\",\"key_findings\":[\"Exact H1 text from https://example.com: \\\"Example Domain\\\" (source: node f8762d7f-bda1-4877-b11c-628b0d0f9cec, source_url: https://example.com, field: h1_text)\",\"External link found on https://example.com: https://iana.org/domains/example \u2014 domain extracted: \\\"iana.org\\\" (source: node f8762d7f-bda1-4877-b11c-628b0d0f9cec, field: links_full)\",\"One URL citation for each visited page: https://example.com (source: node f8762d7f-bda1-4877-b11c-628b0d0f9cec, source_url) and https://www.iana.org/domains/reserved (source: node c6662e22-84c9-441b-966a-0e744f08e5c8, source_url)\",\"IANA page H1/title (additional provenance): \\\"IANA-managed Reserved Domains\\\" (source: node c6662e22-84c9-441b-966a-0e744f08e5c8, field: h1_text/page_title)\"],\"goal_achieved\":true,\"goal_evaluation\":\"All requested outputs were produced and can be verified in the child node results: (1) the exact H1 from example.com is provided and matches the h1_text field; (2) the external link on example.com is present in links_full and its domain was extracted as iana.org; (3) each visited page has an explicit URL citation in its source_url field. The objective (not just keyword presence but the actual required values) is satisfied.\",\"missing_requirements\":[] }",
+              "goal_achieved": true,
+              "goal_evaluation": "All requested outputs were produced and can be verified in the child node results: (1) the exact H1 from example.com is provided and matches the h1_text field; (2) the external link on example.com is present in links_full and its domain was extracted as iana.org; (3) each visited page has an explicit URL citation in its source_url field. The objective (not just keyword presence but the actual required values) is satisfied.",
+              "missing_requirements": []
+            }
+          },
+          "parent_id": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+          "parent_ids": [
+            "ba5f1dac-5296-42ad-ab04-78b63b624f12"
+          ],
+          "status": "done",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 2731,
+        "words": 371,
+        "kilobytes": 2.67
+      },
+      "llm": {
+        "calls": 0,
+        "prompt": {
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0,
+          "tokens": 0
+        },
+        "completion": {
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0,
+          "tokens": 0
+        },
+        "total_tokens": 0
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 2,
+        "chars": 3054,
+        "words": 327,
+        "kilobytes": 2.98
+      },
+      "timings": {
+        "llm_call": {
+          "count": 3,
+          "total_duration": 96.0755,
+          "avg_duration": 32.0252,
+          "min_duration": 17.8585,
+          "max_duration": 52.9628,
+          "success_count": 3,
+          "error_count": 0
+        }
+      },
+      "timings_per_call": [
+        {
+          "name": "llm_call",
+          "duration": 25.2542,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 17.8585,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 52.9628,
+          "success": true
+        }
+      ],
+      "events_count": 0
+    },
+    "duration_seconds": 107.69,
+    "telemetry": {
+      "correlation_id": "idea_test_026_gpt-5-mini_20260302_110006",
+      "trace_file": "/app/agent/idea_test_results/20260302_110006_026_gpt-5-mini.jsonl",
+      "events_count": 0,
+      "timings_count": 3
+    },
+    "graph_visualization": {
+      "ascii": "*-.   Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.\n|\\ \\  \n* | | Visit https://example.com and extract H1, external link domain, and citation\n / /  \n* | Visit https://www.iana.org/domains/reserved and produce one URL citation\n /  \n* Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.\n",
+      "graph_data": {
+        "nodes": [
+          {
+            "id": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+            "title": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "status": "done",
+            "score": null,
+            "memo_key": null,
+            "action": null,
+            "has_result": false,
+            "parent_ids": []
+          },
+          {
+            "id": "f8762d7f-bda1-4877-b11c-628b0d0f9cec",
+            "title": "Visit https://example.com and extract H1, external link domain, and citation",
+            "status": "done",
+            "score": null,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "ba5f1dac-5296-42ad-ab04-78b63b624f12"
+            ]
+          },
+          {
+            "id": "c6662e22-84c9-441b-966a-0e744f08e5c8",
+            "title": "Visit https://www.iana.org/domains/reserved and produce one URL citation",
+            "status": "done",
+            "score": null,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "ba5f1dac-5296-42ad-ab04-78b63b624f12"
+            ]
+          },
+          {
+            "id": "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45",
+            "title": "Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+            "status": "done",
+            "score": null,
+            "memo_key": null,
+            "action": "merge",
+            "has_result": true,
+            "parent_ids": [
+              "ba5f1dac-5296-42ad-ab04-78b63b624f12"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+            "to": "f8762d7f-bda1-4877-b11c-628b0d0f9cec"
+          },
+          {
+            "from": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+            "to": "c6662e22-84c9-441b-966a-0e744f08e5c8"
+          },
+          {
+            "from": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+            "to": "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45"
+          }
+        ]
+      },
+      "analysis": {
+        "total_nodes": 4,
+        "action_counts": {
+          "visit": 2,
+          "merge": 1
+        },
+        "think_count": 0,
+        "think_ratio": 0.0,
+        "other_action_count": 4,
+        "action_diversity": 2,
+        "unique_titles": 4,
+        "duplicate_title_count": 0,
+        "think_nodes": [],
+        "issues": [
+          {
+            "severity": "medium",
+            "type": "similar_long_titles",
+            "message": "Found 1 pairs of nodes with very similar long titles (likely merge/repetition)",
+            "recommendation": "Review merge nodes - they may be duplicating the root node's mandate unnecessarily",
+            "examples": [
+              {
+                "title_preview": "visit https://example.com and https://www.iana.org/domains/reserved. return: (1) the exact h1 text from example.com, (2) the exact domain of the exter...",
+                "node_ids": [
+                  "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+                  "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45"
+                ]
+              }
+            ]
+          }
+        ],
+        "issue_count": 1
+      }
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "visit_count",
+        "passed": true,
+        "score": 1.0,
+        "visit_count": 2,
+        "reason": "Found 2 visit(s)"
+      },
+      {
+        "check": "example_domain_text",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Found deterministic text 'Example Domain'"
+      },
+      {
+        "check": "known_urls",
+        "passed": true,
+        "score": 1.0,
+        "has_example": true,
+        "has_iana_reserved": true,
+        "reason": "known URLs present: example=True, iana_reserved=True"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": true,
+    "overall_score": 1.0,
+    "checks_passed": 3,
+    "total_checks": 3,
+    "pass_rate": 1.0
+  },
+  "timestamp": "2026-03-02T11:01:48.701207",
+  "execution_variant": "graph"
+}

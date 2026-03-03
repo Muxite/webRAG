@@ -1,0 +1,770 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "033",
+    "test_name": "Dual-Niche Comparison",
+    "passed": true,
+    "score": 0.93,
+    "ascii_graph": "*---.   Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.\n|\\ \\ \\  \n* | | | Visit Wikipedia page for Tardigrade and extract extreme survivable conditions + named space-exposure experiment (verbatim fact targets).\n / / /  \n* | | Visit Wikipedia page for Brutalist architecture and extract defining characteristics + one named example building (with exact wording).\n / /  \n* | Synthesize comparison paragraph (100+ words) and ensure every factual claim is backed by one of the two exact Wikipedia URLs.\n /  \n* Merge: Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "f0bbebe2-5f94-4c5b-ace7-63f515748191",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact."
+    },
+    {
+      "node_id": "9749533f-6c42-4860-9d9a-aa9ae3598a18",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Wikipedia page for Tardigrade and extract extreme survivable conditions + named space-exposure experiment (verbatim fact targets)."
+    },
+    {
+      "node_id": "205b0bf5-6276-4297-91d5-ae2e7d4e2a2a",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Wikipedia page for Brutalist architecture and extract defining characteristics + one named example building (with exact wording)."
+    },
+    {
+      "node_id": "29b8a0fc-5b2e-42f8-b7a7-9ca2efdf9ffa",
+      "action": "think",
+      "status": "done",
+      "score": null,
+      "title": "Synthesize comparison paragraph (100+ words) and ensure every factual claim is backed by one of the two exact Wikipedia URLs."
+    },
+    {
+      "node_id": "656e9db7-3b0a-4160-934f-aec77a07b4af",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 2,
+      "reason": "Found 2 visit(s)"
+    },
+    {
+      "check": "tardigrade_facts",
+      "passed": true,
+      "score": 1.0,
+      "conditions_found": 6,
+      "has_experiment": true,
+      "reason": "conditions=6, experiment=True"
+    },
+    {
+      "check": "brutalist_facts",
+      "passed": false,
+      "score": 0.75,
+      "characteristics_found": 1,
+      "buildings_found": 2,
+      "reason": "characteristics=1, buildings=2"
+    },
+    {
+      "check": "comparison_paragraph",
+      "passed": true,
+      "score": 1.0,
+      "word_count": 155,
+      "reason": "tardigrade=True, brutalist=True, parallel=True, words=155"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "reason": "tardigrade_url=True, brutalist_url=True"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 5542,
+      "words": 619,
+      "kilobytes": 5.41
+    },
+    "llm": {
+      "calls": 3,
+      "prompt": {
+        "chars": 8654,
+        "words": 927,
+        "kilobytes": 8.45,
+        "tokens": 14952
+      },
+      "completion": {
+        "chars": 10749,
+        "words": 1254,
+        "kilobytes": 10.5,
+        "tokens": 3802
+      },
+      "total_tokens": 18754
+    },
+    "chroma": {
+      "store": {
+        "count": 1,
+        "chars": 125,
+        "words": 20,
+        "kilobytes": 0.12
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 2,
+      "chars": 96217,
+      "words": 14880,
+      "kilobytes": 93.96
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 37,
+        "total_duration": 129.5913,
+        "avg_duration": 3.5025,
+        "min_duration": 0.382,
+        "max_duration": 30.0272,
+        "success_count": 37,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 5,
+        "total_duration": 131.6415,
+        "avg_duration": 26.3283,
+        "min_duration": 4.5497,
+        "max_duration": 63.6484,
+        "success_count": 5,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 2,
+        "total_duration": 3.8972,
+        "avg_duration": 1.9486,
+        "min_duration": 1.6039,
+        "max_duration": 2.2933,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 5,
+        "total_duration": 58.4108,
+        "avg_duration": 11.6822,
+        "min_duration": 7.4328,
+        "max_duration": 25.6961,
+        "success_count": 5,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 1.1296,
+        "avg_duration": 1.1296,
+        "min_duration": 1.1296,
+        "max_duration": 1.1296,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.4526,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1464,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2124,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.16,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2719,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2739,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6457,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8568,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2658,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8726,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8598,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7486,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9247,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9546,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9892,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0095,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8807,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 4.5497,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 4.5526,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5032,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8165,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2045,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.6039,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8019,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.4021,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 63.6484,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 26.9621,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 24.9855,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7331,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 25.6961,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1048,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.5861,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.4328,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.4319,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.6951,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.2633,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.2735,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.819,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.382,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.7451,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8812,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8744,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7506,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7513,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.2933,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.3536,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 30.0272,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 1.1296,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 31.6192,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 27.2717,
+        "success": true
+      }
+    ],
+    "events_count": 92
+  },
+  "node_index": {
+    "f0bbebe2-5f94-4c5b-ace7-63f515748191": {
+      "node_id": "f0bbebe2-5f94-4c5b-ace7-63f515748191",
+      "title": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "9749533f-6c42-4860-9d9a-aa9ae3598a18",
+        "205b0bf5-6276-4297-91d5-ae2e7d4e2a2a",
+        "29b8a0fc-5b2e-42f8-b7a7-9ca2efdf9ffa",
+        "656e9db7-3b0a-4160-934f-aec77a07b4af"
+      ],
+      "parent_ids": [],
+      "goal": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact."
+    },
+    "9749533f-6c42-4860-9d9a-aa9ae3598a18": {
+      "node_id": "9749533f-6c42-4860-9d9a-aa9ae3598a18",
+      "title": "Visit Wikipedia page for Tardigrade and extract extreme survivable conditions + named space-exposure experiment (verbatim fact targets).",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "f0bbebe2-5f94-4c5b-ace7-63f515748191"
+      ],
+      "goal": "Visit Wikipedia page for Tardigrade and extract extreme survivable conditions + named space-exposure experiment (verbatim fact targets).",
+      "result_success": true,
+      "result_content_preview": "\"Tardigrada\" redirects here. For other uses, see\nTardigrada (disambiguation)\n.\n\"Moss Piglets\" redirects here. For the\nSouth Park\nepisode, see\nMoss Piglets (\nSouth Park\n)\n.\nTardigrade\nTemporal range:\nMiddle Cambrian\nstem-group fossils\nMilnesium tardigradum\n, a\neutardigrade\nEchiniscus insularis\n, a\nheterotardigrade\nScientific classification\nKingdom:\nAnimalia\nSubkingdom:\nEumetazoa\nClade\n:\nParaHoxozoa\nClade\n:\nBilateria\nClade\n:\nNephrozoa\nClade\n:\nProtostomia\nSuperphylum:\nEcdysozoa\nClade\n:\nPanarthropod",
+      "result_source_url": "https://en.wikipedia.org/wiki/Tardigrade"
+    },
+    "205b0bf5-6276-4297-91d5-ae2e7d4e2a2a": {
+      "node_id": "205b0bf5-6276-4297-91d5-ae2e7d4e2a2a",
+      "title": "Visit Wikipedia page for Brutalist architecture and extract defining characteristics + one named example building (with exact wording).",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "f0bbebe2-5f94-4c5b-ace7-63f515748191"
+      ],
+      "goal": "Visit Wikipedia page for Brutalist architecture and extract defining characteristics + one named example building (with exact wording).",
+      "result_success": true,
+      "result_content_preview": "\"Brutalist\" and \"Brutalism\" redirect here. For the 2024 film, see\nThe Brutalist\n. For other uses, see\nBrutalism (disambiguation)\n.\nBrutalist architecture\nTop row\n:\nPark Hill\nflats in\nSheffield\n, England;\nSoviet\n-era housing in\nTalnakh\n, Russia;\nTeresa Carre\u00f1o Cultural Complex\nin\nCaracas\n, Venezuela.\nMiddle row\n:\nRoyal National Theatre\nin London;\nBoston City Hall\n; Soviet-era housing in\nSaint Petersburg\n.\nBottom row\n:\nRobarts Library\nin\nToronto\n, Canada;\nBarbican Centre\nin the\nCity of London\n;\nAl",
+      "result_source_url": "https://en.wikipedia.org/wiki/Brutalist_architecture"
+    },
+    "29b8a0fc-5b2e-42f8-b7a7-9ca2efdf9ffa": {
+      "node_id": "29b8a0fc-5b2e-42f8-b7a7-9ca2efdf9ffa",
+      "title": "Synthesize comparison paragraph (100+ words) and ensure every factual claim is backed by one of the two exact Wikipedia URLs.",
+      "action": "think",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "f0bbebe2-5f94-4c5b-ace7-63f515748191"
+      ],
+      "goal": "Synthesize comparison paragraph (100+ words) and ensure every factual claim is backed by one of the two exact Wikipedia URLs.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "656e9db7-3b0a-4160-934f-aec77a07b4af": {
+      "node_id": "656e9db7-3b0a-4160-934f-aec77a07b4af",
+      "title": "Merge: Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "f0bbebe2-5f94-4c5b-ace7-63f515748191"
+      ],
+      "goal": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## Topic A \u2014 Tardigrades in astrobiology (https://en.wikipedia.org/wiki/Tardigrade)\n\n### (1) Extreme conditions tardigrades survive (at least two)\nFrom the **Tardigrade** article (https://en.wikipedia.org/wiki/Tardigrade):\n\n1) **Extreme temperatures**\n- Verbatim evidence: the page states tardigrades can survive \u201c**exposure to extreme temperatures**\u201d (https://en.wikipedia.org/wiki/Tardigrade: \u201c...survive severe conditions, such as **exposure to extreme temperatures**, extreme pressures...\u201d).\n- It also gives an explicit range in the tun state: \u201c**temperatures from as low as \u2212272\u00a0\u00b0C (\u2212458\u00a0\u00b0F) to as much as +149\u00a0\u00b0C (300\u00a0\u00b0F)**\u201d (https://en.wikipedia.org/wiki/Tardigrade: \u201c...they become highly resistant to environmental stresses, including **temperatures from as low as \u2212272\u00a0\u00b0C (\u2212458\u00a0\u00b0F) to as much as +149\u00a0\u00b0C (300\u00a0\u00b0F)** ...\u201d).\n\n2) **Vacuum / outer space exposure**\n- Verbatim evidence: \u201c**Tardigrades have survived exposure to outer space.**\u201d (https://en.wikipedia.org/wiki/Tardigrade)\n- In the tun state, the page lists \u201c**vacuum**\u201d among stresses they resist (https://en.wikipedia.org/wiki/Tardigrade: \u201c...highly resistant to environmental stresses, including ... **vacuum**, ionising radiation, and high pressure.\u201d).\n\n3) **Radiation (ionising radiation / solar ultraviolet)**\n- Verbatim evidence: the general list includes \u201c**radiation**\u201d (https://en.wikipedia.org/wiki/Tardigrade: \u201c...survive severe conditions, such as ... **radiation**...\u201d).\n- In tun state: \u201c**ionising radiation**\u201d is explicitly listed (https://en.wikipedia.org/wiki/Tardigrade: \u201c...including ... **ionising radiation** ...\u201d).\n\n4) **Dehydration / starvation / air deprivation**\n- Verbatim evidence: the page lists \u201c**air deprivation, radiation, dehydration, and starvation**\u201d (https://en.wikipedia.org/wiki/Tardigrade: \u201c...survive severe conditions, such as ... **air deprivation, radiation, dehydration, and starvation** ...\u201d).\n\n(Any two of the above satisfy the requirement; multiple are provided for completeness.)\n\n### (2) One named space-exposure experiment\n- **FOTON-M3 mission (2007)**\n  - Verbatim evidence: \u201c**In 2007, dehydrated tardigrades were taken on the FOTON-M3 mission and exposed to vacuum, or to both vacuum and solar ultraviolet, for 10 days.**\u201d (https://en.wikipedia.org/wiki/Tardigrade)\n\n\n## Topic B \u2014 Brutalist architecture (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n### (1) Defining characteristics of the style (at least two)\nFrom the **Brutalist architecture** article (https://en.wikipedia.org/wiki/Brutalist_architecture):\n\n1) **Minimalist construction that showcases materials/structure over decoration**\n- Verbatim evidence: \u201c**Brutalist buildings are known for minimalist construction showcasing the bare building materials and structural elements over decorative design.**\u201d (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n2) **Common use of exposed, unpainted concrete or brick**\n- Verbatim evidence: \u201c**The style commonly makes use of exposed, unpainted concrete or brick**...\u201d (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n3) **Angular geometric shapes and predominantly monochrome palette**\n- Verbatim evidence: the same sentence continues: \u201c...**angular geometric shapes and a predominantly monochrome colour palette**...\u201d (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n(Any two of the above satisfy the requirement; several are provided.)\n\n### (2) One specific example building cited\n- **Boston City Hall**\n  - Verbatim evidence (as a named example on the page): in the image-caption list, the page includes \u201c**Boston City Hall**\u201d (https://en.wikipedia.org/wiki/Brutalist_architecture: \u201cMiddle row : Royal National Theatre in London; **Boston City Hall**; ...\u201d).\n  - Verbatim evidence (also discussed as an example): \u201c**In the Boston City Hall, designed in 1962,** the strikingly different and projected portions of the building indicate the special nature of the rooms behind those walls...\u201d (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n\n## Comparative paragraph (100+ words) \u2014 thematic parallel between tardigrade resilience and Brutalist durability\nTardigrades are described as \u201c**among the most resilient animals known**,\u201d able to survive conditions that \u201c**would quickly kill most other forms of life**\u201d (https://en.wikipedia.org/wiki/Tardigrade). Their endurance is tied to tolerating multiple stressors\u2014Wikipedia lists \u201c**extreme temperatures**,\u201d \u201c**radiation**,\u201d \u201c**dehydration**,\u201d and even \u201c**vacuum**\u201d (https://en.wikipedia.org/wiki/Tardigrade), and it explicitly notes that \u201c**Tardigrades have survived exposure to outer space**\u201d (https://en.wikipedia.org/wiki/Tardigrade), including a specific test where \u201c**dehydrated tardigrades were taken on the FOTON-M3 mission**\u201d and \u201c**exposed to vacuum...for 10 days**\u201d (https://en.wikipedia.org/wiki/Tardigrade). Brutalist architecture, likewise, foregrounds toughness by design: \u201c**minimalist construction showcasing the bare building materials and structural elements over decorative design**\u201d (https://en.wikipedia.org/wiki/Brutalist_architecture), commonly using \u201c**exposed, unpainted concrete or brick**\u201d and \u201c**angular geometric shapes**\u201d (https://en.wikipedia.org/wiki/Brutalist_architecture). In both cases, an \u201cas-is\u201d approach\u2014whether a tardigrade\u2019s cryptobiotic survival strategy or a building\u2019s exposed structure\u2014turns vulnerability (harsh environments; raw materials) into a statement of durability, exemplified by landmarks like \u201c**Boston City Hall**\u201d (https://en.wikipedia.org/wiki/Brutalist_architecture).\n",
+    "action_summary": "Extracted (A) multiple extreme conditions tardigrades survive\u2014e.g., extreme temperatures, vacuum/outer space, radiation, dehydration\u2014and identified the named space-exposure experiment \u201cFOTON-M3 mission\u201d from https://en.wikipedia.org/wiki/Tardigrade with verbatim quotes. Extracted (B) defining Brutalist characteristics\u2014minimalist construction exposing materials/structure, exposed unpainted concrete/brick, angular geometry/monochrome palette\u2014and cited \u201cBoston City Hall\u201d as an example from https://en.wikipedia.org/wiki/Brutalist_architecture with verbatim quotes. Wrote a 100+ word comparative paragraph thematically linking tardigrade resilience to Brutalist durability, citing only those two URLs.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.4526,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1464,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2124,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.16,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2719,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2739,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6457,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8568,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2658,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8726,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8598,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7486,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9247,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9546,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9892,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0095,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8807,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 4.5497,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 4.5526,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5032,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8165,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2045,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.6039,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8019,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.4021,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 63.6484,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 26.9621,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 24.9855,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7331,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 25.6961,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1048,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.5861,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.4328,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.4319,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.6951,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.2633,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.2735,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.819,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.382,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.7451,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8812,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8744,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7506,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7513,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.2933,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.3536,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 30.0272,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 1.1296,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 31.6192,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 27.2717,
+      "success": true
+    }
+  ]
+}

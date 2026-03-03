@@ -1,0 +1,913 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "020",
+    "test_name": "GitHub Repository Analysis",
+    "passed": true,
+    "score": 1.0,
+    "ascii_graph": "*---.   Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results.\n|\\ \\ \\  \n* | | | Visit https://github.com/python/cpython and extract repo header metadata (primary language, stars, short description, license label if present)\n / / /  \n* | | Visit the LICENSE file in python/cpython to verify the exact license name/text (fallback if repo page doesn\u2019t clearly show license)\n / /  \n* | Post-visit synthesis: normalize extracted values into final fields and resolve any discrepancies between repo page and LICENSE file\n /  \n* Merge: Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "9ada4b65-c859-4ce8-99c7-7d4c3e42bc66",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results."
+    },
+    {
+      "node_id": "9301b1e8-6caa-49d9-9d79-ab17af93d684",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit https://github.com/python/cpython and extract repo header metadata (primary language, stars, short description, license label if present)"
+    },
+    {
+      "node_id": "3d876337-b9a3-443c-be7f-c0db3f8801b3",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit the LICENSE file in python/cpython to verify the exact license name/text (fallback if repo page doesn\u2019t clearly show license)"
+    },
+    {
+      "node_id": "c555d4ae-568f-4031-bc4b-0eadef70175c",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "title": "Post-visit synthesis: normalize extracted values into final fields and resolve any discrepancies between repo page and LICENSE file"
+    },
+    {
+      "node_id": "345e9f08-cd3c-4dcf-946f-4cce9ed73898",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_executed",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 2,
+      "reason": "Found 2 visit(s)"
+    },
+    {
+      "check": "github_visited",
+      "passed": true,
+      "score": 1.0,
+      "reason": "GitHub cpython repository mentioned"
+    },
+    {
+      "check": "language",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Programming language mentioned"
+    },
+    {
+      "check": "stars",
+      "passed": true,
+      "score": 1.0,
+      "star_count": "8k",
+      "reason": "Star count found: 8k"
+    },
+    {
+      "check": "license",
+      "passed": true,
+      "score": 1.0,
+      "reason": "License mentioned"
+    },
+    {
+      "check": "description",
+      "passed": true,
+      "score": 1.0,
+      "sentence_count": 14,
+      "reason": "Found 14 descriptive sentence(s)"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 2118,
+      "words": 268,
+      "kilobytes": 2.07
+    },
+    "llm": {
+      "calls": 5,
+      "prompt": {
+        "chars": 13697,
+        "words": 1755,
+        "kilobytes": 13.38,
+        "tokens": 9528
+      },
+      "completion": {
+        "chars": 5946,
+        "words": 612,
+        "kilobytes": 5.81,
+        "tokens": 3677
+      },
+      "total_tokens": 13205
+    },
+    "chroma": {
+      "store": {
+        "count": 1,
+        "chars": 131,
+        "words": 18,
+        "kilobytes": 0.13
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 2,
+      "chars": 11358,
+      "words": 1501,
+      "kilobytes": 11.09
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 52,
+        "total_duration": 55.4621,
+        "avg_duration": 1.0666,
+        "min_duration": 0.3553,
+        "max_duration": 6.9062,
+        "success_count": 52,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 7,
+        "total_duration": 74.0557,
+        "avg_duration": 10.5794,
+        "min_duration": 1.4198,
+        "max_duration": 33.8286,
+        "success_count": 7,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 2,
+        "total_duration": 2.519,
+        "avg_duration": 1.2595,
+        "min_duration": 0.3592,
+        "max_duration": 2.1598,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 2,
+        "total_duration": 8.8406,
+        "avg_duration": 4.4203,
+        "min_duration": 2.3964,
+        "max_duration": 6.4442,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 1.2645,
+        "avg_duration": 1.2645,
+        "min_duration": 1.2645,
+        "max_duration": 1.2645,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.3905,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9882,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2616,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2604,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0209,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0447,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0488,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3553,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6129,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8931,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.573,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6014,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6042,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5646,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5913,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5852,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5698,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5648,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5679,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5728,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5359,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5397,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5326,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5192,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5517,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6168,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6645,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6455,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6338,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6469,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6177,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6517,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6822,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.769,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 8.1883,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 8.1913,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4603,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9787,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4022,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.4198,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.4267,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8423,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7268,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6489,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6785,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6585,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.1598,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7643,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.311,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.9062,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.4347,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 6.4442,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.0301,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.9966,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.3964,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7517,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7638,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.3592,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8872,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.9418,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 33.8286,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 1.2645,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 8.6405,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 12.3604,
+        "success": true
+      }
+    ],
+    "events_count": 118
+  },
+  "node_index": {
+    "9ada4b65-c859-4ce8-99c7-7d4c3e42bc66": {
+      "node_id": "9ada4b65-c859-4ce8-99c7-7d4c3e42bc66",
+      "title": "Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "9301b1e8-6caa-49d9-9d79-ab17af93d684",
+        "3d876337-b9a3-443c-be7f-c0db3f8801b3",
+        "c555d4ae-568f-4031-bc4b-0eadef70175c",
+        "345e9f08-cd3c-4dcf-946f-4cce9ed73898"
+      ],
+      "parent_ids": [],
+      "goal": "Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results."
+    },
+    "9301b1e8-6caa-49d9-9d79-ab17af93d684": {
+      "node_id": "9301b1e8-6caa-49d9-9d79-ab17af93d684",
+      "title": "Visit https://github.com/python/cpython and extract repo header metadata (primary language, stars, short description, license label if present)",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "9ada4b65-c859-4ce8-99c7-7d4c3e42bc66"
+      ],
+      "goal": "Visit https://github.com/python/cpython and extract repo header metadata (primary language, stars, short description, license label if present)",
+      "result_success": true,
+      "result_content_preview": "python\n/\ncpython\nPublic\nUh oh!\nThere was an error while loading.\nPlease reload this page\n.\nNotifications\nYou must be signed in to change notification settings\nFork\n34.2k\nStar\n71.8k\nThe Python programming language\nwww.python.org\nLicense\nView license\n71.8k\nstars\n34.2k\nforks\nBranches\nTags\nActivity\nStar\nNotifications\nYou must be signed in to change notification settings\npython/cpython\nBranches\nTags\nOpen more actions menu\nFolders and files\nName\nName\nLast commit message\nLast commit date\nLatest commit\n",
+      "result_source_url": "https://github.com/python/cpython"
+    },
+    "3d876337-b9a3-443c-be7f-c0db3f8801b3": {
+      "node_id": "3d876337-b9a3-443c-be7f-c0db3f8801b3",
+      "title": "Visit the LICENSE file in python/cpython to verify the exact license name/text (fallback if repo page doesn\u2019t clearly show license)",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "9ada4b65-c859-4ce8-99c7-7d4c3e42bc66"
+      ],
+      "goal": "Visit the LICENSE file in python/cpython to verify the exact license name/text (fallback if repo page doesn\u2019t clearly show license)",
+      "result_success": true,
+      "result_content_preview": "python\n/\ncpython\nPublic\nUh oh!\nThere was an error while loading.\nPlease reload this page\n.\nNotifications\nYou must be signed in to change notification settings\nFork\n34.2k\nStar\n71.8k",
+      "result_source_url": "https://github.com/python/cpython/blob/main/LICENSE"
+    },
+    "c555d4ae-568f-4031-bc4b-0eadef70175c": {
+      "node_id": "c555d4ae-568f-4031-bc4b-0eadef70175c",
+      "title": "Post-visit synthesis: normalize extracted values into final fields and resolve any discrepancies between repo page and LICENSE file",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "9ada4b65-c859-4ce8-99c7-7d4c3e42bc66"
+      ],
+      "goal": "Post-visit synthesis: normalize extracted values into final fields and resolve any discrepancies between repo page and LICENSE file",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "345e9f08-cd3c-4dcf-946f-4cce9ed73898": {
+      "node_id": "345e9f08-cd3c-4dcf-946f-4cce9ed73898",
+      "title": "Merge: Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "9ada4b65-c859-4ce8-99c7-7d4c3e42bc66"
+      ],
+      "goal": "Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## 1) Primary programming language used\n**Python** (top/primary language)\n\n**Evidence (verbatim quote):** The repository\u2019s \u201cLanguages\u201d section lists (in order) **\u201cPython 62.1%\u201d** followed by other languages, indicating Python is the primary language. From the repo page (https://github.com/python/cpython):\n- \u201cLanguages\nPython\n62.1%\nC\n35.9%\nC++\n0.7%\nM4\n0.4%\nHTML\n0.3%\nJavaScript\n0.1%\nOther\n0.5%\u201d (https://github.com/python/cpython)\n\n## 2) Number of stars (approximate)\n**~71.8k stars**\n\n**Evidence (verbatim quote):** From the repository header/metadata on GitHub (https://github.com/python/cpython):\n- \u201cStar\n71.8k\u201d (https://github.com/python/cpython)\n- \u201c71.8k\nstars\u201d (https://github.com/python/cpython)\n\n## 3) License type\n**Not explicitly shown by name in the captured page text** (only a generic \u201cView license\u201d label is visible).\n\n**What the GitHub repo page shows (verbatim quote):**\n- \u201cLicense\nView license\u201d (https://github.com/python/cpython)\n\n**Attempt to verify via LICENSE file page:** The visited LICENSE file URL did not load the license text in the captured content; it only shows the repo header area and an error banner. From https://github.com/python/cpython/blob/main/LICENSE:\n- \u201cUh oh!\nThere was an error while loading.\nPlease reload this page\u201d (https://github.com/python/cpython/blob/main/LICENSE)\n\n**Conclusion:** Based on the directly visited pages\u2019 captured text, the license *type/name* cannot be extracted (the repo page only says \u201cView license,\u201d and the LICENSE file text did not render in the capture).\n\n## 4) Brief description of what the repository is\n**\u201cThe Python programming language\u201d** (CPython\u2019s source repository)\n\n**Evidence (verbatim quote):** The \u201cAbout\u201d/header description on the repo page (https://github.com/python/cpython) states:\n- \u201cThe Python programming language\u201d (https://github.com/python/cpython)\n\n**Additional context from the repo page (verbatim quote):** The README content visible in the page capture begins with:\n- \u201cThis is Python version 3.15.0 alpha 6\u201d (https://github.com/python/cpython)\n\nThis supports that the repository contains the source for Python (CPython).",
+    "action_summary": "Extracted from direct visits to https://github.com/python/cpython (and the LICENSE URL): Primary language is Python (\"Python 62.1%\"), stars are ~71.8k (\"71.8k stars\"), description is \"The Python programming language\". License type/name could not be determined from the captured GitHub page text because it only shows \"License \u2013 View license\" and the LICENSE file page content failed to load (\"Uh oh! There was an error while loading\").",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.3905,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9882,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2616,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2604,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0209,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0447,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0488,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3553,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6129,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8931,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.573,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6014,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6042,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5646,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5913,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5852,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5698,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5648,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5679,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5728,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5359,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5397,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5326,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5192,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5517,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6168,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6645,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6455,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6338,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6469,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6177,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6517,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6822,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.769,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 8.1883,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 8.1913,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4603,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9787,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4022,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.4198,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.4267,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8423,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7268,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6489,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6785,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6585,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.1598,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7643,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.311,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.9062,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.4347,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 6.4442,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.0301,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.9966,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.3964,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7517,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7638,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.3592,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8872,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.9418,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 33.8286,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 1.2645,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 8.6405,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 12.3604,
+      "success": true
+    }
+  ]
+}

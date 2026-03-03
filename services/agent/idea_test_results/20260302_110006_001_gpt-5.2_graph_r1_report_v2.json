@@ -1,0 +1,5904 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "001",
+    "test_name": "Conflicting Information Resolution",
+    "passed": true,
+    "score": 0.7833333333333333,
+    "ascii_graph": "*-------.   Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.\n|\\ \\ \\ \\ \\  \n* | | | | | Search for a credible news outlet page that states San Francisco\u2019s population with a date (prefer AP/Reuters/major newspaper citing Census estimates)\n / / / / /  \n* | | | | Visit U.S. Census Bureau QuickFacts (government source) table page for San Francisco County/City and extract the latest population figure + dataset date/label\n / / / /  \n* | | | Search for a research-institution source (e.g., Public Policy Institute of California, UC/Stanford center, or Brookings) reporting San Francisco population with date/series\n / / /  \n* | | Visit a likely research-institution data hub if found (fallback: PPIC/USF/academic library page) and extract population + date + citation URL\n / /  \n* | Think: reconcile figures across government/news/research sources; identify discrepancies (different geographies/years/series) and decide most accurate current figure\n /  \n* Merge: Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "cb7bddb4-45ce-4bab-8c32-550c977c5fc9",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why."
+    },
+    {
+      "node_id": "79aeb2d9-5aa4-44de-85f2-ad93b0cafbaa",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "title": "Search for a credible news outlet page that states San Francisco\u2019s population with a date (prefer AP/Reuters/major newspaper citing Census estimates)"
+    },
+    {
+      "node_id": "b4012111-76dd-4270-8b80-e37aea1d29c0",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit U.S. Census Bureau QuickFacts (government source) table page for San Francisco County/City and extract the latest population figure + dataset date/label"
+    },
+    {
+      "node_id": "4b54934b-03c7-4b97-b86f-d9ad50723971",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "title": "Search for a research-institution source (e.g., Public Policy Institute of California, UC/Stanford center, or Brookings) reporting San Francisco population with date/series"
+    },
+    {
+      "node_id": "7d654ea5-27dc-4f20-9f94-7df1e0a433a4",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit a likely research-institution data hub if found (fallback: PPIC/USF/academic library page) and extract population + date + citation URL"
+    },
+    {
+      "node_id": "8bde8e9d-727d-49c6-b7e5-d894eb7747ed",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "title": "Think: reconcile figures across government/news/research sources; identify discrepancies (different geographies/years/series) and decide most accurate current figure"
+    },
+    {
+      "node_id": "c82f1bc9-2a5b-4123-adde-20e8a2a4ee94",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "search_actions",
+      "passed": true,
+      "score": 1.0,
+      "actual": 10,
+      "expected": 5,
+      "reason": "Found 10 search actions, expected at least 5"
+    },
+    {
+      "check": "source_types",
+      "passed": true,
+      "score": 1.0,
+      "government": true,
+      "news": true,
+      "research": true,
+      "reason": "Found 3 source types (gov: True, news: True, research: True)"
+    },
+    {
+      "check": "data_completeness",
+      "passed": true,
+      "score": 1.0,
+      "has_population": true,
+      "has_dates": true,
+      "has_urls": true,
+      "url_count": 11,
+      "reason": "Data completeness: population=True, dates=True, urls=True (11 URLs found)"
+    },
+    {
+      "check": "discrepancy_analysis",
+      "passed": true,
+      "score": 0.6666666666666666,
+      "has_discrepancy": false,
+      "has_explanation": true,
+      "has_assessment": true,
+      "reason": "Analysis quality: discrepancy=False, explanation=True, assessment=True"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 5575,
+      "words": 701,
+      "kilobytes": 5.44
+    },
+    "llm": {
+      "calls": 8,
+      "prompt": {
+        "chars": 163302,
+        "words": 17242,
+        "kilobytes": 159.47,
+        "tokens": 41873
+      },
+      "completion": {
+        "chars": 17090,
+        "words": 2132,
+        "kilobytes": 16.69,
+        "tokens": 5246
+      },
+      "total_tokens": 47119
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 10,
+      "chars": 3658,
+      "words": 461,
+      "kilobytes": 3.57
+    },
+    "visit": {
+      "count": 4,
+      "chars": 138730,
+      "words": 22000,
+      "kilobytes": 135.48
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 507,
+        "total_duration": 914.0643,
+        "avg_duration": 1.8029,
+        "min_duration": 0.3943,
+        "max_duration": 69.253,
+        "success_count": 507,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 28,
+        "total_duration": 661.2863,
+        "avg_duration": 23.6174,
+        "min_duration": 0.7969,
+        "max_duration": 69.2627,
+        "success_count": 28,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 9,
+        "total_duration": 12.556,
+        "avg_duration": 1.3951,
+        "min_duration": 0.3612,
+        "max_duration": 2.3048,
+        "success_count": 9,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 8,
+        "total_duration": 184.8107,
+        "avg_duration": 23.1013,
+        "min_duration": 5.3576,
+        "max_duration": 70.6422,
+        "success_count": 8,
+        "error_count": 0
+      },
+      "search_query": {
+        "count": 2,
+        "total_duration": 1.9082,
+        "avg_duration": 0.9541,
+        "min_duration": 0.7697,
+        "max_duration": 1.1385,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "search": {
+        "count": 2,
+        "total_duration": 2.3083,
+        "avg_duration": 1.1542,
+        "min_duration": 0.776,
+        "max_duration": 1.5324,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 47.7112,
+        "avg_duration": 47.7112,
+        "min_duration": 47.7112,
+        "max_duration": 47.7112,
+        "success_count": 0,
+        "error_count": 1
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 54.9385,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 54.3384,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8253,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.1429,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.8582,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.3615,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 57.6549,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0354,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.305,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6523,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6925,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6916,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6866,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.6896,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6676,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6689,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 15.0783,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 15.0855,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 13.7397,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 14.0722,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 14.427,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7213,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.3402,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 5.3576,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 5.3634,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.2726,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 13.6401,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 28.9201,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 28.9196,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 28.9236,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 22.1222,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 11.3952,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.2522,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.3962,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4156,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 32.2267,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 32.3688,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 32.5284,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 33.3985,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 33.4045,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 33.4041,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3526,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3538,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 33.4553,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 33.8137,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 33.8152,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4784,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 33.9379,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 5.0114,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.196,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.734,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6625,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.6567,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.975,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6425,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.3048,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.1409,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 69.253,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 69.2627,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 64.5762,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4886,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.4844,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7276,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3943,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 65.9989,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.1377,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 1.1385,
+        "success": true
+      },
+      {
+        "name": "search",
+        "duration": 1.5324,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1652,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5655,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.7969,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5576,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.7684,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 0.7697,
+        "success": true
+      },
+      {
+        "name": "search",
+        "duration": 0.776,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.1993,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4695,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.466,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.4594,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0996,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0979,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0973,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0858,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.1197,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0267,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0288,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6479,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.0039,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.705,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.0051,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 6.5357,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8399,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8476,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8532,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0388,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0344,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.031,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4735,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4745,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4766,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.2069,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0965,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4329,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4314,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0195,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.323,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2992,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2996,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3012,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4059,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.0376,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7197,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5612,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.24,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2257,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2294,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2178,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2215,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.254,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2551,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2958,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2935,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3044,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3039,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3274,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3334,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2896,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2922,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2427,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2401,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2354,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2395,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3178,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3223,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3758,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3751,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3962,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.396,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.449,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4525,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3891,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3893,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.29,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2905,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3206,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3241,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3254,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.325,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2994,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2998,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2529,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2528,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2378,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.238,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9644,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2698,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3323,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3325,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4029,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7125,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3622,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3626,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4132,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4103,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.424,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4236,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.393,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3929,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3814,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.386,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3656,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3703,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.093,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0936,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0768,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0246,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0304,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0712,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.1506,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2276,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2187,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.263,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.1421,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.1471,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0168,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.1015,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7598,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7588,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.8121,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.8106,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0593,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.3612,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0633,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7962,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.5333,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.5403,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.901,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 3.9072,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.4514,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.4508,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.4316,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.4309,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.3675,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1481,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1481,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5921,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.6682,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.6714,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.4585,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.8052,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.6893,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.6984,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.6946,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.4833,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.158,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1675,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.535,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7586,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1257,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1778,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1302,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.197,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1363,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1573,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1035,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0888,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0699,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0156,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0165,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.019,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0245,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0029,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0272,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0154,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.03,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9766,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9666,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9585,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0091,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0271,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0382,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0129,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0055,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9946,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0097,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0267,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0177,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9832,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0498,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0395,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0346,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9404,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9262,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.91,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9037,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9231,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.949,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9611,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9666,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9998,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0188,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0559,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0456,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0206,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9991,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 16.7829,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9862,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.277,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3171,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6343,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3042,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0224,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2588,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2645,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2676,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2482,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9704,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3173,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6286,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3204,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2862,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.224,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2155,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2569,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5564,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.954,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2778,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2549,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2551,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5793,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9486,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9487,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.646,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9015,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9059,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1914,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9742,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9745,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0641,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0153,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0197,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9709,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0204,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0232,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9474,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8827,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8864,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8709,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8711,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8761,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8762,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8705,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8741,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9197,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9477,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9507,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9661,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9564,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9576,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8854,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.884,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9146,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9682,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9684,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.936,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8782,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.879,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.863,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8869,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8864,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9312,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9466,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9485,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9293,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9396,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9386,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9341,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8883,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8921,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8914,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8812,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.884,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8757,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8735,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8742,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.892,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9082,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9083,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8711,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8921,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.892,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9464,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9465,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9469,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9224,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0186,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0219,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0457,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9534,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9495,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9722,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9427,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9428,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9859,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6952,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0086,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6204,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9116,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9113,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9314,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9464,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9408,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9383,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9453,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9413,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9505,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9459,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9465,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9459,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9584,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9627,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9605,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9278,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9286,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9399,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9519,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9524,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9635,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9551,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9692,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.948,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9886,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9997,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0096,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9928,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9832,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9631,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9373,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8912,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8948,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9049,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9605,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9727,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0191,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0356,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0235,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9971,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9431,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9477,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9111,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8987,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8793,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.899,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9256,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0225,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0183,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0363,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9784,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0159,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0017,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0127,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0458,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.094,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0935,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0777,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0672,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0565,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0439,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0364,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0867,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0522,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0592,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9852,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.984,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9454,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9463,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0131,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0424,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0881,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0268,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9858,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.958,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9483,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9592,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9645,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9552,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9627,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.946,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9661,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9689,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9427,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9173,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8917,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8995,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9094,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9454,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9702,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.029,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0041,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.027,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9985,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0089,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9948,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9495,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9311,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8981,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9539,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0369,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1373,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.127,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0531,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9684,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9374,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9771,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9632,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9566,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.931,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9215,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9251,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9652,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0149,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0024,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0559,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.054,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0786,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9807,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9532,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9253,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8975,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8845,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9185,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9144,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9407,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9039,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.944,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9178,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9389,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9459,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9404,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9268,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9111,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9117,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9362,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9317,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9701,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9715,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9622,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0188,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 70.6422,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1128,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1281,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0424,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9585,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9447,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9714,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9423,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9666,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9314,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9283,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9242,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0455,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0827,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0859,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0168,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9924,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9503,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8973,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8871,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9204,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.922,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9154,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8984,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9012,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9254,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9324,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9428,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9637,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9734,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9944,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9725,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9806,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9672,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0141,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9968,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9804,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9293,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9375,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9593,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9974,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9691,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9586,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.037,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 47.7112,
+        "success": false
+      },
+      {
+        "name": "llm_call",
+        "duration": 27.5886,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 28.9122,
+        "success": true
+      }
+    ],
+    "events_count": 1099
+  },
+  "node_index": {
+    "cb7bddb4-45ce-4bab-8c32-550c977c5fc9": {
+      "node_id": "cb7bddb4-45ce-4bab-8c32-550c977c5fc9",
+      "title": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "79aeb2d9-5aa4-44de-85f2-ad93b0cafbaa",
+        "b4012111-76dd-4270-8b80-e37aea1d29c0",
+        "4b54934b-03c7-4b97-b86f-d9ad50723971",
+        "7d654ea5-27dc-4f20-9f94-7df1e0a433a4",
+        "8bde8e9d-727d-49c6-b7e5-d894eb7747ed",
+        "c82f1bc9-2a5b-4123-adde-20e8a2a4ee94"
+      ],
+      "parent_ids": [],
+      "goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why."
+    },
+    "79aeb2d9-5aa4-44de-85f2-ad93b0cafbaa": {
+      "node_id": "79aeb2d9-5aa4-44de-85f2-ad93b0cafbaa",
+      "title": "Search for a credible news outlet page that states San Francisco\u2019s population with a date (prefer AP/Reuters/major newspaper citing Census estimates)",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "cb7bddb4-45ce-4bab-8c32-550c977c5fc9"
+      ],
+      "goal": "Search for a credible news outlet page that states San Francisco\u2019s population with a date (prefer AP/Reuters/major newspaper citing Census estimates)",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "b4012111-76dd-4270-8b80-e37aea1d29c0": {
+      "node_id": "b4012111-76dd-4270-8b80-e37aea1d29c0",
+      "title": "Visit U.S. Census Bureau QuickFacts (government source) table page for San Francisco County/City and extract the latest population figure + dataset date/label",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "cb7bddb4-45ce-4bab-8c32-550c977c5fc9"
+      ],
+      "goal": "Visit U.S. Census Bureau QuickFacts (government source) table page for San Francisco County/City and extract the latest population figure + dataset date/label",
+      "result_success": true,
+      "result_content_preview": "San Francisco County, California\nPopulation estimates, July 1, 2024, (V2024)\n\ue840\n\ue83f\n827,526\nPeople\nPopulation\nPopulation estimates, July 1, 2025, (V2025)\n\ue840\n\ue83f\nNA\nPopulation estimates, July 1, 2024, (V2024)\n\ue840\n\ue83f\n827,526\nPopulation estimates base, April 1, 2020, (V2025)\n\ue840\n\ue83f\nNA\nPopulation estimates base, April 1, 2020, (V2024)\n\ue840\n\ue83f\n878,392\nPopulation, percent change - April 1, 2020 (estimates base) to July 1, 2025, (V2025)\n\ue840\n\ue83f\nNA\nPopulation, percent change - April 1, 2020 (estimates base) to July 1, 2024",
+      "result_source_url": "https://www.census.gov/quickfacts/fact/table/sanfranciscocountycalifornia/PST045224"
+    },
+    "4b54934b-03c7-4b97-b86f-d9ad50723971": {
+      "node_id": "4b54934b-03c7-4b97-b86f-d9ad50723971",
+      "title": "Search for a research-institution source (e.g., Public Policy Institute of California, UC/Stanford center, or Brookings) reporting San Francisco population with date/series",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "cb7bddb4-45ce-4bab-8c32-550c977c5fc9"
+      ],
+      "goal": "Search for a research-institution source (e.g., Public Policy Institute of California, UC/Stanford center, or Brookings) reporting San Francisco population with date/series",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "7d654ea5-27dc-4f20-9f94-7df1e0a433a4": {
+      "node_id": "7d654ea5-27dc-4f20-9f94-7df1e0a433a4",
+      "title": "Visit a likely research-institution data hub if found (fallback: PPIC/USF/academic library page) and extract population + date + citation URL",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "cb7bddb4-45ce-4bab-8c32-550c977c5fc9"
+      ],
+      "goal": "Visit a likely research-institution data hub if found (fallback: PPIC/USF/academic library page) and extract population + date + citation URL",
+      "result_success": true,
+      "result_content_preview": "=== https://www.census.gov ===\nCensus.gov | U.S. Census Bureau Homepage\nNew 2023 Annual Integrated Economic Survey Main Release\nThe AIES offers the first single, comprehensive annual snapshot of U.S. employer businesses.\nMeasuring America's People and Economy\nWe Believe in the Power of Quality Data to Impact Public Life\nLearn More\nMeasuring America's People and Economy\nLearn More\nQuick Links\nRelated Information\nData Profiles\n2026 Census Test\n2030 Census\nVerify a Survey\nAnnual Integrated Economic",
+      "result_source_url": null
+    },
+    "8bde8e9d-727d-49c6-b7e5-d894eb7747ed": {
+      "node_id": "8bde8e9d-727d-49c6-b7e5-d894eb7747ed",
+      "title": "Think: reconcile figures across government/news/research sources; identify discrepancies (different geographies/years/series) and decide most accurate current figure",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "cb7bddb4-45ce-4bab-8c32-550c977c5fc9"
+      ],
+      "goal": "Think: reconcile figures across government/news/research sources; identify discrepancies (different geographies/years/series) and decide most accurate current figure",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "c82f1bc9-2a5b-4123-adde-20e8a2a4ee94": {
+      "node_id": "c82f1bc9-2a5b-4123-adde-20e8a2a4ee94",
+      "title": "Merge: Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "cb7bddb4-45ce-4bab-8c32-550c977c5fc9"
+      ],
+      "goal": "Find the current population of San Francisco as reported by three different authoritative sources (government, news outlet, and research institution). For each source, provide: the population figure, the date of the data, and a direct citation URL. Then identify any discrepancies between the sources and explain which figure is most likely accurate and why.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## Current population of San Francisco (3 authoritative sources)\n\n### 1) Government source \u2014 U.S. Census Bureau (QuickFacts)\n- **Population figure:** **827,526**\n- **Date of the data:** **\u201cPopulation estimates, July 1, 2024, (V2024)\u201d**\n- **Direct citation URL:** https://www.census.gov/quickfacts/fact/table/sanfranciscocountycalifornia/PST045224\n- **Verbatim evidence (from page):**\n  - The QuickFacts table for San Francisco County (city-county) shows: **\u201cPopulation estimates, July 1, 2024, (V2024)\u201d** followed by **\u201c827,526\u201d**. (https://www.census.gov/quickfacts/fact/table/sanfranciscocountycalifornia/PST045224)\n  - The same page also lists the decennial census value: **\u201cPopulation, Census, April 1, 2020 873,965\u201d**. (https://www.census.gov/quickfacts/fact/table/sanfranciscocountycalifornia/PST045224)\n\n### 2) News outlet \u2014 Missing from provided evidence\nThe execution graph did **not** successfully visit or capture RAW VISIT CONTENT from any news outlet page (e.g., AP/Reuters/major newspaper) that states San Francisco\u2019s population **with a date**.\n\n- **What is missing:**\n  - A visited, citable news URL plus a verbatim quote from that news page containing a population figure and the associated date.\n- **Why this matters:**\n  - Per the mandate, the news source must be a **news outlet** and must provide **(a) the number, (b) the date of the data, and (c) a direct URL**. The MERGED RESULTS only show search results (including non-news sources like FRED and Wikipedia) and \u201cretrieved memories\u201d referencing a likely news article, but no visited news page content was provided.\n\n### 3) Research institution \u2014 Missing from provided evidence\nThe execution graph did **not** successfully visit or capture RAW VISIT CONTENT from a research institution (e.g., PPIC, Brookings, UC/Stanford center) that reports San Francisco\u2019s population **with a date**.\n\n- **What is missing:**\n  - A visited, citable research-institution URL plus a verbatim quote from that research page containing a population figure and the associated date.\n- **Evidence of the gap:**\n  - The \u201cresearch institution\u201d search node found PPIC links, but none were visited.\n  - The only non-government page content included in RAW VISIT CONTENT besides QuickFacts is Wikipedia (not a research institution).\n\n---\n\n## Discrepancies observed in the available sources (government vs. Wikipedia)\nBecause the required news and research pages were not captured in the provided evidence, the only cross-source comparison possible here is **U.S. Census QuickFacts vs. Wikipedia\u2019s summary**, both of which appear in the RAW VISIT CONTENT.\n\n### A) Government (Census QuickFacts) vs. Wikipedia (encyclopedia summary)\n- **Census QuickFacts (July 1, 2024 estimate):** **827,526**\n  - Quote: **\u201cPopulation estimates, July 1, 2024, (V2024) \u2026 827,526\u201d** (https://www.census.gov/quickfacts/fact/table/sanfranciscocountycalifornia/PST045224)\n- **Wikipedia (2024 estimate shown in infobox):** **827,526**\n  - Quote: under \u201cPopulation\u201d it lists **\u201cEstimate (2024) 827,526\u201d** (https://en.wikipedia.org/wiki/San_Francisco)\n\nThese two match for the 2024 estimate.\n\n### B) Different \u201cpopulation\u201d concepts by date/series\nEven within the Census QuickFacts page, there are multiple population figures depending on the reference date/series:\n- **Decennial census count (April 1, 2020):** **873,965**\n  - Quote: **\u201cPopulation, Census, April 1, 2020 873,965\u201d** (https://www.census.gov/quickfacts/fact/table/sanfranciscocountycalifornia/PST045224)\n- **Population estimate (July 1, 2024):** **827,526**\n  - Quote: **\u201cPopulation estimates, July 1, 2024, (V2024) \u2026 827,526\u201d** (https://www.census.gov/quickfacts/fact/table/sanfranciscocountycalifornia/PST045224)\n\nWikipedia also shows both:\n- Quote: **\u201cPopulation (2020) \u2022 City and county 873,965\u201d** and **\u201c\u2022 Estimate (2024) 827,526\u201d** (https://en.wikipedia.org/wiki/San_Francisco)\n\nSo, an apparent discrepancy (873,965 vs 827,526) is explained by **different dates and measurement series** (2020 decennial count vs 2024 estimate).\n\n---\n\n## Which figure is most likely accurate for \u201ccurrent population,\u201d and why?\n### Most likely accurate \u201ccurrent\u201d population (from provided evidence)\n- **827,526 (Population estimates, July 1, 2024 (V2024))** from the U.S. Census Bureau QuickFacts.\n  - Evidence: **\u201cPopulation estimates, July 1, 2024, (V2024) \u2026 827,526\u201d** (https://www.census.gov/quickfacts/fact/table/sanfranciscocountycalifornia/PST045224)\n\n### Why this is most likely accurate\n- It is a **government-produced** population estimate (U.S. Census Bureau) and is explicitly labeled with the **reference date** \u201cJuly 1, 2024.\u201d (https://www.census.gov/quickfacts/fact/table/sanfranciscocountycalifornia/PST045224)\n- The Wikipedia page\u2019s \u201cEstimate (2024) 827,526\u201d matches the Census QuickFacts estimate, but Wikipedia is not itself the primary authority; it is a secondary compilation. (https://en.wikipedia.org/wiki/San_Francisco)\n\n---\n\n## What\u2019s needed to fully satisfy the mandate\nTo complete the requirement of **three different authoritative sources (government, news outlet, research institution)** with **population figure + date + direct URL + verbatim quote**, the dataset provided would need RAW VISIT CONTENT for:\n1) A **news outlet** page (visited) quoting a San Francisco population figure with a specific date/estimate year.\n2) A **research institution** page (visited) reporting a San Francisco population figure with a specific date/estimate year.\n\nAt present, only the government source (Census QuickFacts) is fully supported by visited-page evidence and verbatim quotations.",
+    "action_summary": "Only one mandate-qualified source is supported by the provided visited-page evidence: U.S. Census Bureau QuickFacts reports San Francisco County\u2019s \u201cPopulation estimates, July 1, 2024 (V2024)\u201d as 827,526. The evidence set contains no visited/quoted news outlet or research-institution page with a dated population figure, so the full three-source comparison cannot be completed from the supplied data. The apparent 2020 vs 2024 difference (873,965 vs 827,526) is due to decennial census count vs later population estimate.",
+    "success": true,
+    "goal_achieved": true
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 54.9385,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 54.3384,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8253,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.1429,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.8582,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.3615,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 57.6549,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0354,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.305,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6523,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6925,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6916,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6866,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.6896,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6676,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6689,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 15.0783,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 15.0855,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 13.7397,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 14.0722,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 14.427,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7213,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.3402,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 5.3576,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 5.3634,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.2726,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 13.6401,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 28.9201,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 28.9196,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 28.9236,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 22.1222,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 11.3952,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.2522,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.3962,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4156,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 32.2267,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 32.3688,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 32.5284,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 33.3985,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 33.4045,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 33.4041,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3526,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3538,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 33.4553,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 33.8137,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 33.8152,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4784,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 33.9379,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 5.0114,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.196,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.734,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6625,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.6567,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.975,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6425,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.3048,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.1409,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 69.253,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 69.2627,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 64.5762,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4886,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.4844,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7276,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3943,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 65.9989,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.1377,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 1.1385,
+      "success": true
+    },
+    {
+      "name": "search",
+      "duration": 1.5324,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1652,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5655,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.7969,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5576,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.7684,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 0.7697,
+      "success": true
+    },
+    {
+      "name": "search",
+      "duration": 0.776,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.1993,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4695,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.466,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.4594,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0996,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0979,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0973,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0858,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.1197,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0267,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0288,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6479,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.0039,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.705,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.0051,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 6.5357,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8399,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8476,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8532,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0388,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0344,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.031,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4735,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4745,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4766,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.2069,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0965,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4329,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4314,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0195,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.323,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2992,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2996,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3012,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4059,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.0376,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7197,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5612,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.24,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2257,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2294,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2178,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2215,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.254,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2551,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2958,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2935,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3044,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3039,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3274,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3334,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2896,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2922,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2427,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2401,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2354,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2395,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3178,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3223,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3758,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3751,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3962,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.396,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.449,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4525,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3891,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3893,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.29,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2905,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3206,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3241,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3254,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.325,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2994,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2998,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2529,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2528,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2378,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.238,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9644,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2698,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3323,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3325,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4029,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7125,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3622,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3626,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4132,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4103,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.424,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4236,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.393,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3929,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3814,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.386,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3656,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3703,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.093,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0936,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0768,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0246,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0304,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0712,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.1506,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2276,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2187,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.263,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.1421,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.1471,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0168,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.1015,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7598,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7588,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.8121,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.8106,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0593,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.3612,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0633,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7962,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.5333,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.5403,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.901,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 3.9072,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.4514,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.4508,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.4316,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.4309,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.3675,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1481,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1481,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5921,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.6682,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.6714,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.4585,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.8052,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.6893,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.6984,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.6946,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.4833,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.158,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1675,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.535,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7586,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1257,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1778,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1302,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.197,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1363,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1573,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1035,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0888,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0699,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0156,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0165,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.019,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0245,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0029,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0272,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0154,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.03,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9766,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9666,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9585,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0091,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0271,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0382,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0129,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0055,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9946,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0097,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0267,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0177,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9832,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0498,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0395,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0346,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9404,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9262,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.91,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9037,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9231,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.949,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9611,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9666,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9998,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0188,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0559,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0456,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0206,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9991,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 16.7829,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9862,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.277,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3171,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6343,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3042,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0224,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2588,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2645,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2676,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2482,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9704,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3173,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6286,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3204,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2862,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.224,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2155,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2569,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5564,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.954,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2778,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2549,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2551,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5793,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9486,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9487,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.646,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9015,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9059,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1914,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9742,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9745,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0641,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0153,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0197,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9709,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0204,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0232,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9474,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8827,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8864,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8709,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8711,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8761,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8762,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8705,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8741,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9197,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9477,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9507,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9661,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9564,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9576,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8854,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.884,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9146,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9682,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9684,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.936,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8782,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.879,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.863,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8869,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8864,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9312,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9466,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9485,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9293,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9396,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9386,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9341,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8883,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8921,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8914,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8812,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.884,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8757,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8735,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8742,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.892,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9082,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9083,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8711,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8921,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.892,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9464,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9465,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9469,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9224,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0186,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0219,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0457,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9534,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9495,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9722,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9427,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9428,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9859,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6952,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0086,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6204,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9116,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9113,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9314,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9464,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9408,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9383,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9453,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9413,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9505,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9459,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9465,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9459,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9584,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9627,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9605,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9278,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9286,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9399,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9519,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9524,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9635,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9551,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9692,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.948,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9886,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9997,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0096,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9928,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9832,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9631,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9373,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8912,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8948,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9049,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9605,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9727,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0191,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0356,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0235,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9971,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9431,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9477,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9111,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8987,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8793,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.899,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9256,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0225,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0183,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0363,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9784,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0159,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0017,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0127,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0458,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.094,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0935,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0777,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0672,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0565,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0439,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0364,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0867,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0522,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0592,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9852,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.984,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9454,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9463,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0131,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0424,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0881,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0268,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9858,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.958,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9483,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9592,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9645,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9552,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9627,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.946,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9661,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9689,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9427,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9173,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8917,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8995,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9094,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9454,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9702,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.029,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0041,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.027,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9985,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0089,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9948,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9495,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9311,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8981,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9539,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0369,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1373,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.127,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0531,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9684,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9374,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9771,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9632,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9566,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.931,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9215,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9251,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9652,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0149,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0024,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0559,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.054,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0786,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9807,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9532,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9253,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8975,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8845,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9185,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9144,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9407,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9039,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.944,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9178,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9389,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9459,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9404,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9268,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9111,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9117,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9362,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9317,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9701,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9715,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9622,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0188,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 70.6422,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1128,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1281,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0424,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9585,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9447,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9714,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9423,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9666,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9314,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9283,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9242,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0455,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0827,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0859,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0168,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9924,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9503,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8973,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8871,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9204,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.922,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9154,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8984,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9012,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9254,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9324,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9428,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9637,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9734,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9944,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9725,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9806,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9672,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0141,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9968,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9804,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9293,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9375,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9593,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9974,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9691,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9586,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.037,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 47.7112,
+      "success": false
+    },
+    {
+      "name": "llm_call",
+      "duration": 27.5886,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 28.9122,
+      "success": true
+    }
+  ]
+}

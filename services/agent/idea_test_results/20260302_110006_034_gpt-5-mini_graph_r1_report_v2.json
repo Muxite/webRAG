@@ -1,0 +1,807 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "034",
+    "test_name": "Laundry-List Multi-Topic Extraction",
+    "passed": true,
+    "score": 1.0,
+    "ascii_graph": "*---------.   Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?\n|\\ \\ \\ \\ \\ \\  \n* | | | | | | Visit Axolotl Wikipedia page to extract scientific name\n / / / / / /  \n* | | | | | Visit Voynich manuscript Wikipedia page to find current library holding\n / / / / /  \n* | | | | Visit Pando (tree) Wikipedia page to determine US state location\n / / / /  \n* | | | Visit Antikythera mechanism Wikipedia page to find approximate century BCE built\n / / /  \n* | | Visit Mantis shrimp Wikipedia page to extract photoreceptor count\n / /  \n* | Visit https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault\n /  \n* Merge: Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?\n"
+  },
+  "node_table": [
+    {
+      "node_id": "7551ecdb-c310-4815-8840-923794017162",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?"
+    },
+    {
+      "node_id": "3af16030-93c4-4f1a-9cd8-dad1f820a32f",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Axolotl Wikipedia page to extract scientific name"
+    },
+    {
+      "node_id": "f5a25bf9-7b6e-4ec2-9919-3a9c1908dcaa",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Voynich manuscript Wikipedia page to find current library holding"
+    },
+    {
+      "node_id": "ff70cb4d-b720-44c1-8f3b-4e8144983568",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Pando (tree) Wikipedia page to determine US state location"
+    },
+    {
+      "node_id": "c1ecf4d7-c0fd-475f-8b45-72493ba2f285",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Antikythera mechanism Wikipedia page to find approximate century BCE built"
+    },
+    {
+      "node_id": "7ddbfd67-3efc-448c-97b9-33ed564c00e5",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Mantis shrimp Wikipedia page to extract photoreceptor count"
+    },
+    {
+      "node_id": "07a04c7c-d39e-4a14-ad82-e14a5c500b01",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault"
+    },
+    {
+      "node_id": "c82eeac1-4e02-4aa0-9331-6bf9235faa0a",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 6,
+      "reason": "Found 6 visit(s) (target >=4)"
+    },
+    {
+      "check": "answer_correctness",
+      "passed": true,
+      "score": 1.0,
+      "correct": 6,
+      "total": 6,
+      "details": {
+        "Axolotl neoteny": true,
+        "Voynich manuscript": true,
+        "Pando clonal colony": true,
+        "Antikythera mechanism": true,
+        "Mantis shrimp vision": true,
+        "Svalbard Global Seed Vault": true
+      },
+      "reason": "6/6 answers correct"
+    },
+    {
+      "check": "citation_coverage",
+      "passed": true,
+      "score": 1.0,
+      "cited": 6,
+      "total": 6,
+      "reason": "6/6 topics cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 2348,
+      "words": 327,
+      "kilobytes": 2.29
+    },
+    "llm": {
+      "calls": 1,
+      "prompt": {
+        "chars": 9403,
+        "words": 993,
+        "kilobytes": 9.18,
+        "tokens": 0
+      },
+      "completion": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "total_tokens": 0
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 6,
+      "chars": 334151,
+      "words": 53560,
+      "kilobytes": 326.32
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 47,
+        "total_duration": 38.9135,
+        "avg_duration": 0.8279,
+        "min_duration": 0.3937,
+        "max_duration": 1.617,
+        "success_count": 47,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 3,
+        "total_duration": 120.0818,
+        "avg_duration": 40.0273,
+        "min_duration": 23.6329,
+        "max_duration": 59.7924,
+        "success_count": 3,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.4176,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2538,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6107,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.617,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1251,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1285,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1291,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3937,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7545,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1302,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7824,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7947,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7521,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7869,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.835,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8386,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9083,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8295,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.709,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.699,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7084,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7382,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7574,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7671,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.789,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7671,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7534,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7795,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7432,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7145,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7315,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7396,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7585,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7516,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7373,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7273,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7423,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7365,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7255,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7741,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7841,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7183,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7031,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7672,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7504,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8915,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.861,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 23.6329,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 59.7924,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 36.6565,
+        "success": true
+      }
+    ],
+    "events_count": 95
+  },
+  "node_index": {
+    "7551ecdb-c310-4815-8840-923794017162": {
+      "node_id": "7551ecdb-c310-4815-8840-923794017162",
+      "title": "Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "3af16030-93c4-4f1a-9cd8-dad1f820a32f",
+        "f5a25bf9-7b6e-4ec2-9919-3a9c1908dcaa",
+        "ff70cb4d-b720-44c1-8f3b-4e8144983568",
+        "c1ecf4d7-c0fd-475f-8b45-72493ba2f285",
+        "7ddbfd67-3efc-448c-97b9-33ed564c00e5",
+        "07a04c7c-d39e-4a14-ad82-e14a5c500b01",
+        "c82eeac1-4e02-4aa0-9331-6bf9235faa0a"
+      ],
+      "parent_ids": [],
+      "goal": "Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?"
+    },
+    "3af16030-93c4-4f1a-9cd8-dad1f820a32f": {
+      "node_id": "3af16030-93c4-4f1a-9cd8-dad1f820a32f",
+      "title": "Visit Axolotl Wikipedia page to extract scientific name",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7551ecdb-c310-4815-8840-923794017162"
+      ],
+      "goal": "Visit Axolotl Wikipedia page to extract scientific name",
+      "result_success": true,
+      "result_content_preview": "For other uses, see\nAxolotl (disambiguation)\n.\nThis article\nmay require\ncopy editing\nfor Post-Wiki Edu cleanup\n.\nYou can assist by\nediting it\n.\n(\nDecember 2025\n)\n(\nLearn how and when to remove this message\n)\nAxolotl\nThe\nwild type\nform\nConservation status\nCritically Endangered\n(\nIUCN 3.1\n)\nCITES\nAppendix II\nScientific classification\nKingdom:\nAnimalia\nPhylum:\nChordata\nClass:\nAmphibia\nOrder:\nUrodela\nFamily:\nAmbystomatidae\nGenus:\nAmbystoma\nSpecies:\nA.\u00a0mexicanum\nBinomial name\nAmbystoma mexicanum\n(\nSh",
+      "result_source_url": "https://en.wikipedia.org/wiki/Axolotl"
+    },
+    "f5a25bf9-7b6e-4ec2-9919-3a9c1908dcaa": {
+      "node_id": "f5a25bf9-7b6e-4ec2-9919-3a9c1908dcaa",
+      "title": "Visit Voynich manuscript Wikipedia page to find current library holding",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7551ecdb-c310-4815-8840-923794017162"
+      ],
+      "goal": "Visit Voynich manuscript Wikipedia page to find current library holding",
+      "result_success": true,
+      "result_content_preview": "Voynich manuscript\nBeinecke Rare Book and Manuscript Library\nA floral illustration on page 29\nAlso known as\nBeinecke MS 408\nType\nCodex\nDate\nUnknown; parchment dated to early 15th century\nPlace of origin\nUnknown; possibly\nItaly\nLanguage(s)\nUnknown; possibly\nnatural\nor\nconstructed language\nAuthors\nUnknown; suggested (amongst others):\nRoger Bacon\nWilfrid Voynich\nJakub of Tepenec\nAthanasius Kircher\nRaphael Mnishovsky\nAntonio Averlino Filarete\nCornelis Drebbel\nAnthony Ascham\nMaterial\nVellum\nSize\n\u2248 23",
+      "result_source_url": "https://en.wikipedia.org/wiki/Voynich_manuscript"
+    },
+    "ff70cb4d-b720-44c1-8f3b-4e8144983568": {
+      "node_id": "ff70cb4d-b720-44c1-8f3b-4e8144983568",
+      "title": "Visit Pando (tree) Wikipedia page to determine US state location",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7551ecdb-c310-4815-8840-923794017162"
+      ],
+      "goal": "Visit Pando (tree) Wikipedia page to determine US state location",
+      "result_success": true,
+      "result_content_preview": "For other uses, see\nPando\n.\nPando\nImage of the approximate land mass of Pando shaded green\nMap\nLocation in\nUtah\nShow map of Utah\nLocation in the United States\nShow map of the United States\nGeography\nLocation\nSevier County, Utah\n, United States\nCoordinates\n38\u00b031\u203230\u2033N\n111\u00b045\u203200\u2033W\n\ufeff / \ufeff\n38.52500\u00b0N 111.75000\u00b0W\n\ufeff /\n38.52500; -111.75000\nElevation\n2,700\u00a0m (8,900\u00a0ft)\nArea\n43.6\u00a0ha (108 acres)\nAdministration\nEstablished\n+14000\n(\n14000\n)\nBP\nEcology\nDominant tree species\nPopulus tremuloides\nPando\n(from\nLati",
+      "result_source_url": "https://en.wikipedia.org/wiki/Pando_(tree)"
+    },
+    "c1ecf4d7-c0fd-475f-8b45-72493ba2f285": {
+      "node_id": "c1ecf4d7-c0fd-475f-8b45-72493ba2f285",
+      "title": "Visit Antikythera mechanism Wikipedia page to find approximate century BCE built",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7551ecdb-c310-4815-8840-923794017162"
+      ],
+      "goal": "Visit Antikythera mechanism Wikipedia page to find approximate century BCE built",
+      "result_success": true,
+      "result_content_preview": "Antikythera mechanism\nThe Antikythera mechanism (fragment A\u00a0\u2013 front and rear); visible is the largest gear in the mechanism, about 13\u00a0cm (5\u00a0in) in diameter.\nType\nAnalogue computer\nWriting\nAncient Greek\nCreated\n2nd century BC\nPeriod/culture\nHellenistic\nDiscovered\n1901\nAntikythera\n, Greece\nPresent location\nNational Archaeological Museum, Athens\nThe\nAntikythera mechanism\n(\n/\n\u02cc\n\u00e6\nn\nt\n\u026a\nk\n\u026a\n\u02c8\n\u03b8\n\u026a\u0259r\n\u0259\n/\nAN\n-tik-ih-\nTHEER\n-\u0259\n,\nUS\nalso\n/\n\u02cc\n\u00e6\nn\nt\na\u026a\nk\n\u026a\n\u02c8\n-/\nAN\n-ty-kih-\n)\nis an\nancient Greek\nhand-powered",
+      "result_source_url": "https://en.wikipedia.org/wiki/Antikythera_mechanism"
+    },
+    "7ddbfd67-3efc-448c-97b9-33ed564c00e5": {
+      "node_id": "7ddbfd67-3efc-448c-97b9-33ed564c00e5",
+      "title": "Visit Mantis shrimp Wikipedia page to extract photoreceptor count",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7551ecdb-c310-4815-8840-923794017162"
+      ],
+      "goal": "Visit Mantis shrimp Wikipedia page to extract photoreceptor count",
+      "result_success": true,
+      "result_content_preview": "Mantis shrimp\nTemporal range:\nOdontodactylus scyllarus\nLysiosquillina maculata\n(Zebra mantis shrimp)\nScientific classification\nKingdom:\nAnimalia\nPhylum:\nArthropoda\nClass:\nMalacostraca\nSubclass:\nHoplocarida\nOrder:\nStomatopoda\nLatreille\n, 1817\nSubdivisions\nSuperfamilies and families\nBathysquilloidea\nBathysquillidae\nIndosquillidae\nGonodactyloidea\nAlainosquillidae\nHemisquillidae\nGonodactylidae\nOdontodactylidae\nProtosquillidae\nPseudosquillidae\nTakuidae\nErythrosquilloidea\nErythrosquillidae\nLysiosquill",
+      "result_source_url": "https://en.wikipedia.org/wiki/Mantis_shrimp"
+    },
+    "07a04c7c-d39e-4a14-ad82-e14a5c500b01": {
+      "node_id": "07a04c7c-d39e-4a14-ad82-e14a5c500b01",
+      "title": "Visit https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7551ecdb-c310-4815-8840-923794017162"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault",
+      "result_success": true,
+      "result_content_preview": "Svalbard Global Seed Vault\nSvalbard globale fr\u00f8hvelv\nLogo since 2018\nLocation within Svalbard\nGeneral information\nStatus\nCompleted\nType\nSeed bank\nLocation\nSpitsbergen\n,\nLongyearbyen\n,\nNorway\nCoordinates\n78\u00b014\u203209\u2033N\n15\u00b029\u203229\u2033E\n\ufeff / \ufeff\n78.23583\u00b0N 15.49139\u00b0E\n\ufeff /\n78.23583; 15.49139\nElevation\n130\u00a0m (430\u00a0ft)\nGroundbreaking\n19 June 2006\nOpened\n26 February 2008\nCost\n45 million\nkr\n(\nUS$8.8 million\n, 2008)\nOwner\nNorway\u2019s Ministry of Agriculture and Food\n[1]\nTechnical details\nFloor count\n1\nFloor area\nc. 1,000",
+      "result_source_url": "https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault"
+    },
+    "c82eeac1-4e02-4aa0-9331-6bf9235faa0a": {
+      "node_id": "c82eeac1-4e02-4aa0-9331-6bf9235faa0a",
+      "title": "Merge: Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7551ecdb-c310-4815-8840-923794017162"
+      ],
+      "goal": "Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Answers to the six Wikipedia page questions (each with verbatim evidence quoted from the visited page and the citation URL):\n\n1) Axolotl \u2014 What is the scientific name of the axolotl?\nAnswer: Ambystoma mexicanum\nCitation: https://en.wikipedia.org/wiki/Axolotl\nVerbatim quote from the page:\n\"Binomial name\nAmbystoma mexicanum\n(Shaw and Nodder, 1798)\"\n\n2) Voynich manuscript \u2014 In which library is the Voynich manuscript currently held?\nAnswer: Beinecke Rare Book and Manuscript Library (Yale University)\nCitation: https://en.wikipedia.org/wiki/Voynich_manuscript\nVerbatim quote from the page:\n\"Since 1969, it has been held in Yale University's Beinecke Rare Book and Manuscript Library.\"\n\n3) Pando clonal colony \u2014 In which US state is the Pando clonal colony located?\nAnswer: Utah\nCitation: https://en.wikipedia.org/wiki/Pando_(tree)\nVerbatim quote from the page:\n\"Pando (from Latin pando 'I spread') is the name of a quaking aspen (Populus tremuloides) clone located in Sevier County, Utah, United States, in the Fishlake National Forest.\"\n\n4) Antikythera mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\nAnswer: 2nd century BC (approximate)\nCitation: https://en.wikipedia.org/wiki/Antikythera_mechanism\nVerbatim quote from the page:\n\"Created\n2nd century BC\"\n(also relevant supporting excerpts on dating: \"The instrument is believed to have been designed and constructed by Hellenistic scientists and been variously dated to about 87 BC, between 150 and 100 BC, or 205 BC.\")\n\n5) Mantis shrimp vision \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\nAnswer: Between 12 and 16 types of photoreceptor cells (approximate)\nCitation: https://en.wikipedia.org/wiki/Mantis_shrimp\nVerbatim quote from the page:\n\"Compared with the four types of photoreceptor cell that humans possess in their eyes, the eyes of a mantis shrimp have between 12 and 16 types of photoreceptor cells.\"\n\n6) Svalbard Global Seed Vault \u2014 In which country is the Svalbard Global Seed Vault located?\nAnswer: Norway\nCitation: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault\nVerbatim quote from the page:\n\"The Svalbard Global Seed Vault (Norwegian: Svalbard globale fr\u0000f8hvelv) is a secure backup facility for the world's crop diversity on the Norwegian island of Spitsbergen in the remote Arctic Svalbard archipelago.\"\n",
+    "action_summary": "Provided six direct answers (scientific name, library holding, US state, century BCE, photoreceptor count range, country) with verbatim quotations from the corresponding Wikipedia pages and the citation URL for each.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.4176,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2538,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6107,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.617,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1251,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1285,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1291,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3937,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7545,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1302,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7824,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7947,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7521,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7869,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.835,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8386,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9083,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8295,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.709,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.699,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7084,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7382,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7574,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7671,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.789,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7671,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7534,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7795,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7432,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7145,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7315,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7396,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7585,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7516,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7373,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7273,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7423,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7365,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7255,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7741,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7841,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7183,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7031,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7672,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7504,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8915,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.861,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 23.6329,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 59.7924,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 36.6565,
+      "success": true
+    }
+  ]
+}

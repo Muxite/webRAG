@@ -1,0 +1,2260 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "037",
+    "test_name": "Five-Topic Convergence Challenge",
+    "passed": true,
+    "score": 0.9199999999999999,
+    "ascii_graph": "*---------.   Research each of the following five topics by visiting their Wikipedia pages. For each, extract the specific fact requested.\n\n1. Kowloon Walled City: https://en.wikipedia.org/wiki/Kowloon_Walled_City \u2014 Extract: peak population density or approximate resident count\n2. Mycelium networks: https://en.wikipedia.org/wiki/Mycelium \u2014 Extract: the term for fungal communication networks connecting trees\n3. Fermi Paradox: https://en.wikipedia.org/wiki/Fermi_paradox \u2014 Extract: the approximate number of stars in the Milky Way that makes the paradox compelling\n4. Dead Internet theory: https://en.wikipedia.org/wiki/Dead_Internet_theory \u2014 Extract: the core claim of the Dead Internet theory\n5. Kintsugi: https://en.wikipedia.org/wiki/Kintsugi \u2014 Extract: the material used and the philosophy behind kintsugi repair\n\nAfter gathering all facts, write a CONVERGENCE REPORT (250+ words) that:\n- Identifies at least THREE cross-cutting themes that span all five topics (e.g., hidden networks, emergent complexity, human perception vs. reality, decay and renewal)\n- For each theme, references specific facts from at least two of the five topics\n- Concludes with an original insight that connects all five topics\n\nCite every Wikipedia URL used.\n|\\ \\ \\ \\ \\ \\  \n* | | | | | | Visit Kowloon Walled City (Wikipedia) and extract peak population/density\n / / / / / /  \n* | | | | | Visit Mycelium (Wikipedia) and extract the term for fungal communication networks connecting trees\n / / / / /  \n* | | | | Visit Fermi Paradox (Wikipedia) and extract the Milky Way star-count cited\n / / / /  \n* | | | Visit Kintsugi (Wikipedia) and extract materials used and the repair philosophy\n / / /  \n* | | Synthesize facts into a CONVERGENCE REPORT (250+ words) referencing all five Wikipedia URLs\n / /  \n* | Visit https://en.wikipedia.org/wiki/Dead_Internet_theory\n /  \n* Merge: Research each of the following five topics by visiting their Wikipedia pages. For each, extract the specific fact requested.\n\n1. Kowloon Walled City: https://en.wikipedia.org/wiki/Kowloon_Walled_City \u2014 Extract: peak population density or approximate resident count\n2. Mycelium networks: https://en.wikipedia.org/wiki/Mycelium \u2014 Extract: the term for fungal communication networks connecting trees\n3. Fermi Paradox: https://en.wikipedia.org/wiki/Fermi_paradox \u2014 Extract: the approximate number of stars in the Milky Way that makes the paradox compelling\n4. Dead Internet theory: https://en.wikipedia.org/wiki/Dead_Internet_theory \u2014 Extract: the core claim of the Dead Internet theory\n5. Kintsugi: https://en.wikipedia.org/wiki/Kintsugi \u2014 Extract: the material used and the philosophy behind kintsugi repair\n\nAfter gathering all facts, write a CONVERGENCE REPORT (250+ words) that:\n- Identifies at least THREE cross-cutting themes that span all five topics (e.g., hidden networks, emergent complexity, human perception vs. reality, decay and renewal)\n- For each theme, references specific facts from at least two of the five topics\n- Concludes with an original insight that connects all five topics\n\nCite every Wikipedia URL used.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "3b9bbd33-9550-4244-992d-6cfcba40709f",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Research each of the following five topics by visiting their Wikipedia pages. For each, extract the specific fact requested.\n\n1. Kowloon Walled City: https://en.wikipedia.org/wiki/Kowloon_Walled_City \u2014 Extract: peak population density or approximate resident count\n2. Mycelium networks: https://en.wikipedia.org/wiki/Mycelium \u2014 Extract: the term for fungal communication networks connecting trees\n3. Fermi Paradox: https://en.wikipedia.org/wiki/Fermi_paradox \u2014 Extract: the approximate number of stars in the Milky Way that makes the paradox compelling\n4. Dead Internet theory: https://en.wikipedia.org/wiki/Dead_Internet_theory \u2014 Extract: the core claim of the Dead Internet theory\n5. Kintsugi: https://en.wikipedia.org/wiki/Kintsugi \u2014 Extract: the material used and the philosophy behind kintsugi repair\n\nAfter gathering all facts, write a CONVERGENCE REPORT (250+ words) that:\n- Identifies at least THREE cross-cutting themes that span all five topics (e.g., hidden networks, emergent complexity, human perception vs. reality, decay and renewal)\n- For each theme, references specific facts from at least two of the five topics\n- Concludes with an original insight that connects all five topics\n\nCite every Wikipedia URL used."
+    },
+    {
+      "node_id": "1f61abfb-6f4a-4f4a-b35c-bf5ff82185b9",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "title": "Visit Kowloon Walled City (Wikipedia) and extract peak population/density"
+    },
+    {
+      "node_id": "69805254-5d9e-4941-b5aa-98724349a37c",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "title": "Visit Mycelium (Wikipedia) and extract the term for fungal communication networks connecting trees"
+    },
+    {
+      "node_id": "c3aeae7e-278a-4975-8e15-3ee427b92b10",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "title": "Visit Fermi Paradox (Wikipedia) and extract the Milky Way star-count cited"
+    },
+    {
+      "node_id": "3a45e990-79ff-4a8e-a21f-b064e459c5d7",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "title": "Visit Kintsugi (Wikipedia) and extract materials used and the repair philosophy"
+    },
+    {
+      "node_id": "f98dfb6e-984a-48bc-ab56-a5766a26b121",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "title": "Synthesize facts into a CONVERGENCE REPORT (250+ words) referencing all five Wikipedia URLs"
+    },
+    {
+      "node_id": "542b52de-51e6-461f-9fc6-43c764714c8e",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "title": "Visit https://en.wikipedia.org/wiki/Dead_Internet_theory"
+    },
+    {
+      "node_id": "61399d8a-c104-4bae-ad97-084077914205",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Research each of the following five topics by visiting their Wikipedia pages. For each, extract the specific fact requested.\n\n1. Kowloon Walled City: https://en.wikipedia.org/wiki/Kowloon_Walled_City \u2014 Extract: peak population density or approximate resident count\n2. Mycelium networks: https://en.wikipedia.org/wiki/Mycelium \u2014 Extract: the term for fungal communication networks connecting trees\n3. Fermi Paradox: https://en.wikipedia.org/wiki/Fermi_paradox \u2014 Extract: the approximate number of stars in the Milky Way that makes the paradox compelling\n4. Dead Internet theory: https://en.wikipedia.org/wiki/Dead_Internet_theory \u2014 Extract: the core claim of the Dead Internet theory\n5. Kintsugi: https://en.wikipedia.org/wiki/Kintsugi \u2014 Extract: the material used and the philosophy behind kintsugi repair\n\nAfter gathering all facts, write a CONVERGENCE REPORT (250+ words) that:\n- Identifies at least THREE cross-cutting themes that span all five topics (e.g., hidden networks, emergent complexity, human perception vs. reality, decay and renewal)\n- For each theme, references specific facts from at least two of the five topics\n- Concludes with an original insight that connects all five topics\n\nCite every Wikipedia URL used."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 5,
+      "reason": "Found 5 visit(s) (target >=5)"
+    },
+    {
+      "check": "fact_extraction",
+      "passed": true,
+      "score": 1.0,
+      "found": 5,
+      "total": 5,
+      "details": {
+        "Kowloon Walled City": true,
+        "Mycelium networks": true,
+        "Fermi Paradox": true,
+        "Dead Internet theory": true,
+        "Kintsugi": true
+      },
+      "reason": "5/5 facts extracted"
+    },
+    {
+      "check": "convergence_report",
+      "passed": true,
+      "score": 1.0,
+      "themes_found": 7,
+      "topics_mentioned": 5,
+      "word_count": 620,
+      "reason": "themes=7, topics=5/5, words=620"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "cited": 5,
+      "total": 5,
+      "details": {
+        "Kowloon Walled City": true,
+        "Mycelium networks": true,
+        "Fermi Paradox": true,
+        "Dead Internet theory": true,
+        "Kintsugi": true
+      },
+      "reason": "5/5 URLs cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 11735,
+      "words": 1502,
+      "kilobytes": 11.46
+    },
+    "llm": {
+      "calls": 8,
+      "prompt": {
+        "chars": 255786,
+        "words": 31155,
+        "kilobytes": 249.79,
+        "tokens": 37146
+      },
+      "completion": {
+        "chars": 19799,
+        "words": 2293,
+        "kilobytes": 19.33,
+        "tokens": 6794
+      },
+      "total_tokens": 43940
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 5,
+      "chars": 211973,
+      "words": 33200,
+      "kilobytes": 207.0
+    },
+    "timings": {
+      "chroma_add": {
+        "count": 8,
+        "total_duration": 160.0589,
+        "avg_duration": 20.0074,
+        "min_duration": 12.7361,
+        "max_duration": 30.4196,
+        "success_count": 8,
+        "error_count": 0
+      },
+      "chroma_query": {
+        "count": 175,
+        "total_duration": 76.8991,
+        "avg_duration": 0.4394,
+        "min_duration": 0.2522,
+        "max_duration": 7.3462,
+        "success_count": 175,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 8,
+        "total_duration": 284.2953,
+        "avg_duration": 35.5369,
+        "min_duration": 9.5833,
+        "max_duration": 76.6818,
+        "success_count": 8,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 23.2186,
+        "avg_duration": 23.2186,
+        "min_duration": 23.2186,
+        "max_duration": 23.2186,
+        "success_count": 0,
+        "error_count": 1
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_add",
+        "duration": 12.7361,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 12.7421,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.3462,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 28.6778,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0326,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 29.8792,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7297,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.4577,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 14.9412,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3814,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 30.4196,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 15.2531,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 15.4098,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3789,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5318,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8621,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3221,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.817,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.233,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5387,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3096,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3556,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4163,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3396,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3266,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3325,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2883,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3129,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3102,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2738,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.315,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3026,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2954,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3061,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3733,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3155,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.353,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3166,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3235,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3339,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3431,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3192,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5009,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3516,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3068,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3247,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3121,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3057,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2722,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3537,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3316,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2895,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2764,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.303,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2876,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3921,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2745,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3782,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3166,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2836,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2883,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2989,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3197,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2884,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2986,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2987,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2835,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2885,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3491,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3185,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2825,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2963,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4208,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3372,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2872,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2826,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2892,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2787,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.294,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3206,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3473,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3066,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3202,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4234,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2844,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3257,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3038,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3267,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2938,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3047,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3263,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3043,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4241,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3176,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.34,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3567,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2918,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2627,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3303,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.286,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3001,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2714,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3411,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2601,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2909,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2801,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2536,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3102,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2643,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2912,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2803,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.262,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 29.5557,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.277,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3008,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2792,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2642,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.267,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.436,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 34.1348,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6273,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6231,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5915,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5842,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5581,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5614,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5455,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5444,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5415,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5236,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5056,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5182,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2989,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2767,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2798,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2677,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2559,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3195,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3058,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2522,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2566,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2961,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2743,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2998,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.267,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.421,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2753,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3448,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2844,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3421,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3019,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3457,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3328,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3057,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.353,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.268,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3458,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2541,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2799,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2927,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2839,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2796,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.326,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2571,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3085,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2623,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2648,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.277,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2742,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.297,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2738,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3027,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3449,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2869,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.284,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2793,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 47.8148,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 47.8234,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3289,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3043,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3488,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3023,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2862,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2756,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2776,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2846,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.285,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 9.5833,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 19.7975,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 23.2186,
+        "success": false
+      },
+      {
+        "name": "llm_call",
+        "duration": 18.9039,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 76.6818,
+        "success": true
+      }
+    ],
+    "events_count": 368
+  },
+  "node_index": {
+    "3b9bbd33-9550-4244-992d-6cfcba40709f": {
+      "node_id": "3b9bbd33-9550-4244-992d-6cfcba40709f",
+      "title": "Research each of the following five topics by visiting their Wikipedia pages. For each, extract the specific fact requested.\n\n1. Kowloon Walled City: https://en.wikipedia.org/wiki/Kowloon_Walled_City \u2014 Extract: peak population density or approximate resident count\n2. Mycelium networks: https://en.wikipedia.org/wiki/Mycelium \u2014 Extract: the term for fungal communication networks connecting trees\n3. Fermi Paradox: https://en.wikipedia.org/wiki/Fermi_paradox \u2014 Extract: the approximate number of stars in the Milky Way that makes the paradox compelling\n4. Dead Internet theory: https://en.wikipedia.org/wiki/Dead_Internet_theory \u2014 Extract: the core claim of the Dead Internet theory\n5. Kintsugi: https://en.wikipedia.org/wiki/Kintsugi \u2014 Extract: the material used and the philosophy behind kintsugi repair\n\nAfter gathering all facts, write a CONVERGENCE REPORT (250+ words) that:\n- Identifies at least THREE cross-cutting themes that span all five topics (e.g., hidden networks, emergent complexity, human perception vs. reality, decay and renewal)\n- For each theme, references specific facts from at least two of the five topics\n- Concludes with an original insight that connects all five topics\n\nCite every Wikipedia URL used.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "1f61abfb-6f4a-4f4a-b35c-bf5ff82185b9",
+        "69805254-5d9e-4941-b5aa-98724349a37c",
+        "c3aeae7e-278a-4975-8e15-3ee427b92b10",
+        "3a45e990-79ff-4a8e-a21f-b064e459c5d7",
+        "f98dfb6e-984a-48bc-ab56-a5766a26b121",
+        "542b52de-51e6-461f-9fc6-43c764714c8e",
+        "61399d8a-c104-4bae-ad97-084077914205"
+      ],
+      "parent_ids": [],
+      "goal": "Research each of the following five topics by visiting their Wikipedia pages. For each, extract the specific fact requested.\n\n1. Kowloon Walled City: https://en.wikipedia.org/wiki/Kowloon_Walled_City \u2014 Extract: peak population density or approximate resident count\n2. Mycelium networks: https://en.wikipedia.org/wiki/Mycelium \u2014 Extract: the term for fungal communication networks connecting trees\n3. Fermi Paradox: https://en.wikipedia.org/wiki/Fermi_paradox \u2014 Extract: the approximate number of stars in the Milky Way that makes the paradox compelling\n4. Dead Internet theory: https://en.wikipedia.org/wiki/Dead_Internet_theory \u2014 Extract: the core claim of the Dead Internet theory\n5. Kintsugi: https://en.wikipedia.org/wiki/Kintsugi \u2014 Extract: the material used and the philosophy behind kintsugi repair\n\nAfter gathering all facts, write a CONVERGENCE REPORT (250+ words) that:\n- Identifies at least THREE cross-cutting themes that span all five topics (e.g., hidden networks, emergent complexity, human perception vs. reality, decay and renewal)\n- For each theme, references specific facts from at least two of the five topics\n- Concludes with an original insight that connects all five topics\n\nCite every Wikipedia URL used."
+    },
+    "1f61abfb-6f4a-4f4a-b35c-bf5ff82185b9": {
+      "node_id": "1f61abfb-6f4a-4f4a-b35c-bf5ff82185b9",
+      "title": "Visit Kowloon Walled City (Wikipedia) and extract peak population/density",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "children": [],
+      "parent_ids": [
+        "3b9bbd33-9550-4244-992d-6cfcba40709f"
+      ],
+      "goal": "Visit Kowloon Walled City (Wikipedia) and extract peak population/density",
+      "result_success": true,
+      "result_content_preview": "For the park, see\nKowloon Walled City Park\n.\nKowloon Walled City\n\u4e5d\u9f8d\u57ce\u5be8\nThe city in 1989\nKowloon Walled City\nCoordinates:\n22\u00b019\u203256\u2033N\n114\u00b011\u203225\u2033E\n\ufeff / \ufeff\n22.33222\u00b0N 114.19028\u00b0E\n\ufeff /\n22.33222; 114.19028\nCountry / City\nChina\n(\nde facto\n, 1898\u20131912;\nde jure\n, 1898\u20131993)\nBritish Hong Kong\n(\nde facto\n, 1912\u20131941 and 1945\u20131993)\nJapan\n(\nde facto\n, 1941\u20131945)\nDistrict\nKowloon City District\nArea\nKowloon City\nSettled\nc.\n1898\nDemolished\n1993\u20131994\nGovernment\n\u2022\u00a0Type\nUngoverned\nArea\n\u2022\u00a0Total\n2.6\u00a0ha (6.4 acres)\nPopul",
+      "result_source_url": "https://en.wikipedia.org/wiki/Kowloon_Walled_City"
+    },
+    "69805254-5d9e-4941-b5aa-98724349a37c": {
+      "node_id": "69805254-5d9e-4941-b5aa-98724349a37c",
+      "title": "Visit Mycelium (Wikipedia) and extract the term for fungal communication networks connecting trees",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "children": [],
+      "parent_ids": [
+        "3b9bbd33-9550-4244-992d-6cfcba40709f"
+      ],
+      "goal": "Visit Mycelium (Wikipedia) and extract the term for fungal communication networks connecting trees",
+      "result_success": true,
+      "result_content_preview": "Mycelium\nVarious examples of mycelium in different sizes,\nenvironments\nand\nspecies\n.\nMycelium\n(\npl.\n:\nmycelia\n)\nis a root-like structure of a\nfungus\nconsisting of a mass of branching, thread-like\nhyphae\n.\nIts normal form is that of branched, slender, entangled, anastomosing, hyaline threads.\nFungal colonies composed of mycelium are found in and on\nsoil\nand many other\nsubstrates\n. A typical single\nspore\ngerminates into\nmonokaryotic\nmycelium,\nwhich cannot reproduce sexually; when two compatible mo",
+      "result_source_url": "https://en.wikipedia.org/wiki/Mycelium"
+    },
+    "c3aeae7e-278a-4975-8e15-3ee427b92b10": {
+      "node_id": "c3aeae7e-278a-4975-8e15-3ee427b92b10",
+      "title": "Visit Fermi Paradox (Wikipedia) and extract the Milky Way star-count cited",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "children": [],
+      "parent_ids": [
+        "3b9bbd33-9550-4244-992d-6cfcba40709f"
+      ],
+      "goal": "Visit Fermi Paradox (Wikipedia) and extract the Milky Way star-count cited",
+      "result_success": true,
+      "result_content_preview": "This article is about the absence of clear evidence of extraterrestrial life. For a type of estimation problem, see\nFermi problem\n.\nThe\nFermi paradox\nis the discrepancy between the lack of conclusive evidence of advanced\nextraterrestrial life\nand the apparently high likelihood of its existence.\nThe paradox is named after physicist\nEnrico Fermi\n, who informally posed the question\u2014remembered by\nEmil Konopinski\nas \"But where is everybody?\"\u2014during a 1950 conversation at\nLos Alamos\nwith colleagues Ko",
+      "result_source_url": "https://en.wikipedia.org/wiki/Fermi_paradox"
+    },
+    "3a45e990-79ff-4a8e-a21f-b064e459c5d7": {
+      "node_id": "3a45e990-79ff-4a8e-a21f-b064e459c5d7",
+      "title": "Visit Kintsugi (Wikipedia) and extract materials used and the repair philosophy",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "children": [],
+      "parent_ids": [
+        "3b9bbd33-9550-4244-992d-6cfcba40709f"
+      ],
+      "goal": "Visit Kintsugi (Wikipedia) and extract materials used and the repair philosophy",
+      "result_success": true,
+      "result_content_preview": "For other uses, see\nKintsugi (disambiguation)\n.\n\"Kintsukuroi\" redirects here. For other uses, see\nKintsukuroi (disambiguation)\n.\nKintsugi\n(/k\u026an\u02c8tsu\u02d0\u0261i/, Japanese: \u91d1\u7d99\u304e, [k\u02b2int\u0361s\u026f\u0261\u02b2i], lit.\u2009\"golden joinery\"), also known as\nkintsukuroi\n(\n\u91d1\u7e55\u3044\n, \"golden repair\")\n,\nis the\nJapanese art\nof repairing broken\npottery\nby mending the areas of breakage with\nurushi\nlacquer\ndusted or mixed with powdered\ngold\n,\nsilver\n, or\nplatinum\n. The method is similar to the\nmaki-e\ntechnique.\nAs a\nphilosophy\n, it treats brea",
+      "result_source_url": "https://en.wikipedia.org/wiki/Kintsugi"
+    },
+    "f98dfb6e-984a-48bc-ab56-a5766a26b121": {
+      "node_id": "f98dfb6e-984a-48bc-ab56-a5766a26b121",
+      "title": "Synthesize facts into a CONVERGENCE REPORT (250+ words) referencing all five Wikipedia URLs",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "3b9bbd33-9550-4244-992d-6cfcba40709f"
+      ],
+      "goal": "Synthesize facts into a CONVERGENCE REPORT (250+ words) referencing all five Wikipedia URLs",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "542b52de-51e6-461f-9fc6-43c764714c8e": {
+      "node_id": "542b52de-51e6-461f-9fc6-43c764714c8e",
+      "title": "Visit https://en.wikipedia.org/wiki/Dead_Internet_theory",
+      "action": "visit",
+      "status": "done",
+      "score": 0.12,
+      "children": [],
+      "parent_ids": [
+        "3b9bbd33-9550-4244-992d-6cfcba40709f"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Dead_Internet_theory",
+      "result_success": true,
+      "result_content_preview": "The\ndead Internet theory\nis a\nconspiracy theory\nthat asserts that, since around 2016, the\nInternet\nhas consisted primarily of\nbot activity\nand\nautomated content\nmanipulated by\nalgorithmic curation\n. This alleged coordinated effort aims to control the population and reduce genuine human interaction.\nSupporters of the theory claim that\nsocial bots\nwere deliberately created to manipulate algorithms and enhance search results to influence consumers.\nSome proponents also accuse government agencies of",
+      "result_source_url": "https://en.wikipedia.org/wiki/Dead_Internet_theory"
+    },
+    "61399d8a-c104-4bae-ad97-084077914205": {
+      "node_id": "61399d8a-c104-4bae-ad97-084077914205",
+      "title": "Merge: Research each of the following five topics by visiting their Wikipedia pages. For each, extract the specific fact requested.\n\n1. Kowloon Walled City: https://en.wikipedia.org/wiki/Kowloon_Walled_City \u2014 Extract: peak population density or approximate resident count\n2. Mycelium networks: https://en.wikipedia.org/wiki/Mycelium \u2014 Extract: the term for fungal communication networks connecting trees\n3. Fermi Paradox: https://en.wikipedia.org/wiki/Fermi_paradox \u2014 Extract: the approximate number of stars in the Milky Way that makes the paradox compelling\n4. Dead Internet theory: https://en.wikipedia.org/wiki/Dead_Internet_theory \u2014 Extract: the core claim of the Dead Internet theory\n5. Kintsugi: https://en.wikipedia.org/wiki/Kintsugi \u2014 Extract: the material used and the philosophy behind kintsugi repair\n\nAfter gathering all facts, write a CONVERGENCE REPORT (250+ words) that:\n- Identifies at least THREE cross-cutting themes that span all five topics (e.g., hidden networks, emergent complexity, human perception vs. reality, decay and renewal)\n- For each theme, references specific facts from at least two of the five topics\n- Concludes with an original insight that connects all five topics\n\nCite every Wikipedia URL used.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "3b9bbd33-9550-4244-992d-6cfcba40709f"
+      ],
+      "goal": "Research each of the following five topics by visiting their Wikipedia pages. For each, extract the specific fact requested.\n\n1. Kowloon Walled City: https://en.wikipedia.org/wiki/Kowloon_Walled_City \u2014 Extract: peak population density or approximate resident count\n2. Mycelium networks: https://en.wikipedia.org/wiki/Mycelium \u2014 Extract: the term for fungal communication networks connecting trees\n3. Fermi Paradox: https://en.wikipedia.org/wiki/Fermi_paradox \u2014 Extract: the approximate number of stars in the Milky Way that makes the paradox compelling\n4. Dead Internet theory: https://en.wikipedia.org/wiki/Dead_Internet_theory \u2014 Extract: the core claim of the Dead Internet theory\n5. Kintsugi: https://en.wikipedia.org/wiki/Kintsugi \u2014 Extract: the material used and the philosophy behind kintsugi repair\n\nAfter gathering all facts, write a CONVERGENCE REPORT (250+ words) that:\n- Identifies at least THREE cross-cutting themes that span all five topics (e.g., hidden networks, emergent complexity, human perception vs. reality, decay and renewal)\n- For each theme, references specific facts from at least two of the five topics\n- Concludes with an original insight that connects all five topics\n\nCite every Wikipedia URL used.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Extracted facts (with verbatim evidence and citations):\n\n1) Kowloon Walled City \u2014 peak population / density\n- Extracted fact(s): Approximate resident count: roughly 35,000; peak population density reported as ~1,300,000/km2 (and elsewhere approx. 1.2 million/km2). \n- Verbatim evidence from the page: \"Population (1990) \u2022 Total 35,000 \u2022 Density 1,300,000/km2 (3,500,000/sq mi)\" (Kowloon Walled City - Wikipedia: https://en.wikipedia.org/wiki/Kowloon_Walled_City).\n  Source quote (RAW): \"Population (1990)\\n\u2022 Total\\n35,000\\n\u2022 Density\\n1,300,000/km\\n2\\n(3,500,000/sq\\u00a0mi)\" \u2014 https://en.wikipedia.org/wiki/Kowloon_Walled_City\n\n- Additional supporting quote from the article (gives equivalent phrasing): \"By the late 1980s, the walled city contained roughly 35,000 residents within its territory of 2.6 hectares (6.4 acres), equivalent to a population density of approximately 1.2 million inhabitants per square kilometre (3 million inhabitants per square mile).\" \u2014 https://en.wikipedia.org/wiki/Kowloon_Walled_City\n\n2) Mycelium networks \u2014 term for fungal communication networks connecting trees\n- Extracted term/phrase: \"mycelial networks\" (and relatedly the role of mycorrhizal fungi / mycorrhizal mycelial associations in connecting plants).\n- Verbatim evidence from the page: \"Plants appear to communicate within an ecosystem using mycelium, the fungal network produced by mycorrhiza fungi.\" \u2014 https://en.wikipedia.org/wiki/Mycelium\n  Source quote (RAW): \"Plants appear to communicate within an ecosystem using mycelium, the fungal network produced by mycorrhiza fungi.\" \u2014 https://en.wikipedia.org/wiki/Mycelium\n\n- Additional phrase used on the page: \"Mycelial networks constitute 20-30% of soil biomass...\" \u2014 https://en.wikipedia.org/wiki/Mycelium\n  Source quote (RAW): \"Mycelial networks constitute 20-30% of soil biomass, though traditional biomass measures fail to detect them.\" \u2014 https://en.wikipedia.org/wiki/Mycelium\n\n3) Fermi Paradox \u2014 approximate number of stars in the Milky Way that makes the paradox compelling\n- Extracted figure: \"an estimated 200\u2013400 billion stars in the Milky Way (2\u20134 \u00d7 10^11)\".\n- Verbatim evidence from the page: \"The first aspect of the Fermi paradox is a function of the scale or the large numbers involved: there are an estimated 200\u2013400 billion stars in the Milky Way (2\u20134 \u00d7 10^11) and 70 sextillion (7\u00d710^22) in the observable universe.\" \u2014 https://en.wikipedia.org/wiki/Fermi_paradox\n  Source quote (RAW): \"The first aspect of the Fermi paradox is a function of the scale or the large numbers involved: there are an estimated 200\u2013400 billion stars in the Milky Way (2\u20134 \u00d7\\n10\\n11\\n) and 70 sextillion (7\u00d710\\n22\\n) in the observable universe.\" \u2014 https://en.wikipedia.org/wiki/Fermi_paradox\n\n4) Dead Internet theory \u2014 core claim\n- Extracted core claim: The theory asserts that (since about 2016) much of the Internet consists primarily of bot activity and automated content manipulated by algorithmic curation (used to control/manipulate people). \n- Verbatim evidence from the page: \"The dead Internet theory is a conspiracy theory that asserts that, since around 2016, the Internet has consisted primarily of bot activity and automated content manipulated by algorithmic curation.\" \u2014 https://en.wikipedia.org/wiki/Dead_Internet_theory\n  Source quote (RAW): \"The\\ndead Internet theory\\n\\nis a\\nconspiracy theory\\nthat asserts that, since around 2016, the\\nInternet\\nhas consisted primarily of\\nbot activity\\nand\\nautomated content\\nmanipulated by\\nalgorithmic curation\\.\" \u2014 https://en.wikipedia.org/wiki/Dead_Internet_theory\n\n- Additional supporting quote (on intent/claims): \"This alleged coordinated effort aims to control the population and reduce genuine human interaction.\" \u2014 https://en.wikipedia.org/wiki/Dead_Internet_theory\n  Source quote (RAW): \"This alleged coordinated effort aims to control the population and reduce genuine human interaction.\" \u2014 https://en.wikipedia.org/wiki/Dead_Internet_theory\n\n5) Kintsugi \u2014 materials used and the repair philosophy\n- Extracted materials: urushi lacquer dusted or mixed with powdered gold, silver, or platinum (and several urushi types listed such as ki urushi, bengara urushi, etc.).\n- Verbatim evidence from the page (materials): \"Kintsugi ... is the Japanese art of repairing broken pottery by mending the areas of breakage with urushi lacquer dusted or mixed with powdered gold, silver, or platinum.\" \u2014 https://en.wikipedia.org/wiki/Kintsugi\n  Source quote (RAW): \"Kintsugi ... is the\\nJapanese art\\nof repairing broken\\npottery\\nby mending the areas of breakage with\\nurushi\\nlacquer\\ndusted or mixed with powdered\\ngold\\n,\\nsilver\\n, or\\nplatinum\\.\" \u2014 https://en.wikipedia.org/wiki/Kintsugi\n\n- Verbatim evidence from the page (philosophy): \"As a philosophy, it treats breakage and repair as part of the history of an object, rather than something to disguise.\" \u2014 https://en.wikipedia.org/wiki/Kintsugi\n  Source quote (RAW): \"As a\\nphilosophy\\n, it treats breakage and repair as part of the history of an object, rather than something to disguise.\" \u2014 https://en.wikipedia.org/wiki/Kintsugi\n\n\nCONVERGENCE REPORT (250+ words)\n\nOverview: The five topics (Kowloon Walled City; mycelium/mycelial networks; the Fermi paradox; the Dead Internet theory; and kintsugi) come from different domains (urban history, biology, astrobiology/SETI, online-culture conspiracy, and craft/aesthetics). Yet when read side-by-side, they reveal recurring patterns: hidden or networked systems shaping observable outcomes; emergent, self-organizing complexity arising without centralized control; and tensions between appearance/perception and underlying reality \u2014 with human acts of repair or reinterpretation responding to rupture. Below I identify three cross-cutting themes, each referenced to specific facts from the visited Wikipedia pages.\n\nTheme A \u2014 Hidden / networked systems\n- Mycelium: \"Plants appear to communicate within an ecosystem using mycelium, the fungal network produced by mycorrhiza fungi.\" (https://en.wikipedia.org/wiki/Mycelium) \u2014 this highlights subterranean, largely invisible networks connecting organisms.\n- Dead Internet theory: \"The dead Internet theory ... asserts that, since around 2016, the Internet has consisted primarily of bot activity and automated content manipulated by algorithmic curation.\" (https://en.wikipedia.org/wiki/Dead_Internet_theory) \u2014 this posits an underlying non-human layer reshaping what users perceive online.\n- Kowloon Walled City (supporting example of a hidden enclave): the city is described as \"an extremely densely populated and largely lawless enclave\" formed by a \"power vacuum\" \u2014 a human-built hidden social/organizational system within formal jurisdictional structures (https://en.wikipedia.org/wiki/Kowloon_Walled_City: \"Kowloon Walled City ... was an extremely densely populated and largely lawless enclave ... creating a power vacuum.\")\n\nTheme B \u2014 Emergence and self-organization without central control\n- Mycelium: the page documents distributed functions, memory, and resource distribution through mycelial structures (e.g., \"mycelial networks constitute 20-30% of soil biomass...\" and descriptions of memory/capacity and hyphal organization) (https://en.wikipedia.org/wiki/Mycelium: \"Mycelial networks constitute 20-30% of soil biomass...\" and \"Several studies have documented the memory capacity of mycelial networks and their adaptability...\").\n- Kowloon Walled City: buildings and social life grew organically without effective municipal codes: \"Construction in the city went unregulated, and most of the roughly 350 buildings were built with poor foundations and few or no utilities.\" (https://en.wikipedia.org/wiki/Kowloon_Walled_City: \"Construction in the city went unregulated, and most of the roughly 350 buildings were built with poor foundations and few or no utilities.\") \u2014 an urban instance of emergent complexity.\n- Dead Internet theory (weak/observable elements): automated/bot traffic proportions are described (Imperva reports cited) \u2014 e.g., \"Imperva ... found that automated programs were responsible for 52% of web traffic.\" (https://en.wikipedia.org/wiki/Dead_Internet_theory: \"In 2016, the security firm Imperva released a report ... and found that automated programs were responsible for 52% of web traffic.\") \u2014 indicating emergent systemic behavior in online ecology.\n\nTheme C \u2014 Perception, repair, and reinterpretation of damage or absence\n- Kintsugi: \"As a philosophy, it treats breakage and repair as part of the history of an object, rather than something to disguise.\" (https://en.wikipedia.org/wiki/Kintsugi) \u2014 a cultural practice that reframes rupture as part of value.\n- Fermi paradox: the paradox itself centers on a tension between expectation and observation: the Milky Way contains \"an estimated 200\u2013400 billion stars\" (https://en.wikipedia.org/wiki/Fermi_paradox) yet \"there is no convincing evidence\" of extraterrestrial visitation \u2014 a mismatch between perceived expectation and observed absence (https://en.wikipedia.org/wiki/Fermi_paradox: \"The first aspect of the Fermi paradox ... there are an estimated 200\u2013400 billion stars in the Milky Way ... However, there is no convincing evidence that this has happened.\").\n- Dead Internet theory (perception vs. reality): the article notes the theory \"draws attention to a legitimate problem\" while often being a conspiratorial exaggeration \u2014 i.e., it is a reinterpretation of observed decline in signal-to-noise as intentional collapse (https://en.wikipedia.org/wiki/Dead_Internet_theory: \"What makes the Dead Internet a nameworthy conspiracy is that even though it is rooted in selective truths that are exaggerated or even taken to their logical extremes, it also draws attention to a legitimate problem.\")\n\nSynthesis / original insight connecting all five topics:\nEach of these five phenomena is about networks (social, biological, technological, or material) that reconfigure what is visible and valuable. Mycelial networks literally re-route nutrients and signals beneath our notice; Kowloon Walled City shows how human settlements can self-organize into dense, hidden social-ecologies when formal governance is absent; the Dead Internet theory expresses anxieties about an opaque, automated layer that changes what we perceive online; the Fermi paradox forces us to reconcile enormous numerical expectation (\"200\u2013400 billion stars\") with null observation; and kintsugi demonstrates a cultural practice that makes rupture and repair legible and aesthetic. The original insight is this: across domains, humans encounter systems whose internal structures and processes are often invisible (networks, emergent order, automated or ancient dynamics). Our responses fall into two broad strategies \u2014 to expose and contest the hidden (investigate, regulate, decode) or to reframe and integrate it (repair, aestheticize, adapt). Kintsugi models the latter: rather than erasing scars, it makes them meaningful. When societies face hidden networks (whether ecological mycorrhizae, clandestine urban ecologies, or automated bot webs), we oscillate between demanding transparency (as with concerns raised by the Dead Internet theory or the search implied by the Fermi paradox) and finding practices for living with and reinterpreting the seams (as with kintsugi or informal community networks in Kowloon). The five topics together highlight that invisibility of structure invites both anxiety and creative cultural response.\n\nAll cited Wikipedia URLs used:\n- https://en.wikipedia.org/wiki/Kowloon_Walled_City\n- https://en.wikipedia.org/wiki/Mycelium\n- https://en.wikipedia.org/wiki/Fermi_paradox\n- https://en.wikipedia.org/wiki/Dead_Internet_theory\n- https://en.wikipedia.org/wiki/Kintsugi\n\n(End of deliverable.)",
+    "action_summary": "I extracted and quoted the requested facts from five Wikipedia pages: Kowloon Walled City (\u224835,000 residents; density ~1.2\u20131.3 million/km\u00b2), Mycelium (term \"mycelial networks\" / mycorrhizal fungal networks connecting plants), Fermi paradox (Milky Way has an estimated 200\u2013400 billion stars), Dead Internet theory (core claim: internet dominated by bot activity/automated content manipulated by algorithmic curation since ~2016), and Kintsugi (uses urushi lacquer with powdered gold/silver/platinum; philosophy treats breakage as part of an object's history). I then wrote a 250+ word convergence report identifying three themes \u2014 hidden/networked systems; emergent self-organization; and perception/repair \u2014 and concluded with an original insight linking all five topics. Each factual claim is supported by a verbatim quote and the exact Wikipedia URL.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_add",
+      "duration": 12.7361,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 12.7421,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.3462,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 28.6778,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0326,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 29.8792,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7297,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.4577,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 14.9412,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3814,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 30.4196,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 15.2531,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 15.4098,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3789,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5318,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8621,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3221,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.817,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.233,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5387,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3096,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3556,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4163,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3396,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3266,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3325,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2883,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3129,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3102,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2738,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.315,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3026,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2954,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3061,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3733,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3155,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.353,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3166,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3235,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3339,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3431,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3192,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5009,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3516,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3068,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3247,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3121,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3057,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2722,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3537,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3316,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2895,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2764,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.303,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2876,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3921,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2745,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3782,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3166,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2836,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2883,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2989,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3197,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2884,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2986,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2987,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2835,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2885,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3491,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3185,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2825,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2963,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4208,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3372,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2872,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2826,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2892,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2787,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.294,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3206,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3473,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3066,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3202,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4234,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2844,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3257,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3038,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3267,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2938,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3047,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3263,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3043,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4241,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3176,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.34,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3567,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2918,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2627,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3303,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.286,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3001,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2714,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3411,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2601,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2909,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2801,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2536,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3102,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2643,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2912,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2803,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.262,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 29.5557,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.277,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3008,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2792,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2642,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.267,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.436,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 34.1348,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6273,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6231,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5915,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5842,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5581,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5614,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5455,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5444,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5415,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5236,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5056,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5182,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2989,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2767,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2798,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2677,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2559,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3195,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3058,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2522,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2566,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2961,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2743,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2998,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.267,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.421,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2753,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3448,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2844,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3421,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3019,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3457,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3328,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3057,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.353,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.268,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3458,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2541,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2799,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2927,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2839,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2796,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.326,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2571,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3085,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2623,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2648,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.277,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2742,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.297,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2738,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3027,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3449,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2869,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.284,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2793,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 47.8148,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 47.8234,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3289,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3043,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3488,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3023,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2862,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2756,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2776,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2846,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.285,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 9.5833,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 19.7975,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 23.2186,
+      "success": false
+    },
+    {
+      "name": "llm_call",
+      "duration": 18.9039,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 76.6818,
+      "success": true
+    }
+  ]
+}

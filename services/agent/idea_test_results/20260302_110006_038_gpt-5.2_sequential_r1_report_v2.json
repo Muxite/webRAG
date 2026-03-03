@@ -1,0 +1,3881 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "038",
+    "test_name": "Eight-Source Fact Matrix",
+    "passed": false,
+    "score": 0.5625,
+    "ascii_graph": "*-------------.   Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL\n|\\ \\ \\ \\ \\ \\ \\ \\  \n* | | | | | | | | Visit 4 Wikipedia pages (Great Wall, Mariana Trench, Voyager 1, Rosetta Stone) and extract the two specified facts from each\n / / / / / / / /  \n* | | | | | | | Visit remaining 3 Wikipedia pages (Penicillin, Aurora (astronomy), Enigma machine) and extract the two specified facts from each\n / / / / / / /  \n* | | | | | | Visit CRISPR gene editing Wikipedia page again to verify and extract the two exact facts (molecular scissors protein; year first used to edit mammalian cells) with quotable wording\n / / / / / /  \n* | | | | | Think: normalize extraction fields and table schema for final fact matrix (Topic | Fact A | Fact B | Source URL)\n / / / / /  \n* | | | | Visit https://en.wikipedia.org/wiki/Mariana_Trench\n / / / /  \n* | | | Visit https://en.wikipedia.org/wiki/Voyager_1\n / / /  \n* | | Visit https://en.wikipedia.org/wiki/Rosetta_Stone\n / /  \n* | Visit https://en.wikipedia.org/wiki/Aurora_(astronomy)\n /  \n* Visit https://en.wikipedia.org/wiki/Enigma_machine\n"
+  },
+  "node_table": [
+    {
+      "node_id": "7b6d5ea7-83f1-427a-ac59-af20d71da8e9",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL"
+    },
+    {
+      "node_id": "a71e81de-4cce-411a-aeb1-a7a8bd7894c3",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit 4 Wikipedia pages (Great Wall, Mariana Trench, Voyager 1, Rosetta Stone) and extract the two specified facts from each"
+    },
+    {
+      "node_id": "89c69fd1-3a55-4ade-a638-58e4ed648a01",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit remaining 3 Wikipedia pages (Penicillin, Aurora (astronomy), Enigma machine) and extract the two specified facts from each"
+    },
+    {
+      "node_id": "b9b39fe1-a819-424e-9bf9-58aeb08c4190",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit CRISPR gene editing Wikipedia page again to verify and extract the two exact facts (molecular scissors protein; year first used to edit mammalian cells) with quotable wording"
+    },
+    {
+      "node_id": "c2c9452a-cb09-43dc-a764-56af57692cfc",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "title": "Think: normalize extraction fields and table schema for final fact matrix (Topic | Fact A | Fact B | Source URL)"
+    },
+    {
+      "node_id": "e8ee520d-b7a8-43e5-8705-33d4daf1a88e",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit https://en.wikipedia.org/wiki/Mariana_Trench"
+    },
+    {
+      "node_id": "74a4705f-ecba-4ae7-9a61-f075891d5ec7",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Voyager_1"
+    },
+    {
+      "node_id": "61c38d96-2ee4-4848-a513-1c1c91bcbbf5",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Rosetta_Stone"
+    },
+    {
+      "node_id": "32fb48e1-25be-469d-babd-0f78c1fb25c0",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Aurora_(astronomy)"
+    },
+    {
+      "node_id": "e4a8b6fe-5806-48ac-b83d-0c0477d6baaf",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Enigma_machine"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": false,
+      "score": 0.5,
+      "visit_count": 4,
+      "reason": "Found 4 visit(s) (target >=6)"
+    },
+    {
+      "check": "fact_extraction",
+      "passed": false,
+      "score": 0.1875,
+      "correct": 3,
+      "total": 16,
+      "details": {
+        "Great Wall of China": [
+          "True",
+          "True"
+        ],
+        "CRISPR gene editing": [
+          "False",
+          "False"
+        ],
+        "Mariana Trench": [
+          "False",
+          "False"
+        ],
+        "Voyager 1": [
+          "False",
+          "True"
+        ],
+        "Rosetta Stone": [
+          "False",
+          "False"
+        ],
+        "Penicillin": [
+          "False",
+          "False"
+        ],
+        "Aurora (astronomy)": [
+          "False",
+          "False"
+        ],
+        "Enigma machine": [
+          "False",
+          "False"
+        ]
+      },
+      "reason": "3/16 facts correct"
+    },
+    {
+      "check": "structured_table",
+      "passed": true,
+      "score": 1.0,
+      "pipe_rows": 10,
+      "topics_in_table": 8,
+      "reason": "table_rows=10, topics_in_table=8/8"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "cited": 8,
+      "total": 8,
+      "details": {
+        "Great Wall of China": true,
+        "CRISPR gene editing": true,
+        "Mariana Trench": true,
+        "Voyager 1": true,
+        "Rosetta Stone": true,
+        "Penicillin": true,
+        "Aurora (astronomy)": true,
+        "Enigma machine": true
+      },
+      "reason": "8/8 URLs cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 3809,
+      "words": 525,
+      "kilobytes": 3.72
+    },
+    "llm": {
+      "calls": 10,
+      "prompt": {
+        "chars": 482269,
+        "words": 60640,
+        "kilobytes": 470.97,
+        "tokens": 71857
+      },
+      "completion": {
+        "chars": 9739,
+        "words": 1166,
+        "kilobytes": 9.51,
+        "tokens": 2499
+      },
+      "total_tokens": 74356
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 4,
+      "chars": 65100,
+      "words": 10955,
+      "kilobytes": 63.57
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 252,
+        "total_duration": 1307.1199,
+        "avg_duration": 5.187,
+        "min_duration": 0.3436,
+        "max_duration": 65.81,
+        "success_count": 252,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 78,
+        "total_duration": 2348.8485,
+        "avg_duration": 30.1134,
+        "min_duration": 1.4337,
+        "max_duration": 76.5121,
+        "success_count": 76,
+        "error_count": 2
+      },
+      "http_request": {
+        "count": 12,
+        "total_duration": 141.2529,
+        "avg_duration": 11.7711,
+        "min_duration": 0.537,
+        "max_duration": 97.2237,
+        "success_count": 11,
+        "error_count": 1
+      },
+      "llm_call": {
+        "count": 7,
+        "total_duration": 151.7712,
+        "avg_duration": 21.6816,
+        "min_duration": 1.8349,
+        "max_duration": 84.2941,
+        "success_count": 7,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 19.9528,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 28.1352,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 39.4356,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 39.4548,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 39.4622,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 39.4585,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 39.462,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 19.8842,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 19.9587,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.537,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 22.569,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 23.1786,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 23.7023,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 23.7031,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 23.703,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 23.7121,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 65.81,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 65.7675,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 64.875,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.746,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 5.7328,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 15.1694,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 16.7761,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 16.7844,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 11.0987,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6268,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 17.0143,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.8349,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 17.0211,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.844,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1929,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 17.1384,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6059,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.1244,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.4253,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.9582,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 53.0653,
+        "success": false
+      },
+      {
+        "name": "chroma_query",
+        "duration": 55.7932,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 76.5121,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 97.2237,
+        "success": false
+      },
+      {
+        "name": "chroma_query",
+        "duration": 25.4412,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6591,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 27.0778,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 27.0828,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.3292,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 28.195,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1061,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.125,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 28.597,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.8247,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.0885,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 31.3533,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 39.834,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 37.3997,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7062,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 37.8597,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.4337,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.892,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.2088,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8323,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.1774,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.4342,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 7.8497,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.8541,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 13.5419,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.2211,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 41.9546,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 49.6183,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 49.6203,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 36.4496,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7319,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 36.5919,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.237,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.3901,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.9915,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.9917,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 12.5054,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.1015,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 12.4198,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 46.1859,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 33.8469,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 33.8471,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8874,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3148,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 47.5362,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 45.101,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8469,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.1228,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 5.785,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 5.7605,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 10.11,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.4218,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 10.5647,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 41.1679,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 30.6838,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 30.6703,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 41.9498,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7794,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7941,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 34.508,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 3.3285,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.5976,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.7146,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 61.7575,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 61.7623,
+        "success": false
+      },
+      {
+        "name": "chroma_query",
+        "duration": 54.3009,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 61.8932,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.871,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8765,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 62.8434,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 55.5217,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 4.8023,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 12.1157,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 46.7836,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 49.7644,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 49.7648,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 38.7188,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.0672,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 50.6467,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 51.0587,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5338,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 52.3744,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 52.3765,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.8574,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3427,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 52.4738,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 52.8257,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 43.6902,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.5564,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.6679,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.9115,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7801,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 6.8985,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 6.9004,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.1874,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.188,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 42.7275,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 43.0549,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.63,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2282,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 42.7793,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.6163,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.2464,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.7278,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 5.3974,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 8.1747,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 8.6495,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.3723,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 8.6821,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.0972,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 15.9697,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 15.9704,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 57.1335,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 52.9217,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7743,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4022,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 53.9925,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.2429,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.2333,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 14.3024,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 17.5776,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 18.5587,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9975,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 22.0549,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 22.0654,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5295,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 22.2093,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 22.3773,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 23.4763,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.894,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 23.5193,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.5307,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.0203,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 24.1017,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6679,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1112,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1135,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6694,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6432,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9538,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6266,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9292,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9766,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0754,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1429,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1231,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0471,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9892,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9456,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9206,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9259,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9564,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0113,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0157,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9948,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6227,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6088,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6156,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6272,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6305,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6376,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.63,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6215,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6193,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6644,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.644,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5776,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5921,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.631,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 11.3862,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9611,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9304,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9393,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5803,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8914,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.892,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3006,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1453,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1463,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1559,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0421,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0412,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9862,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9933,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9929,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9952,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9466,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.947,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9304,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9384,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.939,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6767,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6937,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6444,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6199,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6098,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6118,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6207,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.674,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7105,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.66,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6087,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6401,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6768,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6511,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6108,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6013,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6174,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6425,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6447,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6373,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6484,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7403,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7742,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7157,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7484,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7344,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7128,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7169,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6872,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6883,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7023,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7541,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7184,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6758,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6925,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6742,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6632,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6699,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6949,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7118,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7152,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6828,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6861,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7297,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7298,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7205,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6757,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6186,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6303,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6598,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6655,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6698,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6662,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6266,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5925,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6071,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 18.8514,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3436,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6194,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8708,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.58,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6046,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6337,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6194,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6034,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6116,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5961,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5893,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5796,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.606,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6193,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6082,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6288,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6385,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6161,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6744,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7263,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6583,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6289,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6804,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6783,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6046,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5946,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6272,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6617,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6607,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6477,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6276,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6078,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6068,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5956,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5801,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6102,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6243,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6269,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6598,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6554,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6211,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6001,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.606,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6392,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6579,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6457,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6279,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6151,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6086,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6207,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6703,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6516,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6778,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6805,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6044,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6065,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6114,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.593,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5755,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5777,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 84.2941,
+        "success": true
+      }
+    ],
+    "events_count": 691
+  },
+  "node_index": {
+    "7b6d5ea7-83f1-427a-ac59-af20d71da8e9": {
+      "node_id": "7b6d5ea7-83f1-427a-ac59-af20d71da8e9",
+      "title": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "a71e81de-4cce-411a-aeb1-a7a8bd7894c3",
+        "89c69fd1-3a55-4ade-a638-58e4ed648a01",
+        "b9b39fe1-a819-424e-9bf9-58aeb08c4190",
+        "c2c9452a-cb09-43dc-a764-56af57692cfc",
+        "e8ee520d-b7a8-43e5-8705-33d4daf1a88e",
+        "74a4705f-ecba-4ae7-9a61-f075891d5ec7",
+        "61c38d96-2ee4-4848-a513-1c1c91bcbbf5",
+        "32fb48e1-25be-469d-babd-0f78c1fb25c0",
+        "e4a8b6fe-5806-48ac-b83d-0c0477d6baaf"
+      ],
+      "parent_ids": [],
+      "goal": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL"
+    },
+    "a71e81de-4cce-411a-aeb1-a7a8bd7894c3": {
+      "node_id": "a71e81de-4cce-411a-aeb1-a7a8bd7894c3",
+      "title": "Visit 4 Wikipedia pages (Great Wall, Mariana Trench, Voyager 1, Rosetta Stone) and extract the two specified facts from each",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "7b6d5ea7-83f1-427a-ac59-af20d71da8e9"
+      ],
+      "goal": "Visit 4 Wikipedia pages (Great Wall, Mariana Trench, Voyager 1, Rosetta Stone) and extract the two specified facts from each",
+      "result_success": true,
+      "result_content_preview": "=== https://en.wikipedia.org/wiki/Great_Wall_of_China ===\n\"Great Wall\" redirects here. For other uses, see\nGreat Wall (disambiguation)\n.\n\"\u9577\u57ce\" redirects here. For place in South Korea, see\nJangseong County\n.\nGreat Wall of China\n\u842c\u91cc\u9577\u57ce / \u4e07\u91cc\u957f\u57ce\nThe\nMing dynasty\nGreat Wall at\nJinshanling\nMap of all the wall constructions\nGeneral information\nType\nFortification\nLocation\nChina\nCoordinates\n40\u00b041\u2032N\n117\u00b014\u2032E\n\ufeff / \ufeff\n40.68\u00b0N 117.23\u00b0E\n\ufeff /\n40.68; 117.23\nUNESCO World Heritage Site\nOfficial\u00a0name\nThe Great Wall\nLoca",
+      "result_source_url": null
+    },
+    "89c69fd1-3a55-4ade-a638-58e4ed648a01": {
+      "node_id": "89c69fd1-3a55-4ade-a638-58e4ed648a01",
+      "title": "Visit remaining 3 Wikipedia pages (Penicillin, Aurora (astronomy), Enigma machine) and extract the two specified facts from each",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "7b6d5ea7-83f1-427a-ac59-af20d71da8e9"
+      ],
+      "goal": "Visit remaining 3 Wikipedia pages (Penicillin, Aurora (astronomy), Enigma machine) and extract the two specified facts from each"
+    },
+    "b9b39fe1-a819-424e-9bf9-58aeb08c4190": {
+      "node_id": "b9b39fe1-a819-424e-9bf9-58aeb08c4190",
+      "title": "Visit CRISPR gene editing Wikipedia page again to verify and extract the two exact facts (molecular scissors protein; year first used to edit mammalian cells) with quotable wording",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "7b6d5ea7-83f1-427a-ac59-af20d71da8e9"
+      ],
+      "goal": "Visit CRISPR gene editing Wikipedia page again to verify and extract the two exact facts (molecular scissors protein; year first used to edit mammalian cells) with quotable wording"
+    },
+    "c2c9452a-cb09-43dc-a764-56af57692cfc": {
+      "node_id": "c2c9452a-cb09-43dc-a764-56af57692cfc",
+      "title": "Think: normalize extraction fields and table schema for final fact matrix (Topic | Fact A | Fact B | Source URL)",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "7b6d5ea7-83f1-427a-ac59-af20d71da8e9"
+      ],
+      "goal": "Think: normalize extraction fields and table schema for final fact matrix (Topic | Fact A | Fact B | Source URL)"
+    },
+    "e8ee520d-b7a8-43e5-8705-33d4daf1a88e": {
+      "node_id": "e8ee520d-b7a8-43e5-8705-33d4daf1a88e",
+      "title": "Visit https://en.wikipedia.org/wiki/Mariana_Trench",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "7b6d5ea7-83f1-427a-ac59-af20d71da8e9"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Mariana_Trench"
+    },
+    "74a4705f-ecba-4ae7-9a61-f075891d5ec7": {
+      "node_id": "74a4705f-ecba-4ae7-9a61-f075891d5ec7",
+      "title": "Visit https://en.wikipedia.org/wiki/Voyager_1",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7b6d5ea7-83f1-427a-ac59-af20d71da8e9"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Voyager_1"
+    },
+    "61c38d96-2ee4-4848-a513-1c1c91bcbbf5": {
+      "node_id": "61c38d96-2ee4-4848-a513-1c1c91bcbbf5",
+      "title": "Visit https://en.wikipedia.org/wiki/Rosetta_Stone",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7b6d5ea7-83f1-427a-ac59-af20d71da8e9"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Rosetta_Stone"
+    },
+    "32fb48e1-25be-469d-babd-0f78c1fb25c0": {
+      "node_id": "32fb48e1-25be-469d-babd-0f78c1fb25c0",
+      "title": "Visit https://en.wikipedia.org/wiki/Aurora_(astronomy)",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7b6d5ea7-83f1-427a-ac59-af20d71da8e9"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Aurora_(astronomy)"
+    },
+    "e4a8b6fe-5806-48ac-b83d-0c0477d6baaf": {
+      "node_id": "e4a8b6fe-5806-48ac-b83d-0c0477d6baaf",
+      "title": "Visit https://en.wikipedia.org/wiki/Enigma_machine",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7b6d5ea7-83f1-427a-ac59-af20d71da8e9"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Enigma_machine"
+    }
+  },
+  "final_output": {
+    "final_deliverable": "| Topic | Fact A | Fact B | Source URL |\n|---|---|---|---|\n| Great Wall of China | **Total length:** **21,196.18 km (13,170.70 mi)**. Evidence: the infobox lists **\u201cSize 21,196.18 km (13,170.70 mi)\u201d** (https://en.wikipedia.org/wiki/Great_Wall_of_China). | **Dynasty that built the most famous sections:** **Ming dynasty**. Evidence: **\u201cthe best-known sections were built by the Ming dynasty (1368\u20131644).\u201d** (https://en.wikipedia.org/wiki/Great_Wall_of_China) | https://en.wikipedia.org/wiki/Great_Wall_of_China |\n| CRISPR gene editing | **Missing evidence in provided RAW VISIT CONTENT.** The required quotes/facts (protein used as molecular scissors; year first used to edit mammalian cells) are not present in the supplied page text for https://en.wikipedia.org/wiki/CRISPR_gene_editing. The MERGED RESULTS/RAW VISIT CONTENT did not include this page\u2019s content. | **Missing evidence in provided RAW VISIT CONTENT.** (See Fact A note.) | https://en.wikipedia.org/wiki/CRISPR_gene_editing |\n| Mariana Trench | **Missing evidence in provided RAW VISIT CONTENT.** Although the MERGED RESULTS show a visit to an *oldid* version (https://en.wikipedia.org/w/index.php?title=Mariana_Trench&oldid=1334269865), its RAW VISIT CONTENT text was not included here, so I cannot quote the maximum depth or deepest point name. | **Missing evidence in provided RAW VISIT CONTENT.** | https://en.wikipedia.org/wiki/Mariana_Trench |\n| Voyager 1 | **Missing evidence in provided RAW VISIT CONTENT.** No Voyager 1 page text was provided, so I cannot quote the launch year or the boundary crossed to enter interstellar space. | **Missing evidence in provided RAW VISIT CONTENT.** | https://en.wikipedia.org/wiki/Voyager_1 |\n| Rosetta Stone | **Missing evidence in provided RAW VISIT CONTENT.** No Rosetta Stone page text was provided, so I cannot quote the three scripts or discovery year. | **Missing evidence in provided RAW VISIT CONTENT.** | https://en.wikipedia.org/wiki/Rosetta_Stone |\n| Penicillin | **Missing evidence in provided RAW VISIT CONTENT.** The Penicillin page was not visited in the execution trail (node skipped), and no RAW VISIT CONTENT is present to quote who discovered it and the discovery year. | **Missing evidence in provided RAW VISIT CONTENT.** | https://en.wikipedia.org/wiki/Penicillin |\n| Aurora (astronomy) | **Missing evidence in provided RAW VISIT CONTENT.** The Aurora (astronomy) page was not visited in the execution trail (node skipped), and no RAW VISIT CONTENT is present to quote the scientific name for northern lights. | **Missing evidence in provided RAW VISIT CONTENT.** | https://en.wikipedia.org/wiki/Aurora_(astronomy) |\n| Enigma machine | **Missing evidence in provided RAW VISIT CONTENT.** The Enigma machine page was not visited in the execution trail (node skipped), and no RAW VISIT CONTENT is present to quote who led the British effort to crack Enigma and the war in which it was used. | **Missing evidence in provided RAW VISIT CONTENT.** | https://en.wikipedia.org/wiki/Enigma_machine |\n\n## Notes on missing items (why they are missing)\nOnly one Wikipedia page\u2019s full content was actually provided in **RAW VISIT CONTENT**: **Great Wall of China** (https://en.wikipedia.org/wiki/Great_Wall_of_China). The execution trail shows multiple other visit tasks were **skipped**, and for Mariana Trench the system visited related pages/oldid but did not supply their full page text in the RAW VISIT CONTENT block; therefore I cannot provide the required verbatim quotes for those topics.\n\n## Verbatim evidence quotes used (from provided RAW VISIT CONTENT)\nFrom https://en.wikipedia.org/wiki/Great_Wall_of_China:\n- Length (infobox): **\u201cSize 21,196.18 km (13,170.70 mi)\u201d**\n- Dynasty for best-known sections: **\u201cthe best-known sections were built by the Ming dynasty (1368\u20131644).\u201d**",
+    "action_summary": "A fact matrix was produced, but only the Great Wall of China row could be fully completed with verbatim quoted evidence from the provided RAW VISIT CONTENT. All other requested topics are marked missing because their Wikipedia page text was not included in the supplied evidence (most visit nodes were skipped and/or RAW VISIT CONTENT for those URLs was not provided).",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 19.9528,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 28.1352,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 39.4356,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 39.4548,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 39.4622,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 39.4585,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 39.462,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 19.8842,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 19.9587,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.537,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 22.569,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 23.1786,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 23.7023,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 23.7031,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 23.703,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 23.7121,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 65.81,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 65.7675,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 64.875,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.746,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 5.7328,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 15.1694,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 16.7761,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 16.7844,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 11.0987,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6268,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 17.0143,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.8349,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 17.0211,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.844,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1929,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 17.1384,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6059,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.1244,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.4253,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.9582,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 53.0653,
+      "success": false
+    },
+    {
+      "name": "chroma_query",
+      "duration": 55.7932,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 76.5121,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 97.2237,
+      "success": false
+    },
+    {
+      "name": "chroma_query",
+      "duration": 25.4412,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6591,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 27.0778,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 27.0828,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.3292,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 28.195,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1061,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.125,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 28.597,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.8247,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.0885,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 31.3533,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 39.834,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 37.3997,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7062,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 37.8597,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.4337,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.892,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.2088,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8323,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.1774,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.4342,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 7.8497,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.8541,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 13.5419,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.2211,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 41.9546,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 49.6183,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 49.6203,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 36.4496,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7319,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 36.5919,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.237,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.3901,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.9915,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.9917,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 12.5054,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.1015,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 12.4198,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 46.1859,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 33.8469,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 33.8471,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8874,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3148,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 47.5362,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 45.101,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8469,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.1228,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 5.785,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 5.7605,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 10.11,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.4218,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 10.5647,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 41.1679,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 30.6838,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 30.6703,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 41.9498,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7794,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7941,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 34.508,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 3.3285,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.5976,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.7146,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 61.7575,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 61.7623,
+      "success": false
+    },
+    {
+      "name": "chroma_query",
+      "duration": 54.3009,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 61.8932,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.871,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8765,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 62.8434,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 55.5217,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 4.8023,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 12.1157,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 46.7836,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 49.7644,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 49.7648,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 38.7188,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.0672,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 50.6467,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 51.0587,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5338,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 52.3744,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 52.3765,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.8574,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3427,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 52.4738,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 52.8257,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 43.6902,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.5564,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.6679,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.9115,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7801,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 6.8985,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 6.9004,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.1874,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.188,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 42.7275,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 43.0549,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.63,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2282,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 42.7793,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.6163,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.2464,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.7278,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 5.3974,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 8.1747,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 8.6495,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.3723,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 8.6821,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.0972,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 15.9697,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 15.9704,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 57.1335,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 52.9217,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7743,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4022,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 53.9925,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.2429,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.2333,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 14.3024,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 17.5776,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 18.5587,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9975,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 22.0549,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 22.0654,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5295,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 22.2093,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 22.3773,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 23.4763,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.894,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 23.5193,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.5307,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.0203,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 24.1017,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6679,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1112,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1135,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6694,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6432,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9538,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6266,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9292,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9766,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0754,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1429,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1231,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0471,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9892,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9456,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9206,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9259,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9564,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0113,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0157,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9948,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6227,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6088,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6156,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6272,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6305,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6376,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.63,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6215,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6193,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6644,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.644,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5776,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5921,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.631,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 11.3862,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9611,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9304,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9393,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5803,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8914,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.892,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3006,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1453,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1463,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1559,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0421,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0412,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9862,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9933,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9929,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9952,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9466,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.947,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9304,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9384,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.939,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6767,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6937,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6444,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6199,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6098,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6118,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6207,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.674,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7105,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.66,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6087,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6401,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6768,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6511,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6108,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6013,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6174,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6425,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6447,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6373,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6484,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7403,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7742,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7157,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7484,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7344,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7128,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7169,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6872,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6883,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7023,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7541,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7184,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6758,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6925,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6742,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6632,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6699,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6949,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7118,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7152,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6828,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6861,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7297,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7298,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7205,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6757,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6186,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6303,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6598,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6655,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6698,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6662,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6266,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5925,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6071,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 18.8514,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3436,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6194,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8708,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.58,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6046,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6337,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6194,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6034,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6116,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5961,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5893,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5796,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.606,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6193,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6082,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6288,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6385,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6161,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6744,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7263,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6583,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6289,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6804,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6783,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6046,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5946,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6272,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6617,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6607,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6477,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6276,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6078,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6068,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5956,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5801,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6102,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6243,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6269,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6598,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6554,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6211,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6001,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.606,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6392,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6579,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6457,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6279,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6151,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6086,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6207,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6703,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6516,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6778,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6805,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6044,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6065,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6114,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.593,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5755,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5777,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 84.2941,
+      "success": true
+    }
+  ]
+}

@@ -1,0 +1,322 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "033",
+    "test_name": "Dual-Niche Comparison",
+    "passed": true,
+    "score": 1.0,
+    "ascii_graph": "*---.   Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.\n|\\ \\ \\  \n* | | | Visit: Wikipedia \u2014 Tardigrade\n / / /  \n* | | Visit: Wikipedia \u2014 Brutalist architecture\n / /  \n* | Think: Synthesize visits and write comparative paragraph\n /  \n* Merge: Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "b56c6a74-ce9b-416e-abd5-91f3c89f6ed6",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact."
+    },
+    {
+      "node_id": "bd1209c9-5b63-409b-9f18-5bb916b24d3e",
+      "action": "visit",
+      "status": "done",
+      "score": 0.1,
+      "title": "Visit: Wikipedia \u2014 Tardigrade"
+    },
+    {
+      "node_id": "d0eb85cc-e252-4362-ba3c-c256c831b406",
+      "action": "visit",
+      "status": "done",
+      "score": 0.1,
+      "title": "Visit: Wikipedia \u2014 Brutalist architecture"
+    },
+    {
+      "node_id": "30b09a6a-7138-4d17-bd8e-d1f89f6f5e0b",
+      "action": "think",
+      "status": "done",
+      "score": 0.15,
+      "title": "Think: Synthesize visits and write comparative paragraph"
+    },
+    {
+      "node_id": "e0322453-b135-4159-9ac7-19acee944795",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 2,
+      "reason": "Found 2 visit(s)"
+    },
+    {
+      "check": "tardigrade_facts",
+      "passed": true,
+      "score": 1.0,
+      "conditions_found": 6,
+      "has_experiment": true,
+      "reason": "conditions=6, experiment=True"
+    },
+    {
+      "check": "brutalist_facts",
+      "passed": true,
+      "score": 1.0,
+      "characteristics_found": 5,
+      "buildings_found": 2,
+      "reason": "characteristics=5, buildings=2"
+    },
+    {
+      "check": "comparison_paragraph",
+      "passed": true,
+      "score": 1.0,
+      "word_count": 208,
+      "reason": "tardigrade=True, brutalist=True, parallel=True, words=208"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "reason": "tardigrade_url=True, brutalist_url=True"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 8673,
+      "words": 1072,
+      "kilobytes": 8.47
+    },
+    "llm": {
+      "calls": 0,
+      "prompt": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "completion": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "total_tokens": 0
+    },
+    "chroma": {
+      "store": {
+        "count": 1,
+        "chars": 56,
+        "words": 7,
+        "kilobytes": 0.05
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 2,
+      "chars": 96217,
+      "words": 14880,
+      "kilobytes": 93.96
+    },
+    "timings": {
+      "chroma_add": {
+        "count": 2,
+        "total_duration": 28.4595,
+        "avg_duration": 14.2297,
+        "min_duration": 14.2285,
+        "max_duration": 14.231,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 4,
+        "total_duration": 173.0243,
+        "avg_duration": 43.2561,
+        "min_duration": 10.8691,
+        "max_duration": 63.6652,
+        "success_count": 4,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 2.2156,
+        "avg_duration": 2.2156,
+        "min_duration": 2.2156,
+        "max_duration": 2.2156,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_add",
+        "duration": 14.231,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 14.2285,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 46.7641,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 10.8691,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 2.2156,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 51.7258,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 63.6652,
+        "success": true
+      }
+    ],
+    "events_count": 3
+  },
+  "node_index": {
+    "b56c6a74-ce9b-416e-abd5-91f3c89f6ed6": {
+      "node_id": "b56c6a74-ce9b-416e-abd5-91f3c89f6ed6",
+      "title": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "bd1209c9-5b63-409b-9f18-5bb916b24d3e",
+        "d0eb85cc-e252-4362-ba3c-c256c831b406",
+        "30b09a6a-7138-4d17-bd8e-d1f89f6f5e0b",
+        "e0322453-b135-4159-9ac7-19acee944795"
+      ],
+      "parent_ids": [],
+      "goal": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact."
+    },
+    "bd1209c9-5b63-409b-9f18-5bb916b24d3e": {
+      "node_id": "bd1209c9-5b63-409b-9f18-5bb916b24d3e",
+      "title": "Visit: Wikipedia \u2014 Tardigrade",
+      "action": "visit",
+      "status": "done",
+      "score": 0.1,
+      "children": [],
+      "parent_ids": [
+        "b56c6a74-ce9b-416e-abd5-91f3c89f6ed6"
+      ],
+      "goal": "Visit: Wikipedia \u2014 Tardigrade",
+      "result_success": true,
+      "result_content_preview": "\"Tardigrada\" redirects here. For other uses, see\nTardigrada (disambiguation)\n.\n\"Moss Piglets\" redirects here. For the\nSouth Park\nepisode, see\nMoss Piglets (\nSouth Park\n)\n.\nTardigrade\nTemporal range:\nMiddle Cambrian\nstem-group fossils\nMilnesium tardigradum\n, a\neutardigrade\nEchiniscus insularis\n, a\nheterotardigrade\nScientific classification\nKingdom:\nAnimalia\nSubkingdom:\nEumetazoa\nClade\n:\nParaHoxozoa\nClade\n:\nBilateria\nClade\n:\nNephrozoa\nClade\n:\nProtostomia\nSuperphylum:\nEcdysozoa\nClade\n:\nPanarthropod",
+      "result_source_url": "https://en.wikipedia.org/wiki/Tardigrade"
+    },
+    "d0eb85cc-e252-4362-ba3c-c256c831b406": {
+      "node_id": "d0eb85cc-e252-4362-ba3c-c256c831b406",
+      "title": "Visit: Wikipedia \u2014 Brutalist architecture",
+      "action": "visit",
+      "status": "done",
+      "score": 0.1,
+      "children": [],
+      "parent_ids": [
+        "b56c6a74-ce9b-416e-abd5-91f3c89f6ed6"
+      ],
+      "goal": "Visit: Wikipedia \u2014 Brutalist architecture",
+      "result_success": true,
+      "result_content_preview": "\"Brutalist\" and \"Brutalism\" redirect here. For the 2024 film, see\nThe Brutalist\n. For other uses, see\nBrutalism (disambiguation)\n.\nBrutalist architecture\nTop row\n:\nPark Hill\nflats in\nSheffield\n, England;\nSoviet\n-era housing in\nTalnakh\n, Russia;\nTeresa Carre\u00f1o Cultural Complex\nin\nCaracas\n, Venezuela.\nMiddle row\n:\nRoyal National Theatre\nin London;\nBoston City Hall\n; Soviet-era housing in\nSaint Petersburg\n.\nBottom row\n:\nRobarts Library\nin\nToronto\n, Canada;\nBarbican Centre\nin the\nCity of London\n;\nAl",
+      "result_source_url": "https://en.wikipedia.org/wiki/Brutalist_architecture"
+    },
+    "30b09a6a-7138-4d17-bd8e-d1f89f6f5e0b": {
+      "node_id": "30b09a6a-7138-4d17-bd8e-d1f89f6f5e0b",
+      "title": "Think: Synthesize visits and write comparative paragraph",
+      "action": "think",
+      "status": "done",
+      "score": 0.15,
+      "children": [],
+      "parent_ids": [
+        "b56c6a74-ce9b-416e-abd5-91f3c89f6ed6"
+      ],
+      "goal": "Combine extracted facts from both visited Wikipedia pages and write a short comparative paragraph (minimum 100 words) drawing a thematic parallel between tardigrade resilience and Brutalist durability. Every factual claim must cite the exact Wikipedia URL where it was found.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "e0322453-b135-4159-9ac7-19acee944795": {
+      "node_id": "e0322453-b135-4159-9ac7-19acee944795",
+      "title": "Merge: Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "b56c6a74-ce9b-416e-abd5-91f3c89f6ed6"
+      ],
+      "goal": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Topic A \u2014 Tardigrades (evidence from https://en.wikipedia.org/wiki/Tardigrade)\n\n1) At least two extreme conditions tardigrades survive (verbatim evidence):\n\n- \"Tardigrades live in diverse regions of Earth's biosphere \u2013 mountaintops, the deep sea, tropical rainforests, and the Antarctic. They are among the most resilient animals known, with individual species able to survive severe conditions, such as exposure to extreme temperatures, extreme pressures (both high and low), air deprivation, radiation, dehydration, and starvation \u2013 that would quickly kill most other forms of life.\" (https://en.wikipedia.org/wiki/Tardigrade)\n\n- \"Further, in that state they become highly resistant to environmental stresses, including temperatures from as low as \u2212272 \u00b0C (\u2212458 \u00b0F) to as much as +149 \u00b0C (300 \u00b0F) (at least for short periods of time), lack of oxygen, vacuum, ionising radiation, and high pressure.\" (https://en.wikipedia.org/wiki/Tardigrade)\n\n2) One named space-exposure experiment (verbatim evidence):\n\n- \"In 2007, dehydrated tardigrades were taken on the FOTON-M3 mission and exposed to vacuum, or to both vacuum and solar ultraviolet, for 10 days.\" (https://en.wikipedia.org/wiki/Tardigrade)\n\n- (Additional space-related evidence also present:) \"In 2011, tardigrades went on the International Space Station STS-134, showing that they could survive microgravity and cosmic radiation, and should be suitable model organisms.\" (https://en.wikipedia.org/wiki/Tardigrade)\n\nTopic B \u2014 Brutalist architecture (evidence from https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n1) At least two defining characteristics of the style (verbatim evidence):\n\n- \"Brutalist buildings are known for minimalist construction showcasing the bare building materials and structural elements over decorative design.\" (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n- \"The style commonly makes use of exposed, unpainted concrete or brick, angular geometric shapes and a predominantly monochrome colour palette; other materials, such as steel, timber, and glass, are also featured.\" (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n- (Additional defining characteristic:) \"A common theme in brutalist designs is the exposure of the building's inner-workings\u2014ranging from their structure and services to their human use\u2014in the exterior of the building.\" (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n2) One specific building cited as an example (verbatim evidence):\n\n- \"The best-known b\u00e9ton brut architecture is the proto-brutalist work of the Swiss-French architect Le Corbusier, in particular his 1952 Unit\u00e9 d'habitation in Marseille, France; the 1951\u20131961 Chandigarh Capitol Complex in India; and the 1955 church of Notre Dame du Haut in Ronchamp, France.\" (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\nComparative paragraph (100+ words) with citations for every factual claim:\n\nTardigrades and Brutalist buildings share a striking thematic parallel: both foreground resilience and the unapologetic revelation of structure as a form of durability. Tardigrades are \"among the most resilient animals known\" and can survive \"extreme temperatures, extreme pressures (both high and low), air deprivation, radiation, dehydration, and starvation\" (https://en.wikipedia.org/wiki/Tardigrade), and they have even been taken into space, for example on the \"FOTON-M3 mission\" in 2007 where \"dehydrated tardigrades were taken on the FOTON-M3 mission and exposed to vacuum, or to both vacuum and solar ultraviolet, for 10 days\" (https://en.wikipedia.org/wiki/Tardigrade). Brutalist architecture likewise emphasizes material honesty and structural endurance: \"Brutalist buildings are known for minimalist construction showcasing the bare building materials and structural elements over decorative design\" and \"commonly makes use of exposed, unpainted concrete or brick, angular geometric shapes and a predominantly monochrome colour palette\" (https://en.wikipedia.org/wiki/Brutalist_architecture). Where tardigrades survive by entering a toughened cryptobiotic state resistant to vacuum and radiation (https://en.wikipedia.org/wiki/Tardigrade), Brutalist designers expose raw concrete and structural systems to make the building\u2019s strength legible and long-lasting (https://en.wikipedia.org/wiki/Brutalist_architecture). Both approaches\u2014biological and architectural\u2014celebrate an aesthetic of function and protection: organisms and buildings that do not hide their means of survival but instead make them central to identity, demonstrating how durability can be expressed through visible, unadorned form (https://en.wikipedia.org/wiki/Tardigrade; https://en.wikipedia.org/wiki/Brutalist_architecture).\n\nExact sentences used as evidence and their URLs (verbatim extracts from the visited pages):\n\nFrom https://en.wikipedia.org/wiki/Tardigrade\n\n1) \"Tardigrades live in diverse regions of Earth's biosphere \u2013 mountaintops, the deep sea, tropical rainforests, and the Antarctic. They are among the most resilient animals known, with individual species able to survive severe conditions, such as exposure to extreme temperatures, extreme pressures (both high and low), air deprivation, radiation, dehydration, and starvation \u2013 that would quickly kill most other forms of life.\" (https://en.wikipedia.org/wiki/Tardigrade)\n\n2) \"Further, in that state they become highly resistant to environmental stresses, including temperatures from as low as \u2212272 \u00b0C (\u2212458 \u00b0F) to as much as +149 \u00b0C (300 \u00b0F) (at least for short periods of time), lack of oxygen, vacuum, ionising radiation, and high pressure.\" (https://en.wikipedia.org/wiki/Tardigrade)\n\n3) \"In 2007, dehydrated tardigrades were taken on the FOTON-M3 mission and exposed to vacuum, or to both vacuum and solar ultraviolet, for 10 days.\" (https://en.wikipedia.org/wiki/Tardigrade)\n\n4) \"In 2011, tardigrades went on the International Space Station STS-134, showing that they could survive microgravity and cosmic radiation, and should be suitable model organisms.\" (https://en.wikipedia.org/wiki/Tardigrade)\n\nFrom https://en.wikipedia.org/wiki/Brutalist_architecture\n\n5) \"Brutalist buildings are known for minimalist construction showcasing the bare building materials and structural elements over decorative design.\" (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n6) \"The style commonly makes use of exposed, unpainted concrete or brick, angular geometric shapes and a predominantly monochrome colour palette; other materials, such as steel, timber, and glass, are also featured.\" (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n7) \"A common theme in brutalist designs is the exposure of the building's inner-workings\u2014ranging from their structure and services to their human use\u2014in the exterior of the building.\" (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\n8) \"The best-known b\u00e9ton brut architecture is the proto-brutalist work of the Swiss-French architect Le Corbusier, in particular his 1952 Unit\u00e9 d'habitation in Marseille, France; the 1951\u20131961 Chandigarh Capitol Complex in India; and the 1955 church of Notre Dame du Haut in Ronchamp, France.\" (https://en.wikipedia.org/wiki/Brutalist_architecture)\n\nNotes on evidence and coverage:\n\n- Every factual claim above is supported by a verbatim sentence or short set of sentences directly quoted from the specified Wikipedia pages and accompanied by the exact URL cited for that page (https://en.wikipedia.org/wiki/Tardigrade and https://en.wikipedia.org/wiki/Brutalist_architecture).\n\n- The mandate asked for (Topic A) at least two extreme conditions tardigrades survive and one named space-exposure experiment; extracted evidence includes multiple extreme conditions (temperatures, pressures, vacuum, radiation, dehydration) and the FOTON-M3 2007 mission (and additionally STS-134 2011 and Beresheet 2019 are mentioned on the page). See quoted sentences 1\u20134 above (https://en.wikipedia.org/wiki/Tardigrade).\n\n- The mandate asked for (Topic B) at least two defining characteristics and one specific building example; extracted evidence includes minimalist/material-honest construction and use of exposed concrete/brick/angular geometry/monochrome palette, plus the Unit\u00e9 d'habitation in Marseille listed as a cited example. See quoted sentences 5\u20138 above (https://en.wikipedia.org/wiki/Brutalist_architecture).\n\nIf you would like, I can (a) extract additional verbatim sentences (e.g., about Beresheet 2019 or Boston City Hall examples) with their URLs, (b) format the evidence as a table mapping each claim to the exact line/paragraph location on the source page, or (c) shorten the comparative paragraph while preserving all required citations.",
+    "action_summary": "I visited and extracted verbatim evidence from the Wikipedia pages for Tardigrade (https://en.wikipedia.org/wiki/Tardigrade) and Brutalist architecture (https://en.wikipedia.org/wiki/Brutalist_architecture). For tardigrades I quoted sentences showing they survive extreme temperatures (\u2212272 \u00b0C to +149 \u00b0C), vacuum, radiation, dehydration and more, and I cited the FOTON-M3 2007 space-exposure experiment (and STS-134 2011). For Brutalism I quoted sentences showing its defining characteristics: minimalist, material-honest construction exposing bare materials and structural elements, use of exposed unpainted concrete or brick and angular geometric shapes, and cited Le Corbusier's 1952 Unit\u00e9 d'habitation in Marseille as an example. I then wrote a 100+ word comparative paragraph drawing a thematic parallel between tardigrade resilience and Brutalist durability, citing the exact Wikipedia URLs for every factual claim and listing all verbatim evidence sentences with their source URLs.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_add",
+      "duration": 14.231,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 14.2285,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 46.7641,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 10.8691,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 2.2156,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 51.7258,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 63.6652,
+      "success": true
+    }
+  ]
+}

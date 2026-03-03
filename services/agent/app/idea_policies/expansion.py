@@ -14,11 +14,6 @@ from agent.app.idea_dag_settings import load_idea_dag_settings
 
 
 def _safe_serialize_details(details: Dict[str, Any]) -> str:
-    """
-    Safely serialize node details to JSON.
-    :param details: Details dictionary.
-    :returns: JSON string.
-    """
     try:
         return json.dumps(details, ensure_ascii=True, default=str)
     except Exception as e:
@@ -26,13 +21,6 @@ def _safe_serialize_details(details: Dict[str, Any]) -> str:
 
 
 class LlmExpansionPolicy(ExpansionPolicy):
-    """
-    LLM-driven expansion policy for generating candidate nodes.
-    :param io: AgentIO instance.
-    :param settings: Settings dictionary.
-    :param model_name: Optional model override.
-    :returns: LlmExpansionPolicy instance.
-    """
     def __init__(self, io: AgentIO, settings: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None):
         default_settings = load_idea_dag_settings()
         merged_settings = {**default_settings, **(settings or {})}
@@ -42,12 +30,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
         self._logger = logging.getLogger(self.__class__.__name__)
 
     async def expand(self, graph: IdeaDag, node_id: str, memories: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
-        """
-        Generate candidate child ideas for a node using an LLM.
-        :param graph: IdeaDag instance.
-        :param node_id: Node identifier.
-        :returns: List of idea dicts.
-        """
         node = graph.get_node(node_id)
         if not node:
             return []
@@ -98,7 +80,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
                 self._logger.error(f"[EXPANSION] CRITICAL: No candidates parsed from LLM response!")
                 self._logger.error(f"[EXPANSION] LLM response length: {len(content) if content else 0} chars")
                 self._logger.error(f"[EXPANSION] LLM response preview: {content[:500] if content else 'None'}")
-                # Try to create a fallback candidate based on node title
                 fallback_candidate = self._create_fallback_candidate(node, graph)
                 if fallback_candidate:
                     self._logger.warning(f"[EXPANSION] Created fallback candidate: {fallback_candidate.get('title', 'Unknown')[:60]}...")
@@ -115,12 +96,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
             return []
 
     def _enhance_details_with_inline_links(self, details: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Enhance node details by adding inline link formatting for visit actions.
-        Links are shown next to their context text for easy association.
-        :param details: Original node details dictionary.
-        :returns: Enhanced details with inline links formatted.
-        """
         from agent.app.idea_policies.action_constants import ActionResultKey
         enhanced = dict(details)
         
@@ -170,12 +145,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
         return enhanced
     
     def _compact_details_for_expansion(self, details: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Remove large fields from action_result to reduce prompt size.
-        Keeps only essential fields needed for expansion decisions.
-        :param details: Full node details dictionary.
-        :returns: Compacted details with large fields removed.
-        """
         from agent.app.idea_policies.action_constants import ActionResultKey
         compact = dict(details)
         
@@ -210,16 +179,48 @@ class LlmExpansionPolicy(ExpansionPolicy):
         compact[DetailKey.ACTION_RESULT.value] = compact_result
         return compact
     
+    def _extract_key_outcome(self, node: IdeaNode) -> Optional[str]:
+        from agent.app.idea_policies.action_constants import ActionResultKey
+        result = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not isinstance(result, dict):
+            return None
+        action = node.details.get(DetailKey.ACTION.value, "")
+        if not result.get(ActionResultKey.SUCCESS.value, False):
+            error = result.get(ActionResultKey.ERROR.value, "unknown error")
+            return f"FAILED: {str(error)[:80]}"
+        if action == IdeaActionType.SEARCH.value:
+            results = result.get(ActionResultKey.RESULTS.value, [])
+            count = len(results) if isinstance(results, list) else 0
+            top_urls = []
+            if isinstance(results, list):
+                for r in results[:3]:
+                    if isinstance(r, dict) and r.get("url"):
+                        top_urls.append(str(r["url"])[:80])
+            if top_urls:
+                return f"Found {count} results. Top URLs: {', '.join(top_urls)}"
+            return f"Found {count} results"
+        if action == IdeaActionType.VISIT.value:
+            url = result.get(ActionResultKey.URL.value, "")
+            page_title = result.get("page_title", "")
+            content_chars = result.get("content_total_chars", 0)
+            links_count = result.get("links_count", 0)
+            parts = []
+            if url:
+                parts.append(f"Visited {str(url)[:80]}")
+            if page_title:
+                parts.append(f"page='{str(page_title)[:50]}'")
+            parts.append(f"{content_chars} chars, {links_count} links")
+            return ". ".join(parts)
+        if action == IdeaActionType.THINK.value:
+            return "Internal reasoning completed"
+        return None
+
     def _build_messages(self, graph: IdeaDag, node: IdeaNode, memories: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, str]]:
-        """
-        Build expansion prompt messages.
-        :param graph: IdeaDag instance.
-        :param node: IdeaNode to expand.
-        :returns: Message list.
-        """
         max_nodes = int(self.settings.get("expansion_max_context_nodes", 5))
         max_detail_chars = int(self.settings.get("expansion_max_detail_chars", 2000))
         max_children = int(self.settings.get("max_branching", 5))
+        if max_children <= 1:
+            max_children = 1
         path = graph.path_to_root(node.node_id)
         path = path[:max_nodes]
         
@@ -236,11 +237,22 @@ class LlmExpansionPolicy(ExpansionPolicy):
                     "title": entry.title,
                     "status": entry.status.value,
                     "score": entry.score,
+                    "action": entry.details.get(DetailKey.ACTION.value, "expansion"),
+                    "goal": entry.details.get(DetailKey.GOAL.value, ""),
+                    "justification": (
+                        entry.details.get(DetailKey.JUSTIFICATION.value)
+                        or entry.details.get(DetailKey.WHY_THIS_NODE.value)
+                        or ""
+                    ),
+                    "key_outcome": self._extract_key_outcome(entry),
                     "details": details_text,
                 }
             )
         allowed = self.settings.get("allowed_actions") or [a.value for a in IdeaActionType]
-        allowed_actions = ", ".join(str(item) for item in allowed)
+        allowed_actions = ", ".join(
+            str(item) for item in allowed
+            if str(item) != IdeaActionType.MERGE.value
+        )
         path_json = json.dumps(serialized, ensure_ascii=True)
         
         blocked_sites = graph._blocked_sites if hasattr(graph, "_blocked_sites") else {}
@@ -258,21 +270,22 @@ class LlmExpansionPolicy(ExpansionPolicy):
         if memories:
             from agent.app.idea_memory import MemoryManager
             temp_mm = MemoryManager(connector_chroma=None, namespace="temp")
-            memories_text = temp_mm.format_memories_for_llm(memories, max_chars=1500)
+            memories_text = temp_mm.format_memories_for_llm(memories, max_chars=4000)
         
         event_log = graph.build_event_log_table(node.node_id, max_events=15)
         event_log_json = json.dumps(event_log) if event_log else json.dumps("No events")
         
         system_template = self.settings.get("expansion_system_prompt")
         user_template = self.settings.get("expansion_user_prompt")
+        effective_range = f"exactly {max_children}" if max_children <= 1 else f"2-{max_children}"
         try:
             system = system_template.format(
                 allowed_actions=allowed_actions,
-                max_children=max_children,
+                max_children=effective_range,
             ) if system_template else ""
         except KeyError as fmt_err:
             self._logger.error(f"[EXPANSION] System prompt format error (missing key: {fmt_err}) - using raw template")
-            system = (system_template or "").replace("{allowed_actions}", str(allowed_actions)).replace("{max_children}", str(max_children))
+            system = (system_template or "").replace("{allowed_actions}", str(allowed_actions)).replace("{max_children}", str(effective_range))
         planning_addendum = str(
             self.settings.get(
                 "expansion_planning_addendum",
@@ -319,11 +332,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
         return messages
 
     def _extract_url_from_text(self, text: str) -> Optional[str]:
-        """
-        Extract URL from text that may contain [link: URL] format or plain URLs.
-        :param text: Text to search for URLs.
-        :return: Extracted URL or None.
-        """
         if not text or not isinstance(text, str):
             return None
         
@@ -343,12 +351,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
         return None
     
     def _is_url_from_visit(self, graph: IdeaDag, node_id: str) -> bool:
-        """
-        Check if a node is a visit action.
-        :param graph: IdeaDag instance.
-        :param node_id: Node ID to check.
-        :returns: True if node is a visit action.
-        """
         node = graph.get_node(node_id)
         if not node:
             return False
@@ -357,13 +359,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
         return action == IdeaActionType.VISIT.value
     
     def _extract_url_from_path_context_with_source(self, graph: IdeaDag, node_id: str, candidate_title: str = "") -> tuple[Optional[str], Optional[str]]:
-        """
-        Extract URLs from parent nodes with source tracking.
-        :param graph: IdeaDag instance.
-        :param node_id: Current node ID.
-        :param candidate_title: Candidate title to help match relevant links.
-        :return: Tuple of (best matching URL, source node ID) or (first available URL, source node ID).
-        """
         url = self._extract_url_from_path_context(graph, node_id, candidate_title)
         if not url:
             return None, None
@@ -435,14 +430,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
         return None, None
     
     def _extract_url_from_path_context(self, graph: IdeaDag, node_id: str, candidate_title: str = "") -> Optional[str]:
-        """
-        Extract URLs from parent nodes (search results and visit links).
-        Tries to match candidate intent with link context text.
-        :param graph: IdeaDag instance.
-        :param node_id: Current node ID.
-        :param candidate_title: Candidate title to help match relevant links.
-        :return: Best matching URL from parent nodes or first available URL.
-        """
         node = graph.get_node(node_id)
         if not node:
             return None
@@ -504,13 +491,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
         return best_match if best_match else first_url
     
     def _parse_candidates(self, content: Optional[str], graph: Optional[IdeaDag] = None, parent_node_id: Optional[str] = None) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Parse candidate list from LLM output and proactively fix missing URLs.
-        :param content: LLM response content.
-        :param graph: Optional IdeaDag for context extraction.
-        :param parent_node_id: Optional parent node ID for context.
-        :returns: Candidate list.
-        """
         if not content:
             return [], {}
         try:
@@ -518,7 +498,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
         except json.JSONDecodeError as e:
             self._logger.error(f"[EXPANSION] JSON PARSE ERROR: {e}")
             self._logger.error(f"[EXPANSION] Content preview (first 500 chars): {content[:500] if content else 'None'}")
-            # Try to extract JSON from text if it's embedded
             if content:
                 import re
                 json_match = re.search(r'\{[^{}]*"candidates"[^{}]*\}', content, re.DOTALL)
@@ -560,10 +539,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
             if justification:
                 details[DetailKey.JUSTIFICATION.value] = str(justification)
 
-            # Establish a local goal for this candidate so that every branch can act
-            # as an independent sub-problem. This makes the subgraph for e.g.
-            # "learn about strawberries" look the same whether it appears alone
-            # or as part of a larger mandate like "learn about bananas and strawberries".
             candidate_goal = candidate.get("goal")
             local_goal: Optional[str] = None
             if isinstance(candidate_goal, str) and candidate_goal.strip():
@@ -577,12 +552,17 @@ class LlmExpansionPolicy(ExpansionPolicy):
 
             if local_goal:
                 details[DetailKey.GOAL.value] = details.get(DetailKey.GOAL.value) or local_goal
-                # Treat the local goal as this branch's original goal unless explicitly overridden.
                 if not details.get(DetailKey.ORIGINAL_GOAL.value):
                     details[DetailKey.ORIGINAL_GOAL.value] = local_goal
             
             if action == IdeaActionType.VISIT.value:
-                url = details.get(DetailKey.URL.value) or details.get(DetailKey.LINK.value) or details.get("url") or details.get("link")
+                url = (
+                    details.get(DetailKey.URL.value)
+                    or details.get(DetailKey.LINK.value)
+                    or details.get("url")
+                    or details.get("link")
+                    or details.get("optional_url")
+                )
                 if not url or not isinstance(url, str) or not url.startswith(("http://", "https://")):
                     extracted_url = None
                     source_node_id = None
@@ -617,8 +597,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
                         self._logger.warning(f"[EXPANSION] Visit candidate missing URL: title='{title[:60]}...', details keys: {list(details.keys())}")
             
             if action == IdeaActionType.SEARCH.value:
-                # SEARCH nodes provide URLs as data and also behave as independent
-                # sub-problems with their own local goal (already set above).
                 details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_search"}
             
             cleaned.append(
@@ -631,19 +609,11 @@ class LlmExpansionPolicy(ExpansionPolicy):
         return cleaned, dict(meta)
     
     def _create_fallback_candidate(self, node: "IdeaNode", graph: Optional["IdeaDag"] = None) -> Optional[Dict[str, Any]]:
-        """
-        Create a fallback candidate when expansion fails.
-        Attempts to extract URL from node title/mandate and create a visit node.
-        :param node: Node that failed to expand.
-        :param graph: Optional graph for context.
-        :returns: Fallback candidate dict or None.
-        """
         import re
         title = node.title or ""
         mandate = node.details.get("mandate") or ""
         text_to_search = f"{title} {mandate}"
         
-        # Look for URLs in title/mandate
         url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
         urls = re.findall(url_pattern, text_to_search)
         
@@ -661,7 +631,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
                 "score": None,
             }
         
-        # Look for visit/search keywords
         text_lower = text_to_search.lower()
         if any(keyword in text_lower for keyword in ["visit", "go to", "fetch", "open", "navigate"]):
             if urls:
@@ -678,7 +647,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
                 }
         
         if any(keyword in text_lower for keyword in ["search", "find", "look for", "query"]):
-            # Extract search query from title
             query = title[:100] if title else "Search"
             return {
                 "title": f"Search: {query}",
@@ -690,7 +658,6 @@ class LlmExpansionPolicy(ExpansionPolicy):
                 "score": None,
             }
         
-        # Last resort: generic think node
         self._logger.warning(f"[EXPANSION] Fallback: Creating generic think node (no URL or search query found)")
         return {
             "title": "Analyze and plan next steps",

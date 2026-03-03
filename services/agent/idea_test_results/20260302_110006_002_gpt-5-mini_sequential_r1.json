@@ -1,0 +1,1179 @@
+{
+  "test_metadata": {
+    "test_id": "002",
+    "test_name": "Basic Fact Retrieval",
+    "difficulty_level": "1/10",
+    "category": "Simple Information Retrieval"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "Answer:\n1) The capital city of Australia is Canberra.\n\nEvidence (authoritative source):\n2) According to the Encyclopaedia Britannica page for Canberra (https://www.britannica.com/place/Canberra):\n\"Canberra, federal capital of the Commonwealth of Australia.\" https://www.britannica.com/place/Canberra\n\nSource cited:\n- https://www.britannica.com/place/Canberra",
+      "action_summary": "The capital of Australia is Canberra, as stated by Encyclopaedia Britannica: \"Canberra, federal capital of the Commonwealth of Australia.\" (https://www.britannica.com/place/Canberra)",
+      "success": true,
+      "goal_achieved": true,
+      "has_failures": false
+    },
+    "graph": {
+      "root_id": "a8e866cb-318b-4643-a738-5af706a815ad",
+      "nodes": {
+        "a8e866cb-318b-4643-a738-5af706a815ad": {
+          "node_id": "a8e866cb-318b-4643-a738-5af706a815ad",
+          "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+          "details": {
+            "mandate": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "memo_namespace": "idea_dag:548a63a98e",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "original_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "merged_results": [
+              {
+                "node_id": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+                "title": "Search for authoritative sources stating the capital of Australia",
+                "status": "done",
+                "score": 0.15,
+                "evaluation": {
+                  "score": 0.15
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "node_id": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+                  "query": "capital city of Australia official Canberra site:.gov.au OR site:.org OR site:.edu OR site:britannica.com",
+                  "intent": "Find authoritative webpages (Australian government, national institutions, or Britannica) that explicitly state the capital of Australia.",
+                  "vector_context": [],
+                  "count": 5,
+                  "results": [
+                    {
+                      "title": "Canberra | History, Map, Population, Climate, & Facts | Britannica",
+                      "url": "https://www.britannica.com/place/Canberra",
+                      "description": "Canberra, <strong>federal capital of the Commonwealth of Australia</strong>. It occupies part of the Australian Capital Territory, in southern Australia, and is about 150 miles (240 km) southwest of Sydney."
+                    },
+                    {
+                      "title": "Australia | History, Cities, Population, Capital, Map, & Facts | Britannica",
+                      "url": "https://www.britannica.com/place/Australia",
+                      "description": "Australia, the smallest continent and one of the largest countries on Earth, lying between the Pacific and Indian oceans in the Southern Hemisphere. Australia\u2019s capital is Canberra, located in the southeast between the larger and more important economic and cultural centres of Sydney and Melbourne."
+                    },
+                    {
+                      "title": "Australian Capital Territory (A.C.T.) | Flag, Facts, Maps, & Points of Interest | Britannica",
+                      "url": "https://www.britannica.com/place/Australian-Capital-Territory",
+                      "description": "Australian Parliament House; Museum ... Democracy at Old Parliament House (bottom), Canberra, Austl.(more) ... <strong>Australian Capital Territory (A.C.T.),</strong> political entity of the Commonwealth of Australia consisting of Canberra, the ..."
+                    },
+                    {
+                      "title": "Canberra - Kids | Britannica Kids | Homework Help",
+                      "url": "https://kids.britannica.com/kids/article/Canberra/345881",
+                      "description": "The government held a competition to choose the design for the new city. The American architect Walter Burley Griffin created the winning design. <strong>Canberra officially became the capital in 1927</strong>."
+                    },
+                    {
+                      "title": "Australian Capital Territory - Kids | Britannica Kids | Homework Help",
+                      "url": "https://kids.britannica.com/kids/article/Australian-Capital-Territory/487556",
+                      "description": "<strong>The Australian Capital Territory</strong> is a region in Australia that includes the country\u2019s capital city of Canberra. It is surrounded by the state of New South Wales. Geography\u2026"
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "f42fcfaa-b01c-4d3e-b9de-0c995854b093",
+                "title": "Visit the top authoritative result and extract the exact statement and URL",
+                "status": "skipped",
+                "score": 0.15,
+                "evaluation": {
+                  "score": 0.15
+                },
+                "result": null,
+                "is_merge": false
+              },
+              {
+                "node_id": "760ec8f0-8b1d-410d-97bc-4c6ebe39d609",
+                "title": "Compile final answer sentence and cite the visited authoritative URL",
+                "status": "skipped",
+                "score": 0.45,
+                "evaluation": {
+                  "score": 0.45
+                },
+                "result": null,
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 3,
+              "success": 1,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 2
+            },
+            "goal_achieved": true
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "done",
+          "children": [
+            "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+            "f42fcfaa-b01c-4d3e-b9de-0c995854b093",
+            "760ec8f0-8b1d-410d-97bc-4c6ebe39d609",
+            "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "95ddd4ae-7d0b-41a9-9907-1010ebb4430f": {
+          "node_id": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+          "title": "Search for authoritative sources stating the capital of Australia",
+          "details": {
+            "query": "capital city of Australia official Canberra site:.gov.au OR site:.org OR site:.edu OR site:britannica.com",
+            "intent": "Find authoritative webpages (Australian government, national institutions, or Britannica) that explicitly state the capital of Australia.",
+            "count": 5,
+            "expected_output_fields": [
+              "ranked_urls",
+              "snippets_for_each_url"
+            ],
+            "why_this_reduces_uncertainty": "A targeted search will locate high-authority sources (gov.au, national museums, Britannica) so the subsequent visit can extract a verifiable citation.",
+            "action": "search",
+            "goal": "Search for authoritative sources stating the capital of Australia",
+            "original_goal": "Search for authoritative sources stating the capital of Australia",
+            "provides_data": {
+              "type": "urls_from_search"
+            },
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.15
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "search",
+              "success": true,
+              "node_id": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+              "query": "capital city of Australia official Canberra site:.gov.au OR site:.org OR site:.edu OR site:britannica.com",
+              "intent": "Find authoritative webpages (Australian government, national institutions, or Britannica) that explicitly state the capital of Australia.",
+              "vector_context": [],
+              "count": 5,
+              "results": [
+                {
+                  "title": "Canberra | History, Map, Population, Climate, & Facts | Britannica",
+                  "url": "https://www.britannica.com/place/Canberra",
+                  "description": "Canberra, <strong>federal capital of the Commonwealth of Australia</strong>. It occupies part of the Australian Capital Territory, in southern Australia, and is about 150 miles (240 km) southwest of Sydney."
+                },
+                {
+                  "title": "Australia | History, Cities, Population, Capital, Map, & Facts | Britannica",
+                  "url": "https://www.britannica.com/place/Australia",
+                  "description": "Australia, the smallest continent and one of the largest countries on Earth, lying between the Pacific and Indian oceans in the Southern Hemisphere. Australia\u2019s capital is Canberra, located in the southeast between the larger and more important economic and cultural centres of Sydney and Melbourne."
+                },
+                {
+                  "title": "Australian Capital Territory (A.C.T.) | Flag, Facts, Maps, & Points of Interest | Britannica",
+                  "url": "https://www.britannica.com/place/Australian-Capital-Territory",
+                  "description": "Australian Parliament House; Museum ... Democracy at Old Parliament House (bottom), Canberra, Austl.(more) ... <strong>Australian Capital Territory (A.C.T.),</strong> political entity of the Commonwealth of Australia consisting of Canberra, the ..."
+                },
+                {
+                  "title": "Canberra - Kids | Britannica Kids | Homework Help",
+                  "url": "https://kids.britannica.com/kids/article/Canberra/345881",
+                  "description": "The government held a competition to choose the design for the new city. The American architect Walter Burley Griffin created the winning design. <strong>Canberra officially became the capital in 1927</strong>."
+                },
+                {
+                  "title": "Australian Capital Territory - Kids | Britannica Kids | Homework Help",
+                  "url": "https://kids.britannica.com/kids/article/Australian-Capital-Territory/487556",
+                  "description": "<strong>The Australian Capital Territory</strong> is a region in Australia that includes the country\u2019s capital city of Canberra. It is surrounded by the state of New South Wales. Geography\u2026"
+                }
+              ]
+            }
+          },
+          "parent_id": "a8e866cb-318b-4643-a738-5af706a815ad",
+          "parent_ids": [
+            "a8e866cb-318b-4643-a738-5af706a815ad"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.15,
+          "memo_key": null
+        },
+        "f42fcfaa-b01c-4d3e-b9de-0c995854b093": {
+          "node_id": "f42fcfaa-b01c-4d3e-b9de-0c995854b093",
+          "title": "Visit the top authoritative result and extract the exact statement and URL",
+          "details": {
+            "link_idea": "The official Australian government or Britannica page that states 'Canberra is the capital of Australia'; prefer .gov.au or britannica.com",
+            "link_count": 1,
+            "intent": "Open the top authoritative page found by the search and extract the exact sentence or heading that identifies Canberra as the capital, plus the page title and canonical URL.",
+            "expected_output_fields": [
+              "page_title",
+              "page_url",
+              "extract_quote_or_sentence",
+              "fetch_timestamp"
+            ],
+            "why_this_reduces_uncertainty": "Visiting the authoritative page produces verifiable, citable text and the exact URL required by the mandate.",
+            "action": "visit",
+            "goal": "Visit the top authoritative result and extract the exact statement and URL",
+            "original_goal": "Visit the top authoritative result and extract the exact statement and URL",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.15
+            }
+          },
+          "parent_id": "a8e866cb-318b-4643-a738-5af706a815ad",
+          "parent_ids": [
+            "a8e866cb-318b-4643-a738-5af706a815ad"
+          ],
+          "status": "skipped",
+          "children": [],
+          "score": 0.15,
+          "memo_key": null
+        },
+        "760ec8f0-8b1d-410d-97bc-4c6ebe39d609": {
+          "node_id": "760ec8f0-8b1d-410d-97bc-4c6ebe39d609",
+          "title": "Compile final answer sentence and cite the visited authoritative URL",
+          "details": {
+            "intent": "Using the extracted page content, produce the final concise answer ('The capital of Australia is Canberra.') and include one authoritative source URL and the extracted supporting sentence.",
+            "input_dependencies": [
+              "output of the visit action: page_title, page_url, extract_quote_or_sentence"
+            ],
+            "expected_output_fields": [
+              "final_answer_text",
+              "citation_url",
+              "supporting_quote"
+            ],
+            "why_this_reduces_uncertainty": "This step formats the verified facts and citation into the exact requested deliverable.",
+            "action": "think",
+            "goal": "Compile final answer sentence and cite the visited authoritative URL",
+            "original_goal": "Compile final answer sentence and cite the visited authoritative URL",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.45
+            }
+          },
+          "parent_id": "a8e866cb-318b-4643-a738-5af706a815ad",
+          "parent_ids": [
+            "a8e866cb-318b-4643-a738-5af706a815ad"
+          ],
+          "status": "skipped",
+          "children": [],
+          "score": 0.45,
+          "memo_key": null
+        },
+        "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a": {
+          "node_id": "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a",
+          "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+          "details": {
+            "action": "merge",
+            "merged_results": [
+              {
+                "node_id": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+                "title": "Search for authoritative sources stating the capital of Australia",
+                "status": "done",
+                "score": 0.15,
+                "evaluation": {
+                  "score": 0.15
+                },
+                "result": {
+                  "action": "search",
+                  "success": true,
+                  "node_id": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+                  "query": "capital city of Australia official Canberra site:.gov.au OR site:.org OR site:.edu OR site:britannica.com",
+                  "intent": "Find authoritative webpages (Australian government, national institutions, or Britannica) that explicitly state the capital of Australia.",
+                  "vector_context": [],
+                  "count": 5,
+                  "results": [
+                    {
+                      "title": "Canberra | History, Map, Population, Climate, & Facts | Britannica",
+                      "url": "https://www.britannica.com/place/Canberra",
+                      "description": "Canberra, <strong>federal capital of the Commonwealth of Australia</strong>. It occupies part of the Australian Capital Territory, in southern Australia, and is about 150 miles (240 km) southwest of Sydney."
+                    },
+                    {
+                      "title": "Australia | History, Cities, Population, Capital, Map, & Facts | Britannica",
+                      "url": "https://www.britannica.com/place/Australia",
+                      "description": "Australia, the smallest continent and one of the largest countries on Earth, lying between the Pacific and Indian oceans in the Southern Hemisphere. Australia\u2019s capital is Canberra, located in the southeast between the larger and more important economic and cultural centres of Sydney and Melbourne."
+                    },
+                    {
+                      "title": "Australian Capital Territory (A.C.T.) | Flag, Facts, Maps, & Points of Interest | Britannica",
+                      "url": "https://www.britannica.com/place/Australian-Capital-Territory",
+                      "description": "Australian Parliament House; Museum ... Democracy at Old Parliament House (bottom), Canberra, Austl.(more) ... <strong>Australian Capital Territory (A.C.T.),</strong> political entity of the Commonwealth of Australia consisting of Canberra, the ..."
+                    },
+                    {
+                      "title": "Canberra - Kids | Britannica Kids | Homework Help",
+                      "url": "https://kids.britannica.com/kids/article/Canberra/345881",
+                      "description": "The government held a competition to choose the design for the new city. The American architect Walter Burley Griffin created the winning design. <strong>Canberra officially became the capital in 1927</strong>."
+                    },
+                    {
+                      "title": "Australian Capital Territory - Kids | Britannica Kids | Homework Help",
+                      "url": "https://kids.britannica.com/kids/article/Australian-Capital-Territory/487556",
+                      "description": "<strong>The Australian Capital Territory</strong> is a region in Australia that includes the country\u2019s capital city of Canberra. It is surrounded by the state of New South Wales. Geography\u2026"
+                    }
+                  ]
+                },
+                "is_merge": false
+              },
+              {
+                "node_id": "f42fcfaa-b01c-4d3e-b9de-0c995854b093",
+                "title": "Visit the top authoritative result and extract the exact statement and URL",
+                "status": "skipped",
+                "score": 0.15,
+                "evaluation": {
+                  "score": 0.15
+                },
+                "result": null,
+                "is_merge": false
+              },
+              {
+                "node_id": "760ec8f0-8b1d-410d-97bc-4c6ebe39d609",
+                "title": "Compile final answer sentence and cite the visited authoritative URL",
+                "status": "skipped",
+                "score": 0.45,
+                "evaluation": {
+                  "score": 0.45
+                },
+                "result": null,
+                "is_merge": false
+              }
+            ],
+            "merge_summary": {
+              "total": 3,
+              "success": 1,
+              "failed": 0,
+              "blocked": 0,
+              "skipped": 2
+            },
+            "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "original_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "goal_achieved": false,
+            "goal_evaluation": "Partially achieved: authoritative evidence that Canberra is Australia's capital was located (Britannica pages), but the original goal required producing the answer and citing one authoritative source URL. The two follow-up tasks that would produce the final answer and explicit citation were skipped, so the objective was not completed.",
+            "missing_requirements": [
+              "Visit at least one authoritative page from the search results and extract the exact statement and URL (task was skipped).",
+              "Compile and return the final answer sentence explicitly stating the capital city and cite one authoritative source URL (task was skipped).",
+              "(Optional) If a government source is preferred, retrieve and cite an official Australian government page that states the capital (e.g., .gov.au) to strengthen provenance."
+            ],
+            "merge_incomplete": true,
+            "merge_should_skip": true,
+            "action_result": {
+              "action": "merge",
+              "success": true,
+              "synthesized": {
+                "summary": "A targeted search of authoritative sources returned multiple Britannica pages that explicitly identify Canberra as Australia's capital (including a Kids entry that states Canberra officially became the capital in 1927). Two downstream tasks (visiting a chosen authoritative page to extract the exact statement and composing the final answered sentence with a cited URL) were skipped, so the workflow stopped short of producing the requested final answer+citation.",
+                "key_findings": [
+                  "Britannica (Canberra page) explicitly calls Canberra the \"federal capital of the Commonwealth of Australia\": https://www.britannica.com/place/Canberra (search node: 95ddd4ae-7d0b-41a9-9907-1010ebb4430f).",
+                  "Britannica (Australia page) states \"Australia's capital is Canberra\": https://www.britannica.com/place/Australia (search node: 95ddd4ae-7d0b-41a9-9907-1010ebb4430f).",
+                  "Britannica Kids notes that \"Canberra officially became the capital in 1927\": https://kids.britannica.com/kids/article/Canberra/345881 (search node: 95ddd4ae-7d0b-41a9-9907-1010ebb4430f).",
+                  "The Australian Capital Territory (A.C.T.) is documented by Britannica as the political entity that contains Canberra: https://www.britannica.com/place/Australian-Capital-Territory (search node: 95ddd4ae-7d0b-41a9-9907-1010ebb4430f)."
+                ],
+                "goal_achieved": false,
+                "goal_evaluation": "Partially achieved: authoritative evidence that Canberra is Australia's capital was located (Britannica pages), but the original goal required producing the answer and citing one authoritative source URL. The two follow-up tasks that would produce the final answer and explicit citation were skipped, so the objective was not completed.",
+                "missing_requirements": [
+                  "Visit at least one authoritative page from the search results and extract the exact statement and URL (task was skipped).",
+                  "Compile and return the final answer sentence explicitly stating the capital city and cite one authoritative source URL (task was skipped).",
+                  "(Optional) If a government source is preferred, retrieve and cite an official Australian government page that states the capital (e.g., .gov.au) to strengthen provenance."
+                ]
+              },
+              "child_count": 3,
+              "raw_response": "{\n  \"summary\": \"A targeted search of authoritative sources returned multiple Britannica pages that explicitly identify Canberra as Australia's capital (including a Kids entry that states Canberra officially became the capital in 1927). Two downstream tasks (visiting a chosen authoritative page to extract the exact statement and composing the final answered sentence with a cited URL) were skipped, so the workflow stopped short of producing the requested final answer+citation.\",\n  \"key_findings\": [\n    \"Britannica (Canberra page) explicitly calls Canberra the \\\"federal capital of the Commonwealth of Australia\\\": https://www.britannica.com/place/Canberra (search node: 95ddd4ae-7d0b-41a9-9907-1010ebb4430f).\",\n    \"Britannica (Australia page) states \\\"Australia's capital is Canberra\\\": https://www.britannica.com/place/Australia (search node: 95ddd4ae-7d0b-41a9-9907-1010ebb4430f).\",\n    \"Britannica Kids notes that \\\"Canberra officially became the capital in 1927\\\": https://kids.britannica.com/kids/article/Canberra/345881 (search node: 95ddd4ae-7d0b-41a9-9907-1010ebb4430f).\",\n    \"The Australian Capital Territory (A.C.T.) is documented by Britannica as the political entity that contains Canberra: https://www.britannica.com/place/Australian-Capital-Territory (search node: 95ddd4ae-7d0b-41a9-9907-1010ebb4430f).\"\n  ],\n  \"goal_achieved\": false,\n  \"goal_evaluation\": \"Partially achieved: authoritative evidence that Canberra is Australia's capital was located (Britannica pages), but the original goal required producing the answer and citing one authoritative source URL. The two follow-up tasks that would produce the final answer and explicit citation were skipped, so the objective was not completed.\",\n  \"missing_requirements\": [\n    \"Visit at least one authoritative page from the search results and extract the exact statement and URL (task was skipped).\",\n    \"Compile and return the final answer sentence explicitly stating the capital city and cite one authoritative source URL (task was skipped).\",\n    \"(Optional) If a government source is preferred, retrieve and cite an official Australian government page that states the capital (e.g., .gov.au) to strengthen provenance.\"\n  ]\n}",
+              "goal_achieved": false,
+              "goal_evaluation": "Partially achieved: authoritative evidence that Canberra is Australia's capital was located (Britannica pages), but the original goal required producing the answer and citing one authoritative source URL. The two follow-up tasks that would produce the final answer and explicit citation were skipped, so the objective was not completed.",
+              "missing_requirements": [
+                "Visit at least one authoritative page from the search results and extract the exact statement and URL (task was skipped).",
+                "Compile and return the final answer sentence explicitly stating the capital city and cite one authoritative source URL (task was skipped).",
+                "(Optional) If a government source is preferred, retrieve and cite an official Australian government page that states the capital (e.g., .gov.au) to strengthen provenance."
+              ]
+            },
+            "merge_skipped_reason": "Partially achieved: authoritative evidence that Canberra is Australia's capital was located (Britannica pages), but the original goal required producing the answer and citing one authoritative source URL. The two follow-up tasks that would produce the final answer and explicit citation were skipped, so the objective was not completed."
+          },
+          "parent_id": "a8e866cb-318b-4643-a738-5af706a815ad",
+          "parent_ids": [
+            "a8e866cb-318b-4643-a738-5af706a815ad"
+          ],
+          "status": "skipped",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 358,
+        "words": 35,
+        "kilobytes": 0.35
+      },
+      "llm": {
+        "calls": 15,
+        "prompt": {
+          "chars": 46761,
+          "words": 5530,
+          "kilobytes": 45.67,
+          "tokens": 16453
+        },
+        "completion": {
+          "chars": 13348,
+          "words": 1465,
+          "kilobytes": 13.04,
+          "tokens": 11237
+        },
+        "total_tokens": 27690
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 5,
+        "chars": 1789,
+        "words": 222,
+        "kilobytes": 1.75
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "chroma_query": {
+          "count": 82,
+          "total_duration": 42.4843,
+          "avg_duration": 0.5181,
+          "min_duration": 0.4204,
+          "max_duration": 0.9777,
+          "success_count": 82,
+          "error_count": 0
+        },
+        "llm_call": {
+          "count": 12,
+          "total_duration": 291.4135,
+          "avg_duration": 24.2845,
+          "min_duration": 9.8909,
+          "max_duration": 41.2469,
+          "success_count": 12,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 3,
+          "total_duration": 3.2653,
+          "avg_duration": 1.0884,
+          "min_duration": 0.2302,
+          "max_duration": 2.2878,
+          "success_count": 3,
+          "error_count": 0
+        },
+        "chroma_add": {
+          "count": 4,
+          "total_duration": 5.0737,
+          "avg_duration": 1.2684,
+          "min_duration": 0.8134,
+          "max_duration": 2.3746,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "search_query": {
+          "count": 2,
+          "total_duration": 3.0418,
+          "avg_duration": 1.5209,
+          "min_duration": 0.7528,
+          "max_duration": 2.2891,
+          "success_count": 2,
+          "error_count": 0
+        },
+        "search": {
+          "count": 1,
+          "total_duration": 2.2933,
+          "avg_duration": 2.2933,
+          "min_duration": 2.2933,
+          "max_duration": 2.2933,
+          "success_count": 1,
+          "error_count": 0
+        }
+      },
+      "timings_per_call": [
+        {
+          "name": "chroma_query",
+          "duration": 0.5974,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.7031,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 34.5649,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 28.5388,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 17.8546,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5909,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.527,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.6572,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 15.774,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4426,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 0.2302,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 2.3746,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 0.8134,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4973,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5924,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5104,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 9.8909,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 0.7473,
+          "success": true
+        },
+        {
+          "name": "search_query",
+          "duration": 0.7528,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 0.8865,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5803,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4652,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4764,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4804,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4732,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4839,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5032,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.471,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.473,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5569,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4559,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4398,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.6089,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5654,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4495,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 33.1229,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 33.1246,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.488,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4705,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5363,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.48,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4528,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5129,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.6014,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4656,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.44,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4365,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4723,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4791,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4755,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5065,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4265,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5181,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.555,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.6251,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4204,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5272,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.6078,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5602,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.6043,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4817,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5243,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5939,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5782,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.578,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4987,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4481,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.474,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4875,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 16.3334,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 16.3357,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4628,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.6269,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.7823,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.443,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 2.2878,
+          "success": true
+        },
+        {
+          "name": "search_query",
+          "duration": 2.2891,
+          "success": true
+        },
+        {
+          "name": "search",
+          "duration": 2.2933,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.9777,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 0.9992,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4611,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4471,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4362,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4552,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4579,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.6012,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4671,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4688,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4685,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.6838,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4992,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4556,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4361,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5708,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.462,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5369,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4273,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5241,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4419,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4787,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4849,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 41.2469,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 19.9149,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 24.712,
+          "success": true
+        }
+      ],
+      "events_count": 198
+    },
+    "duration_seconds": 100.54,
+    "telemetry": {
+      "correlation_id": "idea_test_002_gpt-5-mini_20260302_110006",
+      "trace_file": "/app/agent/idea_test_results/20260302_110006_002_gpt-5-mini.jsonl",
+      "events_count": 198,
+      "timings_count": 104
+    },
+    "graph_visualization": {
+      "ascii": "*---.   What is the capital city of Australia? Provide the answer and cite one authoritative source URL.\n|\\ \\ \\  \n* | | | Search for authoritative sources stating the capital of Australia\n / / /  \n* | | Visit the top authoritative result and extract the exact statement and URL\n / /  \n* | Compile final answer sentence and cite the visited authoritative URL\n /  \n* Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.\n",
+      "graph_data": {
+        "nodes": [
+          {
+            "id": "a8e866cb-318b-4643-a738-5af706a815ad",
+            "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "status": "done",
+            "score": null,
+            "memo_key": null,
+            "action": null,
+            "has_result": false,
+            "parent_ids": []
+          },
+          {
+            "id": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+            "title": "Search for authoritative sources stating the capital of Australia",
+            "status": "done",
+            "score": 0.15,
+            "memo_key": null,
+            "action": "search",
+            "has_result": true,
+            "parent_ids": [
+              "a8e866cb-318b-4643-a738-5af706a815ad"
+            ]
+          },
+          {
+            "id": "f42fcfaa-b01c-4d3e-b9de-0c995854b093",
+            "title": "Visit the top authoritative result and extract the exact statement and URL",
+            "status": "skipped",
+            "score": 0.15,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": false,
+            "parent_ids": [
+              "a8e866cb-318b-4643-a738-5af706a815ad"
+            ]
+          },
+          {
+            "id": "760ec8f0-8b1d-410d-97bc-4c6ebe39d609",
+            "title": "Compile final answer sentence and cite the visited authoritative URL",
+            "status": "skipped",
+            "score": 0.45,
+            "memo_key": null,
+            "action": "think",
+            "has_result": false,
+            "parent_ids": [
+              "a8e866cb-318b-4643-a738-5af706a815ad"
+            ]
+          },
+          {
+            "id": "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a",
+            "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "status": "skipped",
+            "score": null,
+            "memo_key": null,
+            "action": "merge",
+            "has_result": true,
+            "parent_ids": [
+              "a8e866cb-318b-4643-a738-5af706a815ad"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "a8e866cb-318b-4643-a738-5af706a815ad",
+            "to": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f"
+          },
+          {
+            "from": "a8e866cb-318b-4643-a738-5af706a815ad",
+            "to": "f42fcfaa-b01c-4d3e-b9de-0c995854b093"
+          },
+          {
+            "from": "a8e866cb-318b-4643-a738-5af706a815ad",
+            "to": "760ec8f0-8b1d-410d-97bc-4c6ebe39d609"
+          },
+          {
+            "from": "a8e866cb-318b-4643-a738-5af706a815ad",
+            "to": "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a"
+          }
+        ]
+      },
+      "analysis": {
+        "total_nodes": 5,
+        "action_counts": {
+          "search": 1,
+          "visit": 1,
+          "think": 1,
+          "merge": 1
+        },
+        "think_count": 1,
+        "think_ratio": 0.2,
+        "other_action_count": 4,
+        "action_diversity": 4,
+        "unique_titles": 5,
+        "duplicate_title_count": 0,
+        "think_nodes": [
+          {
+            "node_id": "760ec8f0-8b1d-410d-97bc-4c6ebe39d609",
+            "title": "Compile final answer sentence and cite the visited authoritative URL",
+            "status": "skipped"
+          }
+        ],
+        "issues": [
+          {
+            "severity": "medium",
+            "type": "similar_long_titles",
+            "message": "Found 1 pairs of nodes with very similar long titles (likely merge/repetition)",
+            "recommendation": "Review merge nodes - they may be duplicating the root node's mandate unnecessarily",
+            "examples": [
+              {
+                "title_preview": "what is the capital city of australia? provide the answer and cite one authoritative source url.",
+                "node_ids": [
+                  "a8e866cb-318b-4643-a738-5af706a815ad",
+                  "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a"
+                ]
+              }
+            ]
+          }
+        ],
+        "issue_count": 1
+      }
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "correct_answer",
+        "passed": true,
+        "score": 1.0,
+        "reason": "Canberra found"
+      },
+      {
+        "check": "url_present",
+        "passed": true,
+        "score": 1.0,
+        "url_count": 3,
+        "reason": "Found 3 URL(s)"
+      }
+    ],
+    "llm_validation": null,
+    "overall_passed": true,
+    "overall_score": 1.0,
+    "checks_passed": 2,
+    "total_checks": 2,
+    "pass_rate": 1.0
+  },
+  "timestamp": "2026-03-02T11:02:15.489964",
+  "execution_variant": "sequential"
+}

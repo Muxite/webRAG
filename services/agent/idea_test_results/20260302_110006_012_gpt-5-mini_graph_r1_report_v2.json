@@ -1,0 +1,1843 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "012",
+    "test_name": "Wikipedia Link Collection",
+    "passed": true,
+    "score": 1.0,
+    "ascii_graph": "*---.   Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.\n|\\ \\ \\  \n* | | | Visit Wikipedia Main Page and extract candidate links\n / / /  \n* | | Visit the 10 selected pages and extract title and 1-2 sentence description for each\n / /  \n* | Assemble and format final 10-link list\n /  \n* Merge: Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "127292d8-6313-4400-ab9c-b682de6afcbb",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly."
+    },
+    {
+      "node_id": "f45f82a2-92f7-4219-8aef-7d55b402f957",
+      "action": "visit",
+      "status": "done",
+      "score": 0.15,
+      "title": "Visit Wikipedia Main Page and extract candidate links"
+    },
+    {
+      "node_id": "9f586697-013f-4be4-a7ea-48bc8dccb929",
+      "action": "visit",
+      "status": "failed",
+      "score": 0.1,
+      "title": "Visit the 10 selected pages and extract title and 1-2 sentence description for each"
+    },
+    {
+      "node_id": "c1764be6-8b96-4624-a116-732d556da61d",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "title": "Assemble and format final 10-link list"
+    },
+    {
+      "node_id": "f3c5edc5-0438-4dd4-a8c1-5f0af599ef15",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "link_count",
+      "passed": true,
+      "score": 1.0,
+      "url_count": 11,
+      "reason": "Found 11 Wikipedia URLs"
+    },
+    {
+      "check": "descriptions",
+      "passed": true,
+      "score": 1.0,
+      "sentence_count": 73,
+      "reason": "Found 73 descriptive sentences"
+    },
+    {
+      "check": "wikipedia_visit",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 1,
+      "reason": "Found 1 visit actions"
+    },
+    {
+      "check": "link_evidence_overlap",
+      "passed": true,
+      "score": 1.0,
+      "output_url_count": 11,
+      "visit_link_count": 20,
+      "overlap_count": 10,
+      "reason": "Found 10 overlapping link(s)"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 8579,
+      "words": 1031,
+      "kilobytes": 8.38
+    },
+    "llm": {
+      "calls": 19,
+      "prompt": {
+        "chars": 306697,
+        "words": 26338,
+        "kilobytes": 299.51,
+        "tokens": 29946
+      },
+      "completion": {
+        "chars": 33384,
+        "words": 4265,
+        "kilobytes": 32.6,
+        "tokens": 10997
+      },
+      "total_tokens": 40943
+    },
+    "chroma": {
+      "store": {
+        "count": 1,
+        "chars": 38,
+        "words": 6,
+        "kilobytes": 0.04
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 1,
+      "chars": 9320,
+      "words": 1352,
+      "kilobytes": 9.1
+    },
+    "timings": {
+      "chroma_add": {
+        "count": 33,
+        "total_duration": 894.6577,
+        "avg_duration": 27.1108,
+        "min_duration": 0.4518,
+        "max_duration": 46.5645,
+        "success_count": 33,
+        "error_count": 0
+      },
+      "chroma_query": {
+        "count": 100,
+        "total_duration": 86.6772,
+        "avg_duration": 0.8668,
+        "min_duration": 0.2608,
+        "max_duration": 14.0222,
+        "success_count": 100,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 12,
+        "total_duration": 363.0918,
+        "avg_duration": 30.2576,
+        "min_duration": 1.3663,
+        "max_duration": 127.0537,
+        "success_count": 12,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 8,
+        "total_duration": 8.1459,
+        "avg_duration": 1.0182,
+        "min_duration": 0.478,
+        "max_duration": 3.7338,
+        "success_count": 7,
+        "error_count": 1
+      },
+      "search_query": {
+        "count": 3,
+        "total_duration": 1.7089,
+        "avg_duration": 0.5696,
+        "min_duration": 0.4789,
+        "max_duration": 0.7275,
+        "success_count": 3,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 1.7692,
+        "avg_duration": 1.7692,
+        "min_duration": 1.7692,
+        "max_duration": 1.7692,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_add",
+        "duration": 39.2629,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 39.2648,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 40.4472,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 40.4546,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 40.79,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 14.0222,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 41.5306,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 12.5701,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 42.3038,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 12.9662,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1499,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.9928,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.8875,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 44.904,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 45.289,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 45.4042,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 45.5258,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 45.6603,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 45.8038,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 45.9577,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 46.0716,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 46.1856,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 46.3075,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 46.4479,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 46.5645,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.4743,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 9.0027,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 8.4521,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.3663,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.7263,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 0.7275,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.5263,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.6222,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.6007,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 3.7338,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 3.4652,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.0876,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 5.0371,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.2803,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3136,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3207,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3034,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.694,
+        "success": false
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.4518,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.5017,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 0.5025,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.4765,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.478,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 0.4789,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.5175,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 36.8072,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 36.8089,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 7.3754,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 7.3766,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.7295,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 41.8481,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.426,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3838,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 21.0122,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.2072,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.1856,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.8985,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6043,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.2766,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 6.9359,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 6.9381,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.0005,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3047,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.6818,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 6.9761,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4574,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4041,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4027,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3596,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 63.3375,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2977,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.346,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.288,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.314,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2828,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2638,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2964,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3241,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2866,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3246,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.309,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2756,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2926,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.281,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2954,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2787,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2955,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2708,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2752,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3098,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2817,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2907,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2782,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2962,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3541,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3052,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3198,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2876,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2971,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2847,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2675,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2742,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2799,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2787,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2774,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2679,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2759,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2867,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3185,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2943,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2806,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3055,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3015,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2741,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3258,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2851,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3347,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3191,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2726,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3056,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3103,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2742,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.29,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.331,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2982,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2918,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.353,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3771,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3661,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3046,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3142,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3037,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2841,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2789,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3396,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2946,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3156,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2608,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2691,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2675,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2853,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2839,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3075,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.312,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2718,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2873,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2851,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2888,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.272,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 1.7692,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 22.1368,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 127.0537,
+        "success": true
+      }
+    ],
+    "events_count": 295
+  },
+  "node_index": {
+    "127292d8-6313-4400-ab9c-b682de6afcbb": {
+      "node_id": "127292d8-6313-4400-ab9c-b682de6afcbb",
+      "title": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "f45f82a2-92f7-4219-8aef-7d55b402f957",
+        "9f586697-013f-4be4-a7ea-48bc8dccb929",
+        "c1764be6-8b96-4624-a116-732d556da61d",
+        "f3c5edc5-0438-4dd4-a8c1-5f0af599ef15"
+      ],
+      "parent_ids": [],
+      "goal": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly."
+    },
+    "f45f82a2-92f7-4219-8aef-7d55b402f957": {
+      "node_id": "f45f82a2-92f7-4219-8aef-7d55b402f957",
+      "title": "Visit Wikipedia Main Page and extract candidate links",
+      "action": "visit",
+      "status": "done",
+      "score": 0.15,
+      "children": [],
+      "parent_ids": [
+        "127292d8-6313-4400-ab9c-b682de6afcbb"
+      ],
+      "goal": "Visit Wikipedia Main Page and extract candidate links",
+      "result_success": true,
+      "result_content_preview": "Welcome to\nWikipedia\n,\nthe\nfree\nencyclopedia\nthat\nanyone can edit\n.\n290,332\nactive editors\n7,145,613\narticles in\nEnglish\nFrom today's featured article\nNGC 4414\n, a typical\nspiral galaxy\nA\ngalaxy\nis a massive system bound together by\ngravity\nthat contains\nstars\nand\nsurrounding matter\n,\nstellar remnants\n,\ninterstellar\nmatter, and\ndark matter\n, all orbiting a common\ncenter of gravity\n. Typical galaxies range from as few as 10\nmillion stars up to\nsupergiants\nwith 100\u00a0trillion stars, but most of the ",
+      "result_source_url": "https://en.wikipedia.org/wiki/Main_Page"
+    },
+    "9f586697-013f-4be4-a7ea-48bc8dccb929": {
+      "node_id": "9f586697-013f-4be4-a7ea-48bc8dccb929",
+      "title": "Visit the 10 selected pages and extract title and 1-2 sentence description for each",
+      "action": "visit",
+      "status": "failed",
+      "score": 0.1,
+      "children": [],
+      "parent_ids": [
+        "127292d8-6313-4400-ab9c-b682de6afcbb"
+      ],
+      "goal": "Visit the 10 selected pages and extract title and 1-2 sentence description for each",
+      "result_success": false,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "c1764be6-8b96-4624-a116-732d556da61d": {
+      "node_id": "c1764be6-8b96-4624-a116-732d556da61d",
+      "title": "Assemble and format final 10-link list",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "127292d8-6313-4400-ab9c-b682de6afcbb"
+      ],
+      "goal": "Assemble and format final 10-link list",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "f3c5edc5-0438-4dd4-a8c1-5f0af599ef15": {
+      "node_id": "f3c5edc5-0438-4dd4-a8c1-5f0af599ef15",
+      "title": "Merge: Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "127292d8-6313-4400-ab9c-b682de6afcbb"
+      ],
+      "goal": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Collected links from Wikipedia Main Page (https://en.wikipedia.org/wiki/Main_Page)\n\nInstructions followed: I used the visited Main Page content and the extracted link lists from the run. For each of 10 links below I give: (A) link URL, (B) link text/title (as shown on/near the Main Page), (C) a brief 1-2 sentence description of what that page is about, (D) verbatim evidence (quote) from the provided visit data showing the item was present on the Main Page, and (E) URL citations (Main Page and the link URL) for the factual claims.\n\nNotes on evidence: verbatim quote lines come from the provided data (RAW VISIT CONTENT and RETRIEVED MEMORIES / MERGED RESULTS). Each entry includes at least one verbatim quote from the provided data showing the link text or related Main Page text.\n\n1) URL: https://en.wikipedia.org/wiki/Wikipedia:Contents\n   Link text / title: Contents\n   Description: The Contents page is Wikipedia's navigational hub listing content portals, indices, and ways to find and browse encyclopedia content. It helps users find articles by subject, portal, or index.\n   Verbatim evidence: \"- https://en.wikipedia.org/wiki/Wikipedia:Contents (Contents)\" (from the collected links list in the run data)\n   Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Wikipedia:Contents\n\n2) URL: https://en.wikipedia.org/wiki/Portal:Current_events\n   Link text / title: Current events (Portal:Current events)\n   Description: The Current events portal gathers and summarizes recently occurring world news and ongoing events; it is Wikipedia's curated entry point for timely topics and breaking news.\n   Verbatim evidence: \"- https://en.wikipedia.org/wiki/Portal:Current_events (Current events)\" (from the collected links list in the run data) and the Main Page's \"In the news\" section which groups current-news items: \"In the news\" (from RAW VISIT CONTENT).\n   Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Portal:Current_events\n\n3) URL: https://en.wikipedia.org/wiki/Special:Random\n   Link text / title: Special:Random (Random article)\n   Description: Special:Random opens a randomly selected Wikipedia article each time it is used \u2014 a way to explore Wikipedia by surprise.\n   Verbatim evidence: \"- https://en.wikipedia.org/wiki/Special:Random (Random article)\" (from the collected links list in the run data)\n   Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Special:Random\n\n4) URL: https://en.wikipedia.org/wiki/Wikipedia:About\n   Link text / title: About Wikipedia\n   Description: The About page explains what Wikipedia is (a free encyclopedia written by volunteers), how it works, and its mission and scope.\n   Verbatim evidence: The Main Page opening text states: \"Welcome to\\nWikipedia\\n,\\nthe\\nfree\\nencyclopedia\\nthat\\nanyone can edit\\n.\" (RAW VISIT CONTENT). Also: \"- https://en.wikipedia.org/wiki/Wikipedia:About (About Wikipedia)\" (from the collected links list in the run data).\n   Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Wikipedia:About\n\n5) URL: https://en.wikipedia.org/wiki/Wikipedia:Contact_us\n   Link text / title: Contact Wikipedia\n   Description: The Contact page provides information on ways to contact the Wikimedia Foundation and on-site points of contact for broader questions about Wikipedia and its projects.\n   Verbatim evidence: \"- https://en.wikipedia.org/wiki/Wikipedia:Contact_us (Contact Wikipedia)\" (from the collected links list in the run data) and the Main Page mentions the Wikimedia host organization: \"Wikimedia Foundation, a non-profit organization that also hosts a range of other volunteer projects:\" (RAW VISIT CONTENT).\n   Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Wikipedia:Contact_us\n\n6) URL: https://en.wikipedia.org/wiki/Help:Contents\n   Link text / title: Help (Help:Contents)\n   Description: The Help:Contents page is the main index for help pages \u2014 it links to how-to guides, editing help, and policy introductions for readers and editors.\n   Verbatim evidence: \"- https://en.wikipedia.org/wiki/Help:Contents (Help)\" (from the collected links list in the run data) and Main Page text listing help resources: \"Help desk\\n\u2013 Ask questions about using or editing Wikipedia.\" (RAW VISIT CONTENT).\n   Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Help:Contents\n\n7) URL: https://en.wikipedia.org/wiki/Help:Introduction\n   Link text / title: Learn to edit (Help:Introduction)\n   Description: Help:Introduction is an introductory how-to guide for new editors that explains basic editing tasks and how to contribute to Wikipedia.\n   Verbatim evidence: \"- https://en.wikipedia.org/wiki/Help:Introduction (Learn to edit)\" (from the collected links list in the run data) and Main Page listing: \"Teahouse\\n\u2013 Ask basic questions about using or editing Wikipedia.\" (RAW VISIT CONTENT).\n   Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Help:Introduction\n\n8) URL: https://en.wikipedia.org/wiki/Wikipedia:Community_portal\n   Link text / title: Community portal\n   Description: The Community portal is the central hub for editors, with resources, links, tasks, and announcements for the Wikipedia community and editor coordination.\n   Verbatim evidence: The Main Page text under \"Other areas of Wikipedia\" includes: \"\u2013 The central hub for editors, with resources, links, tasks, and announcements.\" (RAW VISIT CONTENT). Also: \"- https://en.wikipedia.org/wiki/Wikipedia:Community_portal (Community portal)\" (from the collected links list in the run data).\n   Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Wikipedia:Community_portal\n\n9) URL: https://en.wikipedia.org/wiki/Special:RecentChanges\n   Link text / title: Recent changes (Special:RecentChanges)\n   Description: The Recent changes page lists the most recent edits to Wikipedia so readers and editors can monitor ongoing activity across the site.\n   Verbatim evidence: \"- https://en.wikipedia.org/wiki/Special:RecentChanges (Recent changes)\" (from the collected links list in the run data) and the Main Page has an entry line for monitoring edits under \"Other areas of Wikipedia\": \"Recent changes\" (RAW VISIT CONTENT).\n   Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Special:RecentChanges\n\n10) URL: https://en.wikipedia.org/wiki/Wikipedia:File_upload_wizard\n    Link text / title: File upload wizard (Wikipedia:File upload wizard)\n    Description: The File upload wizard page guides users through uploading media files (images, audio) to Wikimedia Commons via Wikipedia and explains upload policy and steps.\n    Verbatim evidence: \"- https://en.wikipedia.org/wiki/Wikipedia:File_upload_wizard\" appears in the collected links list (RETRIEVED MEMORIES / MERGED RESULTS) as part of the Main Page links; and the Main Page lists sister project \"Commons\\nFree media repository\" showing the related media hosting: \"Commons\\nFree media repository\" (RAW VISIT CONTENT).\n    Citations: https://en.wikipedia.org/wiki/Main_Page ; https://en.wikipedia.org/wiki/Wikipedia:File_upload_wizard\n\nCaveats / notes about evidence and process:\n- The search/visit stage returned a list of links extracted from the Main Page (see the run's merged results). Example extracted link items (verbatim) included lines such as: \"- https://en.wikipedia.org/wiki/Wikipedia:Contents (Contents)\", \"- https://en.wikipedia.org/wiki/Portal:Current_events (Current events)\", \"- https://en.wikipedia.org/wiki/Special:Random (Random article)\", etc. These verbatim lines are included above as evidence for the presence of the links on the Main Page (these lines appear in the run data under the collected links output).\n- The Main Page text that was returned by the visit is quoted verbatim in places above where relevant (for example, the opening: \"Welcome to\\nWikipedia\\n,\\nthe\\nfree\\nencyclopedia\\nthat\\nanyone can edit\\n.\"). That same Main Page content also lists sections such as \"In the news\", \"Other areas of Wikipedia\", and the \"Wikimedia Foundation / sister projects\" list, which I quoted where they support the descriptions above.\n\nIf you want, I can (A) fetch each of the 10 linked pages to extract precise first-paragraph summaries (one-liners) directly from each page, or (B) pick a different set of 10 links from the Main Page and repeat the same extraction. Note: the run attempted visiting linked pages but one visit failed (see logs) \u2014 I can retry full page visits on request.\n",
+    "action_summary": "I visited the Wikipedia Main Page (https://en.wikipedia.org/wiki/Main_Page) and extracted 10 links found on that page. For each link I provided the URL, the link text/title, a 1-2 sentence description, verbatim evidence from the run data showing the link or supporting Main Page text, and citations to both the Main Page and the link. The collected items are: Wikipedia:Contents; Portal:Current_events; Special:Random; Wikipedia:About; Wikipedia:Contact_us; Help:Contents; Help:Introduction; Wikipedia:Community_portal; Special:RecentChanges; and Wikipedia:File_upload_wizard. I can follow up by visiting each linked page to pull its lead paragraph if you want.",
+    "success": false,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_add",
+      "duration": 39.2629,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 39.2648,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 40.4472,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 40.4546,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 40.79,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 14.0222,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 41.5306,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 12.5701,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 42.3038,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 12.9662,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1499,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.9928,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.8875,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 44.904,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 45.289,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 45.4042,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 45.5258,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 45.6603,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 45.8038,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 45.9577,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 46.0716,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 46.1856,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 46.3075,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 46.4479,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 46.5645,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.4743,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 9.0027,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 8.4521,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.3663,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.7263,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 0.7275,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.5263,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.6222,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.6007,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 3.7338,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 3.4652,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.0876,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 5.0371,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.2803,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3136,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3207,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3034,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.694,
+      "success": false
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.4518,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.5017,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 0.5025,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.4765,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.478,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 0.4789,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.5175,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 36.8072,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 36.8089,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 7.3754,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 7.3766,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.7295,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 41.8481,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.426,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3838,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 21.0122,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.2072,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.1856,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.8985,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6043,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.2766,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 6.9359,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 6.9381,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.0005,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3047,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.6818,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 6.9761,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4574,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4041,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4027,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3596,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 63.3375,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2977,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.346,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.288,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.314,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2828,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2638,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2964,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3241,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2866,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3246,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.309,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2756,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2926,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.281,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2954,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2787,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2955,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2708,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2752,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3098,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2817,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2907,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2782,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2962,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3541,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3052,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3198,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2876,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2971,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2847,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2675,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2742,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2799,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2787,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2774,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2679,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2759,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2867,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3185,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2943,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2806,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3055,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3015,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2741,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3258,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2851,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3347,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3191,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2726,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3056,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3103,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2742,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.29,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.331,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2982,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2918,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.353,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3771,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3661,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3046,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3142,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3037,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2841,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2789,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3396,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2946,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3156,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2608,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2691,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2675,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2853,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2839,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3075,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.312,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2718,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2873,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2851,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2888,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.272,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 1.7692,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 22.1368,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 127.0537,
+      "success": true
+    }
+  ]
+}

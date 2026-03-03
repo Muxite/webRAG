@@ -1,0 +1,1168 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "019",
+    "test_name": "Explicit Visit Requirement",
+    "passed": true,
+    "score": 1.0,
+    "ascii_graph": "*   Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.\n|\\  \n* | Visit the exact Wikipedia URL and retrieve the full page content for 'Python (programming language)'\n /  \n* Extract (1) first release year, (2) creator name, and (3) current stable version from the visited page content and format answers with exact citations\n"
+  },
+  "node_table": [
+    {
+      "node_id": "e1672d26-a3fb-49d0-8f77-09a45ae86da3",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content."
+    },
+    {
+      "node_id": "26be58c7-fc84-43fc-a586-f40d39c322b0",
+      "action": "visit",
+      "status": "done",
+      "score": 0.1,
+      "title": "Visit the exact Wikipedia URL and retrieve the full page content for 'Python (programming language)'"
+    },
+    {
+      "node_id": "bd6fe709-5f2d-4067-8e58-e20facd99497",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "title": "Extract (1) first release year, (2) creator name, and (3) current stable version from the visited page content and format answers with exact citations"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_executed",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 1,
+      "reason": "Found 1 visit(s)"
+    },
+    {
+      "check": "wikipedia_url_visited",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Wikipedia Python page mentioned"
+    },
+    {
+      "check": "year_extracted",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Year 1991 found"
+    },
+    {
+      "check": "creator_extracted",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Guido van Rossum found"
+    },
+    {
+      "check": "version_extracted",
+      "passed": true,
+      "score": 1.0,
+      "version": "9.0",
+      "reason": "Version 9.0 found"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 1828,
+      "words": 198,
+      "kilobytes": 1.79
+    },
+    "llm": {
+      "calls": 10,
+      "prompt": {
+        "chars": 175116,
+        "words": 20900,
+        "kilobytes": 171.01,
+        "tokens": 38967
+      },
+      "completion": {
+        "chars": 9388,
+        "words": 1110,
+        "kilobytes": 9.17,
+        "tokens": 6508
+      },
+      "total_tokens": 45475
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 1,
+      "chars": 40282,
+      "words": 6467,
+      "kilobytes": 39.34
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 63,
+        "total_duration": 234.8653,
+        "avg_duration": 3.728,
+        "min_duration": 0.4042,
+        "max_duration": 34.2559,
+        "success_count": 63,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 8,
+        "total_duration": 247.2279,
+        "avg_duration": 30.9035,
+        "min_duration": 10.9233,
+        "max_duration": 49.188,
+        "success_count": 8,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 7,
+        "total_duration": 7.8996,
+        "avg_duration": 1.1285,
+        "min_duration": 0.268,
+        "max_duration": 2.1861,
+        "success_count": 7,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 18,
+        "total_duration": 292.3323,
+        "avg_duration": 16.2407,
+        "min_duration": 7.0614,
+        "max_duration": 32.989,
+        "success_count": 18,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.414,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3023,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6302,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6366,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1558,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1733,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7829,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5679,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8396,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8063,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7499,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7503,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7724,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7758,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7344,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7233,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7187,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7148,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7451,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7294,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7233,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7472,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7508,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8989,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 10.9233,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8919,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7767,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7584,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7574,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.5346,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.0906,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 41.9336,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 41.9419,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 34.2559,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 31.5688,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.414,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 32.2686,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.8871,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.6482,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.0172,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 11.7446,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 11.7527,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.6459,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.4876,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.831,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 12.6403,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8226,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8258,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.1861,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 13.5773,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 13.5804,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 16.036,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.394,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.3998,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 32.5736,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 32.5751,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 32.989,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8288,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8494,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 9.2473,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 9.2363,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 12.5424,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 12.9433,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 12.9464,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 12.9458,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.0721,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7668,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 13.7465,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 13.7454,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.427,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0974,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5389,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1089,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0581,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0598,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4058,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7562,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1023,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.116,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1268,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7869,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.268,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.8227,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 29.3155,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 49.188,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4686,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 29.1313,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4961,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4042,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.953,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.7567,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.0614,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.3785,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 39.8685,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.3097,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 39.8752,
+        "success": true
+      }
+    ],
+    "events_count": 186
+  },
+  "node_index": {
+    "e1672d26-a3fb-49d0-8f77-09a45ae86da3": {
+      "node_id": "e1672d26-a3fb-49d0-8f77-09a45ae86da3",
+      "title": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "26be58c7-fc84-43fc-a586-f40d39c322b0",
+        "bd6fe709-5f2d-4067-8e58-e20facd99497"
+      ],
+      "parent_ids": [],
+      "goal": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content."
+    },
+    "26be58c7-fc84-43fc-a586-f40d39c322b0": {
+      "node_id": "26be58c7-fc84-43fc-a586-f40d39c322b0",
+      "title": "Visit the exact Wikipedia URL and retrieve the full page content for 'Python (programming language)'",
+      "action": "visit",
+      "status": "done",
+      "score": 0.1,
+      "children": [],
+      "parent_ids": [
+        "e1672d26-a3fb-49d0-8f77-09a45ae86da3"
+      ],
+      "goal": "Visit the exact Wikipedia URL and retrieve the full page content for 'Python (programming language)'",
+      "result_success": true,
+      "result_content_preview": "\".pyc\" redirects here. For the top-level domain in Cyrillic script, see\n.\u0440\u0443\u0441\n.\nThis article\nmay contain\nunverified\nor\nindiscriminate\ninformation\nin\nembedded lists\n.\nPlease help\nclean up the lists\nby removing items or incorporating them into the text of the article.\n(\nOctober 2025\n)\nPython\nParadigm\nMulti-paradigm\n:\nobject-oriented\n,\nprocedural\n(\nimperative\n),\nfunctional\n,\nstructured\n,\nreflective\nDesigned\u00a0by\nGuido van Rossum\nDeveloper\nPython Software Foundation\nFirst\u00a0appeared\n20\u00a0February 1991\n(\n19",
+      "result_source_url": "https://en.wikipedia.org/wiki/Python_(programming_language)"
+    },
+    "bd6fe709-5f2d-4067-8e58-e20facd99497": {
+      "node_id": "bd6fe709-5f2d-4067-8e58-e20facd99497",
+      "title": "Extract (1) first release year, (2) creator name, and (3) current stable version from the visited page content and format answers with exact citations",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "e1672d26-a3fb-49d0-8f77-09a45ae86da3"
+      ],
+      "goal": "Extract (1) first release year, (2) creator name, and (3) current stable version from the visited page content and format answers with exact citations"
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Extracted facts from the Wikipedia article \u201cPython (programming language)\u201d (https://en.wikipedia.org/wiki/Python_(programming_language))\n\n1) Year Python was first released\n- Extracted value: 1991\n- Verbatim evidence from the page: \"First\\u00A0appeared\\n20\\u00A0February 1991\\n(\\n1991-02-20\\n)\" (https://en.wikipedia.org/wiki/Python_(programming_language))\n- Additional supporting verbatim evidence: \"Van Rossum first released it in 1991 as Python\\u00A00.9.0.\" (https://en.wikipedia.org/wiki/Python_(programming_language))\n\n2) Name of Python's creator\n- Extracted value: Guido van Rossum\n- Verbatim evidence from the page (infobox): \"Designed\\u00A0by\\nGuido van Rossum\" (https://en.wikipedia.org/wiki/Python_(programming_language))\n- Additional supporting verbatim evidence from the article text: \"Guido van Rossum began working on Python in the late 1980s as a successor to the\\nABC\\nprogramming language.\" (https://en.wikipedia.org/wiki/Python_(programming_language))\n\n3) Current stable version number\n- Extracted value: 3.14.3\n- Verbatim evidence from the page (infobox): \"Stable release\\n3.14.3\\n/ 3 February 2026\\n(\\n3 February 2026\\n)\" (https://en.wikipedia.org/wiki/Python_(programming_language))\n- Additional supporting verbatim evidence from the article text: \"As of January 2026, the Python Software Foundation supports Python 3.10, 3.11, 3.12, 3.13, and 3.14, following the project's annual release cycle and five-year support policy. Python 3.15 is currently in the alpha development phase, and the stable release is expected to come out in October 2026.\" and \"As of January 2026, Python 3.14.3 is the latest stable release.\" (https://en.wikipedia.org/wiki/Python_(programming_language))\n\nAll quoted passages above are taken verbatim from the visited page: https://en.wikipedia.org/wiki/Python_(programming_language).",
+    "action_summary": "From the visited Wikipedia page (https://en.wikipedia.org/wiki/Python_(programming_language)): (1) Year first released = 1991 (evidence: \"First\u00a0appeared 20\u00a0February 1991 (1991-02-20)\" and \"Van Rossum first released it in 1991 as Python\u00a00.9.0.\"), (2) Creator = Guido van Rossum (evidence: \"Designed\u00a0by Guido van Rossum\" and \"Guido van Rossum began working on Python in the late 1980s ...\"), (3) Current stable version = 3.14.3 (evidence: \"Stable release 3.14.3 / 3 February 2026 (3 February 2026)\" and \"As of January 2026, Python 3.14.3 is the latest stable release.\").",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.414,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3023,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6302,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6366,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1558,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1733,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7829,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5679,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8396,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8063,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7499,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7503,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7724,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7758,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7344,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7233,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7187,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7148,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7451,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7294,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7233,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7472,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7508,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8989,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 10.9233,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8919,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7767,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7584,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7574,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.5346,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.0906,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 41.9336,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 41.9419,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 34.2559,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 31.5688,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.414,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 32.2686,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.8871,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.6482,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.0172,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 11.7446,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 11.7527,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.6459,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.4876,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.831,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 12.6403,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8226,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8258,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.1861,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 13.5773,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 13.5804,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 16.036,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.394,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.3998,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 32.5736,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 32.5751,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 32.989,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8288,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8494,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 9.2473,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 9.2363,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 12.5424,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 12.9433,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 12.9464,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 12.9458,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.0721,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7668,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 13.7465,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 13.7454,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.427,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0974,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5389,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1089,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0581,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0598,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4058,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7562,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1023,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.116,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1268,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7869,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.268,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.8227,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 29.3155,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 49.188,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4686,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 29.1313,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4961,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4042,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.953,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.7567,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.0614,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.3785,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 39.8685,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.3097,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 39.8752,
+      "success": true
+    }
+  ]
+}

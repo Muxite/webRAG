@@ -1,0 +1,1291 @@
+{
+  "test_metadata": {
+    "test_id": "035",
+    "test_name": "Cross-Domain Niche Synthesis",
+    "difficulty_level": "7/10",
+    "category": "Diverge-Converge Synthesis"
+  },
+  "model": "gpt-5.2",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "## 1) Cordyceps fungi (https://en.wikipedia.org/wiki/Cordyceps)\n\n### (a) Common name for the behaviour Cordyceps induces in ants\nThe provided raw page text for **Cordyceps** does **not** contain the requested \u201ccommon name\u201d for the ant behaviour (e.g., a named behavioural syndrome). The only ant-related phrasing in the retrieved page text is indirect, via a quote about \u201czombies,\u201d but it does not name a specific behaviour.\n\nEvidence from the visited page shows only this general description:\n- From the Cordyceps page (https://en.wikipedia.org/wiki/Cordyceps): Scientific American notes some species \u201c**are indeed body snatchers\u2013they have been making real zombies for millions of years**\u201d, though \u201c**of ants or tarantulas, not of humans**.\u201d\n\nBecause the page text provided here does not include a specific named behaviour (such as a common-name label), that exact fact is **missing from the evidence**.\n\n### (b) One commercial or medicinal use of Cordyceps\nOne documented medicinal use (traditional) is its long-standing role in traditional Chinese medicine.\n\nEvidence:\n- From the Cordyceps page (https://en.wikipedia.org/wiki/Cordyceps): \u201c**Diverse variants of cordyceps have had more than 1,500 years of use in Chinese medicine.**\u201d\n- From the \u201cUses\u201d section (https://en.wikipedia.org/wiki/Cordyceps): \u201c**Cordyceps sensu lato \u2026 has long been used in traditional Chinese medicine in the belief it can be used to treat diseases.**\u201d\n\n\n## 2) Admiralty law (https://en.wikipedia.org/wiki/Admiralty_law)\n\nThe required Wikipedia page **was not visited** in the execution trail (it is marked \u201cskipped\u201d), and **no RAW VISIT CONTENT** for it is provided. Therefore, I cannot extract (a) the historical origin/earliest legal code or (b) a modern international maritime convention/treaty with verbatim quotes and citations from the provided evidence.\n\nMissing evidence:\n- No page text from https://en.wikipedia.org/wiki/Admiralty_law is included in RAW VISIT CONTENT.\n\n\n## 3) Mathematics of paper folding (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\nThe required Wikipedia page **was not visited** in the execution trail (it is marked \u201cskipped\u201d), and **no RAW VISIT CONTENT** for it is provided. The \u201cRetrieved Memories\u201d show only fragments of outbound links, not the page\u2019s actual statements, so I cannot quote a theorem/axiom or an engineering application from RAW VISIT CONTENT as required.\n\nMissing evidence:\n- No page text from https://en.wikipedia.org/wiki/Mathematics_of_paper_folding is included in RAW VISIT CONTENT.\n\n\n## Synthesis essay (150+ words): A unifying theme\u2014when systems gain power by controlling constraints\nCordyceps, admiralty law, and the mathematics of paper folding can be seen as three domains where the central problem is **controlling constraints**\u2014how a system (biological, legal, or geometric) channels complex outcomes by setting and exploiting rules.\n\nIn biology, Cordyceps exemplifies constraint-driven control through parasitism: the Wikipedia page characterizes Cordyceps as \u201c**parasitic**\u201d and notes that \u201c**Most Cordyceps species are endoparasitoids**\u201d that invade hosts (https://en.wikipedia.org/wiki/Cordyceps). Even the cultural description emphasizes a rule-like takeover of behavior\u2014Scientific American is quoted describing species that have been making \u201c**real zombies**\u201d for \u201c**ants**\u201d (https://en.wikipedia.org/wiki/Cordyceps). And humans have tried to harness this organismal complexity for their own ends: the page reports \u201c**more than 1,500 years of use in Chinese medicine**\u201d and that it \u201c**has long been used in traditional Chinese medicine**\u201d (https://en.wikipedia.org/wiki/Cordyceps).\n\nAdmiralty law and origami mathematics would likely fit the same theme\u2014legal regimes constrain behavior on the seas, and origami axioms constrain allowable folds to produce powerful constructions\u2014but **the necessary Wikipedia evidence for those two topics is missing** here because their pages were not visited and no quotable page text was provided. To complete the synthesis with specific facts (historical legal origins, named conventions/treaties, and origami axioms/theorems plus engineering applications), the RAW VISIT CONTENT from those two Wikipedia URLs is required.\n",
+      "action_summary": "Only the Cordyceps page was actually visited (raw text provided). From it, I extracted a traditional/medicinal use (\u201cmore than 1,500 years of use in Chinese medicine\u201d / \u201cused in traditional Chinese medicine\u201d). The specific common-name label for the ant behavior is not present in the provided Cordyceps page text. The Admiralty law and Mathematics of paper folding pages were skipped, so their requested facts and quotes cannot be produced from the given evidence. A 150+ word unifying-theme essay is provided, but it can only cite Cordyceps-specific facts; the other two topics lack visit-based evidence.",
+      "success": true,
+      "goal_achieved": false,
+      "has_failures": false
+    },
+    "graph": {
+      "root_id": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+      "nodes": {
+        "ce45baa1-1294-4ac9-80a2-6768f6513abf": {
+          "node_id": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+          "title": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+          "details": {
+            "mandate": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+            "memo_namespace": "idea_dag:33af7fe203",
+            "expansion_meta": {
+              "execute_all_children": true
+            },
+            "goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+            "original_goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact."
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "b36ef73b-6859-46aa-a193-be4703689ab7",
+            "8ea0b753-78b1-4596-8040-d6c0e4ddf0aa",
+            "26e56294-7767-4773-9937-f915a57ccdcb",
+            "adbd9cb8-7409-4f80-8f7f-164218baeb3b"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "b36ef73b-6859-46aa-a193-be4703689ab7": {
+          "node_id": "b36ef73b-6859-46aa-a193-be4703689ab7",
+          "title": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable evidence)",
+          "details": {
+            "optional_url": "https://en.wikipedia.org/wiki/Cordyceps",
+            "action": "visit",
+            "goal": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable evidence)",
+            "original_goal": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable evidence)",
+            "parent_goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.2
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2,
+            "action_result": {
+              "action": "visit",
+              "success": true,
+              "url": "https://en.wikipedia.org/wiki/Cordyceps",
+              "intent": null,
+              "content": "Cordyceps\nCordyceps militaris\nScientific classification\nKingdom:\nFungi\nDivision:\nAscomycota\nClass:\nSordariomycetes\nOrder:\nHypocreales\nFamily:\nCordycipitaceae\nGenus:\nCordyceps\nFr.\n(1818)\nType species\nCordyceps militaris\n(\nL.\n) Fr. (1818)\nSynonyms\nList\nAkrophyton\nLebert (1858)\nAlphitomyces\nReissek (1856)\nAmphichorda\nFr. (1825)\nCampylothecium\nCes. (1846)\nCordylia\nFr. (1818)\nCordyliceps\nFr. (1832)\nCoremiopsis\nSizova & Suprun (1957)\nCorynesphaera\nDumort.2 (1822)\nEvlachovaea\nB.A. Borisov & Tarasov (1999)\nHypoxylum\nJuss. (1789)\nIsaria\nPers. (1794)\nPhytocordyceps\nC.H. Su & H.H. Wang (1986)\nPolistophthora\nLebert (1858)\nRacemella\nCes. (1861)\nRamaria\nHolmsk. (1781)\nTettigorhyza\nG. Bertol. (1875)\nTorrubia\nL\u00e9v. (1863)\nXylaria\nHill ex Grev (1823)\nCordyceps\n/\n\u02c8\nk\n\u0254\u02d0r\nd\n\u026a\ns\n\u025b\np\ns\n/\nis a\ngenus\nof\nascomycete\nfungi\n(sac fungi) that includes over 260 species worldwide, many of which are parasitic. Diverse variants of cordyceps have had more than 1,500 years of use in\nChinese medicine\n.\nMost\nCordyceps\nspecies are\nendoparasitoids\n, parasitic mainly on\ninsects\nand other\narthropods\n(they are thus\nentomopathogenic fungi\n); a few are parasitic on other fungi.\nThe generic name\nCordyceps\nis derived from the\nancient Greek\n\u03ba\u03bf\u03c1\u03b4\u03cd\u03bb\u03b7\nkord\u00fdl\u0113\n, meaning \"club\", and the\nLatin\n-ceps\n, derived from Latin\ncaput\n, meaning \"head\".\nThe\ngenus\nhas a worldwide distribution, with most of the known species\nbeing from Asia.\nTaxonomy\nThere are two recognized\nsubgenera\n:\nCordyceps\nsubgen.\nCordyceps\nFr. 1818\nCordyceps\nsubgen.\nCordylia\nTul.\n&\nC. Tul.\n1865\nCordyceps\nsensu stricto\nare the\nteleomorphs\nof several\ngenera\nof\nanamorphic\n,\nentomopathogenic fungi\nsuch as\nBeauveria\n(\nCordyceps bassiana\n),\nSeptofusidium\n, and\nLecanicillium\n.\nSplits\nCordyceps\nsubgen.\nEpichloe\nwas at one time a subgenus, but is now regarded as a separate genus,\nEpichlo\u00eb\n.\nCordyceps\nsubgen.\nOphiocordyceps\nwas at one time a subgenus defined by morphology.\nNuclear DNA\nsampling done in 2007 shows that members, including \"\nC. sinensis\n\" and \"\nC. unilateralis\n\", as well as some others not placed in the subgenus, were distantly related to most of the remainder of species then placed in\nCordyceps\n(e.g. the type species\nC. militaris\n). As a result, it became its own genus, absorbing new members.\nThe 2007 study also peeled off\nMetacordyceps\n(anamorph\nMetarhizium\n,\nPochonia\n) and\nElaphocordyceps\n. A number of species remain unclearly assigned and provisionally retained in\nCordyceps\nsensu lato\n.\nSelected species\nMain article:\nList of Cordyceps species\nThere are over 260 species in the genus\nCordyceps\nincluding the following species:\nCordyceps caespitosa\nCordyceps chanhua\nCordyceps militaris\nCordyceps sinclairii\nAnamorphic genera\nIsaria\nis a genus name that has been applied to many anamorphs of\nCordyceps\nspecies. This genus itself is treated as a synonym of\nCordyceps\nin Species Fungorum following the \"one fungus one name\" change,\nbut many species names with\nIsaria\nare still preferred by Species Fungorum over the synonyms in other genera (e.g.\nIsaria sinclarii\nis preferred over\nCordyceps sinclairii\n).\nThough confusing, this does match the \"equal footing for priority\" approach of the \"one fungus one name\" concept. To add to the complexity,\nIsaria\nis a\nconserved name\nwith a conserved type.\nWhat remains under\nIsaria\nas of 2016 remains polyphyletic and can be divided into three main clades.\nAnamorphic genera closely allied to\nCordyceps\nsensu stricto include\nEvlachovaea\n,\nLecanicillium\nand\nBeauveria\n.\nBiology\nWhen\nCordyceps\nattacks a host, the\nmycelium\ninvades and eventually replaces the host tissue, while the elongated fruit body (\nascocarp\n) may be cylindrical, branched, or of complex shape. The ascocarp bears many small, flask-shaped\nperithecia\ncontaining\nasci\n. These, in turn, contain thread-like\nascospores\n, which usually break into fragments and are presumably infective.\nCordyceps\nare used by\ndrab stinkbugs\nto protect their eggs from\nparasitoid wasps\n.\nResearch\nPolysaccharide\ncomponents and the nucleoside\ncordycepin\nisolated from\nC. militaris\nare under\nbasic research\n, but more advanced\nclinical research\nhas been limited and too low in quality to identify any therapeutic potential of cordyceps components.\nUses\nCordyceps\nsensu lato\n(which now includes\nOphiocordyceps\nand many other genera holding species originally in this genus) has long been used in\ntraditional Chinese medicine\nin the belief it can be used to treat diseases.\nThere is no\nscientific\nevidence for such uses.\nCultural representations\nThe video game series\nThe Last of Us\n(2013\u20132021) and its\ntelevision adaptation\npresent\nCordyceps\nas a deadly threat to the human race, its parasitism powerful enough to result in global calamity.\nThe result is a\nzombie apocalypse\nand the collapse of human civilization.\nScientific American\nnotes that some species in the genus \"are indeed body snatchers\u2013they have been making real zombies for millions of years\", though of ants or\ntarantulas\n, not of humans.\nThe Last of Us\nproceeds from the premise that a new species of\nCordyceps\nmanages to\njump the species barrier\n, from nonhuman to human, as diseases like influenza and viruses like\nEbola\nand\nCOVID-19\nhave done. Its human hosts initially become violent \"infected\" beings, before turning into blind zombie \"clickers\", with fungal growths emerging from their faces.\nIn a detail that reflects\nCordyceps\nbiology, \"clickers\" then seek out a dark place in which to die and release the fungal spores, enabling the parasite to complete its life cycle.\nScientific American\ncomments that by combining a plausible mechanism with effective artistic design, the series gains \"both scientific rigor and beauty\".\nIn similar vein,\nCordyceps\ncauses a pandemic that wipes out most of humanity in\nMike Carey\n's 2014 postapocalyptic novel\nThe Girl with All the Gifts\nand its 2016\nfilm adaptation\n.\nIn this case, an infected person becomes a \"hungry\", a zombie thirsting for blood. In the fiction, Dr. Caldwell explains that the human-infecting fungus is a mutated form of\nOphiocordyceps unilateralis\n(a group of species now split off from\nCordyceps\n) which alters the behaviour of infected insects. The children of infected mothers, however, become \"hybrids\" with antibodies protecting them against the fungus.\nGallery\nCordyceps militaris\nCordyceps militaris\nCordyceps ophioglossoides\nSee also\nMedicinal fungi\nReferences\n^\nBuenz, E. J.; B. A. Bauer; Osmundson, T. W.; Motley, T. J. (2005).\n\"The traditional Chinese medicine Cordyceps sinensis and its effects on apoptotic homeostasis\"\n.\nJournal of Ethnopharmacology\n.\n96\n(\n1\u2013\n2):\n19\u2013\n29.\ndoi\n:\n10.1016/j.jep.2004.09.029\n.\nPMID\n15588646\n.\n^\nNikoh, N. (April 2000).\n\"Interkingdom host jumping underground: phylogenetic analysis of entomoparasitic fungus of the genus cordyceps\"\n.\nMolecular Biology and Evolution\n.\n17\n(4):\n629\u2013\n638.\ndoi\n:\n10.1093/oxfordjournals.molbev.a026341\n.\nPMID\n10742053\n.\n^\n\"Cordyceps\"\n.\nwww.merriam-webster.com\n. Retrieved\n22 August\n2023\n.\n^\nSung, Gi-Ho; Nigel L. Hywel-Jones; Jae-Mo Sung; J. Jennifer Luangsa-ard; Bhushan Shrestha; Joseph W. Spatafora (2007).\n\"Phylogenetic classification of Cordyceps and the clavicipitaceous fungi\"\n.\nStudies in Mycology\n.\n57\n(1):\n5\u2013\n59.\ndoi\n:\n10.3114/sim.2007.57.01\n.\nPMC\n2104736\n.\nPMID\n18490993\n.\n^\na\nb\n\"\nCordyceps\n\"\n.\nIndex Fungorum\n. Retrieved\n4 September\n2019\n.\n^\nElias Magnus Fries, Observ. mycol. (Havniae) 2: 316 (cancellans) (1818)\n^\nEdmond Tulasne & Charles Tulasne, Select. fung. carpol. (Paris) 3: 20 (1865)\n^\na\nb\nc\nSung, GH; Hywel-Jones, NL; Sung, JM; Luangsa-Ard, JJ; Shrestha, B; Spatafora, JW (2007).\n\"Phylogenetic classification of Cordyceps and the clavicipitaceous fungi\"\n.\nStudies in Mycology\n.\n57\n:\n5\u2013\n59.\ndoi\n:\n10.3114/sim.2007.57.01\n.\nPMC\n2104736\n.\nPMID\n18490993\n.\n^\nHolliday, John; Cleaver, Matt (2008).\n\"Medicinal Value of the Caterpillar Fungi Species of the Genus Cordyceps (Fr.) Link (Ascomycetes). A Review\"\n(PDF)\n.\nInternational Journal of Medicinal Mushrooms\n.\n10\n(3). New York: Begell House:\n219\u2013\n234.\ndoi\n:\n10.1615/IntJMedMushr.v10.i3.30\n.\nISSN\n1521-9437\n. Archived from\nthe original\n(PDF)\non 22 February 2012\n. Retrieved\n10 March\n2009\n.\n^\n\"Index Fungorum - Search Page\"\n.\nwww.indexfungorum.org\n. Retrieved\n6 December\n2024\n.\n^\na\nb\n\"Index Fungorum - Names Record #8636 Isaria Pers., Neues Mag. Bot. 1: 121 (1794)\"\n.\nwww.indexfungorum.org\n.\n^\n\"Species Fungorum - GSD Species #254719 Isaria sinclairii (Berk.) Lloyd, Mycol. Writ. (Cincinnati) 7(Letter 68): 1179 (1923)\"\n.\nwww.speciesfungorum.org\n.\n^\na\nb\nDai, Y.D.; Yu, H.; Zeng, W.B.; Yang, J.Y.; He, L. (22 February 2016).\n\"\u591a\u57fa\u56e0\u8054\u5408\u5206\u6790\u68d2\u675f\u5b62\u5c5e Isaria\uff08Ascomycota, Cordycipitaceae\uff09\u7cfb\u7edf\u53d1\u80b2\u5173\u7cfb\"\n[Multilocus phylogenetic analyses of the genus Isaria (Ascomycota, Cordycipitaceae)].\n\u83cc\u7269\u5b66\u62a5 Mycosystema\n(in Chinese).\n35\n(2):\n147\u2013\n160.\ndoi\n:\n10.13346/j.mycosystema.140292\n.\n^\nShrestha, Bhushan; Han, Sang-Kuk; Sung, Jae-Mo; Sung, Gi-Ho (2012).\n\"Fruiting Body Formation of Cordyceps militaris from Multi-Ascospore Isolates and Their Single Ascospore Progeny Strains\"\n.\nMycobiology\n.\n40\n(2):\n100\u2013\n106.\ndoi\n:\n10.5941/MYCO.2012.40.2.100\n.\nISSN\n1229-8093\n.\nPMC\n3408298\n.\nPMID\n22870051\n.\n^\nNishino, Takanori; Moriyama, Minoru; Mukai, Hiromi; Tanahashi, Masahiko; Hosokawa, Takahiro; et\u00a0al. (16 October 2025).\n\"Defensive fungal symbiosis on insect hindlegs\"\n.\nScience\n.\n390\n(6770):\n279\u2013\n283.\nBibcode\n:\n2025Sci...390..279N\n.\ndoi\n:\n10.1126/science.adp6699\n.\nPMID\n41100614\n.\n^\na\nb\n\"Cordyceps\"\n. Drugs.com. 12 July 2023\n. Retrieved\n15 September\n2023\n.\n^\n\"Chinese Medicine Specimen Database\"\n.\nlibproject.hkbu.edu.hk\n. Retrieved\n6 March\n2023\n.\n^\n\"\u4e2d\u56fd\u5e7f\u4e49\u866b\u8349\u79cd\u7c7b\u53ca\u5176\u9a6f\u5316\u683d\u57f9\u7814\u7a76\u8fdb\u5c55\"\n[Cordyceps Sensu Lato and Their Domestication and Cultivation in China].\n\u98df\u7528\u83cc\u5b66\u62a5\n(in Chinese).\n30\n(05). 15 October 2023.\ndoi\n:\n10.16488/j.cnki.1005-9873.2023.05.012\n.\nISSN\n1005-9873\n.\n^\na\nb\nc\nd\ne\nHill, Kyle (25 June 2013).\n\"The Fungus that Reduced Humanity to The Last of Us\"\n.\nScientific American\n. Retrieved\n4 May\n2021\n.\n^\nD'Addario, Daniel (10 January 2023).\n\"\n'The Last of Us,' From 'Chernobyl's' Craig Mazin, Is a Promising, Moving Zombie Saga: TV Review\"\n.\nVariety\n. Retrieved\n15 February\n2023\n.\n^\na\nb\nBachman, Mara (12 April 2020).\n\"The Girl With All The Gifts: Fungal Infection & Hungries Explained\"\n.\nScreenRant\n. Retrieved\n23 October\n2023\n.",
+              "content_is_truncated": false,
+              "content_total_chars": 10191,
+              "content_full": "Cordyceps\nCordyceps militaris\nScientific classification\nKingdom:\nFungi\nDivision:\nAscomycota\nClass:\nSordariomycetes\nOrder:\nHypocreales\nFamily:\nCordycipitaceae\nGenus:\nCordyceps\nFr.\n(1818)\nType species\nCordyceps militaris\n(\nL.\n) Fr. (1818)\nSynonyms\nList\nAkrophyton\nLebert (1858)\nAlphitomyces\nReissek (1856)\nAmphichorda\nFr. (1825)\nCampylothecium\nCes. (1846)\nCordylia\nFr. (1818)\nCordyliceps\nFr. (1832)\nCoremiopsis\nSizova & Suprun (1957)\nCorynesphaera\nDumort.2 (1822)\nEvlachovaea\nB.A. Borisov & Tarasov (1999)\nHypoxylum\nJuss. (1789)\nIsaria\nPers. (1794)\nPhytocordyceps\nC.H. Su & H.H. Wang (1986)\nPolistophthora\nLebert (1858)\nRacemella\nCes. (1861)\nRamaria\nHolmsk. (1781)\nTettigorhyza\nG. Bertol. (1875)\nTorrubia\nL\u00e9v. (1863)\nXylaria\nHill ex Grev (1823)\nCordyceps\n/\n\u02c8\nk\n\u0254\u02d0r\nd\n\u026a\ns\n\u025b\np\ns\n/\nis a\ngenus\nof\nascomycete\nfungi\n(sac fungi) that includes over 260 species worldwide, many of which are parasitic. Diverse variants of cordyceps have had more than 1,500 years of use in\nChinese medicine\n.\nMost\nCordyceps\nspecies are\nendoparasitoids\n, parasitic mainly on\ninsects\nand other\narthropods\n(they are thus\nentomopathogenic fungi\n); a few are parasitic on other fungi.\nThe generic name\nCordyceps\nis derived from the\nancient Greek\n\u03ba\u03bf\u03c1\u03b4\u03cd\u03bb\u03b7\nkord\u00fdl\u0113\n, meaning \"club\", and the\nLatin\n-ceps\n, derived from Latin\ncaput\n, meaning \"head\".\nThe\ngenus\nhas a worldwide distribution, with most of the known species\nbeing from Asia.\nTaxonomy\nThere are two recognized\nsubgenera\n:\nCordyceps\nsubgen.\nCordyceps\nFr. 1818\nCordyceps\nsubgen.\nCordylia\nTul.\n&\nC. Tul.\n1865\nCordyceps\nsensu stricto\nare the\nteleomorphs\nof several\ngenera\nof\nanamorphic\n,\nentomopathogenic fungi\nsuch as\nBeauveria\n(\nCordyceps bassiana\n),\nSeptofusidium\n, and\nLecanicillium\n.\nSplits\nCordyceps\nsubgen.\nEpichloe\nwas at one time a subgenus, but is now regarded as a separate genus,\nEpichlo\u00eb\n.\nCordyceps\nsubgen.\nOphiocordyceps\nwas at one time a subgenus defined by morphology.\nNuclear DNA\nsampling done in 2007 shows that members, including \"\nC. sinensis\n\" and \"\nC. unilateralis\n\", as well as some others not placed in the subgenus, were distantly related to most of the remainder of species then placed in\nCordyceps\n(e.g. the type species\nC. militaris\n). As a result, it became its own genus, absorbing new members.\nThe 2007 study also peeled off\nMetacordyceps\n(anamorph\nMetarhizium\n,\nPochonia\n) and\nElaphocordyceps\n. A number of species remain unclearly assigned and provisionally retained in\nCordyceps\nsensu lato\n.\nSelected species\nMain article:\nList of Cordyceps species\nThere are over 260 species in the genus\nCordyceps\nincluding the following species:\nCordyceps caespitosa\nCordyceps chanhua\nCordyceps militaris\nCordyceps sinclairii\nAnamorphic genera\nIsaria\nis a genus name that has been applied to many anamorphs of\nCordyceps\nspecies. This genus itself is treated as a synonym of\nCordyceps\nin Species Fungorum following the \"one fungus one name\" change,\nbut many species names with\nIsaria\nare still preferred by Species Fungorum over the synonyms in other genera (e.g.\nIsaria sinclarii\nis preferred over\nCordyceps sinclairii\n).\nThough confusing, this does match the \"equal footing for priority\" approach of the \"one fungus one name\" concept. To add to the complexity,\nIsaria\nis a\nconserved name\nwith a conserved type.\nWhat remains under\nIsaria\nas of 2016 remains polyphyletic and can be divided into three main clades.\nAnamorphic genera closely allied to\nCordyceps\nsensu stricto include\nEvlachovaea\n,\nLecanicillium\nand\nBeauveria\n.\nBiology\nWhen\nCordyceps\nattacks a host, the\nmycelium\ninvades and eventually replaces the host tissue, while the elongated fruit body (\nascocarp\n) may be cylindrical, branched, or of complex shape. The ascocarp bears many small, flask-shaped\nperithecia\ncontaining\nasci\n. These, in turn, contain thread-like\nascospores\n, which usually break into fragments and are presumably infective.\nCordyceps\nare used by\ndrab stinkbugs\nto protect their eggs from\nparasitoid wasps\n.\nResearch\nPolysaccharide\ncomponents and the nucleoside\ncordycepin\nisolated from\nC. militaris\nare under\nbasic research\n, but more advanced\nclinical research\nhas been limited and too low in quality to identify any therapeutic potential of cordyceps components.\nUses\nCordyceps\nsensu lato\n(which now includes\nOphiocordyceps\nand many other genera holding species originally in this genus) has long been used in\ntraditional Chinese medicine\nin the belief it can be used to treat diseases.\nThere is no\nscientific\nevidence for such uses.\nCultural representations\nThe video game series\nThe Last of Us\n(2013\u20132021) and its\ntelevision adaptation\npresent\nCordyceps\nas a deadly threat to the human race, its parasitism powerful enough to result in global calamity.\nThe result is a\nzombie apocalypse\nand the collapse of human civilization.\nScientific American\nnotes that some species in the genus \"are indeed body snatchers\u2013they have been making real zombies for millions of years\", though of ants or\ntarantulas\n, not of humans.\nThe Last of Us\nproceeds from the premise that a new species of\nCordyceps\nmanages to\njump the species barrier\n, from nonhuman to human, as diseases like influenza and viruses like\nEbola\nand\nCOVID-19\nhave done. Its human hosts initially become violent \"infected\" beings, before turning into blind zombie \"clickers\", with fungal growths emerging from their faces.\nIn a detail that reflects\nCordyceps\nbiology, \"clickers\" then seek out a dark place in which to die and release the fungal spores, enabling the parasite to complete its life cycle.\nScientific American\ncomments that by combining a plausible mechanism with effective artistic design, the series gains \"both scientific rigor and beauty\".\nIn similar vein,\nCordyceps\ncauses a pandemic that wipes out most of humanity in\nMike Carey\n's 2014 postapocalyptic novel\nThe Girl with All the Gifts\nand its 2016\nfilm adaptation\n.\nIn this case, an infected person becomes a \"hungry\", a zombie thirsting for blood. In the fiction, Dr. Caldwell explains that the human-infecting fungus is a mutated form of\nOphiocordyceps unilateralis\n(a group of species now split off from\nCordyceps\n) which alters the behaviour of infected insects. The children of infected mothers, however, become \"hybrids\" with antibodies protecting them against the fungus.\nGallery\nCordyceps militaris\nCordyceps militaris\nCordyceps ophioglossoides\nSee also\nMedicinal fungi\nReferences\n^\nBuenz, E. J.; B. A. Bauer; Osmundson, T. W.; Motley, T. J. (2005).\n\"The traditional Chinese medicine Cordyceps sinensis and its effects on apoptotic homeostasis\"\n.\nJournal of Ethnopharmacology\n.\n96\n(\n1\u2013\n2):\n19\u2013\n29.\ndoi\n:\n10.1016/j.jep.2004.09.029\n.\nPMID\n15588646\n.\n^\nNikoh, N. (April 2000).\n\"Interkingdom host jumping underground: phylogenetic analysis of entomoparasitic fungus of the genus cordyceps\"\n.\nMolecular Biology and Evolution\n.\n17\n(4):\n629\u2013\n638.\ndoi\n:\n10.1093/oxfordjournals.molbev.a026341\n.\nPMID\n10742053\n.\n^\n\"Cordyceps\"\n.\nwww.merriam-webster.com\n. Retrieved\n22 August\n2023\n.\n^\nSung, Gi-Ho; Nigel L. Hywel-Jones; Jae-Mo Sung; J. Jennifer Luangsa-ard; Bhushan Shrestha; Joseph W. Spatafora (2007).\n\"Phylogenetic classification of Cordyceps and the clavicipitaceous fungi\"\n.\nStudies in Mycology\n.\n57\n(1):\n5\u2013\n59.\ndoi\n:\n10.3114/sim.2007.57.01\n.\nPMC\n2104736\n.\nPMID\n18490993\n.\n^\na\nb\n\"\nCordyceps\n\"\n.\nIndex Fungorum\n. Retrieved\n4 September\n2019\n.\n^\nElias Magnus Fries, Observ. mycol. (Havniae) 2: 316 (cancellans) (1818)\n^\nEdmond Tulasne & Charles Tulasne, Select. fung. carpol. (Paris) 3: 20 (1865)\n^\na\nb\nc\nSung, GH; Hywel-Jones, NL; Sung, JM; Luangsa-Ard, JJ; Shrestha, B; Spatafora, JW (2007).\n\"Phylogenetic classification of Cordyceps and the clavicipitaceous fungi\"\n.\nStudies in Mycology\n.\n57\n:\n5\u2013\n59.\ndoi\n:\n10.3114/sim.2007.57.01\n.\nPMC\n2104736\n.\nPMID\n18490993\n.\n^\nHolliday, John; Cleaver, Matt (2008).\n\"Medicinal Value of the Caterpillar Fungi Species of the Genus Cordyceps (Fr.) Link (Ascomycetes). A Review\"\n(PDF)\n.\nInternational Journal of Medicinal Mushrooms\n.\n10\n(3). New York: Begell House:\n219\u2013\n234.\ndoi\n:\n10.1615/IntJMedMushr.v10.i3.30\n.\nISSN\n1521-9437\n. Archived from\nthe original\n(PDF)\non 22 February 2012\n. Retrieved\n10 March\n2009\n.\n^\n\"Index Fungorum - Search Page\"\n.\nwww.indexfungorum.org\n. Retrieved\n6 December\n2024\n.\n^\na\nb\n\"Index Fungorum - Names Record #8636 Isaria Pers., Neues Mag. Bot. 1: 121 (1794)\"\n.\nwww.indexfungorum.org\n.\n^\n\"Species Fungorum - GSD Species #254719 Isaria sinclairii (Berk.) Lloyd, Mycol. Writ. (Cincinnati) 7(Letter 68): 1179 (1923)\"\n.\nwww.speciesfungorum.org\n.\n^\na\nb\nDai, Y.D.; Yu, H.; Zeng, W.B.; Yang, J.Y.; He, L. (22 February 2016).\n\"\u591a\u57fa\u56e0\u8054\u5408\u5206\u6790\u68d2\u675f\u5b62\u5c5e Isaria\uff08Ascomycota, Cordycipitaceae\uff09\u7cfb\u7edf\u53d1\u80b2\u5173\u7cfb\"\n[Multilocus phylogenetic analyses of the genus Isaria (Ascomycota, Cordycipitaceae)].\n\u83cc\u7269\u5b66\u62a5 Mycosystema\n(in Chinese).\n35\n(2):\n147\u2013\n160.\ndoi\n:\n10.13346/j.mycosystema.140292\n.\n^\nShrestha, Bhushan; Han, Sang-Kuk; Sung, Jae-Mo; Sung, Gi-Ho (2012).\n\"Fruiting Body Formation of Cordyceps militaris from Multi-Ascospore Isolates and Their Single Ascospore Progeny Strains\"\n.\nMycobiology\n.\n40\n(2):\n100\u2013\n106.\ndoi\n:\n10.5941/MYCO.2012.40.2.100\n.\nISSN\n1229-8093\n.\nPMC\n3408298\n.\nPMID\n22870051\n.\n^\nNishino, Takanori; Moriyama, Minoru; Mukai, Hiromi; Tanahashi, Masahiko; Hosokawa, Takahiro; et\u00a0al. (16 October 2025).\n\"Defensive fungal symbiosis on insect hindlegs\"\n.\nScience\n.\n390\n(6770):\n279\u2013\n283.\nBibcode\n:\n2025Sci...390..279N\n.\ndoi\n:\n10.1126/science.adp6699\n.\nPMID\n41100614\n.\n^\na\nb\n\"Cordyceps\"\n. Drugs.com. 12 July 2023\n. Retrieved\n15 September\n2023\n.\n^\n\"Chinese Medicine Specimen Database\"\n.\nlibproject.hkbu.edu.hk\n. Retrieved\n6 March\n2023\n.\n^\n\"\u4e2d\u56fd\u5e7f\u4e49\u866b\u8349\u79cd\u7c7b\u53ca\u5176\u9a6f\u5316\u683d\u57f9\u7814\u7a76\u8fdb\u5c55\"\n[Cordyceps Sensu Lato and Their Domestication and Cultivation in China].\n\u98df\u7528\u83cc\u5b66\u62a5\n(in Chinese).\n30\n(05). 15 October 2023.\ndoi\n:\n10.16488/j.cnki.1005-9873.2023.05.012\n.\nISSN\n1005-9873\n.\n^\na\nb\nc\nd\ne\nHill, Kyle (25 June 2013).\n\"The Fungus that Reduced Humanity to The Last of Us\"\n.\nScientific American\n. Retrieved\n4 May\n2021\n.\n^\nD'Addario, Daniel (10 January 2023).\n\"\n'The Last of Us,' From 'Chernobyl's' Craig Mazin, Is a Promising, Moving Zombie Saga: TV Review\"\n.\nVariety\n. Retrieved\n15 February\n2023\n.\n^\na\nb\nBachman, Mara (12 April 2020).\n\"The Girl With All The Gifts: Fungal Infection & Hungries Explained\"\n.\nScreenRant\n. Retrieved\n23 October\n2023\n.",
+              "content_with_links": "Cordyceps\nCordyceps militaris\nScientific classification\nKingdom:\nFungi\nDivision:\nAscomycota\nClass:\nSordariomycetes\nOrder:\nHypocreales\nFamily:\nCordycipitaceae\nGenus:\nCordyceps\nFr.\n(1818)\nType species\nCordyceps militaris\n(\nL.\n) Fr. (1818)\nSynonyms\nList\nAkrophyton\nLebert (1858)\nAlphitomyces\nReissek (1856)\nAmphichorda\nFr. (1825)\nCampylothecium\nCes. (1846)\nCordylia\nFr. (1818)\nCordyliceps\nFr. (1832)\nCoremiopsis\nSizova & Suprun (1957)\nCorynesphaera\nDumort.2 (1822)\nEvlachovaea\nB.A. Borisov & Tarasov (1999)\nHypoxylum\nJuss. (1789)\nIsaria\nPers. (1794)\nPhytocordyceps\nC.H. Su & H.H. Wang (1986)\nPolistophthora\nLebert (1858)\nRacemella\nCes. (1861)\nRamaria\nHolmsk. (1781)\nTettigorhyza\nG. Bertol. (1875)\nTorrubia\nL\u00e9v. (1863)\nXylaria\nHill ex Grev (1823)\nCordyceps\n/\n\u02c8\nk\n\u0254\u02d0r\nd\n\u026a\ns\n\u025b\np\ns\n/\nis a\ngenus\nof\nascomycete\nfungi\n(sac fungi) that includes over 260 species worldwide, many of which are parasitic. Diverse variants of cordyceps have had more than 1,500 years of use in\nChinese medicine\n.\nMost\nCordyceps\nspecies are\nendoparasitoids\n, parasitic mainly on\ninsects\nand other\narthropods\n(they are thus\nentomopathogenic fungi\n); a few are parasitic on other fungi.\nThe generic name\nCordyceps\nis derived from the\nancient Greek\n\u03ba\u03bf\u03c1\u03b4\u03cd\u03bb\u03b7\nkord\u00fdl\u0113\n, meaning \"club\", and the\nLatin\n-ceps\n, derived from Latin\ncaput\n, meaning \"head\".\nThe\ngenus\nhas a worldwide distribution, with most of the known species\nbeing from Asia.\nTaxonomy\nThere are two recognized\nsubgenera\n:\nCordyceps\nsubgen.\nCordyceps\nFr. 1818\nCordyceps\nsubgen.\nCordylia\nTul.\n&\nC. Tul.\n1865\nCordyceps\nsensu stricto\nare the\nteleomorphs\nof several\ngenera\nof\nanamorphic\n,\nentomopathogenic fungi\nsuch as\nBeauveria\n(\nCordyceps bassiana\n),\nSeptofusidium\n, and\nLecanicillium\n.\nSplits\nCordyceps\nsubgen.\nEpichloe\nwas at one time a subgenus, but is now regarded as a separate genus,\nEpichlo\u00eb\n.\nCordyceps\nsubgen.\nOphiocordyceps\nwas at one time a subgenus defined by morphology.\nNuclear DNA\nsampling done in 2007 shows that members, including \"\nC. sinensis\n\" and \"\nC. unilateralis\n\", as well as some others not placed in the subgenus, were distantly related to most of the remainder of species then placed in\nCordyceps\n(e.g. the type species\nC. militaris\n). As a result, it became its own genus, absorbing new members.\nThe 2007 study also peeled off\nMetacordyceps\n(anamorph\nMetarhizium\n,\nPochonia\n) and\nElaphocordyceps\n. A number of species remain unclearly assigned and provisionally retained in\nCordyceps\nsensu lato\n.\nSelected species\nMain article:\nList of Cordyceps species\nThere are over 260 species in the genus\nCordyceps\nincluding the following species:\nCordyceps caespitosa\nCordyceps chanhua\nCordyceps militaris\nCordyceps sinclairii\nAnamorphic genera\nIsaria\nis a genus name that has been applied to many anamorphs of\nCordyceps\nspecies. This genus itself is treated as a synonym of\nCordyceps\nin Species Fungorum following the \"one fungus one name\" change,\nbut many species names with\nIsaria\nare still preferred by Species Fungorum over the synonyms in other genera (e.g.\nIsaria sinclarii\nis preferred over\nCordyceps sinclairii\n).\nThough confusing, this does match the \"equal footing for priority\" approach of the \"one fungus one name\" concept. To add to the complexity,\nIsaria\nis a\nconserved name\nwith a conserved type.\nWhat remains under\nIsaria\nas of 2016 remains polyphyletic and can be divided into three main clades.\nAnamorphic genera closely allied to\nCordyceps\nsensu stricto include\nEvlachovaea\n,\nLecanicillium\nand\nBeauveria\n.\nBiology\nWhen\nCordyceps\nattacks a host, the\nmycelium\ninvades and eventually replaces the host tissue, while the elongated fruit body (\nascocarp\n) may be cylindrical, branched, or of complex shape. The ascocarp bears many small, flask-shaped\nperithecia\ncontaining\nasci\n. These, in turn, contain thread-like\nascospores\n, which usually break into fragments and are presumably infective.\nCordyceps\nare used by\ndrab stinkbugs\nto protect their eggs from\nparasitoid wasps\n.\nResearch\nPolysaccharide\ncomponents and the nucleoside\ncordycepin\nisolated from\nC. militaris\nare under\nbasic research\n, but more advanced\nclinical research\nhas been limited and too low in quality to identify any therapeutic potential of cordyceps components.\nUses\nCordyceps\nsensu lato\n(which now includes\nOphiocordyceps\nand many other genera holding species originally in this genus) has long been used in\ntraditional Chinese medicine\nin the belief it can be used to treat diseases.\nThere is no\nscientific\nevidence for such uses.\nCultural representations\nThe video game series\nThe Last of Us\n(2013\u20132021) and its\ntelevision adaptation\npresent\nCordyceps\nas a deadly threat to the human race, its parasitism powerful enough to result in global calamity.\nThe result is a\nzombie apocalypse\nand the collapse of human civilization.\nScientific American\nnotes that some species in the genus \"are indeed body snatchers\u2013they have been making real zombies for millions of years\", though of ants or\ntarantulas\n, not of humans.\nThe Last of Us\nproceeds from the premise that a new species of\nCordyceps\nmanages to\njump the species barrier\n, from nonhuman to human, as diseases like influenza and viruses like\nEbola\nand\nCOVID-19\nhave done. Its human hosts initially become violent \"infected\" beings, before turning into blind zombie \"clickers\", with fungal growths emerging from their faces.\nIn a detail that reflects\nCordyceps\nbiology, \"clickers\" then seek out a dark place in which to die and release the fungal spores, enabling the parasite to complete its life cycle.\nScientific American\ncomments that by combining a plausible mechanism with effective artistic design, the series gains \"both scientific rigor and beauty\".\nIn similar vein,\nCordyceps\ncauses a pandemic that wipes out most of humanity in\nMike Carey\n's 2014 postapocalyptic novel\nThe Girl with All the Gifts\nand its 2016\nfilm adaptation\n.\nIn this case, an infected person becomes a \"hungry\", a zombie thirsting for blood. In the fiction, Dr. Caldwell explains that the human-infecting fungus is a mutated form of\nOphiocordyceps unilateralis\n(a group of species now split off from\nCordyceps\n) which alters the behaviour of infected insects. The children of infected mothers, however, become \"hybrids\" with antibodies protecting them against the fungus.\nGallery\nCordyceps militaris\nCordyceps militaris\nCordyceps ophioglossoides\nSee also\nMedicinal fungi\nReferences\n^\nBuenz, E. J.; B. A. Bauer; Osmundson, T. W.; Motley, T. J. (2005).\n\"The traditional Chinese medicine Cordyceps sinensis and its effects on apoptotic homeostasis\"\n.\nJournal of Ethnopharmacology\n.\n96\n(\n1\u2013\n2):\n19\u2013\n29.\ndoi\n:\n10.1016/j.jep.2004.09.029\n.\nPMID\n15588646\n.\n^\nNikoh, N. (April 2000).\n\"Interkingdom host jumping underground: phylogenetic analysis of entomoparasitic fungus of the genus cordyceps\"\n.\nMolecular Biology and Evolution\n.\n17\n(4):\n629\u2013\n638.\ndoi\n:\n10.1093/oxfordjournals.molbev.a026341\n.\nPMID\n10742053\n.\n^\n\"Cordyceps\"\n.\nwww.merriam-webster.com\n. Retrieved\n22 August\n2023\n.\n^\nSung, Gi-Ho; Nigel L. Hywel-Jones; Jae-Mo Sung; J. Jennifer Luangsa-ard; Bhushan Shrestha; Joseph W. Spatafora (2007).\n\"Phylogenetic classification of Cordyceps and the clavicipitaceous fungi\"\n.\nStudies in Mycology\n.\n57\n(1):\n5\u2013\n59.\ndoi\n:\n10.3114/sim.2007.57.01\n.\nPMC\n2104736\n.\nPMID\n18490993\n.\n^\na\nb\n\"\nCordyceps\n\"\n.\nIndex Fungorum\n. Retrieved\n4 September\n2019\n.\n^\nElias Magnus Fries, Observ. mycol. (Havniae) 2: 316 (cancellans) (1818)\n^\nEdmond Tulasne & Charles Tulasne, Select. fung. carpol. (Paris) 3: 20 (1865)\n^\na\nb\nc\nSung, GH; Hywel-Jones, NL; Sung, JM; Luangsa-Ard, JJ; Shrestha, B; Spatafora, JW (2007).\n\"Phylogenetic classification of Cordyceps and the clavicipitaceous fungi\"\n.\nStudies in Mycology\n.\n57\n:\n5\u2013\n59.\ndoi\n:\n10.3114/sim.2007.57.01\n.\nPMC\n2104736\n.\nPMID\n18490993\n.\n^\nHolliday, John; Cleaver, Matt (2008).\n\"Medicinal Value of the Caterpillar Fungi Species of the Genus Cordyceps (Fr.) Link (Ascomycetes). A Review\"\n(PDF)\n.\nInternational Journal of Medicinal Mushrooms\n.\n10\n(3). New York: Begell House:\n219\u2013\n234.\ndoi\n:\n10.1615/IntJMedMushr.v10.i3.30\n.\nISSN\n1521-9437\n. Archived from\nthe original\n(PDF)\non 22 February 2012\n. Retrieved\n10 March\n2009\n.\n^\n\"Index Fungorum - Search Page\"\n.\nwww.indexfungorum.org\n. Retrieved\n6 December\n2024\n.\n^\na\nb\n\"Index Fungorum - Names Record #8636 Isaria Pers., Neues Mag. Bot. 1: 121 (1794)\"\n.\nwww.indexfungorum.org\n.\n^\n\"Species Fungorum - GSD Species #254719 Isaria sinclairii (Berk.) Lloyd, Mycol. Writ. (Cincinnati) 7(Letter 68): 1179 (1923)\"\n.\nwww.speciesfungorum.org\n.\n^\na\nb\nDai, Y.D.; Yu, H.; Zeng, W.B.; Yang, J.Y.; He, L. (22 February 2016).\n\"\u591a\u57fa\u56e0\u8054\u5408\u5206\u6790\u68d2\u675f\u5b62\u5c5e Isaria\uff08Ascomycota, Cordycipitaceae\uff09\u7cfb\u7edf\u53d1\u80b2\u5173\u7cfb\"\n[Multilocus phylogenetic analyses of the genus Isaria (Ascomycota, Cordycipitaceae)].\n\u83cc\u7269\u5b66\u62a5 Mycosystema\n(in Chinese).\n35\n(2):\n147\u2013\n160.\ndoi\n:\n10.13346/j.mycosystema.140292\n.\n^\nShrestha, Bhushan; Han, Sang-Kuk; Sung, Jae-Mo; Sung, Gi-Ho (2012).\n\"Fruiting Body Formation of Cordyceps militaris from Multi-Ascospore Isolates and Their Single Ascospore Progeny Strains\"\n.\nMycobiology\n.\n40\n(2):\n100\u2013\n106.\ndoi\n:\n10.5941/MYCO.2012.40.2.100\n.\nISSN\n1229-8093\n.\nPMC\n3408298\n.\nPMID\n22870051\n.\n^\nNishino, Takanori; Moriyama, Minoru; Mukai, Hiromi; Tanahashi, Masahiko; Hosokawa, Takahiro; et\u00a0al. (16 October 2025).\n\"Defensive fungal symbiosis on insect hindlegs\"\n.\nScience\n.\n390\n(6770):\n279\u2013\n283.\nBibcode\n:\n2025Sci...390..279N\n.\ndoi\n:\n10.1126/science.adp6699\n.\nPMID\n41100614\n.\n^\na\nb\n\"Cordyceps\"\n. Drugs.com. 12 July 2023\n. Retrieved\n15 September\n2023\n.\n^\n\"Chinese Medicine Specimen Database\"\n.\nlibproject.hkbu.edu.hk\n. Retrieved\n6 March\n2023\n.\n^\n\"\u4e2d\u56fd\u5e7f\u4e49\u866b\u8349\u79cd\u7c7b\u53ca\u5176\u9a6f\u5316\u683d\u57f9\u7814\u7a76\u8fdb\u5c55\"\n[Cordyceps Sensu Lato and Their Domestication and Cultivation in China].\n\u98df\u7528\u83cc\u5b66\u62a5\n(in Chinese).\n30\n(05). 15 October 2023.\ndoi\n:\n10.16488/j.cnki.1005-9873.2023.05.012\n.\nISSN\n1005-9873\n.\n^\na\nb\nc\nd\ne\nHill, Kyle (25 June 2013).\n\"The Fungus that Reduced Humanity to The Last of Us\"\n.\nScientific American\n. Retrieved\n4 May\n2021\n.\n^\nD'Addario, Daniel (10 January 2023).\n\"\n'The Last of Us,' From 'Chernobyl's' Craig Mazin, Is a Promising, Moving Zombie Saga: TV Review\"\n.\nVariety\n. Retrieved\n15 February\n2023\n.\n^\na\nb\nBachman, Mara (12 April 2020).\n\"The Girl With All The Gifts: Fungal Infection & Hungries Explained\"\n.\nScreenRant\n. Retrieved\n23 October\n2023\n.\n\n--- Links found on this page ---\n1. https://en.wikipedia.org/wiki/Main_Page\n2. https://en.wikipedia.org/wiki/Wikipedia:Contents\n3. https://en.wikipedia.org/wiki/Portal:Current_events\n4. https://en.wikipedia.org/wiki/Special:Random\n5. https://en.wikipedia.org/wiki/Wikipedia:About\n",
+              "links": [
+                "https://en.wikipedia.org/wiki/Main_Page",
+                "https://en.wikipedia.org/wiki/Wikipedia:Contents",
+                "https://en.wikipedia.org/wiki/Portal:Current_events",
+                "https://en.wikipedia.org/wiki/Special:Random",
+                "https://en.wikipedia.org/wiki/Wikipedia:About"
+              ],
+              "links_full": [
+                "https://en.wikipedia.org/wiki/Main_Page",
+                "https://en.wikipedia.org/wiki/Wikipedia:Contents",
+                "https://en.wikipedia.org/wiki/Portal:Current_events",
+                "https://en.wikipedia.org/wiki/Special:Random",
+                "https://en.wikipedia.org/wiki/Wikipedia:About",
+                "https://en.wikipedia.org/wiki/Wikipedia:Contact_us",
+                "https://en.wikipedia.org/wiki/Help:Contents",
+                "https://en.wikipedia.org/wiki/Help:Introduction",
+                "https://en.wikipedia.org/wiki/Wikipedia:Community_portal",
+                "https://en.wikipedia.org/wiki/Special:RecentChanges",
+                "https://en.wikipedia.org/wiki/Wikipedia:File_upload_wizard",
+                "https://en.wikipedia.org/wiki/Special:SpecialPages",
+                "https://en.wikipedia.org/wiki/Special:Search",
+                "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en",
+                "https://en.wikipedia.org/w/index.php?title=Special%3ACreateAccount&returnto=Cordyceps",
+                "https://en.wikipedia.org/w/index.php?title=Special%3AUserLogin&returnto=Cordyceps",
+                "https://ar.wikipedia.org/wiki/%D9%87%D8%B1%D8%A7%D9%88%D9%8A_%D8%A7%D9%84%D8%B1%D8%A3%D8%B3",
+                "https://arz.wikipedia.org/wiki/%D9%83%D9%88%D8%B1%D8%AF%D9%8A%D8%B3%D9%8A%D8%A8%D8%B3",
+                "https://be.wikipedia.org/wiki/%D0%9A%D0%BE%D1%80%D0%B4%D1%8B%D1%86%D1%8D%D0%BF%D1%81",
+                "https://bg.wikipedia.org/wiki/%D0%9A%D0%BE%D1%80%D0%B4%D0%B8%D1%86%D0%B5%D0%BF%D1%81",
+                "https://ca.wikipedia.org/wiki/Cordyceps",
+                "https://ceb.wikipedia.org/wiki/Cordyceps",
+                "https://ckb.wikipedia.org/wiki/%DA%AF%DB%86%D9%BE%D8%A7%DA%B5%DB%95%D8%B3%DB%95%D8%B1%DB%95%DA%A9%D8%A7%D9%86",
+                "https://de.wikipedia.org/wiki/Cordyceps",
+                "https://el.wikipedia.org/wiki/%CE%9A%CF%8C%CF%81%CE%BD%CF%84%CE%B9%CF%83%CE%B5%CF%80%CF%82",
+                "https://es.wikipedia.org/wiki/Cordyceps",
+                "https://et.wikipedia.org/wiki/Kedrist%C3%B5lvik",
+                "https://fa.wikipedia.org/wiki/%D8%B3%D8%B1%DA%86%D9%85%D8%A7%D9%82%DB%8C%E2%80%8C%D9%87%D8%A7",
+                "https://fr.wikipedia.org/wiki/Cordyceps",
+                "https://he.wikipedia.org/wiki/%D7%A7%D7%95%D7%A8%D7%93%D7%99%D7%A1%D7%A4%D7%A1",
+                "https://hu.wikipedia.org/wiki/Cordyceps",
+                "https://hy.wikipedia.org/wiki/%D4%BF%D5%B8%D6%80%D5%A4%D5%AB%D6%81%D5%A5%D5%BA%D5%BD",
+                "https://id.wikipedia.org/wiki/Cordyceps",
+                "https://is.wikipedia.org/wiki/P%C3%B6ddusveppir",
+                "https://it.wikipedia.org/wiki/Cordyceps",
+                "https://ja.wikipedia.org/wiki/%E3%83%8E%E3%83%A0%E3%82%B7%E3%82%BF%E3%82%B1%E5%B1%9E",
+                "https://mk.wikipedia.org/wiki/Cordyceps",
+                "https://ms.wikipedia.org/wiki/Cordyceps",
+                "https://nl.wikipedia.org/wiki/Cordyceps",
+                "https://pl.wikipedia.org/wiki/Cordyceps",
+                "https://pt.wikipedia.org/wiki/Cordyceps",
+                "https://ro.wikipedia.org/wiki/Cordyceps",
+                "https://ru.wikipedia.org/wiki/%D0%9A%D0%BE%D1%80%D0%B4%D0%B8%D1%86%D0%B5%D0%BF%D1%81",
+                "https://simple.wikipedia.org/wiki/Cordyceps",
+                "https://sl.wikipedia.org/wiki/Glavatci",
+                "https://sv.wikipedia.org/wiki/Cordyceps",
+                "https://tr.wikipedia.org/wiki/Cordyceps",
+                "https://uk.wikipedia.org/wiki/%D0%9A%D0%BE%D1%80%D0%B4%D0%B8%D1%86%D0%B5%D0%BF%D1%81",
+                "https://vi.wikipedia.org/wiki/Cordyceps",
+                "https://war.wikipedia.org/wiki/Cordyceps",
+                "https://zh.wikipedia.org/wiki/%E8%99%AB%E8%8D%89%E5%B1%9E",
+                "https://www.wikidata.org/wiki/Special:EntityPage/Q312238",
+                "https://en.wikipedia.org/wiki/Talk:Cordyceps",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=history",
+                "https://en.wikipedia.org/wiki/Special:WhatLinksHere/Cordyceps",
+                "https://en.wikipedia.org/wiki/Special:RecentChangesLinked/Cordyceps",
+                "https://en.wikipedia.org/wiki/Wikipedia:File_Upload_Wizard",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&oldid=1338882486",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=info",
+                "https://en.wikipedia.org/w/index.php?title=Special%3ACiteThisPage&page=Cordyceps&id=1338882486&wpFormIdentifier=titleform",
+                "https://en.wikipedia.org/w/index.php?title=Special%3AUrlShortener&url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FCordyceps",
+                "https://en.wikipedia.org/w/index.php?title=Special%3AQrCode&url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FCordyceps",
+                "https://en.wikipedia.org/w/index.php?title=Special%3ADownloadAsPdf&page=Cordyceps&action=show-download-screen",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&printable=yes",
+                "https://commons.wikimedia.org/wiki/Category:Cordyceps",
+                "https://species.wikimedia.org/wiki/Cordyceps",
+                "https://en.wikipedia.org/wiki/File:2010-08-06_Cordyceps_militaris_1.jpg",
+                "https://en.wikipedia.org/wiki/Taxonomy_(biology)",
+                "https://en.wikipedia.org/wiki/Template:Taxonomy/Cordyceps",
+                "https://en.wikipedia.org/wiki/Fungus",
+                "https://en.wikipedia.org/wiki/Ascomycota",
+                "https://en.wikipedia.org/wiki/Sordariomycetes",
+                "https://en.wikipedia.org/wiki/Hypocreales",
+                "https://en.wikipedia.org/wiki/Cordycipitaceae",
+                "https://en.wikipedia.org/wiki/Elias_Magnus_Fries",
+                "https://en.wikipedia.org/wiki/Type_species",
+                "https://en.wikipedia.org/wiki/Cordyceps_militaris",
+                "https://en.wikipedia.org/wiki/Carl_Linnaeus",
+                "https://en.wikipedia.org/wiki/Synonym_(taxonomy)",
+                "https://en.wikipedia.org/wiki/Help:IPA/English",
+                "https://en.wikipedia.org/wiki/Genus",
+                "https://en.wikipedia.org/wiki/Ascomycete",
+                "https://en.wikipedia.org/wiki/Fungi",
+                "https://en.wikipedia.org/wiki/Chinese_medicine",
+                "https://en.wikipedia.org/wiki/Parasitoid",
+                "https://en.wikipedia.org/wiki/Insects",
+                "https://en.wikipedia.org/wiki/Arthropod",
+                "https://en.wikipedia.org/wiki/Entomopathogenic_fungi",
+                "https://en.wikipedia.org/wiki/Ancient_Greek",
+                "https://en.wikipedia.org/wiki/Latin_language",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=1",
+                "https://en.wikipedia.org/wiki/Subgenera",
+                "https://en.wikipedia.org/wiki/Edmond_Tulasne",
+                "https://en.wikipedia.org/wiki/Charles_Tulasne",
+                "https://en.wikipedia.org/wiki/Sensu_stricto",
+                "https://en.wikipedia.org/wiki/Teleomorph",
+                "https://en.wikipedia.org/wiki/Genera",
+                "https://en.wikipedia.org/wiki/Teleomorph,_anamorph_and_holomorph",
+                "https://en.wikipedia.org/wiki/Beauveria",
+                "https://en.wikipedia.org/wiki/Cordyceps_bassiana",
+                "https://en.wikipedia.org/w/index.php?title=Septofusidium&action=edit&redlink=1",
+                "https://en.wikipedia.org/wiki/Lecanicillium",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=2",
+                "https://en.wikipedia.org/wiki/Epichlo%C3%AB",
+                "https://en.wikipedia.org/wiki/Nuclear_DNA",
+                "https://en.wikipedia.org/wiki/Ophiocordyceps_sinensis",
+                "https://en.wikipedia.org/wiki/Ophiocordyceps_unilateralis",
+                "https://en.wikipedia.org/wiki/Metacordyceps",
+                "https://en.wikipedia.org/wiki/Metarhizium",
+                "https://en.wikipedia.org/wiki/Pochonia",
+                "https://en.wikipedia.org/wiki/Elaphocordyceps",
+                "https://en.wikipedia.org/wiki/Sensu_lato",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=3",
+                "https://en.wikipedia.org/wiki/List_of_Cordyceps_species",
+                "https://en.wikipedia.org/wiki/File:Cordyceps.jpg",
+                "https://en.wikipedia.org/wiki/Entomopathogenic_fungus",
+                "https://en.wikipedia.org/wiki/Cordyceps_caespitosa",
+                "https://en.wikipedia.org/wiki/Cordyceps_chanhua",
+                "https://en.wikipedia.org/wiki/Cordyceps_sinclairii",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=4",
+                "https://en.wikipedia.org/wiki/Conserved_name",
+                "https://en.wikipedia.org/wiki/Evlachovaea",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=5",
+                "https://en.wikipedia.org/wiki/Mycelium",
+                "https://en.wikipedia.org/wiki/Ascocarp",
+                "https://en.wikipedia.org/wiki/Perithecia",
+                "https://en.wikipedia.org/wiki/Ascus",
+                "https://en.wikipedia.org/wiki/Ascospores",
+                "https://en.wikipedia.org/wiki/Drab_stinkbug",
+                "https://en.wikipedia.org/wiki/Parasitoid_wasps",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=6",
+                "https://en.wikipedia.org/wiki/File:Cordycepin.svg",
+                "https://en.wikipedia.org/wiki/Cordycepin",
+                "https://en.wikipedia.org/wiki/Polysaccharide",
+                "https://en.wikipedia.org/wiki/Basic_research",
+                "https://en.wikipedia.org/wiki/Clinical_research",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=7",
+                "https://en.wikipedia.org/wiki/Ophiocordyceps",
+                "https://en.wikipedia.org/wiki/Traditional_Chinese_medicine",
+                "https://en.wikipedia.org/wiki/Science",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=8",
+                "https://en.wikipedia.org/wiki/The_Last_of_Us",
+                "https://en.wikipedia.org/wiki/The_Last_of_Us_(TV_series)",
+                "https://en.wikipedia.org/wiki/Zombie_apocalypse",
+                "https://en.wikipedia.org/wiki/Scientific_American",
+                "https://en.wikipedia.org/wiki/Tarantula",
+                "https://en.wikipedia.org/wiki/Zoonosis",
+                "https://en.wikipedia.org/wiki/Ebola",
+                "https://en.wikipedia.org/wiki/COVID-19",
+                "https://en.wikipedia.org/wiki/Mike_Carey_(writer)",
+                "https://en.wikipedia.org/wiki/The_Girl_with_All_the_Gifts",
+                "https://en.wikipedia.org/wiki/The_Girl_with_All_the_Gifts_(film)",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=9",
+                "https://en.wikipedia.org/wiki/File:Cordycepsmilitaris.jpg",
+                "https://en.wikipedia.org/wiki/File:Puppenkernkeule.jpg",
+                "https://en.wikipedia.org/wiki/File:Elaphocordyceps_ophioglossoides_02.jpg",
+                "https://en.wikipedia.org/wiki/Cordyceps_ophioglossoides",
+                "https://en.wikipedia.org/wiki/File:Commons-logo.svg",
+                "https://en.wikipedia.org/wiki/File:Wikispecies-logo.svg",
+                "https://en.wikipedia.org/wiki/Wikispecies",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=10",
+                "https://en.wikipedia.org/wiki/Medicinal_fungi",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=11",
+                "https://www.researchgate.net/publication/8138660",
+                "https://en.wikipedia.org/wiki/Journal_of_Ethnopharmacology",
+                "https://en.wikipedia.org/wiki/Doi_(identifier)",
+                "https://doi.org/10.1016%2Fj.jep.2004.09.029",
+                "https://en.wikipedia.org/wiki/PMID_(identifier)",
+                "https://pubmed.ncbi.nlm.nih.gov/15588646",
+                "https://doi.org/10.1093%2Foxfordjournals.molbev.a026341",
+                "https://pubmed.ncbi.nlm.nih.gov/10742053",
+                "https://www.merriam-webster.com/dictionary/Cordyceps",
+                "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2104736",
+                "https://en.wikipedia.org/wiki/Studies_in_Mycology",
+                "https://doi.org/10.3114%2Fsim.2007.57.01",
+                "https://en.wikipedia.org/wiki/PMC_(identifier)",
+                "https://pubmed.ncbi.nlm.nih.gov/18490993",
+                "http://www.indexfungorum.org/names/Names.asp?strGenus=Cordyceps",
+                "https://web.archive.org/web/20120222065508/http://www.alohamedicinals.com/cordycepsIJM1003.pdf",
+                "https://doi.org/10.1615%2FIntJMedMushr.v10.i3.30",
+                "https://en.wikipedia.org/wiki/ISSN_(identifier)",
+                "https://search.worldcat.org/issn/1521-9437",
+                "http://www.alohamedicinals.com/cordycepsIJM1003.pdf",
+                "https://www.indexfungorum.org/Names/Names.asp?pg=1",
+                "https://www.indexfungorum.org/names/NamesRecord.asp?RecordID=8636",
+                "https://www.speciesfungorum.org/GSD/GSDspecies.asp?RecordID=254719",
+                "https://manu40.magtech.com.cn/Jwxb/CN/10.13346/j.mycosystema.140292",
+                "https://doi.org/10.13346%2Fj.mycosystema.140292",
+                "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3408298",
+                "https://doi.org/10.5941%2FMYCO.2012.40.2.100",
+                "https://search.worldcat.org/issn/1229-8093",
+                "https://pubmed.ncbi.nlm.nih.gov/22870051",
+                "https://www.science.org/doi/10.1126/science.adp6699?et_cid=5763890",
+                "https://en.wikipedia.org/wiki/Bibcode_(identifier)",
+                "https://ui.adsabs.harvard.edu/abs/2025Sci...390..279N",
+                "https://doi.org/10.1126%2Fscience.adp6699",
+                "https://pubmed.ncbi.nlm.nih.gov/41100614",
+                "https://www.drugs.com/npp/cordyceps.html",
+                "https://libproject.hkbu.edu.hk/was40/detail?record=112&channelid=44273",
+                "https://www.syjxb.com/CN/10.16488/j.cnki.1005-9873.2023.05.012",
+                "https://doi.org/10.16488%2Fj.cnki.1005-9873.2023.05.012",
+                "https://search.worldcat.org/issn/1005-9873",
+                "https://blogs.scientificamerican.com/but-not-simpler/the-fungus-that-reduced-humanity-to-the-last-of-us",
+                "https://variety.com/2023/tv/reviews/the-last-of-us-hbo-review-1235480139",
+                "https://en.wikipedia.org/wiki/Variety_(magazine)",
+                "https://screenrant.com/girl-all-gifts-fungal-infection-hungries-explained",
+                "https://en.wikipedia.org/wiki/Help:Taxon_identifiers",
+                "https://en.wikipedia.org/wiki/Wikidata",
+                "https://www.wikidata.org/wiki/Q312238",
+                "https://en.wikipedia.org/wiki/Australian_online_fauna_%26_flora_databases",
+                "https://id.biodiversity.org.au/name/fungi/60014662",
+                "https://en.wikipedia.org/wiki/Catalogue_of_Life",
+                "https://www.catalogueoflife.org/data/taxon/62MKV",
+                "https://en.wikipedia.org/wiki/Encyclopedia_of_Life",
+                "https://eol.org/pages/16523",
+                "https://en.wikipedia.org/wiki/EPPO_Code",
+                "https://gd.eppo.int/taxon/1CODYG",
+                "https://en.wikipedia.org/wiki/Global_Biodiversity_Information_Facility",
+                "https://www.gbif.org/species/2560661",
+                "https://en.wikipedia.org/wiki/INaturalist",
+                "https://inaturalist.org/taxa/58707",
+                "https://en.wikipedia.org/wiki/Index_Fungorum",
+                "https://www.indexfungorum.org/names/NamesRecord.asp?RecordID=1240",
+                "https://en.wikipedia.org/wiki/Interim_Register_of_Marine_and_Nonmarine_Genera",
+                "https://www.irmng.org/aphia.php?p=taxdetails&id=1344115",
+                "https://en.wikipedia.org/wiki/MycoBank",
+                "https://www.mycobank.org/MB/1240",
+                "https://en.wikipedia.org/wiki/National_Biodiversity_Network",
+                "https://species.nbnatlas.org/species/BMSSYS0000044243",
+                "https://en.wikipedia.org/wiki/National_Center_for_Biotechnology_Information",
+                "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Info&id=45234",
+                "https://www.nzor.org.nz/names/c4a3fe71-50fd-4743-b608-41e281db7293",
+                "https://en.wikipedia.org/wiki/Open_Tree_of_Life",
+                "https://tree.opentreeoflife.org/taxonomy/browse?id=64408",
+                "https://www.speciesfungorum.org/Names/NamesRecord.asp?RecordID=1240",
+                "https://en.wikipedia.org/wiki/Help:Authority_control",
+                "https://www.nli.org.il/en/authorities/987007562841205171",
+                "https://en.wikipedia.org/wiki/Help:Category",
+                "https://en.wikipedia.org/wiki/Category:Cordyceps",
+                "https://en.wikipedia.org/wiki/Category:Edible_fungi",
+                "https://en.wikipedia.org/wiki/Category:Parasitic_fungi",
+                "https://en.wikipedia.org/wiki/Category:Sordariomycetes_genera",
+                "https://en.wikipedia.org/wiki/Category:Taxa_named_by_Elias_Magnus_Fries",
+                "https://en.wikipedia.org/wiki/Category:Taxa_described_in_1818",
+                "https://en.wikipedia.org/wiki/Category:CS1_Chinese-language_sources_(zh)",
+                "https://en.wikipedia.org/wiki/Category:Articles_with_short_description",
+                "https://en.wikipedia.org/wiki/Category:Short_description_matches_Wikidata",
+                "https://en.wikipedia.org/wiki/Category:Use_dmy_dates_from_February_2023",
+                "https://en.wikipedia.org/wiki/Category:Articles_with_%27species%27_microformats",
+                "https://en.wikipedia.org/wiki/Category:Commons_category_link_is_on_Wikidata",
+                "https://en.wikipedia.org/wiki/Wikipedia:Text_of_the_Creative_Commons_Attribution-ShareAlike_4.0_International_License",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Policy:Terms_of_Use",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Policy:Privacy_policy",
+                "https://wikimediafoundation.org/",
+                "https://en.wikipedia.org/wiki/Wikipedia:General_disclaimer",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Legal:Wikimedia_Foundation_Legal_and_Safety_Contact_Information",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Policy:Universal_Code_of_Conduct",
+                "https://developer.wikimedia.org",
+                "https://stats.wikimedia.org/",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Policy:Cookie_statement",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&mobileaction=toggle_view_mobile",
+                "https://www.wikimedia.org/",
+                "https://www.mediawiki.org/"
+              ],
+              "links_count": 264,
+              "link_contexts": {
+                "https://en.wikipedia.org/wiki/Main_Page": "Main page",
+                "https://en.wikipedia.org/wiki/Wikipedia:Contents": "Contents",
+                "https://en.wikipedia.org/wiki/Portal:Current_events": "Current events",
+                "https://en.wikipedia.org/wiki/Special:Random": "Random article",
+                "https://en.wikipedia.org/wiki/Wikipedia:About": "About Wikipedia",
+                "https://en.wikipedia.org/wiki/Wikipedia:Contact_us": "Contact Wikipedia",
+                "https://en.wikipedia.org/wiki/Help:Contents": "Help",
+                "https://en.wikipedia.org/wiki/Help:Introduction": "Learn to edit",
+                "https://en.wikipedia.org/wiki/Wikipedia:Community_portal": "Community portal",
+                "https://en.wikipedia.org/wiki/Special:RecentChanges": "Recent changes",
+                "https://en.wikipedia.org/wiki/Wikipedia:File_upload_wizard": "Upload file",
+                "https://en.wikipedia.org/wiki/Special:SpecialPages": "Special pages",
+                "https://en.wikipedia.org/wiki/Special:Search": "Search",
+                "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en": "Donate",
+                "https://en.wikipedia.org/w/index.php?title=Special%3ACreateAccount&returnto=Cordyceps": "Create account",
+                "https://en.wikipedia.org/w/index.php?title=Special%3AUserLogin&returnto=Cordyceps": "Log in",
+                "https://ar.wikipedia.org/wiki/%D9%87%D8%B1%D8%A7%D9%88%D9%8A_%D8%A7%D9%84%D8%B1%D8%A3%D8%B3": "\u0627\u0644\u0639\u0631\u0628\u064a\u0629",
+                "https://arz.wikipedia.org/wiki/%D9%83%D9%88%D8%B1%D8%AF%D9%8A%D8%B3%D9%8A%D8%A8%D8%B3": "\u0645\u0635\u0631\u0649",
+                "https://be.wikipedia.org/wiki/%D0%9A%D0%BE%D1%80%D0%B4%D1%8B%D1%86%D1%8D%D0%BF%D1%81": "\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u043a\u0430\u044f",
+                "https://bg.wikipedia.org/wiki/%D0%9A%D0%BE%D1%80%D0%B4%D0%B8%D1%86%D0%B5%D0%BF%D1%81": "\u0411\u044a\u043b\u0433\u0430\u0440\u0441\u043a\u0438",
+                "https://ca.wikipedia.org/wiki/Cordyceps": "Catal\u00e0",
+                "https://ceb.wikipedia.org/wiki/Cordyceps": "Cebuano",
+                "https://ckb.wikipedia.org/wiki/%DA%AF%DB%86%D9%BE%D8%A7%DA%B5%DB%95%D8%B3%DB%95%D8%B1%DB%95%DA%A9%D8%A7%D9%86": "\u06a9\u0648\u0631\u062f\u06cc",
+                "https://de.wikipedia.org/wiki/Cordyceps": "Deutsch",
+                "https://el.wikipedia.org/wiki/%CE%9A%CF%8C%CF%81%CE%BD%CF%84%CE%B9%CF%83%CE%B5%CF%80%CF%82": "\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac",
+                "https://es.wikipedia.org/wiki/Cordyceps": "Espa\u00f1ol",
+                "https://et.wikipedia.org/wiki/Kedrist%C3%B5lvik": "Eesti",
+                "https://fa.wikipedia.org/wiki/%D8%B3%D8%B1%DA%86%D9%85%D8%A7%D9%82%DB%8C%E2%80%8C%D9%87%D8%A7": "\u0641\u0627\u0631\u0633\u06cc",
+                "https://fr.wikipedia.org/wiki/Cordyceps": "Fran\u00e7ais",
+                "https://he.wikipedia.org/wiki/%D7%A7%D7%95%D7%A8%D7%93%D7%99%D7%A1%D7%A4%D7%A1": "\u05e2\u05d1\u05e8\u05d9\u05ea",
+                "https://hu.wikipedia.org/wiki/Cordyceps": "Magyar",
+                "https://hy.wikipedia.org/wiki/%D4%BF%D5%B8%D6%80%D5%A4%D5%AB%D6%81%D5%A5%D5%BA%D5%BD": "\u0540\u0561\u0575\u0565\u0580\u0565\u0576",
+                "https://id.wikipedia.org/wiki/Cordyceps": "Bahasa Indonesia",
+                "https://is.wikipedia.org/wiki/P%C3%B6ddusveppir": "\u00cdslenska",
+                "https://it.wikipedia.org/wiki/Cordyceps": "Italiano",
+                "https://ja.wikipedia.org/wiki/%E3%83%8E%E3%83%A0%E3%82%B7%E3%82%BF%E3%82%B1%E5%B1%9E": "\u65e5\u672c\u8a9e",
+                "https://mk.wikipedia.org/wiki/Cordyceps": "\u041c\u0430\u043a\u0435\u0434\u043e\u043d\u0441\u043a\u0438",
+                "https://ms.wikipedia.org/wiki/Cordyceps": "Bahasa Melayu",
+                "https://nl.wikipedia.org/wiki/Cordyceps": "Nederlands",
+                "https://pl.wikipedia.org/wiki/Cordyceps": "Polski",
+                "https://pt.wikipedia.org/wiki/Cordyceps": "Portugu\u00eas",
+                "https://ro.wikipedia.org/wiki/Cordyceps": "Rom\u00e2n\u0103",
+                "https://ru.wikipedia.org/wiki/%D0%9A%D0%BE%D1%80%D0%B4%D0%B8%D1%86%D0%B5%D0%BF%D1%81": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
+                "https://simple.wikipedia.org/wiki/Cordyceps": "Simple English",
+                "https://sl.wikipedia.org/wiki/Glavatci": "Sloven\u0161\u010dina",
+                "https://sv.wikipedia.org/wiki/Cordyceps": "Svenska",
+                "https://tr.wikipedia.org/wiki/Cordyceps": "T\u00fcrk\u00e7e",
+                "https://uk.wikipedia.org/wiki/%D0%9A%D0%BE%D1%80%D0%B4%D0%B8%D1%86%D0%B5%D0%BF%D1%81": "\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430",
+                "https://vi.wikipedia.org/wiki/Cordyceps": "Ti\u1ebfng Vi\u1ec7t",
+                "https://war.wikipedia.org/wiki/Cordyceps": "Winaray",
+                "https://zh.wikipedia.org/wiki/%E8%99%AB%E8%8D%89%E5%B1%9E": "\u4e2d\u6587",
+                "https://www.wikidata.org/wiki/Special:EntityPage/Q312238": "Wikidata item",
+                "https://en.wikipedia.org/wiki/Talk:Cordyceps": "Talk",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit": "Edit",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=history": "View history",
+                "https://en.wikipedia.org/wiki/Special:WhatLinksHere/Cordyceps": "What links here",
+                "https://en.wikipedia.org/wiki/Special:RecentChangesLinked/Cordyceps": "Related changes",
+                "https://en.wikipedia.org/wiki/Wikipedia:File_Upload_Wizard": "Upload file",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&oldid=1338882486": "https://en.wikipedia.org/w/index.php?title=Cordyceps&oldid=1338882486",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=info": "Page information",
+                "https://en.wikipedia.org/w/index.php?title=Special%3ACiteThisPage&page=Cordyceps&id=1338882486&wpFormIdentifier=titleform": "Cite this page",
+                "https://en.wikipedia.org/w/index.php?title=Special%3AUrlShortener&url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FCordyceps": "Get shortened URL",
+                "https://en.wikipedia.org/w/index.php?title=Special%3AQrCode&url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FCordyceps": "Download QR code",
+                "https://en.wikipedia.org/w/index.php?title=Special%3ADownloadAsPdf&page=Cordyceps&action=show-download-screen": "Download as PDF",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&printable=yes": "Printable version",
+                "https://commons.wikimedia.org/wiki/Category:Cordyceps": "Cordyceps",
+                "https://species.wikimedia.org/wiki/Cordyceps": "Cordyceps",
+                "https://en.wikipedia.org/wiki/Taxonomy_(biology)": "Scientific classification",
+                "https://en.wikipedia.org/wiki/Fungus": "Fungi",
+                "https://en.wikipedia.org/wiki/Ascomycota": "Ascomycota",
+                "https://en.wikipedia.org/wiki/Sordariomycetes": "Sordariomycetes",
+                "https://en.wikipedia.org/wiki/Hypocreales": "Hypocreales",
+                "https://en.wikipedia.org/wiki/Cordycipitaceae": "Cordycipitaceae",
+                "https://en.wikipedia.org/wiki/Elias_Magnus_Fries": "Fr.",
+                "https://en.wikipedia.org/wiki/Type_species": "Type species",
+                "https://en.wikipedia.org/wiki/Cordyceps_militaris": "C. militaris",
+                "https://en.wikipedia.org/wiki/Carl_Linnaeus": "L.",
+                "https://en.wikipedia.org/wiki/Synonym_(taxonomy)": "Synonyms",
+                "https://en.wikipedia.org/wiki/Help:IPA/English": "/\u02c8k\u0254\u02d0rd\u026as\u025bps/",
+                "https://en.wikipedia.org/wiki/Genus": "genus",
+                "https://en.wikipedia.org/wiki/Ascomycete": "ascomycete",
+                "https://en.wikipedia.org/wiki/Fungi": "fungi",
+                "https://en.wikipedia.org/wiki/Chinese_medicine": "Chinese medicine",
+                "https://en.wikipedia.org/wiki/Parasitoid": "endoparasitoids",
+                "https://en.wikipedia.org/wiki/Insects": "insects",
+                "https://en.wikipedia.org/wiki/Arthropod": "arthropods",
+                "https://en.wikipedia.org/wiki/Entomopathogenic_fungi": "entomopathogenic fungi",
+                "https://en.wikipedia.org/wiki/Ancient_Greek": "ancient Greek",
+                "https://en.wikipedia.org/wiki/Latin_language": "Latin",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=1": "edit",
+                "https://en.wikipedia.org/wiki/Subgenera": "subgenera",
+                "https://en.wikipedia.org/wiki/Edmond_Tulasne": "Tul.",
+                "https://en.wikipedia.org/wiki/Charles_Tulasne": "C. Tul.",
+                "https://en.wikipedia.org/wiki/Sensu_stricto": "sensu stricto",
+                "https://en.wikipedia.org/wiki/Teleomorph": "teleomorphs",
+                "https://en.wikipedia.org/wiki/Genera": "genera",
+                "https://en.wikipedia.org/wiki/Teleomorph,_anamorph_and_holomorph": "anamorphic",
+                "https://en.wikipedia.org/wiki/Beauveria": "Beauveria",
+                "https://en.wikipedia.org/wiki/Cordyceps_bassiana": "Cordyceps bassiana",
+                "https://en.wikipedia.org/w/index.php?title=Septofusidium&action=edit&redlink=1": "Septofusidium",
+                "https://en.wikipedia.org/wiki/Lecanicillium": "Lecanicillium",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=2": "edit",
+                "https://en.wikipedia.org/wiki/Epichlo%C3%AB": "Epichlo\u00eb",
+                "https://en.wikipedia.org/wiki/Nuclear_DNA": "Nuclear DNA",
+                "https://en.wikipedia.org/wiki/Ophiocordyceps_sinensis": "C. sinensis",
+                "https://en.wikipedia.org/wiki/Ophiocordyceps_unilateralis": "Ophiocordyceps unilateralis",
+                "https://en.wikipedia.org/wiki/Metacordyceps": "Metacordyceps",
+                "https://en.wikipedia.org/wiki/Metarhizium": "Metarhizium",
+                "https://en.wikipedia.org/wiki/Pochonia": "Pochonia",
+                "https://en.wikipedia.org/wiki/Elaphocordyceps": "Elaphocordyceps",
+                "https://en.wikipedia.org/wiki/Sensu_lato": "sensu lato",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=3": "edit",
+                "https://en.wikipedia.org/wiki/List_of_Cordyceps_species": "List of Cordyceps species",
+                "https://en.wikipedia.org/wiki/Entomopathogenic_fungus": "entomopathogenic",
+                "https://en.wikipedia.org/wiki/Cordyceps_caespitosa": "Cordyceps caespitosa",
+                "https://en.wikipedia.org/wiki/Cordyceps_chanhua": "Cordyceps chanhua",
+                "https://en.wikipedia.org/wiki/Cordyceps_sinclairii": "Cordyceps sinclairii",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=4": "edit",
+                "https://en.wikipedia.org/wiki/Conserved_name": "conserved name",
+                "https://en.wikipedia.org/wiki/Evlachovaea": "Evlachovaea",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=5": "edit",
+                "https://en.wikipedia.org/wiki/Mycelium": "mycelium",
+                "https://en.wikipedia.org/wiki/Ascocarp": "ascocarp",
+                "https://en.wikipedia.org/wiki/Perithecia": "perithecia",
+                "https://en.wikipedia.org/wiki/Ascus": "asci",
+                "https://en.wikipedia.org/wiki/Ascospores": "ascospores",
+                "https://en.wikipedia.org/wiki/Drab_stinkbug": "drab stinkbugs",
+                "https://en.wikipedia.org/wiki/Parasitoid_wasps": "parasitoid wasps",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=6": "edit",
+                "https://en.wikipedia.org/wiki/Cordycepin": "cordycepin",
+                "https://en.wikipedia.org/wiki/Polysaccharide": "Polysaccharide",
+                "https://en.wikipedia.org/wiki/Basic_research": "basic research",
+                "https://en.wikipedia.org/wiki/Clinical_research": "clinical research",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=7": "edit",
+                "https://en.wikipedia.org/wiki/Ophiocordyceps": "Ophiocordyceps",
+                "https://en.wikipedia.org/wiki/Traditional_Chinese_medicine": "traditional Chinese medicine",
+                "https://en.wikipedia.org/wiki/Science": "scientific",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=8": "edit",
+                "https://en.wikipedia.org/wiki/The_Last_of_Us": "The Last of Us",
+                "https://en.wikipedia.org/wiki/The_Last_of_Us_(TV_series)": "television adaptation",
+                "https://en.wikipedia.org/wiki/Zombie_apocalypse": "zombie apocalypse",
+                "https://en.wikipedia.org/wiki/Scientific_American": "Scientific American",
+                "https://en.wikipedia.org/wiki/Tarantula": "tarantulas",
+                "https://en.wikipedia.org/wiki/Zoonosis": "jump the species barrier",
+                "https://en.wikipedia.org/wiki/Ebola": "Ebola",
+                "https://en.wikipedia.org/wiki/COVID-19": "COVID-19",
+                "https://en.wikipedia.org/wiki/Mike_Carey_(writer)": "Mike Carey",
+                "https://en.wikipedia.org/wiki/The_Girl_with_All_the_Gifts": "The Girl with All the Gifts",
+                "https://en.wikipedia.org/wiki/The_Girl_with_All_the_Gifts_(film)": "film adaptation",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=9": "edit",
+                "https://en.wikipedia.org/wiki/Cordyceps_ophioglossoides": "Cordyceps ophioglossoides",
+                "https://en.wikipedia.org/wiki/Wikispecies": "Wikispecies",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=10": "edit",
+                "https://en.wikipedia.org/wiki/Medicinal_fungi": "Medicinal fungi",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&action=edit&section=11": "edit",
+                "https://www.researchgate.net/publication/8138660": "\"The traditional Chinese medicine Cordyceps sinensis and its effects on apoptotic homeostasis\"",
+                "https://en.wikipedia.org/wiki/Journal_of_Ethnopharmacology": "Journal of Ethnopharmacology",
+                "https://en.wikipedia.org/wiki/Doi_(identifier)": "doi",
+                "https://doi.org/10.1016%2Fj.jep.2004.09.029": "10.1016/j.jep.2004.09.029",
+                "https://en.wikipedia.org/wiki/PMID_(identifier)": "PMID",
+                "https://pubmed.ncbi.nlm.nih.gov/15588646": "15588646",
+                "https://doi.org/10.1093%2Foxfordjournals.molbev.a026341": "10.1093/oxfordjournals.molbev.a026341",
+                "https://pubmed.ncbi.nlm.nih.gov/10742053": "10742053",
+                "https://www.merriam-webster.com/dictionary/Cordyceps": "\"Cordyceps\"",
+                "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2104736": "2104736",
+                "https://en.wikipedia.org/wiki/Studies_in_Mycology": "Studies in Mycology",
+                "https://doi.org/10.3114%2Fsim.2007.57.01": "10.3114/sim.2007.57.01",
+                "https://en.wikipedia.org/wiki/PMC_(identifier)": "PMC",
+                "https://pubmed.ncbi.nlm.nih.gov/18490993": "18490993",
+                "http://www.indexfungorum.org/names/Names.asp?strGenus=Cordyceps": "\"Cordyceps\"",
+                "https://web.archive.org/web/20120222065508/http://www.alohamedicinals.com/cordycepsIJM1003.pdf": "\"Medicinal Value of the Caterpillar Fungi Species of the Genus Cordyceps (Fr.) Link (Ascomycetes). A Review\"",
+                "https://doi.org/10.1615%2FIntJMedMushr.v10.i3.30": "10.1615/IntJMedMushr.v10.i3.30",
+                "https://en.wikipedia.org/wiki/ISSN_(identifier)": "ISSN",
+                "https://search.worldcat.org/issn/1521-9437": "1521-9437",
+                "http://www.alohamedicinals.com/cordycepsIJM1003.pdf": "the original",
+                "https://www.indexfungorum.org/Names/Names.asp?pg=1": "\"Index Fungorum - Search Page\"",
+                "https://www.indexfungorum.org/names/NamesRecord.asp?RecordID=8636": "\"Index Fungorum - Names Record #8636 Isaria Pers., Neues Mag. Bot. 1: 121 (1794)\"",
+                "https://www.speciesfungorum.org/GSD/GSDspecies.asp?RecordID=254719": "\"Species Fungorum - GSD Species #254719 Isaria sinclairii (Berk.) Lloyd, Mycol. Writ. (Cincinnati) 7(Letter 68): 1179 (1923)\"",
+                "https://manu40.magtech.com.cn/Jwxb/CN/10.13346/j.mycosystema.140292": "\"\u591a\u57fa\u56e0\u8054\u5408\u5206\u6790\u68d2\u675f\u5b62\u5c5e Isaria\uff08Ascomycota, Cordycipitaceae\uff09\u7cfb\u7edf\u53d1\u80b2\u5173\u7cfb\"",
+                "https://doi.org/10.13346%2Fj.mycosystema.140292": "10.13346/j.mycosystema.140292",
+                "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3408298": "3408298",
+                "https://doi.org/10.5941%2FMYCO.2012.40.2.100": "10.5941/MYCO.2012.40.2.100",
+                "https://search.worldcat.org/issn/1229-8093": "1229-8093",
+                "https://pubmed.ncbi.nlm.nih.gov/22870051": "22870051",
+                "https://www.science.org/doi/10.1126/science.adp6699?et_cid=5763890": "\"Defensive fungal symbiosis on insect hindlegs\"",
+                "https://en.wikipedia.org/wiki/Bibcode_(identifier)": "Bibcode",
+                "https://ui.adsabs.harvard.edu/abs/2025Sci...390..279N": "2025Sci...390..279N",
+                "https://doi.org/10.1126%2Fscience.adp6699": "10.1126/science.adp6699",
+                "https://pubmed.ncbi.nlm.nih.gov/41100614": "41100614",
+                "https://www.drugs.com/npp/cordyceps.html": "\"Cordyceps\"",
+                "https://libproject.hkbu.edu.hk/was40/detail?record=112&channelid=44273": "\"Chinese Medicine Specimen Database\"",
+                "https://www.syjxb.com/CN/10.16488/j.cnki.1005-9873.2023.05.012": "\"\u4e2d\u56fd\u5e7f\u4e49\u866b\u8349\u79cd\u7c7b\u53ca\u5176\u9a6f\u5316\u683d\u57f9\u7814\u7a76\u8fdb\u5c55\"",
+                "https://doi.org/10.16488%2Fj.cnki.1005-9873.2023.05.012": "10.16488/j.cnki.1005-9873.2023.05.012",
+                "https://search.worldcat.org/issn/1005-9873": "1005-9873",
+                "https://blogs.scientificamerican.com/but-not-simpler/the-fungus-that-reduced-humanity-to-the-last-of-us": "\"The Fungus that Reduced Humanity to The Last of Us\"",
+                "https://variety.com/2023/tv/reviews/the-last-of-us-hbo-review-1235480139": "\"'The Last of Us,' From 'Chernobyl's' Craig Mazin, Is a Promising, Moving Zombie Saga: TV Review\"",
+                "https://en.wikipedia.org/wiki/Variety_(magazine)": "Variety",
+                "https://screenrant.com/girl-all-gifts-fungal-infection-hungries-explained": "\"The Girl With All The Gifts: Fungal Infection & Hungries Explained\"",
+                "https://en.wikipedia.org/wiki/Help:Taxon_identifiers": "Taxon identifiers",
+                "https://en.wikipedia.org/wiki/Wikidata": "Wikidata",
+                "https://www.wikidata.org/wiki/Q312238": "Q312238",
+                "https://en.wikipedia.org/wiki/Australian_online_fauna_%26_flora_databases": "AusFungi",
+                "https://id.biodiversity.org.au/name/fungi/60014662": "60014662",
+                "https://en.wikipedia.org/wiki/Catalogue_of_Life": "CoL",
+                "https://www.catalogueoflife.org/data/taxon/62MKV": "62MKV",
+                "https://en.wikipedia.org/wiki/Encyclopedia_of_Life": "EoL",
+                "https://eol.org/pages/16523": "16523",
+                "https://en.wikipedia.org/wiki/EPPO_Code": "EPPO",
+                "https://gd.eppo.int/taxon/1CODYG": "1CODYG",
+                "https://en.wikipedia.org/wiki/Global_Biodiversity_Information_Facility": "GBIF",
+                "https://www.gbif.org/species/2560661": "2560661",
+                "https://en.wikipedia.org/wiki/INaturalist": "iNaturalist",
+                "https://inaturalist.org/taxa/58707": "58707",
+                "https://en.wikipedia.org/wiki/Index_Fungorum": "SpeciesFungorum",
+                "https://www.indexfungorum.org/names/NamesRecord.asp?RecordID=1240": "1240",
+                "https://en.wikipedia.org/wiki/Interim_Register_of_Marine_and_Nonmarine_Genera": "IRMNG",
+                "https://www.irmng.org/aphia.php?p=taxdetails&id=1344115": "1344115",
+                "https://en.wikipedia.org/wiki/MycoBank": "MycoBank",
+                "https://www.mycobank.org/MB/1240": "1240",
+                "https://en.wikipedia.org/wiki/National_Biodiversity_Network": "NBN",
+                "https://species.nbnatlas.org/species/BMSSYS0000044243": "BMSSYS0000044243",
+                "https://en.wikipedia.org/wiki/National_Center_for_Biotechnology_Information": "NCBI",
+                "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Info&id=45234": "45234",
+                "https://www.nzor.org.nz/names/c4a3fe71-50fd-4743-b608-41e281db7293": "c4a3fe71-50fd-4743-b608-41e281db7293",
+                "https://en.wikipedia.org/wiki/Open_Tree_of_Life": "Open Tree of Life",
+                "https://tree.opentreeoflife.org/taxonomy/browse?id=64408": "64408",
+                "https://www.speciesfungorum.org/Names/NamesRecord.asp?RecordID=1240": "1240",
+                "https://en.wikipedia.org/wiki/Help:Authority_control": "Authority control databases",
+                "https://www.nli.org.il/en/authorities/987007562841205171": "Israel",
+                "https://en.wikipedia.org/wiki/Help:Category": "Categories",
+                "https://en.wikipedia.org/wiki/Category:Cordyceps": "Cordyceps",
+                "https://en.wikipedia.org/wiki/Category:Edible_fungi": "Edible fungi",
+                "https://en.wikipedia.org/wiki/Category:Parasitic_fungi": "Parasitic fungi",
+                "https://en.wikipedia.org/wiki/Category:Sordariomycetes_genera": "Sordariomycetes genera",
+                "https://en.wikipedia.org/wiki/Category:Taxa_named_by_Elias_Magnus_Fries": "Taxa named by Elias Magnus Fries",
+                "https://en.wikipedia.org/wiki/Category:Taxa_described_in_1818": "Taxa described in 1818",
+                "https://en.wikipedia.org/wiki/Category:CS1_Chinese-language_sources_(zh)": "CS1 Chinese-language sources (zh)",
+                "https://en.wikipedia.org/wiki/Category:Articles_with_short_description": "Articles with short description",
+                "https://en.wikipedia.org/wiki/Category:Short_description_matches_Wikidata": "Short description matches Wikidata",
+                "https://en.wikipedia.org/wiki/Category:Use_dmy_dates_from_February_2023": "Use dmy dates from February 2023",
+                "https://en.wikipedia.org/wiki/Category:Articles_with_%27species%27_microformats": "Articles with 'species' microformats",
+                "https://en.wikipedia.org/wiki/Category:Commons_category_link_is_on_Wikidata": "Commons category link is on Wikidata",
+                "https://en.wikipedia.org/wiki/Wikipedia:Text_of_the_Creative_Commons_Attribution-ShareAlike_4.0_International_License": "Creative Commons Attribution-ShareAlike 4.0 License",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Policy:Terms_of_Use": "Terms of Use",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Policy:Privacy_policy": "Privacy policy",
+                "https://wikimediafoundation.org/": "Wikimedia Foundation, Inc.",
+                "https://en.wikipedia.org/wiki/Wikipedia:General_disclaimer": "Disclaimers",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Legal:Wikimedia_Foundation_Legal_and_Safety_Contact_Information": "Legal & safety contacts",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Policy:Universal_Code_of_Conduct": "Code of Conduct",
+                "https://developer.wikimedia.org": "Developers",
+                "https://stats.wikimedia.org/": "Statistics",
+                "https://foundation.wikimedia.org/wiki/Special:MyLanguage/Policy:Cookie_statement": "Cookie statement",
+                "https://en.wikipedia.org/w/index.php?title=Cordyceps&mobileaction=toggle_view_mobile": "Mobile view"
+              },
+              "page_title": "Cordyceps - Wikipedia",
+              "h1_text": "Cordyceps",
+              "source_url": "https://en.wikipedia.org/wiki/Cordyceps"
+            },
+            "provides_data": {
+              "type": "urls_from_visit"
+            }
+          },
+          "parent_id": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+          "parent_ids": [
+            "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+          ],
+          "status": "done",
+          "children": [],
+          "score": 0.2,
+          "memo_key": null
+        },
+        "8ea0b753-78b1-4596-8040-d6c0e4ddf0aa": {
+          "node_id": "8ea0b753-78b1-4596-8040-d6c0e4ddf0aa",
+          "title": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern international maritime convention/treaty (with quotable evidence)",
+          "details": {
+            "optional_url": "https://en.wikipedia.org/wiki/Admiralty_law",
+            "action": "visit",
+            "goal": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern international maritime convention/treaty (with quotable evidence)",
+            "original_goal": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern international maritime convention/treaty (with quotable evidence)",
+            "parent_goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.2
+            }
+          },
+          "parent_id": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+          "parent_ids": [
+            "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+          ],
+          "status": "skipped",
+          "children": [],
+          "score": 0.2,
+          "memo_key": null
+        },
+        "26e56294-7767-4773-9937-f915a57ccdcb": {
+          "node_id": "26e56294-7767-4773-9937-f915a57ccdcb",
+          "title": "Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis essay with per-fact Wikipedia URL citations",
+          "details": {
+            "intent": "Use extracted facts from (1) Cordyceps page, (2) Admiralty law page, and (3) already-visited Mathematics_of_paper_folding page to draft a 150+ word essay with a single unifying theme; ensure every factual claim is followed by the correct Wikipedia URL citation. Also enumerate the required fact answers: Cordyceps (ant behavior common name; one use), Admiralty law (earliest origin/code; one convention/treaty), Origami math (one theorem/axiom; one engineering application).",
+            "output_fields": [
+              "cordyceps_ant_behavior_common_name",
+              "cordyceps_one_use",
+              "admiralty_origin_or_earliest_code",
+              "admiralty_one_modern_convention_or_treaty",
+              "origami_one_theorem_or_axiom",
+              "origami_one_engineering_application",
+              "synthesis_essay_150plus_words_with_citations"
+            ],
+            "action": "think",
+            "goal": "Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis essay with per-fact Wikipedia URL citations",
+            "original_goal": "Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis essay with per-fact Wikipedia URL citations",
+            "parent_goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.5
+            }
+          },
+          "parent_id": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+          "parent_ids": [
+            "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+          ],
+          "status": "skipped",
+          "children": [],
+          "score": 0.5,
+          "memo_key": null
+        },
+        "adbd9cb8-7409-4f80-8f7f-164218baeb3b": {
+          "node_id": "adbd9cb8-7409-4f80-8f7f-164218baeb3b",
+          "title": "Visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding",
+          "details": {
+            "action": "visit",
+            "url": "https://en.wikipedia.org/wiki/Mathematics_of_paper_folding",
+            "optional_url": "https://en.wikipedia.org/wiki/Mathematics_of_paper_folding",
+            "is_leaf": true,
+            "justification": "Mandate requires visiting this URL",
+            "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Mathematics_of_paper_folding",
+            "evaluation": {
+              "score": 0.2
+            }
+          },
+          "parent_id": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+          "parent_ids": [
+            "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+          ],
+          "status": "skipped",
+          "children": [],
+          "score": 0.2,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 4223,
+        "words": 565,
+        "kilobytes": 4.12
+      },
+      "llm": {
+        "calls": 8,
+        "prompt": {
+          "chars": 147984,
+          "words": 13425,
+          "kilobytes": 144.52,
+          "tokens": 42985
+        },
+        "completion": {
+          "chars": 10706,
+          "words": 1294,
+          "kilobytes": 10.46,
+          "tokens": 2507
+        },
+        "total_tokens": 45492
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 1,
+        "chars": 10473,
+        "words": 1599,
+        "kilobytes": 10.23
+      },
+      "timings": {
+        "chroma_query": {
+          "count": 30,
+          "total_duration": 115.1039,
+          "avg_duration": 3.8368,
+          "min_duration": 0.3583,
+          "max_duration": 24.4916,
+          "success_count": 30,
+          "error_count": 0
+        },
+        "chroma_add": {
+          "count": 16,
+          "total_duration": 185.5405,
+          "avg_duration": 11.5963,
+          "min_duration": 1.4221,
+          "max_duration": 25.7086,
+          "success_count": 16,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 8,
+          "total_duration": 27.6727,
+          "avg_duration": 3.4591,
+          "min_duration": 0.9435,
+          "max_duration": 7.2409,
+          "success_count": 8,
+          "error_count": 0
+        },
+        "llm_call": {
+          "count": 7,
+          "total_duration": 145.0208,
+          "avg_duration": 20.7173,
+          "min_duration": 6.2853,
+          "max_duration": 31.12,
+          "success_count": 7,
+          "error_count": 0
+        }
+      },
+      "timings_per_call": [
+        {
+          "name": "chroma_query",
+          "duration": 24.4916,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 25.7086,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 2.6146,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 2.6224,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 2.696,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.7552,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 1.1015,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.3583,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 1.9693,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 1.479,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 1.2076,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 22.2383,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 22.2407,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 21.2655,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 22.3905,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 21.697,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4322,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 6.2853,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 6.2883,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 5.6217,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.3903,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 6.5852,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 0.9435,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 1.442,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 7.4652,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 7.4654,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 7.4677,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 7.2409,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 11.2944,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 23.7137,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 24.2328,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 14.1021,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 14.1109,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 5.5991,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 4.3097,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4392,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 4.4766,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 4.6083,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 6.6691,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 1.4221,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 1.7673,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 1.7284,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 2.6763,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 2.6754,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 3.1513,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4381,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.3776,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.415,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4394,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 1.6189,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.518,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 8.945,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 9.3355,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.3953,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.3695,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.3959,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 1.1669,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 1.5146,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 31.12,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 28.4201,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 28.428,
+          "success": true
+        }
+      ],
+      "events_count": 116
+    },
+    "duration_seconds": 96.7,
+    "telemetry": {
+      "correlation_id": "idea_test_035_gpt-5.2_20260302_110006",
+      "trace_file": "/app/agent/idea_test_results/20260302_110006_035_gpt-5.2.jsonl",
+      "events_count": 116,
+      "timings_count": 61
+    },
+    "graph_visualization": {
+      "ascii": "*---.   Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.\n|\\ \\ \\  \n* | | | Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable evidence)\n / / /  \n* | | Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern international maritime convention/treaty (with quotable evidence)\n / /  \n* | Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis essay with per-fact Wikipedia URL citations\n /  \n* Visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding\n",
+      "graph_data": {
+        "nodes": [
+          {
+            "id": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+            "title": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+            "status": "active",
+            "score": null,
+            "memo_key": null,
+            "action": null,
+            "has_result": false,
+            "parent_ids": []
+          },
+          {
+            "id": "b36ef73b-6859-46aa-a193-be4703689ab7",
+            "title": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable evidence)",
+            "status": "done",
+            "score": 0.2,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": true,
+            "parent_ids": [
+              "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+            ]
+          },
+          {
+            "id": "8ea0b753-78b1-4596-8040-d6c0e4ddf0aa",
+            "title": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern international maritime convention/treaty (with quotable evidence)",
+            "status": "skipped",
+            "score": 0.2,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": false,
+            "parent_ids": [
+              "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+            ]
+          },
+          {
+            "id": "26e56294-7767-4773-9937-f915a57ccdcb",
+            "title": "Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis essay with per-fact Wikipedia URL citations",
+            "status": "skipped",
+            "score": 0.5,
+            "memo_key": null,
+            "action": "think",
+            "has_result": false,
+            "parent_ids": [
+              "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+            ]
+          },
+          {
+            "id": "adbd9cb8-7409-4f80-8f7f-164218baeb3b",
+            "title": "Visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding",
+            "status": "skipped",
+            "score": 0.2,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": false,
+            "parent_ids": [
+              "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+            "to": "b36ef73b-6859-46aa-a193-be4703689ab7"
+          },
+          {
+            "from": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+            "to": "8ea0b753-78b1-4596-8040-d6c0e4ddf0aa"
+          },
+          {
+            "from": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+            "to": "26e56294-7767-4773-9937-f915a57ccdcb"
+          },
+          {
+            "from": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+            "to": "adbd9cb8-7409-4f80-8f7f-164218baeb3b"
+          }
+        ]
+      },
+      "analysis": {
+        "total_nodes": 5,
+        "action_counts": {
+          "visit": 3,
+          "think": 1
+        },
+        "think_count": 1,
+        "think_ratio": 0.2,
+        "other_action_count": 4,
+        "action_diversity": 2,
+        "unique_titles": 5,
+        "duplicate_title_count": 0,
+        "think_nodes": [
+          {
+            "node_id": "26e56294-7767-4773-9937-f915a57ccdcb",
+            "title": "Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis...",
+            "status": "skipped"
+          }
+        ],
+        "issues": [],
+        "issue_count": 0
+      }
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "visit_count",
+        "passed": false,
+        "score": 0.3333333333333333,
+        "visit_count": 1,
+        "reason": "Found 1 visit(s)"
+      },
+      {
+        "check": "cordyceps_facts",
+        "passed": true,
+        "score": 1.0,
+        "reason": "zombie_behaviour=True, commercial_use=True"
+      },
+      {
+        "check": "admiralty_facts",
+        "passed": false,
+        "score": 0.5,
+        "reason": "historical_origin=False, convention=True"
+      },
+      {
+        "check": "origami_math_facts",
+        "passed": true,
+        "score": 1.0,
+        "reason": "theorem=True, engineering=True"
+      },
+      {
+        "check": "synthesis_essay",
+        "passed": false,
+        "score": 0.8759999999999999,
+        "topics_referenced": 3,
+        "has_theme": true,
+        "longest_paragraph_words": 88,
+        "reason": "topics=3/3, theme=True, words=88"
+      },
+      {
+        "check": "citation_urls",
+        "passed": true,
+        "score": 1.0,
+        "details": {
+          "cordyceps": true,
+          "admiralty": true,
+          "paper_folding": true
+        },
+        "reason": "3/3 URLs cited"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.25,
+      "reasons": [
+        "Partial success for Cordyceps: the agent extracted one requested fact (medicinal use in traditional Chinese medicine) with a Wikipedia citation, but did not extract a named common term for the ant behaviour (the agent reported it as missing).",
+        "Admiralty law page was not visited and no facts were extracted for that topic; both requested facts are missing.",
+        "Mathematics of paper folding page was not visited and no facts were extracted for that topic; both requested facts are missing.",
+        "The synthesis essay is present and over 150 words, and it references Cordyceps facts with citations, but it explicitly admits missing evidence for admiralty law and origami mathematics and therefore fails the requirement to reference specific facts (with URLs) from all three topics.",
+        "The output did not cite the Admiralty law and Mathematics of paper folding Wikipedia URLs for facts (they were required to be cited for every fact).",
+        "Overall the task requirements (extract two facts from each of three pages and write a synthesis referencing specific facts from all three with citations) were not met."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.25,
+        "reasons": [
+          "Partial success for Cordyceps: the agent extracted one requested fact (medicinal use in traditional Chinese medicine) with a Wikipedia citation, but did not extract a named common term for the ant behaviour (the agent reported it as missing).",
+          "Admiralty law page was not visited and no facts were extracted for that topic; both requested facts are missing.",
+          "Mathematics of paper folding page was not visited and no facts were extracted for that topic; both requested facts are missing.",
+          "The synthesis essay is present and over 150 words, and it references Cordyceps facts with citations, but it explicitly admits missing evidence for admiralty law and origami mathematics and therefore fails the requirement to reference specific facts (with URLs) from all three topics.",
+          "The output did not cite the Admiralty law and Mathematics of paper folding Wikipedia URLs for facts (they were required to be cited for every fact).",
+          "Overall the task requirements (extract two facts from each of three pages and write a synthesis referencing specific facts from all three with citations) were not met."
+        ],
+        "facts_per_topic": {
+          "cordyceps": 1,
+          "admiralty": 0,
+          "origami": 0
+        },
+        "synthesis_quality": "Low. The essay meets the length requirement and articulates a plausible unifying theme (controlling constraints), and it cites Cordyceps facts. However, it fails the core requirement to reference and cite specific facts from Admiralty law and Mathematics of paper folding because those pages were not visited and their facts were not provided. To pass, the agent must extract both required facts from each Wikipedia page and include all three URLs as citations for the facts used in the synthesis."
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.7084761904761905,
+    "checks_passed": 3,
+    "total_checks": 7,
+    "pass_rate": 0.42857142857142855
+  },
+  "timestamp": "2026-03-02T11:40:02.482406",
+  "execution_variant": "sequential"
+}

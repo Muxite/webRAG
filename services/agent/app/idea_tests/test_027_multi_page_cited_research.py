@@ -122,7 +122,7 @@ def validate_france_facts(result: Dict[str, Any], observability: Dict[str, Any])
         "has_paris": has_paris,
         "has_french": has_french,
         "has_france_url": has_france_url,
-        "reason": f"France: capital={'✓' if has_paris else '✗'}, language={'✓' if has_french else '✗'}, citation={'✓' if has_france_url else '✗'}",
+        "reason": f"France: capital={'[OK]' if has_paris else '[FAIL]'}, language={'[OK]' if has_french else '[FAIL]'}, citation={'[OK]' if has_france_url else '[FAIL]'}",
     }
 
 
@@ -141,7 +141,7 @@ def validate_japan_facts(result: Dict[str, Any], observability: Dict[str, Any]) 
         "has_tokyo": has_tokyo,
         "has_japanese": has_japanese,
         "has_japan_url": has_japan_url,
-        "reason": f"Japan: capital={'✓' if has_tokyo else '✗'}, language={'✓' if has_japanese else '✗'}, citation={'✓' if has_japan_url else '✗'}",
+        "reason": f"Japan: capital={'[OK]' if has_tokyo else '[FAIL]'}, language={'[OK]' if has_japanese else '[FAIL]'}, citation={'[OK]' if has_japan_url else '[FAIL]'}",
     }
 
 
@@ -160,7 +160,7 @@ def validate_brazil_facts(result: Dict[str, Any], observability: Dict[str, Any])
         "has_brasilia": has_brasilia,
         "has_portuguese": has_portuguese,
         "has_brazil_url": has_brazil_url,
-        "reason": f"Brazil: capital={'✓' if has_brasilia else '✗'}, language={'✓' if has_portuguese else '✗'}, citation={'✓' if has_brazil_url else '✗'}",
+        "reason": f"Brazil: capital={'[OK]' if has_brasilia else '[FAIL]'}, language={'[OK]' if has_portuguese else '[FAIL]'}, citation={'[OK]' if has_brazil_url else '[FAIL]'}",
     }
 
 

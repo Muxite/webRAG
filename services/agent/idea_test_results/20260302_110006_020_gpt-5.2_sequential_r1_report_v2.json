@@ -1,0 +1,1255 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "020",
+    "test_name": "GitHub Repository Analysis",
+    "passed": true,
+    "score": 0.9166666666666666,
+    "ascii_graph": "*---.   Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results.\n|\\ \\ \\  \n* | | | Visit https://github.com/python/cpython and extract repo header metadata (language, stars, license, description)\n / / /  \n* | | Visit the LICENSE file in python/cpython to confirm license type from authoritative text\n / /  \n* | Extract and structure the required fields from visited GitHub pages into final answer format (with evidence strings)\n /  \n* Save extracted CPython repository metadata to memory (retry after previous save errors)\n"
+  },
+  "node_table": [
+    {
+      "node_id": "fda92c23-5f6d-4209-8566-dfe06e9c5125",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results."
+    },
+    {
+      "node_id": "e5b3626c-1849-4f7f-bd7c-55062e527323",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit https://github.com/python/cpython and extract repo header metadata (language, stars, license, description)"
+    },
+    {
+      "node_id": "ea3329ec-9d17-4f5a-b9d5-d50042eb1876",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit the LICENSE file in python/cpython to confirm license type from authoritative text"
+    },
+    {
+      "node_id": "3d5d8fd5-da55-43fd-866b-279c6c3419fb",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "title": "Extract and structure the required fields from visited GitHub pages into final answer format (with evidence strings)"
+    },
+    {
+      "node_id": "af450880-1e91-47b8-be22-a32bd93eec73",
+      "action": "save",
+      "status": "skipped",
+      "score": 0.15,
+      "title": "Save extracted CPython repository metadata to memory (retry after previous save errors)"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_executed",
+      "passed": true,
+      "score": 0.5,
+      "visit_count": 1,
+      "reason": "Found 1 visit(s)"
+    },
+    {
+      "check": "github_visited",
+      "passed": true,
+      "score": 1.0,
+      "reason": "GitHub cpython repository mentioned"
+    },
+    {
+      "check": "language",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Programming language mentioned"
+    },
+    {
+      "check": "stars",
+      "passed": true,
+      "score": 1.0,
+      "star_count": "8k",
+      "reason": "Star count found: 8k"
+    },
+    {
+      "check": "license",
+      "passed": true,
+      "score": 1.0,
+      "reason": "License mentioned"
+    },
+    {
+      "check": "description",
+      "passed": true,
+      "score": 1.0,
+      "sentence_count": 12,
+      "reason": "Found 12 descriptive sentence(s)"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 2029,
+      "words": 251,
+      "kilobytes": 1.98
+    },
+    "llm": {
+      "calls": 10,
+      "prompt": {
+        "chars": 134002,
+        "words": 12629,
+        "kilobytes": 130.86,
+        "tokens": 32744
+      },
+      "completion": {
+        "chars": 8737,
+        "words": 936,
+        "kilobytes": 8.53,
+        "tokens": 2243
+      },
+      "total_tokens": 34987
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 1,
+      "chars": 9632,
+      "words": 1376,
+      "kilobytes": 9.41
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 86,
+        "total_duration": 98.2336,
+        "avg_duration": 1.1423,
+        "min_duration": 0.3785,
+        "max_duration": 8.1968,
+        "success_count": 86,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 5,
+        "total_duration": 17.22,
+        "avg_duration": 3.444,
+        "min_duration": 1.2613,
+        "max_duration": 7.8534,
+        "success_count": 5,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 8,
+        "total_duration": 56.2483,
+        "avg_duration": 7.031,
+        "min_duration": 1.2038,
+        "max_duration": 12.3535,
+        "success_count": 8,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 1,
+        "total_duration": 1.7295,
+        "avg_duration": 1.7295,
+        "min_duration": 1.7295,
+        "max_duration": 1.7295,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 3.4785,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.1623,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8584,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7238,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.7427,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.4251,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6345,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0082,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.2613,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3124,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3213,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0272,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.75,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0538,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6342,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6076,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6094,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6552,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6629,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6533,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6294,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6134,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.631,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5758,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.553,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5787,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5736,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6324,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6382,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6157,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6901,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 6.3771,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 6.3808,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3785,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8471,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1968,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.2038,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.2059,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7117,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6694,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 8.6361,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6699,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0571,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.7295,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7541,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4142,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 8.1968,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.8396,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.8389,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.8534,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.2206,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.1989,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.1998,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.2002,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9263,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2215,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2226,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2269,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9633,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0101,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3431,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0203,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0323,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9678,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9715,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6042,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.621,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6038,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5872,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.593,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6073,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6147,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6447,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6333,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6147,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6426,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6292,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6084,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6111,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7733,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8178,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6737,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6414,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6362,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6235,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6072,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5667,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5555,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5718,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5919,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6017,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6041,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6407,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6499,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6209,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5906,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6052,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 12.3535,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 10.0284,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 10.0628,
+        "success": true
+      }
+    ],
+    "events_count": 193
+  },
+  "node_index": {
+    "fda92c23-5f6d-4209-8566-dfe06e9c5125": {
+      "node_id": "fda92c23-5f6d-4209-8566-dfe06e9c5125",
+      "title": "Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results.",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "e5b3626c-1849-4f7f-bd7c-55062e527323",
+        "ea3329ec-9d17-4f5a-b9d5-d50042eb1876",
+        "3d5d8fd5-da55-43fd-866b-279c6c3419fb",
+        "af450880-1e91-47b8-be22-a32bd93eec73"
+      ],
+      "parent_ids": [],
+      "goal": "Visit the GitHub repository at https://github.com/python/cpython and extract the following information: (1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, (4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results."
+    },
+    "e5b3626c-1849-4f7f-bd7c-55062e527323": {
+      "node_id": "e5b3626c-1849-4f7f-bd7c-55062e527323",
+      "title": "Visit https://github.com/python/cpython and extract repo header metadata (language, stars, license, description)",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "fda92c23-5f6d-4209-8566-dfe06e9c5125"
+      ],
+      "goal": "Visit https://github.com/python/cpython and extract repo header metadata (language, stars, license, description)",
+      "result_success": true,
+      "result_content_preview": "python\n/\ncpython\nPublic\nUh oh!\nThere was an error while loading.\nPlease reload this page\n.\nNotifications\nYou must be signed in to change notification settings\nFork\n34.2k\nStar\n71.8k\nThe Python programming language\nwww.python.org\nLicense\nView license\n71.8k\nstars\n34.2k\nforks\nBranches\nTags\nActivity\nStar\nNotifications\nYou must be signed in to change notification settings\npython/cpython\nBranches\nTags\nOpen more actions menu\nFolders and files\nName\nName\nLast commit message\nLast commit date\nLatest commit\n",
+      "result_source_url": "https://github.com/python/cpython"
+    },
+    "ea3329ec-9d17-4f5a-b9d5-d50042eb1876": {
+      "node_id": "ea3329ec-9d17-4f5a-b9d5-d50042eb1876",
+      "title": "Visit the LICENSE file in python/cpython to confirm license type from authoritative text",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "fda92c23-5f6d-4209-8566-dfe06e9c5125"
+      ],
+      "goal": "Visit the LICENSE file in python/cpython to confirm license type from authoritative text"
+    },
+    "3d5d8fd5-da55-43fd-866b-279c6c3419fb": {
+      "node_id": "3d5d8fd5-da55-43fd-866b-279c6c3419fb",
+      "title": "Extract and structure the required fields from visited GitHub pages into final answer format (with evidence strings)",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "fda92c23-5f6d-4209-8566-dfe06e9c5125"
+      ],
+      "goal": "Extract and structure the required fields from visited GitHub pages into final answer format (with evidence strings)"
+    },
+    "af450880-1e91-47b8-be22-a32bd93eec73": {
+      "node_id": "af450880-1e91-47b8-be22-a32bd93eec73",
+      "title": "Save extracted CPython repository metadata to memory (retry after previous save errors)",
+      "action": "save",
+      "status": "skipped",
+      "score": 0.15,
+      "children": [],
+      "parent_ids": [
+        "fda92c23-5f6d-4209-8566-dfe06e9c5125"
+      ],
+      "goal": "Save extracted CPython repository metadata to memory (retry after previous save errors)"
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## Extracted from https://github.com/python/cpython (visited directly)\n\n### 1) Primary programming language used\n- **Primary language: Python**\n  - Evidence (repo \u201cLanguages\u201d section):\n    - The page lists: **\u201cLanguages\nPython\n62.1%\nC\n35.9%\nC++\n0.7%\nM4\n0.4%\nHTML\n0.3%\nJavaScript\n0.1%\nOther\n0.5%\u201d** (https://github.com/python/cpython)\n\n### 2) Number of stars (approximate)\n- **~71.8k stars**\n  - Evidence (repo header / counts):\n    - The page shows: **\u201cStar\n71.8k\u201d** (https://github.com/python/cpython)\n    - It also repeats: **\u201c71.8k\nstars\u201d** (https://github.com/python/cpython)\n\n### 3) License type\n- **License: Not explicitly named on the repository landing page; only \u201cView license\u201d is shown.**\n  - Evidence:\n    - The page displays: **\u201cLicense\nView license\u201d** (https://github.com/python/cpython)\n    - And in the \u201cAbout/Resources\u201d area: **\u201cLicense\nView license\u201d** (https://github.com/python/cpython)\n- Note on missing evidence: the execution trail indicates a planned visit to the LICENSE file was **skipped** (\u201cVisit the LICENSE file \u2026 to confirm license type\u201d), so the **specific license name/type is not available from the visited page text**.\n\n### 4) Brief description of what the repository is\n- **Description: \u201cThe Python programming language\u201d**\n  - Evidence (repo description line):\n    - The page states: **\u201cThe Python programming language\u201d** (https://github.com/python/cpython)\n  - Additional supporting context from the README text rendered on the page:\n    - The README begins: **\u201cThis is Python version 3.15.0 alpha 6\u201d** (https://github.com/python/cpython)\n\n## Final answer (concise)\n- **Primary language:** Python (listed as **\u201cPython 62.1%\u201d**) (https://github.com/python/cpython)\n- **Stars (approx.):** **71.8k** (https://github.com/python/cpython)\n- **License type:** **Not specified by name on the visited page** (only \u201cLicense \u2014 View license\u201d appears) (https://github.com/python/cpython)\n- **What it is:** The CPython repository for **\u201cThe Python programming language\u201d** (https://github.com/python/cpython)\n",
+    "action_summary": "From the GitHub repo page https://github.com/python/cpython: primary language is Python (62.1%); stars are ~71.8k; the page shows only \u201cLicense \u2014 View license\u201d without naming the license type; the repo description is \u201cThe Python programming language\u201d and the README indicates \u201cThis is Python version 3.15.0 alpha 6.\u201d",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 3.4785,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.1623,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8584,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7238,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.7427,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.4251,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6345,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0082,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.2613,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3124,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3213,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0272,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.75,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0538,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6342,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6076,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6094,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6552,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6629,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6533,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6294,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6134,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.631,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5758,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.553,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5787,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5736,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6324,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6382,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6157,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6901,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 6.3771,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 6.3808,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3785,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8471,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1968,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.2038,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.2059,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7117,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6694,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 8.6361,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6699,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0571,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.7295,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7541,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4142,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 8.1968,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.8396,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.8389,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.8534,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.2206,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.1989,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.1998,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.2002,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9263,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2215,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2226,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2269,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9633,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0101,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3431,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0203,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0323,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9678,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9715,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6042,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.621,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6038,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5872,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.593,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6073,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6147,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6447,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6333,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6147,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6426,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6292,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6084,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6111,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7733,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8178,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6737,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6414,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6362,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6235,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6072,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5667,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5555,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5718,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5919,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6017,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6041,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6407,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6499,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6209,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5906,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6052,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 12.3535,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 10.0284,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 10.0628,
+      "success": true
+    }
+  ]
+}

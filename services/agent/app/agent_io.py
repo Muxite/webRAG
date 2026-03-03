@@ -8,6 +8,7 @@ from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
+from agent.app.connector_browser import ConnectorBrowser, BROWSER_FALLBACK_STATUSES
 from agent.app.observation import clean_operation
 from agent.app.telemetry import TelemetrySession
 
@@ -16,53 +17,21 @@ _logger = logging.getLogger(__name__)
 
 class AgentIO:
     """
-    Unified interface for all external service interactions.
-    
-    Provides a single abstraction layer for LLM queries, web search, HTTP requests,
-    and vector database operations. Handles telemetry, error handling, and data
-    normalization automatically.
-    
-    **Usage Pattern:**
-    ```python
-    io = AgentIO(
-        connector_llm=llm_connector,
-        connector_search=search_connector,
-        connector_http=http_connector,
-        connector_chroma=chroma_connector,
-        collection_name="my_memory",
-    )
-    
-    # Query LLM
-    response = await io.query_llm(payload, model_name="gpt-5-mini")
-    
-    # Search web
-    results = await io.query_search("python tutorial", count=10)
-    
-    # Retrieve from vector DB
-    context = await io.retrieve_chroma(topics=["python"], n_results=3)
-    ```
-    
-    **What It Provides:**
-    - **LLM Access**: `query_llm()`, `query_llm_with_fallback()`, `build_llm_payload()`
-    - **Web Search**: `query_search()` - returns title, URL, description
-    - **HTTP Fetching**: `fetch_url()` - retrieves webpage content
-    - **Vector DB**: `retrieve_chroma()` - semantic search for context
-    - **Memory Storage**: `store_chroma()` - saves documents for later retrieval
-    
-    **Key Parameters:**
-    - `connector_llm`: LLM connector (required)
-    - `connector_search`: Search connector (required)
-    - `connector_http`: HTTP connector (required)
-    - `connector_chroma`: ChromaDB connector (required)
-    - `collection_name`: ChromaDB collection for memory isolation
-    - `telemetry`: Optional telemetry session for observability
-    
-    **Important Behavior:**
-    - All methods are async and should be awaited
-    - Automatically handles timeouts and retries
-    - Normalizes data formats across different connectors
-    - Tracks all operations for telemetry if provided
-    - Vector DB queries are automatic on search/visit actions
+    Unified async interface for LLM, web search, HTTP, ChromaDB, and browser operations.
+
+    All methods are async. Telemetry is recorded automatically when a session
+    is attached. Timeouts are configurable per call.
+
+    ``visit`` tries aiohttp first; on 403/401 it falls back to the headless
+    Chrome browser connector (if provided) to bypass bot protection.
+
+    :param connector_llm: LLM connector.
+    :param connector_search: Search API connector.
+    :param connector_http: HTTP connector (aiohttp).
+    :param connector_chroma: ChromaDB connector.
+    :param connector_browser: Optional headless Chrome connector for bot-blocked sites.
+    :param telemetry: Optional telemetry session.
+    :param collection_name: ChromaDB collection for memory isolation.
     """
     def __init__(
         self,
@@ -70,31 +39,20 @@ class AgentIO:
         connector_search: ConnectorSearch,
         connector_http: ConnectorHttp,
         connector_chroma: ConnectorChroma,
+        connector_browser: Optional[ConnectorBrowser] = None,
         telemetry: Optional[TelemetrySession] = None,
         collection_name: str = "agent_memory",
     ) -> None:
-        """
-        Initialize the IO layer.
-        :param connector_llm: LLM connector.
-        :param connector_search: Search connector.
-        :param connector_http: HTTP connector.
-        :param connector_chroma: Chroma connector.
-        :param telemetry: Optional telemetry session.
-        :param collection_name: ChromaDB collection name.
-        """
         self.connector_llm = connector_llm
         self.connector_search = connector_search
         self.connector_http = connector_http
         self.connector_chroma = connector_chroma
+        self.connector_browser = connector_browser
         self.collection_name = collection_name
         self.telemetry = telemetry
         self._attach_telemetry()
 
     def _attach_telemetry(self) -> None:
-        """
-        Attach telemetry to connectors.
-        :returns: None
-        """
         if self.connector_llm:
             self.connector_llm.set_telemetry(self.telemetry)
         if self.connector_search:
@@ -103,21 +61,14 @@ class AgentIO:
             self.connector_http.set_telemetry(self.telemetry)
         if self.connector_chroma:
             self.connector_chroma.set_telemetry(self.telemetry)
+        if self.connector_browser:
+            self.connector_browser.set_telemetry(self.telemetry)
 
     def set_telemetry(self, telemetry: Optional[TelemetrySession]) -> None:
-        """
-        Update telemetry session for this IO layer.
-        :param telemetry: Telemetry session.
-        :returns: None
-        """
         self.telemetry = telemetry
         self._attach_telemetry()
 
     def clear_telemetry(self) -> None:
-        """
-        Remove telemetry session from this IO layer.
-        :returns: None
-        """
         self.telemetry = None
         self._attach_telemetry()
 
@@ -128,10 +79,11 @@ class AgentIO:
         timeout_seconds: Optional[float] = None,
     ) -> Optional[str]:
         """
-        Query the LLM connector with optional per-call model selection.
-        :param payload: LLM payload.
-        :param model_name: Optional model override.
-        :returns: Response content or None.
+        Send a payload to the LLM and return the response text.
+        :param payload: LLM request payload.
+        :param model_name: Override model for this call.
+        :param timeout_seconds: Optional timeout.
+        :returns: Response text or None.
         """
         started_at = time.perf_counter()
         success = False
@@ -164,12 +116,8 @@ class AgentIO:
         timeout_seconds: Optional[float] = None,
     ) -> Optional[str]:
         """
-        Query the LLM with a fallback model.
-        :param payload: LLM payload.
-        :param model_name: Primary model override.
-        :param fallback_model: Fallback model name.
-        :param timeout_seconds: Optional timeout seconds.
-        :returns: Response content or None.
+        Query the LLM; retry with fallback_model if the primary fails.
+        :returns: Response text or None.
         """
         primary_error: Optional[Exception] = None
         content: Optional[str] = None
@@ -189,7 +137,7 @@ class AgentIO:
 
     def pop_last_llm_usage(self) -> Optional[Dict[str, Any]]:
         """
-        Retrieve the last LLM usage record.
+        Pop and return the last LLM usage record (tokens, cost).
         :returns: Usage dict or None.
         """
         return self.connector_llm.pop_last_usage()
@@ -206,16 +154,8 @@ class AgentIO:
         text_verbosity: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Build an LLM payload using the connector.
-        :param messages: Chat messages list.
-        :param json_mode: Whether to enforce JSON response format.
-        :param model_name: Optional model override.
-        :param temperature: Temperature setting.
-        :param max_tokens: Maximum token budget (None = no limit).
-        :param json_schema: Optional JSON schema for structured output.
-        :param reasoning_effort: Optional reasoning effort level.
-        :param text_verbosity: Optional text verbosity level.
-        :returns: Payload dict.
+        Build a normalized LLM request payload.
+        :returns: Payload dict ready for ``query_llm``.
         """
         return self.connector_llm.build_payload(
             messages=messages,
@@ -235,10 +175,10 @@ class AgentIO:
         timeout_seconds: Optional[float] = None,
     ) -> Optional[List[Dict[str, str]]]:
         """
-        Perform a web search and track seen documents.
-        :param query: Search query.
-        :param count: Result count.
-        :returns: Search results.
+        Web search via Brave Search API.
+        :param query: Search query string.
+        :param count: Max results.
+        :returns: List of dicts with title, url, description.
         """
         started_at = time.perf_counter()
         try:
@@ -278,16 +218,35 @@ class AgentIO:
 
     async def visit(self, url: str, timeout_seconds: Optional[float] = None) -> str:
         """
-        Visit a URL, extract text, and track content.
-        :param url: URL to visit.
-        :returns: Cleaned text summary.
+        Fetch a URL, clean the HTML, return extracted text.
+
+        Tries aiohttp first.  On 403/401 (bot-blocking), automatically retries
+        with the headless Chrome browser connector if one is available.
+
+        :param url: Target URL.
+        :param timeout_seconds: Optional per-call timeout.
+        :returns: Cleaned page text.
+        :raises RuntimeError: On HTTP failure after all attempts.
         """
         started_at = time.perf_counter()
-        error_text = None
         result = await self._with_timeout(
             self.connector_http.request("GET", url, retries=3),
             timeout_seconds,
         )
+        used_browser = False
+
+        if result.error and result.status in BROWSER_FALLBACK_STATUSES and self.connector_browser:
+            _logger.info(f"aiohttp got {result.status} for {url}, falling back to headless Chrome")
+            browser_result = await self._with_timeout(
+                self.connector_browser.fetch_page(url),
+                timeout_seconds,
+            )
+            if not browser_result.error:
+                result = browser_result
+                used_browser = True
+            else:
+                _logger.warning(f"Browser fallback also failed for {url}: {browser_result.data}")
+
         if result.error:
             error_text = f"HTTP visit failed: {url} status={result.status}"
             if self.telemetry:
@@ -295,10 +254,11 @@ class AgentIO:
                     name="visit",
                     started_at=started_at,
                     success=False,
-                    payload={"url": url, "status": result.status},
+                    payload={"url": url, "status": result.status, "used_browser": used_browser},
                     error=error_text,
                 )
             raise RuntimeError(error_text)
+
         resp = result.data
         try:
             if isinstance(resp, dict):
@@ -314,10 +274,11 @@ class AgentIO:
                     name="visit",
                     started_at=started_at,
                     success=False,
-                    payload={"url": url, "status": result.status},
+                    payload={"url": url, "status": result.status, "used_browser": used_browser},
                     error=error_text,
                 )
             raise
+
         if self.telemetry:
             self.telemetry.record_document_seen(
                 source="visit",
@@ -327,7 +288,7 @@ class AgentIO:
                 name="visit",
                 started_at=started_at,
                 success=True,
-                payload={"url": url, "status": result.status},
+                payload={"url": url, "status": result.status, "used_browser": used_browser},
             )
         return summary
 
@@ -338,15 +299,31 @@ class AgentIO:
         timeout_seconds: Optional[float] = None,
     ) -> str:
         """
-        Fetch raw content for a URL.
-        :param url: URL to fetch.
-        :param retries: Retry attempts.
-        :returns: Raw response text.
+        Fetch raw content from a URL (no HTML cleaning).
+
+        Tries aiohttp first.  On 403/401 (bot-blocking), automatically retries
+        with the headless Chrome browser connector if one is available.
+
+        :param url: Target URL.
+        :param retries: Number of aiohttp retries.
+        :param timeout_seconds: Optional per-call timeout.
+        :returns: Raw response text or JSON string.
+        :raises RuntimeError: On HTTP failure after all attempts.
         """
         result = await self._with_timeout(
             self.connector_http.request("GET", url, retries=retries),
             timeout_seconds,
         )
+        if result.error and result.status in BROWSER_FALLBACK_STATUSES and self.connector_browser:
+            _logger.info(f"aiohttp got {result.status} for {url}, falling back to headless Chrome (fetch_url)")
+            browser_result = await self._with_timeout(
+                self.connector_browser.fetch_page(url),
+                timeout_seconds,
+            )
+            if not browser_result.error:
+                result = browser_result
+            else:
+                _logger.warning(f"Browser fallback also failed for {url}: {browser_result.data}")
         if result.error:
             raise RuntimeError(f"HTTP fetch failed: {url} status={result.status}")
         resp = result.data
@@ -362,11 +339,11 @@ class AgentIO:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        Store documents in ChromaDB with normalized metadata.
-        :param documents: Document list.
-        :param metadatas: Metadata list.
-        :param ids: IDs list.
-        :returns: True on success, False otherwise.
+        Store documents in ChromaDB. Auto-fills title/topics metadata if absent.
+        :param documents: Document texts.
+        :param metadatas: Per-document metadata.
+        :param ids: Unique document IDs.
+        :returns: True on success.
         """
         if not documents:
             return False
@@ -429,12 +406,11 @@ class AgentIO:
         memory_type: Optional[str] = None,
     ) -> List[str]:
         """
-        Retrieve documents from ChromaDB, optionally filtered by memory_type.
-        :param topics: Query topics.
-        :param n_results: Results per query.
-        :param timeout_seconds: Optional timeout.
-        :param memory_type: Optional filter by memory_type ("internal_thought" or "observation").
-        :returns: List of documents (backward compatible).
+        Semantic search in ChromaDB.
+        :param topics: Query strings.
+        :param n_results: Max results per query.
+        :param memory_type: Filter by ``internal_thought`` or ``observation``.
+        :returns: List of matching document strings.
         """
         if not topics:
             return []
@@ -494,12 +470,8 @@ class AgentIO:
         timeout_seconds: Optional[float] = None,
     ) -> Dict[str, List[str]]:
         """
-        Retrieve documents from ChromaDB split by memory_type.
-        :param topics: Query topics.
-        :param n_internal: Number of internal thoughts to retrieve.
-        :param n_observations: Number of observations to retrieve.
-        :param timeout_seconds: Optional timeout.
-        :returns: Dict with "internal_thoughts" and "observations" lists.
+        Retrieve documents split into internal_thoughts and observations.
+        :returns: Dict with ``internal_thoughts`` and ``observations`` string lists.
         """
         if not topics:
             return {"internal_thoughts": [], "observations": []}
@@ -564,12 +536,6 @@ class AgentIO:
         return {"internal_thoughts": internal_thoughts, "observations": observations}
 
     async def _with_timeout(self, coro, timeout_seconds: Optional[float]):
-        """
-        Run a coroutine with optional timeout.
-        :param coro: Awaitable to execute.
-        :param timeout_seconds: Optional timeout seconds.
-        :returns: Awaited result.
-        """
         if timeout_seconds is None:
             return await coro
         timeout_value = float(timeout_seconds)

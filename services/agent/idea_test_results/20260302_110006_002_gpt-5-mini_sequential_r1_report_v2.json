@@ -1,0 +1,1290 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "002",
+    "test_name": "Basic Fact Retrieval",
+    "passed": true,
+    "score": 1.0,
+    "ascii_graph": "*---.   What is the capital city of Australia? Provide the answer and cite one authoritative source URL.\n|\\ \\ \\  \n* | | | Search for authoritative sources stating the capital of Australia\n / / /  \n* | | Visit the top authoritative result and extract the exact statement and URL\n / /  \n* | Compile final answer sentence and cite the visited authoritative URL\n /  \n* Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "a8e866cb-318b-4643-a738-5af706a815ad",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL."
+    },
+    {
+      "node_id": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+      "action": "search",
+      "status": "done",
+      "score": 0.15,
+      "title": "Search for authoritative sources stating the capital of Australia"
+    },
+    {
+      "node_id": "f42fcfaa-b01c-4d3e-b9de-0c995854b093",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.15,
+      "title": "Visit the top authoritative result and extract the exact statement and URL"
+    },
+    {
+      "node_id": "760ec8f0-8b1d-410d-97bc-4c6ebe39d609",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.45,
+      "title": "Compile final answer sentence and cite the visited authoritative URL"
+    },
+    {
+      "node_id": "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "correct_answer",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Canberra found"
+    },
+    {
+      "check": "url_present",
+      "passed": true,
+      "score": 1.0,
+      "url_count": 3,
+      "reason": "Found 3 URL(s)"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 358,
+      "words": 35,
+      "kilobytes": 0.35
+    },
+    "llm": {
+      "calls": 15,
+      "prompt": {
+        "chars": 46761,
+        "words": 5530,
+        "kilobytes": 45.67,
+        "tokens": 16453
+      },
+      "completion": {
+        "chars": 13348,
+        "words": 1465,
+        "kilobytes": 13.04,
+        "tokens": 11237
+      },
+      "total_tokens": 27690
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 5,
+      "chars": 1789,
+      "words": 222,
+      "kilobytes": 1.75
+    },
+    "visit": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 82,
+        "total_duration": 42.4843,
+        "avg_duration": 0.5181,
+        "min_duration": 0.4204,
+        "max_duration": 0.9777,
+        "success_count": 82,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 12,
+        "total_duration": 291.4135,
+        "avg_duration": 24.2845,
+        "min_duration": 9.8909,
+        "max_duration": 41.2469,
+        "success_count": 12,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 3,
+        "total_duration": 3.2653,
+        "avg_duration": 1.0884,
+        "min_duration": 0.2302,
+        "max_duration": 2.2878,
+        "success_count": 3,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 4,
+        "total_duration": 5.0737,
+        "avg_duration": 1.2684,
+        "min_duration": 0.8134,
+        "max_duration": 2.3746,
+        "success_count": 4,
+        "error_count": 0
+      },
+      "search_query": {
+        "count": 2,
+        "total_duration": 3.0418,
+        "avg_duration": 1.5209,
+        "min_duration": 0.7528,
+        "max_duration": 2.2891,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "search": {
+        "count": 1,
+        "total_duration": 2.2933,
+        "avg_duration": 2.2933,
+        "min_duration": 2.2933,
+        "max_duration": 2.2933,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.5974,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7031,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 34.5649,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 28.5388,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 17.8546,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5909,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.527,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6572,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 15.774,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4426,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.2302,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.3746,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.8134,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4973,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5924,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5104,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 9.8909,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.7473,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 0.7528,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.8865,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5803,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4652,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4764,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4804,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4732,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4839,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5032,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.471,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.473,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5569,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4559,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4398,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6089,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5654,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4495,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 33.1229,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 33.1246,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.488,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4705,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5363,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.48,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4528,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5129,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6014,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4656,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.44,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4365,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4723,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4791,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4755,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5065,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4265,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5181,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.555,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6251,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4204,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5272,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6078,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5602,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6043,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4817,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5243,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5939,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5782,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.578,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4987,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4481,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.474,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4875,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 16.3334,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 16.3357,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4628,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6269,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7823,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.443,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.2878,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 2.2891,
+        "success": true
+      },
+      {
+        "name": "search",
+        "duration": 2.2933,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9777,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.9992,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4611,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4471,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4362,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4552,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4579,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6012,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4671,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4688,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4685,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6838,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4992,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4556,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4361,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5708,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.462,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5369,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4273,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5241,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4419,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4787,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4849,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 41.2469,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 19.9149,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 24.712,
+        "success": true
+      }
+    ],
+    "events_count": 198
+  },
+  "node_index": {
+    "a8e866cb-318b-4643-a738-5af706a815ad": {
+      "node_id": "a8e866cb-318b-4643-a738-5af706a815ad",
+      "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+        "f42fcfaa-b01c-4d3e-b9de-0c995854b093",
+        "760ec8f0-8b1d-410d-97bc-4c6ebe39d609",
+        "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a"
+      ],
+      "parent_ids": [],
+      "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL."
+    },
+    "95ddd4ae-7d0b-41a9-9907-1010ebb4430f": {
+      "node_id": "95ddd4ae-7d0b-41a9-9907-1010ebb4430f",
+      "title": "Search for authoritative sources stating the capital of Australia",
+      "action": "search",
+      "status": "done",
+      "score": 0.15,
+      "children": [],
+      "parent_ids": [
+        "a8e866cb-318b-4643-a738-5af706a815ad"
+      ],
+      "goal": "Search for authoritative sources stating the capital of Australia",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "f42fcfaa-b01c-4d3e-b9de-0c995854b093": {
+      "node_id": "f42fcfaa-b01c-4d3e-b9de-0c995854b093",
+      "title": "Visit the top authoritative result and extract the exact statement and URL",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.15,
+      "children": [],
+      "parent_ids": [
+        "a8e866cb-318b-4643-a738-5af706a815ad"
+      ],
+      "goal": "Visit the top authoritative result and extract the exact statement and URL"
+    },
+    "760ec8f0-8b1d-410d-97bc-4c6ebe39d609": {
+      "node_id": "760ec8f0-8b1d-410d-97bc-4c6ebe39d609",
+      "title": "Compile final answer sentence and cite the visited authoritative URL",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.45,
+      "children": [],
+      "parent_ids": [
+        "a8e866cb-318b-4643-a738-5af706a815ad"
+      ],
+      "goal": "Compile final answer sentence and cite the visited authoritative URL"
+    },
+    "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a": {
+      "node_id": "13c17bc2-2ae8-4297-8e9d-a3fd5d26db1a",
+      "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "a8e866cb-318b-4643-a738-5af706a815ad"
+      ],
+      "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Answer:\n1) The capital city of Australia is Canberra.\n\nEvidence (authoritative source):\n2) According to the Encyclopaedia Britannica page for Canberra (https://www.britannica.com/place/Canberra):\n\"Canberra, federal capital of the Commonwealth of Australia.\" https://www.britannica.com/place/Canberra\n\nSource cited:\n- https://www.britannica.com/place/Canberra",
+    "action_summary": "The capital of Australia is Canberra, as stated by Encyclopaedia Britannica: \"Canberra, federal capital of the Commonwealth of Australia.\" (https://www.britannica.com/place/Canberra)",
+    "success": true,
+    "goal_achieved": true
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.5974,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7031,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 34.5649,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 28.5388,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 17.8546,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5909,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.527,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6572,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 15.774,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4426,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.2302,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.3746,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.8134,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4973,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5924,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5104,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 9.8909,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.7473,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 0.7528,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.8865,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5803,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4652,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4764,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4804,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4732,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4839,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5032,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.471,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.473,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5569,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4559,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4398,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6089,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5654,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4495,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 33.1229,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 33.1246,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.488,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4705,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5363,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.48,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4528,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5129,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6014,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4656,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.44,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4365,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4723,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4791,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4755,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5065,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4265,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5181,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.555,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6251,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4204,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5272,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6078,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5602,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6043,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4817,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5243,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5939,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5782,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.578,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4987,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4481,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.474,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4875,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 16.3334,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 16.3357,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4628,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6269,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7823,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.443,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.2878,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 2.2891,
+      "success": true
+    },
+    {
+      "name": "search",
+      "duration": 2.2933,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9777,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.9992,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4611,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4471,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4362,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4552,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4579,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6012,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4671,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4688,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4685,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6838,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4992,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4556,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4361,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5708,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.462,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5369,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4273,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5241,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4419,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4787,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4849,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 41.2469,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 19.9149,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 24.712,
+      "success": true
+    }
+  ]
+}

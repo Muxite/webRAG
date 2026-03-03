@@ -1,0 +1,1137 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "034",
+    "test_name": "Laundry-List Multi-Topic Extraction",
+    "passed": false,
+    "score": 0.4166666666666667,
+    "ascii_graph": "*-------.   Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?\n|\\ \\ \\ \\ \\  \n* | | | | | Visit Wikipedia: Axolotl \u2014 extract scientific name (binomial) from taxobox/lead\n / / / / /  \n* | | | | Visit Wikipedia: Voynich manuscript \u2014 extract current holding library from lead/infobox\n / / / /  \n* | | | Visit Wikipedia: Pando (tree) \u2014 extract US state where colony is located\n / / /  \n* | | Visit Wikipedia: Antikythera mechanism \u2014 extract approximate century BCE of construction\n / /  \n* | Visit Wikipedia: Svalbard Global Seed Vault \u2014 extract country where vault is located\n /  \n* Visit https://en.wikipedia.org/wiki/Mantis_shrimp\n"
+  },
+  "node_table": [
+    {
+      "node_id": "f77cad6e-943c-46c9-a169-fe498ba7446f",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?"
+    },
+    {
+      "node_id": "497554b8-45fc-4cb7-9cd7-3eaf464019de",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit Wikipedia: Axolotl \u2014 extract scientific name (binomial) from taxobox/lead"
+    },
+    {
+      "node_id": "d052ee76-8318-4a54-bee6-9cdfdbba5638",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit Wikipedia: Voynich manuscript \u2014 extract current holding library from lead/infobox"
+    },
+    {
+      "node_id": "d19f36e6-755d-48e0-a0cb-cff02261fa12",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit Wikipedia: Pando (tree) \u2014 extract US state where colony is located"
+    },
+    {
+      "node_id": "381bee88-470c-4fec-9c48-6c6ae2237d87",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit Wikipedia: Antikythera mechanism \u2014 extract approximate century BCE of construction"
+    },
+    {
+      "node_id": "8dc23a24-2b40-4703-aefb-1a3c2ee51e1a",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit Wikipedia: Svalbard Global Seed Vault \u2014 extract country where vault is located"
+    },
+    {
+      "node_id": "f846c20c-9773-4fc9-8654-791271144be1",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Mantis_shrimp"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": false,
+      "score": 0.16666666666666666,
+      "visit_count": 1,
+      "reason": "Found 1 visit(s) (target >=4)"
+    },
+    {
+      "check": "answer_correctness",
+      "passed": false,
+      "score": 0.3333333333333333,
+      "correct": 2,
+      "total": 6,
+      "details": {
+        "Axolotl neoteny": true,
+        "Voynich manuscript": false,
+        "Pando clonal colony": false,
+        "Antikythera mechanism": true,
+        "Mantis shrimp vision": false,
+        "Svalbard Global Seed Vault": false
+      },
+      "reason": "2/6 answers correct"
+    },
+    {
+      "check": "citation_coverage",
+      "passed": true,
+      "score": 1.0,
+      "cited": 6,
+      "total": 6,
+      "reason": "6/6 topics cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 2126,
+      "words": 291,
+      "kilobytes": 2.08
+    },
+    "llm": {
+      "calls": 6,
+      "prompt": {
+        "chars": 52894,
+        "words": 6059,
+        "kilobytes": 51.65,
+        "tokens": 13850
+      },
+      "completion": {
+        "chars": 3940,
+        "words": 438,
+        "kilobytes": 3.85,
+        "tokens": 1054
+      },
+      "total_tokens": 14904
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 1,
+      "chars": 40282,
+      "words": 6318,
+      "kilobytes": 39.34
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 49,
+        "total_duration": 275.1896,
+        "avg_duration": 5.6161,
+        "min_duration": 0.4653,
+        "max_duration": 45.7619,
+        "success_count": 49,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 25,
+        "total_duration": 307.4934,
+        "avg_duration": 12.2997,
+        "min_duration": 1.4673,
+        "max_duration": 43.6693,
+        "success_count": 25,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 5,
+        "total_duration": 17.0611,
+        "avg_duration": 3.4122,
+        "min_duration": 1.338,
+        "max_duration": 8.6758,
+        "success_count": 5,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 6,
+        "total_duration": 222.2356,
+        "avg_duration": 37.0393,
+        "min_duration": 3.1017,
+        "max_duration": 69.3228,
+        "success_count": 6,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 10.4721,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 10.9268,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4653,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.5971,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.9164,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.9187,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 14.0307,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.0965,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 14.0401,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 14.399,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 45.7619,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7756,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 43.6693,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6831,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.4673,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5662,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.338,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.0324,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.0347,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 68.9597,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 69.3228,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 22.0691,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 22.0819,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8224,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 22.9076,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8469,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 3.1017,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 3.1066,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.6584,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.9964,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 9.1871,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 10.9306,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 8.2947,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 8.6758,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.049,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 13.064,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 13.0669,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 13.0695,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 13.0716,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.1432,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 19.1594,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 19.1428,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 19.3318,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.7881,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 7.7947,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.1068,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.2575,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.4027,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.5487,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.1051,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1317,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.0737,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.0738,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1152,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1165,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1274,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0869,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0876,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4391,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.5819,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.909,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.9166,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 16.8363,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 16.8453,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 16.9621,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.8281,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.8269,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 3.9519,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 6.6319,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.9341,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.9386,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.5294,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8938,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8949,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8147,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8221,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8543,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8538,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8284,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8297,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.8682,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4624,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 9.9138,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 38.8694,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 38.8754,
+        "success": true
+      }
+    ],
+    "events_count": 160
+  },
+  "node_index": {
+    "f77cad6e-943c-46c9-a169-fe498ba7446f": {
+      "node_id": "f77cad6e-943c-46c9-a169-fe498ba7446f",
+      "title": "Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "497554b8-45fc-4cb7-9cd7-3eaf464019de",
+        "d052ee76-8318-4a54-bee6-9cdfdbba5638",
+        "d19f36e6-755d-48e0-a0cb-cff02261fa12",
+        "381bee88-470c-4fec-9c48-6c6ae2237d87",
+        "8dc23a24-2b40-4703-aefb-1a3c2ee51e1a",
+        "f846c20c-9773-4fc9-8654-791271144be1"
+      ],
+      "parent_ids": [],
+      "goal": "Visit each of the following Wikipedia pages and answer the question for each topic. Return all six answers with the citation URL for each.\n\n1. Axolotl neoteny: https://en.wikipedia.org/wiki/Axolotl \u2014 What is the scientific name of the axolotl?\n2. Voynich manuscript: https://en.wikipedia.org/wiki/Voynich_manuscript \u2014 In which library is the Voynich manuscript currently held?\n3. Pando clonal colony: https://en.wikipedia.org/wiki/Pando_(tree) \u2014 In which US state is the Pando clonal colony located?\n4. Antikythera mechanism: https://en.wikipedia.org/wiki/Antikythera_mechanism \u2014 Approximately what century BCE was the Antikythera mechanism built?\n5. Mantis shrimp vision: https://en.wikipedia.org/wiki/Mantis_shrimp \u2014 How many types of photoreceptor cells do mantis shrimp have (approximate)?\n6. Svalbard Global Seed Vault: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault \u2014 In which country is the Svalbard Global Seed Vault located?"
+    },
+    "497554b8-45fc-4cb7-9cd7-3eaf464019de": {
+      "node_id": "497554b8-45fc-4cb7-9cd7-3eaf464019de",
+      "title": "Visit Wikipedia: Axolotl \u2014 extract scientific name (binomial) from taxobox/lead",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "f77cad6e-943c-46c9-a169-fe498ba7446f"
+      ],
+      "goal": "Visit Wikipedia: Axolotl \u2014 extract scientific name (binomial) from taxobox/lead",
+      "result_success": true,
+      "result_content_preview": "For other uses, see\nAxolotl (disambiguation)\n.\nThis article\nmay require\ncopy editing\nfor Post-Wiki Edu cleanup\n.\nYou can assist by\nediting it\n.\n(\nDecember 2025\n)\n(\nLearn how and when to remove this message\n)\nAxolotl\nThe\nwild type\nform\nConservation status\nCritically Endangered\n(\nIUCN 3.1\n)\nCITES\nAppendix II\nScientific classification\nKingdom:\nAnimalia\nPhylum:\nChordata\nClass:\nAmphibia\nOrder:\nUrodela\nFamily:\nAmbystomatidae\nGenus:\nAmbystoma\nSpecies:\nA.\u00a0mexicanum\nBinomial name\nAmbystoma mexicanum\n(\nSh",
+      "result_source_url": "https://en.wikipedia.org/wiki/Axolotl"
+    },
+    "d052ee76-8318-4a54-bee6-9cdfdbba5638": {
+      "node_id": "d052ee76-8318-4a54-bee6-9cdfdbba5638",
+      "title": "Visit Wikipedia: Voynich manuscript \u2014 extract current holding library from lead/infobox",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "f77cad6e-943c-46c9-a169-fe498ba7446f"
+      ],
+      "goal": "Visit Wikipedia: Voynich manuscript \u2014 extract current holding library from lead/infobox"
+    },
+    "d19f36e6-755d-48e0-a0cb-cff02261fa12": {
+      "node_id": "d19f36e6-755d-48e0-a0cb-cff02261fa12",
+      "title": "Visit Wikipedia: Pando (tree) \u2014 extract US state where colony is located",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "f77cad6e-943c-46c9-a169-fe498ba7446f"
+      ],
+      "goal": "Visit Wikipedia: Pando (tree) \u2014 extract US state where colony is located"
+    },
+    "381bee88-470c-4fec-9c48-6c6ae2237d87": {
+      "node_id": "381bee88-470c-4fec-9c48-6c6ae2237d87",
+      "title": "Visit Wikipedia: Antikythera mechanism \u2014 extract approximate century BCE of construction",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "f77cad6e-943c-46c9-a169-fe498ba7446f"
+      ],
+      "goal": "Visit Wikipedia: Antikythera mechanism \u2014 extract approximate century BCE of construction"
+    },
+    "8dc23a24-2b40-4703-aefb-1a3c2ee51e1a": {
+      "node_id": "8dc23a24-2b40-4703-aefb-1a3c2ee51e1a",
+      "title": "Visit Wikipedia: Svalbard Global Seed Vault \u2014 extract country where vault is located",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "f77cad6e-943c-46c9-a169-fe498ba7446f"
+      ],
+      "goal": "Visit Wikipedia: Svalbard Global Seed Vault \u2014 extract country where vault is located"
+    },
+    "f846c20c-9773-4fc9-8654-791271144be1": {
+      "node_id": "f846c20c-9773-4fc9-8654-791271144be1",
+      "title": "Visit https://en.wikipedia.org/wiki/Mantis_shrimp",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "f77cad6e-943c-46c9-a169-fe498ba7446f"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Mantis_shrimp"
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## 1) Axolotl neoteny \u2014 scientific name\n**Answer:** *Ambystoma mexicanum*.\n\n**Evidence (verbatim quote):** The Axolotl page\u2019s taxobox lists the \u201c**Binomial name**\u201d as \u201c**Ambystoma mexicanum**\u201d.\n\n- Quote: \u201c**Binomial name\\nAmbystoma mexicanum**\u201d\n- URL: https://en.wikipedia.org/wiki/Axolotl\n\n---\n\n## 2) Voynich manuscript \u2014 current holding library\n**Answer:** **Missing from provided visit data.** The execution trail shows this page visit was **skipped**, and there is **no RAW VISIT CONTENT** for the Voynich manuscript page to quote/cite.\n\n- URL that was supposed to be visited: https://en.wikipedia.org/wiki/Voynich_manuscript\n\n---\n\n## 3) Pando clonal colony \u2014 US state location\n**Answer:** **Missing from provided visit data.** The execution trail shows this page visit was **skipped**, and there is **no RAW VISIT CONTENT** for the Pando page to quote/cite.\n\n- URL that was supposed to be visited: https://en.wikipedia.org/wiki/Pando_(tree)\n\n---\n\n## 4) Antikythera mechanism \u2014 approximately what century BCE built\n**Answer:** **Missing from provided visit data.** The execution trail shows this page visit was **skipped**, and there is **no RAW VISIT CONTENT** for the Antikythera mechanism page to quote/cite.\n\n- URL that was supposed to be visited: https://en.wikipedia.org/wiki/Antikythera_mechanism\n\n---\n\n## 5) Mantis shrimp vision \u2014 approx. number of photoreceptor cell types\n**Answer:** **Missing from provided visit data.** Although \u201cRETRIEVED MEMORIES\u201d indicates a mantis shrimp page was visited at some point, the required **RAW VISIT CONTENT** text (verbatim page content) is **not included** here, so I cannot quote the exact photoreceptor count from the visited text.\n\n- URL that was supposed to be visited: https://en.wikipedia.org/wiki/Mantis_shrimp\n\n---\n\n## 6) Svalbard Global Seed Vault \u2014 country location\n**Answer:** **Missing from provided visit data.** The execution trail shows this page visit was **skipped**, and there is **no RAW VISIT CONTENT** for the Svalbard Global Seed Vault page to quote/cite.\n\n- URL that was supposed to be visited: https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault\n",
+    "action_summary": "Only 1 of 6 required Wikipedia pages was actually visited in the provided data (Axolotl). From that page, the axolotl\u2019s scientific (binomial) name is Ambystoma mexicanum. The other 5 answers cannot be evidenced because their page visits were skipped or their raw content is missing, so no verbatim quotes/citations can be provided for them.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 10.4721,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 10.9268,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4653,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.5971,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.9164,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.9187,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 14.0307,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.0965,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 14.0401,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 14.399,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 45.7619,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7756,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 43.6693,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6831,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.4673,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5662,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.338,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.0324,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.0347,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 68.9597,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 69.3228,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 22.0691,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 22.0819,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8224,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 22.9076,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8469,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 3.1017,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 3.1066,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.6584,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.9964,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 9.1871,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 10.9306,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 8.2947,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 8.6758,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.049,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 13.064,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 13.0669,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 13.0695,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 13.0716,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.1432,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 19.1594,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 19.1428,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 19.3318,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.7881,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 7.7947,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.1068,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.2575,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.4027,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.5487,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.1051,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1317,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.0737,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.0738,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1152,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1165,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1274,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0869,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0876,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4391,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.5819,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.909,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.9166,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 16.8363,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 16.8453,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 16.9621,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.8281,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.8269,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 3.9519,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 6.6319,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.9341,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.9386,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.5294,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8938,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8949,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8147,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8221,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8543,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8538,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8284,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8297,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.8682,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4624,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 9.9138,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 38.8694,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 38.8754,
+      "success": true
+    }
+  ]
+}

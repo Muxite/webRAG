@@ -1,0 +1,2195 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "039",
+    "test_name": "Multi-Branch Claim Verification",
+    "passed": true,
+    "score": 0.8428571428571429,
+    "ascii_graph": "*---.   You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used.\n|\\ \\ \\  \n* | | | C1 Physics \u2014 Visit NIST page for the speed of light constant to extract the exact defined value and citation text\n / / /  \n* | | C2 Art History \u2014 Search authoritative sources about who painted the Sistine Chapel ceiling (supporting vs contradicting evidence)\n / /  \n* | C3 Biology \u2014 Search authoritative sources on octopus anatomy (three hearts and blue blood)\n /  \n* C4 Geography \u2014 Search authoritative sources about Mount Everest location and what borders it sits on (Nepal/China vs Nepal/India)\n"
+  },
+  "node_table": [
+    {
+      "node_id": "b7306d37-1695-4643-bd1d-58b2141e5b76",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used."
+    },
+    {
+      "node_id": "4fbbf0b1-6bab-4c82-a6c5-7f784ca0ee82",
+      "action": "visit",
+      "status": "blocked",
+      "score": 0.2,
+      "title": "C1 Physics \u2014 Visit NIST page for the speed of light constant to extract the exact defined value and citation text"
+    },
+    {
+      "node_id": "f8d62d5e-07c3-4a3c-916d-68f3936799db",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "title": "C2 Art History \u2014 Search authoritative sources about who painted the Sistine Chapel ceiling (supporting vs contradicting evidence)"
+    },
+    {
+      "node_id": "d383c4dd-9a01-43a6-b39d-621da3eb595e",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "title": "C3 Biology \u2014 Search authoritative sources on octopus anatomy (three hearts and blue blood)"
+    },
+    {
+      "node_id": "bc4aaf92-632e-4ebb-bc69-31be29f4c206",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "title": "C4 Geography \u2014 Search authoritative sources about Mount Everest location and what borders it sits on (Nepal/China vs Nepal/India)"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": false,
+      "score": 0.0,
+      "visit_count": 0,
+      "reason": "Found 0 visit(s) (target >=3)"
+    },
+    {
+      "check": "verdict_correctness",
+      "passed": true,
+      "score": 1.0,
+      "correct": 4,
+      "total": 4,
+      "details": {
+        "C1": {
+          "claim_found": true,
+          "evidence_found": true,
+          "verdict_correct": true,
+          "overall": true
+        },
+        "C2": {
+          "claim_found": true,
+          "evidence_found": true,
+          "verdict_correct": true,
+          "overall": true
+        },
+        "C3": {
+          "claim_found": true,
+          "evidence_found": true,
+          "verdict_correct": true,
+          "overall": true
+        },
+        "C4": {
+          "claim_found": true,
+          "evidence_found": true,
+          "verdict_correct": true,
+          "overall": true
+        }
+      },
+      "reason": "4/4 verdicts correct"
+    },
+    {
+      "check": "confidence_scores",
+      "passed": true,
+      "score": 1.0,
+      "scores_found": [
+        "0.95",
+        "0.55",
+        "0.85",
+        "0.90"
+      ],
+      "reason": "Found 4 distinct confidence scores"
+    },
+    {
+      "check": "verdict_table",
+      "passed": true,
+      "score": 1.0,
+      "pipe_rows": 6,
+      "claims_in_table": 4,
+      "reason": "table_rows=6, claims_in_table=4/4"
+    },
+    {
+      "check": "reliability_summary",
+      "passed": true,
+      "score": 1.0,
+      "word_count": 127,
+      "reason": "summary_marker=True, words=127"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "cited": 4,
+      "total": 4,
+      "details": {
+        "C1": true,
+        "C2": true,
+        "C3": true,
+        "C4": true
+      },
+      "reason": "4/4 claims cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 7564,
+      "words": 877,
+      "kilobytes": 7.39
+    },
+    "llm": {
+      "calls": 6,
+      "prompt": {
+        "chars": 43559,
+        "words": 5682,
+        "kilobytes": 42.54,
+        "tokens": 10868
+      },
+      "completion": {
+        "chars": 9693,
+        "words": 1029,
+        "kilobytes": 9.47,
+        "tokens": 2334
+      },
+      "total_tokens": 13202
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 15,
+      "chars": 5928,
+      "words": 769,
+      "kilobytes": 5.79
+    },
+    "visit": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "timings": {
+      "chroma_add": {
+        "count": 21,
+        "total_duration": 529.972,
+        "avg_duration": 25.2368,
+        "min_duration": 1.1726,
+        "max_duration": 64.372,
+        "success_count": 20,
+        "error_count": 1
+      },
+      "chroma_query": {
+        "count": 148,
+        "total_duration": 365.9319,
+        "avg_duration": 2.4725,
+        "min_duration": 0.4092,
+        "max_duration": 63.4265,
+        "success_count": 148,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 6,
+        "total_duration": 9.7227,
+        "avg_duration": 1.6204,
+        "min_duration": 0.9805,
+        "max_duration": 2.0159,
+        "success_count": 6,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 6,
+        "total_duration": 88.2286,
+        "avg_duration": 14.7048,
+        "min_duration": 4.4981,
+        "max_duration": 28.163,
+        "success_count": 6,
+        "error_count": 0
+      },
+      "search_query": {
+        "count": 3,
+        "total_duration": 4.5974,
+        "avg_duration": 1.5325,
+        "min_duration": 0.9812,
+        "max_duration": 1.9822,
+        "success_count": 3,
+        "error_count": 0
+      },
+      "search": {
+        "count": 3,
+        "total_duration": 4.96,
+        "avg_duration": 1.6533,
+        "min_duration": 1.3328,
+        "max_duration": 1.9899,
+        "success_count": 3,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_add",
+        "duration": 26.7782,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 26.7842,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 27.2879,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.6781,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8448,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7783,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7757,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5438,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5486,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 2.0159,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.9473,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6319,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.634,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.725,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.0717,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 6.2515,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8669,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8228,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.605,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.2563,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6004,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4831,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 11.5857,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 11.5884,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.0935,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.2459,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.3327,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7323,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.156,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 4.4981,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 4.5145,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 9.042,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 11.0405,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 26.6547,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 26.6563,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 26.6654,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 27.1217,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 12.3261,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 27.412,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 28.2577,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8627,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8738,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2088,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.6329,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 29.9132,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7911,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7701,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.0102,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 30.6964,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4092,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 30.8357,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 31.1988,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 31.1991,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5139,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 31.332,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.9805,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 0.9812,
+        "success": true
+      },
+      {
+        "name": "search",
+        "duration": 1.3328,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2342,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7714,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.1726,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.8556,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.9811,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 1.9822,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.7247,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.7246,
+        "success": true
+      },
+      {
+        "name": "search",
+        "duration": 1.9899,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 63.3975,
+        "success": false
+      },
+      {
+        "name": "chroma_query",
+        "duration": 63.417,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 63.4265,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.751,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7682,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 64.372,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.6333,
+        "success": true
+      },
+      {
+        "name": "search_query",
+        "duration": 1.634,
+        "success": true
+      },
+      {
+        "name": "search",
+        "duration": 1.6373,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9702,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9517,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4157,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4242,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4193,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.5062,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2707,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2697,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2675,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2024,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1902,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1902,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1904,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9307,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2296,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2348,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2382,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.23,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9074,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9179,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2435,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6656,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9722,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9476,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9224,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9204,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.915,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.923,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9274,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9209,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1324,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1073,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1018,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8789,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8883,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8839,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8726,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8806,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8751,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9316,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9883,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0674,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0345,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9643,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9273,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9387,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9389,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9676,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9773,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9733,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9418,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9426,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9696,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9337,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8722,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8548,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8817,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8896,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9032,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9046,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9172,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8825,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8543,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8338,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8414,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8487,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8722,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9048,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9509,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9949,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9876,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9749,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9342,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9224,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9124,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9118,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9557,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9673,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9657,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9593,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9293,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9363,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8977,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8982,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8788,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8735,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8922,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8857,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8969,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8991,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9404,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9797,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0769,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1172,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0843,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9706,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9212,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8988,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9225,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9187,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0127,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0301,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.026,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.944,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8973,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9103,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9222,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9132,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8957,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 27.879,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 28.163,
+        "success": true
+      }
+    ],
+    "events_count": 362
+  },
+  "node_index": {
+    "b7306d37-1695-4643-bd1d-58b2141e5b76": {
+      "node_id": "b7306d37-1695-4643-bd1d-58b2141e5b76",
+      "title": "You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used.",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "4fbbf0b1-6bab-4c82-a6c5-7f784ca0ee82",
+        "f8d62d5e-07c3-4a3c-916d-68f3936799db",
+        "d383c4dd-9a01-43a6-b39d-621da3eb595e",
+        "bc4aaf92-632e-4ebb-bc69-31be29f4c206"
+      ],
+      "parent_ids": [],
+      "goal": "You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used."
+    },
+    "4fbbf0b1-6bab-4c82-a6c5-7f784ca0ee82": {
+      "node_id": "4fbbf0b1-6bab-4c82-a6c5-7f784ca0ee82",
+      "title": "C1 Physics \u2014 Visit NIST page for the speed of light constant to extract the exact defined value and citation text",
+      "action": "visit",
+      "status": "blocked",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "b7306d37-1695-4643-bd1d-58b2141e5b76"
+      ],
+      "goal": "C1 Physics \u2014 Visit NIST page for the speed of light constant to extract the exact defined value and citation text",
+      "result_success": false,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "f8d62d5e-07c3-4a3c-916d-68f3936799db": {
+      "node_id": "f8d62d5e-07c3-4a3c-916d-68f3936799db",
+      "title": "C2 Art History \u2014 Search authoritative sources about who painted the Sistine Chapel ceiling (supporting vs contradicting evidence)",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "b7306d37-1695-4643-bd1d-58b2141e5b76"
+      ],
+      "goal": "C2 Art History \u2014 Search authoritative sources about who painted the Sistine Chapel ceiling (supporting vs contradicting evidence)",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "d383c4dd-9a01-43a6-b39d-621da3eb595e": {
+      "node_id": "d383c4dd-9a01-43a6-b39d-621da3eb595e",
+      "title": "C3 Biology \u2014 Search authoritative sources on octopus anatomy (three hearts and blue blood)",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "b7306d37-1695-4643-bd1d-58b2141e5b76"
+      ],
+      "goal": "C3 Biology \u2014 Search authoritative sources on octopus anatomy (three hearts and blue blood)",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "bc4aaf92-632e-4ebb-bc69-31be29f4c206": {
+      "node_id": "bc4aaf92-632e-4ebb-bc69-31be29f4c206",
+      "title": "C4 Geography \u2014 Search authoritative sources about Mount Everest location and what borders it sits on (Nepal/China vs Nepal/India)",
+      "action": "search",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "b7306d37-1695-4643-bd1d-58b2141e5b76"
+      ],
+      "goal": "C4 Geography \u2014 Search authoritative sources about Mount Everest location and what borders it sits on (Nepal/China vs Nepal/India)",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## Fact-check verdicts (C1\u2013C4)\n\n### C1 [Physics]\n**Claim:** \u201cThe speed of light in a vacuum is approximately 299,792,458 metres per second.\u201d\n\n- **Supporting evidence found (but NOT visited):** A NIST CODATA entry exists for the \u201cspeed of light in vacuum,\u201d but the attempted visit **timed out**, and no page text was captured.\n  - The system\u2019s log shows a candidate authoritative URL: https://physics.nist.gov/cgi-bin/cuu/Value?c= (NIST CODATA) (from MERGED RESULTS / RETRIEVED MEMORIES), but **RAW VISIT CONTENT is empty** and the visit failed.\n- **Contradicting evidence found:** None in the provided data.\n- **Authoritative source visit requirement:** **Not satisfied** for C1 because the only attempted visit (NIST) failed and there is no RAW VISIT CONTENT.\n\n**Verdict:** **PARTIALLY TRUE** (value is widely known and consistent with the intended definition, but the workflow evidence here is incomplete\u2014no authoritative page content was successfully visited/captured).\n\n**Confidence:** **0.55**\n\n**Justification (URLs used):** NIST page attempt timed out (no extractable quote available): https://physics.nist.gov/cgi-bin/cuu/Value?c=\n\n---\n\n### C2 [Art History]\n**Claim:** \u201cLeonardo da Vinci painted the ceiling of the Sistine Chapel.\u201d\n\n- **Evidence search (supporting vs contradicting):** The search results strongly indicate the ceiling was painted by **Michelangelo**, not Leonardo.\n- **Authoritative source visit requirement:** **Not satisfied** in the provided dataset because no URLs were actually visited and **RAW VISIT CONTENT is empty**.\n- **Contradicting evidence found (via search results):**\n  - Wikipedia result explicitly identifies the work as \u201cSistine Chapel ceiling\u201d and implies Michelangelo\u2019s role: https://en.wikipedia.org/wiki/Sistine_Chapel_ceiling\n  - Other reputable art-education sources returned (Smarthistory, Khan Academy), also about Michelangelo\u2019s ceiling: https://smarthistory.org/michelangelo-ceiling-of-the-sistine-chapel/ and https://www.khanacademy.org/humanities/ap-art-history/early-europe-and-colonial-americas/renaissance-art-europe-ap/a/michelangelo-ceiling-of-the-sistine-chapel\n\n**Verdict:** **FALSE** (the ceiling is attributed to Michelangelo, not Leonardo da Vinci).\n\n**Confidence:** **0.90**\n\n**Justification (URLs used):** Search results consistently point to Michelangelo as the ceiling\u2019s painter, not Leonardo: https://en.wikipedia.org/wiki/Sistine_Chapel_ceiling ; https://smarthistory.org/michelangelo-ceiling-of-the-sistine-chapel/\n\n---\n\n### C3 [Biology]\n**Claim:** \u201cOctopuses have three hearts and blue blood.\u201d\n\n- **Evidence search:** Multiple sources in the search results explicitly state both \u201cthree hearts\u201d and \u201cblue blood.\u201d\n- **Authoritative source visit requirement:** **Not satisfied** in the provided dataset because no URLs were visited and **RAW VISIT CONTENT is empty**.\n- **Supporting evidence found (via search results):**\n  - Natural History Museum (UK) result states: \u201cAn octopus has blue blood and three hearts.\u201d https://www.nhm.ac.uk/discover/octopuses-keep-surprising-us-here-are-eight-examples-how.html\n  - Smithsonian Magazine also returned with the same combined fact in the title/description: https://www.smithsonianmag.com/science-nature/ten-wild-facts-about-octopuses-they-have-three-hearts-big-brains-and-blue-blood-7625828/\n- **Contradicting evidence found:** None in the provided data.\n\n**Verdict:** **TRUE** (as supported by multiple reputable sources in the provided search results).\n\n**Confidence:** **0.85**\n\n**Justification (URLs used):** Natural History Museum and Smithsonian both support \u201cthree hearts\u201d and \u201cblue blood\u201d: https://www.nhm.ac.uk/discover/octopuses-keep-surprising-us-here-are-eight-examples-how.html ; https://www.smithsonianmag.com/science-nature/ten-wild-facts-about-octopuses-they-have-three-hearts-big-brains-and-blue-blood-7625828/\n\n---\n\n### C4 [Geography]\n**Claim:** \u201cMount Everest is located on the border between Nepal and India.\u201d\n\n- **Evidence search:** Multiple authoritative sources (Wikipedia, Britannica) state Everest lies on the **Nepal\u2013China (Tibet Autonomous Region)** border, not Nepal\u2013India.\n- **Authoritative source visit requirement:** **Not satisfied** in the provided dataset because no URLs were visited and **RAW VISIT CONTENT is empty**.\n- **Contradicting evidence found (via search results):**\n  - Wikipedia snippet: Everest \u201cmarks part of the China\u2013Nepal border at its summit.\u201d https://en.wikipedia.org/wiki/Mount_Everest\n  - Britannica snippet: \u201cIt lies on the border between Nepal and the Tibet Autonomous Region of China.\u201d https://www.britannica.com/place/Mount-Everest\n- **Supporting evidence found:** None in the provided data (no credible source returned claiming Nepal\u2013India border).\n\n**Verdict:** **FALSE**\n\n**Confidence:** **0.95**\n\n**Justification (URLs used):** Authoritative references place Everest on the Nepal\u2013China/Tibet border: https://www.britannica.com/place/Mount-Everest ; https://en.wikipedia.org/wiki/Mount_Everest\n\n---\n\n## VERDICT REPORT\n\n### Verdict table\n\n| Claim ID | Verdict | Confidence | Key Evidence | Source URL |\n|---|---|---:|---|---|\n| C1 | PARTIALLY TRUE | 0.55 | Intended authoritative source (NIST CODATA) could not be visited; claim matches the standard defined value but is not proven with captured authoritative page text in this run. | https://physics.nist.gov/cgi-bin/cuu/Value?c= |\n| C2 | FALSE | 0.90 | Search results identify the Sistine Chapel ceiling with Michelangelo (not Leonardo da Vinci). | https://en.wikipedia.org/wiki/Sistine_Chapel_ceiling ; https://smarthistory.org/michelangelo-ceiling-of-the-sistine-chapel/ |\n| C3 | TRUE | 0.85 | Reputable sources (Natural History Museum, Smithsonian) state octopuses have \u201cthree hearts\u201d and \u201cblue blood.\u201d | https://www.nhm.ac.uk/discover/octopuses-keep-surprising-us-here-are-eight-examples-how.html ; https://www.smithsonianmag.com/science-nature/ten-wild-facts-about-octopuses-they-have-three-hearts-big-brains-and-blue-blood-7625828/ |\n| C4 | FALSE | 0.95 | Wikipedia and Britannica place Everest on the Nepal\u2013China/Tibet border, not Nepal\u2013India. | https://www.britannica.com/place/Mount-Everest ; https://en.wikipedia.org/wiki/Mount_Everest |\n\n### Reliability summary (100+ words)\nC2, C3, and C4 were straightforward to verify at the **search stage** because multiple reputable and/or authoritative references consistently agreed on the core facts: Michelangelo painted the Sistine Chapel ceiling (not Leonardo), octopuses are widely described as having three hearts and blue blood, and Mount Everest is repeatedly described as lying on the Nepal\u2013China/Tibet border rather than Nepal\u2013India. C4 was especially clear because both Wikipedia and Britannica converge on the same border description. C1 should have been the easiest (it\u2019s a defined SI value), but it required deeper investigation in this specific run because the attempted authoritative source visit to NIST timed out and no RAW VISIT CONTENT was captured, preventing the required direct quotation-based verification. Overall, the main reliability limitation here is the absence of successful page visits and verbatim extracts from authoritative pages in the provided dataset.\n\n## Evidence limitations (important)\n- **RAW VISIT CONTENT is empty for all URLs**, so I cannot provide the required verbatim quotes from visited pages.\n- The only recorded visit attempt (NIST for C1) failed with a timeout: https://physics.nist.gov/cgi-bin/cuu/Value?c=\n- For C2\u2013C4, only search results are available; no authoritative page was visited/captured in the provided execution data.\n",
+    "action_summary": "Verdicts: C1 PARTIALLY TRUE (insufficient captured authoritative evidence due to NIST timeout), C2 FALSE, C3 TRUE, C4 FALSE. Confidence highest for C4 and C2 due to consistent authoritative search results; verification quality is limited overall because no RAW VISIT CONTENT was captured and visit requirements were not met for C2\u2013C4.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_add",
+      "duration": 26.7782,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 26.7842,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 27.2879,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.6781,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8448,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7783,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7757,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5438,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5486,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 2.0159,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.9473,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6319,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.634,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.725,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.0717,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 6.2515,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8669,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8228,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.605,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.2563,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6004,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4831,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 11.5857,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 11.5884,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.0935,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.2459,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.3327,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7323,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.156,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 4.4981,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 4.5145,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 9.042,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 11.0405,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 26.6547,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 26.6563,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 26.6654,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 27.1217,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 12.3261,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 27.412,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 28.2577,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8627,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8738,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2088,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.6329,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 29.9132,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7911,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7701,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.0102,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 30.6964,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4092,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 30.8357,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 31.1988,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 31.1991,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5139,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 31.332,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.9805,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 0.9812,
+      "success": true
+    },
+    {
+      "name": "search",
+      "duration": 1.3328,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2342,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7714,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.1726,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.8556,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.9811,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 1.9822,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.7247,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.7246,
+      "success": true
+    },
+    {
+      "name": "search",
+      "duration": 1.9899,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 63.3975,
+      "success": false
+    },
+    {
+      "name": "chroma_query",
+      "duration": 63.417,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 63.4265,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.751,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7682,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 64.372,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.6333,
+      "success": true
+    },
+    {
+      "name": "search_query",
+      "duration": 1.634,
+      "success": true
+    },
+    {
+      "name": "search",
+      "duration": 1.6373,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9702,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9517,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4157,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4242,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4193,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.5062,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2707,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2697,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2675,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2024,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1902,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1902,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1904,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9307,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2296,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2348,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2382,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.23,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9074,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9179,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2435,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6656,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9722,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9476,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9224,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9204,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.915,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.923,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9274,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9209,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1324,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1073,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1018,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8789,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8883,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8839,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8726,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8806,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8751,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9316,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9883,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0674,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0345,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9643,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9273,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9387,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9389,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9676,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9773,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9733,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9418,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9426,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9696,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9337,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8722,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8548,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8817,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8896,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9032,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9046,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9172,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8825,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8543,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8338,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8414,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8487,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8722,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9048,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9509,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9949,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9876,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9749,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9342,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9224,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9124,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9118,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9557,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9673,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9657,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9593,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9293,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9363,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8977,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8982,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8788,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8735,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8922,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8857,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8969,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8991,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9404,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9797,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0769,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1172,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0843,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9706,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9212,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8988,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9225,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9187,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0127,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0301,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.026,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.944,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8973,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9103,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9222,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9132,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8957,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 27.879,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 28.163,
+      "success": true
+    }
+  ]
+}

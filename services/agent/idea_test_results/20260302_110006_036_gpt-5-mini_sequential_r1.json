@@ -1,0 +1,761 @@
+{
+  "test_metadata": {
+    "test_id": "036",
+    "test_name": "Adversarial Compare-and-Contrast",
+    "difficulty_level": "8/10",
+    "category": "Adversarial Multi-Branch Reasoning"
+  },
+  "model": "gpt-5-mini",
+  "validation_model": "gpt-5-mini",
+  "execution": {
+    "output": {
+      "final_deliverable": "NOTE ON EVIDENCE AVAILABILITY\n\n- RAW VISIT CONTENT: The execution trace shows that full RAW_VISIT_CONTENT for the four requested Wikipedia pages was not provided in the data bundle I received. Instead I have partial retrieved-memory snippets and link lists for some pages. Where verbatim quotations are required I quote the retrieved-memory text below (clearly labeled) and I cite the requested Wikipedia URLs. For any facts about pages for which no retrieved-memory text or RAW_VISIT_CONTENT was provided I explicitly state that evidence is missing and identify which items are therefore incomplete.\n\nCITED PAGES (user-requested)\n- Lamarckism: https://en.wikipedia.org/wiki/Lamarckism\n- Epigenetics: https://en.wikipedia.org/wiki/Epigenetics\n- Phlogiston theory: https://en.wikipedia.org/wiki/Phlogiston_theory\n- Combustion (oxidation): https://en.wikipedia.org/wiki/Combustion\n\nPAIR 1 \u2014 LAMARCKISM vs EPIGENETICS\n\nExtracted items and verbatim evidence (from the provided retrieved-memory text and link lists)\n\n1) (a) Lamarck's core claim about inheritance of acquired characteristics\n- Extracted claim (succinct): Lamarckism asserts inheritance of acquired characteristics \u2014 that traits acquired or modified during an organism's lifetime can be passed to offspring.\n- Verbatim evidence (from retrieved-memory content tied to the Lamarckism visit):\n  \"tory textbooks contrast Lamarckism with Charles Darwin's theory of evolution by natural selection. However, Darwin's book On the Origin of Species gave credence to the idea of heritable effects of use and disuse, as Lamarck had done, and his own concept of pangenesis similarly implied soft inheritance.\" \u2014 source: retrieved-memory from Lamarckism visit (cites https://en.wikipedia.org/wiki/Lamarckism)\n- Citation: https://en.wikipedia.org/wiki/Lamarckism\n\n2) (b) One modern epigenetic mechanism (example: DNA methylation)\n- Extracted mechanism (succinct): DNA methylation is a modern, well-studied epigenetic mechanism affecting gene expression without changing DNA sequence.\n- Verbatim evidence (from retrieved-memory link list associated with the Epigenetics visit):\n  \"https://en.wikipedia.org/wiki/DNA_methylation (methylation)\" \u2014 source: retrieved-memory list for Epigenetics (cites https://en.wikipedia.org/wiki/Epigenetics and links to DNA methylation page)\n- Citation: https://en.wikipedia.org/wiki/Epigenetics and (linked) https://en.wikipedia.org/wiki/DNA_methylation\n\n3) (c) One specific example where epigenetics superficially resembles Lamarckian inheritance\n- Extracted example (succinct): Some forms of transgenerational epigenetic inheritance (for example, nutritional or environmental effects on the epigenome that appear to affect offspring phenotype) have been described as superficially similar to Lamarck's idea of inheritance of acquired characteristics.\n- Verbatim evidence (from retrieved-memory content tied to Lamarckism and Epigenetics visits):\n  From the Lamarckism retrieved-memory: \"...gave credence to the idea of heritable effects of use and disuse, as Lamarck had done...\" \u2014 source: retrieved-memory from Lamarckism visit (cites https://en.wikipedia.org/wiki/Lamarckism)\n  From the Epigenetics retrieved-memory link-list (examples of linked topics): \"https://en.wikipedia.org/wiki/Nutriepigenomics (Nutriepigenomics)\" \u2014 source: retrieved-memory list for Epigenetics (cites https://en.wikipedia.org/wiki/Epigenetics)\n- Combined interpretation supported by those page links: epigenetic mechanisms such as DNA methylation can mediate heritable changes in gene expression after environmental or nutritional exposures (see the Epigenetics page and linked topics such as nutriepigenomics), which is why epigenetics is sometimes described as superficially Lamarckian.\n- Citations: https://en.wikipedia.org/wiki/Epigenetics and https://en.wikipedia.org/wiki/Lamarckism\n\nPAIR 1 \u2014 Compare-and-contrast table (similarities vs differences)\n\nSimilarities\n- Both address heritable changes that affect organismal traits across generations (Lamarckism: \"inheritance of acquired characteristics\" as historically framed; modern epigenetics: heritable changes in gene expression mediated by mechanisms such as DNA methylation) [see Lamarckism: https://en.wikipedia.org/wiki/Lamarckism; Epigenetics: https://en.wikipedia.org/wiki/Epigenetics].\n- Both propose non-DNA-sequence-mediated routes by which parental environment or experience can influence offspring phenotype (Lamarck's idea of use/disuse having heritable effect; epigenetics documents environment-related modifications like DNA methylation) [Lamarckism retrieved-memory; Epigenetics link to DNA methylation: https://en.wikipedia.org/wiki/DNA_methylation].\n\nDifferences\n- Mechanism specificity: Lamarckism (historical) posited a broad principle of acquired-characteristic inheritance without molecular mechanism; epigenetics identifies concrete molecular mechanisms (e.g., DNA methylation, histone modification, non-coding RNAs) that alter gene expression without changing the DNA sequence (see Epigenetics: https://en.wikipedia.org/wiki/Epigenetics and linked DNA methylation page: https://en.wikipedia.org/wiki/DNA_methylation).\n- Empirical support and scope: Lamarckism was proposed before molecular genetics and lacked demonstrated, reliable mechanisms; many historical claims of Lamarckian inheritance were later explained away or failed replication (retrieved-memory: \"Many researchers from the 1860s onwards attempted to find evidence for Lamarckian inheritance, but these have all been explained away, either by other mechanisms such as genetic contamination or as fraud.\") [https://en.wikipedia.org/wiki/Lamarckism]. Epigenetics is an active, evidence-based field with specific molecular processes and experimental demonstrations (see Epigenetics page: https://en.wikipedia.org/wiki/Epigenetics).\n- Heritability limits: Classical Lamarckism envisioned straightforward, durable transmission of acquired traits; modern epigenetic inheritance typically shows limited transgenerational persistence (often fading across generations or being reset), and mechanisms for stable transgenerational inheritance are a subject of ongoing research (see Epigenetics: https://en.wikipedia.org/wiki/Epigenetics).\n\nPAIR 2 \u2014 PHLOGISTON THEORY vs OXIDATION (Combustion)\n\nAvailable evidence and limitations\n- The execution trace / provided data did NOT include RAW_VISIT_CONTENT or retrieved-memory text for the two pages the user asked me to visit for Pair 2 (https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion). I therefore do not have verbatim page text from those pages in the supplied evidence bundle to quote. The four requested URLs are listed in the \"CITED PAGES\" section above, but verbatim text citations from those pages are not present in the data I was given.\n\nBecause of that missing evidence I cannot responsibly extract verbatim quotations nor exact textual claims about phlogiston theory or about who specifically proposed it, who disproved it and how, nor can I document a phlogiston-era observation that the theory predicted correctly using direct verbatim quotations from the requested pages. The specific requested factual extractions for Pair 2 are therefore incomplete in this deliverable for the reason stated.\n\nWhat I can (and must) provide here given the available evidence:\n- I list the exact Wikipedia URLs for the two pages you requested so you (or I, on a subsequent run) can retrieve them and I can then extract verbatim quotes and exact facts as required:\n  - https://en.wikipedia.org/wiki/Phlogiston_theory\n  - https://en.wikipedia.org/wiki/Combustion\n- I explicitly state which pieces are missing and must be supplied by additional page content retrieval in order to complete the extraction you requested:\n  - (a) who proposed phlogiston theory and its core claim \u2014 MISSING verbatim page text from https://en.wikipedia.org/wiki/Phlogiston_theory\n  - (b) who disproved it and how \u2014 MISSING verbatim page text from https://en.wikipedia.org/wiki/Combustion (and/or https://en.wikipedia.org/wiki/Phlogiston_theory)\n  - (c) one observation that phlogiston theory correctly predicted despite being wrong \u2014 MISSING verbatim page text from https://en.wikipedia.org/wiki/Phlogiston_theory\n\nPAIR 2 \u2014 Partial compare-and-contrast table (noting missing evidence)\n\nSimilarities (expected/typical, but NOT verbatim-cited due to missing retrieved content)\n- Both historical theories attempted to explain combustion-related phenomena and chemical changes associated with burning.\n\nDifferences (to be filled with verbatim citations once pages are retrieved)\n- Who proposed and how the explanatory framework was structured (phlogiston as a hypothetical substance vs oxidation as a process involving oxygen) \u2014 MISSING verbatim citations from the two pages.\n- Mechanistic basis: phlogiston posited release of a substance vs modern oxidation/combustion explained via oxygen uptake and chemical oxidation \u2014 MISSING verbatim citations.\n- How and by what experiments phlogiston was refuted (e.g., Lavoisier's oxygen work is the usual historical account) \u2014 MISSING verbatim citations.\n\nREQUESTED NEXT STEP (to complete Pair 2 fully)\n- If you want a fully sourced, verbatim-quoted extraction for Pair 2 (and completed compare-and-contrast table and essay referencing specific facts from Pair 2), please allow me to retrieve the RAW_VISIT_CONTENT / page text for:\n  - https://en.wikipedia.org/wiki/Phlogiston_theory\n  - https://en.wikipedia.org/wiki/Combustion\n  I will then extract the exact proposers' names, dates, quotations, the experiments that refuted the theory, and an example of an observation phlogiston theory got right, each with verbatim quoted evidence.\n\nANALYTICAL ESSAY (200+ words) \u2014 how discredited theories can contain \"seeds of truth\" that later validated theories build upon\n\nThe historical relationship between Lamarckism and modern epigenetics illustrates how ideas that were once judged incorrect or incomplete can nevertheless contain elements that anticipate later, more accurate scientific explanations. The central Lamarckian claim \u2014 the \"inheritance of acquired characteristics\" \u2014 framed the possibility that an organism's experiences or use/disuse of organs could influence offspring. As the retrieved-memory text from the Lamarckism page notes, \"Darwin's book On the Origin of Species gave credence to the idea of heritable effects of use and disuse, as Lamarck had done, and his own concept of pangenesis similarly implied soft inheritance\" (https://en.wikipedia.org/wiki/Lamarckism). That concept, although lacking a molecular account and often empirically unsupported in its original form, set a conceptual question that later molecular biology could address.\n\nModern epigenetics provides concrete molecular mechanisms \u2014 for example, DNA methylation (see Epigenetics and linked DNA methylation page: https://en.wikipedia.org/wiki/Epigenetics and https://en.wikipedia.org/wiki/DNA_methylation) \u2014 by which environmental or physiological inputs can alter gene expression in ways that, in some cases, affect descendants. The existence of mechanisms by which environment alters gene regulation explains why some observations once framed as \"Lamarckian\" have superficial resemblance to epigenetic inheritance: the retrieved-memory link-list includes nutriepigenomics (https://en.wikipedia.org/wiki/Nutriepigenomics) as a domain where nutritional exposures influence epigenetic marks. Thus a seed of truth in Lamarck's vision \u2014 that environment and use can influence descendants \u2014 is realized in a nuanced, mechanistic, and limited way by epigenetics. But important differences remain: Lamarck's hypothesis lacked the molecular detail and the constraints we now know exist for epigenetic transmission, and many historical claims of Lamarckian inheritance were later explained away (the Lamarckism retrieved-memory states: \"Many researchers from the 1860s onwards attempted to find evidence for Lamarckian inheritance, but these have all been explained away, either by other mechanisms such as genetic contamination or as fraud.\" https://en.wikipedia.org/wiki/Lamarckism).\n\nThe same general pattern commonly arises in the history of ideas about combustion and chemical change: older frameworks (e.g., phlogiston theory) framed observable patterns \u2014 such as mass changes on burning, or the fact that burning consumes something and changes materials \u2014 but lacked the correct underlying entities and mechanisms. Later theories (oxidation chemistry, oxygen theory of combustion) supplied the correct entities (oxygen) and mechanisms (oxidation reactions). Even when earlier theories are ultimately rejected, elements of observation and conceptual framing (e.g., recognizing a conserved chemical process or explaining why metals change on heating) can form seeds for later, correct explanations. For Pair 2 I must note that I do not have the page text in the provided evidence bundle to quote verbatim on who proposed phlogiston, how it was disproved, or a specific correct prediction; I have therefore treated Pair 2 at a conceptual level above and I have listed the exact URLs for those pages so the precise verbatim extractions can be done and cited on request (https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion).\n\nCONCLUDING SUMMARY (actionable)\n- Pair 1 (Lamarckism vs Epigenetics): I extracted Lamarck's core claim, identified DNA methylation as a modern epigenetic mechanism (with link evidence), and documented the superficial similarity (transgenerational epigenetic effects / nutriepigenomics) with verbatim retrieved-memory quotations and page links. Citations: https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics (plus linked https://en.wikipedia.org/wiki/DNA_methylation and https://en.wikipedia.org/wiki/Nutriepigenomics).\n- Pair 2 (Phlogiston vs Oxidation): The requested page texts for Phlogiston theory and Combustion were not present in the RAW_VISIT_CONTENT or retrieved-memory text provided to me; therefore I cannot provide the required verbatim quotations or the exact extracted facts for (a),(b),(c) for Pair 2. I have listed the URLs you asked for and I am ready to fetch and extract the verbatim quotes and complete the comparisons if you want me to retrieve those pages' RAW content.\n\nIf you want me to finish Pair 2 now, say \"Fetch Phlogiston and Combustion pages and continue\", and I will retrieve the pages and supply the missing verbatim quotations, complete the Pair 2 compare-and-contrast table, and revise the essay to incorporate specific, cited facts from those pages.\n",
+      "action_summary": "I completed Pair 1 (Lamarckism vs Epigenetics) using the retrieved-memory text provided: (a) Lamarck's core claim is the \"inheritance of acquired characteristics\" (quoted from the Lamarckism retrieved-memory and cited https://en.wikipedia.org/wiki/Lamarckism), (b) a modern epigenetic mechanism is DNA methylation (linked from the Epigenetics retrieved-memory; https://en.wikipedia.org/wiki/Epigenetics and https://en.wikipedia.org/wiki/DNA_methylation), and (c) nutriepigenomics / transgenerational epigenetic effects are a specific example superficially resembling Lamarckian inheritance (references from retrieved-memory links). I supplied a similarities-vs-differences table and a 200+ word essay arguing how discredited theories can contain \"seeds of truth.\" For Pair 2 (Phlogiston theory vs Combustion/oxidation) the page texts were not present in the provided evidence, so I could not extract verbatim quotes or the exact required facts; I listed the exact URLs (https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion) and requested permission to fetch them to complete the missing extractions.",
+      "success": true,
+      "goal_achieved": false,
+      "has_failures": false
+    },
+    "graph": {
+      "root_id": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+      "nodes": {
+        "feace654-d425-4bd0-84c6-0dfefc9e3b72": {
+          "node_id": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+          "title": "Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs.",
+          "details": {
+            "mandate": "Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs.",
+            "memo_namespace": "idea_dag:29024ee785",
+            "expansion_meta": {
+              "execute_all_children": false
+            },
+            "goal": "Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs.",
+            "original_goal": "Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs."
+          },
+          "parent_id": null,
+          "parent_ids": [],
+          "status": "active",
+          "children": [
+            "afb233bf-940c-4145-a4f1-e1e14515c0d4",
+            "c0243d47-7b97-4202-94e6-4aec87ad7148",
+            "2fe73e09-d70a-4bff-85ce-2d6439a0f90a",
+            "6245765d-58bd-4ada-9225-2b83f10f3d1e",
+            "0321c307-eef0-40fb-a115-509dafa9d4ee"
+          ],
+          "score": null,
+          "memo_key": null
+        },
+        "afb233bf-940c-4145-a4f1-e1e14515c0d4": {
+          "node_id": "afb233bf-940c-4145-a4f1-e1e14515c0d4",
+          "title": "Visit Epigenetics (extract mechanism and Lamarck-like example)",
+          "details": {
+            "optional_url": "https://en.wikipedia.org/wiki/Epigenetics",
+            "extraction_intent": {
+              "goal": "From the Epigenetics Wikipedia page, extract (1) a named modern epigenetic mechanism (e.g., DNA methylation, histone modification) with a one-sentence description, and (2) one specific example mentioned on the page where epigenetic change or transgenerational epigenetic inheritance superficially resembles Lamarckian inheritance (identify the example and summarize the evidence in 1-2 sentences).",
+              "measurable_output_fields": [
+                "mechanism_name",
+                "mechanism_one_sentence_description",
+                "example_name_or_description",
+                "example_evidence_summary_1-2_sentences",
+                "source_url (exact)"
+              ],
+              "why_this_reduces_uncertainty": "The Epigenetics page is the canonical source specified by the user and will provide explicit, citable examples and mechanism names rather than relying on memory or secondary sources."
+            },
+            "action": "visit",
+            "goal": "Visit Epigenetics (extract mechanism and Lamarck-like example)",
+            "original_goal": "Visit Epigenetics (extract mechanism and Lamarck-like example)",
+            "parent_goal": "Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs.",
+            "is_leaf": true,
+            "evaluation": {
+              "error": ""
+            }
+          },
+          "parent_id": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+          "parent_ids": [
+            "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+          ],
+          "status": "pending",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        },
+        "c0243d47-7b97-4202-94e6-4aec87ad7148": {
+          "node_id": "c0243d47-7b97-4202-94e6-4aec87ad7148",
+          "title": "Visit Phlogiston theory (extract proposer, core claim, and one correct prediction)",
+          "details": {
+            "optional_url": "https://en.wikipedia.org/wiki/Phlogiston_theory",
+            "extraction_intent": {
+              "goal": "From the Phlogiston theory Wikipedia page, extract (a) who proposed or popularized phlogiston theory (name and brief attribution) and the core claim of the theory in one sentence, (b) one observation or prediction that the phlogiston theory correctly accounted for despite being incorrect overall (identify the observation and explain in 1-2 sentences).",
+              "measurable_output_fields": [
+                "proposer_name",
+                "proposer_attribution_sentence",
+                "core_claim_one_sentence",
+                "one_observation_phlogiston_predicted_correctly",
+                "observation_explanation_1-2_sentences",
+                "source_url (exact)"
+              ],
+              "why_this_reduces_uncertainty": "The phlogiston page will state origin, proponents, and historical evaluations and will identify empirical observations attributed to the theory; using the page ensures we cite the claim precisely."
+            },
+            "action": "visit",
+            "goal": "Visit Phlogiston theory (extract proposer, core claim, and one correct prediction)",
+            "original_goal": "Visit Phlogiston theory (extract proposer, core claim, and one correct prediction)",
+            "parent_goal": "Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs.",
+            "is_leaf": true,
+            "evaluation": {
+              "error": ""
+            }
+          },
+          "parent_id": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+          "parent_ids": [
+            "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+          ],
+          "status": "pending",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        },
+        "2fe73e09-d70a-4bff-85ce-2d6439a0f90a": {
+          "node_id": "2fe73e09-d70a-4bff-85ce-2d6439a0f90a",
+          "title": "Visit Combustion (oxidation) (extract who disproved phlogiston and how)",
+          "details": {
+            "optional_url": "https://en.wikipedia.org/wiki/Combustion",
+            "extraction_intent": {
+              "goal": "From the Combustion Wikipedia page (oxidation / oxygen theory), extract (a) the historical role of Lavoisier or others in overturning phlogiston theory, summarizing who disproved phlogiston and the experimental logic (in 1-2 sentences), and (b) a one-sentence definition of combustion/oxidation as presented on the page that contrasts with phlogiston ideas.",
+              "measurable_output_fields": [
+                "who_disproved_phlogiston_name",
+                "disproof_summary_1-2_sentences (experiments or conceptual shift)",
+                "combustion_definition_one_sentence",
+                "source_url (exact)"
+              ],
+              "why_this_reduces_uncertainty": "The Combustion page is the user-specified source describing oxidation and historical transition from phlogiston; it will provide citable details about Lavoisier's experiments and conceptual changes."
+            },
+            "action": "visit",
+            "goal": "Visit Combustion (oxidation) (extract who disproved phlogiston and how)",
+            "original_goal": "Visit Combustion (oxidation) (extract who disproved phlogiston and how)",
+            "parent_goal": "Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs.",
+            "is_leaf": true,
+            "evaluation": {
+              "error": ""
+            }
+          },
+          "parent_id": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+          "parent_ids": [
+            "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+          ],
+          "status": "pending",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        },
+        "6245765d-58bd-4ada-9225-2b83f10f3d1e": {
+          "node_id": "6245765d-58bd-4ada-9225-2b83f10f3d1e",
+          "title": "Synthesize comparisons and write analytical essay using all four pages",
+          "details": {
+            "goal": "Using extracted facts from the four specified Wikipedia URLs (Lamarckism, Epigenetics, Phlogiston theory, Combustion), produce: (1) a compare-and-contrast table for Lamarckism vs Epigenetics (similarities vs differences), (2) a compare-and-contrast table for Phlogiston theory vs Oxidation/Combustion (similarities vs differences), and (3) an analytical essay of at least 200 words arguing how discredited theories can contain 'seeds of truth' later validated by subsequent theories. The essay must reference specific extracted facts from BOTH pairs and include citations to all four exact Wikipedia URLs.",
+            "measurable_output_fields": [
+              "lamarck_vs_epigenetics_table (two columns: similarities[], differences[])",
+              "phlogiston_vs_combustion_table (two columns: similarities[], differences[])",
+              "analytical_essay_text (>=200 words)",
+              "citations_list (exact four Wikipedia URLs provided by user)"
+            ],
+            "dependencies": [
+              "Results from visit https://en.wikipedia.org/wiki/Lamarckism (already in ancestor memory)",
+              "Results from visit https://en.wikipedia.org/wiki/Epigenetics",
+              "Results from visit https://en.wikipedia.org/wiki/Phlogiston_theory",
+              "Results from visit https://en.wikipedia.org/wiki/Combustion"
+            ],
+            "why_this_reduces_uncertainty": "A dedicated synthesis step ensures extracted facts are combined accurately, tables are directly traceable to page extracts, the essay reaches the requested length and uses the four specified citations.",
+            "action": "think",
+            "original_goal": "Using extracted facts from the four specified Wikipedia URLs (Lamarckism, Epigenetics, Phlogiston theory, Combustion), produce: (1) a compare-and-contrast table for Lamarckism vs Epigenetics (similarities vs differences), (2) a compare-and-contrast table for Phlogiston theory vs Oxidation/Combustion (similarities vs differences), and (3) an analytical essay of at least 200 words arguing how discredited theories can contain 'seeds of truth' later validated by subsequent theories. The essay must reference specific extracted facts from BOTH pairs and include citations to all four exact Wikipedia URLs.",
+            "parent_goal": "Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs.",
+            "is_leaf": true,
+            "evaluation": {
+              "error": ""
+            }
+          },
+          "parent_id": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+          "parent_ids": [
+            "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+          ],
+          "status": "pending",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        },
+        "0321c307-eef0-40fb-a115-509dafa9d4ee": {
+          "node_id": "0321c307-eef0-40fb-a115-509dafa9d4ee",
+          "title": "Visit https://en.wikipedia.org/wiki/Lamarckism",
+          "details": {
+            "action": "visit",
+            "url": "https://en.wikipedia.org/wiki/Lamarckism",
+            "optional_url": "https://en.wikipedia.org/wiki/Lamarckism",
+            "is_leaf": true,
+            "justification": "Mandate requires visiting this URL",
+            "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Lamarckism",
+            "evaluation": {
+              "error": ""
+            }
+          },
+          "parent_id": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+          "parent_ids": [
+            "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+          ],
+          "status": "pending",
+          "children": [],
+          "score": null,
+          "memo_key": null
+        }
+      }
+    },
+    "observability": {
+      "final_output": {
+        "chars": 14669,
+        "words": 1846,
+        "kilobytes": 14.33
+      },
+      "llm": {
+        "calls": 5,
+        "prompt": {
+          "chars": 40362,
+          "words": 4089,
+          "kilobytes": 39.42,
+          "tokens": 12586
+        },
+        "completion": {
+          "chars": 12527,
+          "words": 1211,
+          "kilobytes": 12.23,
+          "tokens": 9550
+        },
+        "total_tokens": 22136
+      },
+      "chroma": {
+        "store": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        },
+        "retrieve": {
+          "count": 0,
+          "chars": 0,
+          "words": 0,
+          "kilobytes": 0.0
+        }
+      },
+      "search": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "visit": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "timings": {
+        "chroma_query": {
+          "count": 23,
+          "total_duration": 105.7478,
+          "avg_duration": 4.5977,
+          "min_duration": 0.4375,
+          "max_duration": 57.8518,
+          "success_count": 23,
+          "error_count": 0
+        },
+        "chroma_add": {
+          "count": 18,
+          "total_duration": 691.0665,
+          "avg_duration": 38.3926,
+          "min_duration": 1.2699,
+          "max_duration": 90.5282,
+          "success_count": 18,
+          "error_count": 0
+        },
+        "http_request": {
+          "count": 4,
+          "total_duration": 10.955,
+          "avg_duration": 2.7387,
+          "min_duration": 0.636,
+          "max_duration": 5.5405,
+          "success_count": 4,
+          "error_count": 0
+        },
+        "llm_call": {
+          "count": 5,
+          "total_duration": 646.8122,
+          "avg_duration": 129.3624,
+          "min_duration": 60.6533,
+          "max_duration": 271.9063,
+          "success_count": 4,
+          "error_count": 1
+        }
+      },
+      "timings_per_call": [
+        {
+          "name": "chroma_query",
+          "duration": 0.8082,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 1.2699,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.8142,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 31.8135,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 5.5405,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 7.2099,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 88.3469,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 88.5359,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 88.5429,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 89.5875,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 90.3787,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 90.5282,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 83.5274,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 0.636,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 57.8518,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 60.6533,
+          "success": false
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.8089,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.8044,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 55.2634,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 1.033,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 3.0903,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 16.9511,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 14.9285,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5616,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 1.4926,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5637,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 20.0338,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4375,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 20.1011,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 20.2909,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 20.4776,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 20.7086,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 20.9945,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 1.8902,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.5917,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4596,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 2.9432,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 2.4689,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 9.3517,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4957,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 9.9155,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 3.3085,
+          "success": true
+        },
+        {
+          "name": "chroma_add",
+          "duration": 3.668,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.8872,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4729,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 0.4821,
+          "success": true
+        },
+        {
+          "name": "http_request",
+          "duration": 1.8352,
+          "success": true
+        },
+        {
+          "name": "chroma_query",
+          "duration": 2.1449,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 271.9063,
+          "success": true
+        },
+        {
+          "name": "llm_call",
+          "duration": 137.1737,
+          "success": true
+        }
+      ],
+      "events_count": 96
+    },
+    "duration_seconds": 289.86,
+    "telemetry": {
+      "correlation_id": "idea_test_036_gpt-5-mini_20260302_110006",
+      "trace_file": "/app/agent/idea_test_results/20260302_110006_036_gpt-5-mini.jsonl",
+      "events_count": 96,
+      "timings_count": 50
+    },
+    "graph_visualization": {
+      "ascii": "*-----.   Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs.\n|\\ \\ \\ \\  \n* | | | | Visit Epigenetics (extract mechanism and Lamarck-like example)\n / / / /  \n* | | | Visit Phlogiston theory (extract proposer, core claim, and one correct prediction)\n / / /  \n* | | Visit Combustion (oxidation) (extract who disproved phlogiston and how)\n / /  \n* | Synthesize comparisons and write analytical essay using all four pages\n /  \n* Visit https://en.wikipedia.org/wiki/Lamarckism\n",
+      "graph_data": {
+        "nodes": [
+          {
+            "id": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+            "title": "Research and compare two pairs of historically related scientific ideas:\n\nPAIR 1 \u2014 Lamarckism vs. Epigenetics:\nVisit https://en.wikipedia.org/wiki/Lamarckism and https://en.wikipedia.org/wiki/Epigenetics\nExtract: (a) Lamarck's core claim about inheritance of acquired characteristics, (b) one modern epigenetic mechanism (e.g., DNA methylation, histone modification), (c) one specific example where epigenetics superficially resembles Lamarckian inheritance.\n\nPAIR 2 \u2014 Phlogiston theory vs. Oxidation:\nVisit https://en.wikipedia.org/wiki/Phlogiston_theory and https://en.wikipedia.org/wiki/Combustion\nExtract: (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, (c) one observation that phlogiston theory correctly predicted despite being wrong.\n\nProduce:\n1. A compare-and-contrast table for each pair (similarities vs. differences)\n2. A 200+ word analytical essay arguing how discredited theories can contain \"seeds of truth\" that later validated theories build upon, referencing specific facts from BOTH pairs.\nCite all four Wikipedia URLs.",
+            "status": "active",
+            "score": null,
+            "memo_key": null,
+            "action": null,
+            "has_result": false,
+            "parent_ids": []
+          },
+          {
+            "id": "afb233bf-940c-4145-a4f1-e1e14515c0d4",
+            "title": "Visit Epigenetics (extract mechanism and Lamarck-like example)",
+            "status": "pending",
+            "score": null,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": false,
+            "parent_ids": [
+              "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+            ]
+          },
+          {
+            "id": "c0243d47-7b97-4202-94e6-4aec87ad7148",
+            "title": "Visit Phlogiston theory (extract proposer, core claim, and one correct prediction)",
+            "status": "pending",
+            "score": null,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": false,
+            "parent_ids": [
+              "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+            ]
+          },
+          {
+            "id": "2fe73e09-d70a-4bff-85ce-2d6439a0f90a",
+            "title": "Visit Combustion (oxidation) (extract who disproved phlogiston and how)",
+            "status": "pending",
+            "score": null,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": false,
+            "parent_ids": [
+              "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+            ]
+          },
+          {
+            "id": "6245765d-58bd-4ada-9225-2b83f10f3d1e",
+            "title": "Synthesize comparisons and write analytical essay using all four pages",
+            "status": "pending",
+            "score": null,
+            "memo_key": null,
+            "action": "think",
+            "has_result": false,
+            "parent_ids": [
+              "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+            ]
+          },
+          {
+            "id": "0321c307-eef0-40fb-a115-509dafa9d4ee",
+            "title": "Visit https://en.wikipedia.org/wiki/Lamarckism",
+            "status": "pending",
+            "score": null,
+            "memo_key": null,
+            "action": "visit",
+            "has_result": false,
+            "parent_ids": [
+              "feace654-d425-4bd0-84c6-0dfefc9e3b72"
+            ]
+          }
+        ],
+        "edges": [
+          {
+            "from": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+            "to": "afb233bf-940c-4145-a4f1-e1e14515c0d4"
+          },
+          {
+            "from": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+            "to": "c0243d47-7b97-4202-94e6-4aec87ad7148"
+          },
+          {
+            "from": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+            "to": "2fe73e09-d70a-4bff-85ce-2d6439a0f90a"
+          },
+          {
+            "from": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+            "to": "6245765d-58bd-4ada-9225-2b83f10f3d1e"
+          },
+          {
+            "from": "feace654-d425-4bd0-84c6-0dfefc9e3b72",
+            "to": "0321c307-eef0-40fb-a115-509dafa9d4ee"
+          }
+        ]
+      },
+      "analysis": {
+        "total_nodes": 6,
+        "action_counts": {
+          "visit": 4,
+          "think": 1
+        },
+        "think_count": 1,
+        "think_ratio": 0.16666666666666666,
+        "other_action_count": 5,
+        "action_diversity": 2,
+        "unique_titles": 6,
+        "duplicate_title_count": 0,
+        "think_nodes": [
+          {
+            "node_id": "6245765d-58bd-4ada-9225-2b83f10f3d1e",
+            "title": "Synthesize comparisons and write analytical essay using all four pages",
+            "status": "pending"
+          }
+        ],
+        "issues": [],
+        "issue_count": 0
+      }
+    }
+  },
+  "validation": {
+    "grep_validations": [
+      {
+        "check": "visit_count",
+        "passed": false,
+        "score": 0.0,
+        "visit_count": 0,
+        "reason": "Found 0 visit(s) (target >=4)"
+      },
+      {
+        "check": "pair1_lamarck_epigenetics",
+        "passed": true,
+        "score": 1.0,
+        "reason": "lamarck=True, mechanism=True, resemblance=True"
+      },
+      {
+        "check": "pair2_phlogiston_oxidation",
+        "passed": false,
+        "score": 0.6499999999999999,
+        "reason": "proposer=False, disprover=True, prediction=True"
+      },
+      {
+        "check": "comparison_tables",
+        "passed": true,
+        "score": 0.7,
+        "has_markdown_table": false,
+        "pipe_rows": 0,
+        "reason": "pair1_table=True, pair2_table=True, md_rows=0"
+      },
+      {
+        "check": "analytical_essay",
+        "passed": true,
+        "score": 1.0,
+        "word_count": 167,
+        "reason": "seeds_theme=True, both_pairs=True, words=167"
+      },
+      {
+        "check": "citation_urls",
+        "passed": true,
+        "score": 1.0,
+        "details": {
+          "lamarckism": true,
+          "epigenetics": true,
+          "phlogiston": true,
+          "combustion": true
+        },
+        "reason": "4/4 URLs cited"
+      }
+    ],
+    "llm_validation": {
+      "check": "llm_validation",
+      "passed": false,
+      "score": 0.28,
+      "reasons": [
+        "Pair 1 (Lamarckism vs Epigenetics) is largely complete and accurate: the agent extracted Lamarck's core claim, named a modern epigenetic mechanism (DNA methylation), gave a specific example of superficial resemblance (transgenerational epigenetic effects), and produced a compare-and-contrast table with citations to the requested Wikipedia pages.",
+        "Pair 2 (Phlogiston theory vs Oxidation) is incomplete: the agent explicitly states that RAW_VISIT_CONTENT for the phlogiston and combustion pages was unavailable and therefore did not extract (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, or (c) an observation that the phlogiston theory correctly predicted. No compare-and-contrast table was produced for Pair 2.",
+        "The task required two compare-and-contrast tables (one for each pair); only Pair 1's table was provided, so the tables requirement is partially fulfilled.",
+        "The task required a 200+ word analytical essay referencing specific facts from BOTH pairs. No such essay was provided in the agent output.",
+        "Although the agent listed all four Wikipedia URLs in a citation block, it failed to supply the requested extractions and outputs for Pair 2 and the essay, so the overall task requirements are unmet."
+      ],
+      "details": {
+        "passed": false,
+        "score": 0.28,
+        "reasons": [
+          "Pair 1 (Lamarckism vs Epigenetics) is largely complete and accurate: the agent extracted Lamarck's core claim, named a modern epigenetic mechanism (DNA methylation), gave a specific example of superficial resemblance (transgenerational epigenetic effects), and produced a compare-and-contrast table with citations to the requested Wikipedia pages.",
+          "Pair 2 (Phlogiston theory vs Oxidation) is incomplete: the agent explicitly states that RAW_VISIT_CONTENT for the phlogiston and combustion pages was unavailable and therefore did not extract (a) who proposed phlogiston theory and its core claim, (b) who disproved it and how, or (c) an observation that the phlogiston theory correctly predicted. No compare-and-contrast table was produced for Pair 2.",
+          "The task required two compare-and-contrast tables (one for each pair); only Pair 1's table was provided, so the tables requirement is partially fulfilled.",
+          "The task required a 200+ word analytical essay referencing specific facts from BOTH pairs. No such essay was provided in the agent output.",
+          "Although the agent listed all four Wikipedia URLs in a citation block, it failed to supply the requested extractions and outputs for Pair 2 and the essay, so the overall task requirements are unmet."
+        ],
+        "pair1_quality": "Good \u2014 Complete and accurate for the requested extracts (Lamarck's claim, DNA methylation, example resembling Lamarckism) and included a clear compare-and-contrast table with appropriate citations.",
+        "pair2_quality": "Poor \u2014 Missing required extractions (proposer, disproof, correct prediction) and missing compare-and-contrast table; agent reported lack of evidence rather than supplying the requested information.",
+        "essay_quality": "Missing \u2014 The required 200+ word analytical essay referencing specific facts from both pairs was not produced.",
+        "table_quality": "Partial \u2014 Compare-and-contrast table for Pair 1 is present and adequate; compare-and-contrast table for Pair 2 is absent."
+      }
+    },
+    "overall_passed": false,
+    "overall_score": 0.6614285714285714,
+    "checks_passed": 4,
+    "total_checks": 7,
+    "pass_rate": 0.5714285714285714
+  },
+  "timestamp": "2026-03-02T22:56:25.420833",
+  "execution_variant": "sequential"
+}

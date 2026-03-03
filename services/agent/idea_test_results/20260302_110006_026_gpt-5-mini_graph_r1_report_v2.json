@@ -1,0 +1,226 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "026",
+    "test_name": "Deterministic Page Facts",
+    "passed": true,
+    "score": 1.0,
+    "ascii_graph": "*-.   Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.\n|\\ \\  \n* | | Visit https://example.com and extract H1, external link domain, and citation\n / /  \n* | Visit https://www.iana.org/domains/reserved and produce one URL citation\n /  \n* Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page."
+    },
+    {
+      "node_id": "f8762d7f-bda1-4877-b11c-628b0d0f9cec",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit https://example.com and extract H1, external link domain, and citation"
+    },
+    {
+      "node_id": "c6662e22-84c9-441b-966a-0e744f08e5c8",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit https://www.iana.org/domains/reserved and produce one URL citation"
+    },
+    {
+      "node_id": "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45",
+      "action": "merge",
+      "status": "done",
+      "score": null,
+      "title": "Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 2,
+      "reason": "Found 2 visit(s)"
+    },
+    {
+      "check": "example_domain_text",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Found deterministic text 'Example Domain'"
+    },
+    {
+      "check": "known_urls",
+      "passed": true,
+      "score": 1.0,
+      "has_example": true,
+      "has_iana_reserved": true,
+      "reason": "known URLs present: example=True, iana_reserved=True"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 2731,
+      "words": 371,
+      "kilobytes": 2.67
+    },
+    "llm": {
+      "calls": 0,
+      "prompt": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "completion": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "total_tokens": 0
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 2,
+      "chars": 3054,
+      "words": 327,
+      "kilobytes": 2.98
+    },
+    "timings": {
+      "llm_call": {
+        "count": 3,
+        "total_duration": 96.0755,
+        "avg_duration": 32.0252,
+        "min_duration": 17.8585,
+        "max_duration": 52.9628,
+        "success_count": 3,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "llm_call",
+        "duration": 25.2542,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 17.8585,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 52.9628,
+        "success": true
+      }
+    ],
+    "events_count": 0
+  },
+  "node_index": {
+    "ba5f1dac-5296-42ad-ab04-78b63b624f12": {
+      "node_id": "ba5f1dac-5296-42ad-ab04-78b63b624f12",
+      "title": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "f8762d7f-bda1-4877-b11c-628b0d0f9cec",
+        "c6662e22-84c9-441b-966a-0e744f08e5c8",
+        "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45"
+      ],
+      "parent_ids": [],
+      "goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page."
+    },
+    "f8762d7f-bda1-4877-b11c-628b0d0f9cec": {
+      "node_id": "f8762d7f-bda1-4877-b11c-628b0d0f9cec",
+      "title": "Visit https://example.com and extract H1, external link domain, and citation",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "ba5f1dac-5296-42ad-ab04-78b63b624f12"
+      ],
+      "goal": "Visit https://example.com and extract H1, external link domain, and citation",
+      "result_success": true,
+      "result_content_preview": "Example Domain\nExample Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+      "result_source_url": "https://example.com"
+    },
+    "c6662e22-84c9-441b-966a-0e744f08e5c8": {
+      "node_id": "c6662e22-84c9-441b-966a-0e744f08e5c8",
+      "title": "Visit https://www.iana.org/domains/reserved and produce one URL citation",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "ba5f1dac-5296-42ad-ab04-78b63b624f12"
+      ],
+      "goal": "Visit https://www.iana.org/domains/reserved and produce one URL citation",
+      "result_success": true,
+      "result_content_preview": "IANA-managed Reserved Domains\nCertain domains are set aside, and nominally registered to \u201cIANA\u201d, for specific\n\t\tpolicy or technical purposes.\nExample domains\nAs described in\nRFC 2606\nand\nRFC 6761\n,\n\ta number of domains such as\nexample.com\nand\nexample.org\nare maintained for documentation purposes. These domains may be used as illustrative\n\texamples in documents without prior coordination with us. They are \n\tnot available for registration or transfer.\nTest IDN top-level domains\nThese domains were ",
+      "result_source_url": "https://www.iana.org/domains/reserved"
+    },
+    "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45": {
+      "node_id": "c0a90fcd-3cdc-481b-8a66-bb1c70ae1d45",
+      "title": "Merge: Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+      "action": "merge",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "ba5f1dac-5296-42ad-ab04-78b63b624f12"
+      ],
+      "goal": "Visit https://example.com and https://www.iana.org/domains/reserved. Return: (1) the exact H1 text from example.com, (2) the exact domain of the external link from example.com, and (3) one URL citation for each visited page.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Results\n\n1) Exact H1 text from https://example.com\n\n- Extraction: Example Domain\n- Verbatim quote from the page (RAW VISIT CONTENT): \"Example Domain\"\n- Source / citation: https://example.com\n\n2) Exact domain of the external link from https://example.com\n\n- Extraction (exact domain): iana.org\n- Verbatim evidence that the page contains link text: \"Learn more\" (from the example.com RAW VISIT CONTENT). Quote: \"Learn more\" (https://example.com)\n- Verbatim evidence showing the external link URL found by the visit/scan: \"https://iana.org/domains/example\" (from the visit record for https://example.com)\n  - Quote from the visit record: \"links\": [\"https://iana.org/domains/example\"] (source: visit result for https://example.com)\n- Source / citation for the link target: https://iana.org/domains/example\n\n3) One URL citation for each visited page\n\n- https://example.com (page visited; H1 and page text quoted above)\n- https://www.iana.org/domains/reserved (IANA Reserved Domains page visited)\n\nSupporting verbatim quotes from the RAW VISIT CONTENT (primary evidence)\n\n- From https://example.com (RAW VISIT CONTENT):\n  \"Example Domain\n  Example Domain\n  This domain is for use in documentation examples without needing permission. Avoid use in operations.\n  Learn more\"\n  (https://example.com)\n\n- From https://www.iana.org/domains/reserved (RAW VISIT CONTENT):\n  \"IANA-managed Reserved Domains\"\n  (https://www.iana.org/domains/reserved)\n\n- Also from the IANA page (showing example domains mention) (RAW VISIT CONTENT):\n  \"As described in\n  RFC 2606\n  and\n  RFC 6761\n  ,\n   a number of domains such as\n  example.com\n  and\n  example.org\n  are maintained for documentation purposes. These domains may be used as illustrative\n   examples in documents without prior coordination with us. They are \n   not available for registration or transfer.\"\n  (https://www.iana.org/domains/reserved)\n\nNotes on evidence used\n\n- The H1 text \"Example Domain\" was taken directly from the example.com RAW VISIT CONTENT (see quote above) and is cited to https://example.com.\n- The presence of a link labeled \"Learn more\" is shown in the example.com RAW VISIT CONTENT (see quote above). The visit record for https://example.com lists the external link URL exactly as \"https://iana.org/domains/example\", from which the link's domain is iana.org. Both the example.com visit record and the link target URL are cited above.\n- The IANA reserved page visit and its title / supporting text are quoted directly from the RAW VISIT CONTENT for https://www.iana.org/domains/reserved and are cited to that URL.\n\nAll factual claims above are supported by the quoted raw page content and the visit record link list. URL citations for every claim are provided inline above.",
+    "action_summary": "Returned: (1) H1 from https://example.com is exactly \"Example Domain\" (quoted from the page); (2) the external link on example.com points to https://iana.org/domains/example, so the exact domain is \"iana.org\" (visit record: \"https://iana.org/domains/example\" and the example.com page shows the link text \"Learn more\"); (3) URL citations: https://example.com and https://www.iana.org/domains/reserved (both quoted). All quotations and citations provided.",
+    "success": true,
+    "goal_achieved": true
+  },
+  "timings_per_call": [
+    {
+      "name": "llm_call",
+      "duration": 25.2542,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 17.8585,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 52.9628,
+      "success": true
+    }
+  ]
+}

@@ -1,0 +1,871 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "035",
+    "test_name": "Cross-Domain Niche Synthesis",
+    "passed": false,
+    "score": 0.7084761904761905,
+    "ascii_graph": "*---.   Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.\n|\\ \\ \\  \n* | | | Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable evidence)\n / / /  \n* | | Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern international maritime convention/treaty (with quotable evidence)\n / /  \n* | Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis essay with per-fact Wikipedia URL citations\n /  \n* Visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding\n"
+  },
+  "node_table": [
+    {
+      "node_id": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact."
+    },
+    {
+      "node_id": "b36ef73b-6859-46aa-a193-be4703689ab7",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable evidence)"
+    },
+    {
+      "node_id": "8ea0b753-78b1-4596-8040-d6c0e4ddf0aa",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern international maritime convention/treaty (with quotable evidence)"
+    },
+    {
+      "node_id": "26e56294-7767-4773-9937-f915a57ccdcb",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "title": "Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis essay with per-fact Wikipedia URL citations"
+    },
+    {
+      "node_id": "adbd9cb8-7409-4f80-8f7f-164218baeb3b",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": false,
+      "score": 0.3333333333333333,
+      "visit_count": 1,
+      "reason": "Found 1 visit(s)"
+    },
+    {
+      "check": "cordyceps_facts",
+      "passed": true,
+      "score": 1.0,
+      "reason": "zombie_behaviour=True, commercial_use=True"
+    },
+    {
+      "check": "admiralty_facts",
+      "passed": false,
+      "score": 0.5,
+      "reason": "historical_origin=False, convention=True"
+    },
+    {
+      "check": "origami_math_facts",
+      "passed": true,
+      "score": 1.0,
+      "reason": "theorem=True, engineering=True"
+    },
+    {
+      "check": "synthesis_essay",
+      "passed": false,
+      "score": 0.8759999999999999,
+      "topics_referenced": 3,
+      "has_theme": true,
+      "longest_paragraph_words": 88,
+      "reason": "topics=3/3, theme=True, words=88"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "details": {
+        "cordyceps": true,
+        "admiralty": true,
+        "paper_folding": true
+      },
+      "reason": "3/3 URLs cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 4223,
+      "words": 565,
+      "kilobytes": 4.12
+    },
+    "llm": {
+      "calls": 8,
+      "prompt": {
+        "chars": 147984,
+        "words": 13425,
+        "kilobytes": 144.52,
+        "tokens": 42985
+      },
+      "completion": {
+        "chars": 10706,
+        "words": 1294,
+        "kilobytes": 10.46,
+        "tokens": 2507
+      },
+      "total_tokens": 45492
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 1,
+      "chars": 10473,
+      "words": 1599,
+      "kilobytes": 10.23
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 30,
+        "total_duration": 115.1039,
+        "avg_duration": 3.8368,
+        "min_duration": 0.3583,
+        "max_duration": 24.4916,
+        "success_count": 30,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 16,
+        "total_duration": 185.5405,
+        "avg_duration": 11.5963,
+        "min_duration": 1.4221,
+        "max_duration": 25.7086,
+        "success_count": 16,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 8,
+        "total_duration": 27.6727,
+        "avg_duration": 3.4591,
+        "min_duration": 0.9435,
+        "max_duration": 7.2409,
+        "success_count": 8,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 7,
+        "total_duration": 145.0208,
+        "avg_duration": 20.7173,
+        "min_duration": 6.2853,
+        "max_duration": 31.12,
+        "success_count": 7,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 24.4916,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 25.7086,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.6146,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.6224,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.696,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7552,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1015,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3583,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.9693,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.479,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2076,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 22.2383,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 22.2407,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 21.2655,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 22.3905,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 21.697,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4322,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 6.2853,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 6.2883,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.6217,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3903,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 6.5852,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.9435,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.442,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.4652,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.4654,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.4677,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 7.2409,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 11.2944,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 23.7137,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 24.2328,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 14.1021,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 14.1109,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 5.5991,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.3097,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4392,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.4766,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.6083,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 6.6691,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.4221,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7673,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7284,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.6763,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.6754,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 3.1513,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4381,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3776,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.415,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4394,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.6189,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.518,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 8.945,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 9.3355,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3953,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3695,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3959,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.1669,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5146,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 31.12,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 28.4201,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 28.428,
+        "success": true
+      }
+    ],
+    "events_count": 116
+  },
+  "node_index": {
+    "ce45baa1-1294-4ac9-80a2-6768f6513abf": {
+      "node_id": "ce45baa1-1294-4ac9-80a2-6768f6513abf",
+      "title": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "b36ef73b-6859-46aa-a193-be4703689ab7",
+        "8ea0b753-78b1-4596-8040-d6c0e4ddf0aa",
+        "26e56294-7767-4773-9937-f915a57ccdcb",
+        "adbd9cb8-7409-4f80-8f7f-164218baeb3b"
+      ],
+      "parent_ids": [],
+      "goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact."
+    },
+    "b36ef73b-6859-46aa-a193-be4703689ab7": {
+      "node_id": "b36ef73b-6859-46aa-a193-be4703689ab7",
+      "title": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable evidence)",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+      ],
+      "goal": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable evidence)",
+      "result_success": true,
+      "result_content_preview": "Cordyceps\nCordyceps militaris\nScientific classification\nKingdom:\nFungi\nDivision:\nAscomycota\nClass:\nSordariomycetes\nOrder:\nHypocreales\nFamily:\nCordycipitaceae\nGenus:\nCordyceps\nFr.\n(1818)\nType species\nCordyceps militaris\n(\nL.\n) Fr. (1818)\nSynonyms\nList\nAkrophyton\nLebert (1858)\nAlphitomyces\nReissek (1856)\nAmphichorda\nFr. (1825)\nCampylothecium\nCes. (1846)\nCordylia\nFr. (1818)\nCordyliceps\nFr. (1832)\nCoremiopsis\nSizova & Suprun (1957)\nCorynesphaera\nDumort.2 (1822)\nEvlachovaea\nB.A. Borisov & Tarasov (19",
+      "result_source_url": "https://en.wikipedia.org/wiki/Cordyceps"
+    },
+    "8ea0b753-78b1-4596-8040-d6c0e4ddf0aa": {
+      "node_id": "8ea0b753-78b1-4596-8040-d6c0e4ddf0aa",
+      "title": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern international maritime convention/treaty (with quotable evidence)",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+      ],
+      "goal": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern international maritime convention/treaty (with quotable evidence)"
+    },
+    "26e56294-7767-4773-9937-f915a57ccdcb": {
+      "node_id": "26e56294-7767-4773-9937-f915a57ccdcb",
+      "title": "Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis essay with per-fact Wikipedia URL citations",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+      ],
+      "goal": "Think step: integrate extracted facts from all three pages into a 150+ word unifying-theme synthesis essay with per-fact Wikipedia URL citations"
+    },
+    "adbd9cb8-7409-4f80-8f7f-164218baeb3b": {
+      "node_id": "adbd9cb8-7409-4f80-8f7f-164218baeb3b",
+      "title": "Visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "ce45baa1-1294-4ac9-80a2-6768f6513abf"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Mathematics_of_paper_folding"
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## 1) Cordyceps fungi (https://en.wikipedia.org/wiki/Cordyceps)\n\n### (a) Common name for the behaviour Cordyceps induces in ants\nThe provided raw page text for **Cordyceps** does **not** contain the requested \u201ccommon name\u201d for the ant behaviour (e.g., a named behavioural syndrome). The only ant-related phrasing in the retrieved page text is indirect, via a quote about \u201czombies,\u201d but it does not name a specific behaviour.\n\nEvidence from the visited page shows only this general description:\n- From the Cordyceps page (https://en.wikipedia.org/wiki/Cordyceps): Scientific American notes some species \u201c**are indeed body snatchers\u2013they have been making real zombies for millions of years**\u201d, though \u201c**of ants or tarantulas, not of humans**.\u201d\n\nBecause the page text provided here does not include a specific named behaviour (such as a common-name label), that exact fact is **missing from the evidence**.\n\n### (b) One commercial or medicinal use of Cordyceps\nOne documented medicinal use (traditional) is its long-standing role in traditional Chinese medicine.\n\nEvidence:\n- From the Cordyceps page (https://en.wikipedia.org/wiki/Cordyceps): \u201c**Diverse variants of cordyceps have had more than 1,500 years of use in Chinese medicine.**\u201d\n- From the \u201cUses\u201d section (https://en.wikipedia.org/wiki/Cordyceps): \u201c**Cordyceps sensu lato \u2026 has long been used in traditional Chinese medicine in the belief it can be used to treat diseases.**\u201d\n\n\n## 2) Admiralty law (https://en.wikipedia.org/wiki/Admiralty_law)\n\nThe required Wikipedia page **was not visited** in the execution trail (it is marked \u201cskipped\u201d), and **no RAW VISIT CONTENT** for it is provided. Therefore, I cannot extract (a) the historical origin/earliest legal code or (b) a modern international maritime convention/treaty with verbatim quotes and citations from the provided evidence.\n\nMissing evidence:\n- No page text from https://en.wikipedia.org/wiki/Admiralty_law is included in RAW VISIT CONTENT.\n\n\n## 3) Mathematics of paper folding (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\nThe required Wikipedia page **was not visited** in the execution trail (it is marked \u201cskipped\u201d), and **no RAW VISIT CONTENT** for it is provided. The \u201cRetrieved Memories\u201d show only fragments of outbound links, not the page\u2019s actual statements, so I cannot quote a theorem/axiom or an engineering application from RAW VISIT CONTENT as required.\n\nMissing evidence:\n- No page text from https://en.wikipedia.org/wiki/Mathematics_of_paper_folding is included in RAW VISIT CONTENT.\n\n\n## Synthesis essay (150+ words): A unifying theme\u2014when systems gain power by controlling constraints\nCordyceps, admiralty law, and the mathematics of paper folding can be seen as three domains where the central problem is **controlling constraints**\u2014how a system (biological, legal, or geometric) channels complex outcomes by setting and exploiting rules.\n\nIn biology, Cordyceps exemplifies constraint-driven control through parasitism: the Wikipedia page characterizes Cordyceps as \u201c**parasitic**\u201d and notes that \u201c**Most Cordyceps species are endoparasitoids**\u201d that invade hosts (https://en.wikipedia.org/wiki/Cordyceps). Even the cultural description emphasizes a rule-like takeover of behavior\u2014Scientific American is quoted describing species that have been making \u201c**real zombies**\u201d for \u201c**ants**\u201d (https://en.wikipedia.org/wiki/Cordyceps). And humans have tried to harness this organismal complexity for their own ends: the page reports \u201c**more than 1,500 years of use in Chinese medicine**\u201d and that it \u201c**has long been used in traditional Chinese medicine**\u201d (https://en.wikipedia.org/wiki/Cordyceps).\n\nAdmiralty law and origami mathematics would likely fit the same theme\u2014legal regimes constrain behavior on the seas, and origami axioms constrain allowable folds to produce powerful constructions\u2014but **the necessary Wikipedia evidence for those two topics is missing** here because their pages were not visited and no quotable page text was provided. To complete the synthesis with specific facts (historical legal origins, named conventions/treaties, and origami axioms/theorems plus engineering applications), the RAW VISIT CONTENT from those two Wikipedia URLs is required.\n",
+    "action_summary": "Only the Cordyceps page was actually visited (raw text provided). From it, I extracted a traditional/medicinal use (\u201cmore than 1,500 years of use in Chinese medicine\u201d / \u201cused in traditional Chinese medicine\u201d). The specific common-name label for the ant behavior is not present in the provided Cordyceps page text. The Admiralty law and Mathematics of paper folding pages were skipped, so their requested facts and quotes cannot be produced from the given evidence. A 150+ word unifying-theme essay is provided, but it can only cite Cordyceps-specific facts; the other two topics lack visit-based evidence.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 24.4916,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 25.7086,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.6146,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.6224,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.696,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7552,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1015,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3583,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.9693,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.479,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2076,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 22.2383,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 22.2407,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 21.2655,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 22.3905,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 21.697,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4322,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 6.2853,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 6.2883,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.6217,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3903,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 6.5852,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.9435,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.442,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.4652,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.4654,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.4677,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 7.2409,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 11.2944,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 23.7137,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 24.2328,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 14.1021,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 14.1109,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 5.5991,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.3097,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4392,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.4766,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.6083,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 6.6691,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.4221,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7673,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7284,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.6763,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.6754,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 3.1513,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4381,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3776,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.415,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4394,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.6189,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.518,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 8.945,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 9.3355,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3953,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3695,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3959,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.1669,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5146,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 31.12,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 28.4201,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 28.428,
+      "success": true
+    }
+  ]
+}

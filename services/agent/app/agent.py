@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Callable, Any
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
+from agent.app.connector_browser import ConnectorBrowser
 from agent.app.tick_output import TickOutput, ActionType
 from agent.app.prompt_builder import TickPromptBuilder, FinalPromptBuilder, ObservationBuilder
 from agent.app.idea_engine import IdeaDagEngine
@@ -32,6 +33,7 @@ class Agent:
         connector_search: ConnectorSearch = None,
         connector_http: ConnectorHttp = None,
         connector_chroma: ConnectorChroma = None,
+        connector_browser: Optional[ConnectorBrowser] = None,
         model_name: str | None = None,
         tracer: Optional[TraceRecorder] = None,
         agent_io: Optional[AgentIO] = None,
@@ -58,6 +60,7 @@ class Agent:
         self.connector_search = connector_search
         self.connector_http = connector_http
         self.connector_chroma = connector_chroma
+        self.connector_browser = connector_browser
         self.model_name = model_name
         self.tracer = tracer
         self.model_selector = model_selector
@@ -68,6 +71,7 @@ class Agent:
             connector_search=connector_search,
             connector_http=connector_http,
             connector_chroma=connector_chroma,
+            connector_browser=connector_browser,
         )
 
         self.collection_name = "agent_memory"
@@ -575,11 +579,4 @@ class Agent:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Exit async context manager, cleaning up connector resources.
-        
-        Note: Connectors are shared and reused across multiple Agent instances,
-        so we do NOT close them here. They are managed at the InterfaceAgent level.
-        """
-        # Do not close shared connectors - they are reused across multiple agents
-        # The InterfaceAgent manages their lifecycle
         pass

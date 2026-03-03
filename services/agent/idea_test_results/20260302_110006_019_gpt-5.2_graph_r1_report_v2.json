@@ -1,0 +1,363 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "019",
+    "test_name": "Explicit Visit Requirement",
+    "passed": true,
+    "score": 0.9833333333333334,
+    "ascii_graph": "*-.   Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.\n|\\ \\  \n* | | Visit the specified Wikipedia URL and extract: first release year, creator name, stable version (with exact supporting lines for citation)\n / /  \n* | From the visited page content, locate and quote the infobox fields for: First appeared (year), Designed by (creator), Stable release (version)\n /  \n* Save extracted Python facts (first release year, creator, stable version) with citations for parent merge\n"
+  },
+  "node_table": [
+    {
+      "node_id": "c2868388-8047-40e1-9b24-6e7a24715988",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content."
+    },
+    {
+      "node_id": "9fa9f231-e6f4-4a79-9bb0-90b63eb40d92",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit the specified Wikipedia URL and extract: first release year, creator name, stable version (with exact supporting lines for citation)"
+    },
+    {
+      "node_id": "fa267f9e-b2dd-4958-9c51-5b5c40cfe849",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "title": "From the visited page content, locate and quote the infobox fields for: First appeared (year), Designed by (creator), Stable release (version)"
+    },
+    {
+      "node_id": "6bd59314-b812-420f-b825-2ec683d17b83",
+      "action": "save",
+      "status": "blocked",
+      "score": 0.1,
+      "title": "Save extracted Python facts (first release year, creator, stable version) with citations for parent merge"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_executed",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 1,
+      "reason": "Found 1 visit(s)"
+    },
+    {
+      "check": "wikipedia_url_visited",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Wikipedia Python page mentioned"
+    },
+    {
+      "check": "year_extracted",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Year 1991 found"
+    },
+    {
+      "check": "creator_extracted",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Guido van Rossum found"
+    },
+    {
+      "check": "version_extracted",
+      "passed": true,
+      "score": 1.0,
+      "version": "3.14.3",
+      "reason": "Version 3.14.3 found"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 1224,
+      "words": 137,
+      "kilobytes": 1.2
+    },
+    "llm": {
+      "calls": 2,
+      "prompt": {
+        "chars": 7177,
+        "words": 963,
+        "kilobytes": 7.01,
+        "tokens": 1762
+      },
+      "completion": {
+        "chars": 1234,
+        "words": 112,
+        "kilobytes": 1.21,
+        "tokens": 256
+      },
+      "total_tokens": 2018
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 1,
+      "chars": 79311,
+      "words": 12982,
+      "kilobytes": 77.45
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 2,
+        "total_duration": 1.6129,
+        "avg_duration": 0.8065,
+        "min_duration": 0.6466,
+        "max_duration": 0.9663,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 2,
+        "total_duration": 3.0809,
+        "avg_duration": 1.5405,
+        "min_duration": 1.1567,
+        "max_duration": 1.9243,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 2,
+        "total_duration": 55.6854,
+        "avg_duration": 27.8427,
+        "min_duration": 3.7918,
+        "max_duration": 51.8936,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 4,
+        "total_duration": 60.7062,
+        "avg_duration": 15.1765,
+        "min_duration": 1.1181,
+        "max_duration": 20.0695,
+        "success_count": 4,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 2,
+        "total_duration": 47.5315,
+        "avg_duration": 23.7657,
+        "min_duration": 16.3626,
+        "max_duration": 31.1689,
+        "success_count": 0,
+        "error_count": 2
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.6466,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.1567,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9663,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 51.8936,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.9243,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 3.7918,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 20.0014,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 20.0695,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.1181,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 16.3626,
+        "success": false
+      },
+      {
+        "name": "chroma_store",
+        "duration": 31.1689,
+        "success": false
+      },
+      {
+        "name": "llm_call",
+        "duration": 19.5171,
+        "success": true
+      }
+    ],
+    "events_count": 14
+  },
+  "node_index": {
+    "c2868388-8047-40e1-9b24-6e7a24715988": {
+      "node_id": "c2868388-8047-40e1-9b24-6e7a24715988",
+      "title": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content.",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "9fa9f231-e6f4-4a79-9bb0-90b63eb40d92",
+        "fa267f9e-b2dd-4958-9c51-5b5c40cfe849",
+        "6bd59314-b812-420f-b825-2ec683d17b83"
+      ],
+      "parent_ids": [],
+      "goal": "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) and extract the following information directly from the page content: (1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content."
+    },
+    "9fa9f231-e6f4-4a79-9bb0-90b63eb40d92": {
+      "node_id": "9fa9f231-e6f4-4a79-9bb0-90b63eb40d92",
+      "title": "Visit the specified Wikipedia URL and extract: first release year, creator name, stable version (with exact supporting lines for citation)",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "c2868388-8047-40e1-9b24-6e7a24715988"
+      ],
+      "goal": "Visit the specified Wikipedia URL and extract: first release year, creator name, stable version (with exact supporting lines for citation)",
+      "result_success": true,
+      "result_content_preview": "\".pyc\" redirects here. For the top-level domain in Cyrillic script, see\n.\u0440\u0443\u0441\n.\nThis article\nmay contain\nunverified\nor\nindiscriminate\ninformation\nin\nembedded lists\n.\nPlease help\nclean up the lists\nby removing items or incorporating them into the text of the article.\n(\nOctober 2025\n)\nPython\nParadigm\nMulti-paradigm\n:\nobject-oriented\n,\nprocedural\n(\nimperative\n),\nfunctional\n,\nstructured\n,\nreflective\nDesigned\u00a0by\nGuido van Rossum\nDeveloper\nPython Software Foundation\nFirst\u00a0appeared\n20\u00a0February 1991\n(\n19",
+      "result_source_url": "https://en.wikipedia.org/wiki/Python_(programming_language)"
+    },
+    "fa267f9e-b2dd-4958-9c51-5b5c40cfe849": {
+      "node_id": "fa267f9e-b2dd-4958-9c51-5b5c40cfe849",
+      "title": "From the visited page content, locate and quote the infobox fields for: First appeared (year), Designed by (creator), Stable release (version)",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "c2868388-8047-40e1-9b24-6e7a24715988"
+      ],
+      "goal": "From the visited page content, locate and quote the infobox fields for: First appeared (year), Designed by (creator), Stable release (version)",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "6bd59314-b812-420f-b825-2ec683d17b83": {
+      "node_id": "6bd59314-b812-420f-b825-2ec683d17b83",
+      "title": "Save extracted Python facts (first release year, creator, stable version) with citations for parent merge",
+      "action": "save",
+      "status": "blocked",
+      "score": 0.1,
+      "children": [],
+      "parent_ids": [
+        "c2868388-8047-40e1-9b24-6e7a24715988"
+      ],
+      "goal": "Save extracted Python facts (first release year, creator, stable version) with citations for parent merge",
+      "result_success": false,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## Extracted from Wikipedia: *Python (programming language)*\nSource page visited: https://en.wikipedia.org/wiki/Python_(programming_language)\n\n### 1) Year Python was first released (first appeared)\n- **1991**\n  - Evidence (infobox): The page lists **\u201cFirst appeared 20 February 1991 (1991-02-20)\u201d**. (https://en.wikipedia.org/wiki/Python_(programming_language) \u2014 quote: \"First\u00a0appeared\\n20\u00a0February 1991\\n(\\n1991-02-20\\n)\")\n\n### 2) Name of Python\u2019s creator\n- **Guido van Rossum**\n  - Evidence (infobox): The page states **\u201cDesigned by Guido van Rossum\u201d**. (https://en.wikipedia.org/wiki/Python_(programming_language) \u2014 quote: \"Designed\u00a0by\\nGuido van Rossum\")\n\n### 3) Current stable version number\n- **3.14.3**\n  - Evidence (infobox): The page shows **\u201cStable release 3.14.3 / 3 February 2026 (3 February 2026)\u201d**. (https://en.wikipedia.org/wiki/Python_(programming_language) \u2014 quote: \"Stable release\\n3.14.3\\n/ 3 February 2026\\n(\\n3 February 2026\\n)\")\n\n(Additional confirmation in article text): The page also says **\u201cAs of January 2026, Python 3.14.3 is the latest stable release.\u201d** (https://en.wikipedia.org/wiki/Python_(programming_language) \u2014 quote: \"As of January 2026\\n, Python 3.14.3 is the latest stable release.\")\n",
+    "action_summary": "From https://en.wikipedia.org/wiki/Python_(programming_language): First release year (First appeared) = 1991; creator (Designed by) = Guido van Rossum; current stable version = 3.14.3.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.6466,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.1567,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9663,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 51.8936,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.9243,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 3.7918,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 20.0014,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 20.0695,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.1181,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 16.3626,
+      "success": false
+    },
+    {
+      "name": "chroma_store",
+      "duration": 31.1689,
+      "success": false
+    },
+    {
+      "name": "llm_call",
+      "duration": 19.5171,
+      "success": true
+    }
+  ]
+}

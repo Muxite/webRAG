@@ -1,0 +1,268 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "009",
+    "test_name": "Deep Research Synthesis",
+    "passed": false,
+    "score": 0.603125,
+    "ascii_graph": "*-----.   Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.\n|\\ \\ \\ \\  \n* | | | | Search for primary sources and key scholarly papers on Piltdown (1912 discovery papers; 1953 exposure; 2016 Royal Society Open Science re-analysis) with URLs for later visits\n / / / /  \n* | | | Visit Natural History Museum (UK) page summarizing 2016 findings pointing to Charles Dawson as likely sole perpetrator; extract methods, evidence, motivations hypotheses, and citations to underlying paper\n / / /  \n* | | Visit AAAS/Science news piece on identifying culprit; extract precise description of 1953 exposure methods and 2016 paper findings plus references to primary literature to chase next\n / /  \n* | Visit Science History Institute overview for narrative timeline and pointers to primary documents; extract key dates, actors, and impact on paleoanthropology\n /  \n* Think: draft extraction schema for evidence (claims, methods, dates, perpetrators, motivations, impact, modern techniques) and map which sources will fill each slot; identify gaps to search next\n"
+  },
+  "node_table": [
+    {
+      "node_id": "ae625125-8c4b-47fd-b835-612e5b6cc51f",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents."
+    },
+    {
+      "node_id": "ff66ebea-cba9-4096-90da-89bd5159970a",
+      "action": "search",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Search for primary sources and key scholarly papers on Piltdown (1912 discovery papers; 1953 exposure; 2016 Royal Society Open Science re-analysis) with URLs for later visits"
+    },
+    {
+      "node_id": "6e4ef1a6-4609-4d14-8f88-69f7bfe9844e",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit Natural History Museum (UK) page summarizing 2016 findings pointing to Charles Dawson as likely sole perpetrator; extract methods, evidence, motivations hypotheses, and citations to underlying paper"
+    },
+    {
+      "node_id": "7ae79ba8-2381-481d-a09f-0aea68d589e4",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit AAAS/Science news piece on identifying culprit; extract precise description of 1953 exposure methods and 2016 paper findings plus references to primary literature to chase next"
+    },
+    {
+      "node_id": "5b771aea-4dbb-4e59-8235-b8fec5848030",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit Science History Institute overview for narrative timeline and pointers to primary documents; extract key dates, actors, and impact on paleoanthropology"
+    },
+    {
+      "node_id": "f1de1139-dd84-4f38-b76b-86b4add82081",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "title": "Think: draft extraction schema for evidence (claims, methods, dates, perpetrators, motivations, impact, modern techniques) and map which sources will fill each slot; identify gaps to search next"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "research_areas",
+      "passed": true,
+      "score": 1.0,
+      "areas_covered": 6,
+      "details": {
+        "discovery": true,
+        "exposure": true,
+        "timeline": true,
+        "perpetrator": true,
+        "modern": true,
+        "impact": true
+      },
+      "reason": "Covered 6/6 research areas"
+    },
+    {
+      "check": "synthesis",
+      "passed": true,
+      "score": 0.5,
+      "reason": "Synthesis: present=True, self-correction=True"
+    },
+    {
+      "check": "authoritative_sources",
+      "passed": false,
+      "score": 0.5625,
+      "total_urls": 9,
+      "authoritative_urls": 0,
+      "reason": "Found 9 URLs (0 authoritative)"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 15385,
+      "words": 2164,
+      "kilobytes": 15.02
+    },
+    "llm": {
+      "calls": 0,
+      "prompt": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "completion": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "total_tokens": 0
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 1,
+      "chars": 7712,
+      "words": 1230,
+      "kilobytes": 7.53
+    },
+    "timings": {
+      "llm_call": {
+        "count": 3,
+        "total_duration": 73.321,
+        "avg_duration": 24.4403,
+        "min_duration": 1.5278,
+        "max_duration": 63.3398,
+        "success_count": 3,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "llm_call",
+        "duration": 8.4534,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.5278,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 63.3398,
+        "success": true
+      }
+    ],
+    "events_count": 0
+  },
+  "node_index": {
+    "ae625125-8c4b-47fd-b835-612e5b6cc51f": {
+      "node_id": "ae625125-8c4b-47fd-b835-612e5b6cc51f",
+      "title": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents.",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "ff66ebea-cba9-4096-90da-89bd5159970a",
+        "6e4ef1a6-4609-4d14-8f88-69f7bfe9844e",
+        "7ae79ba8-2381-481d-a09f-0aea68d589e4",
+        "5b771aea-4dbb-4e59-8235-b8fec5848030",
+        "f1de1139-dd84-4f38-b76b-86b4add82081"
+      ],
+      "parent_ids": [],
+      "goal": "Research the controversy surrounding the 'Piltdown Man' hoax. Find: the original discovery claims, the scientific methods used to expose it as a fraud, the timeline of the hoax and its exposure, the identity of the perpetrator(s) and their motivations, modern scientific techniques that would have detected it immediately, and the impact on paleoanthropology. Synthesize this into a coherent narrative explaining how scientific self-correction works. Cite primary sources, scientific papers, and historical documents."
+    },
+    "ff66ebea-cba9-4096-90da-89bd5159970a": {
+      "node_id": "ff66ebea-cba9-4096-90da-89bd5159970a",
+      "title": "Search for primary sources and key scholarly papers on Piltdown (1912 discovery papers; 1953 exposure; 2016 Royal Society Open Science re-analysis) with URLs for later visits",
+      "action": "search",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "ae625125-8c4b-47fd-b835-612e5b6cc51f"
+      ],
+      "goal": "Search for primary sources and key scholarly papers on Piltdown (1912 discovery papers; 1953 exposure; 2016 Royal Society Open Science re-analysis) with URLs for later visits"
+    },
+    "6e4ef1a6-4609-4d14-8f88-69f7bfe9844e": {
+      "node_id": "6e4ef1a6-4609-4d14-8f88-69f7bfe9844e",
+      "title": "Visit Natural History Museum (UK) page summarizing 2016 findings pointing to Charles Dawson as likely sole perpetrator; extract methods, evidence, motivations hypotheses, and citations to underlying paper",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "ae625125-8c4b-47fd-b835-612e5b6cc51f"
+      ],
+      "goal": "Visit Natural History Museum (UK) page summarizing 2016 findings pointing to Charles Dawson as likely sole perpetrator; extract methods, evidence, motivations hypotheses, and citations to underlying paper",
+      "result_success": true,
+      "result_content_preview": "News\nPiltdown Man hoax findings: Charles Dawson the likely fraudster\nBy\nKatie Pavid\nFirst published\n10 August 2016\nLast updated\n10 August 2016\nNew forensic methods have brought researchers a step closer to confirming the man behind an infamous scientific hoax.\nA suite of technological innovations have linked the fake Piltdown fossils to a single forger: amateur archaeologist Charles Dawson.\nBetween 1912 and 1914, two men astounded the scientific world by announcing they had found fossil evidence",
+      "result_source_url": "https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html"
+    },
+    "7ae79ba8-2381-481d-a09f-0aea68d589e4": {
+      "node_id": "7ae79ba8-2381-481d-a09f-0aea68d589e4",
+      "title": "Visit AAAS/Science news piece on identifying culprit; extract precise description of 1953 exposure methods and 2016 paper findings plus references to primary literature to chase next",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "ae625125-8c4b-47fd-b835-612e5b6cc51f"
+      ],
+      "goal": "Visit AAAS/Science news piece on identifying culprit; extract precise description of 1953 exposure methods and 2016 paper findings plus references to primary literature to chase next"
+    },
+    "5b771aea-4dbb-4e59-8235-b8fec5848030": {
+      "node_id": "5b771aea-4dbb-4e59-8235-b8fec5848030",
+      "title": "Visit Science History Institute overview for narrative timeline and pointers to primary documents; extract key dates, actors, and impact on paleoanthropology",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "ae625125-8c4b-47fd-b835-612e5b6cc51f"
+      ],
+      "goal": "Visit Science History Institute overview for narrative timeline and pointers to primary documents; extract key dates, actors, and impact on paleoanthropology"
+    },
+    "f1de1139-dd84-4f38-b76b-86b4add82081": {
+      "node_id": "f1de1139-dd84-4f38-b76b-86b4add82081",
+      "title": "Think: draft extraction schema for evidence (claims, methods, dates, perpetrators, motivations, impact, modern techniques) and map which sources will fill each slot; identify gaps to search next",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "ae625125-8c4b-47fd-b835-612e5b6cc51f"
+      ],
+      "goal": "Think: draft extraction schema for evidence (claims, methods, dates, perpetrators, motivations, impact, modern techniques) and map which sources will fill each slot; identify gaps to search next"
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## Piltdown Man: the claims, the fraud, how it was exposed, and what it teaches about scientific self\u2011correction\n\n### 1) What was originally claimed (1912\u20131914)\nThe Natural History Museum (NHM, UK) summary of the case describes the original claims and the public framing of the fossils as a \u201cmissing link.\u201d\n\n- **Who announced it and what they presented**: NHM states that \u201c**Between 1912 and 1914, two men astounded the scientific world by announcing they had found fossil evidence of the missing evolutionary link between apes and humans. Palaeontologist Arthur Smith Woodward and amateur antiquarian Charles Dawson presented the skull of so-called Piltdown Man, dubbed _Eoanthropus dawsoni_.**\u201d (https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html)\n\n- **How the \u2018discovery\u2019 began**: \u201c**In 1912, Dawson wrote to Woodward, the Keeper of Geology at the Natural History Museum, claiming he had found pieces of human skull in gravel beds at Piltdown, Sussex.**\u201d (https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html)\n\n- **What was found at Piltdown I, according to the claim** (and why it looked persuasive):\n  - \u201c**The finds included five human skull fragments, an ape-like jawbone with two teeth and a variety of animal fossils and primitive stone tools.**\u201d\n  - \u201c**All of them were stained with the same dark red-brown colour as the ancient gravel.**\u201d\n  - \u201c**The jawbone did not look human but the teeth it held did, appearing to have been worn down in a typically human way.**\u201d\n  - The conclusion they promoted: \u201c**Woodward and Dawson claimed all this evidence pointed to a human ancestor living at least 500,000 years ago.**\u201d\n  (All quotes: https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html)\n\n- **How the story expanded (1913\u20131914) and reinforced itself**:\n  - \u201c**Excavations continued in 1913 and 1914, with more important finds including a canine tooth and a carved slab of bone shaped like a cricket bat.**\u201d\n  - \u201c**Dawson also discovered a second site, known as Piltdown II, where he unearthed a second collection of skull fragments and a molar tooth.**\u201d\n  (https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html)\n\n**Controversy embedded from the start:** NHM notes that \u201c**Some anatomists doubted from the beginning the idea that all the remains belonged to a single individual.**\u201d (https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html)\n\n\n### 2) Timeline of the hoax and its exposure (as supported by the provided primary evidence)\nFrom the visited NHM source, we can anchor a clear sequence:\n\n1. **1912** \u2013 Dawson contacts Woodward with the claim.\n   - Quote: \u201c**In 1912, Dawson wrote to Woodward\u2026 claiming he had found pieces of human skull in gravel beds at Piltdown, Sussex.**\u201d (NHM URL above)\n\n2. **1912\u20131914** \u2013 Ongoing excavations, more finds, and a second site.\n   - Quote: \u201c**Between 1912 and 1914\u2026 Woodward and Dawson presented the skull\u2026**\u201d and \u201c**Excavations continued in 1913 and 1914\u2026**\u201d; \u201c**Dawson also discovered a second site, known as Piltdown II\u2026**\u201d (NHM URL above)\n\n3. **1916** \u2013 Discovery activity stops after Dawson\u2019s death.\n   - Quote: \u201c**After Dawson died in 1916, no other specimens were found.**\u201d (NHM URL above)\n\n4. **Early 1950s** \u2013 Objective testing is initiated.\n   - Quote: \u201c**In the early 1950s, a team devised a series of objective tests to try to uncover the truth.**\u201d (NHM URL above)\n\n5. **1950s (NHM gives specific milestones)** \u2013 Chemical/physical tests show fraud.\n   - Quote: \u201c**Through fluorine testing, Dr Kenneth Oakley\u2026 discovered that the Piltdown remains were only 50,000 years old at most**\u2026\u201d (NHM URL above)\n   - Quote: \u201c**In 1955 it was revealed that most of the material had been artificially stained brown to match the local gravels.**\u201d (NHM URL above)\n\n6. **2016** \u2013 Modern re-analysis strongly implicates Dawson as the (likely sole) forger.\n   - Quote: \u201c**New collaborative research, published in the journal _Royal Society Open Science_, used high-precision measurements, chemical analysis and 3D imaging to demonstrate the forger was almost certainly Dawson.**\u201d (NHM URL above)\n   - Quote: \u201c**A suite of technological innovations have linked the fake Piltdown fossils to a single forger: amateur archaeologist Charles Dawson.**\u201d (NHM URL above)\n\n\n### 3) Scientific methods that exposed Piltdown as a fraud (early 1950s onward)\nThe NHM page identifies key objective tests and what they proved.\n\n#### A. Fluorine testing (relative dating)\n- NHM explicitly credits fluorine testing with a decisive contradiction of the claimed antiquity:\n  - \u201c**Through fluorine testing, Dr Kenneth Oakley\u2026 discovered that the Piltdown remains were only 50,000 years old at most - not nearly old enough to be the missing link Dawson had claimed they were.**\u201d\n  (https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html)\n\n#### B. Detecting artificial staining\n- NHM gives a specific later disclosure about the coloration:\n  - \u201c**In 1955 it was revealed that most of the material had been artificially stained brown to match the local gravels.**\u201d\n  (https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html)\n\n#### C. The logic of \u201cobjective tests\u201d and why they mattered\n- NHM frames these as methodological turning points:\n  - \u201c**In the early 1950s, a team devised a series of objective tests to try to uncover the truth. While these tests would be considered basic by today's standards, they demonstrated the bones had been faked.**\u201d\n  (https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html)\n\n\n### 4) Identity of the perpetrator(s) and plausible motivations\n#### A. Who did it? (Best-supported culprit in the provided evidence)\nThe NHM\u2019s 2016 synthesis argues strongly for a single principal forger: Charles Dawson.\n\n- \u201c**New forensic methods\u2026 A suite of technological innovations have linked the fake Piltdown fossils to a single forger: amateur archaeologist Charles Dawson.**\u201d (NHM URL)\n\n- The paper\u2019s co-author emphasizes consistent working methods indicative of one person:\n  - Prof. Chris Stringer: \u201c**Our team has identified consistent working methods that suggest a single perpetrator was at work.**\u201d (NHM URL)\n\n- Lead author Dr Isabelle De Groote similarly concludes one forger:\n  - \u201c**It is clear from our analysis that this work was likely all carried out by one forger: Charles Dawson.**\u201d (NHM URL)\n\n- A key reasoning point is exclusivity of access/connection to Piltdown II:\n  - Stringer: \u201c**It points to the central involvement of Charles Dawson, the only person known to be connected with the supposed discoveries at the second Piltdown site.**\u201d (NHM URL)\n\n#### B. Motivation (what is known vs unknown)\nThe NHM page is explicit that motivation remains uncertain, while still suggesting Dawson understood what the scientific community expected.\n\n- On Dawson\u2019s awareness of expectations:\n  - \u201c**Dawson would have known what the scientific community was expecting from a missing link between apes and humans.**\u201d (NHM URL)\n\n- On uncertainty of motive:\n  - Stringer: \u201c**We now have a clearer idea of who was behind the hoax, but we still don't know for sure what Dawson's motivation was.**\u201d (NHM URL)\n\n\n### 5) What, exactly, was forged? (composition and \u201cmodus operandi\u201d)\nThe 2016 research summarized by NHM provides detailed forensic observations that show systematic fabrication.\n\n- **Multiple individuals used**:\n  - \u201c**The research team found that it is highly likely a single orangutan specimen and at least two human specimens, possibly from the medieval period, were used to create the fake fossils.**\u201d (NHM URL)\n\n- **Even the orangutan\u2019s likely origin is inferred**:\n  - \u201c**We now know the orangutan specimen was likely a member of the subspecies that lives in Sarawak, Borneo.**\u201d (NHM URL)\n\n- **Standardized preparation techniques across both sites**:\n  - \u201c**The research reveals that the whole collection of bones was prepared for the fraud in the same way.**\u201d (NHM URL)\n  - Stringer: \u201c**The same modifications were made on the orangutan and human material from both the Piltdown sites.**\u201d (NHM URL)\n\n- **Radiological/CT evidence of physical tampering**:\n  - \u201c**X-ray imaging and high-resolution CT scans showed several of the bones and teeth had been loaded with gravel and the holes plugged with small pebbles, all of which came from sediment similar to that found at Piltdown.**\u201d (NHM URL)\n\n- **Putty use and restoration**:\n  - \u201c**\u2026the same putty was used throughout the bones to both hold the gravel plugs in place and restore one of the teeth in the orangutan jaw.**\u201d (NHM URL)\n\n- **DNA tying teeth from both sites to the same orangutan**:\n  - \u201c**DNA analysis has linked the canine and molar teeth from the two separate Piltdown sites to the same orangutan individual.**\u201d (NHM URL)\n\n- **Evidence of amateur workmanship** (important for understanding why some clues existed but were missed):\n  - \u201c**the analysis revealed the forger was not a trained conservator\u2026 inexpert skills - which resulted in fractured bones, the putty setting too fast and teeth cracking while being filed down.**\u201d (NHM URL)\n\n\n### 6) Modern scientific techniques that would likely have detected it quickly\nThe provided NHM evidence directly names and describes several modern methods that, when applied, revealed the fraud mechanisms in detail\u2014strong evidence they would have been decisive early on if they had been available/used widely.\n\n- **High-resolution CT and X-ray imaging** revealing gravel loading/plugging:\n  - \u201c**X-ray imaging and high-resolution CT scans showed several of the bones and teeth had been loaded with gravel and the holes plugged with small pebbles\u2026**\u201d (NHM URL)\n\n- **DNA analysis** identifying the non-human species source and linking specimens:\n  - \u201c**DNA analysis has linked the canine and molar teeth from the two separate Piltdown sites to the same orangutan individual.**\u201d (NHM URL)\n\n- **High-precision measurements + 3D imaging + chemical analysis** to connect all fakes to a single \u201cworking method\u201d (forensic attribution):\n  - \u201c**New collaborative research\u2026 used high-precision measurements, chemical analysis and 3D imaging\u2026**\u201d (NHM URL)\n\nThese are exactly the kinds of methods\u2014non-destructive imaging, molecular identification, and quantitative morphometrics/3D comparison\u2014that typically flag inconsistencies between purported age, taphonomy, and biological origin.\n\n\n### 7) Impact on paleoanthropology and why the hoax persisted\nThe NHM page provides direct statements about impact and contributing social/structural factors.\n\n- **Long-term scientific damage**:\n  - \u201c**The forgeries helped to misdirect the study of anthropology for decades.**\u201d (NHM URL)\n\n- **Why it wasn\u2019t caught sooner (restricted access and weak verification norms)**:\n  - \u201c**Part of the reason the forgery was not discovered earlier was that very few scientists were given the opportunity to study the original specimens.**\u201d (NHM URL)\n\nThis supports a key historiographic lesson: scientific claims are most vulnerable when evidence is scarce, access is restricted, and replication/independent inspection is limited.\n\n\n### 8) A coherent narrative of scientific self-correction (what Piltdown demonstrates)\nPiltdown illustrates a multi-stage self-correction process driven by (1) early skepticism, (2) new measurement techniques, (3) independent testing, and (4) open re-analysis using improved tools.\n\n1. **Initial claim and social plausibility**: A compelling story is offered\u2014an apparent \u201cmissing link\u201d\u2014and is bolstered by multiple artifact types and consistent staining.\n   - Evidence: the claim of a \u201cmissing evolutionary link\u201d (NHM: \u201c**missing evolutionary link between apes and humans**\u201d), and the persuasive surface consistency (\u201c**stained with the same dark red-brown colour**\u201d). (NHM URL)\n\n2. **Immediate but non-decisive critique**: Skepticism existed early.\n   - Evidence: \u201c**Some anatomists doubted from the beginning\u2026**\u201d (NHM URL)\n\n3. **Stagnation after the key discoverer dies**: A red flag\u2014no new material appears after Dawson\u2019s death.\n   - Evidence: \u201c**After Dawson died in 1916, no other specimens were found.**\u201d (NHM URL)\n\n4. **Methodological innovation enables decisive tests**: In the early 1950s, researchers apply objective tests (fluorine testing) that directly contradict the proposed antiquity.\n   - Evidence: \u201c**objective tests**\u201d (NHM) and \u201c**Through fluorine testing\u2026 only 50,000 years old at most**.\u201d (NHM URL)\n\n5. **Fraud mechanisms become explicit**: Artificial staining is revealed; later, modern imaging/DNA shows the precise fabrication techniques and biological sources.\n   - Evidence: \u201c**artificially stained**\u201d (1955 disclosure), \u201c**loaded with gravel\u2026 holes plugged**,\u201d \u201c**same putty**,\u201d and \u201c**DNA analysis\u2026 same orangutan individual**.\u201d (NHM URL)\n\n6. **Attribution and lessons learned**: Modern forensic consistency indicates a likely single forger, Dawson, while motivations remain debated.\n   - Evidence: \u201c**linked\u2026 to a single forger:\u2026 Charles Dawson**\u201d and \u201c**we still don't know for sure what Dawson's motivation was.**\u201d (NHM URL)\n\n7. **Institutional learning**: The episode becomes a cautionary tale about rigor.\n   - Evidence: Stringer: \u201c**The forgery has taught the scientific community important lessons, highlighting the rigour required in the evaluation of new discoveries.**\u201d (NHM URL)\n\n**How self-correction worked here:** Not by immediate consensus reversal, but by accumulation of anomalies, then application of more powerful tests (fluorine; later imaging/DNA/3D/chemistry), and finally re-opening the evidence to broader scrutiny\u2014exactly the pattern described by NHM\u2019s emphasis on \u201cobjective tests\u201d and later \u201cnew technologies\u201d producing \u201cnew insights.\u201d\n\n\n## Evidence gaps relative to your mandate (what is missing from the provided crawl)\nOnly one URL\u2019s full text was provided (NHM 2016 news summary). As a result, several items you asked for cannot be properly supported **with primary-source quotations** in this run:\n\n- **Primary 1912\u20131914 publication text** (e.g., the original Nature papers by Woodward/Dawson) is not present in RAW VISIT CONTENT.\n- **Primary 1953 technical papers** (Oakley/Weiner/Le Gros Clark) are not present in RAW VISIT CONTENT.\n- **A fully sourced impact analysis** (e.g., specific downstream theoretical misdirections, institutional biases, how it affected acceptance of other fossils) is only asserted generally by NHM (\u201cmisdirect\u2026 for decades\u201d) but not detailed with additional citations.\n- **A documented motivations analysis** beyond \u201cunknown\u201d is not available from the visited evidence.\n\nIf you want, I can complete the missing pieces by visiting and quoting: (a) the original 1912\u20131914 reports, (b) the 1953 Nature papers on fluorine testing/anatomical assessment, and (c) the 2016 _Royal Society Open Science_ paper itself, plus archival correspondence NHM mentions (\u201cExplore documents and photographs\u2026 in our archive\u201d). NHM explicitly points to these: \u201c**Read the full paper in Royal Society Open Science**\u201d and \u201c**Explore documents and photographs relating to Piltdown Man in our archive**.\u201d (https://www.nhm.ac.uk/discover/news/2016/august/piltdown-man-charles-dawson-likely-fraudster.html)\n",
+    "action_summary": "Using the provided primary evidence (NHM, 10 Aug 2016), Piltdown Man was presented by Arthur Smith Woodward and Charles Dawson (1912\u20131914) as a \u201cmissing link\u201d (Eoanthropus dawsoni) built from skull fragments plus an ape-like jaw with human-like worn teeth. After Dawson\u2019s death in 1916 no new specimens appeared. In the early 1950s \u201cobjective tests\u201d exposed the fraud: fluorine testing (Kenneth Oakley) showed the remains were \u201conly 50,000 years old at most,\u201d and by 1955 most material was shown to be artificially stained. Modern methods (CT/X-ray, DNA, high-precision measurements, chemical analysis, 3D imaging) reveal systematic fabrication (gravel loading/pebble plugs, putty, filed teeth), that a single orangutan and at least two humans were used, and strongly implicate Dawson as likely sole forger. The hoax \u201cmisdirect[ed]\u201d anthropology \u201cfor decades,\u201d aided by restricted access to originals, and serves as a case study in scientific self-correction via improved methods and broader scrutiny.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "llm_call",
+      "duration": 8.4534,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.5278,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 63.3398,
+      "success": true
+    }
+  ]
+}

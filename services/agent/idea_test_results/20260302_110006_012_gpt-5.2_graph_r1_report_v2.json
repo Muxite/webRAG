@@ -1,0 +1,329 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "012",
+    "test_name": "Wikipedia Link Collection",
+    "passed": true,
+    "score": 1.0,
+    "ascii_graph": "*-----.   Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.\n|\\ \\ \\ \\  \n* | | | | Visit Wikipedia Main Page and extract 10 on-page links (URL + link text)\n / / / /  \n* | | | Visit 5 selected links from Main Page to extract 1\u20132 sentence page descriptions\n / / /  \n* | | Visit 5 additional selected links from Main Page to extract 1\u20132 sentence page descriptions\n / /  \n* | Assemble final structured list of 10 links with URL, link text/title, and brief description\n /  \n* Merge: Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "7fcbd01e-2caa-443a-ac92-9769e3d177b5",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly."
+    },
+    {
+      "node_id": "b590fb8d-533b-449d-96da-38d95af49a15",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit Wikipedia Main Page and extract 10 on-page links (URL + link text)"
+    },
+    {
+      "node_id": "df4b33be-2779-4ce1-bf90-46d359cd6abf",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit 5 selected links from Main Page to extract 1\u20132 sentence page descriptions"
+    },
+    {
+      "node_id": "f88a4c5c-9d0b-4690-855a-dca75489d81c",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit 5 additional selected links from Main Page to extract 1\u20132 sentence page descriptions"
+    },
+    {
+      "node_id": "77d791b0-8fe6-474b-8d4d-3455a6d16626",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "title": "Assemble final structured list of 10 links with URL, link text/title, and brief description"
+    },
+    {
+      "node_id": "44ad7a73-28c5-44e7-a0d2-70f3c1bad2a6",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "link_count",
+      "passed": true,
+      "score": 1.0,
+      "url_count": 25,
+      "reason": "Found 25 Wikipedia URLs"
+    },
+    {
+      "check": "descriptions",
+      "passed": true,
+      "score": 1.0,
+      "sentence_count": 51,
+      "reason": "Found 51 descriptive sentences"
+    },
+    {
+      "check": "wikipedia_visit",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 11,
+      "reason": "Found 11 visit actions"
+    },
+    {
+      "check": "link_evidence_overlap",
+      "passed": true,
+      "score": 1.0,
+      "output_url_count": 25,
+      "visit_link_count": 24,
+      "overlap_count": 11,
+      "reason": "Found 11 overlapping link(s)"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 5875,
+      "words": 634,
+      "kilobytes": 5.74
+    },
+    "llm": {
+      "calls": 0,
+      "prompt": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "completion": {
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0,
+        "tokens": 0
+      },
+      "total_tokens": 0
+    },
+    "chroma": {
+      "store": {
+        "count": 1,
+        "chars": 91,
+        "words": 14,
+        "kilobytes": 0.09
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 11,
+      "chars": 96207,
+      "words": 13456,
+      "kilobytes": 93.95
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 1,
+        "total_duration": 0.4169,
+        "avg_duration": 0.4169,
+        "min_duration": 0.4169,
+        "max_duration": 0.4169,
+        "success_count": 1,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 4,
+        "total_duration": 61.9792,
+        "avg_duration": 15.4948,
+        "min_duration": 1.3447,
+        "max_duration": 23.4887,
+        "success_count": 4,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 0.3479,
+        "avg_duration": 0.3479,
+        "min_duration": 0.3479,
+        "max_duration": 0.3479,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.4169,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 21.8133,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.3447,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 0.3479,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 15.3325,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 23.4887,
+        "success": true
+      }
+    ],
+    "events_count": 3
+  },
+  "node_index": {
+    "7fcbd01e-2caa-443a-ac92-9769e3d177b5": {
+      "node_id": "7fcbd01e-2caa-443a-ac92-9769e3d177b5",
+      "title": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "b590fb8d-533b-449d-96da-38d95af49a15",
+        "df4b33be-2779-4ce1-bf90-46d359cd6abf",
+        "f88a4c5c-9d0b-4690-855a-dca75489d81c",
+        "77d791b0-8fe6-474b-8d4d-3455a6d16626",
+        "44ad7a73-28c5-44e7-a0d2-70f3c1bad2a6"
+      ],
+      "parent_ids": [],
+      "goal": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly."
+    },
+    "b590fb8d-533b-449d-96da-38d95af49a15": {
+      "node_id": "b590fb8d-533b-449d-96da-38d95af49a15",
+      "title": "Visit Wikipedia Main Page and extract 10 on-page links (URL + link text)",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "7fcbd01e-2caa-443a-ac92-9769e3d177b5"
+      ],
+      "goal": "Visit Wikipedia Main Page and extract 10 on-page links (URL + link text)",
+      "result_success": true,
+      "result_content_preview": "Welcome to\nWikipedia\n,\nthe\nfree\nencyclopedia\nthat\nanyone can edit\n.\n290,332\nactive editors\n7,145,614\narticles in\nEnglish\nFrom today's featured article\nJohn Tonkin\n(1902\u20131995) was the\npremier of Western Australia\nfrom 3\u00a0March 1971 to 8\u00a0April 1974. Born and receiving most of his education in the\nGoldfields\ntown of\nBoulder\n, Tonkin became a member of the\nLabor Party\nand a minister in the\nWillcock\n,\nWise\nand\nHawke\ngovernments. He was a member of the\nWestern Australian Legislative Assembly\nfrom 1933 ",
+      "result_source_url": "https://en.wikipedia.org/wiki/Main_Page"
+    },
+    "df4b33be-2779-4ce1-bf90-46d359cd6abf": {
+      "node_id": "df4b33be-2779-4ce1-bf90-46d359cd6abf",
+      "title": "Visit 5 selected links from Main Page to extract 1\u20132 sentence page descriptions",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "7fcbd01e-2caa-443a-ac92-9769e3d177b5"
+      ],
+      "goal": "Visit 5 selected links from Main Page to extract 1\u20132 sentence page descriptions",
+      "result_success": true,
+      "result_content_preview": "=== https://en.wikipedia.org/wiki/Special:WhatLinksHere/Main_Page ===\nThe following pages link to\nMain Page\nExternal tools\n(\nlink count\ntransclusion count\nsorted list\n) \u00b7 See\nhelp page\nfor\ntranscluding these entries\n\n=== https://en.wikipedia.org/wiki/Wikipedia:Information_pages ===\nThis page is a\nguideline\nfor project and project talk pages. For information about WikiProjects, see\nWikipedia:WikiProject\n.\nThis page documents an English Wikipedia\nproject content guideline\n.\nEditors should generall",
+      "result_source_url": null
+    },
+    "f88a4c5c-9d0b-4690-855a-dca75489d81c": {
+      "node_id": "f88a4c5c-9d0b-4690-855a-dca75489d81c",
+      "title": "Visit 5 additional selected links from Main Page to extract 1\u20132 sentence page descriptions",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "7fcbd01e-2caa-443a-ac92-9769e3d177b5"
+      ],
+      "goal": "Visit 5 additional selected links from Main Page to extract 1\u20132 sentence page descriptions",
+      "result_success": true,
+      "result_content_preview": "=== https://en.wikipedia.org/wiki/Special:WhatLinksHere/Main_Page ===\nThe following pages link to\nMain Page\nExternal tools\n(\nlink count\ntransclusion count\nsorted list\n) \u00b7 See\nhelp page\nfor\ntranscluding these entries\n\n=== https://en.wikipedia.org/wiki/Special:RecentChangesLinked/Help:Introduction_to_navigating_Wikipedia ===\nEnter a page name to see changes on pages linked to or from that page. (To see members of a category, enter Category:Name of category).\nChanges to pages on your Watchlist are ",
+      "result_source_url": null
+    },
+    "77d791b0-8fe6-474b-8d4d-3455a6d16626": {
+      "node_id": "77d791b0-8fe6-474b-8d4d-3455a6d16626",
+      "title": "Assemble final structured list of 10 links with URL, link text/title, and brief description",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "7fcbd01e-2caa-443a-ac92-9769e3d177b5"
+      ],
+      "goal": "Assemble final structured list of 10 links with URL, link text/title, and brief description",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "44ad7a73-28c5-44e7-a0d2-70f3c1bad2a6": {
+      "node_id": "44ad7a73-28c5-44e7-a0d2-70f3c1bad2a6",
+      "title": "Merge: Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "7fcbd01e-2caa-443a-ac92-9769e3d177b5"
+      ],
+      "goal": "Go to the Wikipedia main page (https://en.wikipedia.org/wiki/Main_Page) and collect 10 links from the page. For each link, provide: the link URL, the link text/title, and a brief description (1-2 sentences) of what the page is about. Organize the results clearly.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## 10 links collected from Wikipedia\u2019s Main Page (https://en.wikipedia.org/wiki/Main_Page)\n\nEvidence that these links are on the Main Page: the Main Page visit output includes them in its extracted link list, e.g. it lists: `https://en.wikipedia.org/wiki/Wikipedia:Contents`, `https://en.wikipedia.org/wiki/Portal:Current_events`, `https://en.wikipedia.org/wiki/Special:Random`, etc. (https://en.wikipedia.org/wiki/Main_Page). The visible page text also shows navigation items like \u201cOther areas of Wikipedia\u201d and \u201cWikipedia\u2019s sister projects\u201d, confirming these are Main Page navigation links (https://en.wikipedia.org/wiki/Main_Page).\n\n> Main Page text examples showing these navigation areas include: \u201c**Other areas of Wikipedia**\u201d and \u201c**Wikipedia's sister projects**\u201d (https://en.wikipedia.org/wiki/Main_Page).\n\n### 1) Contents\n- **Link text/title:** Contents\n- **URL:** https://en.wikipedia.org/wiki/Wikipedia:Contents\n- **Brief description:** The Wikipedia \u201cContents\u201d page is a navigation hub that helps readers browse the encyclopedia by topic and category.\n- **On-page evidence (verbatim):** The Main Page\u2019s extracted links include `https://en.wikipedia.org/wiki/Wikipedia:Contents` (https://en.wikipedia.org/wiki/Main_Page).\n\n### 2) Current events\n- **Link text/title:** Current events\n- **URL:** https://en.wikipedia.org/wiki/Portal:Current_events\n- **Brief description:** The Current events portal aggregates and organizes ongoing and recent news events, typically by date and topic.\n- **On-page evidence (verbatim):** The Main Page\u2019s extracted links include `https://en.wikipedia.org/wiki/Portal:Current_events` (https://en.wikipedia.org/wiki/Main_Page).\n\n### 3) Random article\n- **Link text/title:** Random article\n- **URL:** https://en.wikipedia.org/wiki/Special:Random\n- **Brief description:** A special page that takes you to a random Wikipedia article each time you open it.\n- **On-page evidence (verbatim):** The Main Page\u2019s extracted links include `https://en.wikipedia.org/wiki/Special:Random` (https://en.wikipedia.org/wiki/Main_Page).\n\n### 4) About Wikipedia\n- **Link text/title:** About Wikipedia\n- **URL:** https://en.wikipedia.org/wiki/Wikipedia:About\n- **Brief description:** An overview page describing what Wikipedia is, how it works, and its goals and practices.\n- **On-page evidence (verbatim):** The Main Page\u2019s extracted links include `https://en.wikipedia.org/wiki/Wikipedia:About` (https://en.wikipedia.org/wiki/Main_Page).\n\n### 5) Contact Wikipedia\n- **Link text/title:** Contact Wikipedia\n- **URL:** https://en.wikipedia.org/wiki/Wikipedia:Contact_us\n- **Brief description:** Provides ways to contact Wikipedia/Wikimedia (e.g., help contacts and organizational contact paths).\n- **On-page evidence (verbatim):** The Main Page\u2019s extracted links include `https://en.wikipedia.org/wiki/Wikipedia:Contact_us` (https://en.wikipedia.org/wiki/Main_Page).\n\n### 6) Help\n- **Link text/title:** Help\n- **URL:** https://en.wikipedia.org/wiki/Help:Contents\n- **Brief description:** The main help portal for using Wikipedia, offering guidance and links to help topics.\n- **On-page evidence (verbatim):** The Main Page\u2019s extracted links include `https://en.wikipedia.org/wiki/Help:Contents` (https://en.wikipedia.org/wiki/Main_Page).\n\n### 7) Learn to edit\n- **Link text/title:** Learn to edit\n- **URL:** https://en.wikipedia.org/wiki/Help:Introduction\n- **Brief description:** An introductory help page for newcomers that explains basic Wikipedia editing.\n- **On-page evidence (verbatim):** The Main Page\u2019s extracted links include `https://en.wikipedia.org/wiki/Help:Introduction` (https://en.wikipedia.org/wiki/Main_Page).\n\n### 8) Community portal\n- **Link text/title:** Community portal\n- **URL:** https://en.wikipedia.org/wiki/Wikipedia:Community_portal\n- **Brief description:** A central hub for Wikipedia editors with links to collaboration spaces, tasks, and community resources.\n- **On-page evidence (verbatim):** The Main Page explicitly describes this area: \u201c**Community portal \u2013 The central hub for editors, with resources, links, tasks, and announcements.**\u201d (https://en.wikipedia.org/wiki/Main_Page) and the extracted links include `https://en.wikipedia.org/wiki/Wikipedia:Community_portal` (https://en.wikipedia.org/wiki/Main_Page).\n\n### 9) Recent changes\n- **Link text/title:** Recent changes\n- **URL:** https://en.wikipedia.org/wiki/Special:RecentChanges\n- **Brief description:** A live feed of the most recent edits across Wikipedia.\n- **On-page evidence (verbatim):** The Main Page\u2019s extracted links include `https://en.wikipedia.org/wiki/Special:RecentChanges` (https://en.wikipedia.org/wiki/Main_Page).\n\n### 10) Upload file\n- **Link text/title:** Upload file\n- **URL:** https://en.wikipedia.org/wiki/Wikipedia:File_upload_wizard\n- **Brief description:** A guided tool (\u201cwizard\u201d) for uploading media files for use on Wikipedia and related Wikimedia projects.\n- **On-page evidence (verbatim):** The Main Page\u2019s extracted links include `https://en.wikipedia.org/wiki/Wikipedia:File_upload_wizard` (https://en.wikipedia.org/wiki/Main_Page).\n\n\n## Notes on evidence gaps\nI was able to verify (from the Main Page extraction) that these URLs are present as links on https://en.wikipedia.org/wiki/Main_Page. However, the RAW VISIT CONTENT provided only includes the full text for the Main Page and a Special:WhatLinksHere page\u2014not the full text of each of the 10 linked target pages. As a result, most of the 1\u20132 sentence descriptions above are high-level descriptions based on the well-known purpose implied by the page titles/paths, rather than being quoted from each target page\u2019s content.\n\nWhat I *can* quote directly for a description is the **Community portal** line from the Main Page itself: \u201c**Community portal \u2013 The central hub for editors, with resources, links, tasks, and announcements.**\u201d (https://en.wikipedia.org/wiki/Main_Page).",
+    "action_summary": "Collected 10 links shown in the extracted link list from https://en.wikipedia.org/wiki/Main_Page (Contents, Current events, Random article, About, Contact, Help, Learn to edit, Community portal, Recent changes, Upload file) and provided each URL + link title and a brief description. Only the Community portal description could be directly quoted from provided RAW VISIT CONTENT; the other target pages\u2019 full texts were not included in the evidence bundle.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.4169,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 21.8133,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.3447,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 0.3479,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 15.3325,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 23.4887,
+      "success": true
+    }
+  ]
+}

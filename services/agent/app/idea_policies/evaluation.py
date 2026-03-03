@@ -13,11 +13,6 @@ from agent.app.idea_policies.base import EvaluationPolicy, DetailKey
 
 
 def _safe_serialize_details(details: Dict[str, Any]) -> str:
-    """
-    Safely serialize node details to JSON.
-    :param details: Details dictionary.
-    :returns: JSON string.
-    """
     try:
         return json.dumps(details, ensure_ascii=True, default=str)
     except Exception as e:
@@ -25,12 +20,6 @@ def _safe_serialize_details(details: Dict[str, Any]) -> str:
 
 
 class EvaluationWeights:
-    """
-    Numerical weights and penalties applied to node evaluation scores.
-    Values are loaded from idea_dag_settings.json so they can be tuned without code changes.
-    :param settings: Settings dictionary.
-    :returns: EvaluationWeights instance.
-    """
 
     def __init__(
         self,
@@ -52,11 +41,6 @@ class EvaluationWeights:
 
     @classmethod
     def from_settings(cls, settings: Optional[Dict[str, Any]]) -> "EvaluationWeights":
-        """
-        Construct EvaluationWeights from settings.
-        :param settings: Settings dictionary.
-        :returns: EvaluationWeights instance.
-        """
         settings = settings or {}
         return cls(
             no_action_result_base_score=settings.get("evaluation_no_action_result_base_score", 0.1),
@@ -69,12 +53,6 @@ class EvaluationWeights:
         )
 
     def apply_action_weight(self, action: Optional[str], score: float) -> float:
-        """
-        Apply per-action weight to a raw score.
-        :param action: Action type string.
-        :param score: Raw score value.
-        :returns: Weighted score.
-        """
         if not action:
             return score * self.default_weight
         action_lower = str(action).lower()
@@ -90,13 +68,6 @@ class EvaluationWeights:
 
 
 class LlmEvaluationPolicy(EvaluationPolicy):
-    """
-    LLM-driven evaluation policy for scoring nodes.
-    :param io: AgentIO instance used for LLM calls.
-    :param settings: Settings dictionary.
-    :param model_name: Optional model override.
-    :returns: LlmEvaluationPolicy instance.
-    """
     def __init__(self, io: AgentIO, settings: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None):
         super().__init__(settings=settings)
         self.io = io
@@ -104,13 +75,6 @@ class LlmEvaluationPolicy(EvaluationPolicy):
         self.weights = EvaluationWeights.from_settings(settings)
 
     async def evaluate(self, graph: IdeaDag, node_id: str) -> float:
-        """
-        Score a node based on graph context using an LLM.
-        Penalizes nodes without action results if they have actions.
-        :param graph: IdeaDag instance.
-        :param node_id: Node identifier.
-        :returns: Score value.
-        """
         node = graph.get_node(node_id)
         if not node:
             return 0.0
@@ -178,13 +142,6 @@ class LlmEvaluationPolicy(EvaluationPolicy):
             return 0.0
 
     def _build_messages(self, graph: IdeaDag, node: IdeaNode) -> List[Dict[str, str]]:
-        """
-        Build evaluation prompt messages.
-        Includes parent goal to understand what the previous node aimed to solve.
-        :param graph: IdeaDag instance.
-        :param node: IdeaNode to evaluate.
-        :returns: Message list.
-        """
         from agent.app.idea_policies.base import DetailKey
         
         max_nodes = int(self.settings.get("evaluation_max_context_nodes", 5))
@@ -247,11 +204,6 @@ class LlmEvaluationPolicy(EvaluationPolicy):
         return PromptBuilder.build_messages(system_content=system, user_content=user)
 
     def _parse_score(self, content: Optional[str]) -> tuple[float, str]:
-        """
-        Parse score and rationale from LLM output.
-        :param content: LLM response content.
-        :returns: Tuple of score and rationale.
-        """
         if not content:
             return 0.0, "empty_response"
         try:
@@ -266,22 +218,10 @@ class LlmEvaluationPolicy(EvaluationPolicy):
 
     @staticmethod
     def _clamp(score: float) -> float:
-        """
-        Clamp score to [0,1].
-        :param score: Raw score.
-        :returns: Clamped score.
-        """
         return max(0.0, min(1.0, score))
 
 
 class LlmBatchEvaluationPolicy(EvaluationPolicy):
-    """
-    LLM-driven batch evaluation for multiple candidates in one call.
-    :param io: AgentIO instance used for LLM calls.
-    :param settings: Settings dictionary.
-    :param model_name: Optional model override.
-    :returns: LlmBatchEvaluationPolicy instance.
-    """
     def __init__(self, io: AgentIO, settings: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None):
         super().__init__(settings=settings)
         self.io = io
@@ -290,23 +230,10 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
         self.weights = EvaluationWeights.from_settings(settings)
 
     async def evaluate(self, graph: IdeaDag, node_id: str) -> float:
-        """
-        Fallback to single-node evaluation to satisfy interface.
-        :param graph: IdeaDag instance.
-        :param node_id: Node identifier.
-        :returns: Score value.
-        """
         policy = LlmEvaluationPolicy(self.io, settings=self.settings, model_name=self.model_name)
         return await policy.evaluate(graph, node_id)
 
     async def evaluate_batch(self, graph: IdeaDag, parent_id: str, candidate_ids: List[str]) -> Dict[str, float]:
-        """
-        Score multiple candidates in one LLM call.
-        :param graph: IdeaDag instance.
-        :param parent_id: Parent node identifier.
-        :param candidate_ids: Candidate node ids.
-        :returns: Mapping of node_id to score.
-        """
         parent = graph.get_node(parent_id)
         if not parent:
             return {}
@@ -385,13 +312,6 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
             return {}
 
     def _build_messages(self, graph: IdeaDag, parent: IdeaNode, candidate_ids: List[str]) -> tuple[List[Dict[str, str]], Dict[str, str]]:
-        """
-        Build batch evaluation prompt messages.
-        :param graph: IdeaDag instance.
-        :param parent: Parent node.
-        :param candidate_ids: Candidate node ids.
-        :returns: Tuple of (message list, candidate_id_map).
-        """
         max_nodes = int(self.settings.get("evaluation_max_context_nodes", 5))
         max_detail_chars = int(self.settings.get("evaluation_max_detail_chars", 2000))
         path = graph.path_to_root(parent.node_id)
@@ -470,20 +390,9 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
         return messages, candidate_id_map
 
     def _clamp(self, value: float) -> float:
-        """
-        Clamp score to [0.0, 1.0] range.
-        :param value: Score value.
-        :returns: Clamped score.
-        """
         return max(0.0, min(1.0, float(value)))
 
     def _parse_scores(self, content: Optional[str], candidate_id_map: Dict[str, str] = None) -> Dict[str, float]:
-        """
-        Parse score list from LLM output, converting simple IDs to actual node IDs.
-        :param content: LLM response content.
-        :param candidate_id_map: Mapping from simple ID (e.g., "1") to actual node_id.
-        :returns: Mapping of node_id to score.
-        """
         if not content:
             return {}
         if candidate_id_map is None:

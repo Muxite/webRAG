@@ -1,0 +1,1402 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "033",
+    "test_name": "Dual-Niche Comparison",
+    "passed": false,
+    "score": 0.6116666666666667,
+    "ascii_graph": "*-.   Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.\n|\\ \\  \n* | | Visit Wikipedia: Tardigrade \u2014 extract 2+ survivable extreme conditions + one named space-exposure experiment (with quotable lines/sections)\n / /  \n* | Visit Wikipedia: Brutalist architecture \u2014 extract 2+ defining characteristics + one cited example building (with quotable lines/sections)\n /  \n* Think: consolidate extracted facts into a comparison-ready schema + draft 100+ word parallel paragraph plan with per-fact URL citations\n"
+  },
+  "node_table": [
+    {
+      "node_id": "4b96e076-a4a5-4630-80fe-5d652bb186c6",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact."
+    },
+    {
+      "node_id": "3e2cb9a0-96cb-4d42-8d11-18ad349420c6",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "title": "Visit Wikipedia: Tardigrade \u2014 extract 2+ survivable extreme conditions + one named space-exposure experiment (with quotable lines/sections)"
+    },
+    {
+      "node_id": "316191fc-3c84-4f83-b93e-2d611b8b60b4",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "title": "Visit Wikipedia: Brutalist architecture \u2014 extract 2+ defining characteristics + one cited example building (with quotable lines/sections)"
+    },
+    {
+      "node_id": "a0599972-0f01-43eb-8997-5058767aeece",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "title": "Think: consolidate extracted facts into a comparison-ready schema + draft 100+ word parallel paragraph plan with per-fact URL citations"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": false,
+      "score": 0.5,
+      "visit_count": 1,
+      "reason": "Found 1 visit(s)"
+    },
+    {
+      "check": "tardigrade_facts",
+      "passed": true,
+      "score": 1.0,
+      "conditions_found": 6,
+      "has_experiment": true,
+      "reason": "conditions=6, experiment=True"
+    },
+    {
+      "check": "brutalist_facts",
+      "passed": false,
+      "score": 0.0,
+      "characteristics_found": 0,
+      "buildings_found": 0,
+      "reason": "characteristics=0, buildings=0"
+    },
+    {
+      "check": "comparison_paragraph",
+      "passed": false,
+      "score": 0.8200000000000001,
+      "word_count": 28,
+      "reason": "tardigrade=True, brutalist=True, parallel=True, words=28"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "reason": "tardigrade_url=True, brutalist_url=True"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 4468,
+      "words": 517,
+      "kilobytes": 4.36
+    },
+    "llm": {
+      "calls": 9,
+      "prompt": {
+        "chars": 196087,
+        "words": 21819,
+        "kilobytes": 191.49,
+        "tokens": 43366
+      },
+      "completion": {
+        "chars": 9249,
+        "words": 1004,
+        "kilobytes": 9.03,
+        "tokens": 2141
+      },
+      "total_tokens": 45507
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 1,
+      "chars": 40282,
+      "words": 6171,
+      "kilobytes": 39.34
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 97,
+        "total_duration": 210.4563,
+        "avg_duration": 2.1697,
+        "min_duration": 0.38,
+        "max_duration": 28.8662,
+        "success_count": 97,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 12,
+        "total_duration": 133.086,
+        "avg_duration": 11.0905,
+        "min_duration": 1.1267,
+        "max_duration": 28.878,
+        "success_count": 12,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 7,
+        "total_duration": 91.2408,
+        "avg_duration": 13.0344,
+        "min_duration": 1.2789,
+        "max_duration": 31.6137,
+        "success_count": 7,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 1,
+        "total_duration": 1.5599,
+        "avg_duration": 1.5599,
+        "min_duration": 1.5599,
+        "max_duration": 1.5599,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 28.8662,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 28.878,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2146,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7787,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 4.9098,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.9048,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.9103,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 6.3458,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 6.3735,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.297,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 10.2107,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.6867,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.38,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.0742,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 11.0749,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2441,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.257,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.1267,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7556,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1431,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7909,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7952,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7587,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7355,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7474,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7642,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 8.9186,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 8.9229,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4043,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8222,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2675,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.2789,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 1.2822,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8636,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7655,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7647,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7954,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.5599,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 2.3236,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 31.6137,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 26.0751,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 24.8824,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 24.8951,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7709,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.5834,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.7415,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.9107,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 4.4982,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.3292,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.4222,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 9.1515,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 9.1517,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8446,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 9.4921,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1782,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5325,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5314,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.874,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4791,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1074,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5078,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.8193,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.451,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4536,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0557,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7531,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1301,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9511,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9267,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7374,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7664,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7498,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7426,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8074,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7948,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7833,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7951,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7568,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7484,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7295,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7006,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7133,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7607,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7679,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7463,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7175,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7249,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7352,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7192,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7501,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7634,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7754,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8015,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7698,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7307,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7357,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7663,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7926,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7794,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7534,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.733,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.744,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7372,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7228,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7468,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7898,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8035,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7517,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7185,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7602,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9469,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9084,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7289,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7461,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7593,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 19.6102,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 19.6143,
+        "success": true
+      }
+    ],
+    "events_count": 228
+  },
+  "node_index": {
+    "4b96e076-a4a5-4630-80fe-5d652bb186c6": {
+      "node_id": "4b96e076-a4a5-4630-80fe-5d652bb186c6",
+      "title": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact.",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "3e2cb9a0-96cb-4d42-8d11-18ad349420c6",
+        "316191fc-3c84-4f83-b93e-2d611b8b60b4",
+        "a0599972-0f01-43eb-8997-5058767aeece"
+      ],
+      "parent_ids": [],
+      "goal": "Research TWO separate topics and then compare them:\nTopic A \u2013 Tardigrades in astrobiology: visit https://en.wikipedia.org/wiki/Tardigrade and find (1) at least two extreme conditions tardigrades survive, (2) one named space-exposure experiment.\nTopic B \u2013 Brutalist architecture: visit https://en.wikipedia.org/wiki/Brutalist_architecture and find (1) at least two defining characteristics of the style, (2) one specific building cited as an example.\nFinally, write a short comparative paragraph (100+ words) that draws a thematic parallel between tardigrade resilience and Brutalist durability. Cite the exact Wikipedia URL for every fact."
+    },
+    "3e2cb9a0-96cb-4d42-8d11-18ad349420c6": {
+      "node_id": "3e2cb9a0-96cb-4d42-8d11-18ad349420c6",
+      "title": "Visit Wikipedia: Tardigrade \u2014 extract 2+ survivable extreme conditions + one named space-exposure experiment (with quotable lines/sections)",
+      "action": "visit",
+      "status": "done",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "4b96e076-a4a5-4630-80fe-5d652bb186c6"
+      ],
+      "goal": "Visit Wikipedia: Tardigrade \u2014 extract 2+ survivable extreme conditions + one named space-exposure experiment (with quotable lines/sections)",
+      "result_success": true,
+      "result_content_preview": "\"Tardigrada\" redirects here. For other uses, see\nTardigrada (disambiguation)\n.\n\"Moss Piglets\" redirects here. For the\nSouth Park\nepisode, see\nMoss Piglets (\nSouth Park\n)\n.\nTardigrade\nTemporal range:\nMiddle Cambrian\nstem-group fossils\nMilnesium tardigradum\n, a\neutardigrade\nEchiniscus insularis\n, a\nheterotardigrade\nScientific classification\nKingdom:\nAnimalia\nSubkingdom:\nEumetazoa\nClade\n:\nParaHoxozoa\nClade\n:\nBilateria\nClade\n:\nNephrozoa\nClade\n:\nProtostomia\nSuperphylum:\nEcdysozoa\nClade\n:\nPanarthropod",
+      "result_source_url": "https://en.wikipedia.org/wiki/Tardigrade"
+    },
+    "316191fc-3c84-4f83-b93e-2d611b8b60b4": {
+      "node_id": "316191fc-3c84-4f83-b93e-2d611b8b60b4",
+      "title": "Visit Wikipedia: Brutalist architecture \u2014 extract 2+ defining characteristics + one cited example building (with quotable lines/sections)",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "4b96e076-a4a5-4630-80fe-5d652bb186c6"
+      ],
+      "goal": "Visit Wikipedia: Brutalist architecture \u2014 extract 2+ defining characteristics + one cited example building (with quotable lines/sections)"
+    },
+    "a0599972-0f01-43eb-8997-5058767aeece": {
+      "node_id": "a0599972-0f01-43eb-8997-5058767aeece",
+      "title": "Think: consolidate extracted facts into a comparison-ready schema + draft 100+ word parallel paragraph plan with per-fact URL citations",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "4b96e076-a4a5-4630-80fe-5d652bb186c6"
+      ],
+      "goal": "Think: consolidate extracted facts into a comparison-ready schema + draft 100+ word parallel paragraph plan with per-fact URL citations"
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## Topic A \u2014 Tardigrades in astrobiology (from https://en.wikipedia.org/wiki/Tardigrade)\n\n### (1) Extreme conditions tardigrades survive (at least two)\nWikipedia explicitly lists multiple severe conditions individual tardigrade species can survive: \n- **Extreme temperatures**: The page says tardigrades can survive \u201c**exposure to extreme temperatures**\u201d (https://en.wikipedia.org/wiki/Tardigrade): \u201c*\u2026with individual species able to survive severe conditions, such as exposure to **extreme temperatures**, extreme pressures (both high and low), air deprivation, radiation, dehydration, and starvation\u2026*\u201d\n- **Extreme pressures (high and low)**: Same sentence includes \u201c**extreme pressures (both high and low)**\u201d (https://en.wikipedia.org/wiki/Tardigrade): \u201c*\u2026exposure to extreme temperatures, **extreme pressures (both high and low)**, air deprivation\u2026*\u201d\n- **Air deprivation / lack of oxygen**: The article lists both \u201c**air deprivation**\u201d (https://en.wikipedia.org/wiki/Tardigrade): \u201c*\u2026air deprivation\u2026*\u201d and later \u201c**lack of oxygen**\u201d (https://en.wikipedia.org/wiki/Tardigrade): \u201c*\u2026they become highly resistant to environmental stresses, including\u2026 **lack of oxygen**, vacuum, ionising radiation, and high pressure.*\u201d\n- **Radiation**: It lists \u201c**radiation**\u201d among survivable conditions (https://en.wikipedia.org/wiki/Tardigrade): \u201c*\u2026air deprivation, **radiation**, dehydration, and starvation\u2026*\u201d\n- **Dehydration**: It lists \u201c**dehydration**\u201d as survivable (https://en.wikipedia.org/wiki/Tardigrade): \u201c*\u2026radiation, **dehydration**, and starvation\u2026*\u201d\n- **Vacuum**: In the \u201ctun\u201d state they resist \u201c**vacuum**\u201d (https://en.wikipedia.org/wiki/Tardigrade): \u201c*\u2026highly resistant to environmental stresses, including\u2026 **vacuum**, ionising radiation\u2026*\u201d\n\n(Any two of the above satisfy the requirement; I\u2019ve provided more with direct quotes.)\n\n### (2) One named space-exposure experiment\nA named space-exposure experiment is the **FOTON-M3 mission (2007)**. Wikipedia states (https://en.wikipedia.org/wiki/Tardigrade): \u201c*In 2007, dehydrated tardigrades were taken on the **FOTON-M3 mission** and exposed to vacuum, or to both vacuum and solar ultraviolet, for 10 days.*\u201d\n\nIt also notes additional space context (not required, but evidentiary): \u201c*Tardigrades have survived exposure to space.*\u201d (https://en.wikipedia.org/wiki/Tardigrade)\n\n---\n\n## Topic B \u2014 Brutalist architecture (missing primary evidence from https://en.wikipedia.org/wiki/Brutalist_architecture)\n\nThe task requires visiting https://en.wikipedia.org/wiki/Brutalist_architecture and extracting (1) at least two defining characteristics and (2) one example building **with exact URL citations and verbatim quotes**.\n\nHowever, in the provided materials, **RAW VISIT CONTENT for https://en.wikipedia.org/wiki/Brutalist_architecture is not included**\u2014only partial \u201cRetrieved Memories\u201d metadata (mostly link lists) appears, and it does **not contain the article\u2019s textual statements** needed to quote characteristics or name a building from the page.\n\nBecause the mandate requires that every fact be supported by a quote from the visited page text, I cannot truthfully provide Brutalist characteristics or an example building from that Wikipedia page using the supplied evidence.\n\nWhat is present (but insufficient): the memory confirms the page was visited (\u201cVisit https://en.wikipedia.org/wiki/Brutalist_architecture, action=visit, success=True\u201d), but provides no definitional sentences or building examples to quote.\n\n---\n\n## Comparative paragraph (cannot be completed as specified)\n\nA 100+ word comparative paragraph drawing a thematic parallel between **tardigrade resilience** and **Brutalist durability** requires factual claims about Brutalism (characteristics + example building) with citations to https://en.wikipedia.org/wiki/Brutalist_architecture.\n\nWith the current evidence set, I can accurately support the tardigrade side (e.g., \u201c*survive severe conditions, such as exposure to extreme temperatures\u2026 radiation, dehydration\u2026*\u201d and the \u201c*FOTON-M3 mission*\u201d space exposure) from https://en.wikipedia.org/wiki/Tardigrade, but I **cannot** support the Brutalism side with the required quotes/citations because the Brutalist article text is missing.\n\nIf you provide the RAW VISIT CONTENT for https://en.wikipedia.org/wiki/Brutalist_architecture (or rerun the visit so its full text is included), I will produce the requested 100+ word comparison with per-fact citations and verbatim quotes for both topics.",
+    "action_summary": "From https://en.wikipedia.org/wiki/Tardigrade: tardigrades can survive extreme temperatures, extreme pressures, air deprivation/lack of oxygen, radiation, dehydration, and vacuum; a named space-exposure experiment is the 2007 FOTON-M3 mission. Evidence for Brutalist architecture characteristics and an example building cannot be extracted because the Brutalist_architecture page\u2019s raw text/quotes are not included in the provided data.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 28.8662,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 28.878,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2146,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7787,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 4.9098,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.9048,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.9103,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 6.3458,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 6.3735,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.297,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 10.2107,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.6867,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.38,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.0742,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 11.0749,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2441,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.257,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.1267,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7556,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1431,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7909,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7952,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7587,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7355,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7474,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7642,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 8.9186,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 8.9229,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4043,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8222,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2675,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.2789,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 1.2822,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8636,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7655,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7647,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7954,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.5599,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 2.3236,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 31.6137,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 26.0751,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 24.8824,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 24.8951,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7709,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.5834,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.7415,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.9107,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 4.4982,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.3292,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.4222,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 9.1515,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 9.1517,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8446,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 9.4921,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1782,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5325,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5314,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.874,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4791,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1074,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5078,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.8193,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.451,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4536,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0557,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7531,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1301,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9511,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9267,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7374,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7664,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7498,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7426,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8074,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7948,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7833,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7951,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7568,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7484,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7295,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7006,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7133,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7607,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7679,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7463,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7175,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7249,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7352,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7192,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7501,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7634,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7754,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8015,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7698,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7307,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7357,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7663,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7926,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7794,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7534,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.733,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.744,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7372,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7228,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7468,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7898,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8035,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7517,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7185,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7602,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9469,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9084,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7289,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7461,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7593,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 19.6102,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 19.6143,
+      "success": true
+    }
+  ]
+}

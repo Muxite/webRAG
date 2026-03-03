@@ -1,0 +1,2580 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "039",
+    "test_name": "Multi-Branch Claim Verification",
+    "passed": true,
+    "score": 0.8214285714285714,
+    "ascii_graph": "*-------.   You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used.\n|\\ \\ \\ \\ \\  \n* | | | | | Search authoritative sources for all four claims (collect candidate URLs)\n / / / / /  \n* | | | | Visit authoritative source for C1: speed of light value\n / / / /  \n* | | | Visit authoritative source for C2: who painted the Sistine Chapel ceiling\n / / /  \n* | | Visit authoritative source for C3: octopus hearts and blood color\n / /  \n* | Visit authoritative source for C4: Mount Everest location/border\n /  \n* Merge: You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "811212c9-5991-490f-9323-c49b595b5252",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used."
+    },
+    {
+      "node_id": "d1391069-d64f-43ca-b216-2974532029af",
+      "action": "search",
+      "status": "failed",
+      "score": 0.2,
+      "title": "Search authoritative sources for all four claims (collect candidate URLs)"
+    },
+    {
+      "node_id": "011f48b3-b6cd-4413-9828-89c0bc06a0f5",
+      "action": "visit",
+      "status": "done",
+      "score": 0.14,
+      "title": "Visit authoritative source for C1: speed of light value"
+    },
+    {
+      "node_id": "fa2fa947-556f-4e45-a50c-59943a1e2f21",
+      "action": "visit",
+      "status": "done",
+      "score": 0.14,
+      "title": "Visit authoritative source for C2: who painted the Sistine Chapel ceiling"
+    },
+    {
+      "node_id": "5f671af4-5ef2-49d9-9b27-dd47fafac73a",
+      "action": "visit",
+      "status": "done",
+      "score": 0.18,
+      "title": "Visit authoritative source for C3: octopus hearts and blood color"
+    },
+    {
+      "node_id": "e71a5656-44db-48a9-aa8e-72181b12e737",
+      "action": "visit",
+      "status": "done",
+      "score": 0.14,
+      "title": "Visit authoritative source for C4: Mount Everest location/border"
+    },
+    {
+      "node_id": "9585a8df-0b40-457b-a757-05ff8cc6bd21",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 4,
+      "reason": "Found 4 visit(s) (target >=3)"
+    },
+    {
+      "check": "verdict_correctness",
+      "passed": true,
+      "score": 1.0,
+      "correct": 4,
+      "total": 4,
+      "details": {
+        "C1": {
+          "claim_found": true,
+          "evidence_found": true,
+          "verdict_correct": true,
+          "overall": true
+        },
+        "C2": {
+          "claim_found": true,
+          "evidence_found": true,
+          "verdict_correct": true,
+          "overall": true
+        },
+        "C3": {
+          "claim_found": true,
+          "evidence_found": true,
+          "verdict_correct": true,
+          "overall": true
+        },
+        "C4": {
+          "claim_found": true,
+          "evidence_found": true,
+          "verdict_correct": true,
+          "overall": true
+        }
+      },
+      "reason": "4/4 verdicts correct"
+    },
+    {
+      "check": "confidence_scores",
+      "passed": true,
+      "score": 0.75,
+      "scores_found": [
+        "0.0",
+        "0.95",
+        "0.20"
+      ],
+      "reason": "Found 3 distinct confidence scores"
+    },
+    {
+      "check": "verdict_table",
+      "passed": false,
+      "score": 0.5,
+      "pipe_rows": 0,
+      "claims_in_table": 4,
+      "reason": "table_rows=0, claims_in_table=4/4"
+    },
+    {
+      "check": "reliability_summary",
+      "passed": true,
+      "score": 1.0,
+      "word_count": 256,
+      "reason": "summary_marker=True, words=256"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "cited": 4,
+      "total": 4,
+      "details": {
+        "C1": true,
+        "C2": true,
+        "C3": true,
+        "C4": true
+      },
+      "reason": "4/4 claims cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 13501,
+      "words": 1676,
+      "kilobytes": 13.18
+    },
+    "llm": {
+      "calls": 5,
+      "prompt": {
+        "chars": 23378,
+        "words": 3092,
+        "kilobytes": 22.83,
+        "tokens": 38663
+      },
+      "completion": {
+        "chars": 21621,
+        "words": 2943,
+        "kilobytes": 21.11,
+        "tokens": 10705
+      },
+      "total_tokens": 49368
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 4,
+      "chars": 81449,
+      "words": 11854,
+      "kilobytes": 79.54
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 210,
+        "total_duration": 152.6168,
+        "avg_duration": 0.7267,
+        "min_duration": 0.266,
+        "max_duration": 1.7182,
+        "success_count": 210,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 7,
+        "total_duration": 344.2042,
+        "avg_duration": 49.172,
+        "min_duration": 9.082,
+        "max_duration": 109.2385,
+        "success_count": 7,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 1,
+        "total_duration": 1.1308,
+        "avg_duration": 1.1308,
+        "min_duration": 1.1308,
+        "max_duration": 1.1308,
+        "success_count": 0,
+        "error_count": 1
+      },
+      "search_query": {
+        "count": 1,
+        "total_duration": 1.1315,
+        "avg_duration": 1.1315,
+        "min_duration": 1.1315,
+        "max_duration": 1.1315,
+        "success_count": 0,
+        "error_count": 1
+      },
+      "search": {
+        "count": 1,
+        "total_duration": 1.1364,
+        "avg_duration": 1.1364,
+        "min_duration": 1.1364,
+        "max_duration": 1.1364,
+        "success_count": 0,
+        "error_count": 1
+      },
+      "chroma_add": {
+        "count": 1,
+        "total_duration": 1.2922,
+        "avg_duration": 1.2922,
+        "min_duration": 1.2922,
+        "max_duration": 1.2922,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.5297,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1677,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9412,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.265,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.932,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9368,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9287,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6615,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7067,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7018,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6456,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6179,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6412,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7176,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.692,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6235,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6174,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6089,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6423,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6877,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6497,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6447,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6967,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6569,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5971,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6024,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6149,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6063,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6067,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6342,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6105,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.597,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6154,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6057,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5792,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5666,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5657,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5616,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5528,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5518,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5667,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5893,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5891,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5686,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5637,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5603,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5567,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5742,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5737,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.556,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5642,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5938,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.628,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6197,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5916,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5836,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5866,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6223,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7016,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7017,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6413,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6453,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6314,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5721,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5458,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.575,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6261,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8387,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8198,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6086,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6273,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6512,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6053,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5988,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6325,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5989,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.617,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6465,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6051,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.588,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5718,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5452,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5755,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5949,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5835,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5623,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5686,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5793,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5652,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.61,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6602,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6288,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5948,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6129,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.59,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7147,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9071,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9015,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9121,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0226,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9616,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8148,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8118,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9509,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.013,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9197,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8825,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0776,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1213,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0339,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9518,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9992,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1704,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1088,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.5707,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.7182,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2063,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0336,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9402,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9472,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0083,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9532,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8512,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 41.714,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 41.718,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7953,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8582,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.916,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9038,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 95.1129,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4806,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8584,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.365,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8522,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.547,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5083,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5522,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5682,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5563,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.525,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5005,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5151,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.538,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5369,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5407,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5432,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5254,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5216,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5354,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5614,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5846,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5538,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5112,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5036,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5271,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 9.082,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 9.0852,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5683,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5882,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5851,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.1308,
+        "success": false
+      },
+      {
+        "name": "search_query",
+        "duration": 1.1315,
+        "success": false
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5492,
+        "success": true
+      },
+      {
+        "name": "search",
+        "duration": 1.1364,
+        "success": false
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.266,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5153,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0122,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7779,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 1.2922,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5693,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.5973,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.811,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7571,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7575,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7302,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7375,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7374,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7832,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8442,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8451,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8702,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8199,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8241,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7824,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7657,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7701,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7638,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7955,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7948,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8586,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8611,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8636,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.832,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7947,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7979,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7395,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7487,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7478,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7659,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8084,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8092,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8439,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8042,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8023,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8249,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8543,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8545,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8428,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8228,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8229,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8247,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8228,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8252,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8506,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8829,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8864,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8941,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.867,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8658,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 38.2534,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 109.2385,
+        "success": true
+      }
+    ],
+    "events_count": 431
+  },
+  "node_index": {
+    "811212c9-5991-490f-9323-c49b595b5252": {
+      "node_id": "811212c9-5991-490f-9323-c49b595b5252",
+      "title": "You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "d1391069-d64f-43ca-b216-2974532029af",
+        "011f48b3-b6cd-4413-9828-89c0bc06a0f5",
+        "fa2fa947-556f-4e45-a50c-59943a1e2f21",
+        "5f671af4-5ef2-49d9-9b27-dd47fafac73a",
+        "e71a5656-44db-48a9-aa8e-72181b12e737",
+        "9585a8df-0b40-457b-a757-05ff8cc6bd21"
+      ],
+      "parent_ids": [],
+      "goal": "You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used."
+    },
+    "d1391069-d64f-43ca-b216-2974532029af": {
+      "node_id": "d1391069-d64f-43ca-b216-2974532029af",
+      "title": "Search authoritative sources for all four claims (collect candidate URLs)",
+      "action": "search",
+      "status": "failed",
+      "score": 0.2,
+      "children": [],
+      "parent_ids": [
+        "811212c9-5991-490f-9323-c49b595b5252"
+      ],
+      "goal": "Search authoritative sources for all four claims (collect candidate URLs)",
+      "result_success": false,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "011f48b3-b6cd-4413-9828-89c0bc06a0f5": {
+      "node_id": "011f48b3-b6cd-4413-9828-89c0bc06a0f5",
+      "title": "Visit authoritative source for C1: speed of light value",
+      "action": "visit",
+      "status": "done",
+      "score": 0.14,
+      "children": [],
+      "parent_ids": [
+        "811212c9-5991-490f-9323-c49b595b5252"
+      ],
+      "goal": "Confirm whether the quoted value 299,792,458 m/s is supported by an authoritative measurement or definition.",
+      "result_success": true,
+      "result_content_preview": "The internet we were promised.\nThank you for considering a donation to the Wikimedia Foundation.\nWe invite you to reflect on the number of times you visited Wikipedia in the last year. If the knowledge you gained here was valuable, please join the 2% of readers who donate. Any amount helps:\n$5, $20, $50\n, or whatever feels right to you today.\nThe internet we were promised\u2014a place of free, collaborative, and accessible knowledge\u2014is under constant threat. On Wikipedia, volunteers work together to ",
+      "result_source_url": "https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en"
+    },
+    "fa2fa947-556f-4e45-a50c-59943a1e2f21": {
+      "node_id": "fa2fa947-556f-4e45-a50c-59943a1e2f21",
+      "title": "Visit authoritative source for C2: who painted the Sistine Chapel ceiling",
+      "action": "visit",
+      "status": "done",
+      "score": 0.14,
+      "children": [],
+      "parent_ids": [
+        "811212c9-5991-490f-9323-c49b595b5252"
+      ],
+      "goal": "Verify whether Leonardo da Vinci painted the Sistine Chapel ceiling or whether someone else (commonly Michelangelo) is the correct painter.",
+      "result_success": true,
+      "result_content_preview": "Language:\nDeutsch\n| English |\nEsperanto\n|\nfran\u00e7ais\n|\nespa\u00f1ol\n|\nitaliano\n|\nNederlands\nRetrieved from \"\nhttps://donate.wikimedia.org/wiki/Special:UserLogin\n\"",
+      "result_source_url": "https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin&returnto=Special%3ALandingPage&returntoquery=country%3DCA%26uselang%3Den%26wmf_campaign%3Den.wikipedia.org%26wmf_medium%3Dsidebar%26wmf_source%3Ddonate"
+    },
+    "5f671af4-5ef2-49d9-9b27-dd47fafac73a": {
+      "node_id": "5f671af4-5ef2-49d9-9b27-dd47fafac73a",
+      "title": "Visit authoritative source for C3: octopus hearts and blood color",
+      "action": "visit",
+      "status": "done",
+      "score": 0.18,
+      "children": [],
+      "parent_ids": [
+        "811212c9-5991-490f-9323-c49b595b5252"
+      ],
+      "goal": "Determine whether the statements 'three hearts' and 'blue blood' are accurate for octopuses.",
+      "result_success": true,
+      "result_content_preview": "=== https://en.wikipedia.org/wiki/Octopus ===\nThis article is about the order of cephalopod. For other uses, see\nOctopus (disambiguation)\n.\nOctopus\nTemporal range:\nCommon octopus\n(\nOctopus vulgaris\n)\nScientific classification\nKingdom:\nAnimalia\nPhylum:\nMollusca\nClass:\nCephalopoda\nDivision:\nNeocoleoidea\nClade\n:\nVampyropoda\nSuperorder:\nOctopodiformes\nOrder:\nOctopoda\nLeach\n, 1818\nSuborders\n(traditional)\nCirrina\nIncirrina\nSee\n\u00a7\u00a0Evolution\nfor families\nSynonyms\nOctopoida\nLeach, 1817\nAn\noctopus\n(\npl.\n:\n",
+      "result_source_url": null
+    },
+    "e71a5656-44db-48a9-aa8e-72181b12e737": {
+      "node_id": "e71a5656-44db-48a9-aa8e-72181b12e737",
+      "title": "Visit authoritative source for C4: Mount Everest location/border",
+      "action": "visit",
+      "status": "done",
+      "score": 0.14,
+      "children": [],
+      "parent_ids": [
+        "811212c9-5991-490f-9323-c49b595b5252"
+      ],
+      "goal": "Verify whether Mount Everest is on the border between Nepal and India (or another border such as Nepal and China/Tibet).",
+      "result_success": true,
+      "result_content_preview": "Language:\nDeutsch\n| English |\nEsperanto\n|\nfran\u00e7ais\n|\nespa\u00f1ol\n|\nitaliano\n|\nNederlands\nRetrieved from \"\nhttps://donate.wikimedia.org/wiki/Special:UserLogin\n\"",
+      "result_source_url": "https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin&returnto=Special%3ALandingPage&returntoquery=country%3DCA%26uselang%3Den%26wmf_campaign%3Den.wikipedia.org%26wmf_medium%3Dsidebar%26wmf_source%3Ddonate"
+    },
+    "9585a8df-0b40-457b-a757-05ff8cc6bd21": {
+      "node_id": "9585a8df-0b40-457b-a757-05ff8cc6bd21",
+      "title": "Merge: You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "811212c9-5991-490f-9323-c49b595b5252"
+      ],
+      "goal": "You are a fact-checker.  For each of the following four claims:\n  (a) Search for evidence (both supporting and contradicting).\n  (b) Visit at least one authoritative source (Wikipedia is acceptable).\n  (c) Determine whether the claim is TRUE, PARTIALLY TRUE, or FALSE.\n  (d) Provide a confidence score (0.0\u20131.0) and a short justification citing the source URL.\n\nClaims to verify:\n\n  C1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\"\n  C2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\"\n  C3 [Biology]: \"Octopuses have three hearts and blue blood.\"\n  C4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\"\n\nAfter verifying all claims, produce a VERDICT REPORT with:\n- A verdict table: Claim ID | Verdict | Confidence | Key Evidence | Source URL\n- A 100+ word reliability summary discussing which claims were straightforward to verify and which required deeper investigation.\nCite every URL used.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Fact-check report (session evidence limited \u2014 search failed)\n\nNOTE ABOUT EVIDENCE AVAILABILITY (verbatim session error):\n- The automated search step failed for this session. The merged search node reports: \"Search API query failed: status=422 data=Unprocessable Entity - Semantic errors in request\" (from the execution log). Exact message included in the merged results: \"Search API query failed: status=422 data=Unprocessable Entity - Semantic errors in request\".\n\nLinks/Pages actually visited in this session (raw page text is quoted below under each claim):\n- https://en.wikipedia.org/wiki/Octopus (full article; used for C3)\n- https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en (donation landing page; visited when attempts were made to reach Wikipedia/NIST pages)\n- https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin&returnto=Special%3ALandingPage&returntoquery=country%3DCA%26uselang%3Den%26wmf_campaign%3Den.wikipedia.org%26wmf_medium%3Dsidebar%26wmf_source%3Ddonate (login page; visited in attempts to reach other authoritative pages)\n\nBecause the automated search failed, authoritative pages normally consulted for C1 (e.g., NIST, CODATA, Wikipedia 'Speed of light' page), C2 (Wikipedia/Britannica 'Sistine Chapel' pages), and C4 (Wikipedia/Britannica/'Mount Everest' pages) were not successfully retrieved in this run. The only authoritative content successfully retrieved and available in RAW VISIT CONTENT is the Octopus Wikipedia page (used for C3). For the other claims the pages visited during attempts were donation/login pages and do not contain the factual claims under review; the raw text of those pages is included below to prove what was actually retrieved.\n\nClaim-by-claim findings (each includes: determination, confidence score 0.0\u20131.0, short justification, and verbatim quotes from raw visit content as evidence):\n\nC1 [Physics]: \"The speed of light in a vacuum is approximately 299,792,458 metres per second.\" \n- Determination: PARTIALLY TRUE (insufficient authoritative evidence retrieved in this session)\n- Confidence: 0.20\n- Short justification (session evidence): The automated search for authoritative sources failed and no page containing the numeric value of the speed of light was retrieved in the RAW VISIT CONTENT for this session. The pages that were visited instead were donation/login pages which do not state the physical constant. Example verbatim text from one visited page (donation landing page) showing that the visit did not retrieve scientific data:\n  - Verbatim quote from https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en :\n    \"The internet we were promised.\\nThank you for considering a donation to the Wikimedia Foundation.\" \n  (full page text available in RAW VISIT CONTENT for that URL.)\n- Key missing evidence: No visit to an authoritative source that states the speed of light (e.g., NIST, CODATA, or the relevant Wikipedia page) was completed in this session, so the claim cannot be directly supported from the session's retrieved pages. The claim as stated is the standard internationally accepted exact value for the speed of light in vacuum (299,792,458 m/s), but that authoritative citation was not captured here due to the search failure. To fully confirm and cite the number in-session, we would need to retrieve an authoritative page such as NIST or the Wikipedia 'Speed of light' page.\n- Source URL(s) consulted in-session: https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en (no statement of the constant present)\n\nC2 [Art History]: \"Leonardo da Vinci painted the ceiling of the Sistine Chapel.\" \n- Determination: PARTIALLY TRUE (insufficient authoritative evidence retrieved in this session) \u2014 note: widely known art-historical fact is that Michelangelo painted the Sistine Chapel ceiling; however this session did not retrieve an authoritative source to cite that fact.\n- Confidence: 0.20\n- Short justification (session evidence): The automated search failed and the pages actually visited in attempts to reach authoritative sources were Wikimedia donation/login pages that do not contain the attribution of the Sistine Chapel ceiling to any artist. Example verbatim text from the visited login page (showing the page retrieved was unrelated):\n  - Verbatim quote from https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin... :\n    \"Language:\\nDeutsch\\n| English |\\nEsperanto\\n|\\nfran\\u00e7ais\\n|\\nespa\\u00f1ol\\n|\\nitaliano\\n|\\nNederlands\\nRetrieved from \\\"\\nhttps://donate.wikimedia.org/wiki/Special:UserLogin\\n\\\"\"\n- Key missing evidence: No authoritative page (e.g., Wikipedia 'Sistine Chapel' or Britannica entry stating that Michelangelo painted the ceiling) was retrieved in the RAW VISIT CONTENT. Therefore, while the widely accepted historical fact is that Michelangelo (not Leonardo) painted the Sistine Chapel ceiling, this session does not contain the required supporting raw-visit quote to prove that conclusion. To conclusively support or refute the claim with in-session citations, a visit to a relevant authoritative article (e.g., https://en.wikipedia.org/wiki/Sistine_Chapel or Britannica) should be performed.\n- Source URL(s) consulted in-session: https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin&returnto=Special%3ALandingPage... (login page; no attribution content)\n\nC3 [Biology]: \"Octopuses have three hearts and blue blood.\" \n- Determination: TRUE\n- Confidence: 0.95\n- Short justification and exact verbatim evidence (from the Octopus Wikipedia article retrieved in-session): The RAW VISIT CONTENT includes an explicit section on the circulatory system that states octopuses \"have three hearts\" and explains that their blood contains the copper-rich protein haemocyanin which \"gives the blood a bluish colour.\" Verbatim quotes from the retrieved page (https://en.wikipedia.org/wiki/Octopus):\n  - \"Octopuses have a closed circulatory system, in which the blood remains inside blood vessels. They have three hearts; a systemic or main heart that circulates blood around the body and two branchial or gill hearts that pump it through the two gills.\" \n  - \"Octopus blood contains the copper-rich protein haemocyanin to transport oxygen. ... The haemocyanin is dissolved in the blood plasma instead of carried within blood cells and gives the blood a bluish colour.\" \n  (Both quotes are verbatim excerpts from the RAW VISIT CONTENT for https://en.wikipedia.org/wiki/Octopus.)\n- Key evidence: the above verbatim quotations from the Octopus Wikipedia page (full raw text available in RAW VISIT CONTENT for that URL).\n- Source URL: https://en.wikipedia.org/wiki/Octopus\n\nC4 [Geography]: \"Mount Everest is located on the border between Nepal and India.\" \n- Determination: PARTIALLY TRUE / LIKELY FALSE (insufficient authoritative evidence retrieved in this session)\n- Confidence: 0.20\n- Short justification (session evidence): This session did not retrieve an authoritative page about Mount Everest. The automated search failed and the pages visited in attempts were Wikimedia donation/login pages which do not state Mount Everest\u2019s border location. Example verbatim text from the visited login page (same as used above):\n  - Verbatim quote from https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin... :\n    \"Language:\\nDeutsch\\n| English |\\nEsperanto\\n|\\nfran\\u00e7ais\\n|\\nespa\\u00f1ol\\n|\\nitaliano\\n|\\nNederlands\\nRetrieved from \\\"\\nhttps://donate.wikimedia.org/wiki/Special:UserLogin\\n\\\"\"\n- Key missing evidence: The session did not retrieve the authoritative Mount Everest page (e.g., https://en.wikipedia.org/wiki/Mount_Everest or Britannica entry) which is needed to confirm the exact international boundary touching the summit. Commonly referenced authoritative sources (not retrieved here due to the search failure) indicate Mount Everest lies on the border between Nepal and the Tibet Autonomous Region of China; information about any India\u2013Nepal border claim should be verified by consulting a current authoritative map or entry. To properly verify and cite the correct border statement in-session, a visit to the Mount Everest article on Wikipedia or Britannica is required.\n- Source URL(s) consulted in-session: https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin... (login page; no geographic data)\n\nVERDICT REPORT (table)\n- Columns: Claim ID | Verdict | Confidence | Key Evidence (verbatim excerpt or note) | Source URL (retrieved in-session)\n1) C1 | PARTIALLY TRUE (insufficient in-session evidence) | 0.20 | \"No authoritative page for the speed of light was retrieved in this session; the page visited was a donation landing page: 'The internet we were promised.'\" (verbatim) | https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en\n2) C2 | PARTIALLY TRUE (insufficient in-session evidence) | 0.20 | \"No authoritative page for Sistine Chapel authorship was retrieved in this session; the page visited was a Wikimedia login page: 'Language:\\nDeutsch\\n| English | ...'\" (verbatim) | https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin&returnto=Special%3ALandingPage&returntoquery=country%3DCA%26uselang%3Den%26wmf_campaign%3Den.wikipedia.org%26wmf_medium%3Dsidebar%26wmf_source%3Ddonate\n3) C3 | TRUE | 0.95 | Verbatim evidence: \"Octopuses have a closed circulatory system... They have three hearts; a systemic or main heart... and two branchial or gill hearts...\" and \"Octopus blood contains the copper-rich protein haemocyanin... and gives the blood a bluish colour.\" | https://en.wikipedia.org/wiki/Octopus\n   - Verbatim quotes (from RAW VISIT CONTENT):\n     \"Octopuses have a closed\\ncirculatory system, in which the blood remains inside blood vessels. They have three hearts; a systemic or main heart that circulates blood around the body and two branchial or gill hearts that pump it through the two gills.\"\n     \"Octopus blood contains the\\ncopper-rich protein haemocyanin to transport oxygen. ... The haemocyanin is dissolved in the\\nblood plasma instead of carried within blood cells and gives the blood a bluish colour.\"\n4) C4 | PARTIALLY TRUE (insufficient in-session evidence) | 0.20 | \"No authoritative page for Mount Everest location was retrieved; visited page was Wikimedia login (verbatim snippet shown).\" | https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin&returnto=Special%3ALandingPage&returntoquery=country%3DCA%26uselang%3Den%26wmf_campaign%3Den.wikipedia.org%26wmf_medium%3Dsidebar%26wmf_source%3Ddonate\n\nRELIABILITY SUMMARY (>=100 words):\nThis verification run was partially constrained by an automated search failure. The merged search step failed with the message: \"Search API query failed: status=422 data=Unprocessable Entity - Semantic errors in request\" (reported in the execution trace). As a result, the session successfully retrieved only one authoritative content page relevant to the four claims: the Wikipedia article on Octopus (https://en.wikipedia.org/wiki/Octopus), which directly and clearly supports C3. That claim was straightforward to verify because the RAW VISIT CONTENT contains explicit, verbatim statements: \"They have three hearts...\" and \"...gives the blood a bluish colour.\" The other three claims (C1, C2, C4) could not be verified from authoritative pages in this session because attempts to reach those pages returned donation or login pages (e.g., \"The internet we were promised.\" and the login language block) rather than the expected encyclopedic or standards pages. Because the necessary authoritative pages (e.g., NIST/CODATA or Wikipedia pages for speed of light; Wikipedia/Britannica pages on Sistine Chapel authorship and Mount Everest) were not retrieved here, those claims are labelled PARTIALLY TRUE with low confidence to reflect that the session did not capture direct supporting raw text. To reach final high-confidence verdicts for C1, C2, and C4, the verification should be re-run or repeated queries should directly fetch the authoritative pages: for C1 check NIST / CODATA or Wikipedia 'Speed of light' page; for C2 check the Wikipedia/Britannica 'Sistine Chapel' entry; for C4 check 'Mount Everest' authoritative geography references. All URLs actually used in this session are cited above (donation/login pages and the Octopus article).\n\nRecommended next steps (to obtain full high-confidence verdicts for C1, C2, C4):\n- Re-run the search or directly visit the authoritative pages: NIST/CODATA (speed of light exact value), Wikipedia/Britannica 'Sistine Chapel' (who painted the ceiling), and Wikipedia/Britannica 'Mount Everest' (border location). Once those pages are retrieved, extract verbatim quotes as done for C3 and update the verdicts and confidence scores accordingly.\n\nAll URLs cited in this report (pages actually retrieved in-session):\n- https://en.wikipedia.org/wiki/Octopus\n- https://donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar&wmf_campaign=en.wikipedia.org&uselang=en\n- https://donate.wikimedia.org/w/index.php?title=Special%3AUserLogin&returnto=Special%3ALandingPage&returntoquery=country%3DCA%26uselang%3Den%26wmf_campaign%3Den.wikipedia.org%26wmf_medium%3Dsidebar%26wmf_source%3Ddonate\n\nExecution/search error (verbatim from merged results / execution trace):\n\"Search API query failed: status=422 data=Unprocessable Entity - Semantic errors in request\"\n\nEnd of report.",
+    "action_summary": "I attempted to verify four claims. The automated search failed (\"Search API query failed: status=422 data=Unprocessable Entity - Semantic errors in request\"), so only one authoritative page was successfully retrieved: the Wikipedia article on Octopus (https://en.wikipedia.org/wiki/Octopus). From that page I quote verbatim: \"They have three hearts...\" and \"...gives the blood a bluish colour.\" Therefore C3 is VERIFIED TRUE with high confidence (0.95). For C1 (speed of light = 299,792,458 m/s), C2 (who painted the Sistine Chapel ceiling), and C4 (Mount Everest border location) no relevant authoritative pages were retrieved in this run \u2014 instead, attempts returned Wikimedia donation/login pages (quoted verbatim in the report). Consequently I labeled C1, C2, and C4 PARTIALLY TRUE with low confidence (0.20) to reflect that the session did not capture the required supporting raw-visit evidence. To reach high-confidence determinations for C1, C2, and C4, the recommended next step is to re-run the searches or directly visit the appropriate authoritative pages (e.g., NIST/CODATA for the speed of light; Wikipedia/Britannica pages for Sistine Chapel attribution and Mount Everest location), then extract verbatim citations as done for C3. All URLs actually retrieved in-session are cited in the deliverable.",
+    "success": false,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.5297,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1677,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9412,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.265,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.932,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9368,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9287,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6615,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7067,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7018,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6456,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6179,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6412,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7176,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.692,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6235,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6174,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6089,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6423,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6877,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6497,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6447,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6967,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6569,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5971,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6024,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6149,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6063,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6067,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6342,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6105,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.597,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6154,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6057,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5792,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5666,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5657,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5616,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5528,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5518,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5667,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5893,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5891,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5686,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5637,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5603,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5567,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5742,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5737,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.556,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5642,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5938,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.628,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6197,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5916,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5836,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5866,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6223,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7016,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7017,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6413,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6453,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6314,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5721,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5458,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.575,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6261,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8387,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8198,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6086,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6273,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6512,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6053,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5988,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6325,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5989,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.617,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6465,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6051,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.588,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5718,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5452,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5755,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5949,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5835,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5623,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5686,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5793,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5652,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.61,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6602,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6288,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5948,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6129,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.59,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7147,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9071,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9015,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9121,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0226,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9616,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8148,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8118,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9509,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.013,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9197,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8825,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0776,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1213,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0339,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9518,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9992,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1704,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1088,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.5707,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.7182,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2063,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0336,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9402,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9472,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0083,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9532,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8512,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 41.714,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 41.718,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7953,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8582,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.916,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9038,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 95.1129,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4806,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8584,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.365,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8522,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.547,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5083,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5522,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5682,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5563,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.525,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5005,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5151,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.538,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5369,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5407,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5432,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5254,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5216,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5354,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5614,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5846,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5538,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5112,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5036,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5271,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 9.082,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 9.0852,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5683,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5882,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5851,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.1308,
+      "success": false
+    },
+    {
+      "name": "search_query",
+      "duration": 1.1315,
+      "success": false
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5492,
+      "success": true
+    },
+    {
+      "name": "search",
+      "duration": 1.1364,
+      "success": false
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.266,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5153,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0122,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7779,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 1.2922,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5693,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.5973,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.811,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7571,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7575,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7302,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7375,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7374,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7832,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8442,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8451,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8702,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8199,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8241,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7824,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7657,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7701,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7638,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7955,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7948,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8586,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8611,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8636,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.832,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7947,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7979,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7395,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7487,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7478,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7659,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8084,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8092,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8439,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8042,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8023,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8249,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8543,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8545,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8428,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8228,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8229,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8247,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8228,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8252,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8506,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8829,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8864,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8941,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.867,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8658,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 38.2534,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 109.2385,
+      "success": true
+    }
+  ]
+}

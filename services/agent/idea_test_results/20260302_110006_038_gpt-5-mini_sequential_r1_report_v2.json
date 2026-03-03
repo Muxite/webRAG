@@ -1,0 +1,1172 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "038",
+    "test_name": "Eight-Source Fact Matrix",
+    "passed": false,
+    "score": 0.5125,
+    "ascii_graph": "*-------------.   Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL\n|\\ \\ \\ \\ \\ \\ \\ \\  \n* | | | | | | | | Visit Wikipedia \u2014 Great Wall of China\n / / / / / / / /  \n* | | | | | | | Extract CRISPR facts from ancestor memory (no re-visit)\n / / / / / / /  \n* | | | | | | Visit Wikipedia \u2014 Mariana Trench\n / / / / / /  \n* | | | | | Visit Wikipedia \u2014 Voyager 1\n / / / / /  \n* | | | | Visit Wikipedia \u2014 Rosetta Stone\n / / / /  \n* | | | Visit https://en.wikipedia.org/wiki/CRISPR_gene_editing\n / / /  \n* | | Visit https://en.wikipedia.org/wiki/Penicillin\n / /  \n* | Visit https://en.wikipedia.org/wiki/Aurora_(astronomy)\n /  \n* Visit https://en.wikipedia.org/wiki/Enigma_machine\n"
+  },
+  "node_table": [
+    {
+      "node_id": "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a",
+      "action": "-",
+      "status": "active",
+      "score": null,
+      "title": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL"
+    },
+    {
+      "node_id": "48f58456-fc27-45bf-a345-b043f29c872e",
+      "action": "visit",
+      "status": "done",
+      "score": 0.1,
+      "title": "Visit Wikipedia \u2014 Great Wall of China"
+    },
+    {
+      "node_id": "6ef5dbd3-a599-4262-aacd-45a42622f385",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.45,
+      "title": "Extract CRISPR facts from ancestor memory (no re-visit)"
+    },
+    {
+      "node_id": "7d143e44-3205-4b27-becc-353b03926928",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.1,
+      "title": "Visit Wikipedia \u2014 Mariana Trench"
+    },
+    {
+      "node_id": "8f39a239-4bf6-41e8-a94a-6bb8352e3908",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.1,
+      "title": "Visit Wikipedia \u2014 Voyager 1"
+    },
+    {
+      "node_id": "6fe3020a-83c3-44ba-bd25-d18883319448",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.1,
+      "title": "Visit Wikipedia \u2014 Rosetta Stone"
+    },
+    {
+      "node_id": "22f4888e-2b90-4f58-8ce4-74812688cfd0",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/CRISPR_gene_editing"
+    },
+    {
+      "node_id": "37704659-68a3-479c-9286-e5d170affb58",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Penicillin"
+    },
+    {
+      "node_id": "bc9b9188-a500-4589-9d37-b6403fcf3196",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Aurora_(astronomy)"
+    },
+    {
+      "node_id": "d710d518-91f2-4f8a-95f2-725f6535da67",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "title": "Visit https://en.wikipedia.org/wiki/Enigma_machine"
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": false,
+      "score": 0.125,
+      "visit_count": 1,
+      "reason": "Found 1 visit(s) (target >=6)"
+    },
+    {
+      "check": "fact_extraction",
+      "passed": false,
+      "score": 0.3125,
+      "correct": 5,
+      "total": 16,
+      "details": {
+        "Great Wall of China": [
+          "True",
+          "True"
+        ],
+        "CRISPR gene editing": [
+          "True",
+          "False"
+        ],
+        "Mariana Trench": [
+          "True",
+          "False"
+        ],
+        "Voyager 1": [
+          "False",
+          "True"
+        ],
+        "Rosetta Stone": [
+          "False",
+          "False"
+        ],
+        "Penicillin": [
+          "False",
+          "False"
+        ],
+        "Aurora (astronomy)": [
+          "False",
+          "False"
+        ],
+        "Enigma machine": [
+          "False",
+          "False"
+        ]
+      },
+      "reason": "5/16 facts correct"
+    },
+    {
+      "check": "structured_table",
+      "passed": true,
+      "score": 1.0,
+      "pipe_rows": 10,
+      "topics_in_table": 8,
+      "reason": "table_rows=10, topics_in_table=8/8"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "cited": 8,
+      "total": 8,
+      "details": {
+        "Great Wall of China": true,
+        "CRISPR gene editing": true,
+        "Mariana Trench": true,
+        "Voyager 1": true,
+        "Rosetta Stone": true,
+        "Penicillin": true,
+        "Aurora (astronomy)": true,
+        "Enigma machine": true
+      },
+      "reason": "8/8 URLs cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 10587,
+      "words": 1558,
+      "kilobytes": 10.34
+    },
+    "llm": {
+      "calls": 3,
+      "prompt": {
+        "chars": 11576,
+        "words": 1370,
+        "kilobytes": 11.3,
+        "tokens": 6231
+      },
+      "completion": {
+        "chars": 16645,
+        "words": 1778,
+        "kilobytes": 16.25,
+        "tokens": 7405
+      },
+      "total_tokens": 13636
+    },
+    "chroma": {
+      "store": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 1,
+      "chars": 36316,
+      "words": 6353,
+      "kilobytes": 35.46
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 73,
+        "total_duration": 24.3363,
+        "avg_duration": 0.3334,
+        "min_duration": 0.2612,
+        "max_duration": 0.9444,
+        "success_count": 73,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 1,
+        "total_duration": 1.1377,
+        "avg_duration": 1.1377,
+        "min_duration": 1.1377,
+        "max_duration": 1.1377,
+        "success_count": 1,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 5,
+        "total_duration": 415.4777,
+        "avg_duration": 83.0955,
+        "min_duration": 30.2065,
+        "max_duration": 125.6813,
+        "success_count": 5,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.3207,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.6194,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9444,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7115,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.413,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3376,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2612,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.31,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2826,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3253,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2924,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3569,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2728,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3252,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3395,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3361,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3296,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3171,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3042,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2694,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2827,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2798,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2636,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3127,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3144,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2963,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3425,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3091,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3441,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3408,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2682,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.294,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2959,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2923,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3915,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2876,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.281,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2882,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3064,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.306,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.288,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3071,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3574,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4041,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3236,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3337,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3418,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3256,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3471,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3052,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3704,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3702,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3263,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3125,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.319,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3096,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3149,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3034,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3282,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3579,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3277,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3032,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3049,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2993,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3512,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.266,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2792,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2798,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2777,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3179,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3021,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3228,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.2923,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.1377,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 89.9513,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 84.8105,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 84.828,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 30.2065,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 125.6813,
+        "success": true
+      }
+    ],
+    "events_count": 151
+  },
+  "node_index": {
+    "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a": {
+      "node_id": "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a",
+      "title": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL",
+      "action": null,
+      "status": "active",
+      "score": null,
+      "children": [
+        "48f58456-fc27-45bf-a345-b043f29c872e",
+        "6ef5dbd3-a599-4262-aacd-45a42622f385",
+        "7d143e44-3205-4b27-becc-353b03926928",
+        "8f39a239-4bf6-41e8-a94a-6bb8352e3908",
+        "6fe3020a-83c3-44ba-bd25-d18883319448",
+        "22f4888e-2b90-4f58-8ce4-74812688cfd0",
+        "37704659-68a3-479c-9286-e5d170affb58",
+        "bc9b9188-a500-4589-9d37-b6403fcf3196",
+        "d710d518-91f2-4f8a-95f2-725f6535da67"
+      ],
+      "parent_ids": [],
+      "goal": "Visit each of the following eight Wikipedia pages and extract the two specific facts listed for each topic.  Present your findings as a structured fact matrix (table) with one row per topic and columns for each fact.  Cite every Wikipedia URL.\n\n1. Great Wall of China: https://en.wikipedia.org/wiki/Great_Wall_of_China \u2014 Extract: (a) total length in km or miles AND (b) the dynasty that built the most famous sections\n2. CRISPR gene editing: https://en.wikipedia.org/wiki/CRISPR_gene_editing \u2014 Extract: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells\n3. Mariana Trench: https://en.wikipedia.org/wiki/Mariana_Trench \u2014 Extract: (a) maximum depth in metres or feet AND (b) name of the deepest point\n4. Voyager 1: https://en.wikipedia.org/wiki/Voyager_1 \u2014 Extract: (a) launch year AND (b) the boundary it crossed to enter interstellar space\n5. Rosetta Stone: https://en.wikipedia.org/wiki/Rosetta_Stone \u2014 Extract: (a) the three scripts on the stone AND (b) the year it was discovered\n6. Penicillin: https://en.wikipedia.org/wiki/Penicillin \u2014 Extract: (a) who discovered penicillin AND (b) the year it was discovered\n7. Aurora (astronomy): https://en.wikipedia.org/wiki/Aurora_(astronomy) \u2014 Extract: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026)\n8. Enigma machine: https://en.wikipedia.org/wiki/Enigma_machine \u2014 Extract: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used\n\nAfter gathering all facts, present a MARKDOWN TABLE with columns: Topic | Fact A | Fact B | Source URL"
+    },
+    "48f58456-fc27-45bf-a345-b043f29c872e": {
+      "node_id": "48f58456-fc27-45bf-a345-b043f29c872e",
+      "title": "Visit Wikipedia \u2014 Great Wall of China",
+      "action": "visit",
+      "status": "done",
+      "score": 0.1,
+      "children": [],
+      "parent_ids": [
+        "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a"
+      ],
+      "goal": "Extract (a) total length (km or miles) and (b) dynasty that built the most famous sections from the specified Wikipedia page.",
+      "result_success": true,
+      "result_content_preview": "\"Great Wall\" redirects here. For other uses, see\nGreat Wall (disambiguation)\n.\n\"\u9577\u57ce\" redirects here. For place in South Korea, see\nJangseong County\n.\nGreat Wall of China\n\u842c\u91cc\u9577\u57ce / \u4e07\u91cc\u957f\u57ce\nThe\nMing dynasty\nGreat Wall at\nJinshanling\nMap of all the wall constructions\nGeneral information\nType\nFortification\nLocation\nChina\nCoordinates\n40\u00b041\u2032N\n117\u00b014\u2032E\n\ufeff / \ufeff\n40.68\u00b0N 117.23\u00b0E\n\ufeff /\n40.68; 117.23\nUNESCO World Heritage Site\nOfficial\u00a0name\nThe Great Wall\nLocation\nAsia-Pacific\nCriteria\nCultural: i, ii, iii, iv, vi\nRe",
+      "result_source_url": "https://en.wikipedia.org/wiki/Great_Wall_of_China"
+    },
+    "6ef5dbd3-a599-4262-aacd-45a42622f385": {
+      "node_id": "6ef5dbd3-a599-4262-aacd-45a42622f385",
+      "title": "Extract CRISPR facts from ancestor memory (no re-visit)",
+      "action": "think",
+      "status": "skipped",
+      "score": 0.45,
+      "children": [],
+      "parent_ids": [
+        "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a"
+      ],
+      "goal": "Use the ancestor memory that records a successful visit to the CRISPR gene editing Wikipedia page to extract (a) the protein used as molecular scissors and (b) the year CRISPR was first used to edit mammalian cells."
+    },
+    "7d143e44-3205-4b27-becc-353b03926928": {
+      "node_id": "7d143e44-3205-4b27-becc-353b03926928",
+      "title": "Visit Wikipedia \u2014 Mariana Trench",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.1,
+      "children": [],
+      "parent_ids": [
+        "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a"
+      ],
+      "goal": "Extract (a) maximum depth (metres or feet) and (b) the name of the deepest point from the specified Wikipedia page."
+    },
+    "8f39a239-4bf6-41e8-a94a-6bb8352e3908": {
+      "node_id": "8f39a239-4bf6-41e8-a94a-6bb8352e3908",
+      "title": "Visit Wikipedia \u2014 Voyager 1",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.1,
+      "children": [],
+      "parent_ids": [
+        "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a"
+      ],
+      "goal": "Extract (a) launch year and (b) the boundary it crossed to enter interstellar space from the specified Wikipedia page."
+    },
+    "6fe3020a-83c3-44ba-bd25-d18883319448": {
+      "node_id": "6fe3020a-83c3-44ba-bd25-d18883319448",
+      "title": "Visit Wikipedia \u2014 Rosetta Stone",
+      "action": "visit",
+      "status": "skipped",
+      "score": 0.1,
+      "children": [],
+      "parent_ids": [
+        "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a"
+      ],
+      "goal": "Extract (a) the three scripts on the Rosetta Stone and (b) the year it was discovered from the specified Wikipedia page."
+    },
+    "22f4888e-2b90-4f58-8ce4-74812688cfd0": {
+      "node_id": "22f4888e-2b90-4f58-8ce4-74812688cfd0",
+      "title": "Visit https://en.wikipedia.org/wiki/CRISPR_gene_editing",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/CRISPR_gene_editing"
+    },
+    "37704659-68a3-479c-9286-e5d170affb58": {
+      "node_id": "37704659-68a3-479c-9286-e5d170affb58",
+      "title": "Visit https://en.wikipedia.org/wiki/Penicillin",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Penicillin"
+    },
+    "bc9b9188-a500-4589-9d37-b6403fcf3196": {
+      "node_id": "bc9b9188-a500-4589-9d37-b6403fcf3196",
+      "title": "Visit https://en.wikipedia.org/wiki/Aurora_(astronomy)",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Aurora_(astronomy)"
+    },
+    "d710d518-91f2-4f8a-95f2-725f6535da67": {
+      "node_id": "d710d518-91f2-4f8a-95f2-725f6535da67",
+      "title": "Visit https://en.wikipedia.org/wiki/Enigma_machine",
+      "action": "visit",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "3e91ee90-3685-4478-a0cc-ec6d4cf2be4a"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Enigma_machine"
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Summary of extraction attempt and results\n\nOverview\n- Mandate: Visit each of eight specified Wikipedia pages and extract two specific facts per page; present findings as a structured fact matrix (table) with one row per topic and columns for each fact. Cite every Wikipedia URL and include verbatim quotes from the RAW VISIT CONTENT showing the facts were taken from the actual page.\n- What actually happened during execution: only one page (Great Wall of China) was visited and its RAW VISIT CONTENT is provided below. Visits for the other seven Wikipedia pages were skipped in the execution trail; RAW VISIT CONTENT for those pages is not present in the provided data. Because the developer instructions require that facts be extracted from RAW VISIT CONTENT and quoted verbatim, I can only provide fully evidenced extractions for the page(s) whose RAW VISIT CONTENT is present.\n\nDetailed results (one row per topic). For each topic I either (A) provide the requested facts with verbatim quotes from the RAW VISIT CONTENT and the Wikipedia URL (when that page was visited and its raw content provided), or (B) explicitly state that RAW VISIT CONTENT was not provided and therefore the requested facts could NOT be extracted with the required verbatim-evidence requirement. For the pages lacking RAW VISIT CONTENT I list the mandated Wikipedia URL and any retrieved-memory links available in the provided data (clearly labeled as retrieved memories, not RAW visit content).\n\n1) Great Wall of China\n- Requested extracts: (a) total length in km or miles AND (b) the dynasty that built the most famous sections.\n- Evidence (RAW VISIT CONTENT from https://en.wikipedia.org/wiki/Great_Wall_of_China):\n  - Fact (a) total length: verbatim quote from RAW VISIT CONTENT: \"The collective fortifications constituting the Great Wall stretch from Liaodong in the east to Lop Lake in the west, and from the present-day Sino\u2013Russian border in the north to Tao River in the south: an arc that roughly delineates the edge of the Mongolian steppe, spanning 21,196.18 km (13,170.70 mi) in total.\" [source: https://en.wikipedia.org/wiki/Great_Wall_of_China]\n  - Fact (b) dynasty that built the best-known/most famous sections: verbatim quote from RAW VISIT CONTENT: \"Successive dynasties expanded the wall system; the best-known sections were built by the Ming dynasty (1368\u20131644).\" [source: https://en.wikipedia.org/wiki/Great_Wall_of_China]\n- Extracted facts (from RAW content):\n  - Fact A: 21,196.18 km (13,170.70 mi)\n  - Fact B: Ming dynasty (1368\u20131644)\n- Source URL (visited & quoted): https://en.wikipedia.org/wiki/Great_Wall_of_China\n\n2) CRISPR gene editing\n- Mandated page: https://en.wikipedia.org/wiki/CRISPR_gene_editing\n- Requested extracts: (a) the protein used as molecular scissors AND (b) the year CRISPR was first used to edit mammalian cells.\n- RAW VISIT CONTENT: NOT PROVIDED in the data. The execution trail shows the visit was skipped and no RAW VISIT CONTENT for this Wikipedia page is present in the provided RAW VISIT CONTENT section.\n- Therefore: I could NOT extract the requested facts with the required verbatim RAW-quote evidence from the Wikipedia page. I am reporting what is missing rather than asserting facts without the required RAW quotation.\n- Retrieved-memory (supporting, not RAW) items present in provided data (labelled \"RETRIEVED MEMORIES\") that relate to CRISPR (for user reference only):\n  - Links and references in memory include: Broad Institute \"CRISPR Timeline\" (https://www.broadinstitute.org/what-broad/areas-focus/project-spotlight/crispr-timeline), Scientific papers and DOI links such as 10.1038/nm.3793, PubMed IDs, and references to Cas9 images and CRISPR papers. These are memory items and are NOT verbatim RAW Wikipedia page text. They cannot substitute for the required RAW-visit quotations.\n- Mandated source URL (for user to confirm or for me to re-visit): https://en.wikipedia.org/wiki/CRISPR_gene_editing\n\n3) Mariana Trench\n- Mandated page: https://en.wikipedia.org/wiki/Mariana_Trench\n- Requested extracts: (a) maximum depth in metres or feet AND (b) name of the deepest point.\n- RAW VISIT CONTENT: NOT PROVIDED in the data (visit skipped). Therefore I could NOT extract the requested facts with the required verbatim RAW-quote evidence.\n- Mandated source URL (for user to confirm or for me to re-visit): https://en.wikipedia.org/wiki/Mariana_Trench\n\n4) Voyager 1\n- Mandated page: https://en.wikipedia.org/wiki/Voyager_1\n- Requested extracts: (a) launch year AND (b) the boundary it crossed to enter interstellar space.\n- RAW VISIT CONTENT: NOT PROVIDED in the data (visit skipped). Therefore I could NOT extract the requested facts with the required verbatim RAW-quote evidence.\n- Mandated source URL: https://en.wikipedia.org/wiki/Voyager_1\n\n5) Rosetta Stone\n- Mandated page: https://en.wikipedia.org/wiki/Rosetta_Stone\n- Requested extracts: (a) the three scripts on the stone AND (b) the year it was discovered.\n- RAW VISIT CONTENT: NOT PROVIDED in the data (visit skipped). Therefore I could NOT extract the requested facts with the required verbatim RAW-quote evidence.\n- Mandated source URL: https://en.wikipedia.org/wiki/Rosetta_Stone\n\n6) Penicillin\n- Mandated page: https://en.wikipedia.org/wiki/Penicillin\n- Requested extracts: (a) who discovered penicillin AND (b) the year it was discovered.\n- RAW VISIT CONTENT: NOT PROVIDED in the data (visit skipped). Therefore I could NOT extract the requested facts with the required verbatim RAW-quote evidence.\n- Mandated source URL: https://en.wikipedia.org/wiki/Penicillin\n\n7) Aurora (astronomy)\n- Mandated page: https://en.wikipedia.org/wiki/Aurora_(astronomy)\n- Requested extracts: (a) the scientific name for the northern lights AND (b) what causes auroras (solar particles interacting with \u2026).\n- RAW VISIT CONTENT: NOT PROVIDED in the data (visit skipped). Therefore I could NOT extract the requested facts with the required verbatim RAW-quote evidence.\n- Mandated source URL: https://en.wikipedia.org/wiki/Aurora_(astronomy)\n\n8) Enigma machine\n- Mandated page: https://en.wikipedia.org/wiki/Enigma_machine\n- Requested extracts: (a) who led the British effort to crack Enigma AND (b) the war in which Enigma was used.\n- RAW VISIT CONTENT: NOT PROVIDED in the data (visit skipped). Therefore I could NOT extract the requested facts with the required verbatim RAW-quote evidence.\n- Mandated source URL: https://en.wikipedia.org/wiki/Enigma_machine\n\nMarkdown table (as requested). NOTE: For entries where RAW VISIT CONTENT was provided I include the extracted fact(s) with the required verbatim RAW quote references above. For entries where RAW VISIT CONTENT was NOT provided I mark the Fact cells as NOT EXTRACTED and list the source URL (the Wikipedia page the Mandate asked to visit).\n\n| Topic | Fact A | Fact B | Source URL |\n|---|---|---|---|\n| Great Wall of China | 21,196.18 km (13,170.70 mi) \u2014 quoted from RAW visit: \"spanning 21,196.18 km (13,170.70 mi) in total.\" | Ming dynasty (1368\u20131644) \u2014 quoted from RAW visit: \"the best-known sections were built by the Ming dynasty (1368\u20131644).\" | https://en.wikipedia.org/wiki/Great_Wall_of_China |\n| CRISPR gene editing | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | https://en.wikipedia.org/wiki/CRISPR_gene_editing |\n| Mariana Trench | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | https://en.wikipedia.org/wiki/Mariana_Trench |\n| Voyager 1 | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | https://en.wikipedia.org/wiki/Voyager_1 |\n| Rosetta Stone | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | https://en.wikipedia.org/wiki/Rosetta_Stone |\n| Penicillin | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | https://en.wikipedia.org/wiki/Penicillin |\n| Aurora (astronomy) | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | https://en.wikipedia.org/wiki/Aurora_(astronomy) |\n| Enigma machine | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | NOT EXTRACTED \u2014 RAW VISIT CONTENT NOT PROVIDED | https://en.wikipedia.org/wiki/Enigma_machine |\n\nNotes, next steps, and how I can complete the task per your original mandate\n- Requirement from your mandate and developer rules: include verbatim quotes from the RAW VISIT CONTENT for each fact and cite the Wikipedia URL for every factual claim. I complied for the Great Wall of China because that page's RAW VISIT CONTENT is present and I quoted the page verbatim and cited it.\n- For the other seven pages, the execution trail shows the visits were skipped and no RAW VISIT CONTENT for those Wikipedia pages was included in the provided data. Because of the explicit developer requirement to extract facts from RAW VISIT CONTENT and include verbatim quotes from that RAW content, I cannot truthfully claim I extracted those facts. Instead I have marked them as NOT EXTRACTED and provided the mandated Wikipedia URLs so you (or I, if you instruct me to continue) can have those pages visited and their RAW content captured and quoted.\n\nIf you want me to complete the full extraction now (visit each of the seven remaining Wikipedia pages and extract the two required facts with verbatim quotes), please confirm and I will visit each URL, capture the RAW page text, extract the exact requested facts, include verbatim quotes from the RAW content for each fact, and then present the completed table with full citations as required.\n\nExecution trail (relevant nodes from provided data):\n- visit \u2014 Great Wall of China -> visited https://en.wikipedia.org/wiki/Great_Wall_of_China (RAW content provided) \u2014 success\n- visits for the other seven pages were skipped per the provided execution trail; no RAW VISIT CONTENT for those pages is present in the data.\n\nRaw evidence used (verbatim quotes from RAW VISIT CONTENT provided):\n- From https://en.wikipedia.org/wiki/Great_Wall_of_China: \"The collective fortifications constituting the Great Wall stretch from Liaodong in the east to Lop Lake in the west, and from the present-day Sino\u2013Russian border in the north to Tao River in the south: an arc that roughly delineates the edge of the Mongolian steppe, spanning 21,196.18 km (13,170.70 mi) in total.\" \n- From https://en.wikipedia.org/wiki/Great_Wall_of_China: \"Successive dynasties expanded the wall system; the best-known sections were built by the Ming dynasty (1368\u20131644).\"\n\nEnd of deliverable.",
+    "action_summary": "Only the Great Wall of China Wikipedia page was visited and its RAW VISIT CONTENT is present; I extracted both requested facts and provided verbatim quotes plus the URL. The other seven mandated Wikipedia pages were not visited / RAW VISIT CONTENT not provided in the supplied data, so their requested facts could NOT be extracted with the required verbatim RAW-quote evidence. I marked those rows as NOT EXTRACTED and listed their Wikipedia URLs. If you confirm, I will visit each missing page now, capture RAW content, extract the facts, quote them verbatim, and deliver a completed table.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.3207,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.6194,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9444,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7115,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.413,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3376,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2612,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.31,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2826,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3253,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2924,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3569,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2728,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3252,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3395,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3361,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3296,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3171,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3042,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2694,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2827,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2798,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2636,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3127,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3144,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2963,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3425,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3091,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3441,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3408,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2682,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.294,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2959,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2923,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3915,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2876,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.281,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2882,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3064,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.306,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.288,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3071,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3574,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4041,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3236,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3337,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3418,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3256,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3471,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3052,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3704,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3702,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3263,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3125,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.319,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3096,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3149,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3034,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3282,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3579,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3277,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3032,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3049,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2993,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3512,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.266,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2792,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2798,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2777,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3179,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3021,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3228,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.2923,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.1377,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 89.9513,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 84.8105,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 84.828,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 30.2065,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 125.6813,
+      "success": true
+    }
+  ]
+}

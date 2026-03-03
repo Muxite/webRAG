@@ -1,0 +1,542 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "035",
+    "test_name": "Cross-Domain Niche Synthesis",
+    "passed": true,
+    "score": 0.9742857142857143,
+    "ascii_graph": "*-----.   Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.\n|\\ \\ \\ \\  \n* | | | | Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable lines)\n / / / /  \n* | | | Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern maritime convention/treaty (with quotable lines)\n / / /  \n* | | Re-visit Wikipedia: Mathematics of paper folding \u2014 extract one named theorem/axiom + one engineering application (with quotable lines)\n / /  \n* | Synthesis planning: map a unifying theme linking fungal behavioral manipulation, maritime legal systems, and origami axioms/applications; outline 150+ word essay with per-fact URL citations\n /  \n* Merge: Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "d0bd792d-ea25-4535-a6bb-20280d512cb4",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact."
+    },
+    {
+      "node_id": "0d949901-0528-4b16-9ac6-a3deb499895f",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable lines)"
+    },
+    {
+      "node_id": "d727b775-0229-46fe-bb51-ba63bb8e48ae",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern maritime convention/treaty (with quotable lines)"
+    },
+    {
+      "node_id": "6a518dc5-0825-4b33-bae1-d4942483ab17",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "title": "Re-visit Wikipedia: Mathematics of paper folding \u2014 extract one named theorem/axiom + one engineering application (with quotable lines)"
+    },
+    {
+      "node_id": "ffa9b591-724b-4a9d-afcc-a852991b8679",
+      "action": "think",
+      "status": "done",
+      "score": null,
+      "title": "Synthesis planning: map a unifying theme linking fungal behavioral manipulation, maritime legal systems, and origami axioms/applications; outline 150+ word essay with per-fact URL citations"
+    },
+    {
+      "node_id": "1623dac1-bbfb-467e-893e-f0a6559073a5",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 3,
+      "reason": "Found 3 visit(s)"
+    },
+    {
+      "check": "cordyceps_facts",
+      "passed": true,
+      "score": 1.0,
+      "reason": "zombie_behaviour=True, commercial_use=True"
+    },
+    {
+      "check": "admiralty_facts",
+      "passed": true,
+      "score": 1.0,
+      "reason": "historical_origin=True, convention=True"
+    },
+    {
+      "check": "origami_math_facts",
+      "passed": true,
+      "score": 1.0,
+      "reason": "theorem=True, engineering=True"
+    },
+    {
+      "check": "synthesis_essay",
+      "passed": false,
+      "score": 0.8699999999999999,
+      "topics_referenced": 3,
+      "has_theme": true,
+      "longest_paragraph_words": 85,
+      "reason": "topics=3/3, theme=True, words=85"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "details": {
+        "cordyceps": true,
+        "admiralty": true,
+        "paper_folding": true
+      },
+      "reason": "3/3 URLs cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 5992,
+      "words": 723,
+      "kilobytes": 5.85
+    },
+    "llm": {
+      "calls": 2,
+      "prompt": {
+        "chars": 9679,
+        "words": 1107,
+        "kilobytes": 9.45,
+        "tokens": 2362
+      },
+      "completion": {
+        "chars": 982,
+        "words": 72,
+        "kilobytes": 0.96,
+        "tokens": 231
+      },
+      "total_tokens": 2593
+    },
+    "chroma": {
+      "store": {
+        "count": 1,
+        "chars": 189,
+        "words": 24,
+        "kilobytes": 0.18
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 3,
+      "chars": 75864,
+      "words": 11706,
+      "kilobytes": 74.09
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 13,
+        "total_duration": 75.0087,
+        "avg_duration": 5.7699,
+        "min_duration": 0.3797,
+        "max_duration": 49.2844,
+        "success_count": 13,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 3,
+        "total_duration": 92.5075,
+        "avg_duration": 30.8358,
+        "min_duration": 17.4013,
+        "max_duration": 50.6834,
+        "success_count": 3,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 3,
+        "total_duration": 4.3715,
+        "avg_duration": 1.4572,
+        "min_duration": 1.3514,
+        "max_duration": 1.643,
+        "success_count": 3,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 4,
+        "total_duration": 150.382,
+        "avg_duration": 37.5955,
+        "min_duration": 19.6037,
+        "max_duration": 80.0382,
+        "success_count": 4,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 1.4269,
+        "avg_duration": 1.4269,
+        "min_duration": 1.4269,
+        "max_duration": 1.4269,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 49.2844,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8036,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7877,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 50.6834,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9738,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3653,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.3797,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4283,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.643,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.8154,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 19.6037,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 19.6093,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 16.9835,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 17.4013,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4187,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.545,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.3514,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 1.3771,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8232,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 24.4228,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 1.4269,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 31.1307,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 80.0382,
+        "success": true
+      }
+    ],
+    "events_count": 40
+  },
+  "node_index": {
+    "d0bd792d-ea25-4535-a6bb-20280d512cb4": {
+      "node_id": "d0bd792d-ea25-4535-a6bb-20280d512cb4",
+      "title": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "0d949901-0528-4b16-9ac6-a3deb499895f",
+        "d727b775-0229-46fe-bb51-ba63bb8e48ae",
+        "6a518dc5-0825-4b33-bae1-d4942483ab17",
+        "ffa9b591-724b-4a9d-afcc-a852991b8679",
+        "1623dac1-bbfb-467e-893e-f0a6559073a5"
+      ],
+      "parent_ids": [],
+      "goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact."
+    },
+    "0d949901-0528-4b16-9ac6-a3deb499895f": {
+      "node_id": "0d949901-0528-4b16-9ac6-a3deb499895f",
+      "title": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable lines)",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "d0bd792d-ea25-4535-a6bb-20280d512cb4"
+      ],
+      "goal": "Visit Wikipedia: Cordyceps \u2014 extract ant behavior common name + one commercial/medicinal use (with quotable lines)",
+      "result_success": true,
+      "result_content_preview": "Cordyceps\nCordyceps militaris\nScientific classification\nKingdom:\nFungi\nDivision:\nAscomycota\nClass:\nSordariomycetes\nOrder:\nHypocreales\nFamily:\nCordycipitaceae\nGenus:\nCordyceps\nFr.\n(1818)\nType species\nCordyceps militaris\n(\nL.\n) Fr. (1818)\nSynonyms\nList\nAkrophyton\nLebert (1858)\nAlphitomyces\nReissek (1856)\nAmphichorda\nFr. (1825)\nCampylothecium\nCes. (1846)\nCordylia\nFr. (1818)\nCordyliceps\nFr. (1832)\nCoremiopsis\nSizova & Suprun (1957)\nCorynesphaera\nDumort.2 (1822)\nEvlachovaea\nB.A. Borisov & Tarasov (19",
+      "result_source_url": "https://en.wikipedia.org/wiki/Cordyceps"
+    },
+    "d727b775-0229-46fe-bb51-ba63bb8e48ae": {
+      "node_id": "d727b775-0229-46fe-bb51-ba63bb8e48ae",
+      "title": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern maritime convention/treaty (with quotable lines)",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "d0bd792d-ea25-4535-a6bb-20280d512cb4"
+      ],
+      "goal": "Visit Wikipedia: Admiralty law \u2014 extract earliest origin/legal code + one modern maritime convention/treaty (with quotable lines)",
+      "result_success": true,
+      "result_content_preview": "Maritime law\nor\nadmiralty law\nis a body of\nlaw\nthat governs nautical issues and private maritime disputes. Admiralty law consists of both domestic law on maritime activities, and\nprivate international law\ngoverning the relationships between private parties operating or using ocean-going ships. While each legal jurisdiction usually has its own legislation governing maritime matters, the international nature of the topic and the need for uniformity has, since 1900, led to considerable internationa",
+      "result_source_url": "https://en.wikipedia.org/wiki/Admiralty_law"
+    },
+    "6a518dc5-0825-4b33-bae1-d4942483ab17": {
+      "node_id": "6a518dc5-0825-4b33-bae1-d4942483ab17",
+      "title": "Re-visit Wikipedia: Mathematics of paper folding \u2014 extract one named theorem/axiom + one engineering application (with quotable lines)",
+      "action": "visit",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "d0bd792d-ea25-4535-a6bb-20280d512cb4"
+      ],
+      "goal": "Re-visit Wikipedia: Mathematics of paper folding \u2014 extract one named theorem/axiom + one engineering application (with quotable lines)",
+      "result_success": true,
+      "result_content_preview": "The discipline of\norigami\nor paper folding has received a considerable amount of\nmathematical\nstudy. Fields of interest include a given paper model's flat-foldability (whether the model can be flattened without damaging it), and the use of paper folds to solve\nmathematical equations\nup to the third order.\nComputational origami is a recent branch of\ncomputer science\nthat is concerned with studying algorithms that solve paper-folding problems. The field of computational origami has also grown sign",
+      "result_source_url": "https://en.wikipedia.org/wiki/Mathematics_of_paper_folding"
+    },
+    "ffa9b591-724b-4a9d-afcc-a852991b8679": {
+      "node_id": "ffa9b591-724b-4a9d-afcc-a852991b8679",
+      "title": "Synthesis planning: map a unifying theme linking fungal behavioral manipulation, maritime legal systems, and origami axioms/applications; outline 150+ word essay with per-fact URL citations",
+      "action": "think",
+      "status": "done",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "d0bd792d-ea25-4535-a6bb-20280d512cb4"
+      ],
+      "goal": "Synthesis planning: map a unifying theme linking fungal behavioral manipulation, maritime legal systems, and origami axioms/applications; outline 150+ word essay with per-fact URL citations",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "1623dac1-bbfb-467e-893e-f0a6559073a5": {
+      "node_id": "1623dac1-bbfb-467e-893e-f0a6559073a5",
+      "title": "Merge: Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "d0bd792d-ea25-4535-a6bb-20280d512cb4"
+      ],
+      "goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "## 1) Cordyceps fungi (https://en.wikipedia.org/wiki/Cordyceps)\n\n### (a) Common name for the behaviour Cordyceps induces in ants\nOn the *Cordyceps* page, the behaviour is described in \u201czombie\u201d terms. The page quotes *Scientific American* describing Cordyceps-like fungi as making \u201creal zombies\u201d:\n- Verbatim evidence: Scientific American notes that some species in the genus **\u201care indeed body snatchers\u2013they have been making real zombies for millions of years\u201d** (ants are explicitly mentioned as hosts). (https://en.wikipedia.org/wiki/Cordyceps)\n\n**Extracted common name:** **\u201creal zombies\u201d** (i.e., \u201czombie\u201d behaviour in ants). (https://en.wikipedia.org/wiki/Cordyceps)\n\n### (b) One commercial or medicinal use of Cordyceps\nThe page states that cordyceps has long been used in traditional Chinese medicine:\n- Verbatim evidence: **\u201cDiverse variants of cordyceps have had more than 1,500 years of use in Chinese medicine.\u201d** (https://en.wikipedia.org/wiki/Cordyceps)\n- Verbatim evidence (Uses section): **\u201cCordyceps sensu lato \u2026 has long been used in traditional Chinese medicine in the belief it can be used to treat diseases.\u201d** (https://en.wikipedia.org/wiki/Cordyceps)\n\n**Extracted use:** **Used in traditional Chinese medicine (as a purported treatment for diseases).** (https://en.wikipedia.org/wiki/Cordyceps)\n\n\n## 2) Admiralty law (https://en.wikipedia.org/wiki/Admiralty_law)\n\n### (a) Historical origin or earliest legal code associated with admiralty law\nThe page points to an ancient example: Rhodian law (*Nomos Rhodion Nautikos*):\n- Verbatim evidence (History section): **\u201cAn ancient example was the Rhodian law (Nomos Rhodion Nautikos)\u2026\u201d** (https://en.wikipedia.org/wiki/Admiralty_law)\n\n**Extracted earliest legal code/origin example:** **Rhodian law (*Nomos Rhodion Nautikos*).** (https://en.wikipedia.org/wiki/Admiralty_law)\n\n### (b) One modern international maritime convention or treaty\nThe page names multiple modern conventions/treaties, including UNCLOS:\n- Verbatim evidence (lead): **\u201cthe United Nations Convention on the Law of the Sea has been adopted by 167 countries and the European Union\u201d** (https://en.wikipedia.org/wiki/Admiralty_law)\n\n**Extracted modern convention/treaty:** **United Nations Convention on the Law of the Sea (UNCLOS).** (https://en.wikipedia.org/wiki/Admiralty_law)\n\n\n## 3) Mathematics of paper folding (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\n### (a) Name of one theorem or axiom related to origami mathematics\nThe page lists named theorems and axioms used in origami mathematics, including Maekawa\u2019s theorem:\n- Verbatim evidence (Flat folding rules): **\u201cMaekawa's theorem: at any vertex the number of valley and mountain folds always differ by two.\u201d** (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\n**Extracted theorem/axiom:** **Maekawa\u2019s theorem.** (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\n### (b) One practical engineering application of origami folding\nThe page describes Miura folding applied to spacecraft solar panels:\n- Verbatim evidence (History): **\u201cIn 1985 Miura reported a method of packaging and deployment of large membranes in outer space, and as early as 2012 this technique had been applied to solar panels on spacecraft.\u201d** (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n- Verbatim evidence (Related problems): **\u201cthe Miura map fold is a rigid fold that has been used to deploy large solar panel arrays for space satellites.\u201d** (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\n**Extracted engineering application:** **Miura-ori / Miura map fold used to deploy spacecraft/space-satellite solar panels.** (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\n\n## Synthesis essay (unifying theme; 150+ words)\n\nA unifying theme across Cordyceps fungi, admiralty law, and the mathematics of paper folding is **the creation of reliable \u201ccontrol systems\u201d for complex environments**\u2014whether that environment is a living host, the high-uncertainty ocean, or a sheet transforming into a deployable structure.\n\nIn biology, Cordyceps exemplifies control through parasitic manipulation: the *Cordyceps* page highlights that some species **\u201chave been making real zombies for millions of years\u201d** in hosts such as ants, framing the fungus\u2019s strategy as the takeover of an organism\u2019s behaviour (https://en.wikipedia.org/wiki/Cordyceps). Humans, in turn, try to harness nature\u2019s complexity for their own purposes: the same page notes cordyceps\u2019 **\u201cmore than 1,500 years of use in Chinese medicine\u201d** and that it **\u201chas long been used in traditional Chinese medicine\u201d** as a putative disease treatment (https://en.wikipedia.org/wiki/Cordyceps).\n\nIn the legal realm, admiralty law is a governance/control layer for maritime activity. Its roots reach back to early seafaring trade norms\u2014**\u201cAn ancient example was the Rhodian law (Nomos Rhodion Nautikos)\u201d**\u2014showing that even ancient societies needed rules to stabilize ocean commerce (https://en.wikipedia.org/wiki/Admiralty_law). Modern shipping\u2019s global complexity similarly demands standardization, reflected in adoption of **\u201cthe United Nations Convention on the Law of the Sea\u201d** by **\u201c167 countries and the European Union\u201d** (https://en.wikipedia.org/wiki/Admiralty_law).\n\nOrigami mathematics offers a third angle: formal rules that control how a surface can transform. For instance, **\u201cMaekawa\u2019s theorem\u201d** constrains fold parity at a vertex\u2014**\u201cthe number of valley and mountain folds always differ by two\u201d**\u2014so complex crease patterns remain physically consistent (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding). Those constraints enable engineering reliability, such as Miura-derived structures that, **\u201cas early as 2012,\u201d** were **\u201capplied to solar panels on spacecraft\u201d** (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding). Across all three, the pattern is the same: hidden rules and constraints become tools for directing complex systems toward predictable outcomes.\n",
+    "action_summary": "Extracted facts from three Wikipedia pages: Cordyceps\u2014ant \u201czombie\u201d behaviour (\u201creal zombies\u201d) and use in traditional Chinese medicine; Admiralty law\u2014ancient Rhodian law (Nomos Rhodion Nautikos) and modern UNCLOS; Paper-folding math\u2014Maekawa\u2019s theorem and Miura folding used for spacecraft solar panels. Synthesized theme: control systems/rules governing complex environments.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 49.2844,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8036,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7877,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 50.6834,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9738,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3653,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.3797,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4283,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.643,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.8154,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 19.6037,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 19.6093,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 16.9835,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 17.4013,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4187,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.545,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.3514,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 1.3771,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8232,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 24.4228,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 1.4269,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 31.1307,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 80.0382,
+      "success": true
+    }
+  ]
+}

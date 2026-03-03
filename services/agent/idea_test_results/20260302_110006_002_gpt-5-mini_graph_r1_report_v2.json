@@ -1,0 +1,476 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "002",
+    "test_name": "Basic Fact Retrieval",
+    "passed": true,
+    "score": 1.0,
+    "ascii_graph": "*---.   What is the capital city of Australia? Provide the answer and cite one authoritative source URL.\n|\\ \\ \\  \n* | | | Search for authoritative sources that state the capital of Australia\n / / /  \n* | | Visit the top authoritative result and extract the citation text\n / /  \n* | Synthesize final answer and prepare citation\n /  \n* Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "5a671905-4961-4085-81a5-e43ec8bbacdb",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL."
+    },
+    {
+      "node_id": "1d13ecbd-f230-4998-b554-5367e0e1dd08",
+      "action": "search",
+      "status": "done",
+      "score": 0.15,
+      "title": "Search for authoritative sources that state the capital of Australia"
+    },
+    {
+      "node_id": "7ffab5b4-d6fe-46d6-9580-bf6e6078d851",
+      "action": "visit",
+      "status": "failed",
+      "score": 0.15,
+      "title": "Visit the top authoritative result and extract the citation text"
+    },
+    {
+      "node_id": "dbdc4a22-0742-4636-b1fd-8fdc9fac589b",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "title": "Synthesize final answer and prepare citation"
+    },
+    {
+      "node_id": "bc36cd22-052a-4b93-ac49-2939dbbfe2e9",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "correct_answer",
+      "passed": true,
+      "score": 1.0,
+      "reason": "Canberra found"
+    },
+    {
+      "check": "url_present",
+      "passed": true,
+      "score": 1.0,
+      "url_count": 2,
+      "reason": "Found 2 URL(s)"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 835,
+      "words": 122,
+      "kilobytes": 0.82
+    },
+    "llm": {
+      "calls": 6,
+      "prompt": {
+        "chars": 37945,
+        "words": 3462,
+        "kilobytes": 37.06,
+        "tokens": 12632
+      },
+      "completion": {
+        "chars": 5724,
+        "words": 626,
+        "kilobytes": 5.59,
+        "tokens": 2413
+      },
+      "total_tokens": 15045
+    },
+    "chroma": {
+      "store": {
+        "count": 1,
+        "chars": 44,
+        "words": 6,
+        "kilobytes": 0.04
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 5,
+      "chars": 2232,
+      "words": 298,
+      "kilobytes": 2.18
+    },
+    "visit": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 7,
+        "total_duration": 4.1495,
+        "avg_duration": 0.5928,
+        "min_duration": 0.4459,
+        "max_duration": 0.9177,
+        "success_count": 7,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 7,
+        "total_duration": 133.4284,
+        "avg_duration": 19.0612,
+        "min_duration": 6.4606,
+        "max_duration": 30.2515,
+        "success_count": 7,
+        "error_count": 0
+      },
+      "http_request": {
+        "count": 2,
+        "total_duration": 1.1298,
+        "avg_duration": 0.5649,
+        "min_duration": 0.1798,
+        "max_duration": 0.9501,
+        "success_count": 2,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 4,
+        "total_duration": 4.18,
+        "avg_duration": 1.045,
+        "min_duration": 0.6397,
+        "max_duration": 2.0293,
+        "success_count": 4,
+        "error_count": 0
+      },
+      "search": {
+        "count": 1,
+        "total_duration": 0.757,
+        "avg_duration": 0.757,
+        "min_duration": 0.757,
+        "max_duration": 0.757,
+        "success_count": 1,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 1.6999,
+        "avg_duration": 1.6999,
+        "min_duration": 1.6999,
+        "max_duration": 1.6999,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 0.6126,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9177,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 7.0798,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.756,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4939,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 25.2497,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4528,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4706,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4459,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.9501,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.6401,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.6397,
+        "success": true
+      },
+      {
+        "name": "http_request",
+        "duration": 0.1798,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 2.0293,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 0.8709,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 6.4606,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 28.5412,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 9.8926,
+        "success": true
+      },
+      {
+        "name": "search",
+        "duration": 0.757,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 1.6999,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 25.953,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 30.2515,
+        "success": true
+      }
+    ],
+    "events_count": 32
+  },
+  "node_index": {
+    "5a671905-4961-4085-81a5-e43ec8bbacdb": {
+      "node_id": "5a671905-4961-4085-81a5-e43ec8bbacdb",
+      "title": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "1d13ecbd-f230-4998-b554-5367e0e1dd08",
+        "7ffab5b4-d6fe-46d6-9580-bf6e6078d851",
+        "dbdc4a22-0742-4636-b1fd-8fdc9fac589b",
+        "bc36cd22-052a-4b93-ac49-2939dbbfe2e9"
+      ],
+      "parent_ids": [],
+      "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL."
+    },
+    "1d13ecbd-f230-4998-b554-5367e0e1dd08": {
+      "node_id": "1d13ecbd-f230-4998-b554-5367e0e1dd08",
+      "title": "Search for authoritative sources that state the capital of Australia",
+      "action": "search",
+      "status": "done",
+      "score": 0.15,
+      "children": [],
+      "parent_ids": [
+        "5a671905-4961-4085-81a5-e43ec8bbacdb"
+      ],
+      "goal": "Search for authoritative sources that state the capital of Australia",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "7ffab5b4-d6fe-46d6-9580-bf6e6078d851": {
+      "node_id": "7ffab5b4-d6fe-46d6-9580-bf6e6078d851",
+      "title": "Visit the top authoritative result and extract the citation text",
+      "action": "visit",
+      "status": "failed",
+      "score": 0.15,
+      "children": [],
+      "parent_ids": [
+        "5a671905-4961-4085-81a5-e43ec8bbacdb"
+      ],
+      "goal": "Visit the top authoritative result and extract the citation text",
+      "result_success": false,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "dbdc4a22-0742-4636-b1fd-8fdc9fac589b": {
+      "node_id": "dbdc4a22-0742-4636-b1fd-8fdc9fac589b",
+      "title": "Synthesize final answer and prepare citation",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "5a671905-4961-4085-81a5-e43ec8bbacdb"
+      ],
+      "goal": "Produce the concise answer (capital city name) and a single authoritative source URL with a short citation line and extracted quote.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "bc36cd22-052a-4b93-ac49-2939dbbfe2e9": {
+      "node_id": "bc36cd22-052a-4b93-ac49-2939dbbfe2e9",
+      "title": "Merge: What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "5a671905-4961-4085-81a5-e43ec8bbacdb"
+      ],
+      "goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Answer:\n- The capital city of Australia is Canberra.\n\nAuthoritative source (one URL) and verbatim evidence:\n- Source: \"Australia | History, Cities, Population, Capital, Map, & Facts | Britannica\" \u2014 https://www.britannica.com/place/Australia\n- Verbatim excerpt from the search result metadata for that page: \"Its capital city is Canberra\" (source: https://www.britannica.com/place/Australia).\n\nNote about raw page text availability:\n- The RAW VISIT CONTENT (full page text from visited URLs) was not provided in the data set, so I cannot include a verbatim excerpt extracted from a downloaded page file. The search results returned an authoritative Britannica page that explicitly states the capital; the exact quoted phrase above is taken from the merged search result metadata returned in the task data (see the cited Britannica URL).",
+    "action_summary": "The capital of Australia is Canberra. Cited authoritative source: Encyclopaedia Britannica \u2014 https://www.britannica.com/place/Australia (verbatim excerpt from search metadata: \"Its capital city is Canberra\").",
+    "success": true,
+    "goal_achieved": true
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 0.6126,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9177,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 7.0798,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.756,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4939,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 25.2497,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4528,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4706,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4459,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.9501,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.6401,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.6397,
+      "success": true
+    },
+    {
+      "name": "http_request",
+      "duration": 0.1798,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 2.0293,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 0.8709,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 6.4606,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 28.5412,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 9.8926,
+      "success": true
+    },
+    {
+      "name": "search",
+      "duration": 0.757,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 1.6999,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 25.953,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 30.2515,
+      "success": true
+    }
+  ]
+}

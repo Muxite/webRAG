@@ -1,0 +1,1733 @@
+{
+  "verbosity_level": 2,
+  "verbosity_name": "STANDARD",
+  "summary": {
+    "test_id": "035",
+    "test_name": "Cross-Domain Niche Synthesis",
+    "passed": true,
+    "score": 0.9428571428571428,
+    "ascii_graph": "*-----.   Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.\n|\\ \\ \\ \\  \n* | | | | Visit Cordyceps Wikipedia page and extract two facts\n / / / /  \n* | | | Visit Admiralty law Wikipedia page and extract two facts\n / / /  \n* | | Synthesize extracted facts and compose the 150+ word essay (use existing mathematics-of-paper-folding visit from ancestry)\n / /  \n* | Visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding\n /  \n* Merge: Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.\n"
+  },
+  "node_table": [
+    {
+      "node_id": "0b64f13f-a3b7-4175-bb91-ab1dd66fe265",
+      "action": "-",
+      "status": "done",
+      "score": null,
+      "title": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact."
+    },
+    {
+      "node_id": "1d24f585-96aa-4e17-b85a-b544f2b518cb",
+      "action": "visit",
+      "status": "done",
+      "score": 0.15,
+      "title": "Visit Cordyceps Wikipedia page and extract two facts"
+    },
+    {
+      "node_id": "2b59892d-d615-4518-ad3e-59005b7545de",
+      "action": "visit",
+      "status": "done",
+      "score": 0.15,
+      "title": "Visit Admiralty law Wikipedia page and extract two facts"
+    },
+    {
+      "node_id": "9520d704-2621-4aca-9b0a-853bfbc61c16",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "title": "Synthesize extracted facts and compose the 150+ word essay (use existing mathematics-of-paper-folding visit from ancestry)"
+    },
+    {
+      "node_id": "999dd4e3-7fee-4b5d-ab28-185c52fe2afd",
+      "action": "visit",
+      "status": "done",
+      "score": 0.05,
+      "title": "Visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding"
+    },
+    {
+      "node_id": "9630e96d-b757-4706-96ff-548a5e179402",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "title": "Merge: Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact."
+    }
+  ],
+  "validation_checks": [
+    {
+      "check": "visit_count",
+      "passed": true,
+      "score": 1.0,
+      "visit_count": 3,
+      "reason": "Found 3 visit(s)"
+    },
+    {
+      "check": "cordyceps_facts",
+      "passed": true,
+      "score": 1.0,
+      "reason": "zombie_behaviour=True, commercial_use=True"
+    },
+    {
+      "check": "admiralty_facts",
+      "passed": true,
+      "score": 1.0,
+      "reason": "historical_origin=True, convention=True"
+    },
+    {
+      "check": "origami_math_facts",
+      "passed": true,
+      "score": 1.0,
+      "reason": "theorem=True, engineering=True"
+    },
+    {
+      "check": "synthesis_essay",
+      "passed": true,
+      "score": 1.0,
+      "topics_referenced": 3,
+      "has_theme": true,
+      "longest_paragraph_words": 177,
+      "reason": "topics=3/3, theme=True, words=177"
+    },
+    {
+      "check": "citation_urls",
+      "passed": true,
+      "score": 1.0,
+      "details": {
+        "cordyceps": true,
+        "admiralty": true,
+        "paper_folding": true
+      },
+      "reason": "3/3 URLs cited"
+    }
+  ],
+  "observability_summary": {
+    "final_output": {
+      "chars": 9751,
+      "words": 1195,
+      "kilobytes": 9.52
+    },
+    "llm": {
+      "calls": 7,
+      "prompt": {
+        "chars": 245142,
+        "words": 29707,
+        "kilobytes": 239.4,
+        "tokens": 61831
+      },
+      "completion": {
+        "chars": 9757,
+        "words": 1134,
+        "kilobytes": 9.53,
+        "tokens": 3874
+      },
+      "total_tokens": 65705
+    },
+    "chroma": {
+      "store": {
+        "count": 1,
+        "chars": 122,
+        "words": 15,
+        "kilobytes": 0.12
+      },
+      "retrieve": {
+        "count": 0,
+        "chars": 0,
+        "words": 0,
+        "kilobytes": 0.0
+      }
+    },
+    "search": {
+      "count": 0,
+      "chars": 0,
+      "words": 0,
+      "kilobytes": 0.0
+    },
+    "visit": {
+      "count": 3,
+      "chars": 75864,
+      "words": 11706,
+      "kilobytes": 74.09
+    },
+    "timings": {
+      "chroma_query": {
+        "count": 131,
+        "total_duration": 152.1451,
+        "avg_duration": 1.1614,
+        "min_duration": 0.4009,
+        "max_duration": 20.5089,
+        "success_count": 131,
+        "error_count": 0
+      },
+      "chroma_add": {
+        "count": 5,
+        "total_duration": 54.0751,
+        "avg_duration": 10.815,
+        "min_duration": 7.4426,
+        "max_duration": 20.5179,
+        "success_count": 5,
+        "error_count": 0
+      },
+      "llm_call": {
+        "count": 7,
+        "total_duration": 253.1251,
+        "avg_duration": 36.1607,
+        "min_duration": 11.4635,
+        "max_duration": 100.4241,
+        "success_count": 7,
+        "error_count": 0
+      },
+      "chroma_store": {
+        "count": 1,
+        "total_duration": 8.0053,
+        "avg_duration": 8.0053,
+        "min_duration": 8.0053,
+        "max_duration": 8.0053,
+        "success_count": 1,
+        "error_count": 0
+      }
+    },
+    "timings_per_call": [
+      {
+        "name": "chroma_query",
+        "duration": 20.5089,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 20.5179,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2391,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.4445,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.0747,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.054,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 7.4426,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.629,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.2346,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 5.1854,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 3.1943,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 8.7574,
+        "success": true
+      },
+      {
+        "name": "chroma_add",
+        "duration": 9.1227,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.9135,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.909,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.735,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7365,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7857,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7854,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8074,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8072,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7756,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7753,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8191,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8202,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7802,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7802,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7863,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7864,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8037,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8013,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.706,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7072,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7386,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7393,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8005,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8065,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8136,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8158,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7956,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.795,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8692,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8691,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7997,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8078,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7777,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7774,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7502,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7563,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8011,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.807,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7842,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.784,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 15.726,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7623,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1201,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1028,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.4732,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1143,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0873,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0894,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0893,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.128,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1863,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1866,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1689,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1447,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1466,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2199,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2242,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2235,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.323,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3057,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.3044,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1679,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7885,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8012,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7692,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1667,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7826,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7156,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7338,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7415,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7335,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7443,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7174,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.72,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7344,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7228,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.776,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0047,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.0818,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8658,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8181,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8503,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7871,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7262,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7229,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.791,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7933,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 34.3359,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 34.3448,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4009,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7928,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.1823,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7845,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7866,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 11.4635,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.4344,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8333,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 1.2233,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8499,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.8438,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7724,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7646,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.816,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7784,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7207,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.72,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7458,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.781,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.784,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7788,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.774,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7285,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7395,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7531,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7392,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7166,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7148,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7219,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7432,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7491,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7204,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7663,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7717,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7476,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.801,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.7612,
+        "success": true
+      },
+      {
+        "name": "chroma_query",
+        "duration": 0.707,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 17.1069,
+        "success": true
+      },
+      {
+        "name": "chroma_store",
+        "duration": 8.0053,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 39.7239,
+        "success": true
+      },
+      {
+        "name": "llm_call",
+        "duration": 100.4241,
+        "success": true
+      }
+    ],
+    "events_count": 278
+  },
+  "node_index": {
+    "0b64f13f-a3b7-4175-bb91-ab1dd66fe265": {
+      "node_id": "0b64f13f-a3b7-4175-bb91-ab1dd66fe265",
+      "title": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+      "action": null,
+      "status": "done",
+      "score": null,
+      "children": [
+        "1d24f585-96aa-4e17-b85a-b544f2b518cb",
+        "2b59892d-d615-4518-ad3e-59005b7545de",
+        "9520d704-2621-4aca-9b0a-853bfbc61c16",
+        "999dd4e3-7fee-4b5d-ab28-185c52fe2afd",
+        "9630e96d-b757-4706-96ff-548a5e179402"
+      ],
+      "parent_ids": [],
+      "goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact."
+    },
+    "1d24f585-96aa-4e17-b85a-b544f2b518cb": {
+      "node_id": "1d24f585-96aa-4e17-b85a-b544f2b518cb",
+      "title": "Visit Cordyceps Wikipedia page and extract two facts",
+      "action": "visit",
+      "status": "done",
+      "score": 0.15,
+      "children": [],
+      "parent_ids": [
+        "0b64f13f-a3b7-4175-bb91-ab1dd66fe265"
+      ],
+      "goal": "Visit Cordyceps Wikipedia page and extract two facts",
+      "result_success": true,
+      "result_content_preview": "Cordyceps\nCordyceps militaris\nScientific classification\nKingdom:\nFungi\nDivision:\nAscomycota\nClass:\nSordariomycetes\nOrder:\nHypocreales\nFamily:\nCordycipitaceae\nGenus:\nCordyceps\nFr.\n(1818)\nType species\nCordyceps militaris\n(\nL.\n) Fr. (1818)\nSynonyms\nList\nAkrophyton\nLebert (1858)\nAlphitomyces\nReissek (1856)\nAmphichorda\nFr. (1825)\nCampylothecium\nCes. (1846)\nCordylia\nFr. (1818)\nCordyliceps\nFr. (1832)\nCoremiopsis\nSizova & Suprun (1957)\nCorynesphaera\nDumort.2 (1822)\nEvlachovaea\nB.A. Borisov & Tarasov (19",
+      "result_source_url": "https://en.wikipedia.org/wiki/Cordyceps"
+    },
+    "2b59892d-d615-4518-ad3e-59005b7545de": {
+      "node_id": "2b59892d-d615-4518-ad3e-59005b7545de",
+      "title": "Visit Admiralty law Wikipedia page and extract two facts",
+      "action": "visit",
+      "status": "done",
+      "score": 0.15,
+      "children": [],
+      "parent_ids": [
+        "0b64f13f-a3b7-4175-bb91-ab1dd66fe265"
+      ],
+      "goal": "Visit Admiralty law Wikipedia page and extract two facts",
+      "result_success": true,
+      "result_content_preview": "Maritime law\nor\nadmiralty law\nis a body of\nlaw\nthat governs nautical issues and private maritime disputes. Admiralty law consists of both domestic law on maritime activities, and\nprivate international law\ngoverning the relationships between private parties operating or using ocean-going ships. While each legal jurisdiction usually has its own legislation governing maritime matters, the international nature of the topic and the need for uniformity has, since 1900, led to considerable internationa",
+      "result_source_url": "https://en.wikipedia.org/wiki/Admiralty_law"
+    },
+    "9520d704-2621-4aca-9b0a-853bfbc61c16": {
+      "node_id": "9520d704-2621-4aca-9b0a-853bfbc61c16",
+      "title": "Synthesize extracted facts and compose the 150+ word essay (use existing mathematics-of-paper-folding visit from ancestry)",
+      "action": "think",
+      "status": "done",
+      "score": 0.5,
+      "children": [],
+      "parent_ids": [
+        "0b64f13f-a3b7-4175-bb91-ab1dd66fe265"
+      ],
+      "goal": "Combine the facts extracted from the Cordyceps and Admiralty visits with the already-visited Mathematics of paper folding page (visit recorded in ancestor memory). Produce a 150+ word essay that identifies a unifying theme connecting all three topics; reference specific facts from each topic and cite the Wikipedia URL for every fact used.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    },
+    "999dd4e3-7fee-4b5d-ab28-185c52fe2afd": {
+      "node_id": "999dd4e3-7fee-4b5d-ab28-185c52fe2afd",
+      "title": "Visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding",
+      "action": "visit",
+      "status": "done",
+      "score": 0.05,
+      "children": [],
+      "parent_ids": [
+        "0b64f13f-a3b7-4175-bb91-ab1dd66fe265"
+      ],
+      "goal": "Visit and extract information from https://en.wikipedia.org/wiki/Mathematics_of_paper_folding",
+      "result_success": true,
+      "result_content_preview": "The discipline of\norigami\nor paper folding has received a considerable amount of\nmathematical\nstudy. Fields of interest include a given paper model's flat-foldability (whether the model can be flattened without damaging it), and the use of paper folds to solve\nmathematical equations\nup to the third order.\nComputational origami is a recent branch of\ncomputer science\nthat is concerned with studying algorithms that solve paper-folding problems. The field of computational origami has also grown sign",
+      "result_source_url": "https://en.wikipedia.org/wiki/Mathematics_of_paper_folding"
+    },
+    "9630e96d-b757-4706-96ff-548a5e179402": {
+      "node_id": "9630e96d-b757-4706-96ff-548a5e179402",
+      "title": "Merge: Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+      "action": "merge",
+      "status": "skipped",
+      "score": null,
+      "children": [],
+      "parent_ids": [
+        "0b64f13f-a3b7-4175-bb91-ab1dd66fe265"
+      ],
+      "goal": "Research three unrelated niche topics, extract the requested facts from each Wikipedia page, and then write a synthesis.\n\n1. Cordyceps fungi: visit https://en.wikipedia.org/wiki/Cordyceps \u2014 find (a) the common name for the behaviour Cordyceps induces in ants, (b) one commercial or medicinal use of Cordyceps.\n\n2. Admiralty law: visit https://en.wikipedia.org/wiki/Admiralty_law \u2014 find (a) the historical origin or earliest legal code associated with admiralty law, (b) one modern international maritime convention or treaty.\n\n3. Mathematics of paper folding: visit https://en.wikipedia.org/wiki/Mathematics_of_paper_folding \u2014 find (a) the name of one theorem or axiom related to origami mathematics, (b) one practical engineering application of origami folding.\n\nFinally, write a 150+ word essay identifying a UNIFYING THEME that connects all three topics (e.g., hidden complexity, emergent structure, nature inspiring engineering). The essay must reference specific facts from each topic. Cite the Wikipedia URL for every fact.",
+      "result_success": true,
+      "result_content_preview": "",
+      "result_source_url": null
+    }
+  },
+  "final_output": {
+    "final_deliverable": "Research results and synthesis\n\n1) Extracted facts (verbatim quotes from each Wikipedia page, with source URLs)\n\nA. Cordyceps fungi (https://en.wikipedia.org/wiki/Cordyceps)\n  a. Common name for the behaviour Cordyceps induces in ants (verbatim evidence):\n     - \"Scientific American notes that some species in the genus \\\"are indeed body snatchers\t6they have been making real zombies for millions of years\\\", though of ants or tarantulas, not of humans.\" (https://en.wikipedia.org/wiki/Cordyceps)\n     - \"...the human-infecting fungus is a mutated form of Ophiocordyceps unilateralis (a group of species now split off from Cordyceps) which alters the behaviour of infected insects.\" (https://en.wikipedia.org/wiki/Cordyceps)\n     Evidence summary: the page uses the terms \"zombies\"/\"making real zombies\" and explicitly states the fungus \"alters the behaviour of infected insects,\" supporting the commonly used phrase \"zombie\" (or \"zombie-ant\" behaviour) for the manipulation Cordyceps exerts on ants. (https://en.wikipedia.org/wiki/Cordyceps)\n\n  b. One commercial or medicinal use of Cordyceps (verbatim evidence):\n     - \"Diverse variants of cordyceps have had more than 1,500 years of use in Chinese medicine.\" (https://en.wikipedia.org/wiki/Cordyceps)\n     - \"Cordyceps sensu lato (which now includes Ophiocordyceps and many other genera holding species originally in this genus) has long been used in traditional Chinese medicine in the belief it can be used to treat diseases.\" (https://en.wikipedia.org/wiki/Cordyceps)\n     Evidence summary: the page documents traditional medicinal use (Chinese medicine) and the long history (\"more than 1,500 years\") of Cordyceps in that commercial/medicinal context. (https://en.wikipedia.org/wiki/Cordyceps)\n\nB. Admiralty law (https://en.wikipedia.org/wiki/Admiralty_law)\n  a. Historical origin or earliest legal code associated with admiralty law (verbatim evidence):\n     - \"An ancient example was the Rhodian law (Nomos Rhodion Nautikos), of which no extensive written specimen has survived, but which is alluded to in other legal texts (Roman and Byzantine legal codes).\" (https://en.wikipedia.org/wiki/Admiralty_law)\n     - The page also lists early medieval codes: \"In southern Italy the Ordinamenta et consuetudo maris (1063) at Trani and the Amalfian Laws were in effect from an early date, and later the customs of the Consulate of the Sea and the Hanseatic League.\" (https://en.wikipedia.org/wiki/Admiralty_law)\n     Evidence summary: the article traces admiralty-law origins to ancient Rhodian law and early medieval maritime customs (Ordinamenta et consuetudo maris, Amalfian Laws). (https://en.wikipedia.org/wiki/Admiralty_law)\n\n  b. One modern international maritime convention or treaty (verbatim evidence):\n     - \"While admiralty law is adjudicated in national courts, the United Nations Convention on the Law of the Sea has been adopted by 167 countries and the European Union, and disputes are resolved at the ITLOS tribunal in Hamburg.\" (https://en.wikipedia.org/wiki/Admiralty_law)\n     - The International Maritime Organization conventions are also listed: \"The IMO has prepared numerous international conventions concerning maritime safety, including the International Convention for the Safety of Life at Sea (SOLAS)...\" (https://en.wikipedia.org/wiki/Admiralty_law)\n     Evidence summary: the page explicitly cites the United Nations Convention on the Law of the Sea (UNCLOS) as adopted by 167 countries and the EU, and also names SOLAS as a major IMO convention. (https://en.wikipedia.org/wiki/Admiralty_law)\n\nC. Mathematics of paper folding (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n  a. Name of one theorem or axiom related to origami mathematics (verbatim evidence):\n     - \"Maekawa's theorem: at any vertex the number of valley and mountain folds always differ by two.\" (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n     - \"Kawasaki's theorem or Kawasaki-Justin theorem: at any vertex, the sum of all the odd angles (see image) adds up to 180 degrees, as do the even.\" (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n     - \"The Huzita\u0000adJustin axioms or Huzita\u0000adHatori axioms are an important contribution to this field of study.\" (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n     Evidence summary: the page names Maekawa's theorem, Kawasaki's theorem, and the Huzita\u0000adJustin (Huzita\u0000adHatori) axioms as central mathematical statements for origami. (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\n  b. One practical engineering application of origami folding (verbatim evidence):\n     - \"The Miura map fold is a rigid fold that has been used to deploy large solar panel arrays for space satellites.\" (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n     - Additionally: \"In 1985 Miura reported a method of packaging and deployment of large membranes in outer space, and as early as 2012 this technique had been applied to solar panels on spacecraft.\" (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n     Evidence summary: the page documents the Miura fold (Miura-ori) as a real engineering deployment technique used for spacecraft solar panels and large membrane packaging. (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\n\n2) Concise citation list (mapping each Wikipedia URL to the facts it supports)\n  - https://en.wikipedia.org/wiki/Cordyceps\n    * Supports: (A.a) the \"zombie\"/behaviour-manipulation language and the statement that the fungus \"alters the behaviour of infected insects\"; (A.b) long-standing use in Chinese/traditional medicine (\"more than 1,500 years\"). (https://en.wikipedia.org/wiki/Cordyceps)\n  - https://en.wikipedia.org/wiki/Admiralty_law\n    * Supports: (B.a) historical origins including the \"Rhodian law (Nomos Rhodion Nautikos)\" and medieval codes (Ordinamenta et consuetudo maris, Amalfian Laws); (B.b) modern conventions such as the \"United Nations Convention on the Law of the Sea\" (adopted by 167 countries and the EU) and IMO conventions including SOLAS. (https://en.wikipedia.org/wiki/Admiralty_law)\n  - https://en.wikipedia.org/wiki/Mathematics_of_paper_folding\n    * Supports: (C.a) origami theorems and axioms (\"Maekawa's theorem\", \"Kawasaki's theorem\", \"Huzita\u0000adJustin axioms\"); (C.b) engineering application: \"The Miura map fold ... used to deploy large solar panel arrays for space satellites.\" (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\n\n3) 150+ word synthesis essay naming a unifying theme (with explicit references to the facts above, each fact cited to its Wikipedia URL)\n\nUnifying theme: \"Constraint-driven design and control: simple rules producing complex, functional outcomes\"\n\nAcross biology, law, and engineering, a recurring theme is how compact rules or constraints produce complex, targeted outcomes. In nature, Cordyceps fungi manipulate insect behaviour into a precise lifecycle strategy: Scientific American observed some Cordyceps species \"are indeed body snatchers\t6they have been making real zombies for millions of years\", and the fungus \"alters the behaviour of infected insects\" (https://en.wikipedia.org/wiki/Cordyceps). In human institutions, admiralty law grew from concise, early maritime customs (\"An ancient example was the Rhodian law (Nomos Rhodion Nautikos)\") and medieval codes (\"Ordinamenta et consuetudo maris (1063) ... Amalfian Laws\") into global treaties that govern complex ocean commerce, such as the \"United Nations Convention on the Law of the Sea\" adopted by \"167 countries and the European Union\" (https://en.wikipedia.org/wiki/Admiralty_law). In engineering and mathematics, a few geometric rules (for example, \"Maekawa's theorem: at any vertex the number of valley and mountain folds always differ by two\") underpin powerful design capabilities; those axioms enable practical devices like the Miura fold, \"used to deploy large solar panel arrays for space satellites\" (https://en.wikipedia.org/wiki/Mathematics_of_paper_folding). Each domain shows how constrained operations\n\n\n\n\n\n\n\n\n\n\ncompact, local rules or behaviors\n\n\n\n\n\n\n\n\n\n\ncan produce organized, large-scale function: Cordyceps' behavioural control to spread spores (biology), historical maritime codes that scale into modern international law (social systems), and origami axioms that scale into deployable engineering structures (technology). These parallels show convergent strategies for managing complexity by encoding functionality into simple, repeatable constraints. (Facts cited above: Cordyceps: https://en.wikipedia.org/wiki/Cordyceps; Admiralty law: https://en.wikipedia.org/wiki/Admiralty_law; Mathematics of paper folding: https://en.wikipedia.org/wiki/Mathematics_of_paper_folding)\n\n\n4) Notes on evidence and exactness\n  - Every extracted fact above is supported by a verbatim quote taken from the RAW VISIT CONTENT of the respective Wikipedia pages; each quote is followed by the page URL where it was extracted. The quoted sentences are exact excerpts from the visited page content.\n  - Exact numeric values included from the pages: \"more than 1,500 years\" (traditional use of Cordyceps) and \"167 countries\" (UNCLOS adoption). These numbers are quoted verbatim from the source pages. (https://en.wikipedia.org/wiki/Cordyceps; https://en.wikipedia.org/wiki/Admiralty_law)\n\n\nIf you would like, I can: (a) extract additional verbatim passages about Cordyceps ant-manipulation mechanisms (e.g., Ophiocordyceps unilateralis lifecycle detail), (b) list other specific IMO conventions named on the Admiralty Law page (e.g., SOLAS, MARPOL, STCW), or (c) provide more origami axioms and technical references (e.g., full Huzita\u0000adJustin axiom statements) with direct page-location quotes.",
+    "action_summary": "Provided six exact facts (two per topic) with verbatim quotes from the corresponding Wikipedia pages and their source URLs: Cordyceps (zombie-like manipulation and 1,500+ years of Chinese medicine use), Admiralty law (Rhodian law and UNCLOS adoption by 167 countries), and Mathematics of paper folding (Maekawa's theorem and Miura fold used for satellite solar panels). Included a 150+ word synthesis essay identifying the unifying theme \"Constraint-driven design and control\" with explicit citations to the three Wikipedia pages.",
+    "success": true,
+    "goal_achieved": false
+  },
+  "timings_per_call": [
+    {
+      "name": "chroma_query",
+      "duration": 20.5089,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 20.5179,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2391,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.4445,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.0747,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.054,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 7.4426,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.629,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.2346,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 5.1854,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 3.1943,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 8.7574,
+      "success": true
+    },
+    {
+      "name": "chroma_add",
+      "duration": 9.1227,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.9135,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.909,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.735,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7365,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7857,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7854,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8074,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8072,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7756,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7753,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8191,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8202,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7802,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7802,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7863,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7864,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8037,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8013,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.706,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7072,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7386,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7393,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8005,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8065,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8136,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8158,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7956,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.795,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8692,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8691,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7997,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8078,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7777,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7774,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7502,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7563,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8011,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.807,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7842,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.784,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 15.726,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7623,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1201,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1028,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.4732,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1143,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0873,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0894,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0893,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.128,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1863,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1866,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1689,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1447,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1466,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2199,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2242,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2235,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.323,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3057,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.3044,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1679,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7885,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8012,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7692,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1667,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7826,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7156,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7338,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7415,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7335,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7443,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7174,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.72,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7344,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7228,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.776,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0047,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.0818,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8658,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8181,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8503,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7871,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7262,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7229,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.791,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7933,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 34.3359,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 34.3448,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4009,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7928,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.1823,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7845,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7866,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 11.4635,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.4344,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8333,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 1.2233,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8499,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.8438,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7724,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7646,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.816,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7784,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7207,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.72,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7458,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.781,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.784,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7788,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.774,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7285,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7395,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7531,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7392,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7166,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7148,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7219,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7432,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7491,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7204,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7663,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7717,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7476,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.801,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.7612,
+      "success": true
+    },
+    {
+      "name": "chroma_query",
+      "duration": 0.707,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 17.1069,
+      "success": true
+    },
+    {
+      "name": "chroma_store",
+      "duration": 8.0053,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 39.7239,
+      "success": true
+    },
+    {
+      "name": "llm_call",
+      "duration": 100.4241,
+      "success": true
+    }
+  ]
+}

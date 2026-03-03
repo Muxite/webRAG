@@ -22,7 +22,7 @@ def load_test_results(results_dir: Path, pattern: str = "*.json", run_id_filter:
     files_skipped = 0
     
     for result_file in sorted(results_dir.glob(pattern)):
-        if "summary" in result_file.name:
+        if "summary" in result_file.name or "_report_" in result_file.name:
             continue
         
         if run_id_filter:

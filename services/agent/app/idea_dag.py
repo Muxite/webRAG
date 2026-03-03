@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Union
 import uuid
 
@@ -10,41 +9,6 @@ from agent.app.idea_policies.base import DetailKey, IdeaNodeStatus
 
 @dataclass
 class IdeaNode:
-    """
-    Represents a single unit of work in the problem-solving graph.
-    
-    Each node can be an expansion (breaks into sub-problems), a leaf (executes actions),
-    or a merge (combines results). Nodes track their status, relationships, and results.
-    
-    **Node Types (determined by `details`):**
-    - **Expansion**: Has `action=null`, will be expanded into children
-    - **Leaf**: Has `action` field (search/visit/save/think), executes immediately
-    - **Merge**: Has `action=MERGE`, combines children's results
-    
-    **Status Values:**
-    - `PENDING`: Not yet processed
-    - `ACTIVE`: Currently being worked on
-    - `DONE`: Completed successfully
-    - `BLOCKED`: Temporarily blocked (e.g., rate limit)
-    - `FAILED`: Execution failed
-    - `SKIPPED`: Intentionally skipped
-    
-    **Key Fields:**
-    - `node_id`: Unique UUID identifier
-    - `title`: Human-readable label (e.g., "Search for X")
-    - `details`: Dict containing action, results, merged data, etc.
-    - `status`: Current processing status
-    - `score`: Evaluation score (0.0-1.0) for selection
-    - `children`: List of child node IDs
-    - `parent_id`: Primary parent node ID
-    
-    **Usage:**
-    Users typically access nodes via `graph.get_node(node_id)`, then check:
-    - `node.status` to see if work is complete
-    - `node.details.get("action")` to see what action it performs
-    - `node.details.get("result")` to see execution results
-    - `node.is_leaf()` to check if it's a terminal node
-    """
     node_id: str
     title: str
     details: Dict[str, Any] = field(default_factory=dict)
@@ -56,47 +20,10 @@ class IdeaNode:
     memo_key: Optional[str] = None
 
     def is_leaf(self) -> bool:
-        """
-        Indicate whether the node is a leaf.
-        :returns: True if node has no children.
-        """
         return len(self.children) == 0
 
 
 class IdeaDag:
-    """
-    Directed Acyclic Graph (DAG) structure for organizing problem-solving nodes.
-    
-    Manages a tree-like hierarchy of nodes where each node represents a unit of work.
-    The graph starts with a root node and grows as problems are expanded into sub-problems.
-    Users typically don't modify the graph directly; the engine manages it.
-    
-    **Usage Pattern:**
-    ```python
-    graph = IdeaDag(root_title="Research topic", root_details={"mandate": "..."})
-    root_id = graph.root_id()
-    node = graph.get_node(root_id)
-    node_count = graph.node_count()
-    ```
-    
-    **What It Stores:**
-    - Node hierarchy with parent-child relationships
-    - Node status (pending, active, done, blocked, failed)
-    - Action results and merged data
-    - Blocked sites and execution history
-    
-    **Key Methods:**
-    - `root_id()`: Get the root node's unique ID
-    - `get_node(node_id)`: Retrieve a node by ID
-    - `node_count()`: Total number of nodes in the graph
-    - `to_dict()`: Serialize graph to dictionary for storage/analysis
-    
-    **Important Behavior:**
-    - Each node has a unique UUID
-    - Nodes track their parent(s) and children
-    - Graph automatically manages node lifecycle
-    - Can be serialized to JSON for persistence
-    """
     def __init__(self, root_title: str, root_details: Optional[Dict[str, Any]] = None):
         self._nodes: Dict[str, IdeaNode] = {}
         self._root_id = self._new_id()
@@ -114,40 +41,18 @@ class IdeaDag:
         self._nodes[self._root_id] = root
 
     def _new_id(self) -> str:
-        """
-        Create a unique node identifier.
-        :returns: Node identifier.
-        """
         return str(uuid.uuid4())
 
     def root_id(self) -> str:
-        """
-        Return the root node identifier.
-        :returns: Root node id.
-        """
         return self._root_id
 
     def node_count(self) -> int:
-        """
-        Return the number of nodes in the graph.
-        :returns: Node count.
-        """
         return len(self._nodes)
 
     def get_node(self, node_id: str) -> Optional[IdeaNode]:
-        """
-        Retrieve a node by id.
-        :param node_id: Node identifier.
-        :returns: IdeaNode or None.
-        """
         return self._nodes.get(node_id)
 
     def depth(self, node_id: str) -> int:
-        """
-        Return the depth of a node from the root.
-        :param node_id: Node identifier.
-        :returns: Depth value.
-        """
         depth = 0
         current = self._nodes.get(node_id)
         seen = set()
@@ -169,16 +74,6 @@ class IdeaDag:
         score: Optional[float] = None,
         memo_key: Optional[str] = None,
     ) -> IdeaNode:
-        """
-        Add a child node under a parent.
-        :param parent_id: Parent node identifier.
-        :param title: Title for the child.
-        :param details: Optional details payload.
-        :param status: Status enum or string.
-        :param score: Optional evaluation score.
-        :param memo_key: Optional memoization key.
-        :returns: Newly created IdeaNode.
-        """
         parent = self._nodes.get(parent_id)
         if not parent:
             raise ValueError(f"Unknown parent_id: {parent_id}")
@@ -207,16 +102,6 @@ class IdeaDag:
         score: Optional[float] = None,
         memo_key: Optional[str] = None,
     ) -> IdeaNode:
-        """
-        Merge multiple parents into a new node.
-        :param parent_ids: Parent node identifiers.
-        :param title: Title for the merged node.
-        :param details: Optional details payload.
-        :param status: Status enum or string.
-        :param score: Optional evaluation score.
-        :param memo_key: Optional memoization key.
-        :returns: Newly created IdeaNode.
-        """
         if not parent_ids:
             raise ValueError("parent_ids required")
         missing = [pid for pid in parent_ids if pid not in self._nodes]
@@ -246,12 +131,6 @@ class IdeaDag:
         parent_id: str,
         ideas: List[Dict[str, Any]],
     ) -> List[IdeaNode]:
-        """
-        Expand a node into multiple candidate child ideas.
-        :param parent_id: Parent node identifier.
-        :param ideas: List of idea dicts with title/details/score/memo_key.
-        :returns: List of created nodes.
-        """
         created: List[IdeaNode] = []
         for idea in ideas:
             created.append(
@@ -272,13 +151,6 @@ class IdeaDag:
         score: float,
         status: Optional[Union[IdeaNodeStatus, str]] = None,
     ) -> None:
-        """
-        Evaluate a node by assigning a score and optional status.
-        :param node_id: Node identifier.
-        :param score: Evaluation score.
-        :param status: Optional status update.
-        :returns: None
-        """
         node = self._nodes.get(node_id)
         if not node:
             raise ValueError(f"Unknown node_id: {node_id}")
@@ -291,12 +163,6 @@ class IdeaDag:
         parent_id: str,
         require_score: bool = True,
     ) -> Optional[IdeaNode]:
-        """
-        Select the best child node based on score.
-        :param parent_id: Parent node identifier.
-        :param require_score: Require scored nodes.
-        :returns: Best child node or None.
-        """
         parent = self._nodes.get(parent_id)
         if not parent:
             raise ValueError(f"Unknown parent_id: {parent_id}")
@@ -308,11 +174,6 @@ class IdeaDag:
         return max(candidates, key=lambda node: node.score or float("-inf"))
 
     def leaf_nodes(self, start_id: Optional[str] = None) -> List[IdeaNode]:
-        """
-        Return leaf nodes from a start node.
-        :param start_id: Optional start node id.
-        :returns: List of leaf nodes.
-        """
         leaves: List[IdeaNode] = []
         for node in self.iter_depth_first(start_id):
             if node.is_leaf():
@@ -325,13 +186,6 @@ class IdeaDag:
         child_ids: Optional[List[str]] = None,
         merge_key: str = "merged",
     ) -> None:
-        """
-        Merge child details into a parent node.
-        :param node_id: Node identifier.
-        :param child_ids: Optional child list override.
-        :param merge_key: Destination key for merged list.
-        :returns: None
-        """
         node = self._nodes.get(node_id)
         if not node:
             raise ValueError(f"Unknown node_id: {node_id}")
@@ -353,12 +207,6 @@ class IdeaDag:
         node.details[merge_key] = merged
 
     def update_status(self, node_id: str, status: Union[IdeaNodeStatus, str]) -> None:
-        """
-        Update the status of a node.
-        :param node_id: Node identifier.
-        :param status: New status value.
-        :returns: None
-        """
         node = self._nodes.get(node_id)
         if not node:
             raise ValueError(f"Unknown node_id: {node_id}")
@@ -366,12 +214,6 @@ class IdeaDag:
 
     @staticmethod
     def _sanitize_for_storage(obj: Any) -> Any:
-        """
-        Recursively sanitize data to ensure JSON serializability.
-        Converts all non-serializable types to strings or removes them.
-        :param obj: Object to sanitize.
-        :returns: Sanitized object.
-        """
         if obj is None:
             return None
         if isinstance(obj, (str, int, float, bool)):
@@ -383,13 +225,6 @@ class IdeaDag:
         return str(obj)
 
     def update_details(self, node_id: str, updates: Dict[str, Any]) -> None:
-        """
-        Merge detail updates into a node.
-        All updates are sanitized to ensure JSON serializability.
-        :param node_id: Node identifier.
-        :param updates: Dictionary of updates.
-        :returns: None
-        """
         node = self._nodes.get(node_id)
         if not node:
             raise ValueError(f"Unknown node_id: {node_id}")
@@ -397,23 +232,12 @@ class IdeaDag:
         node.details.update(sanitized)
 
     def set_title(self, node_id: str, title: str) -> None:
-        """
-        Update the node title.
-        :param node_id: Node identifier.
-        :param title: New title.
-        :returns: None
-        """
         node = self._nodes.get(node_id)
         if not node:
             raise ValueError(f"Unknown node_id: {node_id}")
         node.title = title
 
     def path_to_root(self, node_id: str) -> List[IdeaNode]:
-        """
-        Return the path from a node to the root.
-        :param node_id: Node identifier.
-        :returns: List of nodes from node to root.
-        """
         path: List[IdeaNode] = []
         current = self._nodes.get(node_id)
         seen = set()
@@ -427,11 +251,6 @@ class IdeaDag:
         return path
 
     def iter_depth_first(self, start_id: Optional[str] = None) -> Iterable[IdeaNode]:
-        """
-        Iterate nodes depth-first.
-        :param start_id: Optional start node id.
-        :returns: Iterator of nodes.
-        """
         start = start_id or self._root_id
         stack = [start]
         while stack:
@@ -444,11 +263,6 @@ class IdeaDag:
                 stack.append(child_id)
 
     def iter_breadth_first(self, start_id: Optional[str] = None) -> Iterable[IdeaNode]:
-        """
-        Iterate nodes breadth-first.
-        :param start_id: Optional start node id.
-        :returns: Iterator of nodes.
-        """
         start = start_id or self._root_id
         queue = [start]
         idx = 0
@@ -462,19 +276,10 @@ class IdeaDag:
             queue.extend(node.children)
 
     def find_by_status(self, status: Union[IdeaNodeStatus, str]) -> List[IdeaNode]:
-        """
-        Return all nodes matching a status.
-        :param status: Status value.
-        :returns: List of matching nodes.
-        """
         expected = self._coerce_status(status)
         return [node for node in self._nodes.values() if node.status == expected]
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Serialize graph to a dictionary.
-        :returns: Serialized payload.
-        """
         return {
             "root_id": self._root_id,
             "nodes": {
@@ -495,11 +300,6 @@ class IdeaDag:
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> IdeaDag:
-        """
-        Deserialize graph from a dictionary.
-        :param payload: Serialized payload.
-        :returns: IdeaDag instance.
-        """
         root_id = payload.get("root_id")
         nodes = payload.get("nodes", {})
         if not root_id or root_id not in nodes:
@@ -536,11 +336,6 @@ class IdeaDag:
 
     @staticmethod
     def _coerce_status(status: Union[IdeaNodeStatus, str]) -> IdeaNodeStatus:
-        """
-        Convert status input to IdeaNodeStatus.
-        :param status: Status value.
-        :returns: IdeaNodeStatus.
-        """
         if isinstance(status, IdeaNodeStatus):
             return status
         try:
@@ -549,54 +344,32 @@ class IdeaDag:
             raise ValueError(f"Unknown status: {status}")
     
     def _build_action_key(self, action_type: str, details: Dict[str, Any]) -> Optional[str]:
-        """
-        Build a deduplication key for an action.
-        :param action_type: Action type string.
-        :param details: Node details dict.
-        :returns: Action key or None.
-        """
         from agent.app.idea_policies.base import IdeaActionType
         if action_type == IdeaActionType.VISIT.value:
             from agent.app.idea_policies.action_constants import NodeDetailsExtractor
             url = NodeDetailsExtractor.get_url(details)
             if url:
-                return f"visit:{url.lower().strip()}"
+                url_str = url if isinstance(url, str) else str(url)
+                return f"visit:{url_str.lower().strip()}"
         elif action_type == IdeaActionType.SEARCH.value:
             query = details.get(DetailKey.QUERY.value) or details.get(DetailKey.PROMPT.value)
             if query:
-                return f"search:{query.lower().strip()}"
+                query_str = query if isinstance(query, str) else str(query)
+                return f"search:{query_str.lower().strip()}"
         return None
     
     def has_executed_action(self, action_type: str, details: Dict[str, Any]) -> Optional[str]:
-        """
-        Check if an action has already been executed.
-        :param action_type: Action type string.
-        :param details: Node details dict.
-        :returns: Node ID that executed this action, or None.
-        """
         action_key = self._build_action_key(action_type, details)
         if not action_key:
             return None
         return self._executed_actions.get(action_key)
     
     def mark_action_executed(self, node_id: str, action_type: str, details: Dict[str, Any]) -> None:
-        """
-        Mark an action as executed.
-        :param node_id: Node identifier.
-        :param action_type: Action type string.
-        :param details: Node details dict.
-        :returns: None.
-        """
         action_key = self._build_action_key(action_type, details)
         if action_key:
             self._executed_actions[action_key] = node_id
     
     def _extract_domain(self, url: str) -> Optional[str]:
-        """
-        Extract domain from URL for blocking detection.
-        :param url: URL string.
-        :returns: Domain or None.
-        """
         try:
             from urllib.parse import urlparse
             parsed = urlparse(url)
@@ -608,37 +381,17 @@ class IdeaDag:
             return None
     
     def is_site_blocked(self, url: str) -> Optional[str]:
-        """
-        Check if a site is blocked.
-        :param url: URL to check.
-        :returns: Block reason or None.
-        """
         domain = self._extract_domain(url)
         if domain:
             return self._blocked_sites.get(domain)
         return None
     
     def mark_site_blocked(self, url: str, reason: str) -> None:
-        """
-        Mark a site as blocked.
-        :param url: URL that was blocked.
-        :param reason: Reason for blocking.
-        :returns: None.
-        """
         domain = self._extract_domain(url)
         if domain:
             self._blocked_sites[domain] = reason
     
     def build_event_log_table(self, node_id: str, max_events: int = 20) -> str:
-        """
-        Build a concise event log table of actions and outcomes up to a node.
-        This provides branch-aware context: each branch only sees events in its path.
-        Branch-to-branch communication happens via vector database.
-        
-        :param node_id: Node identifier to build log up to.
-        :param max_events: Maximum number of events to include.
-        :returns: Formatted event log table string.
-        """
         path = self.path_to_root(node_id)
         if not path:
             return "No events in path."
@@ -656,7 +409,6 @@ class IdeaDag:
             
             from agent.app.idea_policies.action_constants import ActionResultKey
             from agent.app.idea_policies.base import IdeaActionType
-            # Determine success status
             if result and isinstance(result, dict):
                 success = result.get(ActionResultKey.SUCCESS.value, False)
             elif status == IdeaNodeStatus.DONE.value:
@@ -666,27 +418,49 @@ class IdeaDag:
             else:
                 success = None
             
-            # Build event summary
             event_summary = []
+
+            justification = (
+                node.details.get(DetailKey.JUSTIFICATION.value)
+                or node.details.get(DetailKey.WHY_THIS_NODE.value)
+                or ""
+            )
+            if justification:
+                event_summary.append(f"Why: {str(justification)[:80]}")
+
             if action_type:
                 if action_type == IdeaActionType.VISIT.value:
                     from agent.app.idea_policies.action_constants import NodeDetailsExtractor
                     url = result.get(ActionResultKey.URL.value) if result and isinstance(result, dict) else NodeDetailsExtractor.get_url(node.details)
                     if url:
                         event_summary.append(f"URL: {url[:60]}")
+                    if success and result and isinstance(result, dict):
+                        page_title = result.get("page_title", "")
+                        content_chars = result.get("content_total_chars", 0)
+                        links_count = result.get("links_count", 0)
+                        if page_title:
+                            event_summary.append(f"Page: {page_title[:50]}")
+                        if content_chars:
+                            event_summary.append(f"{content_chars} chars, {links_count} links")
                 elif action_type == IdeaActionType.SEARCH.value:
                     from agent.app.idea_policies.action_constants import NodeDetailsExtractor
                     query = result.get(ActionResultKey.QUERY.value) if result and isinstance(result, dict) else NodeDetailsExtractor.get_query(node.details)
                     if query:
                         event_summary.append(f"Query: {query[:60]}")
                     if result and isinstance(result, dict):
-                        results_count = len(result.get(ActionResultKey.RESULTS.value, []))
+                        search_results = result.get(ActionResultKey.RESULTS.value, [])
+                        results_count = len(search_results) if isinstance(search_results, list) else 0
                         if results_count > 0:
                             event_summary.append(f"Found {results_count} results")
+                            top_urls = []
+                            for sr in (search_results[:3] if isinstance(search_results, list) else []):
+                                if isinstance(sr, dict) and sr.get("url"):
+                                    top_urls.append(str(sr["url"])[:60])
+                            if top_urls:
+                                event_summary.append(f"Top URLs: {', '.join(top_urls)}")
                 elif action_type == IdeaActionType.THINK.value:
                     event_summary.append("Internal reasoning")
             
-            # Add error if failed
             if success is False:
                 error = None
                 if result and isinstance(result, dict):
@@ -696,10 +470,9 @@ class IdeaDag:
                 if error:
                     event_summary.append(f"Error: {error[:80]}")
             
-            # Build event row
             title_short = node.title[:50] if len(node.title) > 50 else node.title
             action_display = action_type if action_type else "planning"
-            status_display = "✓" if success is True else "✗" if success is False else "○"
+            status_display = "[OK]" if success is True else "[FAIL]" if success is False else "[-]"
             summary = " | ".join(event_summary) if event_summary else ""
             
             events.append({
@@ -709,14 +482,12 @@ class IdeaDag:
                 "summary": summary,
             })
         
-        # Limit events
         events = events[-max_events:] if len(events) > max_events else events
         
         if not events:
             return "No events in path."
         
-        # Format as table
-        lines = ["Event Log (branch context):"]
+        lines = ["Ancestor Decision Trail (this branch only):"]
         lines.append("=" * 80)
         lines.append(f"{'Status':<8} {'Action':<12} {'Title':<50}")
         lines.append("-" * 80)
@@ -727,16 +498,13 @@ class IdeaDag:
             title = event["title"]
             summary = event["summary"]
             
-            # Main row
             lines.append(f"{status:<8} {action:<12} {title:<50}")
             
-            # Summary row if present
             if summary:
                 lines.append(f"{'':<8} {'':<12}   └─ {summary}")
         
         lines.append("=" * 80)
-        lines.append(f"Note: This branch focuses on its sub-problem. Other branches handle")
-        lines.append(f"      their sub-problems independently. Cross-branch data sharing")
-        lines.append(f"      happens via vector database when relevant.")
+        lines.append(f"Use the trail above to understand what has been done and decide next steps.")
+        lines.append(f"Do NOT repeat completed work. Build on ancestor outcomes.")
         
         return "\n".join(lines)

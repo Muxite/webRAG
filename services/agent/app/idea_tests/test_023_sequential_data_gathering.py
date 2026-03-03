@@ -26,7 +26,7 @@ def get_task_statement() -> str:
         "You must: (1) First search for the official Rust website, (2) Visit the official website, "
         "(3) Extract the current stable version number, (4) Then search for 'Rust installation guide', "
         "(5) Visit at least one installation guide page, (6) Extract the installation method for your operating system. "
-        "This requires sequential steps: search → visit → extract → search again → visit → extract."
+        "This requires sequential steps: search -> visit -> extract -> search again -> visit -> extract."
     )
 
 
@@ -51,7 +51,7 @@ def get_success_criteria() -> List[str]:
         "Version number extracted",
         "Installation guide mentioned",
         "Installation method provided",
-        "Sequential pattern evident (search → visit → search → visit)",
+        "Sequential pattern evident (search -> visit -> search -> visit)",
     ]
 
 
@@ -139,7 +139,7 @@ def validate_installation_method(result: Dict[str, Any], observability: Dict[str
 
 
 def validate_sequential_pattern(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate sequential pattern (search → visit → search → visit)."""
+    """Validate sequential pattern (search -> visit -> search -> visit)."""
     search_count = observability.get("search", {}).get("count", 0)
     visit_count = observability.get("visit", {}).get("count", 0)
     passed = search_count >= 2 and visit_count >= 2

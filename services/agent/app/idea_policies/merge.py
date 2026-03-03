@@ -10,22 +10,12 @@ from agent.app.idea_policies.base import MergePolicy, DetailKey, IdeaActionType,
 
 
 class SimpleMergePolicy(MergePolicy):
-    """
-    Merge child action results into the parent details with recursive merging support.
-    :param settings: Settings dictionary.
-    :returns: SimpleMergePolicy instance.
-    """
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         super().__init__(settings=settings)
         self._logger = logging.getLogger(__name__)
 
     @staticmethod
     def _sanitize_data(obj: Any) -> Any:
-        """
-        Recursively sanitize data to ensure JSON serializability.
-        :param obj: Object to sanitize.
-        :returns: Sanitized object.
-        """
         if obj is None:
             return None
         if isinstance(obj, (str, int, float, bool)):
@@ -37,12 +27,6 @@ class SimpleMergePolicy(MergePolicy):
         return str(obj)
 
     def are_children_ready_to_merge(self, graph: IdeaDag, node_id: str) -> bool:
-        """
-        Check if all children are complete and ready to merge.
-        :param graph: IdeaDag instance.
-        :param node_id: Node identifier.
-        :returns: True if all children are done/failed/blocked/skipped.
-        """
         node = graph.get_node(node_id)
         if not node or not node.children:
             return False
@@ -51,27 +35,20 @@ class SimpleMergePolicy(MergePolicy):
             child = graph.get_node(child_id)
             if not child:
                 continue
-            # Check if child is a merge node that's already done
+            # Skip already-finished merge nodes
             from agent.app.idea_policies.action_constants import NodeDetailsExtractor
             if NodeDetailsExtractor.is_merge_action(child.details):
-                if child.status == IdeaNodeStatus.DONE:
+                if child.status in (IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED):
                     continue
-                # If merge node failed, still consider it "ready" to merge
-                if child.status in (IdeaNodeStatus.FAILED, IdeaNodeStatus.BLOCKED):
-                    continue
-            # For regular action nodes, check if they're complete
-            if child.status not in (IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.BLOCKED, IdeaNodeStatus.SKIPPED):
+                # Merge node still running -> not ready
+                return False
+            # For regular action nodes: BLOCKED means still retrying -> not ready
+            if child.status not in (IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED):
                 return False
         
         return True
 
     def should_create_merge_node(self, graph: IdeaDag, node_id: str) -> bool:
-        """
-        Determine if a merge node should be created for this parent.
-        :param graph: IdeaDag instance.
-        :param node_id: Node identifier.
-        :returns: True if merge node should be created.
-        """
         if not self.settings.get("enable_recursive_merge", True):
             return False
         
@@ -93,17 +70,11 @@ class SimpleMergePolicy(MergePolicy):
         return self.are_children_ready_to_merge(graph, node_id)
 
     def create_merge_node(self, graph: IdeaDag, parent_id: str) -> Optional[str]:
-        """
-        Create a merge node for a parent with completed children.
-        :param graph: IdeaDag instance.
-        :param parent_id: Parent node identifier.
-        :returns: Created merge node ID or None.
-        """
         parent = graph.get_node(parent_id)
         if not parent:
             return None
         
-        # First, merge the children results into parent
+        # First, merge the children results into parent (populates parent.details.merged_results)
         self.merge(graph, parent_id)
         
         # Create merge node with parent justification
@@ -117,6 +88,14 @@ class SimpleMergePolicy(MergePolicy):
             merge_details[DetailKey.PARENT_JUSTIFICATION.value] = parent_justification
             merge_details[DetailKey.WHY_THIS_NODE.value] = f"Merge results from children to synthesize findings for: {parent.title}. {parent_justification}"
         
+        # Copy merged_results from parent into the merge node so MergeLeafAction can read them
+        parent_merged = parent.details.get(DetailKey.MERGED_RESULTS.value)
+        if parent_merged:
+            merge_details[DetailKey.MERGED_RESULTS.value] = parent_merged
+        parent_merge_summary = parent.details.get(DetailKey.MERGE_SUMMARY.value)
+        if parent_merge_summary:
+            merge_details[DetailKey.MERGE_SUMMARY.value] = parent_merge_summary
+        
         merge_node = graph.add_child(
             parent_id=parent_id,
             title=merge_title,
@@ -129,14 +108,6 @@ class SimpleMergePolicy(MergePolicy):
         return merge_node.node_id
 
     def merge(self, graph: IdeaDag, node_id: str, recursive: bool = True) -> Dict[str, Any]:
-        """
-        Merge child action results into a parent summary payload.
-        Supports recursive merging up the tree.
-        :param graph: IdeaDag instance.
-        :param node_id: Node identifier.
-        :param recursive: If True, recursively merge parent's parent.
-        :returns: Merge payload.
-        """
         node = graph.get_node(node_id)
         if not node:
             return {}
@@ -238,13 +209,6 @@ class SimpleMergePolicy(MergePolicy):
         return {"merged": merged, "summary": merge_summary, "goal_achieved": goal_achieved}
     
     def _validate_goal_achievement(self, graph: IdeaDag, node: IdeaNode, merged_results: List[Dict[str, Any]]) -> bool:
-        """
-        Validate if the original goal was achieved based on merged results.
-        :param graph: IdeaDag instance.
-        :param node: Node to validate.
-        :param merged_results: List of merged child results.
-        :returns: True if goal appears to be achieved.
-        """
         original_goal = node.details.get(DetailKey.GOAL.value) or node.details.get(DetailKey.ORIGINAL_GOAL.value) or node.details.get(DetailKey.INTENT.value)
         if not original_goal:
             return True

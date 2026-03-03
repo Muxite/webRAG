@@ -1,148 +1,70 @@
 # IdeaDAG Agent
 
-DAG-based reasoning agent implementing Graph of Thoughts (GoT) architecture for complex problem-solving with automatic vector database integration, parallel execution, and comprehensive testing infrastructure.
+DAG-based reasoning agent (Graph-of-Thought) with vector DB integration, parallel execution, and bot-resistant web access.
 
-## Overview
-
-The IdeaDAG agent breaks complex problems into sub-problems using a directed acyclic graph (DAG) structure. Each branch follows an **Expansion-Merge Pair** pattern: expansion nodes break problems into sub-problems, leaf nodes execute evidence-gathering actions (search, visit, save), and merge nodes synthesize results toward completion.
-
-### Key Features
-
-- **Graph of Thoughts (GoT) Architecture**: Hierarchical problem decomposition with automatic merge synthesis
-- **Automatic Vector Database Integration**: ChromaDB queried automatically on every node for context
-- **Memory Type Classification**: Separate internal thoughts and observations for granular context control
-- **Parallel Execution**: Multi-model testing with asyncio-based parallelization
-- **Comprehensive Testing Infrastructure**: 24 priority-ordered tests with validation and visualization
-- **Real-time Observability**: Telemetry tracking for LLM calls, searches, visits, and performance metrics
-
-## Architecture
-
-### Core Components
-
-1. **IdeaDAG Engine** (`idea_engine.py`): Main execution engine managing DAG traversal and node execution
-2. **Node Types**: Expansion (decompose), Leaf (execute actions), Merge (synthesize)
-3. **Policies**: Expansion, evaluation, and merge policies using LLM for decision-making
-4. **Memory Manager** (`idea_memory.py`): ChromaDB integration with memory type classification
-5. **Agent IO** (`agent_io.py`): Unified interface for LLM, search, HTTP, and ChromaDB operations
-
-### Execution Flow
+## Flow
 
 ```
-Root Node (Problem)
-  ↓
-Expansion Node (Break into sub-problems)
-  ↓
-[Intermediate Layers - can have recursive expansion-merge pairs]
-  ↓
-Leaf Nodes (Execute actions: search, visit, save)
-  ↓
-Merge Node (Synthesize results)
-  ↓
-[Progress toward root for final completion]
+Mandate → Root node
+  → Expansion (LLM decomposes into 2-5 subproblems)
+  → Evaluation (LLM scores candidates 0-1)
+  → Selection (best-first or sequential prune)
+  → Leaf actions (search / visit / save / think)
+  → Merge (LLM synthesizes child results upward)
+  → Final synthesis → Deliverable
 ```
 
-### Memory System
+## Execution Modes
 
-- **Internal Thoughts**: Agent reasoning, planning, synthesis (from `think`, `save`, merge summaries)
-- **Observations**: External data from searches and visits
-- **Automatic Retrieval**: Top N internal thoughts + Top M observations on every node
-- **Semantic Search**: Vector DB queried with intent for relevant context
+| Mode | Branching | Selection | Use Case |
+|---|---|---|---|
+| `graph` | Parallel, dynamic beam (2-5) | Best-first global | Production — 90.6% pass rate |
+| `sequential` | Generate many, keep one | Prune siblings, depth-first | Baseline comparison — 46.9% pass rate |
 
-### Final Synthesis
-
-Before final LLM synthesis, merged results are compacted to manage token limits:
-- **Action-aware content preservation**: 1500 chars for visits (preserves infobox facts), 400 for others
-- **Action-aware link preservation**: Up to 20 links for visits (enables link collection tasks)
-- Large fields (`content_full`, `content_with_links`, `links_full`) are removed
-
-## Testing Infrastructure
-
-### Test System
-
-Located in `app/testing/`:
-- **Validation System**: Class-based validation with function and LLM checks
-- **Test Runner**: Parallel execution with multi-model support
-- **Test Modules**: Python-based test definitions with validation functions
-- **Visualization**: Matplotlib-based analysis with timestamp tracking
-
-### Test Priority System
-
-Tests ordered by priority (1-24). Environment variable `IDEA_TEST_PRIORITY`:
-- `0`: Run all tests
-- `N`: Run top N priority tests
-
-### Supported Models
-
-- `gpt-5-mini` (default, also used for validation)
-- `gpt-5-nano`
-- `gpt-4.1-nano`
-- `gpt-4o`
-
-### Environment Variables
-
-- `IDEA_TEST_MODELS`: Comma-separated models to test
-- `IDEA_TEST_PRIORITY`: Number of priority tests (0 = all)
-- `IDEA_TEST_MAX_PARALLEL`: Max parallel executions (default: 4)
-- `IDEA_TEST_LOG_LEVEL`: Logging level (default: INFO)
-
-### Running Tests
+## Running
 
 ```bash
-# Run all tests with default model
-python -m app.idea_test_runner
-
-# Run top 10 priority tests with multiple models
-IDEA_TEST_MODELS=gpt-5-mini,gpt-5-nano python -m app.idea_test_runner
-IDEA_TEST_PRIORITY=10 python -m app.idea_test_runner
-
-# Visualize results
-python -m app.testing.idea_test_visualize --run-id 20260221_205459
+docker compose up -d
+docker compose run --profile test idea-test       # full suite: 16 tests × 2 models × 2 variants
+docker compose run --profile test visit-test      # visit-focused: 019, 025, 033, 037
+docker compose run --profile test general-test    # general: 002, 012
+docker compose run --profile debug agent-debug    # GDB-style stepping debugger
 ```
 
-## Deployment
+## Configuration
 
-### Docker Compose
+All tunable parameters live in `app/idea_dag_settings.json`.
 
-```bash
-# Run agent tests
-docker compose up agent-test
+| Variable | Description | Default |
+|---|---|---|
+| `IDEA_TEST_IDS` | Comma-separated test IDs | (all by priority) |
+| `IDEA_TEST_MODELS` | Models to test | `gpt-5.2,gpt-5-mini` |
+| `IDEA_TEST_EXECUTION_VARIANTS` | `graph`, `sequential`, or both | `graph,sequential` |
+| `IDEA_TEST_RUNS` | Repeats per test/model pair | `1` |
+| `IDEA_TEST_CONCURRENCY` | Max parallel tests | `4` |
+| `IDEA_TEST_MAX_STEPS` | Engine step cap | `75` |
+| `IDEA_TEST_REPORT_VERBOSITY` | Detail level 0-3 | `2` |
+| `MODEL_NAME` | Default LLM model | `gpt-5-mini` |
 
-# Run idea tests
-docker compose up idea-test
-```
+## Connectors
 
-### Requirements
+| Connector | Purpose |
+|---|---|
+| `ConnectorLLM` | OpenAI API for expansion, evaluation, merge, finalization |
+| `ConnectorSearch` | Brave Search API for web queries |
+| `ConnectorHttp` | aiohttp for page fetching with retry logic |
+| `ConnectorBrowser` | undetected-chromedriver fallback for bot-protected sites (403/401) |
+| `ConnectorChroma` | ChromaDB for vector storage and retrieval |
 
-- Python 3.10+
-- ChromaDB (local or remote)
-- Redis (for caching)
-- RabbitMQ (for messaging)
-- OpenAI API key (`OPENAI_API_KEY`)
-- Search API key (`SEARCH_API_KEY`)
+## Observability
 
-## Documentation
+Telemetry is handled by `ConnectorBase` (timing, I/O logging) so action classes stay clean. Every LLM call, HTTP request, search query, and browser fetch is recorded with duration, status, and payload metadata. The test runner emits per-test JSON with scores, costs, token counts, and graph structure metrics. The visualization pipeline generates dashboards from these results.
 
-- **Internal Agent System**: See `app/AGENT_ARCHITECTURE.md` for detailed agent implementation
-- **Data Flow**: See `app/DATA_FLOW.md` for memory and data flow details
-- **Testing**: See `app/IDEA_TEST_SYSTEM.md` for test system documentation
-- **Visualization**: See `app/IDEA_TEST_VISUALIZATION.md` for visualization usage
+## Docs
 
-## Code Organization
-
-- **Core Agent**: `idea_engine.py`, `idea_dag.py`, `idea_policies/`, `idea_memory.py`
-- **Testing Infrastructure**: `testing/` (validation, execution, runner, config, utils)
-- **Test Definitions**: `idea_tests/` (24 priority-ordered test modules)
-- **Visualization**: `testing/idea_test_visualize.py`
-- **Connectors**: `connector_*.py` (LLM, search, HTTP, ChromaDB)
-- **Interface**: `agent.py`, `interface_agent.py`, `main.py`
-
-## Statistics & Observability
-
-The system collects comprehensive metrics:
-- LLM call counts, tokens, durations
-- Search/visit counts and data amounts (KB)
-- ChromaDB store/retrieve operations
-- Validation scores and pass rates
-- Timestamp tracking for performance over time
-
-All metrics visualized via `testing/idea_test_visualize.py` with matplotlib diagrams showing performance trends, model comparisons, and validation breakdowns.
+| File | Content |
+|---|---|
+| [AGENT_ARCHITECTURE.md](app/AGENT_ARCHITECTURE.md) | Node types, execution flow, GoT mechanics, data flow, connectors |
+| [DEPLOYMENT.md](app/DEPLOYMENT.md) | Docker services, env vars, prerequisites |
+| [AGENT_DEBUG.md](app/AGENT_DEBUG.md) | GDB-style debugger commands and usage |
+| [idea_tests/README.md](app/idea_tests/README.md) | Test structure and validation system |
