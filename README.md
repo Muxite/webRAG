@@ -112,6 +112,19 @@ docker compose up -d
 docker compose run --profile test visit-test
 ```
 
+### Local Development
+
+The frontend automatically detects local development mode and uses Docker resources:
+
+1. **Start Docker services**: `cd services && docker compose up -d`
+2. **Start frontend dev server**: `cd frontend && npm run dev`
+3. The frontend will automatically connect to `http://localhost:8080` (Docker gateway)
+
+**Override behavior:**
+- Set `VITE_GATEWAY_URL` to use a specific gateway URL
+- Set `VITE_USE_LOCAL=true` to force local mode even in production builds
+- Set `VITE_USE_LOCAL=false` to disable auto-detection
+
 ## Repo Layout
 
 ```

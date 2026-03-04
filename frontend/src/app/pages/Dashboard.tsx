@@ -27,7 +27,7 @@ export default function Dashboard() {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [mandate, setMandate] = useState("");
-  const [maxTicks, setMaxTicks] = useState<number>(10);
+  const [maxTicks] = useState<number>(80);
   const [loading, setLoading] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [showReconnect, setShowReconnect] = useState(false);
@@ -76,6 +76,7 @@ export default function Dashboard() {
       loadTasks();
       
       const interval = setInterval(() => {
+        loadSystemInfo();
         loadTasks();
         loadUserStats();
       }, POLLING_INTERVAL);
@@ -160,7 +161,7 @@ export default function Dashboard() {
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mandate.trim() || maxTicks <= 0) return;
+    if (!mandate.trim()) return;
 
     setLoading(true);
     setSubmitMessage(null);
@@ -179,7 +180,6 @@ export default function Dashboard() {
       if (response) {
         setSubmitMessage(`Task received: ${response.correlation_id}`);
         setMandate("");
-        setMaxTicks(10);
         await loadTasks();
         await loadUserStats();
       } else {
@@ -437,24 +437,6 @@ export default function Dashboard() {
                   color: themeColors.text,
                 }}
                 placeholder="Describe what you want the AI to do..."
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-label mb-2">
-                Max Iterations
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={maxTicks}
-                onChange={(e) => setMaxTicks(parseInt(e.target.value) || 0)}
-                className="w-full border-2 px-4 py-2 focus:outline-none transition-colors text-input"
-                style={{
-                  backgroundColor: themeColors.surface,
-                  borderColor: themeColors.secondary,
-                  color: themeColors.text,
-                }}
                 required
               />
             </div>

@@ -52,7 +52,7 @@ class GatewayTaskRegistrar:
             "user_id": user_id,
             "mandate": req.mandate,
             "status": TaskQueueState.IN_QUEUE.value,
-            "max_ticks": int(req.max_ticks or 50),
+            "max_ticks": int(req.max_ticks or 80),
             "tick": None,
             "result": None,
             "error": None,

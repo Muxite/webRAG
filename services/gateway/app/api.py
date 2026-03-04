@@ -61,8 +61,10 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             allowed_hosts=[host.strip() for host in trusted_hosts.split(",")]
         )
     
-    cors_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173")
-    allowed_origins = [origin.strip() for origin in cors_origins_env.split(",")]
+    cors_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS", "https://euglena.vercel.app,https://web-rag-nine.vercel.app,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173")
+    allowed_origins = [origin.strip().rstrip("/") for origin in cors_origins_env.split(",") if origin.strip()]
+    
+    logger.info(f"CORS allowed origins: {allowed_origins}")
     
     app.add_middleware(
         CORSMiddleware,
@@ -133,7 +135,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             payload["queue_depths"] = queue_depths
         
         if os.environ.get("GATEWAY_HEALTH_LOG", "false").lower() in ("1", "true", "yes"):
-        monitor.log_status()
+            monitor.log_status()
         return payload
 
     @router.get("/version")
@@ -205,7 +207,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
         credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
     ) -> TaskResponse:
         try:
-            max_ticks = int(req.max_ticks or 50)
+            max_ticks = int(req.max_ticks or 80)
             quota = app.state.user_tick_manager
             access_token = credentials.credentials
 

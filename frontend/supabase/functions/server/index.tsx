@@ -2,7 +2,6 @@ import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import { createClient } from "npm:@supabase/supabase-js";
-import * as kv from "./kv_store.tsx";
 
 const app = new Hono();
 
@@ -55,9 +54,8 @@ app.post("/make-server-65da8f1f/signup", async (c) => {
       return c.json({ error: error.message }, 400);
     }
 
-    // Initialize user data in KV store
-    await kv.set(`user:${data.user.id}:ticks`, "1000");
-    await kv.set(`user:${data.user.id}:tasks`, JSON.stringify([]));
+    // Profile and usage data will be created automatically by the gateway service
+    // when the user first accesses their profile via SupabaseUserTickManager
 
     return c.json({ success: true, user: data.user });
   } catch (error: any) {
