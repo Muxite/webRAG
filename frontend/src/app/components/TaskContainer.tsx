@@ -1,7 +1,6 @@
 import { useState } from "react";
 import VectorBox from "./VectorBox";
-import { Clock, Activity, ChevronDown, ChevronUp, X } from "lucide-react";
-import * as Progress from "@radix-ui/react-progress";
+import { Clock, ChevronDown, ChevronUp, X } from "lucide-react";
 
 interface Task {
   id: string;
@@ -67,12 +66,7 @@ export default function TaskContainer({ task, onDelete, defaultOpen, themeColors
     text: "text-gray-400",
   };
 
-  const progressPercentage = task.maxTicks > 0
-    ? Math.min(100, Math.max(0, (task.ticksUsed / task.maxTicks) * 100))
-    : 0;
-
   const primaryColor = themeColors?.primary || "#22D3EE";
-  const secondaryColor = themeColors?.secondary || "#FF3D9A";
   const boxBg = themeColors?.boxBg || "#0a0a0aD9";
 
   return (
@@ -115,32 +109,6 @@ export default function TaskContainer({ task, onDelete, defaultOpen, themeColors
 
           <div className="mb-3">
             <span className="text-body">{task.mandate}</span>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-metadata-secondary">Iterations Used</span>
-              <span className="text-metadata-primary">
-                {task.ticksUsed} / {task.maxTicks}
-              </span>
-            </div>
-            <Progress.Root
-              className="relative overflow-hidden border"
-              style={{ 
-                height: 10,
-                backgroundColor: `${primaryColor}20`,
-                borderColor: primaryColor
-              }}
-              value={progressPercentage}
-            >
-              <Progress.Indicator
-                className="h-full transition-all duration-500 ease-out"
-                style={{
-                  transform: `translateX(-${100 - progressPercentage}%)`,
-                  background: `linear-gradient(to right, ${primaryColor}, ${secondaryColor})`,
-                }}
-              />
-            </Progress.Root>
           </div>
         </button>
 
