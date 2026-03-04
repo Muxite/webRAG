@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { supabase } from "@/lib/supabase";
-import { signupUser } from "@/api/config";
 import VectorBox from "@/app/components/VectorBox";
 import VectorField from "@/app/components/VectorField";
 
@@ -9,7 +8,6 @@ export default function Login() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -50,17 +48,20 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const result = await signupUser({ email, password, name });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
-      if (!result.success) {
-        throw new Error(result.error);
+      if (error) {
+        throw error;
       }
 
-      // After successful signup, switch to login mode
-      setMode("login");
-      setName("");
-      setPassword("");
-      setError("Account created! Please log in.");
+      if (data.user) {
+        setMode("login");
+        setPassword("");
+        setError("Check your email to confirm your account, then log in.");
+      }
     } catch (err: any) {
       setError(err.message || "Failed to create account");
       console.error("Signup error:", err);
@@ -94,7 +95,7 @@ export default function Login() {
             onClick={() => {
               setMode("login");
               setError("");
-              setName("");
+              setPassword("");
             }}
             className={`flex-1 py-2 px-4 text-button font-bold transition-all ${
               mode === "login"
@@ -127,21 +128,7 @@ export default function Login() {
         )}
 
         <form onSubmit={mode === "login" ? handleLogin : handleSignup} className="space-y-6">
-          {mode === "signup" && (
-            <div>
-              <label className="block text-cyan-400 text-label mb-2">
-                Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-black border-2 border-cyan-500 px-3 sm:px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors text-input"
-                placeholder="John Doe"
-                required
-              />
-            </div>
-          )}
+          {mode === "signup" && null}
 
           <div>
             <label className="block text-cyan-400 text-label mb-2">

@@ -51,10 +51,6 @@ if (isLocalDev && !import.meta.env.VITE_GATEWAY_URL) {
   console.log(`   Set VITE_GATEWAY_URL to override or VITE_USE_LOCAL=false to disable`);
 }
 
-export const FUNCTIONS_CONFIG = {
-  functionsBaseUrl: `https://${projectId}.functions.supabase.co`,
-} as const;
-
 /**
  * API ENDPOINTS
  */
@@ -62,7 +58,6 @@ export const API_ENDPOINTS = {
   systemInfo: `${API_CONFIG.gatewayBaseUrl}/system-info`,
   workerCount: `${API_CONFIG.gatewayBaseUrl}/worker-count`,
   submitTask: `${API_CONFIG.gatewayBaseUrl}/tasks`,
-  signup: `${FUNCTIONS_CONFIG.functionsBaseUrl}/make-server-65da8f1f/signup`,
 } as const;
 
 export const MOCK_DATA = {
@@ -169,11 +164,7 @@ export interface TaskSubmissionResponse {
   max_ticks?: number;
 }
 
-export interface SignupData {
-  email: string;
-  password: string;
-  name: string;
-}
+export interface SignupData {}
 
 export interface LoginData {
   email: string;
@@ -532,44 +523,6 @@ function formatTaskResultParts(
   };
 }
 
-/**
- * User signup (creates new account)
- * 
- * 🌐 ENDPOINT: POST /signup
- * 🔓 AUTH: Public (uses anon key)
- * 
- * ⚠️ NOTE: Currently handled by Supabase Auth.
- * Only implement backend endpoint if you need custom signup logic.
- * 
- * @param signupData - User registration data (email, password, name)
- * @returns Object with success status and optional error message
- * 
- * 📤 REQUEST BODY:
- * {
- *   "email": "user@example.com",
- *   "password": "securepass123",
- *   "name": "John Doe"
- * }
- */
-export async function signupUser(signupData: SignupData): Promise<{ success: boolean; error?: string }> {
-  try {
-    const response = await fetch(API_ENDPOINTS.signup, {
-      method: 'POST',
-      headers: createAuthHeaders(),
-      body: JSON.stringify(signupData),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Signup failed');
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    return { 
-      success: false, 
-      error: error.message || 'Failed to create account' 
-    };
-  }
+export async function signupUser(_: SignupData): Promise<{ success: boolean; error?: string }> {
+  return { success: false, error: "Direct signup endpoint removed; use Supabase Auth instead." };
 }
