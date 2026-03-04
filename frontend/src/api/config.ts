@@ -13,14 +13,43 @@ import { supabase } from "@/lib/supabase";
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export const VERSION_CONFIG = {
-  gateway: "v1.3.2",
-  worker: "v2.1.47",
+  gateway: "v2.2",
+  worker: "v3.1",
 } as const;
 
+/**
+ * Detect if running in local development mode.
+ * Uses Vite's dev mode detection or explicit env variable.
+ */
+const isLocalDev = import.meta.env.DEV || import.meta.env.VITE_USE_LOCAL === "true";
+
+/**
+ * Determine the gateway base URL.
+ * Priority:
+ * 1. Explicit VITE_GATEWAY_URL env variable
+ * 2. Local dev mode -> http://localhost:8080 (Docker gateway)
+ * 3. Default production URL
+ */
+const getGatewayBaseUrl = (): string => {
+  if (import.meta.env.VITE_GATEWAY_URL) {
+    return import.meta.env.VITE_GATEWAY_URL;
+  }
+  if (isLocalDev) {
+    return "http://localhost:8080";
+  }
+  return "https://euglena-api.com";
+};
+
 export const API_CONFIG = {
-  gatewayBaseUrl: import.meta.env.VITE_GATEWAY_URL || "https://euglena-api.com",
+  gatewayBaseUrl: getGatewayBaseUrl(),
   publicAnonKey: publicAnonKey,
+  isLocalDev,
 } as const;
+
+if (isLocalDev && !import.meta.env.VITE_GATEWAY_URL) {
+  console.log(`🔧 Local Development Mode: Using Docker gateway at ${API_CONFIG.gatewayBaseUrl}`);
+  console.log(`   Set VITE_GATEWAY_URL to override or VITE_USE_LOCAL=false to disable`);
+}
 
 export const FUNCTIONS_CONFIG = {
   functionsBaseUrl: `https://${projectId}.functions.supabase.co`,
@@ -38,17 +67,17 @@ export const API_ENDPOINTS = {
 
 export const MOCK_DATA = {
   systemInfo: {
-    title: "CyberLink Terminal",
+    title: "Euglena Gateway",
     gatewayVersion: VERSION_CONFIG.gateway,
     workerVersion: VERSION_CONFIG.worker,
-    activeWorkers: 42,
-    lastUpdate: new Date().toLocaleDateString(),
-    github: "https://github.com",
+    activeWorkers: 2,
+    lastUpdate: new Date().toISOString().split("T")[0],
+    github: "https://github.com/muxite/webRAG",
   },
   userStats: {
-    email: "user@cyberlink.net",
-    ticksRemaining: 1000,
-    dailyTicks: 250,
+    email: "user@example.com",
+    ticksRemaining: 3,
+    dailyTicks: 3,
   },
   tasks: [
     {
@@ -210,13 +239,23 @@ export async function fetchSystemInfo(): Promise<SystemInfo> {
       throw new Error(`System info request failed: ${response.status}`);
     }
     const systemInfo = await response.json();
-    const activeWorkers = await fetchWorkerCount();
+    
+    const formatVersion = (version: string | undefined): string => {
+      if (!version) return "0.0";
+      return version.startsWith("v") ? version : `v${version}`;
+    };
+
     return {
-      ...systemInfo,
-      activeWorkers,
+      title: systemInfo.title || "Euglena Gateway",
+      gatewayVersion: formatVersion(systemInfo.gatewayVersion),
+      workerVersion: formatVersion(systemInfo.workerVersion),
+      activeWorkers: systemInfo.activeWorkers ?? 0,
+      lastUpdate: systemInfo.lastUpdate || new Date().toISOString().split("T")[0],
+      github: systemInfo.github || "https://github.com/muxite/webRAG",
     };
   } catch (error) {
     console.error("Error fetching system info:", error);
+    console.warn("Falling back to mock data - gateway may be unavailable");
     return MOCK_DATA.systemInfo;
   }
 }

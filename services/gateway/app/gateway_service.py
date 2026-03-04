@@ -218,7 +218,7 @@ class GatewayService:
             result=None,
             error=None,
             tick=None,
-            max_ticks=int(req.max_ticks or 50),
+            max_ticks=int(req.max_ticks or 80),
         )
         await self.registrar.register_new_task(user_id, access_token, req, correlation_id)
         self.logger.info(
@@ -226,14 +226,14 @@ class GatewayService:
             extra={
                 "correlation_id": correlation_id,
                 "mandate": req.mandate,
-                "max_ticks": int(req.max_ticks or 50),
+                "max_ticks": int(req.max_ticks or 80),
                 "status": record.status,
             },
         )
 
         envelope = TaskEnvelope(
             mandate=req.mandate,
-            max_ticks=req.max_ticks or 50,
+            max_ticks=req.max_ticks or 80,
             correlation_id=correlation_id,
         )
         payload = to_dict(envelope)

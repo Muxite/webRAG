@@ -27,13 +27,13 @@ class SupabaseUserTickManager:
 
     def __init__(
         self,
-        default_daily_limit: int = 32,
+        default_daily_limit: int = 3,
         profile_table: str = "profiles",
         usage_table: str = "user_daily_usage",
     ) -> None:
         """
         Initialize with default limit and table names.
-        :param default_daily_limit: Default daily usage limit in credits (defaults to 32)
+        :param default_daily_limit: Default daily usage limit in credits (defaults to 3)
         """
         self.default_daily_limit = default_daily_limit
         self.profile_table = profile_table
