@@ -18,7 +18,8 @@ class UserQuotaResult:
 
 class SupabaseUserTickManager:
     """
-    Manages per-user daily tick quotas using Supabase with RLS.
+    Manages per-user daily usage quotas using Supabase with RLS.
+    Each task submission consumes 1 credit (use).
     
     Uses user's JWT token to create authenticated clients that respect RLS policies.
     Users can only access their own profiles and usage data.
@@ -32,7 +33,7 @@ class SupabaseUserTickManager:
     ) -> None:
         """
         Initialize with default limit and table names.
-        :param default_daily_limit: Default daily tick limit (defaults to 32)
+        :param default_daily_limit: Default daily usage limit in credits (defaults to 32)
         """
         self.default_daily_limit = default_daily_limit
         self.profile_table = profile_table
@@ -101,7 +102,15 @@ class SupabaseUserTickManager:
         return data
 
     def check_and_consume(self, access_token: str, user_id: str, email: str, units: int) -> UserQuotaResult:
-        """Check and consume ticks. Uses RLS to ensure users can only access their own data."""
+        """
+        Check and consume usage credits (1 credit per task submission).
+        Uses RLS to ensure users can only access their own data.
+        :param access_token: User's JWT token
+        :param user_id: User ID
+        :param email: User email
+        :param units: Number of credits to consume (typically 1 per task)
+        :returns: UserQuotaResult indicating if allowed and remaining credits
+        """
         if units <= 0:
             return UserQuotaResult(allowed=True, remaining=None)
 

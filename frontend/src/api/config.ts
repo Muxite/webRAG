@@ -22,6 +22,10 @@ export const API_CONFIG = {
   publicAnonKey: publicAnonKey,
 } as const;
 
+export const FUNCTIONS_CONFIG = {
+  functionsBaseUrl: `https://${projectId}.functions.supabase.co`,
+} as const;
+
 /**
  * API ENDPOINTS
  */
@@ -29,6 +33,7 @@ export const API_ENDPOINTS = {
   systemInfo: `${API_CONFIG.gatewayBaseUrl}/system-info`,
   workerCount: `${API_CONFIG.gatewayBaseUrl}/worker-count`,
   submitTask: `${API_CONFIG.gatewayBaseUrl}/tasks`,
+  signup: `${FUNCTIONS_CONFIG.functionsBaseUrl}/make-server-65da8f1f/signup`,
 } as const;
 
 export const MOCK_DATA = {
@@ -234,14 +239,14 @@ export async function fetchWorkerCount(): Promise<number> {
 }
 
 /**
- * Fetch user statistics (email, tick balance, daily allowance)
+ * Fetch user statistics (email, credit balance, daily allowance)
  * 
  * 🌐 ENDPOINT: GET /user-stats
  * 🔒 AUTH: Protected (requires user token)
  * 
  * @param token - User's JWT token from Supabase
  * @param userEmail - Optional fallback email for mock data
- * @returns UserStats object with tick balance and email
+ * @returns UserStats object with credit balance and email
  * 
  * 📊 EXPECTED RESPONSE:
  * {

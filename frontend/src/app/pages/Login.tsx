@@ -71,15 +71,11 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Vector field background */}
-      <VectorField spacing={25} lineLength={18} color="#06b6d4" opacity={0.5} arrangement="triangular" />
+      {/* Vector field background (match dashboard style) */}
+      <VectorField spacing={25} lineLength={18} color="#22D3EE" opacity={0.5} arrangement="triangular" />
       
-      {/* Cyberpunk grid background */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f1419_1px,transparent_1px),linear-gradient(to_bottom,#0f1419_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-10" />
-      
-      {/* Glow effects */}
-      <div className="absolute top-20 left-20 w-96 h-96 bg-purple-600 rounded-full blur-[100px] opacity-20" />
-      <div className="absolute bottom-20 right-20 w-96 h-96 bg-cyan-600 rounded-full blur-[100px] opacity-20" />
+      {/* Grid background similar to dashboard */}
+      <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#141A2E_1px,transparent_1px),linear-gradient(to_bottom,#141A2E_1px,transparent_1px)] bg-[size:4rem_4rem]" />
 
       <VectorBox className="w-full max-w-md relative z-10" padding={8}>
         <div className="text-center mb-8">

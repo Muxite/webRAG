@@ -60,6 +60,45 @@ export const colorPalettes: ColorPalette[] = [
     },
   },
   {
+    id: "arctic-circuit",
+    name: "Arctic Circuit",
+    colors: {
+      background: "#070C18",
+      surface:    "#0E1730",
+      text:       "#EAF2FF",
+      textMuted:  "#A7B8D6",
+      primary:    "#3BA7FF",
+      secondary:  "#2DE2E6",
+      accent:     "#8B5CFF",
+    },
+  },
+  {
+    id: "crimson-current",
+    name: "Crimson Current",
+    colors: {
+      background: "#14060B",
+      surface:    "#24101A",
+      text:       "#FFECEF",
+      textMuted:  "#D6A7B2",
+      primary:    "#FF4D6D",
+      secondary:  "#FF2E93",
+      accent:     "#FFB347",
+    },
+  },
+  {
+    id: "frosted-terminal-dark",
+    name: "Frosted Terminal",
+    colors: {
+      background: "#05070C",
+      surface:    "#0B1020",
+      text:       "#FFFFFF",
+      textMuted:  "#D7DEEA",
+      primary:    "#FFFFFF",
+      secondary:  "#C9D2E6",
+      accent:     "#7AA7FF",
+    },
+  },  
+  {
     id: "toxic-teal",
     name: "Toxic Teal",
     colors: {

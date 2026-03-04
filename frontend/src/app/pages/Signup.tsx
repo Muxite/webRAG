@@ -38,15 +38,11 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Vector field background */}
-      <VectorField spacing={25} lineLength={18} color="#a855f7" opacity={0.5} arrangement="triangular" />
+      {/* Vector field background (match dashboard style) */}
+      <VectorField spacing={25} lineLength={18} color="#22D3EE" opacity={0.5} arrangement="triangular" />
       
-      {/* Cyberpunk grid background */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f1419_1px,transparent_1px),linear-gradient(to_bottom,#0f1419_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-10" />
-      
-      {/* Glow effects */}
-      <div className="absolute top-20 left-20 w-96 h-96 bg-purple-600 rounded-full blur-[100px] opacity-20" />
-      <div className="absolute bottom-20 right-20 w-96 h-96 bg-cyan-600 rounded-full blur-[100px] opacity-20" />
+      {/* Grid background similar to dashboard */}
+      <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#141A2E_1px,transparent_1px),linear-gradient(to_bottom,#141A2E_1px,transparent_1px)] bg-[size:4rem_4rem]" />
 
       <VectorBox className="w-full max-w-md relative z-10" padding={8} borderColor="#a855f7">
         <div className="text-center mb-8">
@@ -110,12 +106,14 @@ export default function Signup() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-black font-bold py-3 sm:py-4 px-6 hover:from-cyan-400 hover:to-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group"
+            className="w-full font-bold py-3 sm:py-4 px-6 transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group"
+            style={{
+              backgroundColor: "#3B82F6",
+            }}
           >
-            <span className="relative z-10 text-button">
+            <span className="relative z-10 text-button text-white">
               {loading ? "Creating account..." : "Create Account"}
             </span>
-            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
           </button>
         </form>
 

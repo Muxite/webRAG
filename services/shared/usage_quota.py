@@ -19,7 +19,7 @@ class UsageQuotaBackend(ABC):
     """Abstract daily usage quota backend.
 
     Implementations should track and enforce a global daily usage counter.
-    The unit is an arbitrary integer (we use agent ticks). The interface is
+    The unit represents usage credits (1 credit per task submission). The interface is
     intentionally small to keep it easily replaceable.
     """
 
