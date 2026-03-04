@@ -26,8 +26,6 @@ class ConnectorConfig:
         self.enable_tracking = tracking_value in ("1", "true", "yes", "on")
         self.trace_dir = os.environ.get("AGENT_TRACE_DIR", "")
 
-        # Allow running without explicit env by providing a sane default.
-        # Tests may import modules at collection time; avoid raising here.
         self.daily_tick_limit = int(os.environ.get("DAILY_TICK_LIMIT", "1000"))
 
         if not self.redis_url:

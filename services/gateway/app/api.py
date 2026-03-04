@@ -213,7 +213,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             debug_phrase = os.environ.get("GATEWAY_DEBUG_QUEUE_PHRASE", "debugdebugdebug")
             is_skip_message = skip_phrase and skip_phrase.lower() in (req.mandate or "").lower()
             is_debug_message = debug_phrase and debug_phrase.lower() in (req.mandate or "").lower()
-            units_to_consume = 0 if (is_skip_message or is_debug_message) else max_ticks
+            units_to_consume = 0 if (is_skip_message or is_debug_message) else 1
 
             if not app.state.test_mode:
                 try:
@@ -222,7 +222,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
                         remaining = 0 if result.remaining is None else result.remaining
                         raise HTTPException(
                             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                            detail=f"Daily tick limit exceeded. Remaining ticks: {remaining}",
+                            detail=f"Daily usage limit exceeded. Remaining credits: {remaining}",
                         )
                 except HTTPException:
                     raise
@@ -236,9 +236,9 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
                 logger.debug(f"Test mode: skipping quota check for user {user.id}, units={units_to_consume}")
             
             if is_skip_message:
-                logger.info(f"Skip message detected: consuming 0 ticks instead of {max_ticks}")
+                logger.info(f"Skip message detected: consuming 0 credits instead of 1")
             if is_debug_message:
-                logger.info(f"Debug message detected: consuming 0 ticks instead of {max_ticks}")
+                logger.info(f"Debug message detected: consuming 0 credits instead of 1")
             
             return await _service.create_task(req, user.id, access_token)
         except HTTPException:

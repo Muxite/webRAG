@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [showReconnect, setShowReconnect] = useState(false);
   
-  const [paletteId, setPaletteId] = useState<string>("neon-alley");
+  const [paletteId, setPaletteId] = useState<string>("synthwave-blue");
   const [showPaletteMenu, setShowPaletteMenu] = useState(false);
   const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
   
@@ -413,7 +413,7 @@ export default function Dashboard() {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               <div className="text-metadata" style={{ color: themeColors.text }}>{userStats.email}</div>
               <div className="text-metadata" style={{ color: themeColors.text }}>
-                {userStats.ticksRemaining}/{userStats.dailyTicks} ticks
+                {userStats.ticksRemaining}/{userStats.dailyTicks} credits
               </div>
             </div>
           </VectorBoxHeavy>
@@ -461,9 +461,10 @@ export default function Dashboard() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full text-white font-bold py-3 px-6 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full font-bold py-3 px-6 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               style={{
-                background: `linear-gradient(to right, ${themeColors.secondary}, ${themeColors.primary})`,
+                backgroundColor: themeColors.primary,
+                color: themeColors.text,
               }}
             >
               <Send className="w-4 h-4" />
