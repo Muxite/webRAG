@@ -23,6 +23,7 @@ import {
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -96,7 +97,8 @@ export default function Dashboard() {
       } = await supabase.auth.getSession();
 
       if (sessionError || !session) {
-        navigate("/");
+        navigate("/login");
+        setAuthChecked(true);
         return;
       }
 
@@ -106,14 +108,17 @@ export default function Dashboard() {
       } = await supabase.auth.getUser();
 
       if (userError || !user) {
-        navigate("/");
+        navigate("/login");
+        setAuthChecked(true);
         return;
       }
 
       setUser(user);
     } catch (error) {
       console.error("Auth check error:", error);
-      navigate("/");
+      navigate("/login");
+    } finally {
+      setAuthChecked(true);
     }
   };
 
@@ -228,8 +233,12 @@ export default function Dashboard() {
    */
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate("/");
+    navigate("/login");
   };
+
+  if (!authChecked) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ 

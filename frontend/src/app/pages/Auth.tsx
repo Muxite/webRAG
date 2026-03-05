@@ -74,7 +74,7 @@ export default function Auth() {
           .insert({
             user_id: userId,
             email: userEmail,
-            daily_tick_limit: 3,
+            daily_tick_limit: 6,
           });
 
         if (insertError) {
