@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-03-05T08:13:19.760139+00:00",
+  "mode": "autoscale",
+  "region": "us-east-2",
+  "cluster": "euglena-cluster",
+  "services": {
+    "euglena-gateway": {
+      "status": "ACTIVE",
+      "desiredCount": 1,
+      "runningCount": 1,
+      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:83"
+    },
+    "euglena-agent": {
+      "status": "ACTIVE",
+      "desiredCount": 1,
+      "runningCount": 0,
+      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:81"
+    }
+  },
+  "taskDefinitions": {
+    "euglena-gateway": {
+      "latestRevision": 83,
+      "recentRevisions": 10
+    },
+    "euglena-agent": {
+      "latestRevision": 81,
+      "recentRevisions": 10
+    }
+  },
+  "loadBalancer": {
+    "targetGroupName": "euglena-tg",
+    "healthyTargets": 1
+  },
+  "serviceDiscovery": {
+    "namespace": "euglena.local",
+    "services": 1
+  }
+}

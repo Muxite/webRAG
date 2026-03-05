@@ -38,7 +38,7 @@
                 },
                 {
                     "name": "DAILY_TICK_LIMIT",
-                    "value": "256"
+                    "value": "6"
                 },
                 {
                     "name": "DEFAULT_DELAY",
