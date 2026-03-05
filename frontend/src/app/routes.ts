@@ -1,19 +1,24 @@
 import { createBrowserRouter } from "react-router";
-import Login from "@/app/pages/Login";
+import Auth from "@/app/pages/Auth";
 import Dashboard from "@/app/pages/Dashboard";
+import ResetPassword from "@/app/pages/ResetPassword";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: Login,
+    Component: Auth,
+  },
+  {
+    path: "/login",
+    Component: Auth,
   },
   {
     path: "/signup",
-    // Redirect to login page (signup is now integrated)
-    loader: () => {
-      window.location.href = "/";
-      return null;
-    },
+    Component: Auth,
+  },
+  {
+    path: "/reset-password",
+    Component: ResetPassword,
   },
   {
     path: "/dashboard",

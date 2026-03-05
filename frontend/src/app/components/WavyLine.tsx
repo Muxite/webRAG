@@ -23,7 +23,6 @@ export default function WavyLine({
   const animationRef = useRef<number>();
   const timeRef = useRef(0);
 
-  // Simple noise function
   const noise = (x: number, time: number): number => {
     const scale = 0.015;
     const timeScale = 0.0003;
@@ -36,7 +35,6 @@ export default function WavyLine({
     return noise1 + noise2 + noise3;
   };
 
-  // Generate wavy path
   const generateWavyPath = (width: number, height: number, time: number): string => {
     const points: string[] = [];
     
@@ -56,7 +54,6 @@ export default function WavyLine({
         }
       }
     } else {
-      // Vertical orientation
       const centerX = width / 2;
       
       for (let i = 0; i <= density; i++) {
@@ -76,7 +73,6 @@ export default function WavyLine({
     return points.join(" ");
   };
 
-  // Update dimensions
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -93,7 +89,6 @@ export default function WavyLine({
     return () => window.removeEventListener("resize", updateDimensions);
   }, []);
 
-  // Animate the wavy line
   useEffect(() => {
     if (dimensions.width === 0 || dimensions.height === 0) return;
 
@@ -131,7 +126,6 @@ export default function WavyLine({
         height={dimensions.height}
         style={{ position: "absolute", top: 0, left: 0 }}
       >
-        {/* Outer glow */}
         <path
           d={pathData}
           fill="none"
@@ -143,7 +137,6 @@ export default function WavyLine({
           }}
         />
         
-        {/* Mid glow - purple tint */}
         <path
           d={pathData}
           fill="none"
@@ -155,7 +148,6 @@ export default function WavyLine({
           }}
         />
         
-        {/* Sharp core */}
         <path
           d={pathData}
           fill="none"
