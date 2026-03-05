@@ -6,15 +6,12 @@ interface GlitchBoxProps {
 }
 
 export default function GlitchBox({ children, className = "" }: GlitchBoxProps) {
-  // Check if this is a compact info box
   const isCompact = className.includes('compact-info');
   const padding = isCompact ? 'p-3' : 'p-8';
   
   return (
     <div className={`relative ${className}`}>
-      {/* Cloud-like fuzzy border effect - Gaussian clusters around entire perimeter */}
       <div className="absolute inset-0 pointer-events-none overflow-visible">
-        {/* Outer layer 1 - Cyan - Large Gaussian blur from edge centers */}
         <div
           className="absolute -inset-[50px] opacity-90"
           style={{
@@ -29,7 +26,6 @@ export default function GlitchBox({ children, className = "" }: GlitchBoxProps) 
           }}
         />
 
-        {/* Outer layer 2 - Purple - Large Gaussian blur from edge centers */}
         <div
           className="absolute -inset-[48px] opacity-85"
           style={{
@@ -44,7 +40,6 @@ export default function GlitchBox({ children, className = "" }: GlitchBoxProps) 
           }}
         />
 
-        {/* Mid layer 1 - Mixed cyan/purple - Medium Gaussian */}
         <div
           className="absolute -inset-[40px] opacity-95"
           style={{
@@ -59,7 +54,6 @@ export default function GlitchBox({ children, className = "" }: GlitchBoxProps) 
           }}
         />
 
-        {/* Mid layer 2 - Alternating colors for variation */}
         <div
           className="absolute -inset-[30px] opacity-90"
           style={{
@@ -74,7 +68,6 @@ export default function GlitchBox({ children, className = "" }: GlitchBoxProps) 
           }}
         />
 
-        {/* Inner layer - Bright core glow */}
         <div
           className="absolute -inset-[20px] opacity-95"
           style={{
@@ -89,7 +82,6 @@ export default function GlitchBox({ children, className = "" }: GlitchBoxProps) 
           }}
         />
 
-        {/* Innermost bright edge */}
         <div
           className="absolute -inset-[10px] opacity-100"
           style={{
@@ -105,12 +97,10 @@ export default function GlitchBox({ children, className = "" }: GlitchBoxProps) 
         />
       </div>
 
-      {/* Content with transparent center allowing fuzzy border to show */}
       <div className={`relative z-10 bg-black/50 ${padding} backdrop-blur-sm`}>
         <div className="relative z-10">{children}</div>
       </div>
 
-      {/* Corner accents with glow */}
       <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
       <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
       <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />

@@ -92,16 +92,28 @@ export default function Dashboard() {
     try {
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (!session) {
+      if (sessionError || !session) {
         navigate("/");
         return;
       }
 
-      setUser(session.user);
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        navigate("/");
+        return;
+      }
+
+      setUser(user);
     } catch (error) {
-      setShowReconnect(true);
+      console.error("Auth check error:", error);
+      navigate("/");
     }
   };
 
