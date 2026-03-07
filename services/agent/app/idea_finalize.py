@@ -49,15 +49,16 @@ def _collect_leaf_results_fallback(graph: IdeaDag) -> list:
         ar = node.details.get(DetailKey.ACTION_RESULT.value)
         if not ar or not isinstance(ar, dict):
             continue
+        # Only include successful action results in the fallback merged list.
+        # Failures are still visible in node_summary / event_log; keeping merged
+        # clean improves final synthesis reliability.
+        if not ActionResultExtractor.is_success(ar):
+            continue
         if action == IdeaActionType.MERGE.value:
-            if ActionResultExtractor.is_success(ar):
-                results.append({"node": node.title, "action": action, "result": _compact_action_result(ar, action)})
+            results.append({"node": node.title, "action": action, "result": _compact_action_result(ar, action)})
             continue
         compact_ar = _compact_action_result(ar, action)
         entry = {"node": node.title, "action": action, "result": compact_ar}
-        if not ActionResultExtractor.is_success(ar):
-            entry["failed"] = True
-            entry["error"] = ActionResultExtractor.get_error(ar, default="unknown")
         results.append(entry)
     return results
 

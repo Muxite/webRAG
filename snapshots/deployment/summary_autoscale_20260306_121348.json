@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-05T08:13:19.760139+00:00",
+  "timestamp": "2026-03-06T12:12:52.499522+00:00",
   "mode": "autoscale",
   "region": "us-east-2",
   "cluster": "euglena-cluster",
@@ -8,22 +8,22 @@
       "status": "ACTIVE",
       "desiredCount": 1,
       "runningCount": 1,
-      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:83"
+      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:88"
     },
     "euglena-agent": {
       "status": "ACTIVE",
       "desiredCount": 1,
-      "runningCount": 0,
-      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:81"
+      "runningCount": 1,
+      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:86"
     }
   },
   "taskDefinitions": {
     "euglena-gateway": {
-      "latestRevision": 83,
+      "latestRevision": 88,
       "recentRevisions": 10
     },
     "euglena-agent": {
-      "latestRevision": 81,
+      "latestRevision": 86,
       "recentRevisions": 10
     }
   },

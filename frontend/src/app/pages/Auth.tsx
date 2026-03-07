@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
 import { supabase } from "@/lib/supabase";
 import VectorBoxHeavy from "@/app/components/VectorBoxHeavy";
 import VectorField from "@/app/components/VectorField";
@@ -12,7 +11,6 @@ export default function Auth() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const navigate = useNavigate();
 
   const paletteId = "synthwave-blue";
   const themeMode: "dark" | "light" = "dark";
@@ -129,7 +127,7 @@ export default function Auth() {
         if (!profileCreated) {
           console.warn("Profile creation failed, but continuing with login");
         }
-        navigate("/dashboard");
+        window.location.href = "/";
         return;
       }
 
@@ -178,7 +176,7 @@ export default function Auth() {
               if (!profileCreated) {
                 console.warn("Profile creation failed, but continuing with signup");
               }
-              navigate("/dashboard");
+              window.location.href = "/";
               return;
             } else {
               setPassword("");

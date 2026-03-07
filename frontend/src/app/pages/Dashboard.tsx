@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
 import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 import { LogOut, Send, RefreshCw, Palette, Github } from "lucide-react";
 import VectorBox from "@/app/components/VectorBox";
 import VectorBoxHeavy from "@/app/components/VectorBoxHeavy";
@@ -22,7 +22,7 @@ import {
 } from "@/api/config";
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -48,8 +48,6 @@ export default function Dashboard() {
   const [sourceSpeed, setSourceSpeed] = useState(0.536);
   const [ditherEndHeight, setDitherEndHeight] = useState(0.5);
   const showFieldSettings = false;
-  
-  const navigate = useNavigate();
   
   const palette = getColorPalette(paletteId);
   const colors = palette.colors;
@@ -87,7 +85,7 @@ export default function Dashboard() {
   }, [user]);
 
   /**
-   * Checks authentication status and redirects to login if not authenticated
+   * Checks authentication status - no redirect needed as Home component handles routing
    */
   const checkAuth = async () => {
     try {
@@ -97,7 +95,7 @@ export default function Dashboard() {
       } = await supabase.auth.getSession();
 
       if (sessionError || !session) {
-        navigate("/login");
+        setUser(null);
         setAuthChecked(true);
         return;
       }
@@ -108,7 +106,7 @@ export default function Dashboard() {
       } = await supabase.auth.getUser();
 
       if (userError || !user) {
-        navigate("/login");
+        setUser(null);
         setAuthChecked(true);
         return;
       }
@@ -116,7 +114,7 @@ export default function Dashboard() {
       setUser(user);
     } catch (error) {
       console.error("Auth check error:", error);
-      navigate("/login");
+      setUser(null);
     } finally {
       setAuthChecked(true);
     }
@@ -229,14 +227,14 @@ export default function Dashboard() {
   };
 
   /**
-   * Signs out user and redirects to login page
+   * Signs out user and redirects to home page
    */
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate("/login");
+    window.location.href = "/";
   };
 
-  if (!authChecked) {
+  if (!authChecked || !user) {
     return null;
   }
 

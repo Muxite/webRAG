@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -27,6 +28,7 @@ from agent.app.connector_browser import ConnectorBrowser
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
+from agent.app.startup_preflight import run_startup_preflight
 from shared.storage import RedisTaskStorage
 
 
@@ -121,6 +123,40 @@ class InterfaceAgent:
         
         if not await self._initialize_dependencies():
             raise RuntimeError("Failed to initialize dependencies")
+
+        try:
+            preflight_enabled = os.environ.get("AGENT_START_PREFLIGHT_ENABLED", "1").lower() in ("1", "true", "yes", "on")
+            if preflight_enabled:
+                url = os.environ.get(
+                    "AGENT_START_PREFLIGHT_URL",
+                    "https://en.wikipedia.org/wiki/Python_(programming_language)",
+                )
+                timeout_seconds = float(os.environ.get("AGENT_START_PREFLIGHT_TIMEOUT_SECONDS", "5"))
+                enable_browser = os.environ.get("AGENT_START_PREFLIGHT_BROWSER", "0").lower() in ("1", "true", "yes", "on")
+                min_chars = int(os.environ.get("AGENT_START_PREFLIGHT_MIN_CHARS", "2000"))
+                fail_hard = os.environ.get("AGENT_START_PREFLIGHT_FAIL_HARD", "0").lower() in ("1", "true", "yes", "on")
+                self.logger.info(
+                    "[STARTUP_PREFLIGHT] config",
+                    extra={
+                        "url": url,
+                        "timeout_seconds": timeout_seconds,
+                        "min_chars": min_chars,
+                        "enable_browser": enable_browser,
+                        "fail_hard": fail_hard,
+                    },
+                )
+                await run_startup_preflight(
+                    url=url,
+                    connector_http=self.connector_http,
+                    connector_browser=self.connector_browser,
+                    timeout_seconds=timeout_seconds,
+                    retries=1,
+                    enable_browser=enable_browser,
+                    min_content_chars=min_chars,
+                    fail_hard=fail_hard,
+                )
+        except Exception as exc:
+            self.logger.warning(f"[STARTUP_PREFLIGHT] failed: {exc}")
         
         self._presence_task = asyncio.create_task(self._presence.run())
         self._consumer_task = asyncio.create_task(
@@ -240,7 +276,7 @@ class InterfaceAgent:
             "rabbitmq": False,
             "redis": False,
             "chroma": False,
-            "external_api": False
+            "external_web": False
         }
         
         try:
@@ -276,18 +312,24 @@ class InterfaceAgent:
             self.logger.warning(f"  FAIL: Chroma check failed: {e}")
         
         try:
-            test_url = "https://www.google.com"
-            timeout = aiohttp.ClientTimeout(total=5)
-            result = await self.connector_http.request("GET", test_url, timeout=timeout, retries=1)
-            if result and not result.error and result.status == 200:
-                connectivity["external_api"] = True
-                self.logger.info("  OK: External API access working")
+            urls_raw = os.environ.get(
+                "AGENT_CONNECTIVITY_TEST_URLS",
+                "https://example.com,https://www.wikipedia.org,https://www.cloudflare.com",
+            )
+            urls = [u.strip() for u in urls_raw.split(",") if u.strip()]
+            timeout = aiohttp.ClientTimeout(total=6)
+            ok_count = 0
+            for test_url in urls[:5]:
+                result = await self.connector_http.request("GET", test_url, timeout=timeout, retries=1)
+                if result and not result.error and result.status in (200, 204, 301, 302):
+                    ok_count += 1
+            connectivity["external_web"] = ok_count >= 1
+            if connectivity["external_web"]:
+                self.logger.info(f"  OK: External web access working (ok={ok_count}/{min(len(urls), 5)})")
             else:
-                status = result.status if result else None
-                error = result.error if result else True
-                self.logger.warning(f"  FAIL: External API returned status {status}, error={error}")
+                self.logger.warning(f"  FAIL: External web access failed (ok={ok_count}/{min(len(urls), 5)})")
         except Exception as e:
-            self.logger.warning(f"  FAIL: External API check failed: {e}")
+            self.logger.warning(f"  FAIL: External web check failed: {e}")
         
         return connectivity
 
@@ -306,10 +348,86 @@ class InterfaceAgent:
         self._telemetry = self._build_telemetry()
 
         skip_phrase = os.environ.get("AGENT_SKIP_PHRASE", "skipskipskip")
+        visit_phrase = os.environ.get("AGENT_VISIT_PHRASE", "visitvisitvisit")
 
         await self._cancel_waiting_state()
         await self._set_worker_state("working")
-        
+
+        if visit_phrase and visit_phrase.lower() in self.mandate.lower():
+            self.logger.info(
+                f"VISIT MODE: Mandate contains visit phrase '{visit_phrase}' - performing direct URL visit",
+                extra={
+                    "correlation_id": self.correlation_id,
+                    "mandate": (self.mandate[:200] + "…") if isinstance(self.mandate, str) and len(self.mandate) > 200 else self.mandate,
+                },
+            )
+            await self._publish_status(StatusType.ACCEPTED, max_ticks=max_ticks)
+            await self._publish_status(StatusType.STARTED, max_ticks=max_ticks)
+
+            url_match = re.search(r"https?://\S+", self.mandate or "")
+            default_url = os.environ.get(
+                "AGENT_VISIT_DEFAULT_URL",
+                "https://en.wikipedia.org/wiki/Main_Page",
+            )
+            if url_match:
+                url = url_match.group(0)
+            else:
+                url = default_url
+                self.logger.info(
+                    "VISIT MODE: No URL found in mandate; using default URL",
+                    extra={"correlation_id": self.correlation_id, "default_url": default_url},
+                )
+            visit_timeout = float(os.environ.get("AGENT_VISIT_MODE_TIMEOUT_SECONDS", "20"))
+            self.logger.info(
+                "VISIT MODE: Visiting URL",
+                extra={"correlation_id": self.correlation_id, "url": url, "timeout_seconds": visit_timeout},
+            )
+
+            agent_io = AgentIO(
+                connector_llm=self.connector_llm,
+                connector_search=self.connector_search,
+                connector_http=self.connector_http,
+                connector_chroma=self.connector_chroma,
+                connector_browser=self.connector_browser,
+                telemetry=self._telemetry,
+                collection_name=f"agent_visit_{self.correlation_id or 'unknown'}",
+            )
+            try:
+                page_text = await agent_io.visit(url, timeout_seconds=visit_timeout)
+                completion = CompletionResult(
+                    correlation_id=self.correlation_id,
+                    success=True,
+                    deliverables=[page_text],
+                    notes=f"VISIT MODE: Direct visit of {url} completed",
+                )
+                await self._publish_status(
+                    StatusType.COMPLETED,
+                    max_ticks=max_ticks,
+                    result=completion.result(),
+                )
+                self._finalize_telemetry(success=True)
+            except Exception as exc:
+                self.logger.exception(
+                    "VISIT MODE: Direct visit failed",
+                    extra={"correlation_id": self.correlation_id, "url": url},
+                )
+                completion = CompletionResult(
+                    correlation_id=self.correlation_id,
+                    success=False,
+                    deliverables=[],
+                    notes=f"VISIT MODE: Direct visit failed for {url}: {exc}",
+                )
+                await self._publish_status(
+                    StatusType.COMPLETED,
+                    max_ticks=max_ticks,
+                    result=completion.result(),
+                )
+                self._finalize_telemetry(success=False)
+
+            self._clear_task_telemetry()
+            await self._enter_waiting_state()
+            return
+
         if skip_phrase and skip_phrase.lower() in self.mandate.lower():
             self.logger.info(
                 f"SKIP MODE: Mandate contains skip phrase '{skip_phrase}' - testing connectivity only",

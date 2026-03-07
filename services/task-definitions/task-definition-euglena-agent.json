@@ -9,6 +9,30 @@
                     "value": "agent.mandates"
                 },
                 {
+                    "name": "AGENT_START_PREFLIGHT_BROWSER",
+                    "value": "0"
+                },
+                {
+                    "name": "AGENT_START_PREFLIGHT_ENABLED",
+                    "value": "1"
+                },
+                {
+                    "name": "AGENT_START_PREFLIGHT_FAIL_HARD",
+                    "value": "0"
+                },
+                {
+                    "name": "AGENT_START_PREFLIGHT_MIN_CHARS",
+                    "value": "2000"
+                },
+                {
+                    "name": "AGENT_START_PREFLIGHT_TIMEOUT_SECONDS",
+                    "value": "10"
+                },
+                {
+                    "name": "AGENT_START_PREFLIGHT_URL",
+                    "value": "https://example.com,https://www.wikipedia.org,https://en.wikipedia.org/wiki/Python_(programming_language)"
+                },
+                {
                     "name": "AGENT_STATUS_QUEUE",
                     "value": "agent.status"
                 },
@@ -53,6 +77,10 @@
                     "value": "euglena-cluster"
                 },
                 {
+                    "name": "EUGLENA_ECS_HEALTHCHECK_INTERVAL_SECONDS",
+                    "value": "20"
+                },
+                {
                     "name": "GATEWAY_URL",
                     "value": "http://euglena-gateway.euglena.local:8080"
                 },
@@ -67,6 +95,14 @@
                 {
                     "name": "LITE",
                     "value": "true"
+                },
+                {
+                    "name": "LIVE_PREFLIGHT_BROWSER_TESTS",
+                    "value": "1"
+                },
+                {
+                    "name": "LIVE_PREFLIGHT_TESTS",
+                    "value": "1"
                 },
                 {
                     "name": "MAX_WORKERS",

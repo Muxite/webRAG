@@ -53,7 +53,6 @@ export default function VectorFieldSettings({
   };
 
   const handleToggle = () => {
-    console.log("Field button clicked, isOpen:", isOpen);
     setIsOpen(!isOpen);
   };
 

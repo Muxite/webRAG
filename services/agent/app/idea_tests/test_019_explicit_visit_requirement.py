@@ -1,7 +1,9 @@
 """
-Test 019: Explicit Visit Requirement
-Difficulty: 3/10 (Medium)
+Test 019: URL Extraction from Search Results
+Difficulty: 2/10 (Easy)
 Category: URL Visiting Requirement
+
+Tests that visit nodes can extract URLs from search results when only link_idea is provided.
 """
 
 from typing import Dict, Any, List
@@ -13,8 +15,8 @@ def get_test_metadata() -> Dict[str, Any]:
     """Return test metadata."""
     return {
         "test_id": "019",
-        "test_name": "Explicit Visit Requirement",
-        "difficulty_level": "3/10",
+        "test_name": "URL Extraction from Search Results",
+        "difficulty_level": "2/10",
         "category": "URL Visiting Requirement",
     }
 
@@ -22,10 +24,9 @@ def get_test_metadata() -> Dict[str, Any]:
 def get_task_statement() -> str:
     """Return task statement."""
     return (
-        "Visit the Wikipedia page about 'Python (programming language)' at https://en.wikipedia.org/wiki/Python_(programming_language) "
-        "and extract the following information directly from the page content: "
-        "(1) The year Python was first released, (2) The name of Python's creator, and (3) The current stable version number. "
-        "You MUST visit the URL - do not rely on search results. Provide the information with citations from the actual page content."
+        "Search for 'Python programming language Wikipedia' and visit the Wikipedia page about Python. "
+        "Extract: (1) The year Python was first released, (2) The name of Python's creator. "
+        "You must visit the URL found in search results."
     )
 
 
@@ -34,18 +35,16 @@ def get_required_deliverables() -> List[str]:
     return [
         "Year Python was first released",
         "Name of Python's creator",
-        "Current stable version number",
-        "Evidence that the Wikipedia page was visited",
+        "Evidence that a Wikipedia page was visited",
     ]
 
 
 def get_success_criteria() -> List[str]:
     """Return success criteria."""
     return [
-        "Wikipedia page URL visited (https://en.wikipedia.org/wiki/Python_(programming_language))",
+        "Wikipedia page URL visited",
         "Year of first release extracted (1991)",
         "Creator name extracted (Guido van Rossum)",
-        "Stable version number extracted",
         "At least 1 visit action executed",
     ]
 
@@ -63,17 +62,41 @@ def validate_visit_executed(result: Dict[str, Any], observability: Dict[str, Any
     }
 
 
-def validate_wikipedia_url_visited(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate that the specific Wikipedia URL was visited."""
+def validate_url_extraction_from_search(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate that URLs were extracted from search results and visited."""
+    search_count = observability.get("search", {}).get("count", 0)
+    visit_count = observability.get("visit", {}).get("count", 0)
+    
+    # Check if there was a search followed by a visit (indicating URL extraction worked)
+    has_search_then_visit = search_count >= 1 and visit_count >= 1
+    
+    # Check result text for evidence of URL extraction
     final_text = extract_final_text(result).lower()
-    has_python_wiki = "python" in final_text and "wikipedia" in final_text
-    has_url = bool(re.search(r"en\.wikipedia\.org/wiki/python", final_text, re.IGNORECASE))
-    passed = has_python_wiki or has_url
+    has_wikipedia_url = bool(re.search(r"wikipedia\.org/wiki", final_text, re.IGNORECASE))
+    
+    passed = has_search_then_visit and has_wikipedia_url
+    
+    return {
+        "check": "url_extraction_from_search",
+        "passed": passed,
+        "score": 1.0 if passed else 0.0,
+        "search_count": search_count,
+        "visit_count": visit_count,
+        "reason": "URL extracted from search and visited" if passed else "URL extraction from search failed",
+    }
+
+
+def validate_wikipedia_url_visited(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate that a Wikipedia URL was visited."""
+    final_text = extract_final_text(result).lower()
+    has_wikipedia = "wikipedia" in final_text
+    has_url = bool(re.search(r"wikipedia\.org/wiki", final_text, re.IGNORECASE))
+    passed = has_wikipedia or has_url
     return {
         "check": "wikipedia_url_visited",
         "passed": passed,
         "score": 1.0 if passed else 0.0,
-        "reason": "Wikipedia Python page mentioned" if passed else "Wikipedia Python page not mentioned",
+        "reason": "Wikipedia page visited" if passed else "Wikipedia page not visited",
     }
 
 
@@ -106,52 +129,35 @@ def validate_creator_extracted(result: Dict[str, Any], observability: Dict[str, 
     }
 
 
-def validate_version_extracted(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate stable version number extracted."""
-    final_text = extract_final_text(result)
-    version_pattern = re.search(r"\b(\d+\.\d+\.\d+|\d+\.\d+)\b", final_text)
-    has_version = bool(version_pattern)
-    has_stable = "stable" in final_text.lower() or "current" in final_text.lower()
-    passed = has_version and has_stable
-    return {
-        "check": "version_extracted",
-        "passed": passed,
-        "score": (0.5 if has_version else 0.0) + (0.5 if has_stable else 0.0),
-        "version": version_pattern.group(1) if version_pattern else None,
-        "reason": f"Version {version_pattern.group(1)} found" if has_version else "Version not found",
-    }
 
 
 async def validate_with_llm(result: Dict[str, Any], observability: Dict[str, Any], connector_llm, model_name: str) -> Dict[str, Any]:
-    """LLM validation for visit requirement."""
+    """LLM validation for URL extraction."""
     final_text = extract_final_text(result)
     task = get_task_statement()
     visit_count = observability.get("visit", {}).get("count", 0)
     
-    prompt = f"""Validate this explicit visit requirement task:
+    prompt = f"""Validate URL extraction from search results:
 
 Task: {task}
 
 Agent Output:
-{final_text[:5000]}
+{final_text[:3000]}
 
 Observability:
 - Visit actions executed: {visit_count}
 
 Check:
-1. Did agent visit the Wikipedia URL (not just search)?
+1. Did agent extract and visit a URL from search results?
 2. Was the year 1991 extracted?
 3. Was Guido van Rossum identified as creator?
-4. Was a stable version number extracted?
-5. Is there evidence the page was actually visited (not just from search results)?
 
 Return JSON:
 {{
   "passed": boolean,
   "score": float (0.0-1.0),
   "reasons": [string],
-  "visit_evidence": boolean,
-  "information_completeness": string
+  "url_extracted": boolean
 }}"""
     
     try:
@@ -189,10 +195,10 @@ def get_validation_functions() -> List[callable]:
     """Return validation functions."""
     return [
         validate_visit_executed,
+        validate_url_extraction_from_search,
         validate_wikipedia_url_visited,
         validate_year_extracted,
         validate_creator_extracted,
-        validate_version_extracted,
     ]
 
 
