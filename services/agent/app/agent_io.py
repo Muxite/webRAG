@@ -220,8 +220,8 @@ class AgentIO:
         """
         Fetch a URL, clean the HTML, return extracted text.
 
-        Tries aiohttp first.  On 403/401 (bot-blocking), automatically retries
-        with the headless Chrome browser connector if one is available.
+        Uses headless Chrome browser connector by default. Falls back to aiohttp
+        if browser is not available.
 
         :param url: Target URL.
         :param timeout_seconds: Optional per-call timeout.
@@ -229,14 +229,11 @@ class AgentIO:
         :raises RuntimeError: On HTTP failure after all attempts.
         """
         started_at = time.perf_counter()
-        result = await self._with_timeout(
-            self.connector_http.request("GET", url, retries=3),
-            timeout_seconds,
-        )
         used_browser = False
+        result = None
 
-        if result.error and result.status in BROWSER_FALLBACK_STATUSES and self.connector_browser:
-            _logger.info(f"aiohttp got {result.status} for {url}, falling back to headless Chrome")
+        if self.connector_browser:
+            _logger.info(f"Using headless Chrome to fetch {url}")
             browser_result = await self._with_timeout(
                 self.connector_browser.fetch_page(url),
                 timeout_seconds,
@@ -245,7 +242,14 @@ class AgentIO:
                 result = browser_result
                 used_browser = True
             else:
-                _logger.warning(f"Browser fallback also failed for {url}: {browser_result.data}")
+                _logger.warning(f"Browser fetch failed for {url}: {browser_result.data}, falling back to HTTP")
+        
+        if not result or result.error:
+            _logger.info(f"Falling back to aiohttp for {url}")
+            result = await self._with_timeout(
+                self.connector_http.request("GET", url, retries=3),
+                timeout_seconds,
+            )
 
         if result.error:
             error_text = f"HTTP visit failed: {url} status={result.status}"
@@ -301,21 +305,19 @@ class AgentIO:
         """
         Fetch raw content from a URL (no HTML cleaning).
 
-        Tries aiohttp first.  On 403/401 (bot-blocking), automatically retries
-        with the headless Chrome browser connector if one is available.
+        Uses headless Chrome browser connector by default. Falls back to aiohttp
+        if browser is not available.
 
         :param url: Target URL.
-        :param retries: Number of aiohttp retries.
+        :param retries: Number of aiohttp retries (if fallback needed).
         :param timeout_seconds: Optional per-call timeout.
         :returns: Raw response text or JSON string.
         :raises RuntimeError: On HTTP failure after all attempts.
         """
-        result = await self._with_timeout(
-            self.connector_http.request("GET", url, retries=retries),
-            timeout_seconds,
-        )
-        if result.error and result.status in BROWSER_FALLBACK_STATUSES and self.connector_browser:
-            _logger.info(f"aiohttp got {result.status} for {url}, falling back to headless Chrome (fetch_url)")
+        result = None
+
+        if self.connector_browser:
+            _logger.info(f"Using headless Chrome to fetch {url}")
             browser_result = await self._with_timeout(
                 self.connector_browser.fetch_page(url),
                 timeout_seconds,
@@ -323,7 +325,14 @@ class AgentIO:
             if not browser_result.error:
                 result = browser_result
             else:
-                _logger.warning(f"Browser fallback also failed for {url}: {browser_result.data}")
+                _logger.warning(f"Browser fetch failed for {url}: {browser_result.data}, falling back to HTTP")
+        
+        if not result or result.error:
+            _logger.info(f"Falling back to aiohttp for {url}")
+            result = await self._with_timeout(
+                self.connector_http.request("GET", url, retries=retries),
+                timeout_seconds,
+            )
         if result.error:
             raise RuntimeError(f"HTTP fetch failed: {url} status={result.status}")
         resp = result.data

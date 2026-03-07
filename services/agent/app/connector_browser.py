@@ -60,6 +60,7 @@ class ConnectorBrowser(ConnectorBase):
     def _create_driver(self):
         """
         Synchronous factory — runs inside the thread pool.
+        Creates a Chrome driver configured to mimic human browser behavior.
         :returns: A configured undetected Chrome WebDriver instance.
         """
         import undetected_chromedriver as uc
@@ -73,10 +74,38 @@ class ConnectorBrowser(ConnectorBase):
         options.add_argument("--disable-infobars")
         options.add_argument("--window-size=1920,1080")
         options.add_argument("--lang=en-US,en")
+        
+        user_agent = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        options.add_argument(f"--user-agent={user_agent}")
 
         driver = uc.Chrome(options=options, headless=True, use_subprocess=True)
         driver.set_page_load_timeout(self._page_load_timeout)
         driver.implicitly_wait(self._implicit_wait)
+        
+        driver.execute_cdp_cmd("Network.setUserAgentOverride", {
+            "userAgent": user_agent
+        })
+        
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": """
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en']
+                });
+                window.chrome = {
+                    runtime: {}
+                };
+            """
+        })
+        
         return driver
 
     async def fetch_page(self, url: str, timeout: Optional[float] = None) -> RequestResult:
@@ -139,11 +168,87 @@ class ConnectorBrowser(ConnectorBase):
     def _get_page_source(self, url: str) -> str:
         """
         Synchronous Selenium call — runs inside the thread pool.
+        Navigates to URL, waits for page load, mimics human behavior.
         :param url: URL to navigate to.
         :returns: Full page HTML source.
         """
+        import random
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException
+        
         self._driver.get(url)
+        
+        try:
+            WebDriverWait(self._driver, self._page_load_timeout).until(
+                lambda driver: driver.execute_script("return document.readyState") == "complete"
+            )
+        except TimeoutException:
+            self.logger.warning(f"Page load timeout for {url}, continuing anyway")
+        
+        time.sleep(random.uniform(1.0, 2.5))
+        
+        try:
+            WebDriverWait(self._driver, 5).until(
+                lambda driver: driver.execute_script(
+                    "return (window.jQuery === undefined || jQuery.active == 0) && "
+                    "(typeof window.fetch === 'undefined' || document.readyState === 'complete')"
+                )
+            )
+        except TimeoutException:
+            pass
+        
+        self._wait_for_network_idle()
+        
+        self._scroll_page_like_human()
+        
+        time.sleep(random.uniform(0.5, 1.5))
+        
         return self._driver.page_source
+    
+    def _wait_for_network_idle(self, max_wait: int = 3) -> None:
+        """
+        Wait for network activity to settle (networkidle-like behavior).
+        :param max_wait: Maximum seconds to wait for network idle.
+        """
+        import random
+        
+        try:
+            for _ in range(max_wait):
+                time.sleep(1)
+                network_idle = self._driver.execute_script("""
+                    return (window.performance && 
+                            window.performance.getEntriesByType('resource').length > 0 &&
+                            document.readyState === 'complete')
+                """)
+                if network_idle:
+                    break
+        except Exception as exc:
+            self.logger.debug(f"Error checking network idle: {exc}")
+    
+    def _scroll_page_like_human(self) -> None:
+        """
+        Scroll the page in a human-like manner to trigger lazy-loaded content.
+        """
+        import random
+        
+        try:
+            total_height = self._driver.execute_script("return document.body.scrollHeight")
+            viewport_height = self._driver.execute_script("return window.innerHeight")
+            current_position = 0
+            
+            scroll_steps = random.randint(3, 6)
+            scroll_distance = total_height // scroll_steps
+            
+            for _ in range(scroll_steps):
+                current_position = min(current_position + scroll_distance, total_height - viewport_height)
+                self._driver.execute_script(f"window.scrollTo(0, {current_position});")
+                time.sleep(random.uniform(0.3, 0.8))
+            
+            self._driver.execute_script("window.scrollTo(0, 0);")
+            time.sleep(random.uniform(0.2, 0.5))
+        except Exception as exc:
+            self.logger.debug(f"Error during human-like scrolling: {exc}")
 
     async def _run_in_executor(self, func, *args):
         """

@@ -498,6 +498,7 @@ class IdeaDagEngine:
         self._logger.info(f"[STEP {step_index}] EXPANSION: {len(candidates)} candidates -> {min(len(candidates), max_branching)} children (total nodes: {graph.node_count()})")
         
         self._enforce_visit_nodes_for_mandate_urls(graph, node_id, step_index)
+        self._enforce_mandate_visit_requirements(graph, node_id, step_index)
 
         if self._got:
             await self._got.embed_children(graph, node_id)
@@ -563,6 +564,113 @@ class IdeaDagEngine:
             self._logger.info(
                 f"[STEP {step_index}] ENFORCE: Injected visit node {visit_node.node_id} "
                 f"for mandate URL {url[:60]}"
+            )
+
+    def _enforce_mandate_visit_requirements(self, graph: IdeaDag, node_id: str, step_index: int) -> None:
+        """
+        Enforce that mandates explicitly requiring visits/search must create those actions.
+        Checks for phrases like "must visit", "you must visit", "must search", etc.
+        """
+        node = graph.get_node(node_id)
+        if not node:
+            return
+
+        mandate = node.details.get("mandate") or ""
+        if not mandate:
+            root = graph.get_node(graph.root_id())
+            if root and root.node_id == node_id:
+                mandate = root.title or ""
+            elif root:
+                mandate = root.details.get("mandate") or root.title or ""
+        if not mandate:
+            return
+
+        mandate_lower = mandate.lower()
+        
+        requires_visit = any(phrase in mandate_lower for phrase in [
+            "must visit", "you must visit", "must visit the", "required to visit",
+            "need to visit", "should visit", "visit the url", "visit the page"
+        ])
+        
+        requires_search = any(phrase in mandate_lower for phrase in [
+            "must search", "you must search", "search for", "find and visit"
+        ])
+        
+        if not requires_visit and not requires_search:
+            return
+
+        has_visit = False
+        has_search = False
+        
+        for child_id in node.children:
+            child = graph.get_node(child_id)
+            if not child:
+                continue
+            child_action = NodeDetailsExtractor.get_action(child.details)
+            if child_action == IdeaActionType.VISIT.value:
+                has_visit = True
+            elif child_action == IdeaActionType.SEARCH.value:
+                has_search = True
+
+        search_node_id = None
+        if requires_search and not has_search:
+            self._logger.warning(
+                f"[STEP {step_index}] ENFORCE: Mandate requires search but no search node created. "
+                f"Injecting search node."
+            )
+            search_node = graph.add_child(
+                parent_id=node_id,
+                title="Search for required information",
+                details={
+                    DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+                    DetailKey.QUERY.value: mandate[:200],
+                    DetailKey.IS_LEAF.value: True,
+                    DetailKey.JUSTIFICATION.value: "Mandate explicitly requires search action",
+                    DetailKey.GOAL.value: f"Search as required by mandate: {mandate[:100]}",
+                },
+            )
+            search_node_id = search_node.node_id
+            has_search = True
+            self._logger.info(
+                f"[STEP {step_index}] ENFORCE: Injected search node {search_node_id} "
+                f"for mandate requirement"
+            )
+        elif has_search:
+            for child_id in node.children:
+                child = graph.get_node(child_id)
+                if child and NodeDetailsExtractor.get_action(child.details) == IdeaActionType.SEARCH.value:
+                    search_node_id = child_id
+                    break
+
+        if requires_visit and not has_visit:
+            self._logger.warning(
+                f"[STEP {step_index}] ENFORCE: Mandate requires visit but no visit node created. "
+                f"Injecting visit node."
+            )
+            visit_node = graph.add_child(
+                parent_id=node_id,
+                title="Visit required URL",
+                details={
+                    DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+                    DetailKey.IS_LEAF.value: True,
+                    DetailKey.JUSTIFICATION.value: "Mandate explicitly requires visit action - will extract URL from search results or use link_idea",
+                    DetailKey.GOAL.value: f"Visit URL as required by mandate: {mandate[:100]}",
+                    "link_idea": "URL from search results or mandate",
+                    "link_count": 1,
+                },
+            )
+            if search_node_id:
+                visit_node.details[DetailKey.REQUIRES_DATA.value] = {
+                    "type": "urls_from_search",
+                    "source_node_id": search_node_id
+                }
+                self._logger.info(
+                    f"[STEP {step_index}] ENFORCE: Visit node {visit_node.node_id} "
+                    f"depends on search node {search_node_id}"
+                )
+            self._logger.info(
+                f"[STEP {step_index}] ENFORCE: Injected visit node {visit_node.node_id} "
+                f"for mandate requirement"
             )
 
     @staticmethod
@@ -834,16 +942,42 @@ class IdeaDagEngine:
         from agent.app.idea_policies.base import IdeaActionType
         success = ActionResultExtractor.is_success(result)
         if success:
-            node.status = IdeaNodeStatus.DONE
-            
             action = NodeDetailsExtractor.get_action(node.details)
+            
+            if action == IdeaActionType.VISIT.value:
+                url = result.get(ActionResultKey.URL.value) or result.get("url") or ""
+                content = result.get(ActionResultKey.CONTENT.value) or result.get(ActionResultKey.CONTENT_FULL.value) or result.get("content") or ""
+                content_total_chars = result.get(ActionResultKey.CONTENT_TOTAL_CHARS.value) or len(content) if content else 0
+                
+                if not content or len(content.strip()) == 0:
+                    self._logger.error(
+                        f"[VISIT_VALIDATION] Visit marked as success but has no content! "
+                        f"Node {node_id}, URL: {url[:80] if url else 'unknown'}, "
+                        f"result keys: {list(result.keys())}"
+                    )
+                    result[ActionResultKey.SUCCESS.value] = False
+                    result[ActionResultKey.ERROR.value] = "Visit succeeded but no content was retrieved - this indicates a validation failure"
+                    result[ActionResultKey.ERROR_TYPE.value] = "ValidationError"
+                    result[ActionResultKey.RETRYABLE.value] = True
+                    success = False
+                else:
+                    self._logger.info(
+                        f"[VISIT_SUCCESS] Visit succeeded: Node {node_id}, "
+                        f"URL: {url[:80] if url else 'unknown'}, "
+                        f"Content: {content_total_chars} chars, "
+                        f"Status: DONE"
+                    )
+                    node.details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_visit"}
+                    node.details["visit_content_length"] = content_total_chars
+                    node.details["visit_url"] = url
+                    node.status = IdeaNodeStatus.DONE
+                    return ResultStatus.SUCCESS.value
+            
             if action == IdeaActionType.SEARCH.value:
                 node.details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_search"}
                 self._logger.debug(f"[DATA_FLOW] Node {node_id} (search) now provides URLs")
-            elif action == IdeaActionType.VISIT.value:
-                node.details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_visit"}
-                self._logger.debug(f"[DATA_FLOW] Node {node_id} (visit) now provides URLs")
             
+            node.status = IdeaNodeStatus.DONE
             return ResultStatus.SUCCESS.value
         retryable = ActionResultExtractor.is_retryable(result)
         node.details[DetailKey.ACTION_RETRYABLE.value] = retryable
@@ -883,6 +1017,34 @@ class IdeaDagEngine:
         step_index: int,
     ) -> Optional[IdeaNode]:
         selected_action = NodeDetailsExtractor.get_action(selected.details) or ""
+        # If a visit node has no explicit URL, it often depends on a sibling search node
+        # to provide URLs. In sequential mode, enforce search-before-visit regardless
+        # of score so we don't execute a visit prematurely and fail with "missing URL".
+        if selected_action.lower() == "visit":
+            url = (
+                selected.details.get("optional_url")
+                or selected.details.get(DetailKey.URL.value)
+                or selected.details.get(DetailKey.LINK.value)
+                or selected.details.get("url")
+                or selected.details.get("link")
+            )
+            has_url = isinstance(url, str) and url.startswith(("http://", "https://"))
+            if not has_url:
+                search_candidates: List[IdeaNode] = []
+                for nid in eligible:
+                    if nid == selected.node_id:
+                        continue
+                    child = graph.get_node(nid)
+                    if not child or child.status.value in ("done", "failed", "skipped"):
+                        continue
+                    child_action = NodeDetailsExtractor.get_action(child.details) or ""
+                    if child_action.lower() == "search":
+                        search_candidates.append(child)
+                if search_candidates:
+                    # Prefer the highest-scored search (or first if unscored).
+                    best_search = max(search_candidates, key=lambda n: n.score if n.score is not None else float("-inf"))
+                    return best_search
+
         data_consuming = {"think", "save", "merge"}
         if selected_action.lower() not in data_consuming:
             return None
@@ -953,7 +1115,7 @@ class IdeaDagEngine:
         return False
     
     def _should_chunk_document(self, graph: IdeaDag, node: IdeaNode) -> bool:
-        from agent.app.idea_policies.action_constants import NodeDetailsExtractor, ActionResultKey
+        from agent.app.idea_policies.action_constants import NodeDetailsExtractor, ActionResultKey, ActionResultExtractor
         from agent.app.idea_policies.base import IdeaActionType
         
         action = NodeDetailsExtractor.get_action(node.details)

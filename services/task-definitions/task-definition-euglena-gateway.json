@@ -216,6 +216,10 @@
                     "value": "euglena-cluster"
                 },
                 {
+                    "name": "EUGLENA_ECS_HEALTHCHECK_INTERVAL_SECONDS",
+                    "value": "20"
+                },
+                {
                     "name": "GATEWAY_URL",
                     "value": "http://localhost:8080"
                 },
@@ -230,6 +234,14 @@
                 {
                     "name": "LITE",
                     "value": "true"
+                },
+                {
+                    "name": "LIVE_PREFLIGHT_BROWSER_TESTS",
+                    "value": "1"
+                },
+                {
+                    "name": "LIVE_PREFLIGHT_TESTS",
+                    "value": "1"
                 },
                 {
                     "name": "MAX_WORKERS",

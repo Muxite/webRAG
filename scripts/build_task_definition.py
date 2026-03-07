@@ -189,9 +189,31 @@ def _make_health_check(command, start_period=300, interval=60, retries=5, timeou
     :param timeout: Maximum time for health check to complete (seconds).
     :returns: Health check configuration dictionary.
     """
+    interval_override_raw = str(os.environ.get("EUGLENA_ECS_HEALTHCHECK_INTERVAL_SECONDS", "")).strip()
+    base_interval = interval
+    if interval_override_raw:
+        try:
+            base_interval = float(interval_override_raw)
+        except Exception:
+            base_interval = interval
+
+    multiplier_raw = str(os.environ.get("EUGLENA_ECS_HEALTHCHECK_INTERVAL_MULTIPLIER", "1")).strip()
+    try:
+        multiplier = float(multiplier_raw)
+    except Exception:
+        multiplier = 1.0
+    if multiplier <= 0:
+        multiplier = 1.0
+
+    try:
+        scaled_interval = int(round(float(base_interval) * multiplier))
+    except Exception:
+        scaled_interval = int(interval) if isinstance(interval, int) else 60
+    scaled_interval = max(5, min(300, scaled_interval))
+
     return {
         "command": ["CMD-SHELL", command],
-        "interval": interval,
+        "interval": scaled_interval,
         "retries": retries,
         "startPeriod": start_period,
         "timeout": timeout
@@ -440,6 +462,16 @@ def build_agent_task_definition(account_id, region, secret_name, secret_arn_suff
     secrets = build_secrets_list(secret_name, secret_arn_suffix, region, account_id, secret_keys)
     
     agent_env_vars = env_vars.copy()
+
+    agent_env_vars.setdefault("AGENT_START_PREFLIGHT_ENABLED", "1")
+    agent_env_vars.setdefault(
+        "AGENT_START_PREFLIGHT_URL",
+        "https://example.com,https://www.wikipedia.org,https://en.wikipedia.org/wiki/Python_(programming_language)",
+    )
+    agent_env_vars.setdefault("AGENT_START_PREFLIGHT_MIN_CHARS", "2000")
+    agent_env_vars.setdefault("AGENT_START_PREFLIGHT_TIMEOUT_SECONDS", "10")
+    agent_env_vars.setdefault("AGENT_START_PREFLIGHT_BROWSER", "0")
+    agent_env_vars.setdefault("AGENT_START_PREFLIGHT_FAIL_HARD", "0")
     
     env_list = build_environment_list(agent_env_vars)
     
@@ -584,6 +616,17 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
         "volumesFrom": []
     }
     
+    env_vars = dict(env_vars or {})
+    env_vars.setdefault("AGENT_START_PREFLIGHT_ENABLED", "1")
+    env_vars.setdefault(
+        "AGENT_START_PREFLIGHT_URL",
+        "https://example.com,https://www.wikipedia.org,https://en.wikipedia.org/wiki/Python_(programming_language)",
+    )
+    env_vars.setdefault("AGENT_START_PREFLIGHT_MIN_CHARS", "2000")
+    env_vars.setdefault("AGENT_START_PREFLIGHT_TIMEOUT_SECONDS", "10")
+    env_vars.setdefault("AGENT_START_PREFLIGHT_BROWSER", "0")
+    env_vars.setdefault("AGENT_START_PREFLIGHT_FAIL_HARD", "0")
+
     env_list = build_environment_list(env_vars)
     
     agent = {

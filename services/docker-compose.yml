@@ -61,7 +61,7 @@ services:
       - .env
       - keys.env
     environment:
-      - AGENT_STATUS_TIME=0.2
+      - AGENT_STATUS_TIME=0.6
     networks:
       - enet
 
@@ -97,7 +97,7 @@ services:
       - .env
       - keys.env
     environment:
-      - AGENT_STATUS_TIME=0.2
+      - AGENT_STATUS_TIME=0.6
     networks:
       - enet
 
@@ -115,7 +115,7 @@ services:
       - .env
       - keys.env
     environment:
-      - AGENT_STATUS_TIME=0.2
+      - AGENT_STATUS_TIME=0.6
       - IDEA_TEST_TOP_N=16
       - IDEA_TEST_MODELS=gpt-5-mini,gpt-5.2
       - IDEA_TEST_VALIDATION_MODEL=gpt-5-mini
@@ -145,12 +145,12 @@ services:
       - .env
       - keys.env
     environment:
-      - AGENT_STATUS_TIME=0.2
+      - AGENT_STATUS_TIME=0.6
       - MODEL_NAME=gpt-5-mini
-      - IDEA_TEST_IDS=019,025,033,037
-      - IDEA_TEST_EXECUTION_VARIANTS=graph,sequential
+      - IDEA_TEST_IDS=019
+      - IDEA_TEST_EXECUTION_VARIANTS=graph
       - IDEA_TEST_RUNS=1
-      - IDEA_TEST_CONCURRENCY=2
+      - IDEA_TEST_CONCURRENCY=1
       - IDEA_TEST_REPORT_VERBOSITY=1
     volumes:
       - ./agent/idea_test_results:/app/agent/idea_test_results
@@ -172,7 +172,7 @@ services:
       - .env
       - keys.env
     environment:
-      - AGENT_STATUS_TIME=0.2
+      - AGENT_STATUS_TIME=0.6
       - MODEL_NAME=gpt-5-mini
       - IDEA_TEST_IDS=002,012
       - IDEA_TEST_EXECUTION_VARIANTS=graph,sequential

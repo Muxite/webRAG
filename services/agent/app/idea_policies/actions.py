@@ -331,6 +331,47 @@ class VisitLeafAction(LeafAction):
         
         return content + links_section
 
+    def _extract_urls_from_parent_search_results(self, graph: IdeaDag, node: IdeaNode, max_depth: int = 3) -> List[str]:
+        """
+        Extract all URLs from parent search results.
+        
+        :param graph: The idea DAG
+        :param node: Current node
+        :param max_depth: Maximum depth to search
+        :returns: List of valid URLs found in search results
+        """
+        visited = set()
+        queue = [(node, 0)]
+        all_urls = []
+        
+        while queue:
+            current, depth = queue.pop(0)
+            if depth >= max_depth or current.node_id in visited:
+                continue
+            visited.add(current.node_id)
+            
+            result = current.details.get(DetailKey.ACTION_RESULT.value)
+            if result and isinstance(result, dict):
+                action_type = result.get("action")
+                
+                if action_type == IdeaActionType.SEARCH.value:
+                    search_results = result.get("results", [])
+                    if isinstance(search_results, list):
+                        for item in search_results:
+                            if isinstance(item, dict):
+                                candidate_url = item.get("url") or item.get("link") or item.get("href")
+                                if candidate_url:
+                                    candidate_url = str(candidate_url).strip()
+                                    if self._is_valid_url(candidate_url) and candidate_url not in all_urls:
+                                        all_urls.append(candidate_url)
+            
+            if current.parent_id:
+                parent = graph.get_node(current.parent_id)
+                if parent:
+                    queue.append((parent, depth + 1))
+        
+        return all_urls
+    
     def _extract_url_from_parents(self, graph: IdeaDag, node: IdeaNode, max_depth: int = 3) -> Optional[str]:
         visited = set()
         queue = [(node, 0)]
@@ -355,11 +396,13 @@ class VisitLeafAction(LeafAction):
                 if action_type == IdeaActionType.SEARCH.value:
                     search_results = result.get("results", [])
                     if isinstance(search_results, list):
-                        for item in search_results[:5]:
+                        for item in search_results[:10]:
                             if isinstance(item, dict):
-                                candidate_url = item.get("url") or item.get("link")
-                                if candidate_url and self._is_valid_url(candidate_url):
-                                    all_candidates.append((candidate_url, depth, "search"))
+                                candidate_url = item.get("url") or item.get("link") or item.get("href")
+                                if candidate_url:
+                                    candidate_url = str(candidate_url).strip()
+                                    if self._is_valid_url(candidate_url):
+                                        all_candidates.append((candidate_url, depth, "search"))
                 
                 # Also allow URLs from previous visit results (their links field)
                 if action_type == IdeaActionType.VISIT.value:
@@ -724,6 +767,19 @@ class VisitLeafAction(LeafAction):
             )
         
         timeout_seconds = self._timeout_seconds("fetch_timeout_seconds")
+        
+        use_browser = bool(getattr(io, "connector_browser", None))
+        if use_browser:
+            self._logger.info(
+                f"[VISIT] Using browser connector for {url[:80]}... "
+                f"(will wait for page load, mimic human behavior)"
+            )
+        else:
+            self._logger.info(
+                f"[VISIT] Using HTTP connector for {url[:80]}... "
+                f"(browser not available, using direct HTTP)"
+            )
+        
         raw_html = await io.fetch_url(str(url), timeout_seconds=timeout_seconds)
         if not raw_html:
             return (
@@ -778,11 +834,42 @@ class VisitLeafAction(LeafAction):
                 content_payload = self._limit_text(content_text)
                 content_text = content_payload.get("content") or content_text
         
+        if not content_text or len(content_text.strip()) == 0:
+            self._logger.warning(
+                f"[VISIT] No extractable content from {url[:80]}. "
+                f"HTML length: {len(raw_html)}, cleaned length: {len(cleaned)}"
+            )
+        
         max_links_for_llm = int(self.settings.get("max_links_per_visit", 20))
         links_for_llm = cleaned_links[:max_links_for_llm]
         content_with_links = self._attach_links_to_content(content_text, links_for_llm, max_links=max_links_for_llm)
         
         final_content = content_payload.get("content") or content_text or ""
+        content_total_chars = content_payload.get("total_chars", len(final_content))
+        
+        if not final_content or len(final_content.strip()) == 0:
+            self._logger.error(
+                f"[VISIT] Failed to extract any content from {url[:80]}. "
+                f"Marking visit as failed."
+            )
+            return (
+                ActionResultBuilder.failure(
+                    action=IdeaActionType.VISIT.value,
+                    error=f"Visit succeeded but no content could be extracted from page. HTML length: {len(raw_html)} chars",
+                    error_type=ErrorType.PARSE_ERROR.value,
+                    retryable=True,
+                    url=url,
+                    intent=intent,
+                ),
+                cleaned_links,
+                cleaned_link_contexts,
+            )
+        
+        self._logger.info(
+            f"[VISIT] Successfully retrieved content from {url[:80]}: "
+            f"{content_total_chars} chars, {len(cleaned_links)} links, "
+            f"title: {page_title[:60] if page_title else 'N/A'}"
+        )
         
         result = ActionResultBuilder.success(
             action=IdeaActionType.VISIT.value,
@@ -790,7 +877,7 @@ class VisitLeafAction(LeafAction):
             intent=intent,
             content=final_content,
             content_is_truncated=content_payload.get("is_truncated", False),
-            content_total_chars=content_payload.get("total_chars", len(final_content)),
+            content_total_chars=content_total_chars,
             content_full=cleaned,
             content_with_links=content_with_links,
             links=links_for_llm,
@@ -828,7 +915,17 @@ class VisitLeafAction(LeafAction):
                     link_count = 1
             
             link_idea = node.details.get("link_idea") or node.details.get("link_concept") or ""
-            optional_url = node.details.get("optional_url") or NodeDetailsExtractor.get_url(node.details)
+            # Capture original for diagnostics before filtering
+            original_optional_url = node.details.get("optional_url") or NodeDetailsExtractor.get_url(node.details)
+            optional_url = original_optional_url
+            
+            # Filter out invalid URL values (string "None", empty strings, etc.)
+            if optional_url:
+                optional_url_str = str(optional_url).strip()
+                if optional_url_str.lower() in ("none", "null", ""):
+                    optional_url = None
+                elif not self._is_valid_url(optional_url_str):
+                    optional_url = None
             
             # Detect and clear placeholder URLs (e.g., "<chosen_next_url from ...>")
             if optional_url and not self._is_valid_url(optional_url):
@@ -840,15 +937,20 @@ class VisitLeafAction(LeafAction):
                 think_url = self._extract_url_from_think_node(graph, node)
                 if think_url:
                     optional_url = think_url
+                    self._logger.info(f"[VISIT] Extracted URL from think node: {think_url[:80]}")
                 else:
                     extracted_url = self._extract_url_from_parents(graph, node)
                     if extracted_url:
                         optional_url = extracted_url
+                        self._logger.info(f"[VISIT] Extracted URL from parent nodes: {extracted_url[:80]}")
                     else:
                         # Try to extract URL from completed sibling results
                         sibling_url = self._extract_url_from_sibling_results(graph, node)
                         if sibling_url:
                             optional_url = sibling_url
+                            self._logger.info(f"[VISIT] Extracted URL from sibling results: {sibling_url[:80]}")
+                        else:
+                            self._logger.debug(f"[VISIT] No URL found in node details, think node, parents, or siblings")
             
             # Auto-generate link_idea from intent or title if missing
             if not link_idea and not (optional_url and self._is_valid_url(optional_url)):
@@ -867,9 +969,13 @@ class VisitLeafAction(LeafAction):
             if optional_url and self._is_valid_url(optional_url):
                 result, _, _ = await self._visit_single_page(optional_url, graph, node, io, intent)
                 if result and result.get("success"):
+                    content_length = result.get("content_total_chars") or len(result.get("content", "") or "")
                     optional_success = True
                     urls_to_visit.append(optional_url)
-                    self._logger.info(f"[VISIT] Optional URL visited successfully: {optional_url[:60]}...")
+                    self._logger.info(
+                        f"[VISIT] Optional URL visited successfully: {optional_url[:60]}... "
+                        f"Content: {content_length} chars, Status: SUCCESS"
+                    )
                     if link_count == 1:
                         # Record visit in telemetry before returning
                         if io.telemetry:
@@ -878,23 +984,58 @@ class VisitLeafAction(LeafAction):
                                 document={"url": optional_url, "content": result.get("content_with_links", result.get("content", ""))},
                             )
                         return result
+                else:
+                    error_from_result = result.get("error", "Unknown error") if result else "No result returned"
+                    self._logger.warning(
+                        f"[VISIT] Optional URL visit failed: {optional_url[:60]}... "
+                        f"Error: {error_from_result[:100]}"
+                    )
             
             if not optional_success or link_count > 1:
-                if link_idea:
+                candidate_urls = []
+                
+                # First, try to extract URLs directly from parent search results
+                # This is the most reliable source when visit nodes are created from search results
+                # Always try this when we need URLs, regardless of optional_url status
+                parent_search_urls = self._extract_urls_from_parent_search_results(graph, node)
+                if parent_search_urls:
+                    self._logger.info(f"[VISIT] Extracted {len(parent_search_urls)} URLs from parent search results")
+                    candidate_urls.extend(parent_search_urls)
+                
+                # Then try ChromaDB link collections (for links from previous visits)
+                # Only if we still need more URLs
+                if link_idea and len(candidate_urls) < link_count:
                     query_top_k = int(self.settings.get("visit_link_query_top_k", 10))
-                    candidate_urls = await self._query_links_from_chroma(link_idea, io, top_k=query_top_k)
-                    
-                    if candidate_urls:
-                        if link_count > len(urls_to_visit):
-                            needed = link_count - len(urls_to_visit)
-                            if len(candidate_urls) > needed:
-                                selected = await self._select_links_with_llm(link_idea, candidate_urls, needed, io)
-                                urls_to_visit.extend(selected)
-                            else:
-                                urls_to_visit.extend(candidate_urls[:needed])
+                    chroma_urls = await self._query_links_from_chroma(link_idea, io, top_k=query_top_k)
+                    if chroma_urls:
+                        # Deduplicate
+                        seen = set(candidate_urls)
+                        for url in chroma_urls:
+                            if url not in seen:
+                                candidate_urls.append(url)
+                                seen.add(url)
+                
+                if candidate_urls:
+                    if link_count > len(urls_to_visit):
+                        needed = link_count - len(urls_to_visit)
+                        if len(candidate_urls) > needed:
+                            selected = await self._select_links_with_llm(link_idea or node.title, candidate_urls, needed, io)
+                            urls_to_visit.extend(selected)
+                        else:
+                            urls_to_visit.extend(candidate_urls[:needed])
                 else:
                     if not optional_url or not optional_success:
-                        error_msg = f"Visit node missing valid URL or link_idea. Node title: '{node.title}'. Details should contain 'url'/'optional_url' or 'link_idea' for semantic link discovery."
+                        parent_urls_found = len(parent_search_urls) if 'parent_search_urls' in locals() else 0
+                        chroma_urls_found = len(chroma_urls) if 'chroma_urls' in locals() else 0
+                        error_msg = (
+                            f"Visit node missing valid URL or link_idea. "
+                            f"Node title: '{node.title}'. "
+                            f"Details: optional_url='{original_optional_url}', link_idea='{link_idea}', "
+                            f"link_count={link_count}. "
+                            f"URL extraction attempts: parent_search_urls={parent_urls_found}, "
+                            f"chroma_urls={chroma_urls_found}. "
+                            f"Details should contain 'url'/'optional_url' or 'link_idea' for semantic link discovery."
+                        )
                         self._logger.error(f"[VISIT] {error_msg}")
                         return ActionResultBuilder.failure(
                             action=IdeaActionType.VISIT.value,
@@ -908,7 +1049,17 @@ class VisitLeafAction(LeafAction):
                 if optional_url and self._is_valid_url(optional_url):
                     urls_to_visit = [optional_url]
                 else:
-                    error_msg = f"Visit node: no URLs to visit. link_count={link_count}, link_idea='{link_idea}', optional_url='{optional_url}'"
+                    parent_urls_found = len(parent_search_urls) if 'parent_search_urls' in locals() else 0
+                    chroma_urls_found = len(chroma_urls) if 'chroma_urls' in locals() else 0
+                    error_msg = (
+                        f"Visit node: no URLs to visit. "
+                        f"link_count={link_count}, link_idea='{link_idea}', "
+                        f"optional_url='{original_optional_url}'. "
+                        f"URL extraction results: parent_search_urls={parent_urls_found}, "
+                        f"chroma_urls={chroma_urls_found}. "
+                        f"Diagnosis: {'No URLs found in parent search results' if parent_urls_found == 0 else 'URLs found but not selected'}. "
+                        f"Action: Ensure visit node has valid 'url'/'optional_url' field or depends on a search node that provides URLs."
+                    )
                     self._logger.error(f"[VISIT] {error_msg}")
                     return ActionResultBuilder.failure(
                         action=IdeaActionType.VISIT.value,
@@ -946,9 +1097,16 @@ class VisitLeafAction(LeafAction):
                         self._logger.warning(f"[VISIT] Failed to visit {url_to_visit}: {result.get('error', 'Unknown error')}")
             
             if not visited_results:
+                attempted_urls = ", ".join([url[:60] for url in urls_to_visit[:3]])
+                error_msg = (
+                    f"All URL visits failed. Attempted {len(urls_to_visit)} URL(s): {attempted_urls}"
+                    f"{'...' if len(urls_to_visit) > 3 else ''}. "
+                    f"Check network connectivity, site availability, or bot blocking."
+                )
+                self._logger.error(f"[VISIT] {error_msg}")
                 return ActionResultBuilder.failure(
                     action=IdeaActionType.VISIT.value,
-                    error="All URL visits failed",
+                    error=error_msg,
                     error_type=ErrorType.NETWORK_ERROR.value,
                     retryable=True,
                 )
@@ -972,6 +1130,15 @@ class VisitLeafAction(LeafAction):
                             source="visit",
                             document={"url": result.get("url"), "content": result.get("content_with_links", "")},
                         )
+            
+            primary_url = urls_to_visit[0] if urls_to_visit else None
+            total_content_chars = len(combined_content_text)
+            self._logger.info(
+                f"[VISIT] Multi-page visit completed successfully: "
+                f"{len(visited_results)}/{len(urls_to_visit)} pages visited, "
+                f"total content: {total_content_chars} chars, "
+                f"primary URL: {primary_url[:80] if primary_url else 'N/A'}"
+            )
             
             return ActionResultBuilder.success(
                 action=IdeaActionType.VISIT.value,
