@@ -33,7 +33,7 @@ export default function Dashboard() {
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [showReconnect, setShowReconnect] = useState(false);
   
-  const [paletteId, setPaletteId] = useState<string>("synthwave-blue");
+  const [paletteId, setPaletteId] = useState<string>("arctic-circuit");
   const [showPaletteMenu, setShowPaletteMenu] = useState(false);
   const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
   
