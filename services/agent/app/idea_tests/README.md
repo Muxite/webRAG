@@ -17,9 +17,11 @@ Each `test_XXX_name.py` exports:
 
 ## Validation
 
-- **Function checks**: pattern matching, keyword presence, structural rules.
-- **LLM checks**: semantic grading by `gpt-5-mini`.
-- **Score**: 0.0–1.0 per check; overall = mean. Pass threshold = 0.75.
+- **Function checks**: Pattern matching, keyword presence, structural rules, type validation
+- **LLM checks**: Semantic grading by `gpt-5-mini` (always uses gpt-5-mini regardless of execution model)
+- **Score**: 0.0–1.0 per check; overall = mean of all validation scores
+- **Pass threshold**: 0.75 (test passes if overall score ≥ 0.75)
+- **Results**: Written to `agent/idea_test_results/` as timestamped JSON files
 
 ## Test Categories
 
@@ -34,10 +36,38 @@ Each `test_XXX_name.py` exports:
 
 ## Running
 
+### Basic Usage
+
 ```bash
+# Run specific tests
 IDEA_TEST_IDS=019,025 docker compose run --profile test visit-test
-docker compose run --profile test idea-test    # full suite
+
+# Run full test suite
+docker compose run --profile test idea-test
+
+# Benchmark mode (top 8 tests, 3 models, 3 runs each, concurrency 3)
+IDEA_TEST_MODE=benchmark docker compose run --profile test idea-test
 ```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `IDEA_TEST_IDS` | Comma-separated test IDs (e.g., "019,025,033") | All tests |
+| `IDEA_TEST_MODE` | "default" or "benchmark" | "default" |
+| `IDEA_TEST_TOP_N` | Number of top-priority tests to run (0 = all) | 0 |
+| `IDEA_TEST_RUNS` | Repeats per test/model pair | 1 |
+| `IDEA_TEST_CONCURRENCY` | Max parallel task executions | 1 |
+| `IDEA_TEST_MODELS` | Comma-separated models (e.g., "gpt-5.2,gpt-5-mini") | `MODEL_NAME` or "gpt-5-mini" |
+| `IDEA_TEST_EXECUTION_VARIANTS` | "graph", "sequential", or comma-separated | "graph" |
+| `IDEA_TEST_LOG_LEVEL` | Logging level | INFO |
+
+### Test Execution Modes
+
+- **Graph mode**: Parallel branching with best-first selection (default, higher pass rate)
+- **Sequential mode**: Generate-many, keep-one, depth-first (baseline comparison)
+
+Both modes can be run in the same test run by setting `IDEA_TEST_EXECUTION_VARIANTS=graph,sequential`.
 
 ## Adding Tests
 

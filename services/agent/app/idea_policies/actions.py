@@ -31,7 +31,7 @@ class LeafAction(ABC):
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         self.settings = dict(settings or {})
         self._logger = logging.getLogger(self.__class__.__name__)
-    
+
     def _log_structured(self, level: str, message: str, **kwargs) -> None:
         """
         Log structured message for AWS CloudWatch.
@@ -442,21 +442,21 @@ class VisitLeafAction(LeafAction):
                 })
                 
                 if current_status == IdeaNodeStatus.DONE:
-                    result = current.details.get(DetailKey.ACTION_RESULT.value)
-                    if result and isinstance(result, dict):
+            result = current.details.get(DetailKey.ACTION_RESULT.value)
+            if result and isinstance(result, dict):
                         action_type = result.get(ActionResultKey.ACTION.value) or result.get("action")
-                        
-                        if action_type == IdeaActionType.SEARCH.value:
+                
+                if action_type == IdeaActionType.SEARCH.value:
                             search_results = result.get(ActionResultKey.RESULTS.value) or result.get("results", [])
-                            if isinstance(search_results, list):
+                    if isinstance(search_results, list):
                                 urls_found_in_node = 0
-                                for item in search_results:
-                                    if isinstance(item, dict):
-                                        candidate_url = item.get("url") or item.get("link") or item.get("href")
-                                        if candidate_url:
-                                            candidate_url = str(candidate_url).strip()
-                                            if self._is_valid_url(candidate_url) and candidate_url not in all_urls:
-                                                all_urls.append(candidate_url)
+                        for item in search_results:
+                            if isinstance(item, dict):
+                                candidate_url = item.get("url") or item.get("link") or item.get("href")
+                                if candidate_url:
+                                    candidate_url = str(candidate_url).strip()
+                                    if self._is_valid_url(candidate_url) and candidate_url not in all_urls:
+                                        all_urls.append(candidate_url)
                                                 urls_found_in_node += 1
                                 
                                 if urls_found_in_node > 0:
@@ -1225,13 +1225,13 @@ class VisitLeafAction(LeafAction):
                         error_type=ErrorType.INVALID_URL.value,
                         retryable=False
                     )
-                    return ActionResultBuilder.failure(
-                        action=IdeaActionType.VISIT.value,
-                        error=error_msg,
-                        error_type=ErrorType.INVALID_URL.value,
-                        retryable=False,
-                        url=optional_url or node.title,
-                    )
+                        return ActionResultBuilder.failure(
+                            action=IdeaActionType.VISIT.value,
+                            error=error_msg,
+                            error_type=ErrorType.INVALID_URL.value,
+                            retryable=False,
+                            url=optional_url or node.title,
+                        )
             
             if not urls_to_visit:
                 if optional_url and self._is_valid_url(optional_url):
@@ -1339,7 +1339,7 @@ class VisitLeafAction(LeafAction):
                 f"{len(visited_results)}/{len(urls_to_visit)} pages visited, "
                 f"total content: {total_content_chars} chars, "
                 f"primary URL: {primary_url[:80] if primary_url else 'N/A'}"
-            )
+                        )
             
             return ActionResultBuilder.success(
                 action=IdeaActionType.VISIT.value,

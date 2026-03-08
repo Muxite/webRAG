@@ -1,12 +1,15 @@
 # Architecture
 
 ## Components
-- `frontend/`: React UI with Supabase auth and task history
-- `services/gateway/`: FastAPI gateway, task intake, Supabase sync
-- `services/agent/`: Graph-of-Thought reasoning agent with web crawling and RAG
-- `services/shared/`: Connectors and storage helpers
-- `services/metrics/`: QueueDepth publisher
-- `services/lambda_autoscaling/`: ECS autoscaler
+
+| Component | Description |
+|-----------|-------------|
+| `frontend/` | React UI with Supabase auth, task submission, and task history |
+| `services/gateway/` | FastAPI gateway, task intake, Supabase sync, health monitoring |
+| `services/agent/` | Graph-of-Thought reasoning agent with web crawling and RAG |
+| `services/shared/` | Shared connectors, models, storage helpers, message contracts |
+| `services/metrics/` | CloudWatch queue-depth publisher for autoscaling |
+| `services/lambda_autoscaling/` | Lambda-based ECS autoscaler (deployment only) |
 
 ## Agent Internals
 
@@ -23,32 +26,55 @@ Two execution modes: `graph` (parallel, 90.6% pass rate) and `sequential` (depth
 See [Agent Architecture](../services/agent/app/AGENT_ARCHITECTURE.md) for full details.
 
 ## Message Flow
-1. Client submits task to `gateway /tasks` with JWT
-2. Gateway validates auth/quota, inserts task in Supabase as `in_queue`, publishes `TaskEnvelope` to RabbitMQ
-3. Agent consumes a task, emits status updates, and writes status + presence to Redis
-4. Gateway syncs Redis task statuses into Supabase and clears terminal tasks from Redis
-5. Frontend reads tasks from Supabase and system info/worker counts from the gateway
-6. Metrics service publishes QueueDepth to CloudWatch
-7. Lambda autoscaler reads QueueDepth and adjusts agent ECS desired count
+
+1. **Client submission**: Frontend submits task to `gateway /tasks` with Supabase JWT
+2. **Auth & quota**: Gateway validates JWT, checks per-user daily quota in Supabase
+3. **Task queuing**: Gateway inserts task in Supabase as `in_queue`, publishes `TaskEnvelope` to RabbitMQ queue `agent.mandates`
+4. **Task consumption**: Agent worker consumes task from RabbitMQ, updates status to `in_progress`
+5. **Status updates**: Agent emits status updates to RabbitMQ `agent.status` queue and writes to Redis
+6. **Status sync**: Gateway periodically syncs Redis task statuses into Supabase and clears terminal tasks from Redis
+7. **Frontend polling**: Frontend reads tasks from Supabase and system info/worker counts from gateway `/system` endpoint
+8. **Metrics**: Metrics service publishes QueueDepth to CloudWatch (deployment only)
+9. **Autoscaling**: Lambda autoscaler reads QueueDepth and adjusts agent ECS desired count (deployment only)
 
 ## Queues and Stores
-- RabbitMQ: `agent.mandates` (tasks), `agent.status` (status updates)
-- Redis: task status, worker presence (with TTL), worker state and versions
-- ChromaDB: long-term context storage (observations, thoughts, links)
-- Supabase: authenticated task history and quotas
+
+| Store | Purpose | Data |
+|-------|---------|------|
+| **RabbitMQ** | Task queue and status updates | `agent.mandates` (task envelopes), `agent.status` (status updates) |
+| **Redis** | Ephemeral task status and worker state | Task status cache, worker presence (TTL-based), worker state (`free`/`working`/`waiting`), versions |
+| **ChromaDB** | Long-term context storage | Observations, internal thoughts, discovered links (chunked and embedded) |
+| **Supabase** | Persistent task history and auth | Task records, user profiles, daily usage quotas, JWT authentication |
 
 ## Status and Worker State
-- Task states: `in_queue` → `in_progress` → `completed`/`error`
-- Worker states: `free`, `working`, `waiting`
-- Waiting window keeps a worker alive for short bursts before scaling in
 
-## Autoscaling Signals
-- QueueDepth metric drives desired count
-- Worker state in Redis blocks scale-in for `working` or `waiting` workers
-- Minimum worker count and target-per-worker rules enforce baseline capacity
+### Task States
+- `in_queue`: Task submitted, waiting for agent worker
+- `in_progress`: Agent is processing the task
+- `completed`: Task finished successfully
+- `error`: Task failed with error
+
+### Worker States
+- `free`: Worker idle, ready for tasks
+- `working`: Worker actively processing a task
+- `waiting`: Worker finished task, waiting for new work (prevents immediate scale-in)
+
+The waiting window keeps workers alive for short bursts before scaling in, improving responsiveness to bursty workloads.
+
+## Autoscaling (Deployment Only)
+
+- **QueueDepth metric**: CloudWatch metric published by metrics service drives desired count
+- **Scale-in protection**: Worker state in Redis blocks scale-in for `working` or `waiting` workers
+- **Capacity rules**: Minimum worker count and target-per-worker rules enforce baseline capacity
+- **Lambda function**: Reads QueueDepth from CloudWatch and adjusts ECS service desired count
+
+**Local development**: No autoscaling; fixed number of agent containers via Docker Compose.
 
 ## Failure Handling
-- Connector readiness checks before consuming tasks
-- Retry helpers around external services
-- Browser fallback for bot-blocked HTTP requests (403/401)
-- Graceful shutdown for agent and connectors
+
+- **Connector readiness**: Pre-flight checks verify LLM, search, and ChromaDB connectivity before consuming tasks
+- **Retry logic**: Automatic retries for transient failures in HTTP requests and external API calls
+- **Browser fallback**: Automatic fallback to `undetected-chromedriver` when HTTP requests return 403/401 (bot detection)
+- **Graceful shutdown**: Agents and connectors handle SIGTERM gracefully, finishing current tasks before exit
+- **Error propagation**: Task errors are captured, logged, and stored in Supabase with error messages
+- **Health checks**: Gateway and agent expose health endpoints for monitoring and load balancer checks

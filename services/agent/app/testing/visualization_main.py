@@ -1,42 +1,89 @@
 """
 Main orchestration for visualization.
+
+Simplified API for generating benchmark visualizations from test results.
+Focuses on core plots needed for documentation.
+
+Quick Start:
+    # Generate the 3 plots needed for docs (auto-detects latest run)
+    from agent.app.testing.visualization_main import generate_docs_plots
+    mappings = generate_docs_plots(results_dir="idea_test_results")
+    
+    # Or use the script:
+    python scripts/generate_benchmark_plots.py
+
+The system generates 4 core images:
+- core_p1_executive.png: Executive summary with scores, pass rates, KPIs
+- core_p2_heatmap.png: Test × Model heatmap showing per-test performance
+- core_p3_efficiency.png: Efficiency dashboard (cost, time, tokens, graph vs sequential)
+- core_p4_details.png: Actions & structure (searches/visits, graph metrics)
+
+For documentation, only the first 3 are typically used.
 """
 
 from pathlib import Path
 from typing import Optional
 
 from .visualization_data import load_test_results, list_available_runs
-from .visualization_plots import (
-    plot_validation_scores,
-    plot_pass_rates,
-    plot_execution_metrics,
-    plot_token_efficiency,
-    plot_time_vs_score,
-    plot_tokens_and_actions_dual_axis,
-    plot_comprehensive_performance,
-    plot_cost_analysis,
-    plot_graph_vs_sequential,
-    plot_model_head_to_head,
-    plot_score_heatmap,
-    plot_executive_dashboard,
-    plot_token_breakdown,
-    plot_action_effectiveness,
-    plot_per_test_model_comparison,
-    plot_graph_structure,
-    plot_data_coverage,
-    plot_cost_efficiency_frontier,
-)
 from .visualization_core import generate_core_plots
 from .visualization_summary import calculate_summary_stats, print_summary
 
+def generate_docs_plots(results_dir: Path, output_dir: Optional[Path] = None,
+                       run_id_filter: Optional[str] = None) -> dict:
+    """
+    Generate the 3 core plots needed for documentation.
+    
+    Returns a dict mapping source filenames to destination filenames:
+    {
+        "core_p1_executive.png": "executive_summary.png",
+        "core_p2_heatmap.png": "score_heatmap.png",
+        "core_p3_efficiency.png": "efficiency_dashboard.png",
+    }
+    
+    :param results_dir: Directory containing test result JSON files.
+    :param output_dir: Output directory (defaults to results_dir/plots_latest).
+    :param run_id_filter: Optional run ID to filter by. If None, uses latest run.
+    :return: Dict mapping source -> dest filenames for copying to docs.
+    """
+    if output_dir is None:
+        output_dir = results_dir / "plots_latest"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Auto-detect latest run if not specified
+    if run_id_filter is None:
+        runs = list_available_runs(results_dir)
+        if runs:
+            run_id_filter = runs[0]["run_id"]
+            print(f"Using latest run ID: {run_id_filter} ({runs[0]['count']} test(s))")
+        else:
+            raise ValueError(f"No test results found in {results_dir}")
+    
+    results = load_test_results(results_dir, run_id_filter=run_id_filter)
+    
+    if not results:
+        raise ValueError(f"No test results found in {results_dir} (run_id: {run_id_filter})")
+    
+    print(f"Generating core plots from {len(results)} test result(s)...")
+    generate_core_plots(results, output_dir)
+    
+    return {
+        "core_p1_executive.png": "executive_summary.png",
+        "core_p2_heatmap.png": "score_heatmap.png",
+        "core_p3_efficiency.png": "efficiency_dashboard.png",
+    }
+
+
 def generate_all_plots(results_dir: Path, output_dir: Optional[Path] = None,
-                       run_id_filter: Optional[str] = None, core_only: bool = False):
+                       run_id_filter: Optional[str] = None, core_only: bool = True):
     """
     Generate visualization plots from test results.
+    
+    For documentation use, prefer generate_docs_plots() which is simpler.
+    
     :param results_dir: Directory containing test result JSON files.
     :param output_dir: Output directory (defaults to results_dir/plots or results_dir/plots_{run_id}).
     :param run_id_filter: Optional run ID to filter by.
-    :param core_only: When True, only produce the 4 consolidated core images.
+    :param core_only: When True, only produce the 4 consolidated core images (default: True).
     """
     if output_dir is None:
         if run_id_filter:
@@ -79,74 +126,10 @@ def generate_all_plots(results_dir: Path, output_dir: Optional[Path] = None,
         print_summary(summary_stats)
         return
 
-    print("\n--- Detailed Plots ---")
-    plot_validation_scores(results, output_dir)
-    print("[OK] validation_scores.png")
-    
-    plot_pass_rates(results, output_dir)
-    print("[OK] pass_rates.png")
-    
-    plot_execution_metrics(results, output_dir)
-    print("[OK] execution_metrics.png")
-    
-    plot_token_efficiency(results, output_dir)
-    print("[OK] token_efficiency.png")
-    
-    plot_time_vs_score(results, output_dir)
-    print("[OK] time_vs_score.png")
-    
-    plot_tokens_and_actions_dual_axis(results, output_dir)
-    print("[OK] tokens_and_actions_dual_axis.png")
-    
-    plot_comprehensive_performance(results, output_dir)
-    print("[OK] comprehensive_distributions.png")
-    print("[OK] comprehensive_correlations.png")
-    print("[OK] comprehensive_summary.png")
-    
-    plot_cost_analysis(results, output_dir)
-    print("[OK] cost_analysis.png")
-
-    # --- New advanced plots ---
-    try:
-        plot_graph_vs_sequential(results, output_dir)
-        print("[OK] graph_vs_sequential.png")
-    except Exception:
-        print("[SKIP] graph_vs_sequential.png (need both graph+sequential data)")
-
-    try:
-        plot_model_head_to_head(results, output_dir)
-        print("[OK] model_head_to_head.png")
-    except Exception:
-        print("[SKIP] model_head_to_head.png (need 2+ models)")
-
-    plot_score_heatmap(results, output_dir)
-    print("[OK] score_heatmap.png")
-
-    plot_executive_dashboard(results, output_dir)
-    print("[OK] executive_dashboard.png")
-
-    plot_token_breakdown(results, output_dir)
-    print("[OK] token_breakdown.png")
-
-    plot_action_effectiveness(results, output_dir)
-    print("[OK] action_effectiveness.png")
-
-    plot_per_test_model_comparison(results, output_dir)
-    print("[OK] per_test_model_comparison.png")
-
-    plot_graph_structure(results, output_dir)
-    print("[OK] graph_structure.png")
-
-    plot_data_coverage(results, output_dir)
-    print("[OK] data_coverage.png")
-
-    try:
-        plot_cost_efficiency_frontier(results, output_dir)
-        print("[OK] cost_efficiency_frontier.png")
-    except Exception:
-        print("[SKIP] cost_efficiency_frontier.png (need cost data)")
-
-    print(f"\nAll plots saved to: {output_dir}")
+    # Detailed plots removed - use core_only=True for simplicity
+    # If you need detailed plots, import from visualization_plots directly
+    print("\nNote: Detailed plots are not generated by default.")
+    print("Use core_only=True (default) for documentation plots, or import visualization_plots directly.")
     
     summary_stats = calculate_summary_stats(results)
     print_summary(summary_stats)
@@ -208,7 +191,8 @@ Examples:
     parser.add_argument(
         "--core-only",
         action="store_true",
-        help="Only generate the 4 core summary images (skip detailed plots)",
+        default=True,
+        help="Only generate the 4 core summary images (default: True)",
     )
     
     args = parser.parse_args()

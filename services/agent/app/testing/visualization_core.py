@@ -108,7 +108,7 @@ def _test_system_matrix(results: List[Dict[str, Any]]):
 
 def plot_core_p1_executive(results: List[Dict[str, Any]], output_dir: Path):
     """
-    Priority-1 image: leaderboard table, score box-plot, data volume chart,
+    Priority-1 image: score heatmap, score box-plot, data volume chart,
     graph-vs-sequential score gap.
     :param results: Test result dicts.
     :param output_dir: Output directory.
@@ -117,105 +117,62 @@ def plot_core_p1_executive(results: List[Dict[str, Any]], output_dir: Path):
 
     systems, data = _collect_per_system(results)
     colors = _variant_colors(systems)
+    test_ids, systems_hm, matrix, passed_matrix = _test_system_matrix(results)
 
     fig = plt.figure(figsize=(30, 18), facecolor="white")
-    fig.suptitle("EXECUTIVE SUMMARY", fontsize=40, fontweight="bold", y=0.98)
-    gs = gridspec.GridSpec(2, 2, hspace=0.38, wspace=0.30,
-                           left=0.06, right=0.97, top=0.92, bottom=0.06)
+    # Optimized layout: heatmap left, graph vs sequential (most important) top right, leaderboard bottom right
+    gs = gridspec.GridSpec(2, 3, hspace=0.25, wspace=0.20,
+                           left=0.04, right=0.97, top=0.98, bottom=0.04,
+                           width_ratios=[2.2, 1.2, 1], height_ratios=[1.2, 1])
 
-    ax_tbl = fig.add_subplot(gs[0, 0])
-    ax_tbl.axis("off")
-    ax_tbl.set_title("Model Leaderboard", fontsize=28, fontweight="bold", pad=18)
+    ax_hm = fig.add_subplot(gs[0, 0])
+    n_tests = len(test_ids)
+    n_sys = len(systems_hm)
+    grid = np.full((n_tests, n_sys), np.nan)
+    for i, tid in enumerate(test_ids):
+        for j, s in enumerate(systems_hm):
+            if (tid, s) in matrix:
+                grid[i, j] = matrix[(tid, s)]
 
-    rows = []
-    for rank, s in enumerate(sorted(systems, key=lambda s: np.mean(data[s]["scores"]), reverse=True), 1):
-        d = data[s]
-        avg = np.mean(d["scores"])
-        med = np.median(d["scores"])
-        ac = np.mean(d["costs"])
-        at = np.mean(d["durations"])
-        rows.append([f"#{rank}", s, f"{avg:.3f}", f"{med:.3f}",
-                      format_cost(ac), f"{at:.0f}s"])
+    cmap = plt.cm.RdYlGn
+    cmap.set_bad(color="#f0f0f0")
+    im = ax_hm.imshow(grid, aspect="auto", cmap=cmap, vmin=0, vmax=1)
+    ax_hm.set_xticks(range(n_sys))
+    ax_hm.set_xticklabels([s.replace(" [", "\n[") for s in systems_hm], fontsize=20, fontweight="bold")
+    ax_hm.set_yticks(range(n_tests))
+    test_names = {}
+    for r in results:
+        tid = r.get("test_metadata", {}).get("test_id", "?")
+        name = r.get("test_metadata", {}).get("test_name", tid)
+        test_names[tid] = name
+    ax_hm.set_yticklabels([f"{tid}" for tid in test_ids], fontsize=18, fontweight="bold")
+    ax_hm.text(0.99, 1.01, "(green=1.0, red=0.0)", transform=ax_hm.transAxes,
+               fontsize=16, color="gray", ha="right", va="bottom", fontweight="bold")
 
-    col_labels = ["Rank", "System", "Avg Score", "Median", "$/run", "Time"]
-    tbl = ax_tbl.table(cellText=rows, colLabels=col_labels, loc="center",
-                        cellLoc="center", colColours=["#e8e8e8"] * len(col_labels))
-    tbl.auto_set_font_size(False)
-    tbl.set_fontsize(16)
-    tbl.scale(1.0, 2.2)
-    for (r, c), cell in tbl.get_celld().items():
-        if r == 0:
-            cell.set_facecolor("#4472C4")
-            cell.set_text_props(color="white", fontweight="bold")
-        elif r == 1:
-            cell.set_facecolor("#E2EFDA")
+    for i, tid in enumerate(test_ids):
+        for j, s in enumerate(systems_hm):
+            if (tid, s) in matrix:
+                val = matrix[(tid, s)]
+                ok = passed_matrix.get((tid, s), False)
+                mark = "✓" if ok else "✗"
+                txt_color = "white" if val < 0.4 or val > 0.85 else "black"
+                ax_hm.text(j, i, f"{val:.2f}\n{mark}",
+                            ha="center", va="center", fontsize=14, color=txt_color,
+                            fontweight="bold")
 
-    ax_box = fig.add_subplot(gs[0, 1])
-    box_data = [data[s]["scores"] for s in systems]
-    bp = ax_box.boxplot(box_data, labels=[s.replace(" [", "\n[") for s in systems],
-                         patch_artist=True, widths=0.5,
-                         medianprops=dict(linewidth=2.5),
-                         whiskerprops=dict(linewidth=1.5),
-                         capprops=dict(linewidth=1.5))
-    for patch, s in zip(bp["boxes"], systems):
-        patch.set_facecolor(colors[s])
-        patch.set_alpha(0.75)
-    ax_box.set_ylabel("Score", fontsize=16)
-    ax_box.set_title("Score Distribution", fontsize=28, fontweight="bold")
-    ax_box.text(0.99, 0.99, "(higher is better)", transform=ax_box.transAxes,
-                fontsize=11, color="gray", ha="right", va="top")
-    ax_box.set_ylim(-0.05, 1.15)
-    ax_box.axhline(0.75, color="gray", linestyle="--", alpha=0.4, label="Pass threshold (0.75)")
-    ax_box.legend(fontsize=14)
-    ax_box.tick_params(labelsize=14)
-    ax_box.grid(axis="y", alpha=0.3)
+    cb = fig.colorbar(im, ax=ax_hm, fraction=0.04, pad=0.02)
+    cb.set_label("Score", fontsize=18, fontweight="bold")
+    cb.ax.tick_params(labelsize=16)
 
-    ax_tok = fig.add_subplot(gs[1, 0])
-    ax_tok.set_title("Tokens and Activity", fontsize=28, fontweight="bold")
-    ax_tok.text(0.99, 0.99, "(lower tokens better, higher activity better)",
-                transform=ax_tok.transAxes, fontsize=11, color="gray", ha="right", va="top")
-    x = np.arange(len(systems))
-    bw = 0.22
-    avg_tokens_k = [np.mean(data[s]["tokens"]) / 1000 for s in systems]
-    avg_searches = [np.mean(data[s]["searches"]) for s in systems]
-    avg_visits = [np.mean(data[s]["visits"]) for s in systems]
-
-    sys_colors = [colors[s] for s in systems]
-    ax_tok.bar(x - bw, avg_tokens_k, bw, color=sys_colors,
-               edgecolor="black", linewidth=0.6, label="Tokens (k)")
-    for i, val in enumerate(avg_tokens_k):
-        ax_tok.text(x[i] - bw, val + 0.3, f"{val:.1f}k", ha="center", fontsize=11, fontweight="bold")
-    ax_tok.set_ylabel("Avg Tokens (thousands)", fontsize=16, color="#333333")
-    ax_tok.set_xticks(x)
-    ax_tok.set_xticklabels([s.replace(" [", "\n[") for s in systems], fontsize=14)
-    ax_tok.tick_params(axis="y", labelsize=14)
-    ax_tok.tick_params(axis="x", labelsize=14)
-    ax_tok.grid(axis="y", alpha=0.3)
-
-    ax_ct = ax_tok.twinx()
-    ax_ct.bar(x, avg_searches, bw, color=sys_colors, edgecolor="black",
-              linewidth=0.6, alpha=0.6, hatch="//", label="Searches")
-    ax_ct.bar(x + bw, avg_visits, bw, color=sys_colors, edgecolor="black",
-              linewidth=0.6, alpha=0.6, hatch="..", label="Visits")
-    for i, (sc, vc) in enumerate(zip(avg_searches, avg_visits)):
-        ax_ct.text(x[i], sc + 0.1, f"{sc:.1f}", ha="center", fontsize=11, fontweight="bold")
-        ax_ct.text(x[i] + bw, vc + 0.1, f"{vc:.1f}", ha="center", fontsize=11, fontweight="bold")
-    ax_ct.set_ylabel("Avg Count", fontsize=16, color="#666666")
-    ax_ct.tick_params(axis="y", labelsize=14)
-
-    lines_tok, labels_tok = ax_tok.get_legend_handles_labels()
-    lines_ct, labels_ct = ax_ct.get_legend_handles_labels()
-    ax_tok.legend(lines_tok + lines_ct, labels_tok + labels_ct, fontsize=14, loc="upper left")
-
-    ax_gap = fig.add_subplot(gs[1, 1])
-    ax_gap.set_title("Graph vs Sequential Score", fontsize=28, fontweight="bold")
+    # Graph vs Sequential - TOP RIGHT (most important, frontloaded)
+    ax_gap = fig.add_subplot(gs[0, 1:])
     ax_gap.text(0.99, 0.99, "(higher is better)", transform=ax_gap.transAxes,
-                fontsize=11, color="gray", ha="right", va="top")
-
+                fontsize=16, color="gray", ha="right", va="top", fontweight="bold")
+    
     graph_sys = sorted(s for s in systems if "[graph]" in s)
     seq_sys = sorted(s for s in systems if "[sequential]" in s)
     models = sorted(set(s.split("[")[0].strip() for s in systems))
-
+    
     if graph_sys and seq_sys:
         x_gap = np.arange(len(models))
         w_gap = 0.35
@@ -226,33 +183,108 @@ def plot_core_p1_executive(results: List[Dict[str, Any]], output_dir: Path):
             sl = f"{m} [sequential]"
             g_scores.append(np.mean(data[gl]["scores"]) if gl in data else 0)
             s_scores.append(np.mean(data[sl]["scores"]) if sl in data else 0)
-
+        
         b_g = ax_gap.bar(x_gap - w_gap / 2, g_scores, w_gap,
-                          color="#2B7BBA", edgecolor="black", linewidth=0.8, label="Graph")
+                          color="#2B7BBA", edgecolor="black", linewidth=1.5, label="Graph", alpha=0.85)
         b_s = ax_gap.bar(x_gap + w_gap / 2, s_scores, w_gap,
-                          color="#D94F3B", edgecolor="black", linewidth=0.8, label="Sequential")
-
+                          color="#D94F3B", edgecolor="black", linewidth=1.5, label="Sequential", alpha=0.85)
+        
         for i, (gv, sv) in enumerate(zip(g_scores, s_scores)):
-            ax_gap.text(x_gap[i] - w_gap / 2, gv + 0.01, f"{gv:.3f}",
-                         ha="center", fontsize=14, fontweight="bold", color="#2B7BBA")
-            ax_gap.text(x_gap[i] + w_gap / 2, sv + 0.01, f"{sv:.3f}",
-                         ha="center", fontsize=14, fontweight="bold", color="#D94F3B")
+            ax_gap.text(x_gap[i] - w_gap / 2, gv + 0.02, f"{gv:.3f}",
+                         ha="center", fontsize=18, fontweight="bold", color="#2B7BBA")
+            ax_gap.text(x_gap[i] + w_gap / 2, sv + 0.02, f"{sv:.3f}",
+                         ha="center", fontsize=18, fontweight="bold", color="#D94F3B")
             if gv > sv:
                 pct = (gv - sv) / sv * 100 if sv > 0 else 0
-                ax_gap.annotate(f"+{pct:.0f}%", xy=(x_gap[i], max(gv, sv) + 0.05),
-                                 fontsize=16, fontweight="bold", ha="center", color="#1a5c2a")
-
+                ax_gap.annotate(f"+{pct:.0f}%", xy=(x_gap[i], max(gv, sv) + 0.06),
+                                 fontsize=22, fontweight="bold", ha="center", color="#1a5c2a")
+        
         ax_gap.set_xticks(x_gap)
-        ax_gap.set_xticklabels(models, fontsize=14)
-        ax_gap.set_ylabel("Avg Score", fontsize=16)
-        ax_gap.set_ylim(0, 1.15)
-        ax_gap.axhline(0.75, color="gray", linestyle="--", alpha=0.4)
-        ax_gap.legend(fontsize=14, loc="lower right")
-        ax_gap.tick_params(labelsize=14)
+        ax_gap.set_xticklabels(models, fontsize=20, fontweight="bold")
+        ax_gap.set_ylabel("Avg Score", fontsize=20, fontweight="bold")
+        ax_gap.set_ylim(0, 1.2)
+        ax_gap.axhline(0.75, color="gray", linestyle="--", alpha=0.4, linewidth=2.0)
+        ax_gap.legend(fontsize=16, loc="upper left")
+        ax_gap.tick_params(labelsize=18)
         ax_gap.grid(axis="y", alpha=0.3)
     else:
         ax_gap.text(0.5, 0.5, "Single variant only", ha="center", va="center",
-                     fontsize=16, color="gray", transform=ax_gap.transAxes)
+                     fontsize=20, color="gray", transform=ax_gap.transAxes, fontweight="bold")
+
+    ax_tok = fig.add_subplot(gs[1, 0])
+    ax_tok.text(0.99, 0.99, "(lower tokens better, higher activity better)",
+                transform=ax_tok.transAxes, fontsize=16, color="gray", ha="right", va="top", fontweight="bold")
+    x = np.arange(len(systems))
+    bw = 0.22
+    avg_tokens_k = [np.mean(data[s]["tokens"]) / 1000 for s in systems]
+    avg_searches = [np.mean(data[s]["searches"]) for s in systems]
+    avg_visits = [np.mean(data[s]["visits"]) for s in systems]
+
+    sys_colors = [colors[s] for s in systems]
+    ax_tok.bar(x - bw, avg_tokens_k, bw, color=sys_colors,
+               edgecolor="black", linewidth=0.8, label="Tokens (k)")
+    for i, val in enumerate(avg_tokens_k):
+        ax_tok.text(x[i] - bw, val + 0.3, f"{val:.1f}k", ha="center", fontsize=16, fontweight="bold")
+    ax_tok.set_ylabel("Avg Tokens (thousands)", fontsize=18, color="#333333", fontweight="bold")
+    ax_tok.set_xticks(x)
+    ax_tok.set_xticklabels([s.replace(" [", "\n[") for s in systems], fontsize=16, fontweight="bold")
+    ax_tok.tick_params(axis="y", labelsize=16)
+    ax_tok.tick_params(axis="x", labelsize=16)
+    ax_tok.grid(axis="y", alpha=0.3)
+
+    ax_ct = ax_tok.twinx()
+    ax_ct.bar(x, avg_searches, bw, color=sys_colors, edgecolor="black",
+              linewidth=0.8, alpha=0.6, hatch="//", label="Searches")
+    ax_ct.bar(x + bw, avg_visits, bw, color=sys_colors, edgecolor="black",
+              linewidth=0.8, alpha=0.6, hatch="..", label="Visits")
+    for i, (sc, vc) in enumerate(zip(avg_searches, avg_visits)):
+        ax_ct.text(x[i], sc + 0.1, f"{sc:.1f}", ha="center", fontsize=16, fontweight="bold")
+        ax_ct.text(x[i] + bw, vc + 0.1, f"{vc:.1f}", ha="center", fontsize=16, fontweight="bold")
+    ax_ct.set_ylabel("Avg Count", fontsize=18, color="#666666", fontweight="bold")
+    ax_ct.tick_params(axis="y", labelsize=16)
+
+    lines_tok, labels_tok = ax_tok.get_legend_handles_labels()
+    lines_ct, labels_ct = ax_ct.get_legend_handles_labels()
+    ax_tok.legend(lines_tok + lines_ct, labels_tok + labels_ct, fontsize=14, loc="upper left", ncol=2)
+
+    # Overall Leaderboard - BOTTOM RIGHT (all systems ranked, same bar chart style)
+    ax_leader = fig.add_subplot(gs[1, 1:])
+    ax_leader.text(0.99, 0.99, "(higher is better)", transform=ax_leader.transAxes,
+                   fontsize=16, color="gray", ha="right", va="top", fontweight="bold")
+    
+    # Calculate average scores for all systems and sort
+    system_avgs = [(s, np.mean(data[s]["scores"]), np.mean([1 if p else 0 for p in data[s]["passed"]])) 
+                    for s in systems]
+    system_avgs.sort(key=lambda x: (x[1], x[2]), reverse=True)  # Sort by score, then pass rate
+    
+    sorted_systems = [s[0] for s in system_avgs]
+    sorted_scores = [s[1] for s in system_avgs]
+    sorted_pass_rates = [s[2] for s in system_avgs]
+    
+    x_leader = np.arange(len(sorted_systems))
+    w_leader = 0.6
+    bars = ax_leader.bar(x_leader, sorted_scores, w_leader,
+                         color=[colors[s] for s in sorted_systems],
+                         edgecolor="black", linewidth=1.5, alpha=0.85)
+    
+    # Add score labels on bars
+    for i, (bar, score, pr) in enumerate(zip(bars, sorted_scores, sorted_pass_rates)):
+        ax_leader.text(bar.get_x() + bar.get_width() / 2, score + 0.02,
+                       f"{score:.3f}", ha="center", fontsize=16, fontweight="bold",
+                       color=colors[sorted_systems[i]])
+        # Add pass rate below
+        ax_leader.text(bar.get_x() + bar.get_width() / 2, -0.05,
+                       f"{pr*100:.0f}%", ha="center", fontsize=14, fontweight="bold",
+                       color="gray", va="top")
+    
+    ax_leader.set_xticks(x_leader)
+    ax_leader.set_xticklabels([s.replace(" [", "\n[") for s in sorted_systems], 
+                               fontsize=16, fontweight="bold", rotation=0)
+    ax_leader.set_ylabel("Avg Score", fontsize=20, fontweight="bold")
+    ax_leader.set_ylim(-0.15, 1.2)
+    ax_leader.axhline(0.75, color="gray", linestyle="--", alpha=0.4, linewidth=2.0)
+    ax_leader.tick_params(labelsize=16)
+    ax_leader.grid(axis="y", alpha=0.3)
 
     plt.savefig(output_dir / "core_p1_executive.png", dpi=150, bbox_inches="tight")
     plt.close()
@@ -271,10 +303,10 @@ def plot_core_p2_heatmap(results: List[Dict[str, Any]], output_dir: Path):
     test_ids, systems, matrix, passed_matrix = _test_system_matrix(results)
 
     fig = plt.figure(figsize=(30, 18), facecolor="white")
-    fig.suptitle("TEST x MODEL PERFORMANCE", fontsize=40, fontweight="bold", y=0.98)
-    gs = gridspec.GridSpec(2, 2, height_ratios=[3, 1], width_ratios=[4, 1],
-                           hspace=0.30, wspace=0.15,
-                           left=0.08, right=0.95, top=0.92, bottom=0.06)
+    # Optimized: larger heatmap, compact sidebars, tighter spacing
+    gs = gridspec.GridSpec(2, 3, height_ratios=[2.5, 1], width_ratios=[3, 1, 1],
+                           hspace=0.20, wspace=0.15,
+                           left=0.04, right=0.98, top=0.98, bottom=0.04)
 
     # --- Main: Heatmap ---
     ax_hm = fig.add_subplot(gs[0, 0])
@@ -298,7 +330,6 @@ def plot_core_p2_heatmap(results: List[Dict[str, Any]], output_dir: Path):
         name = r.get("test_metadata", {}).get("test_name", tid)
         test_names[tid] = name
     ax_hm.set_yticklabels([f"{tid} -- {test_names.get(tid, tid)[:30]}" for tid in test_ids], fontsize=11)
-    ax_hm.set_title("Scores (green=1.0, red=0.0)", fontsize=28, fontweight="bold")
     ax_hm.text(0.99, 1.01, "(higher is better)", transform=ax_hm.transAxes,
                fontsize=11, color="gray", ha="right", va="bottom")
 
@@ -318,7 +349,7 @@ def plot_core_p2_heatmap(results: List[Dict[str, Any]], output_dir: Path):
     cb.ax.tick_params(labelsize=14)
 
     # --- Right sidebar: Test difficulty ---
-    ax_diff = fig.add_subplot(gs[0, 1])
+    ax_diff = fig.add_subplot(gs[0, 2])
     test_avg = []
     for tid in test_ids:
         scores = [matrix[(tid, s)] for s in systems if (tid, s) in matrix]
@@ -329,7 +360,6 @@ def plot_core_p2_heatmap(results: List[Dict[str, Any]], output_dir: Path):
     ax_diff.set_yticks(range(n_tests))
     ax_diff.set_yticklabels(test_ids, fontsize=14)
     ax_diff.set_xlim(0, 1.15)
-    ax_diff.set_title("Avg Score\nper Test", fontsize=28, fontweight="bold")
     ax_diff.text(0.99, 0.99, "(higher is better)", transform=ax_diff.transAxes,
                  fontsize=11, color="gray", ha="right", va="top")
     ax_diff.tick_params(labelsize=14)
@@ -338,8 +368,8 @@ def plot_core_p2_heatmap(results: List[Dict[str, Any]], output_dir: Path):
     ax_diff.axvline(0.75, color="red", linestyle="--", alpha=0.4)
     ax_diff.grid(axis="x", alpha=0.3)
 
-    # --- Bottom-left: Per-test pass rates grouped by system ---
-    ax_pass = fig.add_subplot(gs[1, 0])
+    # --- Bottom-left: Per-test pass rates grouped by system (spans 2 columns) ---
+    ax_pass = fig.add_subplot(gs[1, :2])
     test_pass_rates = defaultdict(dict)
     for r in results:
         tid = r.get("test_metadata", {}).get("test_id", "?")
@@ -358,7 +388,6 @@ def plot_core_p2_heatmap(results: List[Dict[str, Any]], output_dir: Path):
     ax_pass.set_xticks(x)
     ax_pass.set_xticklabels(test_ids, fontsize=14)
     ax_pass.set_ylabel("Pass (1) / Fail (0)", fontsize=16)
-    ax_pass.set_title("Pass/Fail per Test x System", fontsize=28, fontweight="bold")
     ax_pass.text(0.99, 0.99, "(higher is better)", transform=ax_pass.transAxes,
                  fontsize=11, color="gray", ha="right", va="top")
     ax_pass.tick_params(labelsize=12)
@@ -367,9 +396,8 @@ def plot_core_p2_heatmap(results: List[Dict[str, Any]], output_dir: Path):
     ax_pass.grid(axis="y", alpha=0.3)
 
     # --- Bottom-right: difficulty ranking as text ---
-    ax_rank = fig.add_subplot(gs[1, 1])
+    ax_rank = fig.add_subplot(gs[1, 2])
     ax_rank.axis("off")
-    ax_rank.set_title("Difficulty\n(hardest first)", fontsize=28, fontweight="bold")
     ranked = sorted(zip(test_ids, test_avg), key=lambda t: t[1])
     for i, (tid, avg) in enumerate(ranked):
         y = 0.95 - i * (0.85 / max(len(ranked), 1))
@@ -399,9 +427,10 @@ def plot_core_p3_efficiency(results: List[Dict[str, Any]], output_dir: Path):
     colors = _variant_colors(systems)
 
     fig = plt.figure(figsize=(30, 18), facecolor="white")
-    fig.suptitle("EFFICIENCY DASHBOARD", fontsize=40, fontweight="bold", y=0.98)
-    gs = gridspec.GridSpec(2, 2, hspace=0.35, wspace=0.30,
-                           left=0.07, right=0.97, top=0.92, bottom=0.06)
+    # Optimized: tighter spacing, better use of space
+    gs = gridspec.GridSpec(2, 3, hspace=0.25, wspace=0.20,
+                           left=0.04, right=0.98, top=0.98, bottom=0.04,
+                           width_ratios=[1, 1, 1.2], height_ratios=[1, 1])
 
     # --- Top-left: Cost per test by system ---
     ax_cost = fig.add_subplot(gs[0, 0])
@@ -414,13 +443,12 @@ def plot_core_p3_efficiency(results: List[Dict[str, Any]], output_dir: Path):
     ax_cost.set_xticks(range(len(systems)))
     ax_cost.set_xticklabels([s.replace(" [", "\n[") for s in systems], fontsize=14)
     ax_cost.set_ylabel("Avg Cost (USD)", fontsize=16)
-    ax_cost.set_title("Cost per Test", fontsize=28, fontweight="bold")
     ax_cost.text(0.99, 0.99, "(lower is better)", transform=ax_cost.transAxes,
                  fontsize=11, color="gray", ha="right", va="top")
     ax_cost.tick_params(labelsize=14)
     ax_cost.grid(axis="y", alpha=0.3)
 
-    # --- Top-right: Time vs Score scatter ---
+    # --- Top-middle: Time vs Score scatter ---
     ax_ts = fig.add_subplot(gs[0, 1])
     for s in systems:
         ax_ts.scatter(data[s]["durations"], data[s]["scores"],
@@ -428,7 +456,6 @@ def plot_core_p3_efficiency(results: List[Dict[str, Any]], output_dir: Path):
                        label=s, alpha=0.8, zorder=3)
     ax_ts.set_xlabel("Duration (s)", fontsize=16)
     ax_ts.set_ylabel("Score", fontsize=16)
-    ax_ts.set_title("Score vs Time", fontsize=28, fontweight="bold")
     ax_ts.text(0.99, 0.99, "(higher score, lower time better)", transform=ax_ts.transAxes,
                fontsize=11, color="gray", ha="right", va="top")
     ax_ts.set_ylim(-0.05, 1.15)
@@ -437,8 +464,8 @@ def plot_core_p3_efficiency(results: List[Dict[str, Any]], output_dir: Path):
     ax_ts.tick_params(labelsize=14)
     ax_ts.grid(alpha=0.3)
 
-    # --- Bottom-left: Avg tokens breakdown ---
-    ax_tok = fig.add_subplot(gs[1, 0])
+    # --- Top-right: Avg tokens breakdown ---
+    ax_tok = fig.add_subplot(gs[0, 2])
     avg_tokens = [np.mean(data[s]["tokens"]) for s in systems]
     bars = ax_tok.bar(range(len(systems)), avg_tokens,
                        color=[colors[s] for s in systems], edgecolor="black", linewidth=0.8)
@@ -448,63 +475,73 @@ def plot_core_p3_efficiency(results: List[Dict[str, Any]], output_dir: Path):
     ax_tok.set_xticks(range(len(systems)))
     ax_tok.set_xticklabels([s.replace(" [", "\n[") for s in systems], fontsize=14)
     ax_tok.set_ylabel("Avg Tokens", fontsize=16)
-    ax_tok.set_title("Token Usage per Test", fontsize=28, fontweight="bold")
     ax_tok.text(0.99, 0.99, "(lower is better)", transform=ax_tok.transAxes,
                 fontsize=11, color="gray", ha="right", va="top")
     ax_tok.tick_params(labelsize=14)
     ax_tok.grid(axis="y", alpha=0.3)
 
-    # --- Bottom-right: Graph vs Sequential comparison table ---
-    ax_gvs = fig.add_subplot(gs[1, 1])
-    ax_gvs.axis("off")
-    ax_gvs.set_title("Graph vs Sequential", fontsize=28, fontweight="bold", pad=16)
+    # --- Bottom: Graph vs Sequential distribution (spans all 3 columns) ---
+    ax_gvs = fig.add_subplot(gs[1, :3])
+    ax_gvs.text(0.99, 0.99, f"(showing all {sum(len(data[s]['scores']) for s in systems)} test runs)",
+                transform=ax_gvs.transAxes, fontsize=16, color="gray", ha="right", va="top", fontweight="bold")
 
     graph_sys = [s for s in systems if "[graph]" in s]
     seq_sys = [s for s in systems if "[sequential]" in s]
 
     if graph_sys and seq_sys:
-        def _agg(sys_list, field):
-            all_vals = []
-            for s in sys_list:
-                all_vals.extend(data[s][field])
-            return np.mean(all_vals) if all_vals else 0
+        graph_scores_all = []
+        seq_scores_all = []
+        
+        for s in graph_sys:
+            graph_scores_all.extend(data[s]["scores"])
+        for s in seq_sys:
+            seq_scores_all.extend(data[s]["scores"])
 
-        g_score = _agg(graph_sys, "scores")
-        s_score = _agg(seq_sys, "scores")
-        g_pass = np.mean([sum(data[s]["passed"]) / len(data[s]["passed"]) for s in graph_sys])
-        s_pass = np.mean([sum(data[s]["passed"]) / len(data[s]["passed"]) for s in seq_sys])
-        g_cost = _agg(graph_sys, "costs")
-        s_cost = _agg(seq_sys, "costs")
-        g_dur = _agg(graph_sys, "durations")
-        s_dur = _agg(seq_sys, "durations")
-        g_tok = _agg(graph_sys, "tokens")
-        s_tok = _agg(seq_sys, "tokens")
-
-        tbl_data = [
-            ["Avg Score", f"{g_score:.3f}", f"{s_score:.3f}",
-             f"{'Graph' if g_score >= s_score else 'Seq'} +{abs(g_score - s_score):.3f}"],
-            ["Pass Rate", f"{g_pass:.0%}", f"{s_pass:.0%}",
-             f"{'Graph' if g_pass >= s_pass else 'Seq'} +{abs(g_pass - s_pass)*100:.0f}pp"],
-            ["Avg Cost", format_cost(g_cost), format_cost(s_cost),
-             f"{'Graph' if g_cost <= s_cost else 'Seq'} cheaper"],
-            ["Avg Time", f"{g_dur:.0f}s", f"{s_dur:.0f}s",
-             f"{'Graph' if g_dur <= s_dur else 'Seq'} faster"],
-            ["Avg Tokens", _format_tokens(g_tok), _format_tokens(s_tok),
-             f"{'Graph' if g_tok <= s_tok else 'Seq'} leaner"],
-        ]
-        tbl = ax_gvs.table(cellText=tbl_data,
-                            colLabels=["Metric", "Graph", "Sequential", "Winner"],
-                            loc="center", cellLoc="center",
-                            colColours=["#e8e8e8", "#D6E4F0", "#FDE9D9", "#e8e8e8"])
-        tbl.auto_set_font_size(False)
-        tbl.set_fontsize(18)
-        tbl.scale(1.0, 2.0)
-        for (r, c), cell in tbl.get_celld().items():
-            if r == 0:
-                cell.set_text_props(fontweight="bold")
+        g_score = np.mean(graph_scores_all)
+        s_score = np.mean(seq_scores_all)
+        
+        parts = ax_gvs.violinplot([seq_scores_all, graph_scores_all], positions=[0, 1], 
+                                  widths=0.6, showmeans=True, showmedians=True)
+        
+        for pc, color in zip(parts['bodies'], ["#D94F3B", "#2B7BBA"]):
+            pc.set_facecolor(color)
+            pc.set_alpha(0.7)
+            pc.set_edgecolor("black")
+            pc.set_linewidth(1.5)
+        
+        parts['cmeans'].set_colors(["#D94F3B", "#2B7BBA"])
+        parts['cmeans'].set_linewidths(3)
+        parts['cmedians'].set_colors(["#8B0000", "#1a5c2a"])
+        parts['cmedians'].set_linewidths(2.5)
+        
+        ax_gvs.scatter([0] * len(seq_scores_all), seq_scores_all, 
+                       s=25, alpha=0.4, color="#D94F3B", edgecolors="black", linewidth=0.3, zorder=3)
+        ax_gvs.scatter([1] * len(graph_scores_all), graph_scores_all,
+                       s=25, alpha=0.4, color="#2B7BBA", edgecolors="black", linewidth=0.3, zorder=3)
+        
+        ax_gvs.axhline(0.75, color="gray", linestyle="--", alpha=0.5, linewidth=2, label="Pass threshold")
+        ax_gvs.axhline(g_score, color="#2B7BBA", linestyle=":", alpha=0.7, linewidth=2.5, 
+                       label=f"Graph avg: {g_score:.3f}")
+        ax_gvs.axhline(s_score, color="#D94F3B", linestyle=":", alpha=0.7, linewidth=2.5,
+                       label=f"Seq avg: {s_score:.3f}")
+        
+        ax_gvs.set_xticks([0, 1])
+        ax_gvs.set_xticklabels(["Sequential", "Graph"], fontsize=20, fontweight="bold")
+        ax_gvs.set_ylabel("Score", fontsize=22, fontweight="bold")
+        ax_gvs.set_ylim(-0.05, 1.15)
+        ax_gvs.grid(axis="y", alpha=0.3)
+        ax_gvs.legend(fontsize=16, loc="upper left")
+        ax_gvs.tick_params(labelsize=18)
+        
+        delta = g_score - s_score
+        delta_pct = (delta / s_score * 100) if s_score > 0 else 0
+        ax_gvs.text(0.5, 0.05, f"Graph advantage: +{delta:.3f} (+{delta_pct:.1f}%)",
+                    transform=ax_gvs.transAxes, fontsize=20, fontweight="bold",
+                    bbox=dict(boxstyle="round,pad=0.8", facecolor="#E3F2FD", edgecolor="#2196F3", linewidth=2.5),
+                    va="bottom", ha="center")
     else:
         ax_gvs.text(0.5, 0.5, "Single variant only\n(no comparison available)",
-                     ha="center", va="center", fontsize=14, color="gray",
+                     ha="center", va="center", fontsize=20, color="gray", fontweight="bold",
                      transform=ax_gvs.transAxes)
 
     plt.savefig(output_dir / "core_p3_efficiency.png", dpi=150, bbox_inches="tight")
@@ -525,9 +562,8 @@ def plot_core_p4_details(results: List[Dict[str, Any]], output_dir: Path):
     colors = _variant_colors(systems)
 
     fig = plt.figure(figsize=(30, 18), facecolor="white")
-    fig.suptitle("ACTIONS & STRUCTURE DETAILS", fontsize=40, fontweight="bold", y=0.98)
     gs = gridspec.GridSpec(2, 2, hspace=0.35, wspace=0.30,
-                           left=0.07, right=0.97, top=0.92, bottom=0.06)
+                           left=0.07, right=0.97, top=0.96, bottom=0.06)
 
     # --- Top-left: Avg searches & visits stacked bars ---
     ax_act = fig.add_subplot(gs[0, 0])
@@ -544,7 +580,6 @@ def plot_core_p4_details(results: List[Dict[str, Any]], output_dir: Path):
     ax_act.set_xticks(x)
     ax_act.set_xticklabels([s.replace(" [", "\n[") for s in systems], fontsize=14)
     ax_act.set_ylabel("Avg Actions per Test", fontsize=16)
-    ax_act.set_title("Searches + Visits per System", fontsize=28, fontweight="bold")
     ax_act.text(0.99, 0.99, "(higher is better)", transform=ax_act.transAxes,
                 fontsize=11, color="gray", ha="right", va="top")
     ax_act.legend(fontsize=14)
@@ -571,7 +606,6 @@ def plot_core_p4_details(results: List[Dict[str, Any]], output_dir: Path):
     ax_gs.set_xticks(x_gs)
     ax_gs.set_xticklabels([s.replace(" [", "\n[") for s in systems], fontsize=14)
     ax_gs.set_ylabel("Count", fontsize=16)
-    ax_gs.set_title("Graph Structure Metrics", fontsize=28, fontweight="bold")
     ax_gs.text(0.99, 0.99, "(informational)", transform=ax_gs.transAxes,
                fontsize=11, color="gray", ha="right", va="top")
     ax_gs.legend(fontsize=14)
@@ -605,7 +639,6 @@ def plot_core_p4_details(results: List[Dict[str, Any]], output_dir: Path):
         ax_val.text(0.5, 0.5, "No validation checks", ha="center", va="center",
                      fontsize=14, color="gray", transform=ax_val.transAxes)
     ax_val.set_xlabel("Success Rate", fontsize=16)
-    ax_val.set_title("Validation Check Success Rates", fontsize=28, fontweight="bold")
     ax_val.text(0.99, 0.99, "(higher is better)", transform=ax_val.transAxes,
                 fontsize=11, color="gray", ha="right", va="top")
     ax_val.tick_params(labelsize=14)
@@ -622,7 +655,6 @@ def plot_core_p4_details(results: List[Dict[str, Any]], output_dir: Path):
     ax_dur.set_xticks(range(len(systems)))
     ax_dur.set_xticklabels([s.replace(" [", "\n[") for s in systems], fontsize=14)
     ax_dur.set_ylabel("Avg Duration (s)", fontsize=16)
-    ax_dur.set_title("Avg Test Duration", fontsize=28, fontweight="bold")
     ax_dur.text(0.99, 0.99, "(lower is better)", transform=ax_dur.transAxes,
                 fontsize=11, color="gray", ha="right", va="top")
     ax_dur.tick_params(labelsize=14)

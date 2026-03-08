@@ -30,6 +30,14 @@ The agent implements a **Graph-of-Thought (GoT)** execution model. A controller 
 | `save` | Documents | Stored in ChromaDB memory |
 | `merge` | Child results | LLM synthesis |
 
+### URL Extraction and Dependencies
+
+Visit actions extract URLs from parent search results:
+- **Source detection**: Checks sibling nodes with `REQUIRES_DATA` dependency type
+- **URL extraction**: Only extracts URLs from `IdeaNodeStatus.DONE` search nodes
+- **Dependency setup**: When mandate requires "visit the URL found in search results", dependencies are automatically configured so visit nodes wait for search completion
+- **Structured logging**: All URL extraction events are logged with CloudWatch-compatible structured logs for debugging
+
 ## Execution Modes
 
 ### Graph (parallel branching)
@@ -53,12 +61,13 @@ Sequential generates the same candidates as graph but explores a single path, ma
 ## Execution Loop
 
 1. Create root node from mandate; initialize `MemoryManager` and `GoTOperations`.
-2. **Main loop** (while steps < max_steps):
+2. **Mandate enforcement**: After initial expansion, `_enforce_mandate_visit_requirements()` injects missing search/visit nodes if the mandate explicitly requires them (e.g., "visit the URL found in search results").
+3. **Main loop** (while steps < max_steps):
    - Expand node if no children.
    - Score children; select best via best-first global selection (graph) or prune-and-pick (sequential).
    - Execute leaf action or trigger merge when all children complete.
    - Merge results propagate upward recursively.
-3. **Final synthesis**: merged results + execution trail + raw visit content + ChromaDB context → LLM → deliverable.
+4. **Final synthesis**: merged results + execution trail + raw visit content + ChromaDB context → LLM → deliverable.
 
 ## GoT Mechanics
 
@@ -122,9 +131,10 @@ Telemetry is layered through base classes so action code stays clean:
 |---|---|---|
 | `ConnectorBase` | `_record_timing()`, `_record_io()` | Every external call: duration, status, payload size |
 | `AgentIO` | Method-level telemetry | Visit/search/store/retrieve with fallback tracking |
-| `IdeaDagEngine` | Structured logging | Step index, node type, candidate counts, merge results |
+| `IdeaDagEngine` | Structured logging | Step index, node type, candidate counts, merge results, mandate enforcement |
 | `GoTOperations` | Event logging | Embedding, dedup hits, beam width, prune events |
 | `MemoryManager` | Operation logging | Chunk counts, retrieval results, namespace isolation |
+| `Actions` | Structured logging | URL extraction, dependency checks, error messages (CloudWatch-compatible JSON) |
 | Test Runner | JSON output | Per-test: score, pass/fail, cost, tokens, duration, graph depth/branching/nodes |
 
 ## Models
