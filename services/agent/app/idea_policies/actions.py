@@ -31,6 +31,21 @@ class LeafAction(ABC):
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         self.settings = dict(settings or {})
         self._logger = logging.getLogger(self.__class__.__name__)
+    
+    def _log_structured(self, level: str, message: str, **kwargs) -> None:
+        """
+        Log structured message for AWS CloudWatch.
+        :param level: Log level (info, warning, error, debug)
+        :param message: Main log message
+        :param kwargs: Additional structured fields
+        """
+        log_method = getattr(self._logger, level.lower(), self._logger.info)
+        
+        if kwargs:
+            fields = " | ".join([f"{k}={v}" for k, v in kwargs.items()])
+            log_method(f"{message} | {fields}")
+        else:
+            log_method(message)
 
     @abstractmethod
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
@@ -333,42 +348,193 @@ class VisitLeafAction(LeafAction):
 
     def _extract_urls_from_parent_search_results(self, graph: IdeaDag, node: IdeaNode, max_depth: int = 3) -> List[str]:
         """
-        Extract all URLs from parent search results.
-        
+        Extract URLs from parent and sibling search results.
         :param graph: The idea DAG
         :param node: Current node
         :param max_depth: Maximum depth to search
-        :returns: List of valid URLs found in search results
+        :returns: List of valid URLs
         """
+        from agent.app.idea_policies.action_constants import ActionResultKey, NodeDetailsExtractor
+        from agent.app.idea_dag import IdeaNodeStatus
+        
+        required_data = node.details.get(DetailKey.REQUIRES_DATA.value)
+        if required_data and isinstance(required_data, dict):
+            source_node_id = required_data.get("source_node_id")
+            data_type = required_data.get("type", "")
+            if source_node_id and data_type == "urls_from_search":
+                source_node = graph.get_node(source_node_id)
+                if source_node:
+                    self._logger.info(
+                        f"[VISIT] Checking REQUIRES_DATA source node {source_node_id[:16]}... "
+                        f"(status: {source_node.status.value})"
+                    )
+                    if source_node.status == IdeaNodeStatus.DONE:
+                        result = source_node.details.get(DetailKey.ACTION_RESULT.value)
+                        if result and isinstance(result, dict):
+                            action_type = result.get(ActionResultKey.ACTION.value) or result.get("action")
+                            if action_type == IdeaActionType.SEARCH.value:
+                                search_results = result.get(ActionResultKey.RESULTS.value) or result.get("results", [])
+                                if isinstance(search_results, list) and search_results:
+                                    urls_from_source = []
+                                    for item in search_results:
+                                        if isinstance(item, dict):
+                                            candidate_url = item.get("url") or item.get("link") or item.get("href")
+                                            if candidate_url:
+                                                candidate_url = str(candidate_url).strip()
+                                                if self._is_valid_url(candidate_url):
+                                                    urls_from_source.append(candidate_url)
+                                    if urls_from_source:
+                                        self._log_structured(
+                                            "info",
+                                            "[VISIT] Extracted URLs from REQUIRES_DATA source node",
+                                            source_node_id=source_node_id[:16],
+                                            urls_found=len(urls_from_source),
+                                            action="visit",
+                                            operation="extract_urls_from_required_source"
+                                        )
+                                        return urls_from_source
+                                    else:
+                                        self._logger.warning(
+                                            f"[VISIT] REQUIRES_DATA source node {source_node_id[:16]}... "
+                                            f"has {len(search_results)} results but no valid URLs extracted"
+                                        )
+                                else:
+                                    self._logger.warning(
+                                        f"[VISIT] REQUIRES_DATA source node {source_node_id[:16]}... "
+                                        f"has no results list (type: {type(search_results).__name__})"
+                                    )
+                            else:
+                                self._logger.warning(
+                                    f"[VISIT] REQUIRES_DATA source node {source_node_id[:16]}... "
+                                    f"is not a search node (action: {action_type})"
+                                )
+                        else:
+                            self._logger.warning(
+                                f"[VISIT] REQUIRES_DATA source node {source_node_id[:16]}... "
+                                f"has no action_result"
+                            )
+                    else:
+                        self._logger.warning(
+                            f"[VISIT] REQUIRES_DATA source node {source_node_id[:16]}... "
+                            f"not yet completed (status: {source_node.status.value})"
+                        )
+        
         visited = set()
-        queue = [(node, 0)]
+        queue = [(node, 0, "self")]
         all_urls = []
+        search_nodes_checked = []
         
         while queue:
-            current, depth = queue.pop(0)
+            current, depth, relation = queue.pop(0)
             if depth >= max_depth or current.node_id in visited:
                 continue
             visited.add(current.node_id)
             
-            result = current.details.get(DetailKey.ACTION_RESULT.value)
-            if result and isinstance(result, dict):
-                action_type = result.get("action")
+            current_action = NodeDetailsExtractor.get_action(current.details)
+            current_status = current.status
+            
+            if current_action == IdeaActionType.SEARCH.value:
+                search_nodes_checked.append({
+                    "node_id": current.node_id,
+                    "status": current_status.value,
+                    "relation": relation,
+                    "depth": depth
+                })
                 
-                if action_type == IdeaActionType.SEARCH.value:
-                    search_results = result.get("results", [])
-                    if isinstance(search_results, list):
-                        for item in search_results:
-                            if isinstance(item, dict):
-                                candidate_url = item.get("url") or item.get("link") or item.get("href")
-                                if candidate_url:
-                                    candidate_url = str(candidate_url).strip()
-                                    if self._is_valid_url(candidate_url) and candidate_url not in all_urls:
-                                        all_urls.append(candidate_url)
+                if current_status == IdeaNodeStatus.DONE:
+                    result = current.details.get(DetailKey.ACTION_RESULT.value)
+                    if result and isinstance(result, dict):
+                        action_type = result.get(ActionResultKey.ACTION.value) or result.get("action")
+                        
+                        if action_type == IdeaActionType.SEARCH.value:
+                            search_results = result.get(ActionResultKey.RESULTS.value) or result.get("results", [])
+                            if isinstance(search_results, list):
+                                urls_found_in_node = 0
+                                for item in search_results:
+                                    if isinstance(item, dict):
+                                        candidate_url = item.get("url") or item.get("link") or item.get("href")
+                                        if candidate_url:
+                                            candidate_url = str(candidate_url).strip()
+                                            if self._is_valid_url(candidate_url) and candidate_url not in all_urls:
+                                                all_urls.append(candidate_url)
+                                                urls_found_in_node += 1
+                                
+                                if urls_found_in_node > 0:
+                                    self._log_structured(
+                                        "info",
+                                        "[VISIT] Extracted URLs from search node",
+                                        urls_found=urls_found_in_node,
+                                        relation=relation,
+                                        search_node_id=current.node_id[:16],
+                                        search_node_status=current_status.value,
+                                        depth=depth,
+                                        action="visit",
+                                        operation="extract_urls_from_search"
+                                    )
+                            else:
+                                self._logger.debug(
+                                    f"[VISIT] Search node {current.node_id[:8]}... has no results list "
+                                    f"(type: {type(search_results).__name__})"
+                                )
+                        else:
+                            self._logger.debug(
+                                f"[VISIT] Node {current.node_id[:8]}... marked as search but action_type={action_type}"
+                            )
+                    else:
+                        self._logger.debug(
+                            f"[VISIT] Search node {current.node_id[:8]}... (status: {current_status.value}) "
+                            f"has no action_result"
+                        )
+                else:
+                    self._logger.debug(
+                        f"[VISIT] Search node {current.node_id[:8]}... not yet completed "
+                        f"(status: {current_status.value})"
+                    )
             
             if current.parent_id:
                 parent = graph.get_node(current.parent_id)
                 if parent:
-                    queue.append((parent, depth + 1))
+                    queue.append((parent, depth + 1, "parent"))
+            
+            if current.parent_id and relation == "self":
+                parent = graph.get_node(current.parent_id)
+                if parent:
+                    for sibling_id in parent.children:
+                        if sibling_id != current.node_id:
+                            sibling = graph.get_node(sibling_id)
+                            if sibling:
+                                queue.append((sibling, depth, "sibling"))
+        
+        if search_nodes_checked:
+            search_node_summary = ",".join([f"{n['relation']}:{n['status']}" for n in search_nodes_checked])
+            self._log_structured(
+                "info",
+                "[VISIT] Checked search nodes for URL extraction",
+                search_nodes_checked=len(search_nodes_checked),
+                search_node_summary=search_node_summary,
+                action="visit",
+                operation="extract_urls_from_search"
+            )
+        
+        if all_urls:
+            self._log_structured(
+                "info",
+                "[VISIT] Successfully extracted URLs from search results",
+                total_urls=len(all_urls),
+                action="visit",
+                operation="extract_urls_from_search"
+            )
+        else:
+            search_node_details = ",".join([f"{n['node_id'][:8]}...({n['status']})" for n in search_nodes_checked])
+            self._log_structured(
+                "warning",
+                "[VISIT] No URLs extracted from search results",
+                search_nodes_checked=len(search_nodes_checked),
+                search_node_details=search_node_details,
+                action="visit",
+                operation="extract_urls_from_search",
+                issue="no_urls_found"
+            )
         
         return all_urls
     
@@ -392,7 +558,6 @@ class VisitLeafAction(LeafAction):
             if result and isinstance(result, dict):
                 action_type = result.get("action")
 
-                # Prefer URLs that already came from search results
                 if action_type == IdeaActionType.SEARCH.value:
                     search_results = result.get("results", [])
                     if isinstance(search_results, list):
@@ -404,7 +569,6 @@ class VisitLeafAction(LeafAction):
                                     if self._is_valid_url(candidate_url):
                                         all_candidates.append((candidate_url, depth, "search"))
                 
-                # Also allow URLs from previous visit results (their links field)
                 if action_type == IdeaActionType.VISIT.value:
                     visit_links = result.get("links", []) or result.get("links_full", [])
                     link_contexts = result.get("link_contexts", {})
@@ -422,17 +586,14 @@ class VisitLeafAction(LeafAction):
         if not all_candidates:
             return None
         
-        # Score candidates based on relevance
         scored = []
         for candidate in all_candidates:
             url = candidate[0]
             url_lower = url.lower()
             score = 0
             
-            # Prefer closer nodes (lower depth)
             score += (max_depth - candidate[1]) * 10
             
-            # Prefer URLs that match keywords in node title/intent
             if "wikipedia" in node_title_lower or "wikipedia" in node_intent_lower:
                 if "wikipedia.org" in url_lower:
                     score += 50
@@ -440,11 +601,9 @@ class VisitLeafAction(LeafAction):
                 if "guido" in url_lower or "van_rossum" in url_lower:
                     score += 30
             
-            # Prefer visit links over search (more reliable)
             if len(candidate) > 2 and candidate[2] == "visit":
                 score += 5
             
-            # Check if link context matches node intent
             if len(candidate) > 3:
                 context = candidate[3].lower() if candidate[3] else ""
                 if context and any(word in context for word in node_title_lower.split()[:5]):
@@ -452,7 +611,6 @@ class VisitLeafAction(LeafAction):
             
             scored.append((score, url))
         
-        # Return highest scored URL
         scored.sort(reverse=True, key=lambda x: x[0])
         if scored:
             return scored[0][1]
@@ -495,7 +653,6 @@ class VisitLeafAction(LeafAction):
     def _extract_url_from_sibling_results(self, graph: IdeaDag, node: IdeaNode) -> Optional[str]:
         import re
         
-        # Find parent to get siblings
         parent = None
         for pid in node.parent_ids:
             parent = graph.get_node(pid)
@@ -507,7 +664,6 @@ class VisitLeafAction(LeafAction):
         node_title_lower = (node.title or "").lower()
         node_intent = (node.details.get(DetailKey.INTENT.value) or "").lower()
         
-        # Collect URLs from completed sibling results
         sibling_links: List[str] = []
         for sibling_id in parent.children:
             if sibling_id == node.node_id:
@@ -519,12 +675,10 @@ class VisitLeafAction(LeafAction):
             if not isinstance(result, dict) or not result.get("success"):
                 continue
             
-            # Get links from the sibling's visit result
             links = result.get("links", []) or result.get("links_full", [])
             if isinstance(links, list):
                 sibling_links.extend(links)
             
-            # Also check inline link content
             content = result.get("content_with_links", "") or result.get("content", "")
             if isinstance(content, str):
                 found = re.findall(r'https?://[^\s\]\)\"\'<>]+', content)
@@ -533,7 +687,6 @@ class VisitLeafAction(LeafAction):
         if not sibling_links:
             return None
         
-        # Deduplicate
         seen = set()
         unique_links = []
         for link in sibling_links:
@@ -544,7 +697,6 @@ class VisitLeafAction(LeafAction):
         if not unique_links:
             return None
         
-        # Try to find a link that matches the node's intent
         search_terms = node_title_lower + " " + node_intent
         best_link = None
         best_score = 0
@@ -552,7 +704,6 @@ class VisitLeafAction(LeafAction):
         for link in unique_links:
             link_lower = link.lower()
             score = 0
-            # Score based on keyword overlap
             for word in search_terms.split():
                 if len(word) > 3 and word in link_lower:
                     score += 1
@@ -564,7 +715,6 @@ class VisitLeafAction(LeafAction):
             self._logger.info(f"[VISIT] Found URL from sibling results: {best_link[:80]}")
             return best_link
         
-        # If no match, return first valid link as fallback
         self._logger.info(f"[VISIT] Using first sibling link as fallback: {unique_links[0][:80]}")
         return unique_links[0]
     
@@ -915,11 +1065,9 @@ class VisitLeafAction(LeafAction):
                     link_count = 1
             
             link_idea = node.details.get("link_idea") or node.details.get("link_concept") or ""
-            # Capture original for diagnostics before filtering
             original_optional_url = node.details.get("optional_url") or NodeDetailsExtractor.get_url(node.details)
             optional_url = original_optional_url
             
-            # Filter out invalid URL values (string "None", empty strings, etc.)
             if optional_url:
                 optional_url_str = str(optional_url).strip()
                 if optional_url_str.lower() in ("none", "null", ""):
@@ -927,11 +1075,34 @@ class VisitLeafAction(LeafAction):
                 elif not self._is_valid_url(optional_url_str):
                     optional_url = None
             
-            # Detect and clear placeholder URLs (e.g., "<chosen_next_url from ...>")
             if optional_url and not self._is_valid_url(optional_url):
                 if optional_url.startswith("<") or optional_url.startswith("{") or "chosen" in optional_url.lower():
                     self._logger.warning(f"[VISIT] Clearing placeholder URL: {optional_url[:80]}")
                     optional_url = None
+            
+            required_data = node.details.get(DetailKey.REQUIRES_DATA.value)
+            if required_data and isinstance(required_data, dict):
+                source_node_id = required_data.get("source_node_id")
+                data_type = required_data.get("type", "")
+                if source_node_id and data_type == "urls_from_search":
+                    source_node = graph.get_node(source_node_id)
+                    if source_node:
+                        from agent.app.idea_dag import IdeaNodeStatus
+                        if source_node.status != IdeaNodeStatus.DONE:
+                            self._log_structured(
+                                "warning",
+                                "[VISIT] Node requires URLs from search node but source not ready",
+                                node_id=node_id[:16],
+                                source_node_id=source_node_id[:16],
+                                source_status=source_node.status.value,
+                                action="visit",
+                                issue="dependency_not_ready"
+                            )
+                        else:
+                            self._logger.info(
+                                f"[VISIT] Node {node_id[:8]}... depends on search node {source_node_id[:8]}... "
+                                f"(status: {source_node.status.value})"
+                            )
             
             if not optional_url or not self._is_valid_url(optional_url):
                 think_url = self._extract_url_from_think_node(graph, node)
@@ -944,7 +1115,6 @@ class VisitLeafAction(LeafAction):
                         optional_url = extracted_url
                         self._logger.info(f"[VISIT] Extracted URL from parent nodes: {extracted_url[:80]}")
                     else:
-                        # Try to extract URL from completed sibling results
                         sibling_url = self._extract_url_from_sibling_results(graph, node)
                         if sibling_url:
                             optional_url = sibling_url
@@ -952,11 +1122,9 @@ class VisitLeafAction(LeafAction):
                         else:
                             self._logger.debug(f"[VISIT] No URL found in node details, think node, parents, or siblings")
             
-            # Auto-generate link_idea from intent or title if missing
             if not link_idea and not (optional_url and self._is_valid_url(optional_url)):
                 link_idea = intent or node.title or ""
                 if link_idea:
-                    # Trim to a short semantic search phrase
                     link_idea = link_idea[:200]
                     self._logger.info(f"[VISIT] Auto-generated link_idea from context: '{link_idea[:60]}...'")
             
@@ -977,7 +1145,6 @@ class VisitLeafAction(LeafAction):
                         f"Content: {content_length} chars, Status: SUCCESS"
                     )
                     if link_count == 1:
-                        # Record visit in telemetry before returning
                         if io.telemetry:
                             io.telemetry.record_document_seen(
                                 source="visit",
@@ -994,21 +1161,29 @@ class VisitLeafAction(LeafAction):
             if not optional_success or link_count > 1:
                 candidate_urls = []
                 
-                # First, try to extract URLs directly from parent search results
-                # This is the most reliable source when visit nodes are created from search results
-                # Always try this when we need URLs, regardless of optional_url status
+                self._logger.info(
+                    f"[VISIT] Attempting to extract URLs from search results. "
+                    f"Node: {node_id[:8]}..., link_idea: '{link_idea[:60] if link_idea else 'None'}...', "
+                    f"link_count: {link_count}"
+                )
                 parent_search_urls = self._extract_urls_from_parent_search_results(graph, node)
                 if parent_search_urls:
-                    self._logger.info(f"[VISIT] Extracted {len(parent_search_urls)} URLs from parent search results")
+                    self._logger.info(
+                        f"[VISIT] Successfully extracted {len(parent_search_urls)} URLs from search results. "
+                        f"Sample URLs: {', '.join([url[:50] + '...' if len(url) > 50 else url for url in parent_search_urls[:3]])}"
+                    )
                     candidate_urls.extend(parent_search_urls)
+                else:
+                    self._logger.warning(
+                        f"[VISIT] No URLs extracted from search results. "
+                        f"This may indicate: (1) search node hasn't completed, "
+                        f"(2) search returned no results, or (3) search results format is unexpected."
+                    )
                 
-                # Then try ChromaDB link collections (for links from previous visits)
-                # Only if we still need more URLs
                 if link_idea and len(candidate_urls) < link_count:
                     query_top_k = int(self.settings.get("visit_link_query_top_k", 10))
                     chroma_urls = await self._query_links_from_chroma(link_idea, io, top_k=query_top_k)
                     if chroma_urls:
-                        # Deduplicate
                         seen = set(candidate_urls)
                         for url in chroma_urls:
                             if url not in seen:
@@ -1036,14 +1211,27 @@ class VisitLeafAction(LeafAction):
                             f"chroma_urls={chroma_urls_found}. "
                             f"Details should contain 'url'/'optional_url' or 'link_idea' for semantic link discovery."
                         )
-                        self._logger.error(f"[VISIT] {error_msg}")
-                        return ActionResultBuilder.failure(
-                            action=IdeaActionType.VISIT.value,
-                            error=error_msg,
-                            error_type=ErrorType.INVALID_URL.value,
-                            retryable=False,
-                            url=optional_url or node.title,
-                        )
+                        self._log_structured(
+                        "error",
+                        "[VISIT] Visit node missing valid URL or link_idea",
+                        node_id=node_id[:16],
+                        node_title=node.title[:100] if node.title else "None",
+                        optional_url=original_optional_url[:100] if original_optional_url else "None",
+                        link_idea=link_idea[:100] if link_idea else "None",
+                        link_count=link_count,
+                        parent_search_urls_found=parent_urls_found,
+                        chroma_urls_found=chroma_urls_found,
+                        action="visit",
+                        error_type=ErrorType.INVALID_URL.value,
+                        retryable=False
+                    )
+                    return ActionResultBuilder.failure(
+                        action=IdeaActionType.VISIT.value,
+                        error=error_msg,
+                        error_type=ErrorType.INVALID_URL.value,
+                        retryable=False,
+                        url=optional_url or node.title,
+                    )
             
             if not urls_to_visit:
                 if optional_url and self._is_valid_url(optional_url):
@@ -1060,7 +1248,20 @@ class VisitLeafAction(LeafAction):
                         f"Diagnosis: {'No URLs found in parent search results' if parent_urls_found == 0 else 'URLs found but not selected'}. "
                         f"Action: Ensure visit node has valid 'url'/'optional_url' field or depends on a search node that provides URLs."
                     )
-                    self._logger.error(f"[VISIT] {error_msg}")
+                    self._log_structured(
+                        "error",
+                        "[VISIT] No URLs to visit after extraction attempts",
+                        node_id=node_id[:16],
+                        link_count=link_count,
+                        link_idea=link_idea[:100] if link_idea else "None",
+                        optional_url=original_optional_url[:100] if original_optional_url else "None",
+                        parent_search_urls_found=parent_urls_found,
+                        chroma_urls_found=chroma_urls_found,
+                        diagnosis="no_urls_found" if parent_urls_found == 0 else "urls_not_selected",
+                        action="visit",
+                        error_type=ErrorType.INVALID_URL.value,
+                        retryable=False
+                    )
                     return ActionResultBuilder.failure(
                         action=IdeaActionType.VISIT.value,
                         error=error_msg,
@@ -1427,8 +1628,6 @@ class MergeLeafAction(LeafAction):
                     if not parent_justification:
                         parent_justification = parent.details.get(DetailKey.JUSTIFICATION.value) or parent.details.get(DetailKey.PARENT_JUSTIFICATION.value) or ""
             
-            # Compact merged results to prevent token overflow
-            # Strip large content fields (raw page content is in visit_content for finalize)
             compacted = []
             for mr in merged_results:
                 if isinstance(mr, dict):
@@ -1446,7 +1645,6 @@ class MergeLeafAction(LeafAction):
                 else:
                     compacted.append(mr)
             merged_json = json.dumps(compacted, ensure_ascii=True)
-            # Hard cap at 100k chars
             if len(merged_json) > 100000:
                 merged_json = merged_json[:100000] + "... ]"
                 self._logger.warning(f"[MERGE] merged_json truncated to 100k chars")
