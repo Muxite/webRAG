@@ -19,9 +19,9 @@ export const VERSION_CONFIG = {
 
 /**
  * Detect if running in local development mode.
- * Uses Vite's dev mode detection or explicit env variable.
+ * Only uses explicit env variable - no auto-detection.
  */
-const isLocalDev = import.meta.env.DEV || import.meta.env.VITE_USE_LOCAL === "true";
+const isLocalDev = import.meta.env.VITE_USE_LOCAL === "true";
 
 /**
  * Determine the gateway base URL.

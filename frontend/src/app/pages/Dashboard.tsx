@@ -438,6 +438,22 @@ export default function Dashboard() {
           </VectorBoxHeavy>
         )}
 
+        {/* Deployment Notice */}
+        <VectorBox padding={4} borderColor="#FBBF24" bgColor={themeColors.boxBg}>
+          <div className="space-y-2">
+            <h3 className="text-subheading">Deployment Notice</h3>
+            <div className="text-metadata space-y-1" style={{ color: themeColors.text }}>
+              <p>
+                The visit system does not work on deployment due to website anti-bot measures that detect AWS datacenter IPs. 
+                The agent demonstrates resilience by working with search results and other available data sources.
+              </p>
+              <p style={{ color: themeColors.textMuted }}>
+                This website will be available until 2026-03-16 00:00 PST.
+              </p>
+            </div>
+          </div>
+        </VectorBox>
+
         {/* Task Submission */}
         <VectorBoxHeavy padding={6} borderColor={themeColors.primary} bgColor={themeColors.boxBgHeavy}>
           <h2 className="text-heading mb-3">New Task</h2>

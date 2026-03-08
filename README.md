@@ -4,6 +4,8 @@ Agentic AI platform with Graph-of-Thought reasoning, web crawling, and retrieval
 
 **Live:** <https://web-rag-nine.vercel.app/>
 
+**Note:** The visit system does not work on deployment due to website anti-bot measures that detect AWS datacenter IPs. The agent demonstrates resilience by working with search results and other available data sources. This website will be available until 2026-03-16 00:00 PST.
+
 ## Benchmark Results
 
 64 runs across 16 tests x 2 models x 2 execution variants.

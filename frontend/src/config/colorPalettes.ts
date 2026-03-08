@@ -67,9 +67,9 @@ export const colorPalettes: ColorPalette[] = [
       surface:    "#0E1730",
       text:       "#EAF2FF",
       textMuted:  "#A7B8D6",
-      primary:    "#3BA7FF",
-      secondary:  "#2DE2E6",
-      accent:     "#8B5CFF",
+      primary:    "#5B9BD5",
+      secondary:  "#5B9BD5",
+      accent:     "#8B7FA8",
     },
   },
   {

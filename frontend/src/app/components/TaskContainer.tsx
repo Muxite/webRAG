@@ -72,45 +72,44 @@ export default function TaskContainer({ task, onDelete, defaultOpen, themeColors
   return (
     <VectorBox padding={6} borderColor={themeColors?.secondary || statusColor.border} bgColor={boxBg}>
       <div>
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full text-left"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Clock className="w-3 h-3 sm:w-4 sm:h-4" style={{ color: primaryColor }} />
-              <span className="text-metadata-muted">{task.timestamp}</span>
+        <div className="flex items-start gap-2 mb-3">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex-1 text-left"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Clock className="w-3 h-3 sm:w-4 sm:h-4" style={{ color: primaryColor }} />
+                <span className="text-metadata-muted">{task.timestamp}</span>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className={`text-status px-2 py-1 border ${statusColor.text}`} style={{ borderColor: statusColor.border }}>
+                  {task.status.toUpperCase()}
+                </span>
+                {isExpanded ? (
+                  <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: primaryColor }} />
+                ) : (
+                  <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: primaryColor }} />
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <span className={`text-status px-2 py-1 border ${statusColor.text}`} style={{ borderColor: statusColor.border }}>
-                {task.status.toUpperCase()}
-              </span>
-              {onDelete && (
-                <button
-                  type="button"
-                  aria-label="Delete task"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDelete(task.id);
-                  }}
-                  className="border px-1.5 py-1 transition-colors"
-                  style={{ borderColor: `${primaryColor}40`, color: primaryColor }}
-                >
-                  <X className="w-3 h-3 sm:w-4 sm:h-4" />
-                </button>
-              )}
-              {isExpanded ? (
-                <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: primaryColor }} />
-              ) : (
-                <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: primaryColor }} />
-              )}
-            </div>
-          </div>
 
-          <div className="mb-3">
-            <span className="text-body">{task.mandate}</span>
-          </div>
-        </button>
+            <div className="mb-3">
+              <span className="text-body">{task.mandate}</span>
+            </div>
+          </button>
+          {onDelete && (
+            <button
+              type="button"
+              aria-label="Delete task"
+              onClick={() => onDelete(task.id)}
+              className="border px-1.5 py-1 transition-colors flex-shrink-0"
+              style={{ borderColor: `${primaryColor}40`, color: primaryColor }}
+            >
+              <X className="w-3 h-3 sm:w-4 sm:h-4" />
+            </button>
+          )}
+        </div>
 
         {isExpanded && (task.results || task.deliverables || task.notes || task.completedAt) && (
           <div

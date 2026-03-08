@@ -127,6 +127,7 @@ export default function Auth() {
         if (!profileCreated) {
           console.warn("Profile creation failed, but continuing with login");
         }
+        setLoading(false);
         window.location.href = "/";
         return;
       }
@@ -176,6 +177,7 @@ export default function Auth() {
               if (!profileCreated) {
                 console.warn("Profile creation failed, but continuing with signup");
               }
+              setLoading(false);
               window.location.href = "/";
               return;
             } else {
@@ -186,13 +188,14 @@ export default function Auth() {
             }
           }
         } else {
-          throw loginError;
+          setError(loginError.message || "Authentication failed");
+          setLoading(false);
+          return;
         }
       }
     } catch (err: any) {
       setError(err.message || "Authentication failed");
       console.error("Auth error:", err);
-    } finally {
       setLoading(false);
     }
   };
