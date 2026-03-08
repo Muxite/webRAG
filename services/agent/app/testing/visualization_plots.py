@@ -1668,28 +1668,55 @@ def plot_executive_dashboard(results: List[Dict[str, Any]], output_dir: Path):
     draw_kpi(ax, f"{score_dollar:.1f}", "Score per Dollar", "Higher = more efficient",
              color="#2E7D32" if score_dollar > 10 else "#E65100", fontsize=36)
 
-    # Row 3: Graph vs Sequential & model counts
+    # Row 3: Graph vs Sequential distribution with all datapoints
     ax = fig.add_subplot(gs[2, 0:2])
-    ax.axis("off")
-    ax.add_patch(plt.Rectangle((0.02, 0.02), 0.96, 0.96, fill=True, facecolor="white",
-                                edgecolor="#E0E0E0", linewidth=2, transform=ax.transAxes))
-    ax.text(0.5, 0.85, "Graph vs Sequential", ha="center", va="center",
-           fontsize=24, fontweight="bold", color="#212121", transform=ax.transAxes)
+    ax.set_title(f"Graph vs Sequential: Score Distribution (n={len(graph_scores) + len(seq_scores)} runs)", 
+                fontsize=18, fontweight="bold", pad=10)
     if graph_scores and seq_scores:
+        parts = ax.violinplot([seq_scores, graph_scores], positions=[0, 1], 
+                              widths=0.5, showmeans=True, showmedians=True)
+        
+        for pc, color in zip(parts['bodies'], ["#FF9800", "#2196F3"]):
+            pc.set_facecolor(color)
+            pc.set_alpha(0.6)
+            pc.set_edgecolor("black")
+            pc.set_linewidth(1.2)
+        
+        parts['cmeans'].set_colors(["#FF9800", "#2196F3"])
+        parts['cmeans'].set_linewidths(2.5)
+        parts['cmedians'].set_colors(["#E65100", "#1565C0"])
+        parts['cmedians'].set_linewidths(2)
+        
+        ax.scatter([0] * len(seq_scores), seq_scores, 
+                  s=20, alpha=0.5, color="#FF9800", edgecolors="black", linewidth=0.2, zorder=3)
+        ax.scatter([1] * len(graph_scores), graph_scores,
+                  s=20, alpha=0.5, color="#2196F3", edgecolors="black", linewidth=0.2, zorder=3)
+        
+        ax.axhline(0.75, color="gray", linestyle="--", alpha=0.4, linewidth=1.5, label="Pass threshold")
+        ax.axhline(graph_avg, color="#2196F3", linestyle=":", alpha=0.7, linewidth=2, 
+                  label=f"Graph avg: {graph_avg:.3f}")
+        ax.axhline(seq_avg, color="#FF9800", linestyle=":", alpha=0.7, linewidth=2,
+                  label=f"Seq avg: {seq_avg:.3f}")
+        
+        ax.set_xticks([0, 1])
+        ax.set_xticklabels(["Sequential", "Graph"], fontsize=14, fontweight="bold")
+        ax.set_ylabel("Score", fontsize=14, fontweight="bold")
+        ax.set_ylim(-0.05, 1.15)
+        ax.grid(axis="y", alpha=0.3)
+        ax.legend(fontsize=12, loc="upper left")
+        ax.tick_params(labelsize=12)
+        
         delta = graph_avg - seq_avg
-        winner = "Graph" if delta > 0 else "Sequential" if delta < 0 else "Tied"
         delta_pct = abs(delta / seq_avg * 100) if seq_avg > 0 else 0
-        ax.text(0.25, 0.55, f"Graph\n{graph_avg:.3f}", ha="center", va="center",
-               fontsize=14, fontweight="bold", color="#2196F3", transform=ax.transAxes)
-        ax.text(0.5, 0.55, "vs", ha="center", va="center",
-               fontsize=14, color="#9E9E9E", transform=ax.transAxes)
-        ax.text(0.75, 0.55, f"Sequential\n{seq_avg:.3f}", ha="center", va="center",
-               fontsize=14, fontweight="bold", color="#FF9800", transform=ax.transAxes)
+        winner = "Graph" if delta > 0 else "Sequential" if delta < 0 else "Tied"
         winner_color = "#2196F3" if winner == "Graph" else "#FF9800" if winner == "Sequential" else "#9E9E9E"
-        ax.text(0.5, 0.18, f"Winner: {winner} (+{delta_pct:.1f}%)",
-               ha="center", va="center", fontsize=14, fontweight="bold",
-               color=winner_color, transform=ax.transAxes)
+        
+        ax.text(0.5, 0.05, f"{winner} wins: +{abs(delta):.3f} (+{delta_pct:.1f}%)",
+               transform=ax.transAxes, fontsize=14, fontweight="bold",
+               bbox=dict(boxstyle="round,pad=0.6", facecolor="#E3F2FD", edgecolor=winner_color, linewidth=2),
+               va="bottom", ha="center", color=winner_color)
     else:
+        ax.axis("off")
         ax.text(0.5, 0.5, "Single variant only", ha="center", va="center",
                fontsize=14, color="#9E9E9E", transform=ax.transAxes)
 

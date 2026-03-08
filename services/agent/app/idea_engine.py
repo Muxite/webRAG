@@ -970,7 +970,7 @@ class IdeaDagEngine:
                     node.details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_visit"}
                     node.details["visit_content_length"] = content_total_chars
                     node.details["visit_url"] = url
-                    node.status = IdeaNodeStatus.DONE
+            node.status = IdeaNodeStatus.DONE
                     return ResultStatus.SUCCESS.value
             
             if action == IdeaActionType.SEARCH.value:

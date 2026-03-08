@@ -1,25 +1,16 @@
-# Euglena AI
+# Euglena
 
-Agentic AI platform with Graph-of-Thought reasoning, web crawling, and retrieval-augmented generation. Tasks decompose into parallel subproblems (search, visit, save, think), execute concurrently, and merge into structured deliverables. Context persists in ChromaDB. Cost efficiency is maximized through dynamic beam width and token-efficient workflows.
+A scalable Graph-of-Thoughts (GoT) agent service for web research using task decomposition and parallel reasoning to increase accuracy and reduce cost. 
 
-**Live:** <https://web-rag-nine.vercel.app/>
+Euglena is an agent with web crawling and retrieval-augmented generation. Tasks decompose into parallel subproblems (search, visit, save, think) and merge into structured deliverables. Context persists in ChromaDB. Cost efficiency is maximized through dynamic beam-width and a token-efficient workflow that benefits cheaper models through structured reasoning.
+
+**Live:** <https://euglena.vercel.app/>
 
 **Note:** The visit system does not work on deployment due to website anti-bot measures that detect AWS datacenter IPs. The agent demonstrates resilience by working with search results and other available data sources. This website will be available until 2026-03-16 00:00 PST.
 
 ## Benchmark Results
 
 64 runs across 16 tests x 2 models x 2 execution variants.
-
-![Executive Summary](docs/benchmark/executive_summary.png)
-
-### Overall Leaderboard
-
-| Rank | System | Avg Score | Median | Std | Pass % | $/run | Time |
-|---|---|---|---|---|---|---|---|
-| 1 | **gpt-5.2 [graph]** | **0.930** | 0.979 | 0.094 | **93.8%** | $0.07 | 471s |
-| 2 | gpt-5-mini [graph] | 0.912 | 0.931 | 0.097 | 87.5% | $0.01 | 904s |
-| 3 | gpt-5.2 [sequential] | 0.729 | 0.746 | 0.172 | 50.0% | $0.09 | 200s |
-| 4 | gpt-5-mini [sequential] | 0.724 | 0.697 | 0.164 | 43.8% | $0.03 | 497s |
 
 ### Graph vs Sequential
 
@@ -33,42 +24,33 @@ Graph-of-Thought scores **26.8% higher** than sequential and uses **29% fewer to
 | Avg Tokens | **22.6k** | 32.0k | -9.4k | -29.3% |
 | Avg Duration | 688s | **349s** | +339s | +97.2% |
 
-### Per-Model Graph Advantage
 
-| Model | Graph Score | Sequential Score | Delta Score | Graph Pass% | Seq Pass% | Delta Pass% |
-|---|---|---|---|---|---|---|
-| gpt-5.2 | **0.930** | 0.729 | +0.201 (+27.6%) | **93.8%** | 50.0% | +43.8pp |
-| gpt-5-mini | **0.912** | 0.724 | +0.188 (+26.0%) | **87.5%** | 43.8% | +43.8pp |
+![Executive Summary](docs/benchmark/executive_summary.png)
 
-### Score Heatmap (Test x System)
+### Overall Leaderboard
 
-![Score Heatmap](docs/benchmark/score_heatmap.png)
+| Rank | System | Avg Score | Median | Std | Pass % | $/run | Time |
+|---|---|---|---|---|---|---|---|
+| 1 | **gpt-5.2 [graph]** | **0.930** | 0.979 | 0.094 | **93.8%** | $0.07 | 471s |
+| 2 | gpt-5-mini [graph] | 0.912 | 0.931 | 0.097 | 87.5% | $0.01 | 904s |
+| 3 | gpt-5.2 [sequential] | 0.729 | 0.746 | 0.172 | 50.0% | $0.09 | 200s |
+| 4 | gpt-5-mini [sequential] | 0.724 | 0.697 | 0.164 | 43.8% | $0.03 | 497s |
 
 ### Efficiency
 
 ![Efficiency Dashboard](docs/benchmark/efficiency_dashboard.png)
 
-| System | Score/1M tok | $/point |
-|---|---|---|
-| gpt-5-mini [graph] | 35.23 | $0.02 |
-| gpt-5.2 [graph] | **48.01** | $0.08 |
-| gpt-5-mini [sequential] | 21.75 | $0.04 |
-| gpt-5.2 [sequential] | 23.74 | $0.12 |
+## Features
 
-### Cost-Efficiency Frontier
-
-![Cost-Efficiency](docs/benchmark/cost_efficiency.png)
-
-## What It Does
-
-- **Graph-of-Thought reasoning**: tasks decompose into parallel subproblems (search, visit, think, save), then merge results upward through the DAG into structured deliverables
+- **Graph-of-Thought reasoning**: Tasks decompose into parallel subproblems (search, visit, think, save), then merge results upward through the DAG into structured deliverables
 - **Dual execution modes**: `graph` (parallel branching with best-first selection) and `sequential` (generate then pick, single path depth first) for A/B comparison
-- **Bot-resistant web access**: primary `aiohttp` connector with automatic `undetected-chromedriver` fallback on 403/401
-- **Long-term memory (RAG)**: crawled content is chunked and embedded into ChromaDB, queryable across tasks and reasoning steps
-- **Dynamic beam width**: branching factor adapts to score quality. Expands exploration when scores are low, narrows when confident
-- **Deduplication and pruning**: candidate thoughts are deduplicated by embedding similarity. Low-scoring nodes are pruned to save budget
+- **Bot-resistant web access**: Primary `aiohttp` connector with automatic `undetected-chromedriver` fallback on 403/401
+- **Long-term memory (RAG)**: Crawled content is chunked and embedded into ChromaDB, queryable across tasks and reasoning steps
+- **Dynamic beam width**: Branching factor adapts to score quality. Expands exploration when scores are low, narrows when confident
+- **Deduplication and pruning**: Candidate thoughts are deduplicated by embedding similarity. Low-scoring nodes are pruned to save budget
 - **Elastic worker fleet**: ECS autoscaling matches demand via CloudWatch queue-depth metrics, winds down when idle
 - **User-scoped quotas**: Supabase enforces per-user daily usage limits with JWT authentication
+- **Comprehensive test suite**: 39 priority-ordered tests with programmatic and LLM-based validation
 
 ## Observability
 
@@ -96,6 +78,31 @@ idea_test_runner  >  JSON results  >  visualization_summary  >  terminal report
 
 Results are written to `agent/idea_test_results/` as timestamped JSON. The visualizer can filter by run ID (`--latest`, `--run-id`) and generates executive dashboards, heatmaps, efficiency frontiers, and per-test breakdowns.
 
+**Regenerating Visualizations:**
+
+```bash
+# From services/ directory, run visualization in Docker
+docker compose run --rm agent python -m app.testing.idea_test_visualize --latest --core-only
+
+# Or generate all plots (including detailed gallery)
+docker compose run --rm agent python -m app.testing.idea_test_visualize --latest
+
+# List available test runs
+docker compose run --rm agent python -m app.testing.idea_test_visualize --list-runs
+
+# Generate and copy benchmark plots to docs/benchmark/ (from project root)
+python scripts/generate_benchmark_plots.py
+```
+
+**Visualization Improvements:**
+- **Executive Summary**: Score heatmap (test × system) replaces model leaderboard table for better visual insight
+- **Efficiency Dashboard**: Violin plots with all datapoints replace cramped tables, showing full score distributions
+- **Larger fonts**: All text increased for better readability (titles 32-48pt, labels 18-22pt)
+- **All datapoints visible**: Individual test runs shown as scatter points overlaid on distributions
+- **Clear trends**: Graph vs Sequential advantage highlighted with annotations and visual comparisons
+
+Visualizations are automatically generated after test runs and saved to `agent/idea_test_results/plots_<run_id>/`.
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -107,25 +114,42 @@ Results are written to `agent/idea_test_results/` as timestamped JSON. The visua
 
 ## Quick Start
 
+### Local Development
+
 ```bash
 cd services
 cp keys.env.example keys.env   # add OPENAI_API_KEY + SEARCH_API_KEY
-docker compose up -d
-docker compose run --profile test visit-test
+docker compose up -d            # starts gateway, agent, rabbitmq, redis, chroma
 ```
 
-### Local Development
+The system will be available at:
+- **Frontend**: `http://localhost:5173` (Vite dev server)
+- **Gateway API**: `http://localhost:8000`
+- **RabbitMQ Management**: `http://localhost:15672` (guest/guest)
+- **ChromaDB**: `http://localhost:8001`
 
-The frontend automatically detects local development mode and uses Docker resources:
+### Running Tests
 
-1. **Start Docker services**: `cd services && docker compose up -d`
-2. **Start frontend dev server**: `cd frontend && npm run dev`
-3. The frontend will automatically connect to `http://localhost:8080` (Docker gateway)
+```bash
+# Run specific tests
+IDEA_TEST_IDS=019,025 docker compose run --profile test visit-test
 
-**Override behavior:**
-- Set `VITE_GATEWAY_URL` to use a specific gateway URL
-- Set `VITE_USE_LOCAL=true` to force local mode even in production builds
-- Set `VITE_USE_LOCAL=false` to disable auto-detection
+# Run full test suite
+docker compose run --profile test idea-test
+
+# Benchmark mode (top 8 tests, 3 models, 3 runs each)
+IDEA_TEST_MODE=benchmark docker compose run --profile test idea-test
+```
+
+### Environment Variables
+
+Key environment variables for testing:
+- `IDEA_TEST_IDS`: Comma-separated test IDs (e.g., "019,025,033")
+- `IDEA_TEST_MODE`: "default" or "benchmark"
+- `IDEA_TEST_RUNS`: Number of runs per test/model pair
+- `IDEA_TEST_CONCURRENCY`: Max parallel executions
+- `IDEA_TEST_MODELS`: Comma-separated models (e.g., "gpt-5.2,gpt-5-mini")
+- `IDEA_TEST_EXECUTION_VARIANTS`: "graph", "sequential", or both
 
 ## Repo Layout
 
@@ -141,12 +165,11 @@ scripts/          Deployment, diagnostics, audits
 docs/             Architecture, security, benchmark plots
 ```
 
-## Docs
+## Documentation
 
-- [Agent Architecture](services/agent/app/AGENT_ARCHITECTURE.md)
-- [Deployment](services/agent/app/DEPLOYMENT.md)
-- [Debugger](services/agent/app/AGENT_DEBUG.md)
-- [Test Suite](services/agent/app/idea_tests/README.md)
-- [System Architecture](docs/ARCHITECTURE.md)
-- [Security](docs/SECURITY.md)
-- [Scripts](scripts/README.md)
+- [System Architecture](docs/ARCHITECTURE.md) - Overall system design and message flow
+- [Agent Architecture](services/agent/app/AGENT_ARCHITECTURE.md) - Graph-of-Thought engine internals
+- [Test Suite](services/agent/app/idea_tests/README.md) - Test structure and validation
+- [Deployment](services/agent/app/DEPLOYMENT.md) - Deployment guide
+- [Debugger](services/agent/app/AGENT_DEBUG.md) - Debugging tools and techniques
+- [Scripts](scripts/README.md) - Deployment and diagnostic scripts
