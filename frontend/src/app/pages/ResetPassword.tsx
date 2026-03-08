@@ -14,7 +14,7 @@ export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const paletteId = "synthwave-blue";
+  const paletteId = "arctic-circuit";
   const themeMode: "dark" | "light" = "dark";
   const palette = getColorPalette(paletteId);
   const colors = palette.colors;

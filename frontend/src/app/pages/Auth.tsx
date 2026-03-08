@@ -12,7 +12,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
-  const paletteId = "synthwave-blue";
+  const paletteId = "arctic-circuit";
   const themeMode: "dark" | "light" = "dark";
   const palette = getColorPalette(paletteId);
   const colors = palette.colors;
