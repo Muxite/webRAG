@@ -970,13 +970,11 @@ class IdeaDagEngine:
                     node.details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_visit"}
                     node.details["visit_content_length"] = content_total_chars
                     node.details["visit_url"] = url
-            node.status = IdeaNodeStatus.DONE
-                    return ResultStatus.SUCCESS.value
-            
+
             if action == IdeaActionType.SEARCH.value:
                 node.details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_search"}
                 self._logger.debug(f"[DATA_FLOW] Node {node_id} (search) now provides URLs")
-            
+
             node.status = IdeaNodeStatus.DONE
             return ResultStatus.SUCCESS.value
         retryable = ActionResultExtractor.is_retryable(result)

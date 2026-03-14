@@ -1,11 +1,13 @@
 FROM python:3.10-slim
 
+ARG CHROME_VERSION_MAIN=145
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     AGENT_STATUS_TIME=0.2 \
     SENTENCE_TRANSFORMERS_HOME=/root/.cache \
-    TRANSFORMERS_CACHE=/root/.cache/huggingface
+    TRANSFORMERS_CACHE=/root/.cache/huggingface \
+    CHROME_VERSION_MAIN=${CHROME_VERSION_MAIN}
 
 WORKDIR /app
 
@@ -22,6 +24,8 @@ RUN apt-get update && \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends google-chrome-stable \
+    && google-chrome --version 2>/dev/null | grep -oE '[0-9]+' | head -1 > /etc/chrome_version_main \
+    || echo "145" > /etc/chrome_version_main \
     && apt-get purge -y gnupg \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*

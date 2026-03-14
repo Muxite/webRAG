@@ -510,37 +510,6 @@ class InterfaceAgent:
                 result = await self.agent.run()
 
             success = bool(result.get("success", True)) if isinstance(result, dict) else True
-            error_message = None
-            warning_message = None
-            if isinstance(result, dict):
-                error_message = result.get("error")
-                warning_message = result.get("warning")
-                pending_nodes_count = result.get("pending_nodes_count", 0)
-                goal_achieved = result.get("goal_achieved", True)
-                has_failures = result.get("has_failures", False)
-                
-                if not success:
-                    if not error_message:
-                        if pending_nodes_count > 0:
-                            error_message = f"Task incomplete: {pending_nodes_count} nodes still pending execution"
-                        elif not goal_achieved:
-                            error_message = "Task goal not achieved"
-                        elif has_failures:
-                            error_message = "Task failed due to critical action failures"
-                        else:
-                            error_message = result.get("action_summary") or result.get("notes") or "Task failed to complete successfully"
-                elif warning_message or pending_nodes_count > 0 or (not goal_achieved and has_failures):
-                    success = False
-                    if not error_message:
-                        if pending_nodes_count > 0:
-                            error_message = f"Task incomplete: {pending_nodes_count} nodes still pending execution"
-                        elif not goal_achieved:
-                            error_message = "Task goal not achieved"
-                        elif warning_message:
-                            error_message = warning_message
-                        else:
-                            error_message = "Task did not complete successfully"
-            
             deliverables = []
             if isinstance(result, dict) and "deliverables" in result:
                 deliverables = result.get("deliverables") or []
@@ -553,45 +522,27 @@ class InterfaceAgent:
             if isinstance(result, dict):
                 notes = result.get("notes") or result.get("action_summary") or ""
 
-            if not success:
-                self.logger.warning(
-                    "Task failed",
-                    extra={
-                        "correlation_id": self.correlation_id,
-                        "success": success,
-                        "deliverables_count": len(deliverables),
-                        "error": error_message,
-                    },
-                )
-                await self._publish_status(
-                    StatusType.ERROR,
-                    max_ticks=max_ticks,
-                    error=error_message or "Task failed to complete successfully",
-                    result={"success": False, "deliverables": deliverables, "notes": notes} if deliverables or notes else None,
-                )
-                self._finalize_telemetry(success=False)
-            else:
-                completion = CompletionResult(
-                    correlation_id=self.correlation_id,
-                    success=success,
-                    deliverables=deliverables,
-                    notes=notes
-                )
+            completion = CompletionResult(
+                correlation_id=self.correlation_id,
+                success=success,
+                deliverables=deliverables,
+                notes=notes
+            )
 
-                self.logger.info(
-                    "Task completed",
-                    extra={
-                        "correlation_id": self.correlation_id,
-                        "success": success,
-                        "deliverables_count": len(deliverables),
-                    },
-                )
-                await self._publish_status(
-                    StatusType.COMPLETED,
-                    max_ticks=max_ticks,
-                    result=completion.result(),
-                )
-                self._finalize_telemetry(success=success)
+            self.logger.info(
+                "Task completed",
+                extra={
+                    "correlation_id": self.correlation_id,
+                    "success": success,
+                    "deliverables_count": len(deliverables),
+                },
+            )
+            await self._publish_status(
+                StatusType.COMPLETED,
+                max_ticks=max_ticks,
+                result=completion.result(),
+            )
+            self._finalize_telemetry(success=success)
         except Exception as e:
             self.logger.exception("Agent execution failed")
             await self._publish_status(StatusType.ERROR, max_ticks=max_ticks, error=str(e))

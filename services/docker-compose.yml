@@ -160,7 +160,7 @@ services:
     environment:
       - AGENT_STATUS_TIME=0.6
       - MODEL_NAME=gpt-5-mini
-      - IDEA_TEST_IDS=019
+      - IDEA_TEST_IDS=019,021
       - IDEA_TEST_EXECUTION_VARIANTS=graph
       - IDEA_TEST_RUNS=1
       - IDEA_TEST_CONCURRENCY=1
