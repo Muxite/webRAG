@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
@@ -36,14 +37,38 @@ class ConnectorBrowser(ConnectorBase):
         super().__init__(connector_config, name="ConnectorBrowser")
         self._driver = None
         self._ready = False
+        self._permanently_unavailable = False
         self._page_load_timeout = page_load_timeout
         self._implicit_wait = implicit_wait
+
+    def _get_version_main(self) -> Optional[int]:
+        """
+        Get Chrome major version for ChromeDriver alignment.
+        Reads from CHROME_VERSION_MAIN env, or /etc/chrome_version_main (set at Docker build).
+        :returns: Major version int or None to use default.
+        """
+        raw = os.environ.get("CHROME_VERSION_MAIN", "").strip()
+        if not raw:
+            try:
+                with open("/etc/chrome_version_main", "r") as f:
+                    raw = f.read().strip()
+            except (OSError, IOError):
+                pass
+        if not raw:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            return None
 
     async def _ensure_browser(self) -> bool:
         """
         Lazily start the headless Chrome driver if not already running.
+        On first failure, marks browser permanently unavailable to avoid retry spam.
         :returns: True if the browser is ready.
         """
+        if self._permanently_unavailable:
+            return False
         if self._ready and self._driver is not None:
             return True
         try:
@@ -53,8 +78,9 @@ class ConnectorBrowser(ConnectorBase):
                 self.logger.info("Headless Chrome started via undetected-chromedriver")
             return self._ready
         except Exception as exc:
-            self.logger.error(f"Failed to start headless Chrome: {exc}")
+            self.logger.warning(f"Failed to start headless Chrome: {exc}; browser fallback disabled")
             self._ready = False
+            self._permanently_unavailable = True
             return False
 
     def _create_driver(self):
@@ -81,7 +107,11 @@ class ConnectorBrowser(ConnectorBase):
         )
         options.add_argument(f"--user-agent={user_agent}")
 
-        driver = uc.Chrome(options=options, headless=True, use_subprocess=True)
+        kwargs = {"options": options, "headless": True, "use_subprocess": True}
+        version_main = self._get_version_main()
+        if version_main is not None:
+            kwargs["version_main"] = version_main
+        driver = uc.Chrome(**kwargs)
         driver.set_page_load_timeout(self._page_load_timeout)
         driver.implicitly_wait(self._implicit_wait)
         
@@ -117,6 +147,15 @@ class ConnectorBrowser(ConnectorBase):
         :returns: ``RequestResult`` with status 200 on success, or error=True on failure.
         """
         started_at = time.perf_counter()
+        if self._permanently_unavailable:
+            self._record_timing(
+                name="browser_fetch",
+                started_at=started_at,
+                success=False,
+                payload={"url": url},
+                error="Browser permanently unavailable",
+            )
+            return RequestResult(status=None, data="Browser not available", error=True)
         if not self._ready:
             ok = await self._ensure_browser()
             if not ok:
@@ -271,6 +310,7 @@ class ConnectorBrowser(ConnectorBase):
                 self.logger.debug(f"Error closing Chrome: {exc}")
             self._driver = None
         self._ready = False
+        self._permanently_unavailable = False
         self.logger.info("Browser connector closed")
 
     async def __aenter__(self):

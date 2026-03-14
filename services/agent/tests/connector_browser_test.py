@@ -113,8 +113,7 @@ class TestConnectorBrowserUnit:
 class TestAgentIOBrowserFallback:
     """Tests for AgentIO.visit behavior with an optional browser connector.
 
-    Note: AgentIO.visit is browser-first when connector_browser is present, and
-    falls back to HTTP when the browser visit fails.
+    AgentIO.visit tries HTTP first; on 401/403 it falls back to the browser connector.
     """
 
     def _make_io(self, http_result, browser_result=None):
@@ -160,9 +159,8 @@ class TestAgentIOBrowserFallback:
         browser_ok = RequestResult(status=200, data="<html><body>Browser OK</body></html>", error=False)
         io, mock_http, mock_browser = self._make_io(http_403, browser_ok)
         text = await io.visit("https://protected-site.com")
+        mock_http.request.assert_awaited_once()
         mock_browser.fetch_page.assert_awaited_once()
-        # Browser-first: HTTP should not be called when browser succeeds.
-        mock_http.request.assert_not_awaited()
         assert text
 
     @pytest.mark.asyncio
@@ -176,12 +174,11 @@ class TestAgentIOBrowserFallback:
     async def test_visit_403_browser_also_fails_raises(self):
         http_403 = RequestResult(status=403, data="Forbidden", error=True)
         browser_fail = RequestResult(status=None, data="Browser failed too", error=True)
-        io, _, mock_browser = self._make_io(http_403, browser_fail)
+        io, mock_http, mock_browser = self._make_io(http_403, browser_fail)
         with pytest.raises(RuntimeError):
             await io.visit("https://protected-site.com")
-        # Browser attempted first, then HTTP fallback attempted.
+        mock_http.request.assert_awaited_once()
         mock_browser.fetch_page.assert_awaited_once()
-        io.connector_http.request.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_visit_401_falls_back_to_browser(self):
@@ -189,8 +186,8 @@ class TestAgentIOBrowserFallback:
         browser_ok = RequestResult(status=200, data="<html><body>Got it</body></html>", error=False)
         io, mock_http, mock_browser = self._make_io(http_401, browser_ok)
         text = await io.visit("https://auth-site.com")
+        mock_http.request.assert_awaited_once()
         mock_browser.fetch_page.assert_awaited_once()
-        mock_http.request.assert_not_awaited()
         assert text
 
     @pytest.mark.asyncio

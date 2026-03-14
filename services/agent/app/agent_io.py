@@ -22,8 +22,8 @@ class AgentIO:
     All methods are async. Telemetry is recorded automatically when a session
     is attached. Timeouts are configurable per call.
 
-    ``visit`` tries aiohttp first; on 403/401 it falls back to the headless
-    Chrome browser connector (if provided) to bypass bot protection.
+    ``visit`` and ``fetch_url`` try aiohttp (HTTPS/HTTP) first; on 401/403 or when
+    the HTTP request raises they fall back to the headless Chrome connector (if provided).
 
     :param connector_llm: LLM connector.
     :param connector_search: Search API connector.
@@ -220,8 +220,8 @@ class AgentIO:
         """
         Fetch a URL, clean the HTML, return extracted text.
 
-        Uses headless Chrome browser connector by default. Falls back to aiohttp
-        if browser is not available.
+        Tries aiohttp (HTTPS/HTTP) first. Falls back to headless Chrome only on
+        401/403 (bot blocking) or when the HTTP request raises.
 
         :param url: Target URL.
         :param timeout_seconds: Optional per-call timeout.
@@ -231,9 +231,22 @@ class AgentIO:
         started_at = time.perf_counter()
         used_browser = False
         result = None
+        http_result = None
+        http_error = None
+        try:
+            http_result = await self._with_timeout(
+                self.connector_http.request("GET", url, retries=3),
+                timeout_seconds,
+            )
+        except Exception as exc:
+            http_error = exc
 
-        if self.connector_browser:
-            _logger.info(f"Using headless Chrome to fetch {url}")
+        if http_result and not http_result.error:
+            result = http_result
+        if (result is None or result.error) and self.connector_browser and (
+            http_result is None or (http_result.error and http_result.status in BROWSER_FALLBACK_STATUSES)
+        ):
+            _logger.info(f"Falling back to headless Chrome for {url}")
             browser_result = await self._with_timeout(
                 self.connector_browser.fetch_page(url),
                 timeout_seconds,
@@ -242,14 +255,11 @@ class AgentIO:
                 result = browser_result
                 used_browser = True
             else:
-                _logger.warning(f"Browser fetch failed for {url}: {browser_result.data}, falling back to HTTP")
-        
-        if not result or result.error:
-            _logger.info(f"Falling back to aiohttp for {url}")
-            result = await self._with_timeout(
-                self.connector_http.request("GET", url, retries=3),
-                timeout_seconds,
-            )
+                _logger.warning(f"Browser fetch failed for {url}: {browser_result.data}")
+        if result is None and http_result is not None and http_result.error:
+            result = http_result
+        if result is None and http_error is not None:
+            raise http_error
 
         if result.error:
             error_text = f"HTTP visit failed: {url} status={result.status}"
@@ -305,19 +315,32 @@ class AgentIO:
         """
         Fetch raw content from a URL (no HTML cleaning).
 
-        Uses headless Chrome browser connector by default. Falls back to aiohttp
-        if browser is not available.
+        Tries aiohttp (HTTPS/HTTP) first. Falls back to headless Chrome only on
+        401/403 (bot blocking) or when the HTTP request raises.
 
         :param url: Target URL.
-        :param retries: Number of aiohttp retries (if fallback needed).
+        :param retries: Number of aiohttp retries.
         :param timeout_seconds: Optional per-call timeout.
         :returns: Raw response text or JSON string.
         :raises RuntimeError: On HTTP failure after all attempts.
         """
         result = None
+        http_result = None
+        http_error = None
+        try:
+            http_result = await self._with_timeout(
+                self.connector_http.request("GET", url, retries=retries),
+                timeout_seconds,
+            )
+        except Exception as exc:
+            http_error = exc
 
-        if self.connector_browser:
-            _logger.info(f"Using headless Chrome to fetch {url}")
+        if http_result and not http_result.error:
+            result = http_result
+        if (result is None or result.error) and self.connector_browser and (
+            http_result is None or (http_result.error and http_result.status in BROWSER_FALLBACK_STATUSES)
+        ):
+            _logger.info(f"Falling back to headless Chrome for {url}")
             browser_result = await self._with_timeout(
                 self.connector_browser.fetch_page(url),
                 timeout_seconds,
@@ -325,14 +348,11 @@ class AgentIO:
             if not browser_result.error:
                 result = browser_result
             else:
-                _logger.warning(f"Browser fetch failed for {url}: {browser_result.data}, falling back to HTTP")
-        
-        if not result or result.error:
-            _logger.info(f"Falling back to aiohttp for {url}")
-            result = await self._with_timeout(
-                self.connector_http.request("GET", url, retries=retries),
-                timeout_seconds,
-            )
+                _logger.warning(f"Browser fetch failed for {url}: {browser_result.data}")
+        if result is None and http_result is not None and http_result.error:
+            result = http_result
+        if result is None and http_error is not None:
+            raise http_error
         if result.error:
             raise RuntimeError(f"HTTP fetch failed: {url} status={result.status}")
         resp = result.data

@@ -376,13 +376,16 @@ class VisitLeafAction(LeafAction):
                                 search_results = result.get(ActionResultKey.RESULTS.value) or result.get("results", [])
                                 if isinstance(search_results, list) and search_results:
                                     urls_from_source = []
-                                    for item in search_results:
-                                        if isinstance(item, dict):
-                                            candidate_url = item.get("url") or item.get("link") or item.get("href")
-                                            if candidate_url:
-                                                candidate_url = str(candidate_url).strip()
-                                                if self._is_valid_url(candidate_url):
-                                                    urls_from_source.append(candidate_url)
+                                for item in search_results:
+                                    if isinstance(item, dict):
+                                        candidate_url = (
+                                            item.get("url") or item.get("link") or item.get("href")
+                                            or item.get("source") or item.get("page_url")
+                                        )
+                                        if candidate_url:
+                                            candidate_url = str(candidate_url).strip()
+                                            if self._is_valid_url(candidate_url):
+                                                urls_from_source.append(candidate_url)
                                     if urls_from_source:
                                         self._log_structured(
                                             "info",
@@ -442,23 +445,24 @@ class VisitLeafAction(LeafAction):
                 })
                 
                 if current_status == IdeaNodeStatus.DONE:
-            result = current.details.get(DetailKey.ACTION_RESULT.value)
-            if result and isinstance(result, dict):
+                    result = current.details.get(DetailKey.ACTION_RESULT.value)
+                    if result and isinstance(result, dict):
                         action_type = result.get(ActionResultKey.ACTION.value) or result.get("action")
-                
-                if action_type == IdeaActionType.SEARCH.value:
+                        if action_type == IdeaActionType.SEARCH.value:
                             search_results = result.get(ActionResultKey.RESULTS.value) or result.get("results", [])
-                    if isinstance(search_results, list):
+                            if isinstance(search_results, list):
                                 urls_found_in_node = 0
-                        for item in search_results:
-                            if isinstance(item, dict):
-                                candidate_url = item.get("url") or item.get("link") or item.get("href")
-                                if candidate_url:
-                                    candidate_url = str(candidate_url).strip()
-                                    if self._is_valid_url(candidate_url) and candidate_url not in all_urls:
-                                        all_urls.append(candidate_url)
+                                for item in search_results:
+                                    if isinstance(item, dict):
+                                        candidate_url = (
+                                            item.get("url") or item.get("link") or item.get("href")
+                                            or item.get("source") or item.get("page_url")
+                                        )
+                                        if candidate_url:
+                                            candidate_url = str(candidate_url).strip()
+                                            if self._is_valid_url(candidate_url) and candidate_url not in all_urls:
+                                                all_urls.append(candidate_url)
                                                 urls_found_in_node += 1
-                                
                                 if urls_found_in_node > 0:
                                     self._log_structured(
                                         "info",
@@ -472,10 +476,18 @@ class VisitLeafAction(LeafAction):
                                         operation="extract_urls_from_search"
                                     )
                             else:
-                                self._logger.debug(
-                                    f"[VISIT] Search node {current.node_id[:8]}... has no results list "
-                                    f"(type: {type(search_results).__name__})"
-                                )
+                                if search_results and isinstance(search_results, list) and len(search_results) > 0:
+                                    first = search_results[0]
+                                    sample_keys = list(first.keys())[:8] if isinstance(first, dict) else []
+                                    self._logger.debug(
+                                        f"[VISIT] Search node {current.node_id[:8]}... results format: "
+                                        f"first_item_keys={sample_keys}"
+                                    )
+                                else:
+                                    self._logger.debug(
+                                        f"[VISIT] Search node {current.node_id[:8]}... has no results list "
+                                        f"(type: {type(search_results).__name__})"
+                                    )
                         else:
                             self._logger.debug(
                                 f"[VISIT] Node {current.node_id[:8]}... marked as search but action_type={action_type}"
@@ -652,9 +664,12 @@ class VisitLeafAction(LeafAction):
     
     def _extract_url_from_sibling_results(self, graph: IdeaDag, node: IdeaNode) -> Optional[str]:
         import re
-        
+
         parent = None
-        for pid in node.parent_ids:
+        pids = node.parent_ids if node.parent_ids else ([node.parent_id] if node.parent_id else [])
+        for pid in pids:
+            if not pid:
+                continue
             parent = graph.get_node(pid)
             if parent:
                 break
@@ -672,13 +687,25 @@ class VisitLeafAction(LeafAction):
             if not sibling or sibling.status.value != "done":
                 continue
             result = sibling.details.get(DetailKey.ACTION_RESULT.value)
-            if not isinstance(result, dict) or not result.get("success"):
+            if not isinstance(result, dict):
                 continue
-            
+            if not result.get("success") and result.get(ActionResultKey.ACTION.value) != IdeaActionType.SEARCH.value:
+                continue
+
+            action_type = result.get(ActionResultKey.ACTION.value) or result.get("action")
+            if action_type == IdeaActionType.SEARCH.value:
+                search_results = result.get(ActionResultKey.RESULTS.value) or result.get("results", [])
+                if isinstance(search_results, list):
+                    for item in search_results:
+                        if isinstance(item, dict):
+                            u = item.get("url") or item.get("link") or item.get("href") or item.get("source")
+                            if u and isinstance(u, str) and self._is_valid_url(u.strip()):
+                                sibling_links.append(u.strip())
+
             links = result.get("links", []) or result.get("links_full", [])
             if isinstance(links, list):
                 sibling_links.extend(links)
-            
+
             content = result.get("content_with_links", "") or result.get("content", "")
             if isinstance(content, str):
                 found = re.findall(r'https?://[^\s\]\)\"\'<>]+', content)
@@ -1174,11 +1201,16 @@ class VisitLeafAction(LeafAction):
                     )
                     candidate_urls.extend(parent_search_urls)
                 else:
-                    self._logger.warning(
-                        f"[VISIT] No URLs extracted from search results. "
-                        f"This may indicate: (1) search node hasn't completed, "
-                        f"(2) search returned no results, or (3) search results format is unexpected."
-                    )
+                    sibling_url = self._extract_url_from_sibling_results(graph, node)
+                    if sibling_url:
+                        candidate_urls.append(sibling_url)
+                        self._logger.info(f"[VISIT] Fallback: extracted 1 URL from sibling results")
+                    else:
+                        self._logger.warning(
+                            f"[VISIT] No URLs extracted from search results. "
+                            f"This may indicate: (1) search node hasn't completed, "
+                            f"(2) search returned no results, or (3) search results format is unexpected."
+                        )
                 
                 if link_idea and len(candidate_urls) < link_count:
                     query_top_k = int(self.settings.get("visit_link_query_top_k", 10))

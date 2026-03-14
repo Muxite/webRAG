@@ -448,7 +448,7 @@ export default function Dashboard() {
                 The agent demonstrates resilience by working with search results and other available data sources.
               </p>
               <p style={{ color: themeColors.textMuted }}>
-                This website will be available until 2026-03-16 00:00 PST.
+                This website will be available until 2026-03-21 00:00 PST.
               </p>
             </div>
           </div>
