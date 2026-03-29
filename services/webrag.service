@@ -1,0 +1,17 @@
+[Unit]
+Description=WebRAG Docker Compose stack
+Requires=docker.service
+After=docker.service tailscaled.service network-online.target
+Wants=network-online.target tailscaled.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/muk/projects/webRAG/services
+ExecStartPre=/bin/bash -c 'for i in $(seq 1 90); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1'
+ExecStart=/bin/bash -c '/usr/bin/docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --scale agent=3 && sleep 5 && /usr/bin/tailscale funnel --bg --yes 18080'
+ExecStop=/bin/bash -c '/usr/bin/tailscale funnel reset 2>/dev/null; /usr/bin/docker compose -f docker-compose.yml -f docker-compose.local.yml --profile local-spa down'
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

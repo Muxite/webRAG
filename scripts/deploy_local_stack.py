@@ -1,13 +1,7 @@
 """
-Deploy Euglena on a single machine with Docker Compose (fixed replicas, no ECS autoscale).
+Local Docker Compose stack. Same Supabase config as production; point the frontend at this API with VITE_GATEWAY_URL.
 
-Typical host: Ubuntu Server with Docker; expose HTTPS via Tailscale funnel to nginx on port 80.
-
-Commands:
-  python scripts/deploy_local_stack.py build-frontend
-  python scripts/deploy_local_stack.py up
-  python scripts/deploy_local_stack.py down
-  python scripts/deploy_local_stack.py funnel-help
+Commands: up, up-spa, build-frontend, down, ps, funnel-help
 
 :returns: None (process exit code 0 on success).
 """
@@ -39,22 +33,28 @@ def _services_dir() -> Path:
     return _repo_root() / "services"
 
 
-def _compose_cmd() -> list[str]:
+def _compose_files() -> list[str]:
     """
-    Build docker compose base command with both compose files.
+    Compose file arguments for local stack (base + local override).
 
-    :returns: Command prefix list for subprocess.
+    :returns: Flat list of -f path pairs for subprocess.
     """
     base = _services_dir() / "docker-compose.yml"
     override = _services_dir() / "docker-compose.local.yml"
-    return [
-        "docker",
-        "compose",
-        "-f",
-        str(base),
-        "-f",
-        str(override),
-    ]
+    return ["-f", str(base), "-f", str(override)]
+
+
+def _compose_cmd(*, profile_local_spa: bool = False) -> list[str]:
+    """
+    Build docker compose command with local compose files and optional local-spa profile.
+
+    :param profile_local_spa: When True, enable nginx + static SPA service.
+    :returns: Command prefix list for subprocess.
+    """
+    cmd = ["docker", "compose", *_compose_files()]
+    if profile_local_spa:
+        cmd.extend(["--profile", "local-spa"])
+    return cmd
 
 
 def _run(cmd: list[str], *, cwd: Optional[Path] = None, env: Optional[dict[str, str]] = None) -> int:
@@ -72,7 +72,7 @@ def _run(cmd: list[str], *, cwd: Optional[Path] = None, env: Optional[dict[str, 
 
 def cmd_build_frontend(_: argparse.Namespace) -> int:
     """
-    Build the Vite frontend with same-origin gateway URLs for nginx.
+    Build the Vite bundle for nginx same-origin (VITE_GATEWAY_RELATIVE) or local dev.
 
     :param _: Parsed arguments (unused).
     :returns: Exit code (0 on success).
@@ -93,32 +93,48 @@ def cmd_build_frontend(_: argparse.Namespace) -> int:
     )
     if code == 0:
         dist = frontend / "dist"
-        print(f"Frontend build OK: {dist}")
+        print(f"Built {dist}")
     return code
 
 
 def cmd_up(_: argparse.Namespace) -> int:
     """
-    Start the stack (build images if needed).
+    Start local backend only (rabbitmq, redis, chroma, agents, gateway). No nginx.
+
+    :param _: Parsed arguments (unused).
+    :returns: Exit code (0 on success).
+    """
+    return _run(
+        _compose_cmd() + ["up", "-d", "--build", "--scale", "agent=3"],
+        cwd=_services_dir(),
+    )
+
+
+def cmd_up_spa(_: argparse.Namespace) -> int:
+    """
+    Start local backend plus nginx serving frontend/dist on port 80.
 
     :param _: Parsed arguments (unused).
     :returns: Exit code (0 on success).
     """
     dist = _repo_root() / "frontend" / "dist" / "index.html"
     if not dist.is_file():
-        print("frontend/dist missing. Run: python scripts/deploy_local_stack.py build-frontend", file=sys.stderr)
+        print("No frontend/dist. Run: python scripts/deploy_local_stack.py build-frontend", file=sys.stderr)
         return 1
-    return _run(_compose_cmd() + ["up", "-d", "--build"], cwd=_services_dir())
+    return _run(
+        _compose_cmd(profile_local_spa=True) + ["up", "-d", "--build", "--scale", "agent=3"],
+        cwd=_services_dir(),
+    )
 
 
 def cmd_down(_: argparse.Namespace) -> int:
     """
-    Stop and remove containers for this stack.
+    Stop and remove containers for this stack (includes optional nginx when it was used).
 
     :param _: Parsed arguments (unused).
     :returns: Exit code (0 on success).
     """
-    return _run(_compose_cmd() + ["down"], cwd=_services_dir())
+    return _run(_compose_cmd(profile_local_spa=True) + ["down"], cwd=_services_dir())
 
 
 def cmd_ps(_: argparse.Namespace) -> int:
@@ -133,31 +149,18 @@ def cmd_ps(_: argparse.Namespace) -> int:
 
 def cmd_funnel_help(_: argparse.Namespace) -> int:
     """
-    Print Tailscale funnel and Supabase checklist (no network operations).
+    Print notes for Tailscale and env vars.
 
     :param _: Parsed arguments (unused).
     :returns: Always 0.
     """
     print(
-        """
-Tailscale funnel (run on the Ubuntu host, not inside Docker):
-  1) Install Tailscale and log in: https://tailscale.com/download/linux
-  2) Enable Funnel in your tailnet ACL (see Tailscale docs: tailscale funnel).
-  3) Start the stack first so nginx listens on port 80, then:
-       sudo tailscale funnel 80
-     This exposes http://127.0.0.1:80 (nginx + SPA + proxied API) at https://<device>.<tailnet>.ts.net
-     Run `tailscale funnel --help` for your CLI version (e.g. background: tailscale funnel --bg 80).
-
-Supabase (dashboard -> Authentication -> URL configuration):
-  - Add your funnel URL to "Site URL" and "Redirect URLs" (e.g. https://YOURHOST.tailXXXX.ts.net).
-
-Stack notes:
-  - Gateway is only on 127.0.0.1:8080; public traffic should go to nginx on :80 via funnel.
-  - Fixed worker count: default is one agent container. To run two agents:
-       docker compose -f services/docker-compose.yml -f services/docker-compose.local.yml up -d --scale agent=2
-
-AWS/ECS deployments are unchanged; this compose stack is separate.
-"""
+        "AWS: deploy with your usual ECS flow.\n"
+        "Local: run up, then tailscale funnel --bg --yes 18080. Set VITE_GATEWAY_URL on Vercel to the "
+        "HTTPS URL Tailscale prints. Redeploy the frontend.\n"
+        "up-spa with nginx on port 80: tailscale funnel --bg --yes 80\n"
+        "Supabase Site URL: keep your Vercel hostname unless users hit the funnel URL.\n"
+        "Gateway host port: 127.0.0.1:18080 (see docker-compose.local.yml). up uses --scale agent=3."
     )
     return 0
 
@@ -168,19 +171,21 @@ def main() -> int:
 
     :returns: Process exit code.
     """
-    parser = argparse.ArgumentParser(description="Local Docker deployment helper (Compose + optional Tailscale funnel).")
+    parser = argparse.ArgumentParser(description="Local docker compose helper.")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("build-frontend", help="npm run build with VITE_GATEWAY_RELATIVE=true")
-    sub.add_parser("up", help="docker compose up -d --build (requires frontend/dist)")
-    sub.add_parser("down", help="docker compose down")
-    sub.add_parser("ps", help="docker compose ps")
-    sub.add_parser("funnel-help", help="Print Tailscale funnel and Supabase steps")
+    sub.add_parser("up", help="Backend services only (no nginx)")
+    sub.add_parser("up-spa", help="Backend plus nginx on port 80 (run build-frontend first)")
+    sub.add_parser("build-frontend", help="Production build with VITE_GATEWAY_RELATIVE=true")
+    sub.add_parser("down", help="Stop stack")
+    sub.add_parser("ps", help="Compose ps")
+    sub.add_parser("funnel-help", help="Notes for Tailscale and env vars")
 
     args = parser.parse_args()
     handlers = {
-        "build-frontend": cmd_build_frontend,
         "up": cmd_up,
+        "up-spa": cmd_up_spa,
+        "build-frontend": cmd_build_frontend,
         "down": cmd_down,
         "ps": cmd_ps,
         "funnel-help": cmd_funnel_help,

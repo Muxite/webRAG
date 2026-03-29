@@ -1,16 +1,20 @@
-# Override for local server deployment: nginx on :80 (same origin as API), gateway only on loopback.
-# Apply together with the base file (no autoscale; fixed replica count is Compose default):
-#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
-# Or: python scripts/deploy_local_stack.py up
+# Use with docker-compose.yml. Does not change AWS ECS task definitions.
+#
+# Gateway published on host 127.0.0.1:18080 -> container 8080 (avoids clashes with other apps on 8080).
+# Tailscale funnel should target port 18080. Change the left port if you need a different host port.
+#
+# Profile local-spa: nginx serves ../frontend/dist on port 80.
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml --profile local-spa up -d
 
 services:
   gateway:
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:18080:8080"
     environment:
-      CORS_ALLOWED_ORIGIN_REGEX: "https://.*\\.ts\\.net"
+      CORS_ALLOWED_ORIGIN_REGEX: "https://.*\\.(ts\\.net|vercel\\.app)"
 
   web:
+    profiles: ["local-spa"]
     image: nginx:alpine
     depends_on:
       - gateway
