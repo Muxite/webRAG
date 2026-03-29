@@ -27,12 +27,16 @@ const isLocalDev = import.meta.env.VITE_USE_LOCAL === "true";
  * Determine the gateway base URL.
  * Priority:
  * 1. Explicit VITE_GATEWAY_URL env variable
- * 2. Local dev mode -> http://localhost:8080 (Docker gateway)
- * 3. Default production URL
+ * 2. VITE_GATEWAY_RELATIVE=true -> same origin as the SPA (nginx + Tailscale funnel)
+ * 3. Local dev mode -> http://localhost:8080 (Docker gateway)
+ * 4. Default production URL
  */
 const getGatewayBaseUrl = (): string => {
   if (import.meta.env.VITE_GATEWAY_URL) {
     return import.meta.env.VITE_GATEWAY_URL;
+  }
+  if (import.meta.env.VITE_GATEWAY_RELATIVE === "true") {
+    return "";
   }
   if (isLocalDev) {
     return "http://localhost:8080";

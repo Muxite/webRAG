@@ -17,6 +17,7 @@ import os
 from shared.models import FinalResult
 from agent.app.trace_recorder import TraceRecorder
 from agent.app.agent_io import AgentIO
+from agent.app.mandate_addendum import effective_mandate
 
 
 class Agent:
@@ -192,7 +193,7 @@ class Agent:
                 model_name=self._select_model_for_call("idea_dag"),
                 settings=settings,
             )
-            result = await engine.run(self.mandate, max_steps=self.max_ticks)
+            result = await engine.run(effective_mandate(self.mandate), max_steps=self.max_ticks)
             result["metrics"] = self.metrics
             return result
 
@@ -211,7 +212,7 @@ class Agent:
                 )
 
             prompt_builder = TickPromptBuilder(
-                mandate=self.mandate,
+                mandate=effective_mandate(self.mandate),
                 short_term_summary=self.history,
 
                 notes=(self.notes[-1] if self.notes else ""),
@@ -507,7 +508,7 @@ class Agent:
         :return: Dictionary with final deliverable and action summary.
         """
         final_messages = FinalPromptBuilder(
-            mandate=self.mandate,
+            mandate=effective_mandate(self.mandate),
             history=self.history,
             notes=self.notes,
             deliverables=self.deliverables,

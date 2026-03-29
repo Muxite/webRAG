@@ -63,12 +63,16 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
     
     cors_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS", "https://euglena.vercel.app,https://web-rag-nine.vercel.app,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173")
     allowed_origins = [origin.strip().rstrip("/") for origin in cors_origins_env.split(",") if origin.strip()]
-    
+    cors_origin_regex = os.environ.get("CORS_ALLOWED_ORIGIN_REGEX", "").strip() or None
+
     logger.info(f"CORS allowed origins: {allowed_origins}")
-    
+    if cors_origin_regex:
+        logger.info(f"CORS allowed origin regex: {cors_origin_regex}")
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
+        allow_origin_regex=cors_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

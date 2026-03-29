@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-07T04:25:36.062824+00:00",
+  "timestamp": "2026-03-10T13:35:20.700257+00:00",
   "mode": "autoscale",
   "region": "us-east-2",
   "cluster": "euglena-cluster",
@@ -391,7 +391,7 @@
         "taskRoleArn": "***REDACTED***",
         "executionRoleArn": "***REDACTED***",
         "networkMode": "awsvpc",
-        "revision": 90,
+        "revision": 95,
         "volumes": [
           {
             "name": "chroma-data",
@@ -475,20 +475,20 @@
         ],
         "cpu": "1024",
         "memory": "2048",
-        "registeredAt": "2026-03-06T20:25:04.788000-08:00",
+        "registeredAt": "2026-03-10T06:34:49.829000-07:00",
         "registeredBy": "arn:aws:iam::848960888155:root"
       },
       "recent_revisions": [
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:95",
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:94",
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:93",
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:92",
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:91",
         "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:90",
         "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:89",
         "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:88",
         "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:87",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:86",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:85",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:84",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:83",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:82",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:81"
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:86"
       ]
     },
     "euglena-agent": {
@@ -669,7 +669,7 @@
         "taskRoleArn": "***REDACTED***",
         "executionRoleArn": "***REDACTED***",
         "networkMode": "awsvpc",
-        "revision": 88,
+        "revision": 93,
         "volumes": [],
         "status": "ACTIVE",
         "requiresAttributes": [
@@ -710,28 +710,28 @@
         "placementConstraints": [],
         "compatibilities": [
           "EC2",
-          "MANAGED_INSTANCES",
-          "FARGATE"
+          "FARGATE",
+          "MANAGED_INSTANCES"
         ],
         "requiresCompatibilities": [
           "FARGATE"
         ],
         "cpu": "256",
         "memory": "512",
-        "registeredAt": "2026-03-06T20:25:07.198000-08:00",
+        "registeredAt": "2026-03-10T06:34:52.739000-07:00",
         "registeredBy": "arn:aws:iam::848960888155:root"
       },
       "recent_revisions": [
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:93",
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:92",
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:91",
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:90",
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:89",
         "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:88",
         "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:87",
         "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:86",
         "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:85",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:84",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:83",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:82",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:81",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:80",
-        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:79"
+        "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:84"
       ]
     }
   },
@@ -742,7 +742,7 @@
       "desiredCount": 1,
       "runningCount": 1,
       "pendingCount": 0,
-      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:90",
+      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-gateway:95",
       "deploymentConfiguration": {
         "deploymentCircuitBreaker": {
           "enable": true,
@@ -786,71 +786,71 @@
       "launchType": null,
       "recentEvents": [
         {
-          "id": "2394f7ca-88d6-4534-9cfb-bcbbb8947516",
-          "createdAt": "2026-03-06T16:26:58.482000-08:00",
+          "id": "97b97d92-066c-44ba-9034-e0d00b57204b",
+          "createdAt": "2026-03-10T01:55:45.956000-07:00",
           "message": "(service euglena-gateway) has reached a steady state."
         },
         {
-          "id": "556a8da1-c2fc-429f-93f0-3d86a1c0f87d",
-          "createdAt": "2026-03-06T16:26:58.481000-08:00",
-          "message": "(service euglena-gateway) (deployment ecs-svc/6504567326246456231) deployment completed."
+          "id": "88f1915d-a4c3-4b24-8cac-d2da622b445e",
+          "createdAt": "2026-03-09T19:55:41.064000-07:00",
+          "message": "(service euglena-gateway) has reached a steady state."
         },
         {
-          "id": "efd2b762-eefe-428f-9a33-7dce4adcee17",
-          "createdAt": "2026-03-06T16:25:15.219000-08:00",
-          "message": "(service euglena-gateway, taskSet ecs-svc/9261840344971853505) has begun draining connections on 1 tasks."
+          "id": "36502182-876a-41f0-8429-86fbb6b83468",
+          "createdAt": "2026-03-09T13:55:12.891000-07:00",
+          "message": "(service euglena-gateway) has reached a steady state."
         },
         {
-          "id": "dd41b79e-152e-4414-87a6-a4a0038dbcdb",
-          "createdAt": "2026-03-06T16:25:15.215000-08:00",
+          "id": "cdc1ccca-5560-49e1-b097-a33d008b0800",
+          "createdAt": "2026-03-09T07:55:01.815000-07:00",
+          "message": "(service euglena-gateway) has reached a steady state."
+        },
+        {
+          "id": "00f81f32-0f76-45da-a640-570e6e141dec",
+          "createdAt": "2026-03-09T01:54:44.165000-07:00",
+          "message": "(service euglena-gateway) has reached a steady state."
+        },
+        {
+          "id": "6d212c30-cece-4e58-8dcd-37a89f254841",
+          "createdAt": "2026-03-08T19:55:16.681000-07:00",
+          "message": "(service euglena-gateway) has reached a steady state."
+        },
+        {
+          "id": "2ac320bf-abb6-4e23-8fc5-7d9b0912171b",
+          "createdAt": "2026-03-08T19:55:16.680000-07:00",
+          "message": "(service euglena-gateway) (deployment ecs-svc/7343317086625137528) deployment completed."
+        },
+        {
+          "id": "bfd14d93-6bc9-4fb0-b499-a55e1e2adfd9",
+          "createdAt": "2026-03-08T19:54:24.143000-07:00",
+          "message": "(service euglena-gateway, taskSet ecs-svc/0427778437237791992) has begun draining connections on 1 tasks."
+        },
+        {
+          "id": "8904ee09-32e9-4132-955c-3d1f9c2981e7",
+          "createdAt": "2026-03-08T19:54:24.137000-07:00",
           "message": "(service euglena-gateway) deregistered 1 targets in (target-group arn:aws:elasticloadbalancing:us-east-2:848960888155:targetgroup/euglena-tg/ea4bbe2f98578c2a)"
         },
         {
-          "id": "2879ca19-54b7-4d8f-8a2e-e71ec0bff2f1",
-          "createdAt": "2026-03-06T16:25:05.406000-08:00",
-          "message": "(service euglena-gateway) has stopped 1 running tasks: (task 642fac86881e4ac3873f49a259c0061e)."
-        },
-        {
-          "id": "618f6595-1943-4af6-903a-9c29637543f2",
-          "createdAt": "2026-03-06T16:23:23.943000-08:00",
-          "message": "(service euglena-gateway) registered 1 targets in (target-group arn:aws:elasticloadbalancing:us-east-2:848960888155:targetgroup/euglena-tg/ea4bbe2f98578c2a)"
-        },
-        {
-          "id": "4f28ed96-60ec-4f7e-8e53-cb195b13ab4c",
-          "createdAt": "2026-03-06T16:22:32.980000-08:00",
-          "message": "(service euglena-gateway) has started 1 tasks: (task 7cfee93c8bbe45cc95a861ec23de1edc)."
-        },
-        {
-          "id": "4bdc0543-6266-46ff-88b1-82b0ba67db60",
-          "createdAt": "2026-03-06T16:16:12.485000-08:00",
-          "message": "(service euglena-gateway, taskSet ecs-svc/6504567326246456231) has begun draining connections on 1 tasks."
-        },
-        {
-          "id": "0f4c480b-d9d2-4bdb-af50-3d7a1599a11d",
-          "createdAt": "2026-03-06T16:16:02.195000-08:00",
-          "message": "(service euglena-gateway) deregistered 1 targets in (target-group arn:aws:elasticloadbalancing:us-east-2:848960888155:targetgroup/euglena-tg/ea4bbe2f98578c2a)"
-        },
-        {
-          "id": "6d3580ec-bfa4-44d0-a2ba-a8ba7cd510b8",
-          "createdAt": "2026-03-06T16:16:00.890000-08:00",
-          "message": "(service euglena-gateway) has stopped 1 running tasks: (task c65c6da8655a4913992014f424207b9f)."
+          "id": "1085b74a-0dc3-42d9-a78a-60384350f9c1",
+          "createdAt": "2026-03-08T19:54:14.725000-07:00",
+          "message": "(service euglena-gateway) has stopped 1 running tasks: (task aa34e064edb240b18d6c4fced87a2328)."
         }
       ],
       "runningTasks": [
         {
-          "taskArn": "arn:aws:ecs:us-east-2:848960888155:task/euglena-cluster/7cfee93c8bbe45cc95a861ec23de1edc",
+          "taskArn": "arn:aws:ecs:us-east-2:848960888155:task/euglena-cluster/a7e71b7e7fbe4597af79a81c33b3ffe4",
           "lastStatus": "RUNNING",
           "healthStatus": "HEALTHY",
           "containers": [
             {
-              "name": "metrics",
+              "name": "rabbitmq",
               "lastStatus": "RUNNING",
               "healthStatus": "HEALTHY",
               "exitCode": null,
               "reason": null
             },
             {
-              "name": "rabbitmq",
+              "name": "gateway",
               "lastStatus": "RUNNING",
               "healthStatus": "HEALTHY",
               "exitCode": null,
@@ -864,21 +864,21 @@
               "reason": null
             },
             {
-              "name": "gateway",
+              "name": "redis",
               "lastStatus": "RUNNING",
               "healthStatus": "HEALTHY",
               "exitCode": null,
               "reason": null
             },
             {
-              "name": "redis",
+              "name": "metrics",
               "lastStatus": "RUNNING",
               "healthStatus": "HEALTHY",
               "exitCode": null,
               "reason": null
             }
           ],
-          "startedAt": "2026-03-06T16:23:28.657000-08:00",
+          "startedAt": "2026-03-08T19:52:35.269000-07:00",
           "cpu": "1024",
           "memory": "2048"
         }
@@ -888,9 +888,9 @@
       "serviceArn": "arn:aws:ecs:us-east-2:848960888155:service/euglena-cluster/euglena-agent",
       "status": "ACTIVE",
       "desiredCount": 1,
-      "runningCount": 1,
-      "pendingCount": 0,
-      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:88",
+      "runningCount": 0,
+      "pendingCount": 1,
+      "taskDefinition": "arn:aws:ecs:us-east-2:848960888155:task-definition/euglena-agent:93",
       "deploymentConfiguration": {
         "deploymentCircuitBreaker": {
           "enable": true,
@@ -924,71 +924,71 @@
       "launchType": null,
       "recentEvents": [
         {
-          "id": "fb8fa679-ca10-4e05-b24a-53afa0693eb5",
-          "createdAt": "2026-03-06T16:19:48.762000-08:00",
+          "id": "b5aa01b6-026c-4bf1-b26d-a07d8ca6b6ec",
+          "createdAt": "2026-03-10T06:33:18.256000-07:00",
+          "message": "(service euglena-agent) has started 1 tasks: (task 7f5633835c3a4f32b81ba18a6fbc8936)."
+        },
+        {
+          "id": "499da510-6203-4d1b-9bdd-c79a8ba148ab",
+          "createdAt": "2026-03-10T06:28:21.291000-07:00",
+          "message": "(service euglena-agent) has started 1 tasks: (task 8de457aced2042c195cfc33c3dbfb6c5)."
+        },
+        {
+          "id": "5e47e85d-22c8-419a-b5ee-b8bd05c0b03e",
+          "createdAt": "2026-03-10T01:57:59.539000-07:00",
           "message": "(service euglena-agent) has reached a steady state."
         },
         {
-          "id": "fe21e45b-d29f-4526-9854-16ea9cb47e34",
-          "createdAt": "2026-03-06T16:19:48.761000-08:00",
-          "message": "(service euglena-agent) (deployment ecs-svc/2880919081501408471) deployment completed."
-        },
-        {
-          "id": "df74318c-9644-4e1e-8746-4f95fb6bb5df",
-          "createdAt": "2026-03-06T16:18:17.119000-08:00",
-          "message": "(service euglena-agent) has stopped 1 running tasks: (task 426076fa38ba44c18a1a7ba0989ad89b)."
-        },
-        {
-          "id": "15df43fa-000c-473b-9d35-34cd9491c85b",
-          "createdAt": "2026-03-06T16:13:30.145000-08:00",
-          "message": "(service euglena-agent) has started 1 tasks: (task 5c94b758f257427d9d03474ff0809608)."
-        },
-        {
-          "id": "231ed104-d77d-4de8-b11e-06581e1badf5",
-          "createdAt": "2026-03-06T10:18:18.423000-08:00",
+          "id": "ee8196ad-e225-4233-8769-fae4650b59fc",
+          "createdAt": "2026-03-09T19:57:54.728000-07:00",
           "message": "(service euglena-agent) has reached a steady state."
         },
         {
-          "id": "232e4e0b-d1a2-47e5-89f6-95fa380db990",
-          "createdAt": "2026-03-06T04:19:54.528000-08:00",
+          "id": "8df5d244-926e-49be-a977-8d4ea7110c40",
+          "createdAt": "2026-03-09T13:57:31.999000-07:00",
           "message": "(service euglena-agent) has reached a steady state."
         },
         {
-          "id": "e35027c9-2af3-45de-a267-c2f9fe51ce83",
-          "createdAt": "2026-03-06T04:19:54.527000-08:00",
-          "message": "(service euglena-agent) (deployment ecs-svc/3749140735108711546) deployment completed."
-        },
-        {
-          "id": "b77be519-e498-473d-b5a8-25d32c174fa6",
-          "createdAt": "2026-03-06T04:18:00.845000-08:00",
-          "message": "(service euglena-agent) has stopped 1 running tasks: (task 5a4663e4fa50453a96d89d98bf8624d6)."
-        },
-        {
-          "id": "a2ed12e4-5c4e-4698-9abf-6b37ca22c822",
-          "createdAt": "2026-03-06T04:13:13.223000-08:00",
-          "message": "(service euglena-agent) has started 1 tasks: (task 426076fa38ba44c18a1a7ba0989ad89b)."
-        },
-        {
-          "id": "48c99769-b9a7-4dee-92a4-eaa001ea1b1d",
-          "createdAt": "2026-03-06T02:50:13.111000-08:00",
+          "id": "5599f2bd-15c7-47c9-a3d2-50e8d2fe4f90",
+          "createdAt": "2026-03-09T07:57:25.630000-07:00",
           "message": "(service euglena-agent) has reached a steady state."
+        },
+        {
+          "id": "9a3755dc-3bd1-4c69-b2c7-702c94e8ff7c",
+          "createdAt": "2026-03-09T01:57:12.962000-07:00",
+          "message": "(service euglena-agent) has reached a steady state."
+        },
+        {
+          "id": "389ace1b-fced-4b3d-99cf-da68d657617f",
+          "createdAt": "2026-03-08T19:58:40.323000-07:00",
+          "message": "(service euglena-agent) has reached a steady state."
+        },
+        {
+          "id": "a33ed71c-0a59-4f69-9ae3-115a263e9b10",
+          "createdAt": "2026-03-08T19:58:40.322000-07:00",
+          "message": "(service euglena-agent) (deployment ecs-svc/2181101443576097911) deployment completed."
+        },
+        {
+          "id": "074bd79d-1529-449a-a749-b7bfd62625e2",
+          "createdAt": "2026-03-08T19:56:46.689000-07:00",
+          "message": "(service euglena-agent) has stopped 1 running tasks: (task 048fe153755b403c90fee757682f9188)."
         }
       ],
       "runningTasks": [
         {
-          "taskArn": "arn:aws:ecs:us-east-2:848960888155:task/euglena-cluster/5c94b758f257427d9d03474ff0809608",
-          "lastStatus": "RUNNING",
-          "healthStatus": "HEALTHY",
+          "taskArn": "arn:aws:ecs:us-east-2:848960888155:task/euglena-cluster/7f5633835c3a4f32b81ba18a6fbc8936",
+          "lastStatus": "PENDING",
+          "healthStatus": "UNKNOWN",
           "containers": [
             {
               "name": "agent",
-              "lastStatus": "RUNNING",
-              "healthStatus": "HEALTHY",
+              "lastStatus": "PENDING",
+              "healthStatus": "UNKNOWN",
               "exitCode": null,
               "reason": null
             }
           ],
-          "startedAt": "2026-03-06T16:16:30.407000-08:00",
+          "startedAt": null,
           "cpu": "256",
           "memory": "512"
         }
@@ -1013,7 +1013,7 @@
     "targetHealth": [
       {
         "Target": {
-          "Id": "10.0.23.120",
+          "Id": "10.0.28.96",
           "Port": 8080,
           "AvailabilityZone": "us-east-2b"
         },
@@ -1053,11 +1053,11 @@
         "healthCheckConfig": null,
         "instances": [
           {
-            "Id": "7cfee93c8bbe45cc95a861ec23de1edc",
+            "Id": "a7e71b7e7fbe4597af79a81c33b3ffe4",
             "Attributes": {
               "AVAILABILITY_ZONE": "us-east-2b",
               "AWS_INIT_HEALTH_STATUS": "UNHEALTHY",
-              "AWS_INSTANCE_IPV4": "10.0.23.120",
+              "AWS_INSTANCE_IPV4": "10.0.28.96",
               "ECS_CLUSTER_NAME": "euglena-cluster",
               "ECS_SERVICE_NAME": "euglena-gateway",
               "ECS_TASK_DEFINITION_FAMILY": "euglena-gateway",
@@ -1208,6 +1208,12 @@
       },
       {
         "imageTags": [],
+        "imageDigest": "sha256:66db04d3306776b1b1e762560c2008a9ff4813c17be804a8d9d52e50e8f213ed",
+        "imagePushedAt": "2026-03-08T17:32:00.523000-07:00",
+        "imageSizeInBytes": 5017621184
+      },
+      {
+        "imageTags": [],
         "imageDigest": "sha256:ffb069c65c4d24ed7d1833e7d4ed66fc48cb8cff98bece9eb814b8a5a9e7279d",
         "imagePushedAt": "2026-01-12T06:28:24.653000-08:00",
         "imageSizeInBytes": 640256618
@@ -1229,12 +1235,6 @@
         "imageDigest": "sha256:389671b16f209b248ac36cf94a3276dc52d850bec86566a36b147c8b907a5768",
         "imagePushedAt": "2026-02-09T09:23:00.281000-08:00",
         "imageSizeInBytes": 4501958452
-      },
-      {
-        "imageTags": [],
-        "imageDigest": "sha256:39a8eef0a2e5bd510dba7a57eb162613bfd801cb96ab594615d73c5cd1e713e9",
-        "imagePushedAt": "2026-01-30T02:04:22.812000-08:00",
-        "imageSizeInBytes": 4491329891
       }
     ],
     "metrics": [
@@ -1309,10 +1309,10 @@
       "throughputMode": "elastic",
       "encrypted": true,
       "sizeInBytes": {
-        "Value": 2719973376,
-        "Timestamp": "2026-03-06T20:16:31-08:00",
+        "Value": 2724958208,
+        "Timestamp": "2026-03-10T06:23:46-07:00",
         "ValueInIA": 0,
-        "ValueInStandard": 96706560,
+        "ValueInStandard": 101691392,
         "ValueInArchive": 2623266816
       }
     }

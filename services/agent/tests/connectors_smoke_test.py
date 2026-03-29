@@ -63,8 +63,8 @@ async def test_connector_llm_smoke():
     if not _real_enabled():
         pytest.skip("CONNECTOR_SMOKE_TESTS not enabled")
     config = ConnectorConfig()
-    if not config.llm_api_url or not config.openai_api_key:
-        pytest.skip("MODEL_API_URL/OPENAI_API_KEY not configured")
+    if not config.llm_api_key:
+        pytest.skip("LLM_API_KEY or provider API key not configured")
     connector = ConnectorLLM(config)
     payload = connector.build_payload(
         messages=[{"role": "user", "content": "Reply with pong"}],
