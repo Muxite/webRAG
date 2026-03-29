@@ -265,7 +265,11 @@ def build_gateway_task_definition(account_id, region, secret_name, secret_arn_su
     chroma_efs_id = chroma_efs_id if chroma_efs_id else None
     rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
     
-    chroma_health_command = "curl -f -s -S --max-time 15 --connect-timeout 5 http://localhost:8000/api/v1/heartbeat > /dev/null 2>&1 || exit 1"
+    chroma_health_command = (
+        "/bin/bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000 && "
+        'printf "GET /api/v2/heartbeat HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n" >&3 && '
+        "head -1 <&3 | grep -q \"200 OK\"' || exit 1"
+    )
     chroma_mount_points = []
     if chroma_efs_id:
         chroma_mount_points.append({"sourceVolume": "chroma-data", "containerPath": "/chroma-data", "readOnly": False})
@@ -545,7 +549,11 @@ def build_euglena_task_definition(account_id, region, secret_name, secret_arn_su
     chroma_efs_id = chroma_efs_id if chroma_efs_id else None
     rabbitmq_efs_id = rabbitmq_efs_id if rabbitmq_efs_id else None
     
-    chroma_health_command = "curl -f -s -S --max-time 15 --connect-timeout 5 http://localhost:8000/api/v1/heartbeat > /dev/null 2>&1 || exit 1"
+    chroma_health_command = (
+        "/bin/bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000 && "
+        'printf "GET /api/v2/heartbeat HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n" >&3 && '
+        "head -1 <&3 | grep -q \"200 OK\"' || exit 1"
+    )
     chroma_mount_points = []
     if chroma_efs_id:
         chroma_mount_points.append({"sourceVolume": "chroma-data", "containerPath": "/chroma-data", "readOnly": False})

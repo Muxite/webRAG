@@ -110,23 +110,49 @@ Visualizations are automatically generated after test runs and saved to `agent/i
 | Frontend | React, Vite, Supabase Auth |
 | Backend | FastAPI, RabbitMQ, Redis, ChromaDB, Supabase |
 | Agent | Graph-of-Thought engine, OpenAI LLMs, Brave Search, undetected-chromedriver |
-| Infra | AWS ECS, ECR, CloudWatch, Lambda autoscaling |
+| Infra | AWS ECS, ECR, CloudWatch, Lambda autoscaling; optional local Docker |
 
 ## Quick Start
+
+### Production (AWS)
+
+Use the existing ECS deploy path. If `VITE_GATEWAY_URL` is unset, the app uses the default hosted API URL in `frontend/src/api/config.ts`.
+
+### Local backend (Docker) and Vercel UI
+
+Same Supabase keys. Run the stack without nginx:
+
+```bash
+cd services
+cp keys.env.example keys.env
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build --scale agent=3
+```
+
+Or: `python scripts/deploy_local_stack.py up` from the repo root.
+
+Run `tailscale funnel --bg --yes 18080`, set `VITE_GATEWAY_URL` on Vercel to the printed HTTPS URL, redeploy.
+
+Optional static UI on this host (nginx on port 80):
+
+```bash
+python scripts/deploy_local_stack.py build-frontend
+python scripts/deploy_local_stack.py up-spa
+```
+
+Start on boot (systemd): from `services/` run `./install-webrag-service.sh` once (sets `WorkingDirectory` and enables `webrag.service`). Build images before first boot: `docker compose -f docker-compose.yml -f docker-compose.local.yml build`.
 
 ### Local Development
 
 ```bash
 cd services
-cp keys.env.example keys.env   # add OPENAI_API_KEY + SEARCH_API_KEY
-docker compose up -d            # starts gateway, agent, rabbitmq, redis, chroma
+cp keys.env.example keys.env
+docker compose up -d
 ```
 
-The system will be available at:
-- **Frontend**: `http://localhost:5173` (Vite dev server)
-- **Gateway API**: `http://localhost:8000`
-- **RabbitMQ Management**: `http://localhost:15672` (guest/guest)
-- **ChromaDB**: `http://localhost:8001`
+- Frontend (Vite): `http://localhost:5173`
+- Gateway: `http://localhost:8080`
+- RabbitMQ UI: `http://localhost:15672` (guest/guest)
+- ChromaDB: `http://localhost:8001`
 
 ### Running Tests
 

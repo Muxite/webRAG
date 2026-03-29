@@ -2,15 +2,7 @@ import { projectId, publicAnonKey } from "/utils/supabase/info.tsx";
 import { supabase } from "@/lib/supabase";
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * VERSION CONFIGURATION
- * ═══════════════════════════════════════════════════════════════════════════
- * 
- * 🔧 EASY API REPLACEMENT:
- * Update these version strings to match your backend gateway and worker versions.
- * These are displayed in the Dashboard's "Backend Status" section.
- * 
- * ═══════════════════════════════════════════════════════════════════════════
+ * Version strings for the dashboard Backend Status section. Match your deployed gateway and worker.
  */
 export const VERSION_CONFIG = {
   gateway: "v2.2",
@@ -24,12 +16,9 @@ export const VERSION_CONFIG = {
 const isLocalDev = import.meta.env.VITE_USE_LOCAL === "true";
 
 /**
- * Determine the gateway base URL.
- * Priority:
- * 1. Explicit VITE_GATEWAY_URL env variable
- * 2. VITE_GATEWAY_RELATIVE=true -> same origin as the SPA (nginx + Tailscale funnel)
- * 3. Local dev mode -> http://localhost:8080 (Docker gateway)
- * 4. Default production URL
+ * Gateway base URL. Order: VITE_GATEWAY_URL if set; else empty if VITE_GATEWAY_RELATIVE; else
+ * localhost in local dev; else default production URL. For Vercel UI with a local API, set
+ * VITE_GATEWAY_URL to your Tailscale funnel HTTPS origin (no trailing slash).
  */
 const getGatewayBaseUrl = (): string => {
   if (import.meta.env.VITE_GATEWAY_URL) {
@@ -51,8 +40,8 @@ export const API_CONFIG = {
 } as const;
 
 if (isLocalDev && !import.meta.env.VITE_GATEWAY_URL) {
-  console.log(`🔧 Local Development Mode: Using Docker gateway at ${API_CONFIG.gatewayBaseUrl}`);
-  console.log(`   Set VITE_GATEWAY_URL to override or VITE_USE_LOCAL=false to disable`);
+  console.log(`Local dev: gateway ${API_CONFIG.gatewayBaseUrl}`);
+  console.log(`Set VITE_GATEWAY_URL to override, or VITE_USE_LOCAL=false to disable`);
 }
 
 /**
@@ -184,7 +173,7 @@ export interface LoginData {
  * @param token - Optional user JWT token from Supabase auth
  * @returns Headers object with Authorization and Content-Type
  * 
- * 💡 USAGE:
+ * Usage:
  * - Without token: Uses Supabase anon key (for public endpoints)
  * - With token: Uses user's JWT token (for protected endpoints)
  */
@@ -205,12 +194,12 @@ export function createAuthHeaders(token?: string): HeadersInit {
 /**
  * Fetch system information (backend status, versions, active workers)
  * 
- * 🌐 ENDPOINT: GET /system-info
- * 🔓 AUTH: Public (uses anon key)
+ * Endpoint: GET /system-info
+ * Auth: public (anon key)
  * 
  * @returns SystemInfo object with backend status
  * 
- * 📊 EXPECTED RESPONSE:
+ * Expected response:
  * {
  *   "title": "CyberLink Terminal",
  *   "gatewayVersion": "v1.3.2",
@@ -220,7 +209,7 @@ export function createAuthHeaders(token?: string): HeadersInit {
  *   "github": "https://github.com/..."
  * }
  * 
- * 🔧 FALLBACK BEHAVIOR:
+ * Fallback:
  * If the API fails, returns VERSION_CONFIG values for gateway/worker versions.
  * Update VERSION_CONFIG at the top of this file to change displayed versions.
  */
@@ -275,14 +264,14 @@ export async function fetchWorkerCount(): Promise<number> {
 /**
  * Fetch user statistics (email, credit balance, daily allowance)
  * 
- * 🌐 ENDPOINT: GET /user-stats
- * 🔒 AUTH: Protected (requires user token)
+ * Endpoint: GET /user-stats
+ * Auth: bearer token required
  * 
  * @param token - User's JWT token from Supabase
  * @param userEmail - Optional fallback email for mock data
  * @returns UserStats object with credit balance and email
  * 
- * 📊 EXPECTED RESPONSE:
+ * Expected response:
  * {
  *   "email": "user@example.com",
  *   "ticksRemaining": 1000,
@@ -341,13 +330,13 @@ export async function fetchUserStats(token: string, userEmail?: string): Promise
 /**
  * Fetch all tasks for the current user
  * 
- * 🌐 ENDPOINT: GET /tasks
- * 🔒 AUTH: Protected (requires user token)
+ * Endpoint: GET /tasks
+ * Auth: bearer token required
  * 
  * @param token - User's JWT token from Supabase
  * @returns Array of Task objects
  * 
- * 📊 EXPECTED RESPONSE:
+ * Expected response:
  * {
  *   "tasks": [
  *     {
@@ -402,20 +391,20 @@ export async function fetchTasks(token: string): Promise<Task[]> {
 /**
  * Submit a new task to the backend
  * 
- * 🌐 ENDPOINT: POST /submit-task
- * 🔒 AUTH: Protected (requires user token)
+ * Endpoint: POST /submit-task
+ * Auth: bearer token required
  * 
  * @param token - User's JWT token from Supabase
  * @param taskData - Task submission data (mandate, maxTicks)
  * @returns Boolean indicating success/failure
  * 
- * 📤 REQUEST BODY:
+ * Request body:
  * {
  *   "mandate": "Write a comprehensive report",
  *   "maxTicks": 500
  * }
  * 
- * 📊 EXPECTED RESPONSE (Success):
+ * Expected response (success):
  * {
  *   "id": "task-003",
  *   "timestamp": "2026-02-08T12:00:00Z",
