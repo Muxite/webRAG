@@ -198,6 +198,7 @@
   "final_temperature": 0.3,
   "final_max_tokens": 120000,
   "final_chroma_results": 10,
+  "final_allow_partial_success": true,
   "merge_system_prompt": "You are the Aggregate operation in a Graph-of-Thought system. Combine child node results into a coherent summary. Remove redundancy, extract key findings. Evaluate if the original goal has been achieved. Return JSON: {{summary: string, key_findings: [string, ...], goal_achieved: boolean, goal_evaluation: string, missing_requirements: [string, ...]}}.",
   "merge_planning_addendum": "Produce a synthesis that preserves provenance. Include what is confirmed, what is uncertain, and what additional evidence would close gaps. Prefer concise factual bullets that map claims to source evidence. CRITICAL: Evaluate goal achievement based on the original intent/reason the branch was created - not just whether keywords appear in the text, but whether the actual objective has been met.",
   "merge_user_prompt": "{{\"merged_results\": {merged_json}, \"original_goal\": \"{original_goal}\", \"parent_intent\": \"{parent_intent}\", \"parent_justification\": \"{parent_justification}\"}}",

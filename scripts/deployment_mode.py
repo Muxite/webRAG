@@ -10,9 +10,11 @@ class DeploymentMode(Enum):
     
     SINGLE: All containers in a single ECS service
     AUTOSCALE: Separate gateway and agent services with autoscaling
+    LOCAL_DOCKER: Fixed-replica Docker Compose on a machine (e.g. Ubuntu + Tailscale funnel)
     """
     SINGLE = "single"
     AUTOSCALE = "autoscale"
+    LOCAL_DOCKER = "local-docker"
     
     def __str__(self):
         return self.value
@@ -22,7 +24,7 @@ class DeploymentMode(Enum):
         """
         Create DeploymentMode from string.
         
-        :param value: String value ("single" or "autoscale")
+        :param value: String value ("single", "autoscale", or "local-docker")
         :returns: DeploymentMode enum value
         :raises ValueError: If value is not a valid mode
         """
@@ -30,7 +32,7 @@ class DeploymentMode(Enum):
         for mode in cls:
             if mode.value == value_lower:
                 return mode
-        raise ValueError(f"Invalid deployment mode: {value}. Must be 'single' or 'autoscale'")
+        raise ValueError(f"Invalid deployment mode: {value}. Must be 'single', 'autoscale', or 'local-docker'")
 
 
 def main():

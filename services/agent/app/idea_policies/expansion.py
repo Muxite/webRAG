@@ -66,14 +66,21 @@ class LlmExpansionPolicy(ExpansionPolicy):
             else:
                 expansion_timeout = max(expansion_timeout, 120)
             
-            self._logger.info(f"[EXPANSION] LLM Input - Full messages: {json.dumps(messages, indent=2, ensure_ascii=True)}")
+            try:
+                preview = json.dumps(messages, indent=2, ensure_ascii=True)
+            except Exception:
+                preview = str(messages)
+            if len(preview) > 2000:
+                preview = preview[:2000] + "... [truncated]"
+            self._logger.debug(f"[EXPANSION] LLM Input preview: {preview}")
             content = await self.io.query_llm_with_fallback(
                 payload,
                 model_name=model_name,
                 fallback_model=self.settings.get("fallback_model"),
                 timeout_seconds=expansion_timeout,
             )
-            self._logger.info(f"[EXPANSION] LLM Output - Full response: {content}")
+            output_preview = content[:2000] + "... [truncated]" if isinstance(content, str) and len(content) > 2000 else content
+            self._logger.debug(f"[EXPANSION] LLM Output preview: {output_preview}")
             candidates, meta = self._parse_candidates(content, graph=graph, parent_node_id=node_id)
             self._logger.info(f"[EXPANSION] Parsed {len(candidates)} candidates from LLM response, meta={meta}")
             if not candidates:

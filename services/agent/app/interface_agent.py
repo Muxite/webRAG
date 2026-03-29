@@ -545,7 +545,32 @@ class InterfaceAgent:
             self._finalize_telemetry(success=success)
         except Exception as e:
             self.logger.exception("Agent execution failed")
-            await self._publish_status(StatusType.ERROR, max_ticks=max_ticks, error=str(e))
+            deliverables = []
+            if self.agent and getattr(self.agent, "deliverables", None):
+                try:
+                    deliverables = list(self.agent.deliverables)
+                except Exception:
+                    deliverables = []
+            notes = f"Internal agent error: {str(e)}"
+
+            if deliverables:
+                completion = CompletionResult(
+                    correlation_id=self.correlation_id,
+                    success=False,
+                    deliverables=deliverables,
+                    notes=notes,
+                )
+                await self._publish_status(
+                    StatusType.COMPLETED,
+                    max_ticks=max_ticks,
+                    result=completion.result(),
+                )
+            else:
+                await self._publish_status(
+                    StatusType.ERROR,
+                    max_ticks=max_ticks,
+                    error=str(e),
+                )
             self._finalize_telemetry(success=False)
         finally:
             await self._cancel_task(self._heartbeat_task)

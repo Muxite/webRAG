@@ -1678,8 +1678,7 @@ class MergeLeafAction(LeafAction):
                     compacted.append(mr)
             merged_json = json.dumps(compacted, ensure_ascii=True)
             if len(merged_json) > 100000:
-                merged_json = merged_json[:100000] + "... ]"
-                self._logger.warning(f"[MERGE] merged_json truncated to 100k chars")
+                self._logger.warning(f"[MERGE] merged_json size={len(merged_json)} chars (no truncation applied)")
             user_content = user_template.format(
                 merged_json=merged_json,
                 original_goal=original_goal or "",
@@ -1709,14 +1708,21 @@ class MergeLeafAction(LeafAction):
             )
             
             timeout_seconds = self._timeout_seconds("llm_timeout_seconds")
-            self._logger.info(f"[MERGE] LLM Input - Full messages: {json.dumps(messages, indent=2, ensure_ascii=True)}")
+            try:
+                merge_preview = json.dumps(messages, indent=2, ensure_ascii=True)
+            except Exception:
+                merge_preview = str(messages)
+            if len(merge_preview) > 2000:
+                merge_preview = merge_preview[:2000] + "... [truncated]"
+            self._logger.debug(f"[MERGE] LLM Input preview: {merge_preview}")
             response = await io.query_llm_with_fallback(
                 payload,
                 model_name=model_name,
                 fallback_model=self.settings.get("fallback_model"),
                 timeout_seconds=timeout_seconds,
             )
-            self._logger.info(f"[MERGE] LLM Output - Full response: {response}")
+            response_preview = response[:2000] + "... [truncated]" if isinstance(response, str) and len(response) > 2000 else response
+            self._logger.debug(f"[MERGE] LLM Output preview: {response_preview}")
             
             if not response:
                 return ActionResultBuilder.failure(

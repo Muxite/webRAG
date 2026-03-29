@@ -512,8 +512,8 @@ def build_agent_task_definition(account_id, region, secret_name, secret_arn_suff
         "volumes": [],
         "placementConstraints": [],
         "requiresCompatibilities": ["FARGATE"],
-        "cpu": "256",
-        "memory": "512"
+        "cpu": "1024",
+        "memory": "2048"
     }
 
 

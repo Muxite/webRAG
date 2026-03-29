@@ -478,7 +478,11 @@ async def build_final_payload(
             if n.details.get(DetailKey.ACTION.value) in critical_actions
         ]
         has_critical_failures = len(critical_failures) > 0
-        success = bool(deliverable.strip()) and (goal_achieved or not has_critical_failures)
+        allow_partial_success = bool(settings.get("final_allow_partial_success", False))
+        if allow_partial_success:
+            success = bool(deliverable.strip())
+        else:
+            success = bool(deliverable.strip()) and (goal_achieved or not has_critical_failures)
 
         return {
             "final_deliverable": deliverable,
