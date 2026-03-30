@@ -6,7 +6,7 @@ Euglena is an agent with web crawling and retrieval-augmented generation. Tasks 
 
 **Live:** <https://euglena.vercel.app/>
 
-**Note:** The visit system does not work on deployment due to website anti-bot measures that detect AWS datacenter IPs. The agent demonstrates resilience by working with search results and other available data sources. This website will be available until 2026-03-16 00:00 PST.
+**Ops (2026-03):** Project is winding down. Production uses a local backend instead of AWS: ECS deploy scripts in-repo still work if needed.
 
 ## Benchmark Results
 
