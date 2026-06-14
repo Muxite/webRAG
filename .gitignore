@@ -18,3 +18,14 @@ dist/
 .claude
 .cursor
 .venv
+
+# Environment files
+.env
+*.env
+
+# IDE / OS junk
+.idea/
+desktop.ini
+
+# Generated benchmark / test-run artifacts
+idea_test_results/
