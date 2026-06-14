@@ -5,20 +5,26 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from agent.app.prompts.loader import apply_default_prompts
+
 
 def load_idea_dag_settings(path: Optional[Path] = None) -> Dict[str, Any]:
     if path is None:
         path = Path(__file__).resolve().parent / "idea_dag_settings.json"
     with path.open("r", encoding="utf-8") as handle:
         settings = json.load(handle)
-    
+
+    # Prompts present in settings.json win; missing/empty keys are filled from
+    # `prompts/defaults/*.md` so prompt content can be edited as documents.
+    apply_default_prompts(settings)
+
     env_overrides = {
         "expansion_max_tokens": os.environ.get("IDEA_DAG_EXPANSION_MAX_TOKENS"),
         "evaluation_max_tokens": os.environ.get("IDEA_DAG_EVALUATION_MAX_TOKENS"),
         "final_max_tokens": os.environ.get("IDEA_DAG_FINAL_MAX_TOKENS"),
         "merge_max_tokens": os.environ.get("IDEA_DAG_MERGE_MAX_TOKENS"),
     }
-    
+
     for key, env_value in env_overrides.items():
         if env_value is not None:
             env_value = env_value.strip()
@@ -30,5 +36,5 @@ def load_idea_dag_settings(path: Optional[Path] = None) -> Dict[str, Any]:
                         settings[key] = int(env_value)
                 except (ValueError, TypeError):
                     pass
-    
+
     return settings

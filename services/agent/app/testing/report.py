@@ -196,6 +196,10 @@ class TestReportGenerator:
         console.append("Observability:")
         llm_obs = observability.get("llm", {})
         console.append(f"  LLM calls: {llm_obs.get('calls', 0)}, tokens: {llm_obs.get('total_tokens', 0)}")
+        cost_obs = observability.get("cost", {})
+        if cost_obs:
+            est_tag = " (est)" if cost_obs.get("estimated") else ""
+            console.append(f"  Cost: {cost_obs.get('usd_str', 'N/A')}{est_tag}  [{cost_obs.get('model', '?')}]")
         console.append(f"  Visits: {observability.get('visit', {}).get('count', 0)}")
         console.append(f"  Searches: {observability.get('search', {}).get('count', 0)}")
         console.append(f"  Chroma stores: {observability.get('chroma', {}).get('store', {}).get('count', 0)}")

@@ -51,6 +51,16 @@ class LeafAction(ABC):
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         raise NotImplementedError()
 
+    def post_execute_provides(self, node: "IdeaNode", result: Dict[str, Any]) -> Optional[str]:
+        """
+        Name of the `DataContract` this action satisfies on successful execution.
+
+        Returning `None` (the default) means the action does not auto-tag the
+        node's `PROVIDES_DATA` detail. Subclasses override to declare what
+        downstream nodes can rely on this action having produced.
+        """
+        return None
+
     def _max_observation_chars(self) -> int:
         return int(self.settings.get("max_observation_chars", 100000))
 
@@ -164,6 +174,11 @@ class LeafAction(ABC):
 
 
 class SearchLeafAction(LeafAction):
+    name = "search"
+
+    def post_execute_provides(self, node, result: Dict[str, Any]) -> Optional[str]:
+        return "urls_from_search"
+
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         node = None
         query = None
@@ -261,6 +276,21 @@ class SearchLeafAction(LeafAction):
 
 
 class VisitLeafAction(LeafAction):
+    name = "visit"
+
+    def post_execute_provides(self, node, result: Dict[str, Any]) -> Optional[str]:
+        from agent.app.idea_policies.action_constants import ActionResultKey
+
+        content = (
+            result.get(ActionResultKey.CONTENT.value)
+            or result.get(ActionResultKey.CONTENT_FULL.value)
+            or result.get("content")
+            or ""
+        )
+        if not content or not content.strip():
+            return None
+        return "urls_from_visit"
+
     def _is_valid_url(self, candidate: str) -> bool:
         if not candidate or not isinstance(candidate, str):
             return False
@@ -1449,6 +1479,8 @@ class VisitLeafAction(LeafAction):
 
 
 class ThinkLeafAction(LeafAction):
+    name = "think"
+
     def _extract_url_from_parent_result(self, graph: IdeaDag, node: IdeaNode) -> Optional[str]:
         from agent.app.idea_policies.action_constants import ActionResultKey
         from agent.app.idea_policies.base import DetailKey
@@ -1574,6 +1606,8 @@ class ThinkLeafAction(LeafAction):
 
 
 class SaveLeafAction(LeafAction):
+    name = "save"
+
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         node = None
         try:
@@ -1611,6 +1645,8 @@ class SaveLeafAction(LeafAction):
 
 
 class MergeLeafAction(LeafAction):
+    name = "merge"
+
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         import json
         node = None
@@ -1778,9 +1814,27 @@ class MergeLeafAction(LeafAction):
 
 
 class LeafActionRegistry:
+    """Registry of leaf actions.
+
+    Built-ins (`search/visit/think/save/merge`) ship pre-registered and are
+    addressable by either their `IdeaActionType` enum value or by name string.
+    Custom actions register themselves by name via `register(cls)` or in
+    bulk via `install_pack(pack)`.
+    """
+
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         self.settings = dict(settings or {})
-        self._registry = {
+        # Single source of truth: name → class. Enum lookups go through the
+        # enum's `.value` (which equals the name string) into this dict.
+        self._by_name: Dict[str, type] = {
+            IdeaActionType.SEARCH.value: SearchLeafAction,
+            IdeaActionType.VISIT.value: VisitLeafAction,
+            IdeaActionType.SAVE.value: SaveLeafAction,
+            IdeaActionType.THINK.value: ThinkLeafAction,
+            IdeaActionType.MERGE.value: MergeLeafAction,
+        }
+        # Kept for legacy code paths that introspect `._registry` directly.
+        self._registry: Dict[IdeaActionType, type] = {
             IdeaActionType.SEARCH: SearchLeafAction,
             IdeaActionType.VISIT: VisitLeafAction,
             IdeaActionType.SAVE: SaveLeafAction,
@@ -1788,11 +1842,52 @@ class LeafActionRegistry:
             IdeaActionType.MERGE: MergeLeafAction,
         }
 
-    def get(self, action_type: IdeaActionType) -> LeafAction:
-        action_cls = self._registry.get(action_type)
+    @staticmethod
+    def _normalize(key: Any) -> Optional[str]:
+        if isinstance(key, IdeaActionType):
+            return key.value
+        if isinstance(key, str):
+            return key
+        return None
+
+    def get(self, action_type: Any) -> LeafAction:
+        """Resolve an action by enum value or by name string."""
+        name = self._normalize(action_type)
+        if name is None:
+            raise ValueError(f"Unknown action type: {action_type!r}")
+        action_cls = self._by_name.get(name)
         if not action_cls:
-            raise ValueError(f"Unknown action type: {action_type}")
+            raise ValueError(f"Unknown action type: {action_type!r}")
         return action_cls(settings=self.settings)
+
+    def has(self, action_type: Any) -> bool:
+        name = self._normalize(action_type)
+        return bool(name and name in self._by_name)
+
+    def register(self, cls: type) -> None:
+        """Register a `LeafAction` subclass by its `name` ClassVar."""
+        name = getattr(cls, "name", None)
+        if not isinstance(name, str) or not name:
+            raise ValueError(
+                f"Action class {cls.__name__} must declare a non-empty string `name` ClassVar"
+            )
+        self._by_name[name] = cls
+
+    def install_pack(self, pack: Any) -> List[str]:
+        """Register every action class in `pack.ACTION_CLASSES`.
+
+        Returns the list of names that were installed (for callers that want
+        to update `allowed_actions` in settings).
+        """
+        installed: List[str] = []
+        action_classes = getattr(pack, "ACTION_CLASSES", None) or []
+        for cls in action_classes:
+            self.register(cls)
+            installed.append(getattr(cls, "name"))
+        return installed
+
+    def names(self) -> List[str]:
+        return list(self._by_name.keys())
 
 
 def execute_leaf_action(action: LeafAction, graph: IdeaDag, node_id: str, io: AgentIO):

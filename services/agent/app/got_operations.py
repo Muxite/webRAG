@@ -201,6 +201,28 @@ class GoTOperations:
             _logger.warning(f"[GoT:IMPROVE] Failed to improve node {node_id}: {exc}")
             return None
 
+    def _adaptive_dedup_threshold(self, graph: IdeaDag) -> float:
+        """
+        Pick a similarity cutoff based on graph density. Sparse graphs tolerate
+        more variety (lower cutoff → less aggressive dedup); dense ones tighten
+        the cutoff to keep growth in check. Clamped to [0.75, 0.92].
+
+        :param graph: Current DAG.
+        :returns: Threshold in [0.75, 0.92].
+        """
+        if not self.settings.get("got_adaptive_policies", True):
+            return float(self.settings.get("got_dedup_similarity_threshold", 0.85))
+        floor = float(self.settings.get("got_dedup_threshold_min", 0.75))
+        ceil = float(self.settings.get("got_dedup_threshold_max", 0.92))
+        # Use sibling fanout as a density proxy: max children across non-leaf nodes.
+        fanout = 0
+        for n in graph.iter_depth_first():
+            if n.children:
+                fanout = max(fanout, len(n.children))
+        # 0 siblings → loose (floor); >=8 siblings → tight (ceil); linear in between.
+        ratio = min(1.0, fanout / 8.0)
+        return round(floor + ratio * (ceil - floor), 3)
+
     async def is_duplicate_thought(
         self,
         candidate_title: str,
@@ -212,7 +234,7 @@ class GoTOperations:
         if not self.memory_manager:
             return False, None
 
-        threshold = float(self.settings.get("got_dedup_similarity_threshold", 0.85))
+        threshold = self._adaptive_dedup_threshold(graph)
         n_query = int(self.settings.get("got_dedup_max_query", 5))
 
         query = f"{candidate_title} {candidate_goal}"
@@ -281,19 +303,35 @@ class GoTOperations:
 
         beam_min = int(self.settings.get("got_beam_min", 2))
         beam_max = int(self.settings.get("got_beam_max", 5))
-        score_high = float(self.settings.get("got_beam_score_high", 0.7))
-        score_low = float(self.settings.get("got_beam_score_low", 0.3))
 
-        scores = []
+        scores: List[float] = []
         for node in graph.iter_depth_first():
             if node.score is not None and node.parent_id is not None:
-                scores.append(node.score)
+                scores.append(float(node.score))
 
         if not scores:
             return beam_max
 
-        avg_score = sum(scores) / len(scores)
+        adaptive = bool(self.settings.get("got_adaptive_policies", True))
+        if adaptive and len(scores) >= 4:
+            # Beam widens when scores are spread (uncertain) and narrows when they
+            # cluster (converged). Use p25/p75 spread relative to a target band.
+            ordered = sorted(scores)
+            p25 = ordered[max(0, int(len(ordered) * 0.25) - 1)]
+            p75 = ordered[min(len(ordered) - 1, int(len(ordered) * 0.75))]
+            spread = max(0.0, p75 - p25)  # 0..1 in practice
+            target_spread = float(self.settings.get("got_beam_target_spread", 0.4))
+            ratio = min(1.0, spread / target_spread) if target_spread > 0 else 0.0
+            beam = beam_min + int(round(ratio * (beam_max - beam_min)))
+            beam = max(beam_min, min(beam_max, beam))
+            _logger.debug(
+                f"[GoT:BEAM] adaptive p25={p25:.3f} p75={p75:.3f} spread={spread:.3f} -> beam={beam}"
+            )
+            return beam
 
+        score_high = float(self.settings.get("got_beam_score_high", 0.7))
+        score_low = float(self.settings.get("got_beam_score_low", 0.3))
+        avg_score = sum(scores) / len(scores)
         if avg_score >= score_high:
             beam = beam_min
         elif avg_score <= score_low:
@@ -301,20 +339,32 @@ class GoTOperations:
         else:
             ratio = (score_high - avg_score) / (score_high - score_low)
             beam = beam_min + int(ratio * (beam_max - beam_min))
-
         beam = max(beam_min, min(beam_max, beam))
-        _logger.debug(f"[GoT:BEAM] avg_score={avg_score:.3f} -> beam_width={beam}")
+        _logger.debug(f"[GoT:BEAM] legacy avg_score={avg_score:.3f} -> beam_width={beam}")
         return beam
 
     def identify_prune_candidates(self, graph: IdeaDag) -> List[str]:
         if not self.settings.get("got_prune_enabled", True):
             return []
 
-        threshold = float(self.settings.get("got_prune_score_threshold", 0.15))
         min_nodes = int(self.settings.get("got_prune_min_nodes_before_prune", 6))
-
         if graph.node_count() < min_nodes:
             return []
+
+        scored: List[float] = []
+        for node in graph.iter_depth_first():
+            if node.score is not None and node.parent_id is not None:
+                scored.append(float(node.score))
+
+        adaptive = bool(self.settings.get("got_adaptive_policies", True))
+        if adaptive and len(scored) >= 5:
+            mean = sum(scored) / len(scored)
+            variance = sum((s - mean) ** 2 for s in scored) / len(scored)
+            stddev = variance ** 0.5
+            stddev_factor = float(self.settings.get("got_prune_stddev_factor", 1.0))
+            threshold = max(0.0, mean - stddev_factor * stddev)
+        else:
+            threshold = float(self.settings.get("got_prune_score_threshold", 0.15))
 
         prune_ids = []
         for node in graph.iter_depth_first():
@@ -328,7 +378,10 @@ class GoTOperations:
                     prune_ids.append(node.node_id)
 
         if prune_ids:
-            _logger.info(f"[GoT:PRUNE] Identified {len(prune_ids)} low-score nodes for pruning (threshold={threshold})")
+            _logger.info(
+                f"[GoT:PRUNE] Identified {len(prune_ids)} low-score nodes for pruning "
+                f"(threshold={threshold:.3f}, adaptive={adaptive})"
+            )
         return prune_ids
 
     def prune_nodes(self, graph: IdeaDag, node_ids: List[str]) -> int:
@@ -353,6 +406,7 @@ class GoTOperations:
             return False
 
         dead_end_limit = int(self.settings.get("got_backtrack_dead_end_threshold", 3))
+        low_score = float(self.settings.get("got_backtrack_low_score_threshold", 0.3))
 
         node = graph.get_node(current_id)
         if not node:
@@ -361,7 +415,7 @@ class GoTOperations:
         consecutive_low = 0
         path = graph.path_to_root(current_id)
         for path_node in path:
-            if path_node.score is not None and path_node.score < 0.3:
+            if path_node.score is not None and path_node.score < low_score:
                 consecutive_low += 1
             else:
                 break
@@ -369,7 +423,7 @@ class GoTOperations:
         if consecutive_low >= dead_end_limit:
             _logger.info(
                 f"[GoT:BACKTRACK] Dead-end detected: {consecutive_low} consecutive low-score nodes "
-                f"at node {current_id}"
+                f"at node {current_id} (threshold={dead_end_limit}, low_score<{low_score})"
             )
             self._dead_end_count += 1
             return True
@@ -377,11 +431,12 @@ class GoTOperations:
         return False
 
     def find_backtrack_target(self, graph: IdeaDag, current_id: str) -> Optional[str]:
+        low_score = float(self.settings.get("got_backtrack_low_score_threshold", 0.3))
         path = graph.path_to_root(current_id)
         for path_node in path:
             if path_node.node_id == graph.root_id():
                 continue
-            if path_node.score is not None and path_node.score >= 0.3:
+            if path_node.score is not None and path_node.score >= low_score:
                 if path_node.parent_id:
                     _logger.info(f"[GoT:BACKTRACK] Backtracking from {current_id} to {path_node.parent_id}")
                     return path_node.parent_id

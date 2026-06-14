@@ -6,6 +6,7 @@ from shared.request_result import RequestResult
 from shared.connector_config import ConnectorConfig
 from shared.retry import Retry
 from agent.app.connector_base import ConnectorBase
+from agent.app import web_fixtures
 
 class ConnectorHttp(ConnectorBase):
     """
@@ -97,6 +98,22 @@ class ConnectorHttp(ConnectorBase):
         Generic request using shared Retry with exponential backoff.
         :return: RequestResult
         """
+        # Record/replay fixtures: serve cached web evidence so cross-model
+        # comparisons vary only the model and reruns avoid the network.
+        fixture_mode = web_fixtures.fixture_mode()
+        fixture_key = None
+        if fixture_mode != "off":
+            fixture_key = web_fixtures.make_key(method, url, kwargs.get("params"))
+            if fixture_mode == "replay":
+                cached = web_fixtures.load(fixture_key)
+                if cached is not None:
+                    self._record_io(
+                        direction="out",
+                        operation="http_request",
+                        payload={"method": method, "url": url, "status": cached.status, "fixture": "hit"},
+                    )
+                    return cached
+
         async def _get_session() -> aiohttp.ClientSession:
             await self._ensure_session()
             return self.get_session()
@@ -171,6 +188,8 @@ class ConnectorHttp(ConnectorBase):
                 operation="http_request",
                 payload={"method": method, "url": url, "status": result.status, "error": result.error},
             )
+            if fixture_key is not None and not result.error:
+                web_fixtures.save(fixture_key, method, url, kwargs.get("params"), result)
             return result
         except Exception as e:
             status = e.status if hasattr(e, "status") else None

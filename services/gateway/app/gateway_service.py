@@ -12,6 +12,7 @@ from shared.message_contract import (
     TaskEnvelope,
     KeyNames,
     TaskQueueState,
+    TaskState,
     to_dict,
 )
 from shared.storage import RedisTaskStorage, SupabaseTaskStorage
@@ -239,27 +240,50 @@ class GatewayService:
         payload = to_dict(envelope)
 
         payload[KeyNames.CORRELATION_ID] = correlation_id
-        
+
         debug_phrase = os.environ.get("GATEWAY_DEBUG_QUEUE_PHRASE", "debugdebugdebug")
         debug_queue_name = self.config.gateway_debug_queue_name
         is_debug_message = debug_phrase.lower() in (req.mandate or "").lower()
-        
-        if is_debug_message:
-            await self.rabbitmq.publish_message(
-                queue_name=debug_queue_name,
-                payload=payload,
-                correlation_id=correlation_id,
+
+        try:
+            if is_debug_message:
+                await self.rabbitmq.publish_message(
+                    queue_name=debug_queue_name,
+                    payload=payload,
+                    correlation_id=correlation_id,
+                )
+                self.logger.info(
+                    "Published task to gateway debug queue",
+                    extra={"correlation_id": correlation_id, "queue": debug_queue_name},
+                )
+            else:
+                await self.rabbitmq.publish_task(correlation_id=correlation_id, payload=payload)
+                self.logger.info(
+                    "Published task to input queue",
+                    extra={"correlation_id": correlation_id, "queue": self.config.input_queue},
+                )
+        except Exception as publish_error:
+            self.logger.error(
+                "RabbitMQ publish failed after Supabase insert; marking task FAILED",
+                extra={"correlation_id": correlation_id, "error": str(publish_error)},
+                exc_info=True,
             )
-            self.logger.info(
-                "Published task to gateway debug queue",
-                extra={"correlation_id": correlation_id, "queue": debug_queue_name},
-            )
-        else:
-            await self.rabbitmq.publish_task(correlation_id=correlation_id, payload=payload)
-            self.logger.info(
-                "Published task to input queue",
-                extra={"correlation_id": correlation_id, "queue": self.config.input_queue},
-            )
+            try:
+                await self.registrar._update_supabase(
+                    correlation_id,
+                    {
+                        "status": TaskState.FAILED.value,
+                        "error": f"queue publish failed: {publish_error}",
+                        "updated_at": datetime.utcnow().isoformat(),
+                    },
+                )
+            except Exception as compensate_error:
+                self.logger.error(
+                    "Failed to mark task FAILED after publish error",
+                    extra={"correlation_id": correlation_id, "error": str(compensate_error)},
+                    exc_info=True,
+                )
+            raise
 
         return TaskResponse(
             correlation_id=correlation_id,

@@ -4,8 +4,8 @@ from pydantic import BaseModel, Field
 
 class TaskRequest(BaseModel):
     """Request a model for creating a new task."""
-    mandate: str
-    max_ticks: int = 50
+    mandate: str = Field(..., min_length=1, max_length=8000)
+    max_ticks: int = Field(default=50, ge=1, le=200)
     correlation_id: Optional[str] = None
 
 

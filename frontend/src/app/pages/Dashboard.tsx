@@ -30,7 +30,9 @@ export default function Dashboard() {
   const [mandate, setMandate] = useState("");
   const [maxTicks] = useState<number>(80);
   const [loading, setLoading] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [submitMessage, setSubmitMessage] = useState<
+    { kind: "success" | "error"; text: string } | null
+  >(null);
   const [showReconnect, setShowReconnect] = useState(false);
   
   const [paletteId, setPaletteId] = useState<string>("arctic-circuit");
@@ -193,15 +195,16 @@ export default function Dashboard() {
       const response = await submitTask(session.access_token, { mandate, maxTicks });
 
       if (response) {
-        setSubmitMessage(`Task received: ${response.correlation_id}`);
+        setSubmitMessage({ kind: "success", text: `Task received: ${response.correlation_id}` });
         setMandate("");
         await loadTasks();
         await loadUserStats();
       } else {
-        setSubmitMessage("Task submission failed");
+        setSubmitMessage({ kind: "error", text: "Task submission failed" });
       }
     } catch (error) {
-      setSubmitMessage("Task submission failed");
+      const detail = error instanceof Error ? error.message : "unknown error";
+      setSubmitMessage({ kind: "error", text: `Task submission failed: ${detail}` });
     } finally {
       setLoading(false);
     }
@@ -455,12 +458,13 @@ export default function Dashboard() {
         {/* Task Submission */}
         <VectorBoxHeavy padding={6} borderColor={themeColors.primary} bgColor={themeColors.boxBgHeavy}>
           <h2 className="text-heading mb-3">New Task</h2>
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="space-y-3" aria-label="Submit new task">
             <div>
-              <label className="block text-label mb-2">
+              <label htmlFor="task-mandate" className="block text-label mb-2">
                 Task Description
               </label>
               <textarea
+                id="task-mandate"
                 value={mandate}
                 onChange={(e) => setMandate(e.target.value)}
                 className="w-full border-2 px-4 py-3 focus:outline-none transition-colors resize-none h-24 text-input"
@@ -471,23 +475,38 @@ export default function Dashboard() {
                 }}
                 placeholder="Describe what you want the AI to do..."
                 required
+                maxLength={8000}
+                aria-required="true"
+                aria-describedby={submitMessage ? "task-submit-status" : undefined}
+                aria-invalid={submitMessage?.kind === "error" || undefined}
               />
             </div>
             <button
               type="submit"
               disabled={loading}
+              aria-busy={loading || undefined}
+              aria-label={loading ? "Submitting task" : "Submit task"}
               className="w-full font-bold py-3 px-6 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               style={{
                 backgroundColor: themeColors.primary,
                 color: themeColors.text,
               }}
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4" aria-hidden="true" />
               <span className="text-button">{loading ? "Processing..." : "Submit Task"}</span>
             </button>
             {submitMessage && (
-              <div className="text-metadata-secondary text-sm" style={{ color: themeColors.text }}>
-                {submitMessage}
+              <div
+                id="task-submit-status"
+                role={submitMessage.kind === "error" ? "alert" : "status"}
+                aria-live={submitMessage.kind === "error" ? "assertive" : "polite"}
+                className="text-metadata-secondary text-sm"
+                style={{
+                  color:
+                    submitMessage.kind === "error" ? "#ef4444" : themeColors.text,
+                }}
+              >
+                {submitMessage.text}
               </div>
             )}
           </form>

@@ -8,6 +8,8 @@ Euglena is an agent with web crawling and retrieval-augmented generation. Tasks 
 
 **Ops (2026-03):** Project is winding down. Production uses a local backend instead of AWS: ECS deploy scripts in-repo still work if needed.
 
+**LLM provider (2026-05):** Default provider is OpenRouter — set `LLM_PROVIDER=openrouter`, `OPENROUTER_API_KEY=...` in `services/keys.env`, and use OR slugs like `openai/gpt-5-mini` or `anthropic/claude-opus-4.7` as `MODEL_NAME`. To bypass OR and call OpenAI directly, set `LLM_PROVIDER=openai_compatible` and revert `MODEL_API_URL` to `https://api.openai.com/v1`.
+
 ## Benchmark Results
 
 64 runs across 16 tests x 2 models x 2 execution variants.

@@ -16,6 +16,8 @@ class ConnectorConfig:
         self.llm_api_key = self._resolve_llm_api_key()
         self.openai_api_key = self.llm_api_key
         self.llm_api_url = self._resolve_llm_api_url()
+        self.openrouter_http_referer = os.environ.get("OPENROUTER_HTTP_REFERER") or "https://euglena.vercel.app"
+        self.openrouter_x_title = os.environ.get("OPENROUTER_X_TITLE") or "Euglena"
         self.search_api_key = os.environ.get("SEARCH_API_KEY")
 
         self.default_delay = int(os.environ.get("DEFAULT_DELAY", "2"))
@@ -42,6 +44,8 @@ class ConnectorConfig:
             self.logger.warning("No LLM API URL (MODEL_API_URL / OPENAI_BASE_URL); using OpenAI default base URL")
         if not self.llm_api_url and self.llm_provider == "anthropic":
             self.logger.debug("MODEL_API_URL unset; Anthropic SDK default base URL will be used")
+        if self.llm_provider == "openrouter" and not self.llm_api_key:
+            self.logger.error("LLM_PROVIDER=openrouter but no OPENROUTER_API_KEY / LLM_API_KEY set")
         if not self.search_api_key:
             self.logger.warning("No Search API key set")
         if not self.rabbitmq_url:
@@ -58,6 +62,10 @@ class ConnectorConfig:
         general = os.environ.get("LLM_API_KEY")
         if general and str(general).strip():
             return str(general).strip()
+        if self.llm_provider == "openrouter":
+            ak = os.environ.get("OPENROUTER_API_KEY")
+            if ak and str(ak).strip():
+                return str(ak).strip()
         if self.llm_provider == "anthropic":
             ak = os.environ.get("ANTHROPIC_API_KEY")
             if ak and str(ak).strip():
@@ -80,6 +88,8 @@ class ConnectorConfig:
         raw = os.environ.get("MODEL_API_URL")
         if raw and str(raw).strip():
             return str(raw).strip().rstrip("/")
+        if self.llm_provider == "openrouter":
+            return (os.environ.get("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
         if self.llm_provider == "openai_compatible":
             return (os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").strip().rstrip("/")
         if self.llm_provider == "anthropic":

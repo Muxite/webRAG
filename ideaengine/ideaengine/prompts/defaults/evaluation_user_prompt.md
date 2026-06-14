@@ -1,0 +1,1 @@
+{{"path": {path_json}, "candidate_id": "{candidate_id}", "candidate_title": "{candidate_title}", "parent_goal": "{parent_goal}"}}

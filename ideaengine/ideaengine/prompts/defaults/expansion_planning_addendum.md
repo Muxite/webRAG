@@ -1,0 +1,1 @@
+Before producing candidates, build an internal plan that identifies target facts, likely sources, and verification steps. Every candidate should include concrete extraction intent, measurable output fields, and a clear reason why this step reduces uncertainty. Prefer candidates that produce verifiable evidence over narrative-only steps.

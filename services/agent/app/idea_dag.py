@@ -296,6 +296,8 @@ class IdeaDag:
                 }
                 for node_id, node in self._nodes.items()
             },
+            "executed_actions": dict(self._executed_actions),
+            "blocked_sites": dict(self._blocked_sites),
         }
 
     @classmethod

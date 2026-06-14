@@ -35,6 +35,15 @@ class ConnectorLLM(ConnectorBase):
         """
         self._backend.reset_client()
 
+    @property
+    def client(self) -> Any:
+        """
+        Expose the underlying provider client for legacy callers (e.g. preflight checks
+        that bypass query_llm and hit the SDK directly). Returns the OpenAI-compatible
+        AsyncOpenAI client when the backend has one; otherwise None.
+        """
+        return getattr(self._backend, "client", None) or getattr(self._backend, "_client", None)
+
     def build_payload(
         self,
         messages: list,
@@ -76,13 +85,17 @@ class ConnectorLLM(ConnectorBase):
             if model_name and model_name.strip():
                 payload["model"] = model_name.strip()
             return self._normalize_payload(payload)
+        def _is_gpt5_family(name: str) -> bool:
+            bare = name.split("/", 1)[-1] if "/" in name else name
+            return name.startswith(("gpt-5", "gpt-4.1")) or bare.startswith(("gpt-5", "gpt-4.1"))
+
         if reasoning_effort:
             model_name_check = (model_name or self.model_name or "").strip()
-            if model_name_check.startswith(("gpt-5", "gpt-4.1")):
+            if _is_gpt5_family(model_name_check):
                 payload["reasoning_effort"] = reasoning_effort
         if text_verbosity:
             model_name_check = (model_name or self.model_name or "").strip()
-            if model_name_check.startswith(("gpt-5", "gpt-4.1")):
+            if _is_gpt5_family(model_name_check):
                 payload["text"] = {"verbosity": text_verbosity}
         if model_name and model_name.strip():
             payload["model"] = model_name.strip()

@@ -39,10 +39,13 @@ export const API_CONFIG = {
   isLocalDev,
 } as const;
 
-if (isLocalDev && !import.meta.env.VITE_GATEWAY_URL) {
+if (import.meta.env.DEV && isLocalDev && !import.meta.env.VITE_GATEWAY_URL) {
   console.log(`Local dev: gateway ${API_CONFIG.gatewayBaseUrl}`);
   console.log(`Set VITE_GATEWAY_URL to override, or VITE_USE_LOCAL=false to disable`);
 }
+
+const ENABLE_MOCK_FALLBACK =
+  import.meta.env.VITE_DISABLE_MOCK_FALLBACK !== "true";
 
 /**
  * API ENDPOINTS
@@ -239,6 +242,9 @@ export async function fetchSystemInfo(): Promise<SystemInfo> {
     };
   } catch (error) {
     console.error("Error fetching system info:", error);
+    if (!ENABLE_MOCK_FALLBACK) {
+      throw error;
+    }
     console.warn("Falling back to mock data - gateway may be unavailable");
     return MOCK_DATA.systemInfo;
   }
@@ -257,6 +263,9 @@ export async function fetchWorkerCount(): Promise<number> {
     return Number.isFinite(activeWorkers) ? activeWorkers : MOCK_DATA.systemInfo.activeWorkers;
   } catch (error) {
     console.error("Error fetching worker count:", error);
+    if (!ENABLE_MOCK_FALLBACK) {
+      throw error;
+    }
     return MOCK_DATA.systemInfo.activeWorkers;
   }
 }
@@ -320,6 +329,9 @@ export async function fetchUserStats(token: string, userEmail?: string): Promise
     };
   } catch (error) {
     console.error("Error fetching user stats:", error);
+    if (!ENABLE_MOCK_FALLBACK) {
+      throw error;
+    }
     return {
       ...MOCK_DATA.userStats,
       email: userEmail || MOCK_DATA.userStats.email,
@@ -384,6 +396,9 @@ export async function fetchTasks(token: string): Promise<Task[]> {
     });
   } catch (error) {
     console.error("Error fetching tasks:", error);
+    if (!ENABLE_MOCK_FALLBACK) {
+      throw error;
+    }
     return [...MOCK_DATA.tasks];
   }
 }

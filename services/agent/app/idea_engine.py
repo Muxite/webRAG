@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, List
+import asyncio
 import hashlib
 import logging
 
@@ -23,6 +24,13 @@ from agent.app.idea_policies import (
 from agent.app.idea_finalize import build_final_payload
 from agent.app.idea_branch_pair import BranchPair, find_branch_pair, get_completion_path
 from agent.app.got_operations import GoTOperations
+from agent.app.idea_checkpointer import Checkpointer, create_checkpointer_from_env
+from agent.app.idea_policies.data_contracts import ContractRegistry, default_contract_registry
+from agent.app.idea_policies.post_expansion_hooks import (
+    PostExpansionHook,
+    default_post_expansion_hooks,
+    extract_mandate,
+)
 
 
 class IdeaDagEngine:
@@ -37,6 +45,8 @@ class IdeaDagEngine:
         decomposition: Optional[ScoreThresholdDecompositionPolicy] = None,
         merge: Optional[SimpleMergePolicy] = None,
         actions: Optional[LeafActionRegistry] = None,
+        contracts: Optional[ContractRegistry] = None,
+        post_expansion_hooks: Optional[List[PostExpansionHook]] = None,
     ):
         self._logger = logging.getLogger(self.__class__.__name__)
         self.settings = settings or load_idea_dag_settings()
@@ -48,13 +58,18 @@ class IdeaDagEngine:
         self.decomposition = decomposition or ScoreThresholdDecompositionPolicy(settings=self.settings)
         self.merge = merge or SimpleMergePolicy(settings=self.settings)
         self.actions = actions or LeafActionRegistry(settings=self.settings)
+        self.contracts = contracts or default_contract_registry()
+        self.post_expansion_hooks: List[PostExpansionHook] = (
+            list(post_expansion_hooks) if post_expansion_hooks is not None else default_post_expansion_hooks()
+        )
         self._step_index = 0
         self._memory_manager: Optional[MemoryManager] = None
         self._got: Optional[GoTOperations] = None
+        self._checkpointer: Optional[Checkpointer] = create_checkpointer_from_env()
 
-    async def run(self, mandate: str, max_steps: int = 50) -> Dict[str, Any]:
+    async def run(self, mandate: str, max_steps: int = 50, run_id: Optional[str] = None) -> Dict[str, Any]:
         mandate_short = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate[:100]
-        self._logger.info(f"[RUN] Starting idea DAG engine with mandate: {mandate_short}..., max_steps={max_steps}")
+        self._logger.info(f"[RUN] Starting idea DAG engine with mandate: {mandate_short}..., max_steps={max_steps}, run_id={run_id}")
         namespace = self._memo_namespace(mandate)
         self.settings[DetailKey.MEMO_NAMESPACE.value] = namespace
         self._memory_manager = MemoryManager(
@@ -68,10 +83,39 @@ class IdeaDagEngine:
         )
         self._current_mandate = mandate
         root_title = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate
-        graph = IdeaDag(root_title=root_title, root_details={"mandate": mandate, "memo_namespace": namespace})
-        current_id = graph.root_id()
-        self._logger.info(f"[RUN] Created graph with root_id={current_id}")
+
+        graph: Optional[IdeaDag] = None
+        current_id: Optional[str] = None
         steps = 0
+        if run_id and self._checkpointer:
+            try:
+                cp = await self._checkpointer.load(run_id)
+            except Exception as exc:  # noqa: BLE001 — checkpoint load must never crash a run
+                self._logger.warning(f"[RUN] Checkpoint load failed for run_id={run_id}: {exc}")
+                cp = None
+            if cp and isinstance(cp.get("snapshot"), dict):
+                snap = cp["snapshot"]
+                try:
+                    graph = IdeaDag.from_dict(snap.get("graph") or {})
+                    current_id = snap.get("current_id") or graph.root_id()
+                    steps = int(cp.get("step_index") or 0) + 1
+                    self._step_index = steps
+                    self._parallel_leaves_total = int(snap.get("parallel_leaves_total") or 0)
+                    if self._got and isinstance(snap.get("got_dead_end_count"), int):
+                        self._got.dead_end_count = snap["got_dead_end_count"]
+                    self._logger.info(
+                        f"[RUN] Resumed run_id={run_id} from checkpoint step={steps - 1}, current_id={current_id}"
+                    )
+                except Exception as exc:  # noqa: BLE001 — corrupt checkpoint should not block a fresh run
+                    self._logger.warning(f"[RUN] Checkpoint restore failed; starting fresh: {exc}")
+                    graph = None
+                    current_id = None
+                    steps = 0
+
+        if graph is None:
+            graph = IdeaDag(root_title=root_title, root_details={"mandate": mandate, "memo_namespace": namespace})
+            current_id = graph.root_id()
+            self._logger.info(f"[RUN] Created graph with root_id={current_id}")
         while steps < max_steps:
             self._logger.info(f"[RUN] === STEP {steps}/{max_steps} ===")
             current_id = await self.step(graph, current_id, steps)
@@ -79,10 +123,42 @@ class IdeaDagEngine:
             self._step_index = steps
             self._maybe_log_dag(graph, steps)
 
-            if self._got and steps % 5 == 0:
+            prune_interval = max(1, int(self.settings.get("got_prune_interval_steps", 5)))
+            if self._got and steps % prune_interval == 0:
                 prune_ids = self._got.identify_prune_candidates(graph)
                 if prune_ids:
                     self._got.prune_nodes(graph, prune_ids)
+
+            # Fix #3: backtrack on dead-end chains. Gated by
+            # `got_backtrack_enabled` (default False); when on, redirect
+            # `current_id` away from a low-score path.
+            if (
+                self._got
+                and current_id
+                and self.settings.get("got_backtrack_enabled", False)
+                and self._got.should_backtrack(graph, current_id)
+            ):
+                target = self._got.find_backtrack_target(graph, current_id)
+                if target and target != current_id:
+                    self._logger.info(
+                        f"[RUN] STEP {steps}: backtrack redirect {current_id[:8]} -> {target[:8]}"
+                    )
+                    current_id = target
+
+            if run_id and self._checkpointer:
+                try:
+                    await self._checkpointer.save(
+                        run_id,
+                        steps - 1,
+                        {
+                            "graph": graph.to_dict(),
+                            "current_id": current_id,
+                            "parallel_leaves_total": getattr(self, "_parallel_leaves_total", 0),
+                            "got_dead_end_count": getattr(self._got, "dead_end_count", 0) if self._got else 0,
+                        },
+                    )
+                except Exception as exc:  # noqa: BLE001 — checkpoint save must never crash a run
+                    self._logger.warning(f"[RUN] Checkpoint save failed at step {steps - 1}: {exc}")
 
             if steps == 1:
                 root = graph.get_node(graph.root_id())
@@ -139,6 +215,7 @@ class IdeaDagEngine:
                 "dead_ends_detected": self._got.dead_end_count,
                 "nodes_pruned": pruned_count,
                 "nodes_improved": improved_count,
+                "parallel_leaves_total": getattr(self, "_parallel_leaves_total", 0),
             }
 
         self._logger.info(f"[RUN] Final payload created, graph has {graph.node_count()} nodes, {len(pending_nodes) if pending_nodes else 0} pending")
@@ -313,64 +390,32 @@ class IdeaDagEngine:
         return node_id
     
     def _has_required_data(self, graph: IdeaDag, node: IdeaNode) -> bool:
-        from agent.app.idea_policies.action_constants import NodeDetailsExtractor
-        from agent.app.idea_policies.base import IdeaActionType
-        
         requires_data = node.details.get(DetailKey.REQUIRES_DATA.value)
-        if not requires_data:
+        if not requires_data or not isinstance(requires_data, dict):
             return True
-        
-        if not isinstance(requires_data, dict):
-            return True
-        
-        required_type = requires_data.get("type")
+
         data_source_node_id = requires_data.get("source_node_id")
-        
         if not data_source_node_id:
             return True
-        
+
         source_node = graph.get_node(data_source_node_id)
         if not source_node:
             return False
-        
         if source_node.status != IdeaNodeStatus.DONE:
             return False
-        
+
         source_result = source_node.details.get(DetailKey.ACTION_RESULT.value)
         if not source_result:
             return False
-        
-        from agent.app.idea_policies.action_constants import ActionResultKey, ActionResultExtractor
+
+        from agent.app.idea_policies.action_constants import ActionResultExtractor
         if not ActionResultExtractor.is_success(source_result):
             return False
-        
-        if required_type == "urls_from_search":
-            results = source_result.get(ActionResultKey.RESULTS.value) or []
-            if not results or len(results) == 0:
-                return False
+
+        contract = self.contracts.get(requires_data.get("type"))
+        if not contract:
             return True
-        
-        if required_type == "urls_from_visit":
-            links = source_result.get(ActionResultKey.LINKS.value) or source_result.get(ActionResultKey.LINKS_FULL.value) or []
-            if not links or len(links) == 0:
-                return False
-            return True
-        
-        if required_type == "url_from_think":
-            extracted_url = source_result.get(ActionResultKey.URL.value) or source_result.get("extracted_url")
-            if not extracted_url or not isinstance(extracted_url, str) or not extracted_url.startswith(("http://", "https://")):
-                url_from_details = NodeDetailsExtractor.get_url(source_node.details)
-                if not url_from_details or not isinstance(url_from_details, str) or not url_from_details.startswith(("http://", "https://")):
-                    return False
-            return True
-        
-        if required_type == "chunk_from_visit":
-            content_full = source_result.get(ActionResultKey.CONTENT_FULL.value) or ""
-            if not content_full:
-                return False
-            return True
-        
-        return True
+        return contract.is_ready(source_result, source_node)
     
     async def _handle_expansion_node(self, graph: IdeaDag, node_id: str, step_index: int, branch_pair: Optional[BranchPair]) -> Optional[str]:
         node = graph.get_node(node_id)
@@ -496,198 +541,159 @@ class IdeaDagEngine:
                 child.details[DetailKey.IS_LEAF.value] = True
         
         self._logger.info(f"[STEP {step_index}] EXPANSION: {len(candidates)} candidates -> {min(len(candidates), max_branching)} children (total nodes: {graph.node_count()})")
-        
-        self._enforce_visit_nodes_for_mandate_urls(graph, node_id, step_index)
-        self._enforce_mandate_visit_requirements(graph, node_id, step_index)
+
+        mandate = extract_mandate(graph, node_id)
+        for hook in self.post_expansion_hooks:
+            hook.apply(graph, node_id, step_index, mandate, self._logger)
+
+        if self.settings.get("semantic_dedup_visits_enabled", True):
+            self._semantic_dedup_visits(graph, node_id, step_index)
 
         if self._got:
             await self._got.embed_children(graph, node_id)
 
         return node_id
-    
-    def _enforce_visit_nodes_for_mandate_urls(self, graph: IdeaDag, node_id: str, step_index: int) -> None:
-        import re
-        node = graph.get_node(node_id)
-        if not node:
-            return
 
-        mandate = node.details.get("mandate") or ""
-        if not mandate:
-            root = graph.get_node(graph.root_id())
-            if root and root.node_id == node_id:
-                mandate = root.title or ""
-            elif root:
-                mandate = root.details.get("mandate") or root.title or ""
-        if not mandate:
-            return
+    def _action_timeout_for(self, action_name: Optional[str]) -> float:
+        """Resolve the timeout for an action by name.
 
-        raw_urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', mandate)
-        mandate_urls = [self._clean_extracted_url(u) for u in raw_urls]
-        mandate_urls = [u for u in mandate_urls if u]
-        if not mandate_urls:
-            return
-
-        covered_urls = set()
-        for child_id in node.children:
-            child = graph.get_node(child_id)
-            if not child:
-                continue
-            child_action = NodeDetailsExtractor.get_action(child.details)
-            if child_action == IdeaActionType.VISIT.value:
-                child_url = (
-                    child.details.get(DetailKey.URL.value)
-                    or child.details.get("optional_url")
-                    or ""
-                )
-                if child_url:
-                    covered_urls.add(child_url.rstrip("/"))
-
-        missing_urls = [
-            u for u in mandate_urls if u.rstrip("/") not in covered_urls
-        ]
-        if not missing_urls:
-            return
-
-        for url in missing_urls:
-            visit_node = graph.add_child(
-                parent_id=node_id,
-                title=f"Visit {url[:60]}",
-                details={
-                    DetailKey.ACTION.value: IdeaActionType.VISIT.value,
-                    DetailKey.URL.value: url,
-                    "optional_url": url,
-                    DetailKey.IS_LEAF.value: True,
-                    DetailKey.JUSTIFICATION.value: f"Mandate requires visiting this URL",
-                    DetailKey.GOAL.value: f"Visit and extract information from {url}",
-                },
-            )
-            self._logger.info(
-                f"[STEP {step_index}] ENFORCE: Injected visit node {visit_node.node_id} "
-                f"for mandate URL {url[:60]}"
-            )
-
-    def _enforce_mandate_visit_requirements(self, graph: IdeaDag, node_id: str, step_index: int) -> None:
+        Prefers `{action}_timeout_seconds` (e.g. `visit_timeout_seconds=20`,
+        `search_timeout_seconds=15`); falls back to `action_timeout_seconds`
+        (default 120).
         """
-        Enforce that mandates explicitly requiring visits/search must create those actions.
-        Checks for phrases like "must visit", "you must visit", "must search", etc.
-        """
-        node = graph.get_node(node_id)
-        if not node:
-            return
-
-        mandate = node.details.get("mandate") or ""
-        if not mandate:
-            root = graph.get_node(graph.root_id())
-            if root and root.node_id == node_id:
-                mandate = root.title or ""
-            elif root:
-                mandate = root.details.get("mandate") or root.title or ""
-        if not mandate:
-            return
-
-        mandate_lower = mandate.lower()
-        
-        requires_visit = any(phrase in mandate_lower for phrase in [
-            "must visit", "you must visit", "must visit the", "required to visit",
-            "need to visit", "should visit", "visit the url", "visit the page"
-        ])
-        
-        requires_search = any(phrase in mandate_lower for phrase in [
-            "must search", "you must search", "search for", "find and visit"
-        ])
-        
-        if not requires_visit and not requires_search:
-            return
-
-        has_visit = False
-        has_search = False
-        
-        for child_id in node.children:
-            child = graph.get_node(child_id)
-            if not child:
-                continue
-            child_action = NodeDetailsExtractor.get_action(child.details)
-            if child_action == IdeaActionType.VISIT.value:
-                has_visit = True
-            elif child_action == IdeaActionType.SEARCH.value:
-                has_search = True
-
-        search_node_id = None
-        if requires_search and not has_search:
-            self._logger.warning(
-                f"[STEP {step_index}] ENFORCE: Mandate requires search but no search node created. "
-                f"Injecting search node."
-            )
-            search_node = graph.add_child(
-                parent_id=node_id,
-                title="Search for required information",
-                details={
-                    DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
-                    DetailKey.QUERY.value: mandate[:200],
-                    DetailKey.IS_LEAF.value: True,
-                    DetailKey.JUSTIFICATION.value: "Mandate explicitly requires search action",
-                    DetailKey.GOAL.value: f"Search as required by mandate: {mandate[:100]}",
-                },
-            )
-            search_node_id = search_node.node_id
-            has_search = True
-            self._logger.info(
-                f"[STEP {step_index}] ENFORCE: Injected search node {search_node_id} "
-                f"for mandate requirement"
-            )
-        elif has_search:
-            for child_id in node.children:
-                child = graph.get_node(child_id)
-                if child and NodeDetailsExtractor.get_action(child.details) == IdeaActionType.SEARCH.value:
-                    search_node_id = child_id
-                    break
-
-        if requires_visit and not has_visit:
-            self._logger.warning(
-                f"[STEP {step_index}] ENFORCE: Mandate requires visit but no visit node created. "
-                f"Injecting visit node."
-            )
-            visit_node = graph.add_child(
-                parent_id=node_id,
-                title="Visit required URL",
-                details={
-                    DetailKey.ACTION.value: IdeaActionType.VISIT.value,
-                    DetailKey.IS_LEAF.value: True,
-                    DetailKey.JUSTIFICATION.value: "Mandate explicitly requires visit action - will extract URL from search results or use link_idea",
-                    DetailKey.GOAL.value: f"Visit URL as required by mandate: {mandate[:100]}",
-                    "link_idea": "URL from search results or mandate",
-                    "link_count": 1,
-                },
-            )
-            if search_node_id:
-                visit_node.details[DetailKey.REQUIRES_DATA.value] = {
-                    "type": "urls_from_search",
-                    "source_node_id": search_node_id
-                }
-                self._logger.info(
-                    f"[STEP {step_index}] ENFORCE: Visit node {visit_node.node_id} "
-                    f"depends on search node {search_node_id}"
-                )
-            self._logger.info(
-                f"[STEP {step_index}] ENFORCE: Injected visit node {visit_node.node_id} "
-                f"for mandate requirement"
-            )
+        fallback = float(self.settings.get("action_timeout_seconds", 120))
+        if not action_name:
+            return fallback
+        per_type = self.settings.get(f"{action_name}_timeout_seconds")
+        if per_type is None:
+            return fallback
+        try:
+            return float(per_type)
+        except (TypeError, ValueError):
+            return fallback
 
     @staticmethod
-    def _clean_extracted_url(url: str) -> str:
+    def _url_slug_tokens(url: str) -> List[str]:
+        """Pull the trailing path slug from a URL and return its lowercased tokens."""
+        from urllib.parse import unquote, urlparse
+
+        if not isinstance(url, str) or not url:
+            return []
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return []
+        path = (parsed.path or "").rstrip("/")
+        slug = path.rsplit("/", 1)[-1] if path else ""
+        if not slug:
+            return []
+        slug = unquote(slug).replace("_", " ").replace("-", " ").lower()
+        # Strip wrapping parens like "Pando_(tree)" → "pando tree"
+        slug = slug.replace("(", " ").replace(")", " ")
+        tokens = [t for t in slug.split() if len(t) >= 3]
+        return tokens
+
+    def _semantic_dedup_visits(self, graph: IdeaDag, parent_id: str, step_index: int) -> None:
+        """Fold URL-less planner visit candidates into URL-bearing siblings.
+
+        Weak planners (notably Gemini 2.5 Flash) often emit visit candidates
+        with a title like "Visit Axolotl Wikipedia page" but no `url` or
+        `link_idea` detail. The mandate-injection hook then adds a sibling
+        with the explicit URL. The engine sees them as distinct, dispatches
+        both, and the URL-less one fails — or worse, in sequential mode the
+        evaluator may pick the URL-less candidate, prune the correct sibling,
+        and execute the wrong thing.
+
+        This pre-execution pass detects each URL-less visit, scans the
+        URL-bearing siblings for one whose path slug appears in the URL-less
+        node's title/goal text, and marks the URL-less node SKIPPED with a
+        diagnostic reason. The URL-bearing sibling runs unopposed.
+
+        No-op when no visit candidates lack URLs, or when no slug matches.
         """
-        Strip trailing punctuation from a URL while preserving balanced parentheses.
-        Wikipedia URLs like https://en.wikipedia.org/wiki/Python_(programming_language)
-        must keep the closing paren when the opening paren is present in the path.
-        :param url: Raw extracted URL.
-        :returns: Cleaned URL.
-        """
-        strip_chars = ".,;:!?"
-        url = url.rstrip(strip_chars)
-        while url.endswith(")") and url.count("(") < url.count(")"):
-            url = url[:-1]
-        url = url.rstrip(strip_chars)
-        return url
+        parent = graph.get_node(parent_id)
+        if not parent or not parent.children:
+            return
+
+        url_bearing: List[tuple] = []  # (node_id, url, slug_tokens)
+        url_less: List[tuple] = []     # (node_id, node, search_text)
+
+        for child_id in parent.children:
+            child = graph.get_node(child_id)
+            if not child or child.status in (IdeaNodeStatus.DONE, IdeaNodeStatus.SKIPPED, IdeaNodeStatus.FAILED):
+                continue
+            action = NodeDetailsExtractor.get_action(child.details)
+            if action != IdeaActionType.VISIT.value:
+                continue
+            url = (
+                child.details.get(DetailKey.URL.value)
+                or child.details.get("optional_url")
+                or child.details.get("url")
+            )
+            link_idea = child.details.get("link_idea")
+            if isinstance(url, str) and url.startswith(("http://", "https://")):
+                tokens = self._url_slug_tokens(url)
+                if tokens:
+                    url_bearing.append((child_id, url, tokens))
+            elif not url and not link_idea:
+                title = (child.title or "").lower()
+                goal = (child.details.get("goal") or "").lower()
+                parent_goal = (child.details.get("parent_goal") or "").lower()
+                search_text = " ".join([title, goal, parent_goal])
+                url_less.append((child_id, child, search_text))
+
+        if not url_bearing or not url_less:
+            return
+
+        # Hook-only gate: only fold against URL-bearing siblings that came
+        # from MandateUrlInjectionHook (i.e. the mandate text literally
+        # contained the URL). This protects chain-of-links tests where
+        # planner-generated URL-less candidates were intended for sequential
+        # link discovery rather than as duplicates of the literal URL.
+        require_hook_source = bool(
+            self.settings.get("semantic_dedup_require_hook_source", True)
+        )
+
+        def _is_hook_injected(source_id: str) -> bool:
+            source = graph.get_node(source_id)
+            if not source:
+                return False
+            justification = (source.details.get(DetailKey.JUSTIFICATION.value) or "")
+            return justification.startswith("Mandate requires visiting")
+
+        folded = 0
+        gate_blocked = 0
+        for nid, node, search_text in url_less:
+            for source_id, source_url, tokens in url_bearing:
+                # Match: every slug token must appear as a substring in the
+                # URL-less node's text. Slugs like "Axolotl" → ["axolotl"]
+                # match "Visit Axolotl Wikipedia page". Multi-word slugs like
+                # "Pando tree" require both "pando" and "tree" present.
+                if not all(tok in search_text for tok in tokens):
+                    continue
+                if require_hook_source and not _is_hook_injected(source_id):
+                    gate_blocked += 1
+                    continue
+                node.status = IdeaNodeStatus.SKIPPED
+                node.details[DetailKey.ACTION_ERROR.value] = (
+                    f"Semantic dedup: URL-less visit folded into sibling {source_id} "
+                    f"(URL: {source_url})"
+                )
+                node.details["__semantic_dedup_source"] = source_id
+                folded += 1
+                break
+
+        if gate_blocked:
+            self._logger.info(
+                f"[STEP {step_index}] SEMANTIC_DEDUP: gate blocked {gate_blocked} fold(s) "
+                f"(URL-bearing sibling was not from MandateUrlInjectionHook)"
+            )
+
+        if folded:
+            self._logger.info(
+                f"[STEP {step_index}] SEMANTIC_DEDUP: folded {folded} URL-less visit "
+                f"candidates into URL-bearing siblings (under parent {parent_id[:8]})"
+            )
 
     async def _handle_merge_creation(self, graph: IdeaDag, node_id: str, step_index: int, branch_pair: Optional[BranchPair]) -> Optional[str]:
         if not self.merge.should_create_merge_node(graph, node_id):
@@ -771,14 +777,61 @@ class IdeaDagEngine:
             execute_all = True
 
         if execute_all and bool(self.settings.get("allow_execute_all_children", True)) and not has_dependencies:
-            self._logger.info(f"[STEP {step_index}] PARALLEL: Executing all {len(eligible)} children (skipping evaluation)")
-            for child_id in eligible:
-                child = graph.get_node(child_id)
-                if not child or not self._is_action_ready(child, step_index):
+            ready_children = [
+                cid for cid in eligible
+                if (c := graph.get_node(cid)) and self._is_action_ready(c, step_index)
+            ]
+            if not ready_children:
+                return node_id
+
+            parallel_limit = max(1, int(self.settings.get("parallel_action_limit", 4)))
+            self._logger.info(
+                f"[STEP {step_index}] PARALLEL: Executing {len(ready_children)} children "
+                f"(limit={parallel_limit}, skipping evaluation)"
+            )
+            semaphore = asyncio.Semaphore(parallel_limit)
+
+            async def _run_one(cid: str) -> Optional[Dict[str, Any]]:
+                child = graph.get_node(cid)
+                action_name = NodeDetailsExtractor.get_action(child.details) if child else None
+                timeout_s = self._action_timeout_for(action_name)
+                async with semaphore:
+                    return await asyncio.wait_for(
+                        self._execute_action(graph, node_id, cid),
+                        timeout=timeout_s,
+                    )
+
+            results = await asyncio.gather(
+                *[_run_one(cid) for cid in ready_children],
+                return_exceptions=True,
+            )
+
+            self._parallel_leaves_total = getattr(self, "_parallel_leaves_total", 0) + len(ready_children)
+
+            for cid, res in zip(ready_children, results):
+                if isinstance(res, asyncio.TimeoutError):
+                    child = graph.get_node(cid)
+                    action_name = NodeDetailsExtractor.get_action(child.details) if child else None
+                    timeout_used = self._action_timeout_for(action_name)
+                    self._logger.warning(
+                        f"[STEP {step_index}] Action timed out after {timeout_used}s "
+                        f"(node={cid}, action={action_name})"
+                    )
+                    if child:
+                        child.status = IdeaNodeStatus.FAILED
+                        child.details["action_error"] = f"timeout after {timeout_used}s"
                     continue
-                result = await self._execute_action(graph, node_id, child_id)
-                if result is not None:
-                    self._handle_action_result(graph, child_id, step_index)
+                if isinstance(res, Exception):
+                    self._logger.warning(
+                        f"[STEP {step_index}] Action raised (node={cid}): {type(res).__name__}: {res}"
+                    )
+                    child = graph.get_node(cid)
+                    if child:
+                        child.status = IdeaNodeStatus.FAILED
+                        child.details["action_error"] = f"{type(res).__name__}: {res}"
+                    continue
+                if res is not None:
+                    self._handle_action_result(graph, cid, step_index)
             return node_id
 
         needs_evaluation = any(
@@ -850,6 +903,9 @@ class IdeaDagEngine:
                 sibling = graph.get_node(cid)
                 if sibling and sibling.status not in (IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED):
                     sibling.status = IdeaNodeStatus.SKIPPED
+                    # Fix #8: mark so sibling recovery can find these later.
+                    sibling.details["__sequential_pruned"] = True
+                    sibling.details["__sequential_pruned_parent"] = node_id
             return selected.node_id
 
         return node_id
@@ -898,7 +954,12 @@ class IdeaDagEngine:
                 action_enum = IdeaActionType.THINK
             else:
                 action_enum = IdeaActionType(str(action_type))
-        except Exception:
+        except (ValueError, KeyError) as exc:
+            self._logger.warning(
+                "Unknown action_type=%r, defaulting to THINK: %s",
+                action_type,
+                exc,
+            )
             action_enum = IdeaActionType.THINK
         action = self.actions.get(action_enum)
         attempts = int(node.details.get(DetailKey.ACTION_ATTEMPTS.value, 0)) + 1
@@ -943,12 +1004,12 @@ class IdeaDagEngine:
         success = ActionResultExtractor.is_success(result)
         if success:
             action = NodeDetailsExtractor.get_action(node.details)
-            
+
             if action == IdeaActionType.VISIT.value:
                 url = result.get(ActionResultKey.URL.value) or result.get("url") or ""
                 content = result.get(ActionResultKey.CONTENT.value) or result.get(ActionResultKey.CONTENT_FULL.value) or result.get("content") or ""
                 content_total_chars = result.get(ActionResultKey.CONTENT_TOTAL_CHARS.value) or len(content) if content else 0
-                
+
                 if not content or len(content.strip()) == 0:
                     self._logger.error(
                         f"[VISIT_VALIDATION] Visit marked as success but has no content! "
@@ -967,16 +1028,32 @@ class IdeaDagEngine:
                         f"Content: {content_total_chars} chars, "
                         f"Status: DONE"
                     )
-                    node.details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_visit"}
                     node.details["visit_content_length"] = content_total_chars
                     node.details["visit_url"] = url
 
-            if action == IdeaActionType.SEARCH.value:
-                node.details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_search"}
-                self._logger.debug(f"[DATA_FLOW] Node {node_id} (search) now provides URLs")
+            if success:
+                try:
+                    action_type = IdeaActionType(action) if action else None
+                except ValueError:
+                    action_type = None
+                if action_type:
+                    action_instance = self.actions.get(action_type)
+                    contract_name = action_instance.post_execute_provides(node, result)
+                    if contract_name:
+                        node.details[DetailKey.PROVIDES_DATA.value] = {"type": contract_name}
+                        if action_type == IdeaActionType.SEARCH:
+                            self._logger.debug(f"[DATA_FLOW] Node {node_id} (search) now provides {contract_name}")
 
-            node.status = IdeaNodeStatus.DONE
-            return ResultStatus.SUCCESS.value
+                node.status = IdeaNodeStatus.DONE
+                return ResultStatus.SUCCESS.value
+            # Fix #9: VISIT empty-content path flipped `success` to False above.
+            # Previously the code fell through to `node.status = DONE` anyway —
+            # a latent bug. With `visit_empty_content_retryable` (default True),
+            # the node now falls through to the retry/fail branch below.
+            if not bool(self.settings.get("visit_empty_content_retryable", True)):
+                # Legacy behavior preserved behind a kill-switch.
+                node.status = IdeaNodeStatus.DONE
+                return ResultStatus.SUCCESS.value
         retryable = ActionResultExtractor.is_retryable(result)
         node.details[DetailKey.ACTION_RETRYABLE.value] = retryable
         attempts = int(node.details.get(DetailKey.ACTION_ATTEMPTS.value, 0))
@@ -1005,7 +1082,54 @@ class IdeaDagEngine:
         node.details[DetailKey.ACTION_ERROR.value] = error_info
         node.details[f"{DetailKey.ACTION_ERROR.value}_details"] = error_details
         node.status = IdeaNodeStatus.FAILED
+
+        # Fix #8: sequential sibling recovery. When the selected sibling in
+        # sequential mode fails terminally, un-SKIP the next-best
+        # sequential-pruned sibling so the parent can still produce useful
+        # output instead of giving up. Gated by setting.
+        if bool(self.settings.get("sequential_sibling_recovery_enabled", True)):
+            self._recover_pruned_sibling(graph, node, step_index)
+
         return ResultStatus.FAILED.value
+
+    def _recover_pruned_sibling(self, graph: IdeaDag, failed_node: IdeaNode, step_index: int) -> None:
+        """Un-SKIP the highest-scored sequential-pruned sibling of a failed node.
+
+        Triggers at most once per parent (tracked via
+        `__sequential_recovery_used`). The recovered sibling is set back to
+        PENDING with a marker so the next step can pick it up.
+        """
+        parent_id = failed_node.parent_id
+        if not parent_id:
+            return
+        parent = graph.get_node(parent_id)
+        if not parent:
+            return
+        if parent.details.get("__sequential_recovery_used"):
+            return
+
+        candidates: List[IdeaNode] = []
+        for cid in parent.children:
+            sib = graph.get_node(cid)
+            if not sib or sib.node_id == failed_node.node_id:
+                continue
+            if sib.status != IdeaNodeStatus.SKIPPED:
+                continue
+            if not sib.details.get("__sequential_pruned"):
+                continue
+            candidates.append(sib)
+        if not candidates:
+            return
+
+        candidates.sort(key=lambda n: (n.score if n.score is not None else -1.0), reverse=True)
+        winner = candidates[0]
+        winner.status = IdeaNodeStatus.PENDING
+        winner.details["__sequential_recovery_invoked"] = True
+        parent.details["__sequential_recovery_used"] = True
+        self._logger.info(
+            f"[STEP {step_index}] SEQUENTIAL_RECOVERY: failed node {failed_node.node_id[:8]} -> "
+            f"un-SKIPped sibling {winner.node_id[:8]} (score={winner.score})"
+        )
 
     def _reorder_for_sequential(
         self,

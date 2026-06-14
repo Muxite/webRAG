@@ -82,6 +82,8 @@ def create_llm_backend(config: ConnectorConfig, logger: logging.Logger) -> LLMBa
     provider = (config.llm_provider or "openai_compatible").strip().lower()
     if provider == "anthropic":
         return AnthropicMessagesBackend(config, logger)
+    if provider == "openrouter":
+        return OpenRouterBackend(config, logger)
     if provider not in ("openai_compatible", "openai", "ollama", "local"):
         logger.warning("Unknown LLM_PROVIDER=%s; using openai_compatible", provider)
     return OpenAICompatibleBackend(config, logger)
@@ -116,6 +118,9 @@ class OpenAICompatibleBackend(LLMBackend):
         """
         Return a conservative max completion token cap for known model ids.
 
+        Recognizes both bare names ("gpt-5-mini") and OpenRouter slugs
+        ("openai/gpt-5-mini", "anthropic/claude-opus-4.7").
+
         :param model_name: Model identifier.
         :returns: Max completion tokens or None.
         """
@@ -126,11 +131,17 @@ class OpenAICompatibleBackend(LLMBackend):
             "gpt-5": 128000,
             "gpt-4.1-nano": 128000,
             "gpt-4o": 16384,
+            "anthropic/claude": 64000,
+            "google/gemini": 65536,
+            "meta-llama/llama": 32768,
         }
+        bare_name = model_name.split("/", 1)[-1] if "/" in model_name else model_name
         if model_name in limits:
             return limits[model_name]
+        if bare_name in limits:
+            return limits[bare_name]
         for prefix, limit in limits.items():
-            if model_name.startswith(prefix):
+            if model_name.startswith(prefix) or bare_name.startswith(prefix):
                 return limit
         return None
 
@@ -157,8 +168,11 @@ class OpenAICompatibleBackend(LLMBackend):
                 payload.pop("temperature", None)
             elif "temperature" in profile:
                 payload["temperature"] = profile["temperature"]
+        bare_model = model_name.split("/", 1)[-1] if "/" in model_name else model_name
         if "max_tokens" in payload and payload["max_tokens"] is not None and (
-            profile.get("use_max_completion_tokens") or model_name.startswith(("gpt-5", "gpt-4o"))
+            profile.get("use_max_completion_tokens")
+            or model_name.startswith(("gpt-5", "gpt-4o"))
+            or bare_model.startswith(("gpt-5", "gpt-4o"))
         ):
             max_tokens = payload.pop("max_tokens")
             max_limit = self._get_max_completion_tokens_limit(model_name)
@@ -182,7 +196,9 @@ class OpenAICompatibleBackend(LLMBackend):
                     model_name,
                 )
                 payload["max_completion_tokens"] = max_limit
-        if "temperature" in payload and model_name.startswith(("gpt-5", "gpt-4o")) and payload["temperature"] != 1:
+        if "temperature" in payload and (
+            model_name.startswith(("gpt-5", "gpt-4o")) or bare_model.startswith(("gpt-5", "gpt-4o"))
+        ) and payload["temperature"] != 1:
             payload.pop("temperature", None)
         return payload
 
@@ -274,6 +290,28 @@ class OpenAICompatibleBackend(LLMBackend):
         :returns: None.
         """
         self.client = self._build_client()
+
+
+class OpenRouterBackend(OpenAICompatibleBackend):
+    """
+    OpenRouter backend. Wire-compatible with the OpenAI Chat Completions API,
+    but routes to any provider/model via slugs like 'openai/gpt-5-mini' or
+    'anthropic/claude-opus-4.7'. Adds OpenRouter app-attribution headers.
+    """
+
+    def _build_client(self) -> AsyncOpenAI:
+        """
+        Build AsyncOpenAI client with OpenRouter base URL and attribution headers.
+
+        :returns: AsyncOpenAI client targeting OpenRouter.
+        """
+        api_key = self.config.llm_api_key if self.config.llm_api_key is not None else ""
+        base_url = (self.config.llm_api_url or "https://openrouter.ai/api/v1").rstrip("/")
+        default_headers = {
+            "HTTP-Referer": getattr(self.config, "openrouter_http_referer", "") or "https://euglena.vercel.app",
+            "X-Title": getattr(self.config, "openrouter_x_title", "") or "Euglena",
+        }
+        return AsyncOpenAI(api_key=api_key, base_url=base_url, default_headers=default_headers)
 
 
 class AnthropicMessagesBackend(LLMBackend):

@@ -6,13 +6,19 @@ import json
 from typing import Dict, Any
 
 from agent.app.idea_test_utils import count_words, count_chars
+from agent.app.model_costs import estimate_cost, format_cost
+
+# Rough chars-per-token used only when the provider omits a usage block so we can
+# still place a (flagged) cost estimate on the chart instead of $0.
+_CHARS_PER_TOKEN = 4.0
 
 
-def summarize_observability(result: Dict[str, Any], telemetry) -> Dict[str, Any]:
+def summarize_observability(result: Dict[str, Any], telemetry, model_name: str = "") -> Dict[str, Any]:
     """
     Summarize observability metrics from telemetry.
     :param result: Test result payload.
     :param telemetry: Telemetry session.
+    :param model_name: Execution model name, used to price token usage in USD.
     :return: Observability summary.
     """
     output = result.get("output", {})
@@ -137,7 +143,23 @@ def summarize_observability(result: Dict[str, Any], telemetry) -> Dict[str, Any]
         entry["total_duration"] = round(entry["total_duration"], 4)
         entry["min_duration"] = round(entry["min_duration"], 4)
         entry["max_duration"] = round(entry["max_duration"], 4)
-    
+
+    # USD cost: price the reported token usage when available, otherwise fall back
+    # to a chars/token approximation flagged as estimated so headline numbers aren't
+    # silently understated when a provider (e.g. some OpenRouter slugs) omits usage.
+    cost_estimated = False
+    cost_prompt_tokens = llm_prompt_tokens
+    cost_completion_tokens = llm_completion_tokens
+    if llm_prompt_tokens == 0 and llm_completion_tokens == 0 and (llm_prompt_chars or llm_completion_chars):
+        cost_estimated = True
+        cost_prompt_tokens = int(llm_prompt_chars / _CHARS_PER_TOKEN)
+        cost_completion_tokens = int(llm_completion_chars / _CHARS_PER_TOKEN)
+    cost_usd = (
+        estimate_cost(model_name, cost_prompt_tokens, cost_completion_tokens)
+        if model_name
+        else None
+    )
+
     return {
         "final_output": {
             "chars": final_chars,
@@ -159,6 +181,14 @@ def summarize_observability(result: Dict[str, Any], telemetry) -> Dict[str, Any]
                 "tokens": llm_completion_tokens,
             },
             "total_tokens": llm_prompt_tokens + llm_completion_tokens,
+        },
+        "cost": {
+            "model": model_name,
+            "usd": cost_usd,
+            "usd_str": format_cost(cost_usd),
+            "estimated": cost_estimated,
+            "prompt_tokens": cost_prompt_tokens,
+            "completion_tokens": cost_completion_tokens,
         },
         "chroma": {
             "store": {

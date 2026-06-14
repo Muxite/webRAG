@@ -16,8 +16,10 @@ from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.testing.test_module import IdeaTestModule
-from agent.app.testing.execution import run_test_execution
+from agent.app.testing.execution import run_test_execution, run_baseline_execution
 from agent.app.testing.validation import ValidationRunner
+
+BASELINE_VARIANTS = ("parametric", "naive_rag")
 
 _logger = logging.getLogger(__name__)
 
@@ -48,6 +50,7 @@ async def run_complete_test(
     run_stamp: str,
     summarize_observability_func,
     validation_model: str = VALIDATION_MODEL,
+    execution_variant: str = "graph",
 ) -> Dict[str, Any]:
     """
     Run complete test: execution + validation.
@@ -61,19 +64,33 @@ async def run_complete_test(
     :param run_stamp: Run timestamp.
     :param summarize_observability_func: Function to summarize observability.
     :param validation_model: Model name for validation.
+    :param execution_variant: graph / sequential (engine) or parametric / naive_rag (baseline).
     :return: Complete test result.
     """
-    execution_result = await run_test_execution(
-        test_module=test_module,
-        model_name=model_name,
-        connector_llm=connector_llm,
-        connector_search=connector_search,
-        connector_http=connector_http,
-        connector_chroma=connector_chroma,
-        idea_settings=idea_settings,
-        run_stamp=run_stamp,
-        summarize_observability_func=summarize_observability_func,
-    )
+    if execution_variant in BASELINE_VARIANTS:
+        execution_result = await run_baseline_execution(
+            test_module=test_module,
+            model_name=model_name,
+            variant=execution_variant,
+            connector_llm=connector_llm,
+            connector_search=connector_search,
+            connector_http=connector_http,
+            connector_chroma=connector_chroma,
+            run_stamp=run_stamp,
+            summarize_observability_func=summarize_observability_func,
+        )
+    else:
+        execution_result = await run_test_execution(
+            test_module=test_module,
+            model_name=model_name,
+            connector_llm=connector_llm,
+            connector_search=connector_search,
+            connector_http=connector_http,
+            connector_chroma=connector_chroma,
+            idea_settings=idea_settings,
+            run_stamp=run_stamp,
+            summarize_observability_func=summarize_observability_func,
+        )
     
     validation_runner = test_module.validation_runner
     validation_runner.validation_model = validation_model

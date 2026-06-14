@@ -13,12 +13,31 @@ MODEL_CANDIDATES = [
     "gpt-5-nano",
 ]
 
+# Cost-recovery benchmark roster (OpenRouter slugs). Run with LLM_PROVIDER=openrouter
+# and IDEA_TEST_MODELS set to the slug subset you want. Pricing is auto-fetched from
+# OpenRouter's /models endpoint (see model_costs.py). flash-lite / nano are JSON-gated:
+# the structured-output preflight (preflight_check_llm) drops them if they can't reliably
+# emit json_mode output, which the engine's expansion/evaluation/merge calls require.
+BENCHMARK_ROSTER = {
+    "reference": ["google/gemini-3.1-pro-preview"],
+    "reference_cached": ["openai/gpt-5", "google/gemini-2.5-pro"],
+    "cheap": ["google/gemini-2.5-flash", "openai/gpt-5-mini", "openai/gpt-4.1-nano"],
+    "experiment": ["google/gemini-2.5-flash-lite", "openai/gpt-5-nano"],
+}
+
 MODEL_ALIASES = {
     "gpt-5": "gpt-5",
     "gpt-5.2": "gpt-5.2",
     "gpt-5-mini": "gpt-5-mini",
     "gpt-5-nano": "gpt-5-nano",
     "gpt-4.1-nano": "gpt-4.1-nano",
+    # Bare-name conveniences -> OpenRouter slugs for the benchmark roster.
+    "gemini-3.1-pro": "google/gemini-3.1-pro",
+    "gemini-2.5-pro": "google/gemini-2.5-pro",
+    "gemini-2.5-flash": "google/gemini-2.5-flash",
+    "gemini-2.5-flash-lite": "google/gemini-2.5-flash-lite",
+    "flash": "google/gemini-2.5-flash",
+    "flash-lite": "google/gemini-2.5-flash-lite",
 }
 
 VALIDATION_MODEL = "gpt-5-mini"

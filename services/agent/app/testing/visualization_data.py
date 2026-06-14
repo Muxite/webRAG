@@ -21,12 +21,26 @@ def load_test_results(results_dir: Path, pattern: str = "*.json", run_id_filter:
     files_loaded = 0
     files_skipped = 0
     
-    for result_file in sorted(results_dir.glob(pattern)):
+    # Result files can live either at the top level (legacy layout) or nested
+    # in {run_id}_{test_id}_{model_short}/ subdirectories (current layout).
+    # Match either, and resolve run_id against filename OR parent directory.
+    candidates = list(results_dir.glob(pattern)) + list(results_dir.rglob(pattern))
+    seen_paths: set = set()
+    deduped = []
+    for f in candidates:
+        if f in seen_paths:
+            continue
+        seen_paths.add(f)
+        deduped.append(f)
+
+    for result_file in sorted(deduped):
         if "summary" in result_file.name or "_report_" in result_file.name:
             continue
-        
+
         if run_id_filter:
-            if not result_file.name.startswith(run_id_filter):
+            name_match = result_file.name.startswith(run_id_filter)
+            parent_match = result_file.parent.name.startswith(run_id_filter)
+            if not (name_match or parent_match):
                 files_skipped += 1
                 continue
         
@@ -63,13 +77,25 @@ def list_available_runs(results_dir: Path) -> List[Dict[str, Any]]:
     :return: List of run info dicts with run_id, count, and latest file.
     """
     run_data = defaultdict(lambda: {"count": 0, "files": []})
-    
-    for result_file in sorted(results_dir.glob("*.json")):
+
+    # Look at both top-level and nested JSON files.
+    candidates = list(results_dir.glob("*.json")) + list(results_dir.rglob("*.json"))
+    seen_paths: set = set()
+    for result_file in sorted(candidates):
+        if result_file in seen_paths:
+            continue
+        seen_paths.add(result_file)
         if "summary" in result_file.name:
             continue
+        run_id = None
         match = re.match(r"(\d{8}_\d{6})_", result_file.name)
         if match:
             run_id = match.group(1)
+        else:
+            parent_match = re.match(r"(\d{8}_\d{6})_", result_file.parent.name)
+            if parent_match:
+                run_id = parent_match.group(1)
+        if run_id:
             run_data[run_id]["count"] += 1
             run_data[run_id]["files"].append(result_file.name)
     

@@ -1,0 +1,1 @@
+{{"merged_results": {merged_json}, "original_goal": "{original_goal}", "parent_intent": "{parent_intent}", "parent_justification": "{parent_justification}"}}

@@ -33,7 +33,18 @@ async def test_llm_preflight():
     Test LLM with a minimal DAG step using the same settings as expansion.
     """
     print("=== LLM Preflight Test ===\n")
-    
+
+    provider = (os.environ.get("LLM_PROVIDER") or "openai_compatible").strip().lower()
+    print(f"Provider: {provider}")
+    if provider == "openrouter" and not (
+        os.environ.get("OPENROUTER_API_KEY") or os.environ.get("LLM_API_KEY")
+    ):
+        print(
+            "[FAIL] LLM_PROVIDER=openrouter but neither OPENROUTER_API_KEY "
+            "nor LLM_API_KEY is set."
+        )
+        return False
+
     # Load settings
     idea_settings = load_idea_dag_settings()
     model_name = idea_settings.get('expansion_model') or os.environ.get('MODEL_NAME', 'default')

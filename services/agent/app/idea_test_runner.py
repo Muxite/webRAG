@@ -74,6 +74,7 @@ async def preflight_check_llm(connector_llm: ConnectorLLM, model_name: str) -> b
     last_error = "unknown"
     connector_llm.set_model(model_name)
     try:
+        working_payload = None
         for payload in payload_candidates:
             try:
                 response = await asyncio.wait_for(
@@ -100,17 +101,77 @@ async def preflight_check_llm(connector_llm: ConnectorLLM, model_name: str) -> b
                     f"[PASSED] Pre-flight check for {model_name} "
                     f"(finish_reason={finish_reason}, content_len={content_len}, payload={payload})"
                 )
-                return True
+                working_payload = payload
+                break
             except Exception as exc:
                 last_error = str(exc)
                 continue
-        logging.warning(f"[FAILED] Pre-flight check for {model_name}: {last_error}")
-        return False
+
+        if working_payload is None:
+            logging.warning(f"[FAILED] Pre-flight check for {model_name}: {last_error}")
+            return False
+
+        # Structured-JSON gate: the engine relies on json_mode for expansion / evaluation /
+        # merge, so a model that can't emit parseable JSON cannot drive the graph. Drop it.
+        if _is_enabled(os.environ.get("IDEA_TEST_PREFLIGHT_JSON", "1")):
+            if not await _preflight_json_capable(connector_llm, model_name, working_payload):
+                logging.warning(
+                    f"[FAILED] Structured-JSON pre-flight for {model_name}: "
+                    f"model could not emit parseable json_mode output (dropped)"
+                )
+                return False
+        return True
     except Exception as exc:
         logging.error(f"[FAILED] Pre-flight check for {model_name}: {exc}")
         return False
     finally:
         connector_llm.set_model(original_model)
+
+
+async def _preflight_json_capable(connector_llm: ConnectorLLM, model_name: str, base_payload: dict) -> bool:
+    """
+    Verify a model can produce parseable JSON under response_format=json_object.
+    :param connector_llm: LLM connector.
+    :param model_name: Model name to test.
+    :param base_payload: The token/temperature payload that passed the plain check.
+    :return: True if the model returns a parseable JSON object.
+    """
+    messages = [
+        {"role": "system", "content": "You output only JSON. No prose."},
+        {"role": "user", "content": 'Return a JSON object exactly like {"ok": true, "n": 1}'},
+    ]
+    payload = dict(base_payload)
+    payload["response_format"] = {"type": "json_object"}
+    # Reasoning models (gpt-5*, gemini-2.5-pro) spend hidden tokens before emitting
+    # content; the plain check's tiny 256-token cap can starve the JSON body and cause a
+    # false drop. The engine uses 8k+ tokens in practice, so give the probe real room.
+    json_budget = int(os.environ.get("IDEA_TEST_PREFLIGHT_JSON_TOKENS", "4096"))
+    if "max_completion_tokens" in payload:
+        payload["max_completion_tokens"] = max(int(payload["max_completion_tokens"]), json_budget)
+    elif "max_tokens" in payload:
+        payload["max_tokens"] = max(int(payload["max_tokens"]), json_budget)
+    else:
+        payload["max_completion_tokens"] = json_budget
+    try:
+        response = await asyncio.wait_for(
+            connector_llm.client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                **payload,
+            ),
+            timeout=20,
+        )
+        choices = getattr(response, "choices", None) or []
+        if not choices:
+            return False
+        content = getattr(getattr(choices[0], "message", None), "content", None)
+        if not isinstance(content, str) or not content.strip():
+            return False
+        parsed = json.loads(content)
+        return isinstance(parsed, dict)
+    except Exception as exc:
+        logging.info(f"[json-gate] {model_name} JSON probe error: {exc}")
+        return False
 
 
 TEST_PRIORITY_ORDER = [
@@ -216,6 +277,13 @@ def _parse_execution_variants(raw: str) -> List[str]:
         "sequential": "sequential",
         "chain": "sequential",
         "cot": "sequential",
+        # No-graph baselines for the cost-recovery benchmark.
+        "parametric": "parametric",
+        "completion": "parametric",
+        "raw": "parametric",
+        "naive_rag": "naive_rag",
+        "naive": "naive_rag",
+        "rag": "naive_rag",
     }
     out: List[str] = []
     seen = set()
@@ -254,6 +322,53 @@ def _variant_settings(base_settings: Dict[str, Any], variant: str) -> Dict[str, 
                 + "\n\nSEQUENTIAL MODE: Propose multiple candidates. Only the highest-scoring one will be selected."
             )
     return settings
+
+
+def _parse_effort_tiers(raw: str) -> List[int]:
+    """
+    Parse effort tiers (node budgets) for the recovery-curve sweep.
+
+    Each tier is a max-node budget for the graph; ``0`` means "no override"
+    (use the settings defaults — used for full-capability reference runs).
+    :param raw: Comma/space separated integers.
+    :return: Ordered list of tiers (default ``[0]``).
+    """
+    text = (raw or "").strip()
+    if not text:
+        return [0]
+    out: List[int] = []
+    seen = set()
+    for part in text.replace(";", ",").replace(" ", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            value = int(part)
+        except ValueError:
+            continue
+        if value < 0 or value in seen:
+            continue
+        out.append(value)
+        seen.add(value)
+    return out or [0]
+
+
+def _apply_effort_tier(settings: Dict[str, Any], tier_nodes: int) -> Dict[str, Any]:
+    """
+    Apply an effort tier (node budget) to a settings copy.
+
+    Bounds spend by capping total nodes and step count; realized USD (measured
+    ex-post) is the actual x-axis of the recovery curve.
+    :param settings: Base settings.
+    :param tier_nodes: Node budget; ``0`` leaves settings untouched.
+    :return: Settings copy.
+    """
+    s = dict(settings)
+    if tier_nodes and tier_nodes > 0:
+        s["max_total_nodes"] = int(tier_nodes)
+        steps_factor = float(os.environ.get("IDEA_TEST_TIER_STEPS_FACTOR", "2"))
+        s["max_steps"] = max(10, int(round(tier_nodes * steps_factor)))
+    return s
 
 
 def _difficulty_value(metadata: Dict[str, Any]) -> int:
@@ -421,6 +536,7 @@ async def run_single_test(
     execution_variant: str = "graph",
     repeat_index: int = 1,
     total_repeats: int = 1,
+    effort_tier: int = 0,
 ) -> Dict[str, Any]:
     """
     Run a single test for a single model.
@@ -428,12 +544,13 @@ async def run_single_test(
     """
     test_id = extract_test_id(test_file)
     normalized = normalize_model_name(model_name)
-    
+
     try:
         test_module = IdeaTestModule(test_file)
         metadata = test_module.metadata
-        
+
         variant_specific_settings = _variant_settings(idea_settings, execution_variant)
+        variant_specific_settings = _apply_effort_tier(variant_specific_settings, effort_tier)
         result = await run_complete_test(
             test_module=test_module,
             model_name=normalized,
@@ -445,13 +562,17 @@ async def run_single_test(
             run_stamp=run_id,
             summarize_observability_func=summarize_observability,
             validation_model=validation_model,
+            execution_variant=execution_variant,
         )
-        
+
         result["execution_variant"] = execution_variant
-        
+        result["effort_tier"] = effort_tier
+
         result = add_graph_visualization(result)
-        
-        out_path = results_dir / f"{run_id}_{test_id}_{normalized}_{execution_variant}_r{repeat_index}.json"
+
+        tier_tag = f"_t{effort_tier}" if effort_tier else ""
+        safe_model = normalized.replace("/", "-")
+        out_path = results_dir / f"{run_id}_{test_id}_{safe_model}_{execution_variant}{tier_tag}_r{repeat_index}.json"
         
         report_verbosity = _env_int("IDEA_TEST_REPORT_VERBOSITY", [], 1)
         reporter = TestReportGenerator(verbosity=report_verbosity)
@@ -665,6 +786,8 @@ async def main() -> None:
     
     execution_variants_env = os.environ.get("IDEA_TEST_EXECUTION_VARIANTS", "graph")
     execution_variants = _parse_execution_variants(execution_variants_env)
+
+    effort_tiers = _parse_effort_tiers(os.environ.get("IDEA_TEST_EFFORT_TIERS", "0"))
     
     if benchmark_mode:
         max_parallel = min(max_parallel, 3)
@@ -684,6 +807,7 @@ async def main() -> None:
     logging.info(f"Models: {', '.join(models)}")
     logging.info(f"Validation model: {validation_model}")
     logging.info(f"Execution variants: {', '.join(execution_variants)} ({len(execution_variants)} variant(s))")
+    logging.info(f"Effort tiers (node budgets, 0=default): {effort_tiers}")
     if specific_test_ids:
         logging.info(f"Test ID filter active: {specific_test_ids}")
     logging.info(f"Top N tests: {priority_count} (0 means all)")
@@ -760,19 +884,22 @@ async def main() -> None:
         results_dir = Path(__file__).resolve().parent.parent / "idea_test_results"
         results_dir.mkdir(parents=True, exist_ok=True)
         
-        test_tasks: List[Tuple[Path, str, str, int]] = []
+        test_tasks: List[Tuple[Path, str, str, int, int]] = []
         for test_file in test_files:
             for model_name in execution_models:
                 for execution_variant in execution_variants:
-                    for repeat_index in range(1, repeats + 1):
-                        test_tasks.append((test_file, model_name, execution_variant, repeat_index))
+                    # Baselines ignore effort tiers (single fixed pass); engine variants sweep.
+                    tiers = [0] if execution_variant in ("parametric", "naive_rag") else effort_tiers
+                    for effort_tier in tiers:
+                        for repeat_index in range(1, repeats + 1):
+                            test_tasks.append((test_file, model_name, execution_variant, effort_tier, repeat_index))
         
         logging.info(f"Total test tasks: {len(test_tasks)}")
         
         semaphore = asyncio.Semaphore(max_parallel)
         
         async def run_with_semaphore(task):
-            test_file, model_name, execution_variant, repeat_index = task
+            test_file, model_name, execution_variant, effort_tier, repeat_index = task
             queue_wait_start = time.perf_counter()
             async with semaphore:
                 queue_wait_end = time.perf_counter()
@@ -791,6 +918,7 @@ async def main() -> None:
                     execution_variant=execution_variant,
                     repeat_index=repeat_index,
                     total_repeats=repeats,
+                    effort_tier=effort_tier,
                 )
                 if result and isinstance(result, dict):
                     execution_data = result.get("execution", {})
@@ -815,6 +943,7 @@ async def main() -> None:
             "models": valid_models,
             "validation_model": validation_model,
             "execution_variants": execution_variants,
+            "effort_tiers": effort_tiers,
             "tests_run": len(test_files),
             "total_tests_available": len(all_test_files),
             "priority_count": priority_count,
