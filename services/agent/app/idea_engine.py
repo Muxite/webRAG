@@ -34,6 +34,9 @@ from agent.app.idea_policies.post_expansion_hooks import (
 )
 from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
 from agent.app.idea_policies.grounding import evaluate_grounding
+from agent.app import idea_chunking
+from agent.app import idea_visit_dedup
+from agent.app import idea_sequencing
 
 
 class IdeaDagEngine:
@@ -688,125 +691,16 @@ class IdeaDagEngine:
     @staticmethod
     def _url_slug_tokens(url: str) -> List[str]:
         """Pull the trailing path slug from a URL and return its lowercased tokens."""
-        from urllib.parse import unquote, urlparse
-
-        if not isinstance(url, str) or not url:
-            return []
-        try:
-            parsed = urlparse(url)
-        except ValueError:
-            return []
-        path = (parsed.path or "").rstrip("/")
-        slug = path.rsplit("/", 1)[-1] if path else ""
-        if not slug:
-            return []
-        slug = unquote(slug).replace("_", " ").replace("-", " ").lower()
-        # Strip wrapping parens like "Pando_(tree)" → "pando tree"
-        slug = slug.replace("(", " ").replace(")", " ")
-        tokens = [t for t in slug.split() if len(t) >= 3]
-        return tokens
+        return idea_visit_dedup.url_slug_tokens(url)
 
     def _semantic_dedup_visits(self, graph: IdeaDag, parent_id: str, step_index: int) -> None:
-        """Fold URL-less planner visit candidates into URL-bearing siblings.
-
-        Weak planners (notably Gemini 2.5 Flash) often emit visit candidates
-        with a title like "Visit Axolotl Wikipedia page" but no `url` or
-        `link_idea` detail. The mandate-injection hook then adds a sibling
-        with the explicit URL. The engine sees them as distinct, dispatches
-        both, and the URL-less one fails — or worse, in sequential mode the
-        evaluator may pick the URL-less candidate, prune the correct sibling,
-        and execute the wrong thing.
-
-        This pre-execution pass detects each URL-less visit, scans the
-        URL-bearing siblings for one whose path slug appears in the URL-less
-        node's title/goal text, and marks the URL-less node SKIPPED with a
-        diagnostic reason. The URL-bearing sibling runs unopposed.
-
-        No-op when no visit candidates lack URLs, or when no slug matches.
-        """
-        parent = graph.get_node(parent_id)
-        if not parent or not parent.children:
-            return
-
-        url_bearing: List[tuple] = []  # (node_id, url, slug_tokens)
-        url_less: List[tuple] = []     # (node_id, node, search_text)
-
-        for child_id in parent.children:
-            child = graph.get_node(child_id)
-            if not child or child.status in (IdeaNodeStatus.DONE, IdeaNodeStatus.SKIPPED, IdeaNodeStatus.FAILED):
-                continue
-            action = NodeDetailsExtractor.get_action(child.details)
-            if action != IdeaActionType.VISIT.value:
-                continue
-            url = (
-                child.details.get(DetailKey.URL.value)
-                or child.details.get("optional_url")
-                or child.details.get("url")
-            )
-            link_idea = child.details.get("link_idea")
-            if isinstance(url, str) and url.startswith(("http://", "https://")):
-                tokens = self._url_slug_tokens(url)
-                if tokens:
-                    url_bearing.append((child_id, url, tokens))
-            elif not url and not link_idea:
-                title = (child.title or "").lower()
-                goal = (child.details.get("goal") or "").lower()
-                parent_goal = (child.details.get("parent_goal") or "").lower()
-                search_text = " ".join([title, goal, parent_goal])
-                url_less.append((child_id, child, search_text))
-
-        if not url_bearing or not url_less:
-            return
-
-        # Hook-only gate: only fold against URL-bearing siblings that came
-        # from MandateUrlInjectionHook (i.e. the mandate text literally
-        # contained the URL). This protects chain-of-links tests where
-        # planner-generated URL-less candidates were intended for sequential
-        # link discovery rather than as duplicates of the literal URL.
-        require_hook_source = bool(
-            self._cfg.engine.semantic_dedup_require_hook_source
+        idea_visit_dedup.semantic_dedup_visits(
+            graph,
+            parent_id,
+            step_index,
+            bool(self._cfg.engine.semantic_dedup_require_hook_source),
+            self._logger,
         )
-
-        def _is_hook_injected(source_id: str) -> bool:
-            source = graph.get_node(source_id)
-            if not source:
-                return False
-            justification = (source.details.get(DetailKey.JUSTIFICATION.value) or "")
-            return justification.startswith("Mandate requires visiting")
-
-        folded = 0
-        gate_blocked = 0
-        for nid, node, search_text in url_less:
-            for source_id, source_url, tokens in url_bearing:
-                # Match: every slug token must appear as a substring in the
-                # URL-less node's text. Slugs like "Axolotl" → ["axolotl"]
-                # match "Visit Axolotl Wikipedia page". Multi-word slugs like
-                # "Pando tree" require both "pando" and "tree" present.
-                if not all(tok in search_text for tok in tokens):
-                    continue
-                if require_hook_source and not _is_hook_injected(source_id):
-                    gate_blocked += 1
-                    continue
-                node.status = IdeaNodeStatus.SKIPPED
-                node.details[DetailKey.ACTION_ERROR.value] = (
-                    f"Semantic dedup: URL-less visit folded into sibling {source_id} "
-                    f"(URL: {source_url})"
-                )
-                node.details["__semantic_dedup_source"] = source_id
-                folded += 1
-                break
-
-        if gate_blocked:
-            self._logger.info(
-                f"[STEP {step_index}] SEMANTIC_DEDUP: gate blocked {gate_blocked} fold(s) "
-                f"(URL-bearing sibling was not from MandateUrlInjectionHook)"
-            )
-
-        if folded:
-            self._logger.info(
-                f"[STEP {step_index}] SEMANTIC_DEDUP: folded {folded} URL-less visit "
-                f"candidates into URL-bearing siblings (under parent {parent_id[:8]})"
-            )
 
     async def _handle_merge_creation(self, graph: IdeaDag, node_id: str, step_index: int, branch_pair: Optional[BranchPair]) -> Optional[str]:
         if not self.merge.should_create_merge_node(graph, node_id):
@@ -1292,237 +1186,35 @@ class IdeaDagEngine:
         eligible: List[str],
         step_index: int,
     ) -> Optional[IdeaNode]:
-        selected_action = NodeDetailsExtractor.get_action(selected.details) or ""
-        # If a visit node has no explicit URL, it often depends on a sibling search node
-        # to provide URLs. In sequential mode, enforce search-before-visit regardless
-        # of score so we don't execute a visit prematurely and fail with "missing URL".
-        if selected_action.lower() == "visit":
-            url = (
-                selected.details.get("optional_url")
-                or selected.details.get(DetailKey.URL.value)
-                or selected.details.get(DetailKey.LINK.value)
-                or selected.details.get("url")
-                or selected.details.get("link")
-            )
-            has_url = isinstance(url, str) and url.startswith(("http://", "https://"))
-            if not has_url:
-                search_candidates: List[IdeaNode] = []
-                for nid in eligible:
-                    if nid == selected.node_id:
-                        continue
-                    child = graph.get_node(nid)
-                    if not child or child.status.value in ("done", "failed", "skipped"):
-                        continue
-                    child_action = NodeDetailsExtractor.get_action(child.details) or ""
-                    if child_action.lower() == "search":
-                        search_candidates.append(child)
-                if search_candidates:
-                    # Prefer the highest-scored search (or first if unscored).
-                    best_search = max(search_candidates, key=lambda n: n.score if n.score is not None else float("-inf"))
-                    return best_search
+        return idea_sequencing.reorder_for_sequential(graph, selected, eligible, step_index)
 
-        data_consuming = {"think", "save", "merge"}
-        if selected_action.lower() not in data_consuming:
-            return None
-        
-        data_producing_candidates: List[IdeaNode] = []
-        for nid in eligible:
-            if nid == selected.node_id:
-                continue
-            child = graph.get_node(nid)
-            if not child or child.status.value == "done":
-                continue
-            child_action = NodeDetailsExtractor.get_action(child.details) or ""
-            if child_action.lower() == "search":
-                data_producing_candidates.append(child)
-            elif child_action.lower() == "visit":
-                url = child.details.get("optional_url") or child.details.get("url") or child.details.get("link") or ""
-                has_url = isinstance(url, str) and url.startswith(("http://", "https://"))
-                has_link_idea = bool(child.details.get("link_idea"))
-                if has_url or has_link_idea:
-                    data_producing_candidates.append(child)
-        
-        if not data_producing_candidates:
-            return None
-        
-        for candidate in data_producing_candidates:
-            url = candidate.details.get("optional_url") or candidate.details.get("url") or candidate.details.get("link") or ""
-            if isinstance(url, str) and url.startswith(("http://", "https://")):
-                return candidate
-        
-        return data_producing_candidates[0]
-    
     def _detect_state_dependencies(self, graph: IdeaDag, candidate_ids: List[str]) -> bool:
-        from agent.app.idea_policies.action_constants import NodeDetailsExtractor
-        from agent.app.idea_policies.base import IdeaActionType
-        
-        has_search = False
-        has_visit = False
-        visit_needs_url = False
-        has_data_dependencies = False
-        
-        for node_id in candidate_ids:
-            node = graph.get_node(node_id)
-            if not node:
-                continue
-            
-            action = NodeDetailsExtractor.get_action(node.details)
-            if action == IdeaActionType.SEARCH.value:
-                has_search = True
-            elif action == IdeaActionType.VISIT.value:
-                has_visit = True
-                url = node.details.get(DetailKey.URL.value) or node.details.get(DetailKey.LINK.value) or node.details.get("url") or node.details.get("link")
-                if not url or not isinstance(url, str) or not url.startswith(("http://", "https://")):
-                    visit_needs_url = True
-                
-                requires_data = node.details.get(DetailKey.REQUIRES_DATA.value)
-                if requires_data and isinstance(requires_data, dict):
-                    source_node_id = requires_data.get("source_node_id")
-                    if source_node_id and source_node_id in candidate_ids:
-                        has_data_dependencies = True
-                        self._logger.info(f"[DEPENDENCY] Node {node_id} requires data from sibling {source_node_id} - forcing sequential")
-        
-        if has_search and has_visit and visit_needs_url:
-            return True
-        
-        if has_data_dependencies:
-            return True
-        
-        return False
-    
+        return idea_sequencing.detect_state_dependencies(graph, candidate_ids, self._logger)
+
     def _should_chunk_document(self, graph: IdeaDag, node: IdeaNode) -> bool:
-        from agent.app.idea_policies.action_constants import NodeDetailsExtractor, ActionResultKey, ActionResultExtractor
-        from agent.app.idea_policies.base import IdeaActionType
-        
-        action = NodeDetailsExtractor.get_action(node.details)
-        if action != IdeaActionType.VISIT.value:
-            return False
-        
-        result = node.details.get(DetailKey.ACTION_RESULT.value)
-        if not isinstance(result, dict):
-            return False
-        
-        if not ActionResultExtractor.is_success(result):
-            return False
-        
-        content_total = result.get(ActionResultKey.CONTENT_TOTAL_CHARS.value) or 0
-        chunk_threshold = self._cfg.memory.document_chunk_threshold
-        
-        if content_total > chunk_threshold:
-            self._logger.info(f"[CHUNKING] Document size {content_total} chars exceeds threshold {chunk_threshold}")
-            return True
-        
-        return False
-    
+        return idea_chunking.should_chunk_document(
+            graph, node, self._cfg.memory.document_chunk_threshold, self._logger
+        )
+
     async def _create_chunk_subproblems(self, graph: IdeaDag, visit_node: IdeaNode) -> Optional[List[str]]:
-        from agent.app.idea_policies.action_constants import ActionResultKey
-        from agent.app.idea_policies.base import IdeaActionType
-        
-        result = visit_node.details.get(DetailKey.ACTION_RESULT.value)
-        if not isinstance(result, dict):
-            return None
-        
-        content_full = result.get(ActionResultKey.CONTENT_FULL.value) or ""
-        if not content_full or not isinstance(content_full, str):
-            return None
-        
-        chunk_size = self._cfg.memory.document_chunk_size
-        chunk_overlap = self._cfg.memory.document_chunk_overlap
-        
-        chunks = self._chunk_text(content_full, chunk_size, chunk_overlap)
-        if len(chunks) <= 1:
-            return None
-        
-        original_goal = visit_node.details.get(DetailKey.GOAL.value) or visit_node.details.get(DetailKey.INTENT.value) or visit_node.title
-        url = result.get(ActionResultKey.URL.value) or ""
-        
-        chunk_nodes = []
-        for i, chunk in enumerate(chunks):
-            chunk_title = f"Search chunk {i+1}/{len(chunks)} of {visit_node.title[:40]}..."
-            chunk_details = {
-                DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
-                DetailKey.QUERY.value: original_goal,
-                DetailKey.CHUNK_INDEX.value: i,
-                DetailKey.TOTAL_CHUNKS.value: len(chunks),
-                DetailKey.CHUNK_CONTENT.value: chunk,
-                DetailKey.ORIGINAL_GOAL.value: original_goal,
-                DetailKey.GOAL.value: f"Find information in chunk {i+1} relevant to: {original_goal}",
-                DetailKey.REQUIRES_DATA.value: {
-                    "type": "chunk_from_visit",
-                    "source_node_id": visit_node.node_id
-                },
-                DetailKey.JUSTIFICATION.value: f"Document too large ({len(content_full)} chars) - searching chunk {i+1}/{len(chunks)} for: {original_goal}",
-            }
-            
-            chunk_node = graph.add_child(
-                parent_id=visit_node.node_id,
-                title=chunk_title,
-                details=chunk_details,
-                status=IdeaNodeStatus.PENDING,
-            )
-            chunk_nodes.append(chunk_node.node_id)
-        
-        self._logger.info(f"[CHUNKING] Created {len(chunk_nodes)} chunk sub-problems for document from {url[:60]}...")
-        return chunk_nodes
-    
+        return await idea_chunking.create_chunk_subproblems(
+            graph,
+            visit_node,
+            self._cfg.memory.document_chunk_size,
+            self._cfg.memory.document_chunk_overlap,
+            self._logger,
+        )
+
     @staticmethod
     def _chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
-        if not text or len(text) <= chunk_size:
-            return [text] if text else []
-        
-        chunks = []
-        start = 0
-        
-        while start < len(text):
-            end = start + chunk_size
-            if end >= len(text):
-                chunks.append(text[start:].strip())
-                break
-            
-            chunk = text[start:end].strip()
-            if chunk:
-                chunks.append(chunk)
-            
-            start = max(start + 1, end - chunk_overlap)
-        
-        return chunks
-    
+        return idea_chunking.chunk_text(text, chunk_size, chunk_overlap)
+
     def _detect_chunk_dependencies(self, graph: IdeaDag, candidate_ids: List[str]) -> bool:
-        chunk_nodes = {}
-        for node_id in candidate_ids:
-            node = graph.get_node(node_id)
-            if not node:
-                continue
-            
-            chunk_index = node.details.get(DetailKey.CHUNK_INDEX.value)
-            total_chunks = node.details.get(DetailKey.TOTAL_CHUNKS.value)
-            source_node_id = None
-            requires_data = node.details.get(DetailKey.REQUIRES_DATA.value)
-            if isinstance(requires_data, dict):
-                source_node_id = requires_data.get("source_node_id")
-            
-            if chunk_index is not None and total_chunks is not None and source_node_id:
-                if source_node_id not in chunk_nodes:
-                    chunk_nodes[source_node_id] = []
-                chunk_nodes[source_node_id].append((node_id, chunk_index))
-        
-        for source_id, chunks in chunk_nodes.items():
-            if len(chunks) > 1:
-                chunks_sorted = sorted(chunks, key=lambda x: x[1] or 0)
-                for i, (node_id, idx) in enumerate(chunks_sorted):
-                    if i > 0 and idx is not None and chunks_sorted[i-1][1] is not None:
-                        if idx <= chunks_sorted[i-1][1]:
-                            return True
-        
-        return False
-    
+        return idea_chunking.detect_chunk_dependencies(graph, candidate_ids)
+
     def _is_chunk_node(self, graph: IdeaDag, node_id: str) -> bool:
-        node = graph.get_node(node_id)
-        if not node:
-            return False
-        
-        return node.details.get(DetailKey.CHUNK_CONTENT.value) is not None
-    
+        return idea_chunking.is_chunk_node(graph, node_id)
+
     def _get_pending_executable_nodes(self, graph: IdeaDag) -> List[IdeaNode]:
         pending = []
         for node in graph.iter_depth_first():
