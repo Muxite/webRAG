@@ -19,9 +19,13 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
+
+from agent.app import model_costs
 
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
@@ -110,6 +114,137 @@ async def _run_leaf(agent_io: AgentIO, instruction: str, expect: str, model_name
     return last_evidence[:400] or "UNKNOWN"
 
 
+# --- Thin leaf: the harness owns the control flow; the LLM only does atomic perception ---------
+# The JSON-ReAct leaf above makes the (weak) model choose actions, form JSON, and self-terminate —
+# many ways to flake (returns UNKNOWN, bad JSON, stops early). The THIN leaf removes all of that:
+# a FIXED pipeline (one search -> pick the wiki page -> one visit -> extract), where the model is
+# asked only micro-questions with tiny outputs we can read off directly. Same tools, far less rope.
+_THIN_QUERY_SYS = (
+    "Output ONLY a short web-search query (a few words) that would find the requested fact. "
+    "No quotes, no explanation, no punctuation — just the query."
+)
+_THIN_EXTRACT_SYS = (
+    "Read the PAGE and answer the QUESTION with ONLY the value — a name, a number, or a year — and "
+    "nothing else (no sentence, no units unless asked, no source). If the PAGE does not contain it, "
+    "output exactly: UNKNOWN."
+)
+
+
+def _votes_for_model(model_name: str) -> int:
+    """Price-aware redundancy. A dirt-cheap (usually weaker) model spends its cheapness on MORE
+    independent extractions to vote/prune over; a premium model needs only one trustworthy call.
+    Driven by the model's output price/Mtok (model_costs); override with IDEA_TEST_COMPILED_VOTES.
+    """
+    override = os.environ.get("IDEA_TEST_COMPILED_VOTES", "").strip()
+    if override.isdigit():
+        return max(1, int(override))
+    try:
+        pricing = model_costs._lookup_pricing(model_name) or {}
+        out_price = float(pricing.get("output_per_million") or 0.0)
+    except Exception:  # noqa: BLE001
+        out_price = 0.0
+    if out_price <= 0.0:
+        return 3            # unknown price -> a little redundancy is cheap insurance
+    if out_price <= 1.0:
+        return 5            # dirt cheap -> heavy redundancy
+    if out_price <= 5.0:
+        return 3
+    return 1               # premium -> trust a single call
+
+
+def _vote_key(ans: str) -> str:
+    """Normalized voting key so equivalent answers vote together. Prefer the longest number token
+    when present ('1,642 m', '1642 metres', 'Max depth: 1,642' -> '1642'); else a cleaned text key."""
+    low = ans.strip().lower()
+    nums = re.findall(r"\d[\d,]*", low)
+    if nums:
+        return max((n.replace(",", "") for n in nums), key=len)
+    return re.sub(r"[^a-z0-9]+", " ", low).strip()
+
+
+async def _thin_extract_once(agent_io: AgentIO, page: str, instruction: str, model_name: str,
+                             temperature: float) -> str:
+    ep = agent_io.build_llm_payload(
+        messages=[{"role": "system", "content": _THIN_EXTRACT_SYS},
+                  {"role": "user", "content": f"PAGE:\n{page}\n\nQUESTION: {instruction}"}],
+        json_mode=False, model_name=model_name, temperature=temperature, max_tokens=24,
+    )
+    return (await agent_io.query_llm(ep, model_name=model_name) or "").strip()
+
+
+async def _vote_extract(agent_io: AgentIO, page: str, instruction: str, model_name: str, k: int) -> str:
+    """Run k INDEPENDENT extractions (neutral prompt — no leading answer) and return the majority
+    value; '' if every sample is UNKNOWN. The cheap 'make candidate nodes -> prune' step.
+
+    The first sample is ANCHORED at temperature 0 (the deterministic best read); the remaining
+    k-1 add mild diversity (temp 0.3) only to surface alternatives. Ties break toward the anchor.
+    This keeps clean single-read facts (e.g. an infobox year) stable while still letting redundancy
+    rescue genuinely uncertain extractions (e.g. a chain hop) — voting that helps, never hurts.
+    """
+    if k <= 1:
+        a = await _thin_extract_once(agent_io, page, instruction, model_name, 0.0)
+        return a if a and not a.upper().startswith("UNKNOWN") else ""
+    temps = [0.0] + [0.3] * (k - 1)
+    answers = await asyncio.gather(*[
+        _thin_extract_once(agent_io, page, instruction, model_name, t) for t in temps
+    ])
+    cands = [a for a in answers if a and not a.upper().startswith("UNKNOWN")]
+    if not cands:
+        return ""
+    counts = Counter(_vote_key(a) for a in cands)
+    top_count = counts.most_common(1)[0][1]
+    tied = {key for key, c in counts.items() if c == top_count}
+    anchor = answers[0] if (answers[0] and not answers[0].upper().startswith("UNKNOWN")) else ""
+    chosen_key = _vote_key(anchor) if anchor and _vote_key(anchor) in tied else counts.most_common(1)[0][0]
+    return next(a for a in cands if _vote_key(a) == chosen_key)
+
+
+async def _run_leaf_thin(agent_io: AgentIO, instruction: str, expect: str, model_name: str,
+                         page_chars: int, search_k: int) -> str:
+    """Fixed search->pick->visit->vote-extract pipeline of thin prompts.
+
+    The model only answers micro-questions (a ~few-token search query, then value extractions) —
+    no JSON, no action-planning. Price-aware k-sample voting (``_votes_for_model``) makes a cheap
+    model's noisy extraction reliable via redundancy + majority pruning, and a second candidate page
+    is tried (a repeat cycle) if the first yields no consensus. Returns ``"<value> — source:<url>"``.
+    """
+    # 1) thin search query (tiny output)
+    qp = agent_io.build_llm_payload(
+        messages=[{"role": "system", "content": _THIN_QUERY_SYS}, {"role": "user", "content": instruction}],
+        json_mode=False, model_name=model_name, temperature=0.0, max_tokens=24,
+    )
+    raw_q = (await agent_io.query_llm(qp, model_name=model_name) or "").strip()
+    query = raw_q.splitlines()[0].strip(' "\'')[:200] if raw_q else " ".join(instruction.split()[:12])
+
+    # 2) search
+    try:
+        results = await agent_io.search(query, count=search_k, timeout_seconds=20) or []
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning(f"thin leaf search failed: {exc}")
+        results = []
+    if not results:
+        return "UNKNOWN"
+
+    # 3) candidate pages — Wikipedia article(s) first (stable), then the rest (more 'nodes' to try)
+    urls = [str(r.get("url", "")) for r in results if str(r.get("url", ""))]
+    urls.sort(key=lambda u: 0 if "wikipedia.org/wiki/" in u else 1)
+    if not urls:
+        return "UNKNOWN"
+
+    # 4/5) try up to 2 candidate pages; vote-extract on each (repeat cycle if no consensus)
+    k = _votes_for_model(model_name)
+    for url in urls[:2]:
+        try:
+            page = (await agent_io.visit(url, timeout_seconds=30) or "")[:page_chars]
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning(f"thin leaf visit failed for {url}: {exc}")
+            continue
+        ans = await _vote_extract(agent_io, page, instruction, model_name, k)
+        if ans:
+            return f"{ans} — source: {url}"
+    return f"UNKNOWN — {urls[0]}"
+
+
 async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str, max_tokens: int) -> str:
     """Execute a compiled DAG plan topologically, then run the aggregation call.
 
@@ -132,6 +267,9 @@ async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str
     page_chars = int(os.environ.get("IDEA_TEST_COMPILED_PAGE_CHARS", "6000"))
     search_k = int(os.environ.get("IDEA_TEST_COMPILED_SEARCH_K", "6"))
     concurrency = max(1, int(os.environ.get("IDEA_TEST_COMPILED_CONCURRENCY", "6")))
+    # "react" (default): per-leaf JSON ReAct loop. "thin": fixed micro-prompt pipeline (cheaper,
+    # more robust for weak models — the harness owns control flow, the LLM only perceives).
+    leaf_mode = os.environ.get("IDEA_TEST_COMPILED_LEAF_MODE", "react").strip().lower()
     sem = asyncio.Semaphore(concurrency)
 
     results: Dict[str, str] = {}
@@ -142,10 +280,15 @@ async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str
             dep_results = {dep: results.get(dep, "UNKNOWN") for dep in leaf["depends_on"]}
             instruction = substitute_deps(leaf["instruction"], dep_results)
             try:
-                fact = await _run_leaf(
-                    agent_io, instruction, leaf["expect"],
-                    model_name, leaf_steps, page_chars, search_k,
-                )
+                if leaf_mode == "thin":
+                    fact = await _run_leaf_thin(
+                        agent_io, instruction, leaf["expect"], model_name, page_chars, search_k,
+                    )
+                else:
+                    fact = await _run_leaf(
+                        agent_io, instruction, leaf["expect"],
+                        model_name, leaf_steps, page_chars, search_k,
+                    )
             except Exception as exc:  # noqa: BLE001 — a single bad leaf must not sink the run
                 _logger.warning(f"compiled leaf '{leaf['id']}' failed: {exc}")
                 fact = "UNKNOWN"
@@ -157,13 +300,21 @@ async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str
             results[lid] = fact
 
     # Aggregate over every leaf, in declared plan order (stable for the judge/validators).
-    facts_block = "\n".join(f"- [{leaf['id']}] {results.get(leaf['id'], 'UNKNOWN')}" for leaf in leaves)
+    # Facts are NUMBERED, not tagged with the leaf id: weak models copy a leading "[leaf_id]" tag
+    # verbatim as if it were a citation instead of citing the source URL inside the fact.
+    facts_block = "\n".join(
+        f"Fact {i}: {results.get(leaf['id'], 'UNKNOWN')}" for i, leaf in enumerate(leaves, 1)
+    )
     # Compilers sometimes template {leaf_id} into the aggregation too — fill those in as well so
     # the recipe reads with resolved values, not literal placeholders (facts_block still carries them).
     aggregation = substitute_deps(aggregation, results)
 
     messages = [
-        {"role": "system", "content": "You are an aggregation step. Follow the AGGREGATION INSTRUCTION exactly, using ONLY the gathered facts. Cite the source URLs they contain."},
+        {"role": "system", "content": (
+            "You are an aggregation step. Follow the AGGREGATION INSTRUCTION exactly, using ONLY the "
+            "gathered facts. Cite ONLY the http(s) source URLs that appear inside those facts — never "
+            "output the 'Fact N' labels or any bracketed internal identifiers as if they were citations."
+        )},
         {"role": "user", "content": f"AGGREGATION INSTRUCTION:\n{aggregation}\n\nGATHERED FACTS:\n{facts_block}"},
     ]
     payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.2, max_tokens=max_tokens)
