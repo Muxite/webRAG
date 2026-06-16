@@ -142,7 +142,7 @@ Every step optionally writes a checkpoint (`idea_engine.py:119–132`); every fi
 
 Two implementations:
 
-- `LlmEvaluationPolicy` (per-node) scores a single candidate against its path context. It enforces a hard penalty: nodes with an action but no `action_result` are capped at `no_action_result_score_cap=0.2`. `EvaluationWeights` then applies action-specific multipliers (search/visit/think/save).
+- `LlmEvaluationPolicy` (per-node) scores a single candidate against its path context. It enforces a hard penalty: nodes with an action but no `action_result` are capped at `no_action_result_score_cap=0.5`. The `EvaluationConfig` typed view (`weight_for(action)`) then applies action-specific multipliers (search/visit/think/save/verify).
 - `LlmBatchEvaluationPolicy` (the default, lines 224–429) scores up to `evaluation_batch_max_candidates=5` candidates in a single LLM call. It builds an internal map of `simple_id (1, 2, 3 …) → real UUID` and parses a JSON response shaped `{"scores":[{"id":"1","score":0.85}, ...]}` (line 362). All weighting and penalties apply per candidate. Token cap `evaluation_max_tokens=16384`, temp `0.2`.
 
 ### Selection (`idea_policies/selection.py:11–28`)

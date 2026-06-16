@@ -219,8 +219,10 @@ class EvaluationConfig:
     def from_settings(cls, settings: Mapping[str, Any]) -> "EvaluationConfig":
         return _build(cls, settings)
 
-    def weight_for(self, action: str) -> float:
-        return getattr(self, f"weight_{action}", self.weight_default)
+    def weight_for(self, action: Optional[str]) -> float:
+        if not action:
+            return self.weight_default
+        return getattr(self, f"weight_{str(action).lower()}", self.weight_default)
 
 
 @dataclass(frozen=True)

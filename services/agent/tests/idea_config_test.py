@@ -101,6 +101,28 @@ def test_evaluation_weight_for_falls_back_to_default():
     assert e.weight_for("nonexistent") == e.weight_default
 
 
+def test_evaluation_config_folds_legacy_weights():
+    # Production settings (JSON defaults are always merged at runtime) must
+    # resolve the penalty knobs to the shipped values, and the per-action
+    # multipliers default to 1.0. This pins the fold of the old
+    # ``EvaluationWeights`` class into the ``EvaluationConfig`` typed view.
+    e = EvaluationConfig.from_settings(load_idea_dag_settings())
+    assert e.no_action_result_base_score == 0.4
+    assert e.no_action_result_score_cap == 0.5
+    for action in ("search", "visit", "think", "save", "verify"):
+        assert e.weight_for(action) == 1.0
+
+
+def test_evaluation_weight_for_is_case_insensitive_and_none_safe():
+    # Faithful drop-in for the old ``apply_action_weight``: action names are
+    # lowercased before lookup and a falsy action falls back to the default.
+    e = EvaluationConfig.from_settings({"evaluation_weight_visit": 2.0})
+    assert e.weight_for("VISIT") == 2.0
+    assert e.weight_for("Visit") == 2.0
+    assert e.weight_for(None) == e.weight_default
+    assert e.weight_for("") == e.weight_default
+
+
 def test_validate_settings_rejects_bad_type():
     # A non-numeric value for an int knob must fail loudly at validation time.
     with pytest.raises(ValueError):
