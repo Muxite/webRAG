@@ -15,7 +15,8 @@ __pycache__/
 secrets.json
 dist/
 .pytest_cache/
-.claude
+.claude/*
+!.claude/agents/
 .cursor
 .venv
 
