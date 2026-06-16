@@ -1,1 +1,0 @@
-Return your response as valid JSON. {{"path": {path_json}, "parent_id": "{parent_id}", "parent_title": "{parent_title}", "blocked_sites": "{blocked_sites}", "errors": "{errors}", "memories": "{memories}", "event_log": {event_log}}}
