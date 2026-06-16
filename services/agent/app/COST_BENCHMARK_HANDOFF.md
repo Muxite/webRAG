@@ -199,6 +199,43 @@ URL-free so the driver records on the reference pass and replays (replay-or-reco
 
 ---
 
+## ROUND 4 (2026-06-16): structured-work strategy makes weak models stronger — DONE, uncommitted on branch
+
+Branch `compiled-scaffold-dag` (commits 66b5718 benchmark+DAG layer, 815f284 thin+vote). Goal:
+push structure DOWN to the leaf to lift cheap/weak models. Gated A/B experiments (flash-lite, nano,
+n=3, on 050-054) drove every choice.
+
+DECOMPOSITION — atomic wins. A "fold same-entity multi-hop into one leaf" rule helped independent
+breadth (052 flash 0.78->0.97) but REGRESSED chains by cramming cross-PAGE navigation into one
+budget-limited leaf (050 nano 1.00->0.38, 051 gpt-5-mini 0.75->0.17). Reverted to ATOMIC (one fact
+/ one page; chain cross-entity hops with depends_on + {dep_id} templating). Restores chains.
+
+THIN LEAF (`IDEA_TEST_COMPILED_LEAF_MODE=thin`, default still `react`). Replaces the per-leaf JSON
+ReAct loop with a fixed micro-pipeline: thin search query -> pick the wiki result (heuristic) ->
+visit -> extract the value. The harness owns control flow; the LLM only answers micro-questions with
+tiny outputs. Beats react on weak models at ~HALF the cost (flash-lite 052 0.86->1.00, $0.0040->$0.0023).
+
+PRICE-AWARE VOTING (`_votes_for_model` reads output $/Mtok via model_costs). A dirt-cheap (weaker)
+model spends cheapness on redundancy: k independent NEUTRAL-prompt extractions -> majority-vote
+prune -> repeat-cycle to a 2nd page if no consensus; ANCHORED on the temp-0 read (ties break to it)
+so clean facts stay stable while uncertain ones get rescued. k: out<=$1/Mtok->5, <=$5->3, premium->1
+(nano=5, flash-lite=5, gpt-5-mini=3, gemini-3.1-pro=1). Override `IDEA_TEST_COMPILED_VOTES`.
+Unanchored temp-0.5 voting helped chains but hurt clean breadth (nano 052 0.93->0.81); the temp-0
+ANCHOR fixed it (nano 052 ->0.99) while keeping the chain win (nano 051 0.71->1.00).
+
+RESULT (atomic + thin + anchored price-aware vote): **nano avg 0.87 -> 0.95** (051 chain 0.71->1.00,
+052 0.93->0.99); flash-lite ~0.95 (already strong — redundancy helps the WEAKER model more, exactly
+the thesis). Lone residual: 054 nano 0.75 (mixed-DAG task floor, not a strategy artifact).
+CITATION FIX: aggregation facts numbered "Fact N" (not "[leaf_id]") + "cite only URLs" — weak models
+stopped echoing leaf ids as citations (flash-lite 054 citation 0.00 fixed).
+
+Knobs: `IDEA_TEST_COMPILED_LEAF_MODE=thin|react`, `IDEA_TEST_COMPILED_VOTES=<k>` (else price-aware),
+`IDEA_TEST_COMPILED_CONCURRENCY` (lower to ~2 when voting — each leaf fans out k inner calls).
+NEXT: try thin+vote on the reference model (untested — keep react default until then); push 054;
+recover per-cheap-model B-hand (Round-3 driver collision, now fixed).
+
+---
+
 The ORIGINAL pilot section below is retained for the instrumentation map and gotchas.
 
 ---
