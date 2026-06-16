@@ -73,10 +73,17 @@ register at session START — they were authored this session, so invoke them by
 (this session used `general-purpose` with the brief injected).
 
 ## Known debt / open items
-1. **13 pre-existing import-context test failures** (now on master): `got_backtrack_test` ×7,
-   `idea_engine_features_test` ×5, `visit_url_extraction_test` ×1 — the modules fail to *import*
-   (`cannot import name 'IdeaActionType' … unknown location` — circular-import / collection-order
-   from the typed-config churn), NOT logic bugs, NOT from the breakup. **Fix to make the suite green.**
+1. ~~import-context test failures~~ **RESOLVED 2026-06-16 (commit `4717ab8`): suite green —
+   0 failed, 377 passed, 17 skipped.** The "import-context / cannot import name IdeaActionType"
+   diagnosis was STALE. Actual root causes (17 failures, not 13): `idea_engine_features` ×5 = the
+   god-class breakup moved mandate-URL enforcement into `MandateUrlInjectionHook`; restored a thin
+   delegating `_enforce_visit_nodes_for_mandate_urls` on the engine (test surface). `got_backtrack`
+   ×7 = test self-pollution (stub installer short-circuited when a sibling test imported the real
+   `idea_memory` first → stubs now install conditionally, no reverse pollution). `visit_url_extraction`
+   ×1 = stale assertion (VISIT uses `io.fetch_url`, not `io.visit`). `connectors_smoke` + `pre_deploy_sanity`
+   = environment guards (missing LLM key / `supabase` deploy dep absent from lean venv). `task_definition_preflight_env`
+   ×2 = test drift; MIN_CHARS aligned to config source-of-truth `2000` (test had a never-passing `20000`
+   — **confirm whether 20000 was the real deploy intent**, else this is settled).
 2. **054 (mixed-DAG) nano ≈ 0.75** — a genuine task-difficulty floor, not a strategy artifact.
 3. **Thin+vote untested on the premium reference** — test before making `thin` the default.
 4. **Per-cheap-model B-hand was lost** in the Round-3 run (driver run-id collision; driver now fixed
@@ -86,8 +93,9 @@ register at session START — they were authored this session, so invoke them by
 6. Optional: fold legacy `EvaluationWeights` into `EvaluationConfig` (small dup).
 
 ## Recommended next order
-(1) green the suite [debt #1] → (2) reference test of thin+vote [#3] → (3) recover B-hand [#4] →
-(4) push on 054 [#2] → (5) continue the engine breakup [#5].
+(1) ✅ green the suite [debt #1 — done 2026-06-16, commit `4717ab8`] → (2) reference test of
+thin+vote [#3] → (3) recover B-hand [#4] → (4) push on 054 [#2] →
+(5) continue the engine breakup [#5].
 
 Memory: `project_compiled_scaffold_thesis`, `project_engine_canonical`, `project_cost_benchmark_state`,
 `project_benchmark_run_recipe` (run recipe), `project_typed_config_layer`.
