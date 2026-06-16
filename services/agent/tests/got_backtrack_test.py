@@ -52,8 +52,11 @@ def _install_stubs():
     idea_dag.IdeaNode = _StubIdeaNode
     sys.modules["agent.app.idea_dag"] = idea_dag
 
-    # idea_policies + base
+    # idea_policies + base. Give the stub package a real __path__ so that
+    # genuinely lightweight submodules (e.g. `config`, pure-stdlib dataclasses)
+    # load from disk, while heavy ones stay stubbed via sys.modules below.
     pkg_policies = types.ModuleType("agent.app.idea_policies")
+    pkg_policies.__path__ = [str(Path(__file__).resolve().parent.parent / "app" / "idea_policies")]
     sys.modules["agent.app.idea_policies"] = pkg_policies
     base_mod = types.ModuleType("agent.app.idea_policies.base")
 

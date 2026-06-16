@@ -28,8 +28,12 @@ from statistics import mean
 from typing import Any, Dict, List, Optional, Tuple
 
 DEFAULT_REFERENCE = ["google/gemini-3.1-pro-preview", "openai/gpt-5", "google/gemini-2.5-pro"]
-ENGINE_VARIANTS = {"graph", "sequential"}
-BASELINE_VARIANTS = {"parametric", "naive_rag"}
+ENGINE_VARIANTS = {"graph", "sequential", "sequential_react", "graph_compiled"}
+BASELINE_VARIANTS = {"parametric", "naive_rag", "minimal"}
+# Internal variant -> tooling-ablation rung (mirrors testing/tooling.py). Used to
+# back-fill the tooling column for runs launched via the legacy variant axis.
+_VARIANT_TO_TOOLING = {"minimal": "minimal", "naive_rag": "partial", "graph": "full",
+                       "sequential_react": "sequential", "graph_compiled": "compiled"}
 
 
 def _results_dir() -> Path:
@@ -54,9 +58,11 @@ def _load_row(path: Path) -> Optional[Dict[str, Any]]:
     usd = cost.get("usd")
     if score is None or usd is None:
         return None
+    variant = d.get("execution_variant")
     return {
         "model": d.get("model"),
-        "variant": d.get("execution_variant"),
+        "variant": variant,
+        "tooling": d.get("tooling_profile") or _VARIANT_TO_TOOLING.get(variant, variant),
         "tier": int(d.get("effort_tier") or 0),
         "test_id": meta.get("test_id"),
         "score": float(score),
@@ -77,6 +83,7 @@ def _aggregate(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         out.append({
             "model": model,
             "variant": variant,
+            "tooling": bucket[0].get("tooling", _VARIANT_TO_TOOLING.get(variant, variant)),
             "tier": tier,
             "n": len(bucket),
             "score": round(mean(r["score"] for r in bucket), 4),
@@ -120,7 +127,7 @@ def _reference_lines(agg: List[Dict[str, Any]], reference_models: List[str]) -> 
 
 def _write_csv(agg: List[Dict[str, Any]], path: Path) -> None:
     with path.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=["model", "variant", "tier", "n", "score", "usd", "visit_chars", "estimated"])
+        w = csv.DictWriter(fh, fieldnames=["model", "variant", "tooling", "tier", "n", "score", "usd", "visit_chars", "estimated"])
         w.writeheader()
         for row in agg:
             w.writerow(row)
@@ -175,6 +182,9 @@ def _plot(agg: List[Dict[str, Any]], lines: Dict[str, Dict[str, Any]], reference
 def main(argv: List[str]) -> int:
     parser = argparse.ArgumentParser(description="Recovery-curve & Pareto analysis")
     parser.add_argument("--since", default="", help="Only files with name prefix >= this")
+    parser.add_argument("--run-id", dest="run_id", default="",
+                        help="Only files from this exact run_id (the YYYYMMDD_HHMMSS prefix). "
+                             "Preferred over --since: isolates one run with no cross-run pollution.")
     parser.add_argument("--files", nargs="*", help="Explicit result files")
     parser.add_argument("--reference-models", default=",".join(DEFAULT_REFERENCE))
     parser.add_argument("--tests", default="", help="Comma-separated test_ids to include (default all)")
@@ -186,12 +196,16 @@ def main(argv: List[str]) -> int:
     if args.files:
         files = [Path(p) for p in args.files]
     else:
+        run_prefix = f"{args.run_id}_" if args.run_id else ""
         files = sorted(
             p for p in results_dir.glob("*_r*.json")
-            if "_report_" not in p.name and (not args.since or p.name >= args.since)
+            if "_report_" not in p.name
+            and (not run_prefix or p.name.startswith(run_prefix))
+            and (not args.since or p.name >= args.since)
         )
     if not files:
-        print(f"No result files found (dir={results_dir}, since={args.since!r})", file=sys.stderr)
+        print(f"No result files found (dir={results_dir}, run_id={args.run_id!r}, since={args.since!r})",
+              file=sys.stderr)
         return 2
 
     rows = [r for r in (_load_row(p) for p in files) if r and r["model"] and r["variant"]]

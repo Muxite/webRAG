@@ -11,6 +11,9 @@ Modes (env ``IDEA_TEST_FIXTURES``):
 - ``record``: always go live, then persist the response.
 - ``replay``: serve from cache when present; on a miss, go live and persist
   (replay-or-record) so the cache fills in lazily and reruns become deterministic.
+- ``replay_strict``: serve from cache when present; on a miss, FAIL (return an error
+  result) instead of going live. Use for the final, locked headline run so every model
+  sees byte-identical evidence and no asymmetry is possible.
 
 Auth headers are never part of the key, so fixtures are portable across API keys.
 """
@@ -29,10 +32,10 @@ from shared.request_result import RequestResult
 def fixture_mode() -> str:
     """
     Resolve the active fixture mode from the environment.
-    :return: One of ``off``, ``record``, ``replay``.
+    :return: One of ``off``, ``record``, ``replay``, ``replay_strict``.
     """
     mode = (os.environ.get("IDEA_TEST_FIXTURES") or "off").strip().lower()
-    return mode if mode in ("off", "record", "replay") else "off"
+    return mode if mode in ("off", "record", "replay", "replay_strict") else "off"
 
 
 def _fixtures_dir() -> Path:

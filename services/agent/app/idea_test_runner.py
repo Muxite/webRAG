@@ -48,6 +48,7 @@ from agent.app.testing.config import (
     filter_test_files_by_priority,
 )
 from agent.app.testing.utils import summarize_observability
+from agent.app.testing.tooling import profile_for_variant
 from agent.app.idea_graph_analyzer import add_graph_visualization
 from agent.app.testing.report import TestReportGenerator, Verbosity
 
@@ -186,6 +187,22 @@ TEST_PRIORITY_ORDER = [
     "037",  # Five-Topic Convergence Challenge (9/10) - Priority 9 (branching: 5-way convergence)
     "038",  # Eight-Source Fact Matrix (9/10) - Priority 10 (branching: 8-way parallel extraction)
     "039",  # Multi-Branch Claim Verification (10/10) - Priority 11 (4-branch search+visit+verdict)
+    "040",  # Multi-Hop Dependent Chain (8/10) - dependent 3-hop; breaks naive_rag by construction
+    "041",  # Wide-Breadth Source Matrix (9/10) - 6 named sources; breaks naive_rag's 3-visit cap
+    "042",  # Faithfulness & Contradiction (9/10) - planted-false claims; exercises the verify action
+    "043",  # Capstone Reconciliation & Synthesis (10/10) - multi-hop breadth + judged synthesis
+    "044",  # Security Vuln Root-Cause Analysis (10/10) - deep CVE research; keystone in source not summaries
+    "045",  # Micro: single-page fact extraction (2/10) - level=micro, weight=short
+    "046",  # Navigation: link-following traversal (7/10) - level=navigation, weight=long
+    "047",  # Graph: wiki-race shortest chain (10/10) - level=graph, weight=long
+    # Cross-shape tiered ladder (tier1..tier5) — the graph_compiled / compiler A/B/C suite.
+    "048",  # Tier 1: single-page fact (2/10) - level=micro, weight=short
+    "049",  # Tier 2: two-page combine (4/10) - level=integration, weight=short
+    "050",  # Tier 3: URL-free 2-hop search chain (7/10) - level=navigation, weight=long
+    "051",  # Tier 4: URL-free 3-hop dependent chain (9/10) - level=graph, weight=long
+    "052",  # Tier 5: 6-way fan-out & aggregation / argmin (8/10) - level=graph, weight=long
+    "053",  # Tier 5: 6-way fan-out & aggregation / argmax, page-only depths (8/10) - level=graph
+    "054",  # Tier 5: mixed DAG — parallel gather + dependent final hop (8/10) - level=graph
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12
@@ -284,6 +301,20 @@ def _parse_execution_variants(raw: str) -> List[str]:
         "naive_rag": "naive_rag",
         "naive": "naive_rag",
         "rag": "naive_rag",
+        # Tooling-ablation rungs (testing/tooling.py): minimal / partial / full.
+        "minimal": "minimal",
+        "search_only": "minimal",
+        "searchonly": "minimal",
+        "partial": "naive_rag",
+        "full": "graph",
+        # Strong linear comparator: ReAct loop, same toolset as the graph, no GoT.
+        "sequential_react": "sequential_react",
+        "react": "sequential_react",
+        "linear": "sequential_react",
+        # Cheap model executing an expensive-model-authored offline plan (no runtime planning).
+        "graph_compiled": "graph_compiled",
+        "compiled": "graph_compiled",
+        "compiled_graph": "graph_compiled",
     }
     out: List[str] = []
     seen = set()
@@ -368,6 +399,48 @@ def _apply_effort_tier(settings: Dict[str, Any], tier_nodes: int) -> Dict[str, A
         s["max_total_nodes"] = int(tier_nodes)
         steps_factor = float(os.environ.get("IDEA_TEST_TIER_STEPS_FACTOR", "2"))
         s["max_steps"] = max(10, int(round(tier_nodes * steps_factor)))
+    return s
+
+
+def _apply_lean_overlay(settings: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """Cap token budgets + branching so the graph is cost-competitive on EASY tasks.
+
+    The pilot showed the graph burning ~164k tokens / $0.0275 on a single-fact micro
+    task (huge ``final_max_tokens``, over-expansion). For short-``weight`` tasks we shrink
+    the budgets; hard (``long``) tasks keep full budgets so deep multi-hop work is not
+    starved. Force on/off via ``IDEA_TEST_LEAN=1/0`` (default: auto by weight).
+    :param settings: Settings copy (post effort-tier).
+    :param metadata: Test metadata (uses ``weight``).
+    :return: Settings copy, possibly capped.
+    """
+    weight = str(metadata.get("weight", "")).strip().lower()
+    force = os.environ.get("IDEA_TEST_LEAN", "").strip().lower()
+    if force in ("0", "false", "no", "off"):
+        return settings
+    lean = force in ("1", "true", "yes", "on") or weight == "short"
+    if not lean:
+        return settings
+    s = dict(settings)
+    caps = {
+        "final_max_tokens": 4096,
+        "expansion_max_tokens": 2048,
+        "evaluation_max_tokens": 2048,
+        "max_branching": 3,
+        "max_total_nodes": 40,
+        "max_steps": 12,
+        # Big pages (e.g. Wikipedia, 500k+ chars raw) make VisitLeafAction's link
+        # extraction + Chroma embedding the dominant cost — and it can exceed the 20s
+        # visit timeout. Easy tasks need a fact, not the whole link graph, so cap it.
+        "max_links_per_visit": 5,
+        # The real token driver: full page content (64k+ chars) flows into the MERGE
+        # call (observed merged_json ~400k chars -> ~100k tokens). Cap the observation
+        # size fed to LLM stages AND the merge aggregation so easy tasks stay cheap.
+        "max_observation_chars": 8000,
+        "merge_max_json_chars": 24000,
+    }
+    for key, cap in caps.items():
+        cur = s.get(key)
+        s[key] = cap if not isinstance(cur, int) else min(int(cur), cap)
     return s
 
 
@@ -551,6 +624,7 @@ async def run_single_test(
 
         variant_specific_settings = _variant_settings(idea_settings, execution_variant)
         variant_specific_settings = _apply_effort_tier(variant_specific_settings, effort_tier)
+        variant_specific_settings = _apply_lean_overlay(variant_specific_settings, metadata)
         result = await run_complete_test(
             test_module=test_module,
             model_name=normalized,
@@ -566,6 +640,7 @@ async def run_single_test(
         )
 
         result["execution_variant"] = execution_variant
+        result["tooling_profile"] = profile_for_variant(execution_variant)
         result["effort_tier"] = effort_tier
 
         result = add_graph_visualization(result)
@@ -607,6 +682,7 @@ async def run_single_test(
             "test_metadata": {"test_id": test_id},
             "model": normalized,
             "execution_variant": execution_variant,
+            "tooling_profile": profile_for_variant(execution_variant),
             "error": str(exc),
             "timestamp": datetime.utcnow().isoformat(),
         }
@@ -770,7 +846,9 @@ async def main() -> None:
             models = _unique_models(MODEL_CANDIDATES[:3])
         if len(models) > 3:
             models = models[:3]
-    run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    # Pin a run_id via IDEA_TEST_RUN_ID so a multi-stage driver can tag every file from one
+    # experiment with the same prefix (clean `--run-id` analysis); else timestamp it.
+    run_id = os.environ.get("IDEA_TEST_RUN_ID", "").strip() or datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     
     default_top_n = 8 if benchmark_mode else 0
     default_runs = 3 if benchmark_mode else 1
@@ -784,7 +862,13 @@ async def main() -> None:
         specific_test_ids = [tid.strip() for tid in test_ids_env.split(",") if tid.strip()]
         logging.info(f"Filtering to specific test IDs: {specific_test_ids}")
     
-    execution_variants_env = os.environ.get("IDEA_TEST_EXECUTION_VARIANTS", "graph")
+    # Tooling-ablation axis. IDEA_TEST_TOOLING ("minimal,partial,full") is the
+    # benchmark-facing name; it feeds the same variant parser and takes precedence
+    # over the legacy IDEA_TEST_EXECUTION_VARIANTS when set.
+    execution_variants_env = (
+        os.environ.get("IDEA_TEST_TOOLING")
+        or os.environ.get("IDEA_TEST_EXECUTION_VARIANTS", "graph")
+    )
     execution_variants = _parse_execution_variants(execution_variants_env)
 
     effort_tiers = _parse_effort_tiers(os.environ.get("IDEA_TEST_EFFORT_TIERS", "0"))
@@ -820,7 +904,22 @@ async def main() -> None:
     idea_settings = load_idea_dag_settings()
     idea_settings["log_dag_ascii"] = False
     idea_settings["log_dag_step_interval"] = 0
-    idea_settings["allowed_actions"] = ["search", "visit", "save", "think", "merge"]
+    idea_settings["allowed_actions"] = ["search", "visit", "save", "think", "merge", "verify"]
+    # Intra-graph action parallelism: the connectors are shared across leaves, and
+    # large-page parsing is CPU-bound, so concurrent visits can starve the loop and
+    # time out (breaks wide-breadth tasks). Allow serializing via env for reliable runs.
+    _pal = os.environ.get("IDEA_TEST_PARALLEL_ACTION_LIMIT")
+    if _pal:
+        idea_settings["parallel_action_limit"] = max(1, int(_pal))
+    # Optional visit/fetch/action timeout overrides for slow or contended fetches.
+    for _env, _key in (
+        ("IDEA_TEST_VISIT_TIMEOUT", "visit_timeout_seconds"),
+        ("IDEA_TEST_FETCH_TIMEOUT", "fetch_timeout_seconds"),
+        ("IDEA_TEST_ACTION_TIMEOUT", "action_timeout_seconds"),
+    ):
+        _val = os.environ.get(_env)
+        if _val:
+            idea_settings[_key] = float(_val)
     if benchmark_mode:
         visit_prompt_suffix = (
             " Benchmark rule: when external evidence is needed, run search then visit the best URLs. "
@@ -888,8 +987,8 @@ async def main() -> None:
         for test_file in test_files:
             for model_name in execution_models:
                 for execution_variant in execution_variants:
-                    # Baselines ignore effort tiers (single fixed pass); engine variants sweep.
-                    tiers = [0] if execution_variant in ("parametric", "naive_rag") else effort_tiers
+                    # Baselines + linear agents ignore effort tiers (single fixed pass); engine variants sweep.
+                    tiers = [0] if execution_variant in ("parametric", "naive_rag", "minimal", "sequential_react") else effort_tiers
                     for effort_tier in tiers:
                         for repeat_index in range(1, repeats + 1):
                             test_tasks.append((test_file, model_name, execution_variant, effort_tier, repeat_index))

@@ -1,39 +1,23 @@
 FROM python:3.10-slim
 
-ARG CHROME_VERSION_MAIN=145
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     AGENT_STATUS_TIME=0.2 \
     SENTENCE_TRANSFORMERS_HOME=/root/.cache \
     TRANSFORMERS_CACHE=/root/.cache/huggingface \
-    CHROME_VERSION_MAIN=${CHROME_VERSION_MAIN}
+    PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 
 WORKDIR /app
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        curl \
-        gnupg \
-        libnss3 \
-        libgbm1 \
-        libasound2 \
-        libatk-bridge2.0-0 \
-        libdrm2 \
-    && curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends google-chrome-stable \
-    && google-chrome --version 2>/dev/null | grep -oE '[0-9]+' | head -1 > /etc/chrome_version_main \
-    || echo "145" > /etc/chrome_version_main \
-    && apt-get purge -y gnupg \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir --upgrade pip
 
 COPY agent/requirements.txt /app/agent/requirements.txt
 RUN pip install --no-cache-dir -r /app/agent/requirements.txt
+
+# Install the Chromium browser used by the headless fallback (ConnectorBrowser).
+# --with-deps pulls the required system libraries (libnss3, libgbm1, etc.).
+RUN playwright install --with-deps chromium
 
 COPY shared /app/shared
 RUN pip install --no-cache-dir /app/shared

@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from agent.app.idea_memory import MemoryManager
 
 from agent.app.idea_policies.base import DetailKey, IdeaNodeStatus
+from agent.app.idea_policies.config import IdeaConfig
 
 _logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class GoTOperations:
 
     def __init__(self, settings: Dict[str, Any], io: AgentIO, memory_manager: Optional[MemoryManager] = None):
         self.settings = settings
+        self._cfg = IdeaConfig.from_settings(settings)
         self.io = io
         self.memory_manager = memory_manager
         self._dead_end_count = 0
@@ -31,7 +33,7 @@ class GoTOperations:
         parent_id: Optional[str] = None,
         depth: int = 0,
     ) -> bool:
-        if not self.settings.get("got_embed_on_create", True):
+        if not self._cfg.got.embed_on_create:
             return False
         if not self.memory_manager:
             return False
@@ -61,7 +63,7 @@ class GoTOperations:
         )
 
     async def embed_children(self, graph: IdeaDag, parent_id: str) -> int:
-        if not self.settings.get("got_embed_on_create", True):
+        if not self._cfg.got.embed_on_create:
             return 0
         parent = graph.get_node(parent_id)
         if not parent:
@@ -100,18 +102,18 @@ class GoTOperations:
         node_id: str,
         model_name: Optional[str] = None,
     ) -> Optional[float]:
-        if not self.settings.get("got_improve_enabled", True):
+        if not self._cfg.got.improve_enabled:
             return None
 
         node = graph.get_node(node_id)
         if not node or node.score is None:
             return None
 
-        threshold = float(self.settings.get("got_improve_score_threshold", 0.3))
+        threshold = self._cfg.got.improve_score_threshold
         if node.score >= threshold:
             return None
 
-        max_iters = int(self.settings.get("got_improve_max_iterations", 2))
+        max_iters = self._cfg.got.improve_max_iterations
         iteration_count = int(node.details.get("_got_improve_iterations", 0))
         if iteration_count >= max_iters:
             _logger.debug(f"[GoT:IMPROVE] Node {node_id} already improved {iteration_count} times, skipping")
@@ -148,8 +150,8 @@ class GoTOperations:
             {"role": "user", "content": user_content},
         ]
 
-        improve_model = model_name or self.settings.get("evaluation_model") or None
-        temperature = float(self.settings.get("got_improve_temperature", 0.3))
+        improve_model = model_name or self._cfg.evaluation.model or None
+        temperature = self._cfg.got.improve_temperature
 
         payload = self.io.build_llm_payload(
             messages=messages,
@@ -162,8 +164,8 @@ class GoTOperations:
             response = await self.io.query_llm_with_fallback(
                 payload,
                 model_name=improve_model,
-                fallback_model=self.settings.get("fallback_model"),
-                timeout_seconds=self.settings.get("llm_timeout_seconds", 60),
+                fallback_model=self._cfg.generation.fallback_model,
+                timeout_seconds=self._cfg.timeouts.llm,
             )
             if not response:
                 return None
@@ -210,10 +212,10 @@ class GoTOperations:
         :param graph: Current DAG.
         :returns: Threshold in [0.75, 0.92].
         """
-        if not self.settings.get("got_adaptive_policies", True):
-            return float(self.settings.get("got_dedup_similarity_threshold", 0.85))
-        floor = float(self.settings.get("got_dedup_threshold_min", 0.75))
-        ceil = float(self.settings.get("got_dedup_threshold_max", 0.92))
+        if not self._cfg.got.adaptive_policies:
+            return self._cfg.got.dedup_similarity_threshold
+        floor = self._cfg.got.dedup_threshold_min
+        ceil = self._cfg.got.dedup_threshold_max
         # Use sibling fanout as a density proxy: max children across non-leaf nodes.
         fanout = 0
         for n in graph.iter_depth_first():
@@ -229,13 +231,13 @@ class GoTOperations:
         candidate_goal: str,
         graph: IdeaDag,
     ) -> Tuple[bool, Optional[str]]:
-        if not self.settings.get("got_dedup_enabled", True):
+        if not self._cfg.got.dedup_enabled:
             return False, None
         if not self.memory_manager:
             return False, None
 
         threshold = self._adaptive_dedup_threshold(graph)
-        n_query = int(self.settings.get("got_dedup_max_query", 5))
+        n_query = self._cfg.got.dedup_max_query
 
         query = f"{candidate_title} {candidate_goal}"
         try:
@@ -269,7 +271,7 @@ class GoTOperations:
         candidates: List[Dict[str, Any]],
         graph: IdeaDag,
     ) -> List[Dict[str, Any]]:
-        if not self.settings.get("got_dedup_enabled", True):
+        if not self._cfg.got.dedup_enabled:
             return candidates
         if not self.memory_manager:
             return candidates
@@ -298,11 +300,11 @@ class GoTOperations:
         return filtered if filtered else candidates[:1]
 
     def compute_dynamic_beam_width(self, graph: IdeaDag) -> int:
-        if not self.settings.get("got_dynamic_beam_enabled", True):
-            return int(self.settings.get("max_branching", 5))
+        if not self._cfg.got.dynamic_beam_enabled:
+            return self._cfg.engine.max_branching
 
-        beam_min = int(self.settings.get("got_beam_min", 2))
-        beam_max = int(self.settings.get("got_beam_max", 5))
+        beam_min = self._cfg.got.beam_min
+        beam_max = self._cfg.got.beam_max
 
         scores: List[float] = []
         for node in graph.iter_depth_first():
@@ -312,7 +314,7 @@ class GoTOperations:
         if not scores:
             return beam_max
 
-        adaptive = bool(self.settings.get("got_adaptive_policies", True))
+        adaptive = self._cfg.got.adaptive_policies
         if adaptive and len(scores) >= 4:
             # Beam widens when scores are spread (uncertain) and narrows when they
             # cluster (converged). Use p25/p75 spread relative to a target band.
@@ -320,7 +322,7 @@ class GoTOperations:
             p25 = ordered[max(0, int(len(ordered) * 0.25) - 1)]
             p75 = ordered[min(len(ordered) - 1, int(len(ordered) * 0.75))]
             spread = max(0.0, p75 - p25)  # 0..1 in practice
-            target_spread = float(self.settings.get("got_beam_target_spread", 0.4))
+            target_spread = self._cfg.got.beam_target_spread
             ratio = min(1.0, spread / target_spread) if target_spread > 0 else 0.0
             beam = beam_min + int(round(ratio * (beam_max - beam_min)))
             beam = max(beam_min, min(beam_max, beam))
@@ -329,8 +331,8 @@ class GoTOperations:
             )
             return beam
 
-        score_high = float(self.settings.get("got_beam_score_high", 0.7))
-        score_low = float(self.settings.get("got_beam_score_low", 0.3))
+        score_high = self._cfg.got.beam_score_high
+        score_low = self._cfg.got.beam_score_low
         avg_score = sum(scores) / len(scores)
         if avg_score >= score_high:
             beam = beam_min
@@ -344,10 +346,10 @@ class GoTOperations:
         return beam
 
     def identify_prune_candidates(self, graph: IdeaDag) -> List[str]:
-        if not self.settings.get("got_prune_enabled", True):
+        if not self._cfg.got.prune_enabled:
             return []
 
-        min_nodes = int(self.settings.get("got_prune_min_nodes_before_prune", 6))
+        min_nodes = self._cfg.got.prune_min_nodes_before_prune
         if graph.node_count() < min_nodes:
             return []
 
@@ -356,15 +358,15 @@ class GoTOperations:
             if node.score is not None and node.parent_id is not None:
                 scored.append(float(node.score))
 
-        adaptive = bool(self.settings.get("got_adaptive_policies", True))
+        adaptive = self._cfg.got.adaptive_policies
         if adaptive and len(scored) >= 5:
             mean = sum(scored) / len(scored)
             variance = sum((s - mean) ** 2 for s in scored) / len(scored)
             stddev = variance ** 0.5
-            stddev_factor = float(self.settings.get("got_prune_stddev_factor", 1.0))
+            stddev_factor = self._cfg.got.prune_stddev_factor
             threshold = max(0.0, mean - stddev_factor * stddev)
         else:
-            threshold = float(self.settings.get("got_prune_score_threshold", 0.15))
+            threshold = self._cfg.got.prune_score_threshold
 
         prune_ids = []
         for node in graph.iter_depth_first():
@@ -402,11 +404,11 @@ class GoTOperations:
         return pruned
 
     def should_backtrack(self, graph: IdeaDag, current_id: str) -> bool:
-        if not self.settings.get("got_backtrack_enabled", True):
+        if not self._cfg.got.backtrack_enabled:
             return False
 
-        dead_end_limit = int(self.settings.get("got_backtrack_dead_end_threshold", 3))
-        low_score = float(self.settings.get("got_backtrack_low_score_threshold", 0.3))
+        dead_end_limit = self._cfg.got.backtrack_dead_end_threshold
+        low_score = self._cfg.got.backtrack_low_score_threshold
 
         node = graph.get_node(current_id)
         if not node:
@@ -431,7 +433,7 @@ class GoTOperations:
         return False
 
     def find_backtrack_target(self, graph: IdeaDag, current_id: str) -> Optional[str]:
-        low_score = float(self.settings.get("got_backtrack_low_score_threshold", 0.3))
+        low_score = self._cfg.got.backtrack_low_score_threshold
         path = graph.path_to_root(current_id)
         for path_node in path:
             if path_node.node_id == graph.root_id():
@@ -492,17 +494,17 @@ class GoTOperations:
         return combined[:n_results + len(graph_context)]
 
     def get_model_for_operation(self, operation: str, default_model: Optional[str] = None) -> Optional[str]:
-        if not self.settings.get("got_telemetry_routing_enabled", False):
+        if not self._cfg.got.telemetry_routing_enabled:
             return default_model
 
         if operation in ("score", "evaluate", "evaluation"):
-            override = self.settings.get("got_telemetry_routing_score_model")
+            override = self._cfg.got.telemetry_routing_score_model
             if override:
                 return override
             return default_model
 
         if operation in ("generate", "expand", "expansion"):
-            override = self.settings.get("got_telemetry_routing_generate_model")
+            override = self._cfg.got.telemetry_routing_generate_model
             if override:
                 return override
             return self._select_cheaper_model(default_model)

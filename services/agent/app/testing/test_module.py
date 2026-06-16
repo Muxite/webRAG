@@ -44,7 +44,13 @@ class IdeaTestModule:
         llm_func = self.module.get_llm_validation_function()
         if llm_func:
             self.validation_runner.add_llm_check(llm_func)
-    
+
+        # Give the rubric judge the task statement to grade against.
+        try:
+            self.validation_runner.mandate = self.module.get_task_statement()
+        except Exception:
+            self.validation_runner.mandate = ""
+
     def get_task_statement(self) -> str:
         """Get task statement from module."""
         return self.module.get_task_statement()

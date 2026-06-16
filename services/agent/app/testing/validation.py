@@ -4,6 +4,7 @@ Validation system for test results.
 
 import asyncio
 import logging
+import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional, Callable
 
@@ -137,6 +138,8 @@ class ValidationRunner:
         self.validation_model = validation_model
         self.checks: List[ValidationCheck] = []
         self.llm_checks: List[LLMValidationCheck] = []
+        # Mandate (task statement) for the rubric judge; set by the test-module loader.
+        self.mandate: str = ""
     
     def add_check(self, check: ValidationCheck):
         """
@@ -198,7 +201,24 @@ class ValidationRunner:
                 validation_results["llm_validation"] = llm_result
                 if "score" in llm_result:
                     scores.append(llm_result["score"])
-        
+
+        # Rubric judge (opt-in, spends tokens): augments with per-dimension scores but
+        # does NOT contribute to overall_score — function-validators stay authoritative.
+        if connector_llm and os.environ.get("IDEA_TEST_RUBRIC", "").strip().lower() in ("1", "true", "yes", "on"):
+            try:
+                from agent.app.testing.rubric import score_rubric
+                samples = int(os.environ.get("IDEA_TEST_RUBRIC_SAMPLES", "1") or "1")
+                original_model = connector_llm.get_model()
+                connector_llm.set_model(self.validation_model)
+                try:
+                    validation_results["rubric"] = await score_rubric(
+                        self.mandate, result, observability, connector_llm, self.validation_model, samples=samples
+                    )
+                finally:
+                    connector_llm.set_model(original_model)
+            except Exception as exc:  # noqa: BLE001 — judge must never break validation
+                _logger.warning(f"[RUBRIC] scoring failed: {exc}")
+
         if scores:
             validation_results["overall_score"] = sum(scores) / len(scores)
             validation_results["overall_passed"] = validation_results["overall_score"] >= 0.75

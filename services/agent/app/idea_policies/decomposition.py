@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from agent.app.idea_dag import IdeaDag
 
 from agent.app.idea_policies.base import DecompositionPolicy
+from agent.app.idea_policies.config import IdeaConfig
 
 
 class ScoreThresholdDecompositionPolicy(DecompositionPolicy):
@@ -16,6 +17,7 @@ class ScoreThresholdDecompositionPolicy(DecompositionPolicy):
     """
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         super().__init__(settings=settings)
+        self._cfg = IdeaConfig.from_settings(self.settings)
 
     def should_decompose(self, graph: IdeaDag, node_id: str) -> bool:
         """
@@ -33,7 +35,7 @@ class ScoreThresholdDecompositionPolicy(DecompositionPolicy):
         if node.details.get(DetailKey.ACTION.value):
             return False
         
-        threshold = float(self.settings.get("decomposition_threshold", 0.5))
+        threshold = self._cfg.policy.decomposition_threshold
         score = node.score if node.score is not None else 0.0
         
         # Prefer decomposition when score is low (problem not well understood)

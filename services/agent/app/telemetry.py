@@ -1,8 +1,30 @@
+import os
 import time
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from agent.app.trace_recorder import TraceRecorder
+
+
+class DecisionStage(str, Enum):
+    """The seven decision points captured in the agent's thought-process trace."""
+
+    EXPANSION = "expansion"    # planner proposed candidate sub-problems
+    EVALUATION = "evaluation"  # candidate scored 0-1 with a rationale
+    SELECTION = "selection"    # the next node to execute was chosen
+    ENFORCE = "enforce"        # a mandate-enforcement hook injected a node
+    ACTION = "action"          # a leaf action (search/visit/verify/...) ran
+    GROUNDING = "grounding"    # the grounding gate evaluated / re-planned
+    FINALIZE = "finalize"      # the run finalized (grounded or flagged)
+
+
+def _decision_detail_enabled() -> bool:
+    """Full rationale text is captured only at report verbosity >= 2 (keeps JSON small)."""
+    try:
+        return int(os.environ.get("IDEA_TEST_REPORT_VERBOSITY", "1")) >= 2
+    except (TypeError, ValueError):
+        return False
 
 
 class TelemetrySession:
@@ -36,6 +58,48 @@ class TelemetrySession:
         self.llm_usage: List[Dict[str, Any]] = []
         self.timings: List[Dict[str, Any]] = []
         self.events: List[Dict[str, Any]] = []
+        self.decisions: List[Dict[str, Any]] = []
+
+    def record_decision(
+        self,
+        stage: Any,
+        node_id: Optional[str] = None,
+        chosen: Optional[Any] = None,
+        rationale: str = "",
+        score: Optional[float] = None,
+        alternatives: Optional[List[Any]] = None,
+        grounded: Optional[bool] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Record one decision on the thought-process trace.
+
+        A compact record (stage / node / chosen / score / grounded / metadata) is always
+        kept; full ``rationale`` and ``alternatives`` text is included only at report
+        verbosity >= 2 so the per-cell result JSON stays small during the matrix run.
+        """
+        if not self.enabled:
+            return
+        stage_val = stage.value if isinstance(stage, DecisionStage) else str(stage)
+        rec: Dict[str, Any] = {
+            "ts": time.time(),
+            "stage": stage_val,
+            "node_id": (str(node_id)[:16] if node_id else ""),
+            "chosen": (str(chosen)[:160] if chosen is not None else None),
+        }
+        if score is not None:
+            rec["score"] = score
+        if grounded is not None:
+            rec["grounded"] = bool(grounded)
+        if metadata:
+            rec["metadata"] = metadata
+        if _decision_detail_enabled():
+            if rationale:
+                rec["rationale"] = str(rationale)[:500]
+            if alternatives:
+                rec["alternatives"] = alternatives
+        self.decisions.append(rec)
+        if self._trace:
+            self._trace.record("decision", rec)
 
     def record_event(self, event: str, payload: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -153,6 +217,7 @@ class TelemetrySession:
             "llm_usage": self.llm_usage,
             "timings": self.timings,
             "events": self.events,
+            "decisions": self.decisions,
         }
 
     def finish(self, success: Optional[bool] = None) -> None:

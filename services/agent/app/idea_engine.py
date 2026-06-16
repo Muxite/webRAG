@@ -9,6 +9,7 @@ from agent.app.idea_dag import IdeaDag
 from agent.app.idea_policies.base import IdeaNodeStatus
 from agent.app.agent_io import AgentIO
 from agent.app.idea_dag_settings import load_idea_dag_settings
+from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_memory import MemoryManager
 from agent.app.idea_policies import (
     DetailKey,
@@ -31,6 +32,8 @@ from agent.app.idea_policies.post_expansion_hooks import (
     default_post_expansion_hooks,
     extract_mandate,
 )
+from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
+from agent.app.idea_policies.grounding import evaluate_grounding
 
 
 class IdeaDagEngine:
@@ -49,7 +52,11 @@ class IdeaDagEngine:
         post_expansion_hooks: Optional[List[PostExpansionHook]] = None,
     ):
         self._logger = logging.getLogger(self.__class__.__name__)
-        self.settings = settings or load_idea_dag_settings()
+        # Merge any caller overrides over the JSON defaults so a partial settings
+        # dict still resolves every knob (consistent with the policy classes,
+        # which already merge). The typed config view is the canonical reader.
+        self.settings = {**load_idea_dag_settings(), **(settings or {})}
+        self._cfg = IdeaConfig.from_settings(self.settings)
         self.io = io
         self.model_name = model_name
         self.expansion = expansion or LlmExpansionPolicy(io=io, settings=self.settings, model_name=model_name)
@@ -123,7 +130,7 @@ class IdeaDagEngine:
             self._step_index = steps
             self._maybe_log_dag(graph, steps)
 
-            prune_interval = max(1, int(self.settings.get("got_prune_interval_steps", 5)))
+            prune_interval = max(1, self._cfg.engine.got_prune_interval_steps)
             if self._got and steps % prune_interval == 0:
                 prune_ids = self._got.identify_prune_candidates(graph)
                 if prune_ids:
@@ -135,7 +142,7 @@ class IdeaDagEngine:
             if (
                 self._got
                 and current_id
-                and self.settings.get("got_backtrack_enabled", False)
+                and self._cfg.got.backtrack_enabled
                 and self._got.should_backtrack(graph, current_id)
             ):
                 target = self._got.find_backtrack_target(graph, current_id)
@@ -180,6 +187,12 @@ class IdeaDagEngine:
                     self._logger.warning(f"[RUN] VALIDATION WARNING: No actions created after step 3 (total nodes: {graph.node_count()})")
             
             if current_id is None:
+                # Soft grounding gate: if the mandate needs substantiated (visited)
+                # evidence and we are not grounded yet, inject the missing follow-through
+                # and run another pass. Capped by `grounding_max_replans`; never hangs.
+                if self._grounding_replan(graph, mandate, steps, max_steps):
+                    current_id = graph.root_id()
+                    continue
                 self._logger.warning(f"[RUN] Step {steps} returned None, breaking loop")
                 break
         self._logger.info(f"[RUN] Completed {steps} steps, checking for pending nodes before finalizing")
@@ -218,13 +231,33 @@ class IdeaDagEngine:
                 "parallel_leaves_total": getattr(self, "_parallel_leaves_total", 0),
             }
 
+        # Grounding verdict for the final answer (substantiation mandates only). Surfaced
+        # in the result so observability/groundedness reflect real visited-page evidence.
+        try:
+            _req = parse_mandate_requirements(mandate)
+            if _req.needs_substantiation:
+                _g = evaluate_grounding(graph, _req)
+                final_payload["grounded"] = bool(_g.grounded)
+                final_payload["missing_requirements"] = _g.missing
+                final_payload["grounding_replans"] = int(getattr(self, "_grounding_replans", 0))
+                self._record_decision(
+                    "finalize", node_id=graph.root_id(), chosen="finalized",
+                    grounded=_g.grounded, rationale=_g.reason,
+                    metadata={"replans": int(getattr(self, "_grounding_replans", 0)),
+                              "missing": _g.missing},
+                )
+            else:
+                self._record_decision("finalize", node_id=graph.root_id(), chosen="finalized")
+        except Exception as exc:  # noqa: BLE001 — never crash finalize on grounding
+            self._logger.warning(f"[GROUNDING] final grounding check failed: {exc}")
+
         self._logger.info(f"[RUN] Final payload created, graph has {graph.node_count()} nodes, {len(pending_nodes) if pending_nodes else 0} pending")
         self._maybe_log_dag(graph, steps, force=True)
         return final_payload
 
     async def step(self, graph: IdeaDag, current_id: str, step_index: int) -> Optional[str]:
         self._logger.info(f"[STEP {step_index}] Starting step with current_id={current_id}, node_count={graph.node_count()}")
-        if graph.node_count() >= int(self.settings.get("max_total_nodes", 500)):
+        if graph.node_count() >= self._cfg.engine.max_total_nodes:
             self._logger.warning(f"[STEP {step_index}] Max nodes reached, stopping")
             return None
         
@@ -437,8 +470,8 @@ class IdeaDagEngine:
             
             query = " ".join(query_parts)
             
-            n_internal = int(self.settings.get("expansion_chroma_internal", 5))
-            n_observations = int(self.settings.get("expansion_chroma_observations", 5))
+            n_internal = self._cfg.memory.expansion_chroma_internal
+            n_observations = self._cfg.memory.expansion_chroma_observations
             split_memories = await self._memory_manager.retrieve_memories_split(
                 query=query,
                 node_context={
@@ -500,8 +533,8 @@ class IdeaDagEngine:
         if self._got:
             max_branching = self._got.compute_dynamic_beam_width(graph)
         else:
-            max_branching = int(self.settings.get("max_branching", len(candidates)))
-        hard_cap = int(self.settings.get("max_branching", 500))
+            max_branching = self._cfg.engine.max_branching
+        hard_cap = self._cfg.engine.max_branching
         max_branching = min(max_branching, hard_cap)
         graph.expand(node_id, candidates[:max_branching])
         
@@ -541,18 +574,98 @@ class IdeaDagEngine:
                 child.details[DetailKey.IS_LEAF.value] = True
         
         self._logger.info(f"[STEP {step_index}] EXPANSION: {len(candidates)} candidates -> {min(len(candidates), max_branching)} children (total nodes: {graph.node_count()})")
+        self._record_decision(
+            "expansion", node_id=node_id,
+            chosen=f"{min(len(candidates), max_branching)} sub-problems",
+            alternatives=[
+                {"title": str(c.get("title", ""))[:80], "action": c.get("action")}
+                for c in (candidates or [])[:8] if isinstance(c, dict)
+            ],
+            metadata={"step": step_index, "n_candidates": len(candidates or [])},
+        )
 
         mandate = extract_mandate(graph, node_id)
+        _telemetry = getattr(self.io, "telemetry", None)
         for hook in self.post_expansion_hooks:
-            hook.apply(graph, node_id, step_index, mandate, self._logger)
+            hook.apply(graph, node_id, step_index, mandate, self._logger, telemetry=_telemetry)
 
-        if self.settings.get("semantic_dedup_visits_enabled", True):
+        if self._cfg.engine.semantic_dedup_visits_enabled:
             self._semantic_dedup_visits(graph, node_id, step_index)
 
         if self._got:
             await self._got.embed_children(graph, node_id)
 
         return node_id
+
+    def _record_decision(self, stage: str, **kwargs) -> None:
+        """Proxy a decision onto the telemetry thought-process trace (best-effort)."""
+        telemetry = getattr(self.io, "telemetry", None)
+        rec = getattr(telemetry, "record_decision", None)
+        if callable(rec):
+            try:
+                rec(stage=stage, **kwargs)
+            except Exception:  # noqa: BLE001 — tracing must never crash a run
+                pass
+
+    def _grounding_replan(self, graph: IdeaDag, mandate: str, steps: int, max_steps: int) -> bool:
+        """Soft grounding gate. Returns True if another pass should run.
+
+        If the mandate needs substantiation (navigation / "do not guess") and the graph is
+        not grounded, inject follow-through deterministically via the enforcement hooks
+        (no extra LLM expansion) and ask the run loop to continue. Bounded by
+        `grounding_max_replans` (default 2) so a model that cannot navigate still finalizes
+        — flagged ungrounded — rather than hanging.
+        """
+        telemetry = getattr(self.io, "telemetry", None)
+
+        def _decide(chosen: str, res, **meta) -> None:
+            if telemetry is not None and hasattr(telemetry, "record_decision"):
+                telemetry.record_decision(
+                    stage="grounding", node_id=graph.root_id(), chosen=chosen,
+                    rationale=getattr(res, "reason", ""), grounded=getattr(res, "grounded", None),
+                    metadata=meta,
+                )
+
+        try:
+            req = parse_mandate_requirements(mandate)
+        except Exception:
+            return False
+        if not req.needs_substantiation:
+            return False
+
+        res = evaluate_grounding(graph, req)
+        if res.grounded:
+            _decide("grounded", res, distinct_visits=res.distinct_visits)
+            return False
+
+        replans = getattr(self, "_grounding_replans", 0)
+        cap = self._cfg.engine.grounding_max_replans
+        if replans >= cap or steps >= max_steps:
+            _decide("ungrounded-finalize", res, replans=replans, missing=res.missing)
+            return False
+
+        root_id = graph.root_id()
+        before = graph.node_count()
+        for hook in self.post_expansion_hooks:
+            try:
+                hook.apply(graph, root_id, steps, mandate, self._logger, telemetry=telemetry)
+            except Exception as exc:  # noqa: BLE001 — a hook must never crash a run
+                self._logger.warning(f"[GROUNDING] hook failed: {exc}")
+        injected = graph.node_count() - before
+        if injected <= 0:
+            _decide("ungrounded-no-followup", res, replans=replans)
+            return False
+
+        self._grounding_replans = replans + 1
+        root = graph.get_node(root_id)
+        if root:
+            root.status = IdeaNodeStatus.ACTIVE
+        _decide("replan", res, attempt=self._grounding_replans, injected=injected)
+        self._logger.info(
+            f"[GROUNDING] Re-plan {self._grounding_replans}/{cap}: injected {injected} "
+            f"follow-through node(s) ({res.reason})"
+        )
+        return True
 
     def _action_timeout_for(self, action_name: Optional[str]) -> float:
         """Resolve the timeout for an action by name.
@@ -561,10 +674,10 @@ class IdeaDagEngine:
         `search_timeout_seconds=15`); falls back to `action_timeout_seconds`
         (default 120).
         """
-        fallback = float(self.settings.get("action_timeout_seconds", 120))
+        fallback = float(self._cfg.timeouts.action)
         if not action_name:
             return fallback
-        per_type = self.settings.get(f"{action_name}_timeout_seconds")
+        per_type = getattr(self._cfg.timeouts, action_name, None)
         if per_type is None:
             return fallback
         try:
@@ -651,7 +764,7 @@ class IdeaDagEngine:
         # planner-generated URL-less candidates were intended for sequential
         # link discovery rather than as duplicates of the literal URL.
         require_hook_source = bool(
-            self.settings.get("semantic_dedup_require_hook_source", True)
+            self._cfg.engine.semantic_dedup_require_hook_source
         )
 
         def _is_hook_injected(source_id: str) -> bool:
@@ -776,7 +889,34 @@ class IdeaDagEngine:
         if chunk_nodes and not has_dependencies:
             execute_all = True
 
-        if execute_all and bool(self.settings.get("allow_execute_all_children", True)) and not has_dependencies:
+        # Auto-parallelize independent leaf-action siblings instead of executing
+        # the single best child one-per-step. Only fires when EVERY eligible
+        # child is an executable action leaf (has a non-merge action, is ready,
+        # not yet executed, and has no children of its own) so we never skip a
+        # node that still needs expansion. Gated by auto_parallel_siblings.
+        if (
+            not execute_all
+            and self._cfg.engine.auto_parallel_siblings
+            and not has_dependencies
+            and len(eligible) > 1
+        ):
+            all_executable_leaves = all(
+                (c := graph.get_node(cid)) is not None
+                and not c.children
+                and NodeDetailsExtractor.get_action(c.details)
+                and not NodeDetailsExtractor.is_merge_action(c.details)
+                and c.details.get(DetailKey.ACTION_RESULT.value) is None
+                and self._is_action_ready(c, step_index)
+                for cid in eligible
+            )
+            if all_executable_leaves:
+                self._logger.info(
+                    f"[STEP {step_index}] AUTO-PARALLEL: {len(eligible)} independent "
+                    f"leaf siblings, executing concurrently"
+                )
+                execute_all = True
+
+        if execute_all and self._cfg.engine.allow_execute_all_children and not has_dependencies:
             ready_children = [
                 cid for cid in eligible
                 if (c := graph.get_node(cid)) and self._is_action_ready(c, step_index)
@@ -784,7 +924,7 @@ class IdeaDagEngine:
             if not ready_children:
                 return node_id
 
-            parallel_limit = max(1, int(self.settings.get("parallel_action_limit", 4)))
+            parallel_limit = max(1, self._cfg.engine.parallel_action_limit)
             self._logger.info(
                 f"[STEP {step_index}] PARALLEL: Executing {len(ready_children)} children "
                 f"(limit={parallel_limit}, skipping evaluation)"
@@ -847,8 +987,8 @@ class IdeaDagEngine:
                 for child_id in eligible:
                     await self.evaluation.evaluate(graph, child_id)
 
-        min_score = float(self.settings.get("min_score_threshold", 0.0))
-        allow_unscored = bool(self.settings.get("allow_unscored_selection", True))
+        min_score = self._cfg.engine.min_score_threshold
+        allow_unscored = self._cfg.engine.allow_unscored_selection
         scored_eligible = []
         for child_id in eligible:
             child = graph.get_node(child_id)
@@ -874,7 +1014,7 @@ class IdeaDagEngine:
         original_children = list(node.children)
         node.children = scored_eligible
         try:
-            if bool(self.settings.get("best_first_global", False)):
+            if self._cfg.engine.best_first_global:
                 selected, parent_id = self._select_best_global(graph, min_score, allow_unscored)
             else:
                 selected = self.selection.select(graph, node_id)
@@ -892,11 +1032,17 @@ class IdeaDagEngine:
             selected = best_to_execute
 
         self._logger.info(f"[STEP {step_index}] SEQUENTIAL: Executing best child: {selected.title[:50]}...")
+        self._record_decision(
+            "selection", node_id=selected.node_id, chosen=selected.title,
+            score=(selected.details.get(DetailKey.EVALUATION.value) or {}).get("score"),
+            rationale=(selected.details.get(DetailKey.EVALUATION.value) or {}).get("rationale", ""),
+            metadata={"step": step_index, "action": NodeDetailsExtractor.get_action(selected.details)},
+        )
         result = await self._execute_action(graph, parent_id or node_id, selected.node_id)
         if result is not None:
             self._handle_action_result(graph, selected.node_id, step_index)
 
-        if bool(self.settings.get("sequential_prune_siblings", False)):
+        if self._cfg.engine.sequential_prune_siblings:
             for cid in scored_eligible:
                 if cid == selected.node_id:
                     continue
@@ -963,7 +1109,7 @@ class IdeaDagEngine:
             action_enum = IdeaActionType.THINK
         action = self.actions.get(action_enum)
         attempts = int(node.details.get(DetailKey.ACTION_ATTEMPTS.value, 0)) + 1
-        max_retries = int(self.settings.get("action_max_retries", 0))
+        max_retries = self._cfg.action.max_retries
         graph.update_details(
             node_id,
             {
@@ -975,6 +1121,14 @@ class IdeaDagEngine:
         result = await action.execute(graph, node_id, self.io)
         sanitized_result = self._sanitize_action_result(result) if result else None
         graph.update_details(node_id, {DetailKey.ACTION_RESULT.value: sanitized_result})
+        self._record_decision(
+            "action", node_id=node_id, chosen=action_enum.value,
+            metadata={
+                "success": bool(result.get("success")) if isinstance(result, dict) else False,
+                "url": (result.get("url") if isinstance(result, dict) else None),
+                "link_idea": node.details.get("link_idea"),
+            },
+        )
         
         if self._memory_manager and result:
             await self._memory_manager.write_node_result(
@@ -1050,16 +1204,16 @@ class IdeaDagEngine:
             # Previously the code fell through to `node.status = DONE` anyway —
             # a latent bug. With `visit_empty_content_retryable` (default True),
             # the node now falls through to the retry/fail branch below.
-            if not bool(self.settings.get("visit_empty_content_retryable", True)):
+            if not self._cfg.action.visit_empty_content_retryable:
                 # Legacy behavior preserved behind a kill-switch.
                 node.status = IdeaNodeStatus.DONE
                 return ResultStatus.SUCCESS.value
         retryable = ActionResultExtractor.is_retryable(result)
         node.details[DetailKey.ACTION_RETRYABLE.value] = retryable
         attempts = int(node.details.get(DetailKey.ACTION_ATTEMPTS.value, 0))
-        max_retries = int(self.settings.get("action_max_retries", 0))
+        max_retries = self._cfg.action.max_retries
         if retryable and attempts <= max_retries:
-            backoff = int(self.settings.get("action_retry_backoff_steps", 1))
+            backoff = self._cfg.action.retry_backoff_steps
             next_step = step_index + max(1, backoff)
             node.details[DetailKey.ACTION_COOLDOWN_UNTIL.value] = next_step
             node.status = IdeaNodeStatus.BLOCKED
@@ -1087,7 +1241,7 @@ class IdeaDagEngine:
         # sequential mode fails terminally, un-SKIP the next-best
         # sequential-pruned sibling so the parent can still produce useful
         # output instead of giving up. Gated by setting.
-        if bool(self.settings.get("sequential_sibling_recovery_enabled", True)):
+        if self._cfg.engine.sequential_sibling_recovery_enabled:
             self._recover_pruned_sibling(graph, node, step_index)
 
         return ResultStatus.FAILED.value
@@ -1252,7 +1406,7 @@ class IdeaDagEngine:
             return False
         
         content_total = result.get(ActionResultKey.CONTENT_TOTAL_CHARS.value) or 0
-        chunk_threshold = int(self.settings.get("document_chunk_threshold", 200000))
+        chunk_threshold = self._cfg.memory.document_chunk_threshold
         
         if content_total > chunk_threshold:
             self._logger.info(f"[CHUNKING] Document size {content_total} chars exceeds threshold {chunk_threshold}")
@@ -1272,8 +1426,8 @@ class IdeaDagEngine:
         if not content_full or not isinstance(content_full, str):
             return None
         
-        chunk_size = int(self.settings.get("document_chunk_size", 2000))
-        chunk_overlap = int(self.settings.get("document_chunk_overlap", 200))
+        chunk_size = self._cfg.memory.document_chunk_size
+        chunk_overlap = self._cfg.memory.document_chunk_overlap
         
         chunks = self._chunk_text(content_full, chunk_size, chunk_overlap)
         if len(chunks) <= 1:
@@ -1462,9 +1616,9 @@ class IdeaDagEngine:
         return best, parent_id
 
     def _maybe_log_dag(self, graph: IdeaDag, step_index: int, force: bool = False) -> None:
-        if not self.settings.get("log_dag_ascii"):
+        if not self._cfg.engine.log_dag_ascii:
             return
-        interval = int(self.settings.get("log_dag_step_interval", 0))
+        interval = self._cfg.engine.log_dag_step_interval
         if not force and interval <= 0:
             return
         if not force and step_index % interval != 0:

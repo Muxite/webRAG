@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from agent.app.agent_io import AgentIO
 from agent.app.observation import clean_operation
 from agent.app.idea_policies.base import IdeaActionType, DetailKey, IdeaNodeStatus
+from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.action_constants import (
     ActionResultKey,
     PromptKey,
@@ -30,6 +31,7 @@ from agent.app.idea_policies.action_constants import (
 class LeafAction(ABC):
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         self.settings = dict(settings or {})
+        self._cfg = IdeaConfig.from_settings(self.settings)
         self._logger = logging.getLogger(self.__class__.__name__)
 
     def _log_structured(self, level: str, message: str, **kwargs) -> None:
@@ -62,12 +64,15 @@ class LeafAction(ABC):
         return None
 
     def _max_observation_chars(self) -> int:
-        return int(self.settings.get("max_observation_chars", 100000))
+        return self._cfg.action.max_observation_chars
 
     def _timeout_seconds(self, key: str) -> Optional[float]:
-        value = self.settings.get(key)
+        # Accepts a full settings key (e.g. "search_timeout_seconds"); resolves
+        # it against TimeoutConfig, falling back to the generic action timeout.
+        name = key[:-len("_timeout_seconds")] if key.endswith("_timeout_seconds") else key
+        value = getattr(self._cfg.timeouts, name, None)
         if value is None:
-            value = self.settings.get("action_timeout_seconds")
+            value = self._cfg.timeouts.action
         if value is None:
             return None
         try:
@@ -192,7 +197,7 @@ class SearchLeafAction(LeafAction):
             from agent.app.idea_policies.action_constants import NodeDetailsExtractor
             query = NodeDetailsExtractor.get_query(node.details, fallback_title=node.title)
             intent = node.details.get(DetailKey.INTENT.value)
-            count = int(node.details.get(DetailKey.COUNT.value, self.settings.get("default_search_count", 10)))
+            count = int(node.details.get(DetailKey.COUNT.value, self._cfg.action.default_search_count))
             
             chunk_content = node.details.get(DetailKey.CHUNK_CONTENT.value)
             if chunk_content:
@@ -222,9 +227,9 @@ class SearchLeafAction(LeafAction):
                 )
             if count is None and node:
                 try:
-                    count = int(node.details.get(DetailKey.COUNT.value, self.settings.get("default_search_count", 10)))
+                    count = int(node.details.get(DetailKey.COUNT.value, self._cfg.action.default_search_count))
                 except (ValueError, TypeError):
-                    count = self.settings.get("default_search_count", 10)
+                    count = self._cfg.action.default_search_count
             failure = self._failure(
                 action=IdeaActionType.SEARCH,
                 node_id=node_id,
@@ -350,16 +355,26 @@ class VisitLeafAction(LeafAction):
         except Exception:
             return None
     
+    # Wikipedia non-content namespaces / chrome that are never valid navigation targets.
+    _WIKI_CHROME = re.compile(
+        r"/wiki/(main_page|special:|wikipedia:|help:|portal:|template:|category:|file:|"
+        r"talk:|user:|draft:|module:|mediawiki:|book:)",
+        re.IGNORECASE,
+    )
+
+    def _is_wiki_chrome(self, url: str) -> bool:
+        return bool(self._WIKI_CHROME.search(url or ""))
+
     def _filter_and_prioritize_links(self, links: List[str], base_url: str) -> List[str]:
         seen: Set[str] = set()
         cleaned_links: List[str] = []
-        
+
         for link in links:
             cleaned = self._clean_and_fix_link(link, base_url)
-            if cleaned and cleaned not in seen:
+            if cleaned and cleaned not in seen and not self._is_wiki_chrome(cleaned):
                 seen.add(cleaned)
                 cleaned_links.append(cleaned)
-        
+
         return cleaned_links
     
     def _attach_links_to_content(self, content: str, links: List[str], max_links: int = 20) -> str:
@@ -906,10 +921,12 @@ class VisitLeafAction(LeafAction):
             return candidate_urls[:link_count]
         
         try:
-            model_name = self.settings.get("visit_link_selection_model") or self.settings.get("evaluation_model") or ""
-            if not model_name:
-                return candidate_urls[:link_count]
-            
+            # No explicit selection model -> use the connector's current (execution) model
+            # via model_name=None, so the agent can reason about which discovered link
+            # matches a descriptive link_idea (e.g. "rocket that launched the mission" ->
+            # Saturn V). Cost attributes to the execution model, like other leaf LLM calls.
+            model_name = self._cfg.action.visit_link_selection_model or self._cfg.evaluation.model or None
+
             candidates_text = "\n".join([f"{i+1}. {url}" for i, url in enumerate(candidate_urls)])
             system_content = f"Select the top {link_count} URLs that best match the user's request. Return JSON with a 'selected' array of URLs in order of preference."
             user_content = f"User wants: {link_idea}\n\nCandidate URLs:\n{candidates_text}\n\nReturn JSON: {{\"selected\": [\"url1\", \"url2\", ...]}}"
@@ -927,7 +944,7 @@ class VisitLeafAction(LeafAction):
             response = await io.query_llm_with_fallback(
                 payload,
                 model_name=model_name,
-                fallback_model=self.settings.get("fallback_model"),
+                fallback_model=self._cfg.generation.fallback_model,
                 timeout_seconds=timeout_seconds,
             )
             
@@ -947,6 +964,75 @@ class VisitLeafAction(LeafAction):
         
         return candidate_urls[:link_count]
     
+    def _parse_visit_html(self, raw_html: str, url: str) -> Dict[str, Any]:
+        """
+        CPU-bound HTML parsing for a visited page. Pure/synchronous so it can be
+        offloaded to a thread executor, keeping the event loop responsive while
+        concurrent page fetches and LLM calls proceed.
+
+        :param raw_html: Raw page HTML.
+        :param url: Source URL (for link resolution).
+        :returns: Dict of parsed/derived fields consumed by _visit_single_page.
+        """
+        cleaned = clean_operation(raw_html) or ""
+        soup = BeautifulSoup(raw_html, "html.parser")
+        raw_links = []
+        link_contexts = {}
+
+        for tag in soup.find_all("a", href=True):
+            href = tag.get("href")
+            if href:
+                raw_links.append(href)
+                link_text = tag.get_text(strip=True)
+                if link_text:
+                    link_contexts[href] = link_text[:200]
+
+        page_title = ""
+        title_tag = soup.find("title")
+        if title_tag:
+            page_title = title_tag.get_text(strip=True)
+
+        h1_text = ""
+        h1_tag = soup.find("h1")
+        if h1_tag:
+            h1_text = h1_tag.get_text(separator=" ", strip=True)
+
+        cleaned_links = self._filter_and_prioritize_links(raw_links, url)
+        cleaned_link_contexts = {}
+        for raw_link in raw_links:
+            fixed_link = self._clean_and_fix_link(raw_link, url)
+            if fixed_link and raw_link in link_contexts:
+                cleaned_link_contexts[fixed_link] = link_contexts[raw_link]
+
+        content_payload = self._limit_text(cleaned)
+        content_text = content_payload.get("content") or cleaned or ""
+        if not content_text or len(content_text.strip()) == 0:
+            content_text = soup.get_text(separator="\n", strip=True)
+            if content_text:
+                content_payload = self._limit_text(content_text)
+                content_text = content_payload.get("content") or content_text
+
+        max_links_for_llm = self._cfg.action.max_links_per_visit
+        links_for_llm = cleaned_links[:max_links_for_llm]
+        content_with_links = self._attach_links_to_content(content_text, links_for_llm, max_links=max_links_for_llm)
+
+        final_content = content_payload.get("content") or content_text or ""
+        content_total_chars = content_payload.get("total_chars", len(final_content))
+
+        return {
+            "cleaned": cleaned,
+            "cleaned_links": cleaned_links,
+            "cleaned_link_contexts": cleaned_link_contexts,
+            "page_title": page_title,
+            "h1_text": h1_text,
+            "content_text": content_text,
+            "content_payload": content_payload,
+            "links_for_llm": links_for_llm,
+            "content_with_links": content_with_links,
+            "final_content": final_content,
+            "content_total_chars": content_total_chars,
+        }
+
     async def _visit_single_page(
         self,
         url: str,
@@ -1001,58 +1087,45 @@ class VisitLeafAction(LeafAction):
                 {},
             )
         
-        cleaned = clean_operation(raw_html) or ""
-        soup = BeautifulSoup(raw_html, "html.parser")
-        raw_links = []
-        link_contexts = {}
-        
-        for tag in soup.find_all("a", href=True):
-            href = tag.get("href")
-            if href:
-                raw_links.append(href)
-                link_text = tag.get_text(strip=True)
-                if link_text:
-                    link_contexts[href] = link_text[:200]
-        
-        page_title = ""
-        title_tag = soup.find("title")
-        if title_tag:
-            page_title = title_tag.get_text(strip=True)
-        
-        h1_text = ""
-        h1_tag = soup.find("h1")
-        if h1_tag:
-            h1_text = h1_tag.get_text(separator=" ", strip=True)
-        
-        cleaned_links = self._filter_and_prioritize_links(raw_links, str(url))
-        cleaned_link_contexts = {}
-        for raw_link in raw_links:
-            fixed_link = self._clean_and_fix_link(raw_link, str(url))
-            if fixed_link and raw_link in link_contexts:
-                cleaned_link_contexts[fixed_link] = link_contexts[raw_link]
-        
-        await self._store_links_in_chroma(str(url), cleaned_links, cleaned_link_contexts, io)
-        
-        content_payload = self._limit_text(cleaned)
-        content_text = content_payload.get("content") or cleaned or ""
-        if not content_text or len(content_text.strip()) == 0:
-            content_text = soup.get_text(separator="\n", strip=True)
-            if content_text:
-                content_payload = self._limit_text(content_text)
-                content_text = content_payload.get("content") or content_text
-        
+        # HTML parsing (clean_operation + BeautifulSoup) is CPU-bound and pure
+        # Python; run it in a thread executor so it doesn't freeze the event
+        # loop while sibling page fetches / LLM calls proceed concurrently.
+        parsed = await asyncio.get_running_loop().run_in_executor(
+            None, self._parse_visit_html, raw_html, str(url)
+        )
+        cleaned = parsed["cleaned"]
+        cleaned_links = parsed["cleaned_links"]
+        cleaned_link_contexts = parsed["cleaned_link_contexts"]
+        page_title = parsed["page_title"]
+        h1_text = parsed["h1_text"]
+        content_text = parsed["content_text"]
+        content_payload = parsed["content_payload"]
+        links_for_llm = parsed["links_for_llm"]
+        content_with_links = parsed["content_with_links"]
+        final_content = parsed["final_content"]
+        content_total_chars = parsed["content_total_chars"]
+
+        # Storing every page's links in Chroma (embedding 1000+ link contexts) is the
+        # dominant per-visit cost and is only useful when this visit will FOLLOW links
+        # (link_count>1 or a link_idea). For single-URL fact reads it is pure waste, so
+        # skip it — this keeps the graph cheap/fast on small tasks. Navigation visits
+        # (046/047) still populate Chroma.
+        _lc = node.details.get("link_count")
+        try:
+            _lc = int(_lc) if _lc is not None else 1
+        except (TypeError, ValueError):
+            _lc = 1
+        _following_links = _lc > 1 or bool(node.details.get("link_idea"))
+        if _following_links:
+            await self._store_links_in_chroma(str(url), cleaned_links, cleaned_link_contexts, io)
+        else:
+            self._logger.debug(f"[VISIT] Single-URL read; skipping Chroma link store for {str(url)[:60]}")
+
         if not content_text or len(content_text.strip()) == 0:
             self._logger.warning(
                 f"[VISIT] No extractable content from {url[:80]}. "
                 f"HTML length: {len(raw_html)}, cleaned length: {len(cleaned)}"
             )
-        
-        max_links_for_llm = int(self.settings.get("max_links_per_visit", 20))
-        links_for_llm = cleaned_links[:max_links_for_llm]
-        content_with_links = self._attach_links_to_content(content_text, links_for_llm, max_links=max_links_for_llm)
-        
-        final_content = content_payload.get("content") or content_text or ""
-        content_total_chars = content_payload.get("total_chars", len(final_content))
         
         if not final_content or len(final_content.strip()) == 0:
             self._logger.error(
@@ -1185,7 +1258,7 @@ class VisitLeafAction(LeafAction):
                     link_idea = link_idea[:200]
                     self._logger.info(f"[VISIT] Auto-generated link_idea from context: '{link_idea[:60]}...'")
             
-            max_sites = int(self.settings.get("visit_max_sites_per_action", 20))
+            max_sites = self._cfg.action.visit_max_sites_per_action
             link_count = min(link_count, max_sites)
             
             urls_to_visit: List[str] = []
@@ -1243,7 +1316,7 @@ class VisitLeafAction(LeafAction):
                         )
                 
                 if link_idea and len(candidate_urls) < link_count:
-                    query_top_k = int(self.settings.get("visit_link_query_top_k", 10))
+                    query_top_k = self._cfg.action.visit_link_query_top_k
                     chroma_urls = await self._query_links_from_chroma(link_idea, io, top_k=query_top_k)
                     if chroma_urls:
                         seen = set(candidate_urls)
@@ -1338,12 +1411,31 @@ class VisitLeafAction(LeafAction):
             all_page_titles: List[str] = []
             all_h1_texts: List[str] = []
             
-            for url_to_visit in urls_to_visit:
-                if url_to_visit in [r.get("url") for r in visited_results]:
+            # Dedup URLs preserving input order (first URL stays primary), then
+            # fetch pages concurrently. aiohttp's ClientSession is safe for
+            # concurrent requests; a semaphore caps in-flight fetches so a burst
+            # of CPU-bound HTML parsing can't starve the event loop.
+            unique_urls = list(dict.fromkeys(urls_to_visit))
+            concurrency = max(1, self._cfg.action.visit_page_concurrency)
+            semaphore = asyncio.Semaphore(concurrency)
+
+            async def _visit_with_limit(target_url: str):
+                async with semaphore:
+                    return await self._visit_single_page(target_url, graph, node, io, intent)
+
+            page_outcomes = await asyncio.gather(
+                *[_visit_with_limit(u) for u in unique_urls],
+                return_exceptions=True,
+            )
+
+            # gather preserves input order, so visited_results stays deterministic
+            # and primary_result remains the first successful input URL.
+            for url_to_visit, outcome in zip(unique_urls, page_outcomes):
+                if isinstance(outcome, BaseException):
+                    self._logger.warning(f"[VISIT] Error visiting {url_to_visit}: {outcome}")
                     continue
-                
-                result, page_links, page_link_contexts = await self._visit_single_page(url_to_visit, graph, node, io, intent)
-                
+
+                result, page_links, page_link_contexts = outcome
                 if result:
                     if result.get("success"):
                         visited_results.append(result)
@@ -1376,7 +1468,7 @@ class VisitLeafAction(LeafAction):
             
             primary_result = visited_results[0]
             combined_content_text = "\n\n".join(combined_content)
-            max_links_for_llm = int(self.settings.get("max_links_per_visit", 20))
+            max_links_for_llm = self._cfg.action.max_links_per_visit
             links_for_llm = list(dict.fromkeys(all_links))[:max_links_for_llm]
             
             if h1_text := primary_result.get("h1_text"):
@@ -1713,8 +1805,10 @@ class MergeLeafAction(LeafAction):
                 else:
                     compacted.append(mr)
             merged_json = json.dumps(compacted, ensure_ascii=True)
-            if len(merged_json) > 100000:
-                self._logger.warning(f"[MERGE] merged_json size={len(merged_json)} chars (no truncation applied)")
+            _merge_cap = int(self.settings.get("merge_max_json_chars", 100000))
+            if len(merged_json) > _merge_cap:
+                self._logger.info(f"[MERGE] merged_json {len(merged_json)} chars > cap {_merge_cap}; truncating")
+                merged_json = merged_json[:_merge_cap] + ' ...[truncated]'
             user_content = user_template.format(
                 merged_json=merged_json,
                 original_goal=original_goal or "",
@@ -1727,17 +1821,17 @@ class MergeLeafAction(LeafAction):
                 user_content=user_content,
             )
             
-            model_name = self.settings.get("merge_model") or self.settings.get("final_model")
+            model_name = self._cfg.merge.model or self._cfg.final.model
             json_schema = self.settings.get("merge_json_schema")
-            reasoning_effort = self.settings.get("reasoning_effort", "high")
-            text_verbosity = self.settings.get("text_verbosity", "medium")
+            reasoning_effort = self._cfg.generation.reasoning_effort
+            text_verbosity = self._cfg.generation.text_verbosity
             
             payload = io.build_llm_payload(
                 messages=messages,
                 json_mode=True,
                 model_name=model_name,
-                temperature=float(self.settings.get("merge_temperature", 0.3)),
-                max_tokens=self.settings.get("merge_max_tokens") if self.settings.get("merge_max_tokens") is not None else None,
+                temperature=self._cfg.merge.temperature,
+                max_tokens=self._cfg.merge.max_tokens,
                 json_schema=json_schema,
                 reasoning_effort=reasoning_effort,
                 text_verbosity=text_verbosity,
@@ -1754,7 +1848,7 @@ class MergeLeafAction(LeafAction):
             response = await io.query_llm_with_fallback(
                 payload,
                 model_name=model_name,
-                fallback_model=self.settings.get("fallback_model"),
+                fallback_model=self._cfg.generation.fallback_model,
                 timeout_seconds=timeout_seconds,
             )
             response_preview = response[:2000] + "... [truncated]" if isinstance(response, str) and len(response) > 2000 else response
@@ -1813,6 +1907,178 @@ class MergeLeafAction(LeafAction):
             return self._failure(action=IdeaActionType.MERGE, node_id=node_id, error=exc)
 
 
+class VerifyLeafAction(LeafAction):
+    """Cross-check a claim against gathered evidence.
+
+    A `verify` node takes a target ``claim`` plus the evidence already gathered by
+    ancestor/sibling ``visit`` nodes, optionally fetches one authoritative
+    ``optional_url``, then emits a structured verdict via a single LLM call. It is a
+    graph-only differentiator: `parametric` (no sources) and `naive_rag` (no second
+    round) cannot reconcile sources or flag a contradicting authority.
+    """
+
+    name = "verify"
+
+    _DEFAULT_SYSTEM_PROMPT = (
+        "You are the Verify operation in a Graph-of-Thought fact-checking system. "
+        "Given a CLAIM and EVIDENCE collected from web pages, decide whether the claim "
+        "is supported. Rely ONLY on the provided evidence — never on prior knowledge. "
+        "If the evidence contradicts the claim, identify the authoritative source URL "
+        "that contradicts it and quote the exact contradicting sentence. "
+        'Return strict JSON: {"verdict": "TRUE"|"PARTIALLY_TRUE"|"FALSE"|"UNVERIFIABLE", '
+        '"confidence": 0.0-1.0, "supporting_url": "<url or empty>", '
+        '"contradicting_url": "<url or empty>", "quote": "<verbatim sentence from '
+        'evidence>", "reasoning": "<one sentence>"}. '
+        "Use UNVERIFIABLE only when the evidence does not address the claim."
+    )
+
+    def _collect_evidence(
+        self, graph: IdeaDag, node: IdeaNode, max_chars: int = 30000, max_depth: int = 4
+    ) -> List[Dict[str, str]]:
+        """Gather visit content + search snippets from ancestors and siblings."""
+        visited_nodes: Set[str] = set()
+        queue: List[Tuple[IdeaNode, int]] = [(node, 0)]
+        evidence: List[Dict[str, str]] = []
+        budget = max_chars
+
+        while queue and budget > 0:
+            current, depth = queue.pop(0)
+            if current.node_id in visited_nodes or depth > max_depth:
+                continue
+            visited_nodes.add(current.node_id)
+
+            result = current.details.get(DetailKey.ACTION_RESULT.value)
+            if isinstance(result, dict) and result.get(ActionResultKey.SUCCESS.value):
+                action_type = result.get(ActionResultKey.ACTION.value)
+                if action_type == IdeaActionType.VISIT.value:
+                    url = result.get(ActionResultKey.URL.value) or ""
+                    content = (
+                        result.get(ActionResultKey.CONTENT.value)
+                        or result.get(ActionResultKey.CONTENT_FULL.value)
+                        or ""
+                    )
+                    if content:
+                        snippet = content[:budget]
+                        budget -= len(snippet)
+                        evidence.append({"url": str(url), "content": snippet})
+                elif action_type == IdeaActionType.SEARCH.value:
+                    for item in (result.get(ActionResultKey.RESULTS.value) or [])[:10]:
+                        if isinstance(item, dict):
+                            line = f"{item.get('title', '')} — {item.get('snippet', '')} ({item.get('url', '')})"
+                            evidence.append({"url": str(item.get("url", "")), "content": line[:500]})
+
+            # Walk to parent and to siblings (one hop).
+            pids = current.parent_ids if current.parent_ids else ([current.parent_id] if current.parent_id else [])
+            for pid in pids:
+                if pid:
+                    parent = graph.get_node(pid)
+                    if parent:
+                        queue.append((parent, depth + 1))
+                        for sib_id in parent.children:
+                            if sib_id != current.node_id:
+                                sib = graph.get_node(sib_id)
+                                if sib:
+                                    queue.append((sib, depth + 1))
+        return evidence
+
+    async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
+        node = None
+        try:
+            node = graph.get_node(node_id)
+            if not node:
+                raise ValueError(f"Unknown node_id: {node_id}")
+
+            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+
+            claim = (
+                node.details.get(DetailKey.CLAIM.value)
+                or node.details.get(DetailKey.INTENT.value)
+                or NodeDetailsExtractor.get_query(node.details, fallback_title=node.title)
+                or ""
+            )
+            claim = str(claim).strip()
+            if not claim:
+                return ActionResultBuilder.failure(
+                    action=IdeaActionType.VERIFY.value,
+                    error="Verify node missing a 'claim' to check.",
+                    node_id=node_id,
+                )
+
+            evidence = self._collect_evidence(graph, node)
+
+            # Optionally fetch one authoritative page named on the node.
+            optional_url = NodeDetailsExtractor.get_url(node.details) or node.details.get("optional_url")
+            if optional_url and isinstance(optional_url, str) and optional_url.startswith(("http://", "https://")):
+                visitor = VisitLeafAction(settings=self.settings)
+                fetch_result, _, _ = await visitor._visit_single_page(optional_url, graph, node, io, intent=claim)
+                if fetch_result and fetch_result.get(ActionResultKey.SUCCESS.value):
+                    content = fetch_result.get(ActionResultKey.CONTENT.value) or ""
+                    if content:
+                        evidence.insert(0, {"url": str(optional_url), "content": content[:30000]})
+
+            if not evidence:
+                return ActionResultBuilder.failure(
+                    action=IdeaActionType.VERIFY.value,
+                    error="Verify node found no gathered evidence to cross-check. Visit sources first.",
+                    error_type="ValidationError",
+                    node_id=node_id,
+                )
+
+            evidence_text = "\n\n".join(
+                f"[SOURCE {i + 1}] {e['url']}\n{e['content']}" for i, e in enumerate(evidence)
+            )
+            system_content = self.settings.get("verify_system_prompt") or self._DEFAULT_SYSTEM_PROMPT
+            user_content = f"CLAIM:\n{claim}\n\nEVIDENCE:\n{evidence_text}"
+            messages = PromptBuilder.build_messages(system_content=system_content, user_content=user_content)
+
+            model_name = self._cfg.verify.model  # None -> connector's current execution model
+            payload = io.build_llm_payload(
+                messages=messages,
+                json_mode=True,
+                model_name=model_name,
+                temperature=self._cfg.verify.temperature,
+                max_tokens=self._cfg.verify.max_tokens,
+            )
+            timeout_seconds = self._timeout_seconds("llm_timeout_seconds")
+            response = await io.query_llm_with_fallback(
+                payload,
+                model_name=model_name,
+                fallback_model=self._cfg.generation.fallback_model,
+                timeout_seconds=timeout_seconds,
+            )
+            if not response:
+                return ActionResultBuilder.failure(
+                    action=IdeaActionType.VERIFY.value,
+                    error="Verify LLM returned empty response",
+                    node_id=node_id,
+                )
+
+            try:
+                verdict_data = json.loads(response)
+            except json.JSONDecodeError:
+                verdict_data = {
+                    "verdict": "UNVERIFIABLE",
+                    "confidence": 0.0,
+                    "reasoning": "Failed to parse verify response",
+                }
+
+            return ActionResultBuilder.success(
+                action=IdeaActionType.VERIFY.value,
+                node_id=node_id,
+                claim=claim,
+                verdict=verdict_data.get("verdict", "UNVERIFIABLE"),
+                confidence=verdict_data.get("confidence", 0.0),
+                supporting_url=verdict_data.get("supporting_url", ""),
+                contradicting_url=verdict_data.get("contradicting_url", ""),
+                quote=verdict_data.get("quote", ""),
+                reasoning=verdict_data.get("reasoning", ""),
+                evidence_sources=[e["url"] for e in evidence],
+                raw_response=response,
+            )
+        except Exception as exc:
+            return self._failure(action=IdeaActionType.VERIFY, node_id=node_id, error=exc)
+
+
 class LeafActionRegistry:
     """Registry of leaf actions.
 
@@ -1832,6 +2098,7 @@ class LeafActionRegistry:
             IdeaActionType.SAVE.value: SaveLeafAction,
             IdeaActionType.THINK.value: ThinkLeafAction,
             IdeaActionType.MERGE.value: MergeLeafAction,
+            IdeaActionType.VERIFY.value: VerifyLeafAction,
         }
         # Kept for legacy code paths that introspect `._registry` directly.
         self._registry: Dict[IdeaActionType, type] = {
@@ -1840,6 +2107,7 @@ class LeafActionRegistry:
             IdeaActionType.SAVE: SaveLeafAction,
             IdeaActionType.THINK: ThinkLeafAction,
             IdeaActionType.MERGE: MergeLeafAction,
+            IdeaActionType.VERIFY: VerifyLeafAction,
         }
 
     @staticmethod

@@ -235,7 +235,7 @@ class AgentIO:
         http_error = None
         try:
             http_result = await self._with_timeout(
-                self.connector_http.request("GET", url, retries=3),
+                self.connector_http.request("GET", url, retries=2),
                 timeout_seconds,
             )
         except Exception as exc:
@@ -309,7 +309,7 @@ class AgentIO:
     async def fetch_url(
         self,
         url: str,
-        retries: int = 3,
+        retries: int = 2,
         timeout_seconds: Optional[float] = None,
     ) -> str:
         """

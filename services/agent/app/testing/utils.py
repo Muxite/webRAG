@@ -3,6 +3,7 @@ Testing utilities.
 """
 
 import json
+from collections import Counter
 from typing import Dict, Any
 
 from agent.app.idea_test_utils import count_words, count_chars
@@ -106,6 +107,35 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
             visit_chars += count_chars(content)
             visit_words += count_words(content)
     
+    # Fixture hit/miss counts: a non-zero miss rate means a model saw evidence the
+    # prewarm did not cover, which is the asymmetry strict replay is meant to remove.
+    fixture_hits = 0
+    fixture_misses = 0
+    for entry in telemetry.events:
+        if entry.get("event") != "connector_io":
+            continue
+        io_payload = (entry.get("payload") or {}).get("payload") or {}
+        fixture_flag = io_payload.get("fixture")
+        if fixture_flag == "hit":
+            fixture_hits += 1
+        elif fixture_flag == "miss":
+            fixture_misses += 1
+
+    # Decision trace + grounding verdict (thought-process observability).
+    decisions = list(getattr(telemetry, "decisions", []) or [])
+    grounded_flag = None
+    for d in decisions:
+        if isinstance(d, dict) and "grounded" in d:
+            grounded_flag = d["grounded"]  # last grounded-bearing decision wins
+    missing_reqs = []
+    replans = 0
+    if isinstance(result, dict):
+        if "grounded" in result:
+            grounded_flag = result.get("grounded")
+        missing_reqs = result.get("missing_requirements", []) or []
+        replans = int(result.get("grounding_replans", 0) or 0)
+    stage_counts = Counter(d.get("stage") for d in decisions if isinstance(d, dict))
+
     timings_summary = {}
     timings_per_call = []
     for timing in telemetry.timings:
@@ -215,6 +245,22 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
             "chars": visit_chars,
             "words": visit_words,
             "kilobytes": round(visit_chars / 1024, 2),
+        },
+        "fixtures": {
+            "hits": fixture_hits,
+            "misses": fixture_misses,
+            "miss_rate": round(fixture_misses / (fixture_hits + fixture_misses), 3)
+            if (fixture_hits + fixture_misses) else 0.0,
+        },
+        "grounding": {
+            "grounded": grounded_flag,
+            "missing": missing_reqs,
+            "replans": replans,
+        },
+        "decisions": {
+            "count": len(decisions),
+            "by_stage": dict(stage_counts),
+            "trace": decisions[:200],
         },
         "timings": timings_summary,
         "timings_per_call": timings_per_call,

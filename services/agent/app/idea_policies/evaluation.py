@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import EvaluationPolicy, DetailKey
+from agent.app.idea_policies.config import IdeaConfig
 
 
 def _safe_serialize_details(details: Dict[str, Any]) -> str:
@@ -29,6 +30,7 @@ class EvaluationWeights:
         visit_weight: float = 1.0,
         think_weight: float = 1.0,
         save_weight: float = 1.0,
+        verify_weight: float = 1.0,
         default_weight: float = 1.0,
     ):
         self.no_action_result_base_score = float(no_action_result_base_score)
@@ -37,6 +39,7 @@ class EvaluationWeights:
         self.visit_weight = float(visit_weight)
         self.think_weight = float(think_weight)
         self.save_weight = float(save_weight)
+        self.verify_weight = float(verify_weight)
         self.default_weight = float(default_weight)
 
     @classmethod
@@ -49,6 +52,7 @@ class EvaluationWeights:
             visit_weight=settings.get("evaluation_weight_visit", 1.0),
             think_weight=settings.get("evaluation_weight_think", 1.0),
             save_weight=settings.get("evaluation_weight_save", 1.0),
+            verify_weight=settings.get("evaluation_weight_verify", 1.0),
             default_weight=settings.get("evaluation_weight_default", 1.0),
         )
 
@@ -64,6 +68,8 @@ class EvaluationWeights:
             return score * self.think_weight
         if action_lower == "save":
             return score * self.save_weight
+        if action_lower == "verify":
+            return score * self.verify_weight
         return score * self.default_weight
 
 
@@ -73,6 +79,7 @@ class LlmEvaluationPolicy(EvaluationPolicy):
         self.io = io
         self.model_name = model_name
         self.weights = EvaluationWeights.from_settings(settings)
+        self._cfg = IdeaConfig.from_settings(self.settings)
 
     async def evaluate(self, graph: IdeaDag, node_id: str) -> float:
         node = graph.get_node(node_id)
@@ -100,16 +107,16 @@ class LlmEvaluationPolicy(EvaluationPolicy):
                 return penalty_score
         
         messages = self._build_messages(graph, node)
-        model_name = self.model_name or self.settings.get("evaluation_model")
+        model_name = self.model_name or self._cfg.evaluation.model
         json_schema = self.settings.get("evaluation_json_schema")
-        reasoning_effort = self.settings.get("reasoning_effort", "high")
-        text_verbosity = self.settings.get("text_verbosity", "medium")
+        reasoning_effort = self._cfg.generation.reasoning_effort
+        text_verbosity = self._cfg.generation.text_verbosity
         payload = self.io.build_llm_payload(
             messages=messages,
             json_mode=True,
             model_name=model_name,
-            temperature=float(self.settings.get("evaluation_temperature", 0.2)),
-            max_tokens=self.settings.get("evaluation_max_tokens") if self.settings.get("evaluation_max_tokens") is not None else None,
+            temperature=self._cfg.evaluation.temperature,
+            max_tokens=self._cfg.evaluation.max_tokens,
             json_schema=json_schema,
             reasoning_effort=reasoning_effort,
             text_verbosity=text_verbosity,
@@ -119,8 +126,8 @@ class LlmEvaluationPolicy(EvaluationPolicy):
             content = await self.io.query_llm_with_fallback(
                 payload,
                 model_name=model_name,
-                fallback_model=self.settings.get("fallback_model"),
-                timeout_seconds=self.settings.get("llm_timeout_seconds"),
+                fallback_model=self._cfg.generation.fallback_model,
+                timeout_seconds=self._cfg.timeouts.llm,
             )
             self._logger.debug(f"[EVALUATION] LLM response: {content[:200] if content else 'None'}...")
             score, rationale = self._parse_score(content)
@@ -144,8 +151,8 @@ class LlmEvaluationPolicy(EvaluationPolicy):
     def _build_messages(self, graph: IdeaDag, node: IdeaNode) -> List[Dict[str, str]]:
         from agent.app.idea_policies.base import DetailKey
         
-        max_nodes = int(self.settings.get("evaluation_max_context_nodes", 5))
-        max_detail_chars = int(self.settings.get("evaluation_max_detail_chars", 2000))
+        max_nodes = self._cfg.evaluation.max_context_nodes
+        max_detail_chars = self._cfg.evaluation.max_detail_chars
         path = graph.path_to_root(node.node_id)
         path = path[:max_nodes]
         serialized = []
@@ -228,6 +235,7 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
         self.model_name = model_name
         self._logger = logging.getLogger(self.__class__.__name__)
         self.weights = EvaluationWeights.from_settings(settings)
+        self._cfg = IdeaConfig.from_settings(self.settings)
 
     async def evaluate(self, graph: IdeaDag, node_id: str) -> float:
         policy = LlmEvaluationPolicy(self.io, settings=self.settings, model_name=self.model_name)
@@ -237,19 +245,19 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
         parent = graph.get_node(parent_id)
         if not parent:
             return {}
-        max_candidates = int(self.settings.get("evaluation_batch_max_candidates", 5))
+        max_candidates = self._cfg.evaluation.batch_max_candidates
         candidate_ids = candidate_ids[:max_candidates]
         messages, candidate_id_map = self._build_messages(graph, parent, candidate_ids)
-        model_name = self.model_name or self.settings.get("evaluation_model")
+        model_name = self.model_name or self._cfg.evaluation.model
         json_schema = self.settings.get("evaluation_batch_json_schema")
-        reasoning_effort = self.settings.get("reasoning_effort", "high")
-        text_verbosity = self.settings.get("text_verbosity", "medium")
+        reasoning_effort = self._cfg.generation.reasoning_effort
+        text_verbosity = self._cfg.generation.text_verbosity
         payload = self.io.build_llm_payload(
             messages=messages,
             json_mode=True,
             model_name=model_name,
-            temperature=float(self.settings.get("evaluation_temperature", 0.2)),
-            max_tokens=self.settings.get("evaluation_max_tokens") if self.settings.get("evaluation_max_tokens") is not None else None,
+            temperature=self._cfg.evaluation.temperature,
+            max_tokens=self._cfg.evaluation.max_tokens,
             json_schema=json_schema,
             reasoning_effort=reasoning_effort,
             text_verbosity=text_verbosity,
@@ -259,8 +267,8 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
             content = await self.io.query_llm_with_fallback(
                 payload,
                 model_name=model_name,
-                fallback_model=self.settings.get("fallback_model"),
-                timeout_seconds=self.settings.get("llm_timeout_seconds"),
+                fallback_model=self._cfg.generation.fallback_model,
+                timeout_seconds=self._cfg.timeouts.llm,
             )
             if content:
                 self._logger.debug(f"[EVALUATION_BATCH] Full LLM response: {content}")
@@ -300,6 +308,10 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
                 try:
                     graph.evaluate(node_id, score)
                     node.details[DetailKey.EVALUATION.value] = {"score": score}
+                    _rec = getattr(getattr(self.io, "telemetry", None), "record_decision", None)
+                    if callable(_rec):
+                        _rec(stage="evaluation", node_id=node_id, chosen=node.title[:80],
+                             score=score, metadata={"action": NodeDetailsExtractor.get_action(node.details)})
                 except ValueError as e:
                     self._logger.warning(f"[EVALUATION_BATCH] Failed to evaluate node {node_id}: {e}")
             return scores
@@ -312,8 +324,8 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
             return {}
 
     def _build_messages(self, graph: IdeaDag, parent: IdeaNode, candidate_ids: List[str]) -> tuple[List[Dict[str, str]], Dict[str, str]]:
-        max_nodes = int(self.settings.get("evaluation_max_context_nodes", 5))
-        max_detail_chars = int(self.settings.get("evaluation_max_detail_chars", 2000))
+        max_nodes = self._cfg.evaluation.max_context_nodes
+        max_detail_chars = self._cfg.evaluation.max_detail_chars
         path = graph.path_to_root(parent.node_id)
         path = path[:max_nodes]
         path_serialized = []

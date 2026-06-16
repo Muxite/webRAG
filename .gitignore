@@ -29,3 +29,5 @@ desktop.ini
 
 # Generated benchmark / test-run artifacts
 idea_test_results/
+# Offline-authored compiled-scaffold plan cache (regenerable via scripts/compile_plans.py)
+compiled_plans/

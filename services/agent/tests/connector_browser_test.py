@@ -22,15 +22,16 @@ class TestConnectorBrowserUnit:
     @pytest.mark.asyncio
     async def test_init_defaults(self):
         connector = self._make_connector()
-        assert connector._driver is None
+        assert connector._browser is None
         assert connector._ready is False
 
     @pytest.mark.asyncio
     async def test_fetch_page_returns_request_result(self):
         connector = self._make_connector()
         fake_html = "<html><head><title>Test</title></head><body><h1>Hello</h1></body></html>"
-        with patch.object(connector, "_run_in_executor", new_callable=AsyncMock, return_value=fake_html):
+        with patch.object(connector, "_fetch", new_callable=AsyncMock, return_value=fake_html):
             connector._ready = True
+            connector._browser = MagicMock()
             result = await connector.fetch_page("https://example.com")
             assert isinstance(result, RequestResult)
             assert result.error is False
@@ -40,8 +41,9 @@ class TestConnectorBrowserUnit:
     @pytest.mark.asyncio
     async def test_fetch_page_returns_error_on_exception(self):
         connector = self._make_connector()
-        with patch.object(connector, "_run_in_executor", new_callable=AsyncMock, side_effect=Exception("Chrome crashed")):
+        with patch.object(connector, "_fetch", new_callable=AsyncMock, side_effect=Exception("Chrome crashed")):
             connector._ready = True
+            connector._browser = MagicMock()
             result = await connector.fetch_page("https://example.com")
             assert isinstance(result, RequestResult)
             assert result.error is True
@@ -52,7 +54,7 @@ class TestConnectorBrowserUnit:
         connector = self._make_connector()
         fake_html = "<html><body>Content</body></html>"
         with patch.object(connector, "_ensure_browser", new_callable=AsyncMock, return_value=True):
-            with patch.object(connector, "_run_in_executor", new_callable=AsyncMock, return_value=fake_html):
+            with patch.object(connector, "_fetch", new_callable=AsyncMock, return_value=fake_html):
                 result = await connector.fetch_page("https://example.com")
                 connector._ensure_browser.assert_awaited_once()
                 assert result.error is False
@@ -69,17 +71,17 @@ class TestConnectorBrowserUnit:
     async def test_close_sets_not_ready(self):
         connector = self._make_connector()
         connector._ready = True
-        connector._driver = MagicMock()
-        with patch.object(connector, "_run_in_executor", new_callable=AsyncMock):
-            await connector.close()
-            assert connector._ready is False
-            assert connector._driver is None
+        connector._browser = AsyncMock()
+        await connector.close()
+        assert connector._ready is False
+        assert connector._browser is None
 
     @pytest.mark.asyncio
     async def test_fetch_page_empty_html_returns_error(self):
         connector = self._make_connector()
-        with patch.object(connector, "_run_in_executor", new_callable=AsyncMock, return_value=""):
+        with patch.object(connector, "_fetch", new_callable=AsyncMock, return_value=""):
             connector._ready = True
+            connector._browser = MagicMock()
             result = await connector.fetch_page("https://example.com")
             assert result.error is True
 
@@ -91,8 +93,9 @@ class TestConnectorBrowserUnit:
             await asyncio.sleep(10)
             return "<html></html>"
 
-        with patch.object(connector, "_run_in_executor", side_effect=slow_fetch):
+        with patch.object(connector, "_fetch", side_effect=slow_fetch):
             connector._ready = True
+            connector._browser = MagicMock()
             result = await connector.fetch_page("https://example.com", timeout=0.1)
             assert result.error is True
 
@@ -104,8 +107,9 @@ class TestConnectorBrowserUnit:
         connector.set_telemetry(mock_telemetry)
 
         fake_html = "<html><body>Telemetry test</body></html>"
-        with patch.object(connector, "_run_in_executor", new_callable=AsyncMock, return_value=fake_html):
+        with patch.object(connector, "_fetch", new_callable=AsyncMock, return_value=fake_html):
             connector._ready = True
+            connector._browser = MagicMock()
             await connector.fetch_page("https://example.com")
             mock_telemetry.record_timing.assert_called()
 

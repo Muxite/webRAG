@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from agent.app.prompts.loader import apply_default_prompts
+from agent.app.idea_dag_schemas import apply_default_schemas
 
 
 def load_idea_dag_settings(path: Optional[Path] = None) -> Dict[str, Any]:
@@ -17,6 +18,10 @@ def load_idea_dag_settings(path: Optional[Path] = None) -> Dict[str, Any]:
     # Prompts present in settings.json win; missing/empty keys are filled from
     # `prompts/defaults/*.md` so prompt content can be edited as documents.
     apply_default_prompts(settings)
+
+    # JSON schemas live in `idea_dag_schemas.py` (code) rather than inline in the
+    # settings file; an override present in settings.json still wins.
+    apply_default_schemas(settings)
 
     env_overrides = {
         "expansion_max_tokens": os.environ.get("IDEA_DAG_EXPANSION_MAX_TOKENS"),

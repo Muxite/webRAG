@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from agent.app.idea_dag import IdeaDag, IdeaNode
 
 from agent.app.idea_policies.base import SelectionPolicy
+from agent.app.idea_policies.config import IdeaConfig
 
 
 class BestScoreSelectionPolicy(SelectionPolicy):
@@ -16,6 +17,7 @@ class BestScoreSelectionPolicy(SelectionPolicy):
     """
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         super().__init__(settings=settings)
+        self._cfg = IdeaConfig.from_settings(self.settings)
 
     def select(self, graph: IdeaDag, parent_id: str) -> Optional[IdeaNode]:
         """
@@ -24,5 +26,5 @@ class BestScoreSelectionPolicy(SelectionPolicy):
         :param parent_id: Parent node identifier.
         :returns: Selected IdeaNode or None.
         """
-        require_score = bool(self.settings.get("require_score", True))
+        require_score = self._cfg.policy.require_score
         return graph.select_best_child(parent_id, require_score=require_score)

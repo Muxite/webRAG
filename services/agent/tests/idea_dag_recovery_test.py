@@ -102,6 +102,10 @@ async def test_dag_action_retry_recovery():
         "min_score_threshold": 0.0,
         "action_max_retries": 2,
         "action_retry_backoff_steps": 1,
+        # Exercise the local (per-parent) retry path explicitly. The engine now
+        # merges JSON defaults, where best_first_global is True; this test targets
+        # the local-selection retry behaviour, so pin it off.
+        "best_first_global": False,
     }
     engine = IdeaDagEngine(
         io=DummyIO(),

@@ -84,6 +84,7 @@ class IdeaActionType(str, Enum):
     VISIT = "visit"
     SAVE = "save"
     MERGE = "merge"
+    VERIFY = "verify"
 
 
 class DetailKey(str, Enum):
@@ -131,3 +132,4 @@ class DetailKey(str, Enum):
     TOTAL_CHUNKS = "total_chunks"
     CHUNK_CONTENT = "chunk_content"
     ORIGINAL_GOAL = "original_goal"
+    CLAIM = "claim"

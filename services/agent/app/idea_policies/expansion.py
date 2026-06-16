@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import ExpansionPolicy, DetailKey, IdeaActionType
+from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_dag_settings import load_idea_dag_settings
 
 
@@ -25,6 +26,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
         default_settings = load_idea_dag_settings()
         merged_settings = {**default_settings, **(settings or {})}
         super().__init__(settings=merged_settings)
+        self._cfg = IdeaConfig.from_settings(merged_settings)
         self.io = io
         self.model_name = model_name
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -39,17 +41,17 @@ class LlmExpansionPolicy(ExpansionPolicy):
         if total_prompt_size > 50000:
             self._logger.warning(f"[EXPANSION] Large prompt detected ({total_prompt_size} chars) for node {node_id} - may cause slow expansion")
         
-        model_name = self.model_name or self.settings.get("expansion_model")
+        model_name = self.model_name or self._cfg.expansion.model
         json_schema = self.settings.get("expansion_json_schema")
-        reasoning_effort = self.settings.get("reasoning_effort", "high")
-        text_verbosity = self.settings.get("text_verbosity", "medium")
-        max_tokens = self.settings.get("expansion_max_tokens") if self.settings.get("expansion_max_tokens") is not None else None
-        
+        reasoning_effort = self._cfg.generation.reasoning_effort
+        text_verbosity = self._cfg.generation.text_verbosity
+        max_tokens = self._cfg.expansion.max_tokens
+
         payload = self.io.build_llm_payload(
             messages=messages,
             json_mode=True,
             model_name=model_name,
-            temperature=float(self.settings.get("expansion_temperature", 0.4)),
+            temperature=self._cfg.expansion.temperature,
             max_tokens=max_tokens,
             json_schema=json_schema,
             reasoning_effort=reasoning_effort,
@@ -59,8 +61,8 @@ class LlmExpansionPolicy(ExpansionPolicy):
             estimated_tokens = (total_prompt_size // 4) + (max_tokens or 4096)
             self._logger.debug(f"[EXPANSION] Calling LLM for node {node_id} with model={model_name}, prompt={total_prompt_size} chars, max_tokens={max_tokens}, estimated ~{estimated_tokens} total tokens")
             
-            default_timeout = self.settings.get("llm_timeout_seconds") or 120
-            expansion_timeout = self.settings.get("expansion_timeout_seconds") or default_timeout
+            default_timeout = self._cfg.timeouts.llm or 120
+            expansion_timeout = self._cfg.timeouts.expansion or default_timeout
             if total_prompt_size > 50000 or estimated_tokens > 10000:
                 expansion_timeout = max(expansion_timeout, 180)
             else:
@@ -76,7 +78,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
             content = await self.io.query_llm_with_fallback(
                 payload,
                 model_name=model_name,
-                fallback_model=self.settings.get("fallback_model"),
+                fallback_model=self._cfg.generation.fallback_model,
                 timeout_seconds=expansion_timeout,
             )
             output_preview = content[:2000] + "... [truncated]" if isinstance(content, str) and len(content) > 2000 else content
@@ -123,7 +125,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
             return enhanced
         
         link_contexts = action_result.get(ActionResultKey.LINK_CONTEXTS.value) or {}
-        max_links_to_show = int(self.settings.get("max_links_per_visit", 20))
+        max_links_to_show = self._cfg.action.max_links_per_visit
         links_to_show = links[:max_links_to_show]
         
         inline_links_section = []
@@ -223,9 +225,9 @@ class LlmExpansionPolicy(ExpansionPolicy):
         return None
 
     def _build_messages(self, graph: IdeaDag, node: IdeaNode, memories: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, str]]:
-        max_nodes = int(self.settings.get("expansion_max_context_nodes", 5))
-        max_detail_chars = int(self.settings.get("expansion_max_detail_chars", 2000))
-        max_children = int(self.settings.get("max_branching", 5))
+        max_nodes = self._cfg.expansion.max_context_nodes
+        max_detail_chars = self._cfg.expansion.max_detail_chars
+        max_children = self._cfg.engine.max_branching
         if max_children <= 1:
             max_children = 1
         path = graph.path_to_root(node.node_id)
@@ -357,6 +359,54 @@ class LlmExpansionPolicy(ExpansionPolicy):
         
         return None
     
+    def _mandate_urls(self, graph: Optional["IdeaDag"]) -> List[str]:
+        """URLs named in the root mandate (the task statement), in order.
+
+        Used to recover a visit candidate's URL when the LLM emitted a visit node
+        without one — explicit-URL mandates otherwise fail because the planner names
+        the page in the title but drops the URL from details.
+        """
+        if graph is None:
+            return []
+        import re
+        try:
+            root = graph.get_node(graph.root_id())
+        except Exception:
+            return []
+        mandate = ""
+        if root and isinstance(root.details, dict):
+            mandate = str(root.details.get("mandate") or "")
+        if not mandate:
+            return []
+        urls: List[str] = []
+        for u in re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', mandate):
+            cleaned = u.rstrip('.,;:!?)]')
+            if cleaned not in urls:
+                urls.append(cleaned)
+        return urls
+
+    def _match_mandate_url(self, title: str, urls: List[str]) -> Optional[str]:
+        """Best mandate URL for a URL-less visit candidate, matched by title overlap.
+
+        Scores each URL by how many slug tokens of its last path segment (e.g.
+        ``Eiffel_Tower`` -> {eiffel, tower}) appear in the candidate title. With a
+        single mandate URL and no signal, returns it (the only sensible target).
+        """
+        if not urls:
+            return None
+        if len(urls) == 1:
+            return urls[0]
+        import re
+        title_l = (title or "").lower()
+        best_url, best_score = None, 0
+        for u in urls:
+            slug = u.rstrip('/').rsplit('/', 1)[-1]
+            tokens = [t for t in re.split(r'[_\-%]+', slug.lower()) if len(t) > 2]
+            score = sum(1 for t in tokens if t in title_l)
+            if score > best_score:
+                best_url, best_score = u, score
+        return best_url if best_score > 0 else None
+
     def _is_url_from_visit(self, graph: IdeaDag, node_id: str) -> bool:
         node = graph.get_node(node_id)
         if not node:
@@ -601,8 +651,19 @@ class LlmExpansionPolicy(ExpansionPolicy):
                             self._logger.info(f"[EXPANSION] Visit candidate requires data from node {source_node_id}: {extracted_url[:60]}...")
                         self._logger.info(f"[EXPANSION] Proactively extracted URL for visit candidate '{title[:50]}...': {extracted_url[:60]}...")
                     else:
-                        self._logger.warning(f"[EXPANSION] Visit candidate missing URL: title='{title[:60]}...', details keys: {list(details.keys())}")
-            
+                        # Last resort: recover from a URL named in the mandate (explicit-URL
+                        # tasks otherwise fail — the planner names the page but drops the URL).
+                        recovered = self._match_mandate_url(title, self._mandate_urls(graph))
+                        if recovered:
+                            details[DetailKey.URL.value] = recovered
+                            self._logger.info(f"[EXPANSION] Recovered visit URL from mandate for '{title[:50]}...': {recovered[:60]}...")
+                        else:
+                            # No URL yet — KEEP the node. In a search-driven task the visit's
+                            # URL is resolved at execution time from a sibling search's results
+                            # (VisitLeafAction._extract_urls_from_parent_search_results); dropping
+                            # it here would break the search->visit pipeline (visits=0).
+                            self._logger.warning(f"[EXPANSION] Visit candidate has no URL yet (search-driven?); keeping for runtime resolution: title='{title[:60]}...'")
+
             if action == IdeaActionType.SEARCH.value:
                 details[DetailKey.PROVIDES_DATA.value] = {"type": "urls_from_search"}
             

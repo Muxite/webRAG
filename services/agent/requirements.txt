@@ -8,8 +8,7 @@ anthropic>=0.40.0
 supabase
 sentence-transformers
 aio-pika
-undetected-chromedriver
-selenium
+playwright
 pytest
 pytest-asyncio
 pytest-repeat

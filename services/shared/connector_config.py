@@ -23,6 +23,10 @@ class ConnectorConfig:
         self.default_delay = int(os.environ.get("DEFAULT_DELAY", "2"))
         self.default_timeout = int(os.environ.get("DEFAULT_TIMEOUT", "5"))
         self.jitter_seconds = float(os.environ.get("JITTER_SECONDS", "0.5"))
+        # Backoff delay between failed-request retries. Kept separate from
+        # default_delay (inter-request politeness) so a transient failure costs
+        # ~0.5s, not the 2s+ politeness pause. Set RETRY_BASE_DELAY=0 for speed.
+        self.retry_base_delay = float(os.environ.get("RETRY_BASE_DELAY", "0.5"))
 
         self.rabbitmq_url = os.environ.get("RABBITMQ_URL")
         self.input_queue = os.environ.get("AGENT_INPUT_QUEUE", "agent.mandates")

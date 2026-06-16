@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from agent.app.idea_dag import IdeaDag
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import DetailKey
+from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.action_constants import NodeDetailsExtractor
 from agent.app.prompt_builder import FinalPromptBuilder
 from agent.app.idea_memory import MemoryManager
@@ -306,6 +307,7 @@ async def build_final_payload(
     model_name: Optional[str],
     memory_manager: Optional[MemoryManager] = None,
 ) -> Dict[str, Any]:
+    cfg = IdeaConfig.from_settings(settings)
     root = graph.get_node(graph.root_id())
 
     merged = []
@@ -321,7 +323,7 @@ async def build_final_payload(
     event_log = graph.build_event_log_table(graph.root_id(), max_events=100)
     visit_content = _collect_all_visit_content(graph)
 
-    n_final_chroma = int(settings.get("final_chroma_results", 15))
+    n_final_chroma = cfg.final.chroma_results
     chroma_context = await _retrieve_final_chroma_context(
         memory_manager=memory_manager,
         mandate=mandate,
@@ -344,7 +346,7 @@ async def build_final_payload(
     merged_json = json.dumps(compacted_merged, ensure_ascii=True)
 
     # Cap individual components to prevent token overflow
-    max_prompt_chars = int(settings.get("final_max_prompt_chars", 200000))
+    max_prompt_chars = cfg.final.max_prompt_chars
     total_raw = len(merged_json) + len(node_summary) + len(chroma_context) + len(visit_content)
     if total_raw > max_prompt_chars:
         _logger.warning(f"[FINALIZE] Prompt too large ({total_raw}c), trimming to {max_prompt_chars}c")
@@ -404,7 +406,7 @@ async def build_final_payload(
             retrieved_context=[chroma_context] if chroma_context else [],
         ).build_messages()
 
-    model_name = model_name or settings.get("final_model")
+    model_name = model_name or cfg.final.model
     _logger.info(f"[FINALIZE] LLM call model={model_name}")
 
     system_content = final_messages[0].get("content", "") if final_messages else ""
@@ -414,15 +416,15 @@ async def build_final_payload(
         _logger.warning("[FINALIZE] Empty prompts detected")
 
     json_schema = settings.get("final_json_schema")
-    reasoning_effort = settings.get("reasoning_effort", "high")
-    text_verbosity = settings.get("text_verbosity", "medium")
+    reasoning_effort = cfg.generation.reasoning_effort
+    text_verbosity = cfg.generation.text_verbosity
 
     payload = io.build_llm_payload(
         messages=final_messages,
         json_mode=True,
         model_name=model_name,
-        temperature=float(settings.get("final_temperature", 0.3)),
-        max_tokens=settings.get("final_max_tokens") if settings.get("final_max_tokens") is not None else None,
+        temperature=cfg.final.temperature,
+        max_tokens=cfg.final.max_tokens,
         json_schema=json_schema,
         reasoning_effort=reasoning_effort,
         text_verbosity=text_verbosity,
@@ -432,7 +434,7 @@ async def build_final_payload(
         f"max_tokens={payload.get('max_tokens') or payload.get('max_completion_tokens')}"
     )
 
-    final_timeout = settings.get("final_timeout_seconds") or settings.get("llm_timeout_seconds") or 180
+    final_timeout = cfg.timeouts.final or cfg.timeouts.llm or 180
     total_prompt_size = len(merged_json) + len(node_summary) + len(chroma_context) + len(visit_content)
     if total_prompt_size > 5000:
         final_timeout = max(final_timeout, int(total_prompt_size / 60))
@@ -442,7 +444,7 @@ async def build_final_payload(
     response = await io.query_llm_with_fallback(
         payload,
         model_name=model_name,
-        fallback_model=settings.get("fallback_model"),
+        fallback_model=cfg.generation.fallback_model,
         timeout_seconds=final_timeout,
     )
     _logger.info(f"[FINALIZE] response={len(response) if response else 0}c")
@@ -478,7 +480,7 @@ async def build_final_payload(
             if n.details.get(DetailKey.ACTION.value) in critical_actions
         ]
         has_critical_failures = len(critical_failures) > 0
-        allow_partial_success = bool(settings.get("final_allow_partial_success", False))
+        allow_partial_success = cfg.final.allow_partial_success
         if allow_partial_success:
             success = bool(deliverable.strip())
         else:

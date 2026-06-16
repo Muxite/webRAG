@@ -93,7 +93,7 @@ class ConnectorHttp(ConnectorBase):
         except Exception:
             self.session = None
 
-    async def request(self, method: str, url: str, retries: int = 4, **kwargs) -> RequestResult:
+    async def request(self, method: str, url: str, retries: int = 2, **kwargs) -> RequestResult:
         """
         Generic request using shared Retry with exponential backoff.
         :return: RequestResult
@@ -104,7 +104,7 @@ class ConnectorHttp(ConnectorBase):
         fixture_key = None
         if fixture_mode != "off":
             fixture_key = web_fixtures.make_key(method, url, kwargs.get("params"))
-            if fixture_mode == "replay":
+            if fixture_mode in ("replay", "replay_strict"):
                 cached = web_fixtures.load(fixture_key)
                 if cached is not None:
                     self._record_io(
@@ -113,6 +113,20 @@ class ConnectorHttp(ConnectorBase):
                         payload={"method": method, "url": url, "status": cached.status, "fixture": "hit"},
                     )
                     return cached
+                # Cache miss: record it so asymmetry is measurable.
+                self._record_io(
+                    direction="out",
+                    operation="http_request",
+                    payload={"method": method, "url": url, "status": None, "fixture": "miss"},
+                )
+                if fixture_mode == "replay_strict":
+                    # Locked run: never go live on a miss.
+                    return RequestResult(
+                        status=None,
+                        error=True,
+                        data=f"fixture miss (strict replay, no live fallback): {method} {url}",
+                    )
+                # Plain replay falls through to live (replay-or-record).
 
         async def _get_session() -> aiohttp.ClientSession:
             await self._ensure_session()
@@ -168,9 +182,9 @@ class ConnectorHttp(ConnectorBase):
             result: RequestResult = await Retry(
                 func=do_request,
                 max_attempts=retries,
-                base_delay=max(1.0, float(self.config.default_delay)),
+                base_delay=max(0.0, float(getattr(self.config, "retry_base_delay", 0.5))),
                 multiplier=2.0,
-                max_delay=60.0,
+                max_delay=15.0,
                 jitter=float(self.config.jitter_seconds or 0.0),
                 name=f"HTTP {method} {url}",
                 retry_exceptions=(asyncio.TimeoutError, aiohttp.ClientError),

@@ -18,6 +18,8 @@ from agent.app.idea_dag import IdeaDag
 from agent.app.idea_finalize import build_final_payload
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
+from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
+from agent.app.idea_policies.grounding import evaluate_grounding
 from agent.app.trace_recorder import TraceRecorder
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
@@ -44,8 +46,9 @@ async def run_baseline_execution(
     summarize_observability_func=summarize_observability,
 ) -> Dict[str, Any]:
     """
-    Run a no-graph baseline: ``parametric`` (single completion, no tools) or
-    ``naive_rag`` (one fixed round of search+visit stuffed into one synthesis call).
+    Run a no-graph baseline: ``parametric`` (single completion, no tools),
+    ``minimal`` (search-only, no crawl) or ``naive_rag`` (one fixed round of
+    search+visit stuffed into one synthesis call).
 
     Returns the same shape as :func:`run_test_execution` so validation, cost
     instrumentation and reporting are identical across variants.
@@ -96,6 +99,8 @@ async def run_baseline_execution(
     try:
         if variant == "naive_rag":
             deliverable = await _run_naive_rag(agent_io, mandate, model_name, max_tokens)
+        elif variant == "minimal":
+            deliverable = await _run_search_only(agent_io, mandate, model_name, max_tokens)
         else:
             deliverable = await _run_parametric(agent_io, mandate, model_name, max_tokens)
     except Exception as exc:
@@ -141,6 +146,43 @@ async def _run_parametric(agent_io: AgentIO, mandate: str, model_name: str, max_
     messages = [
         {"role": "system", "content": "You are a careful research assistant. Answer the task as completely and accurately as possible. If you cite sources, include their URLs."},
         {"role": "user", "content": mandate},
+    ]
+    payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.3, max_tokens=max_tokens)
+    return (await agent_io.query_llm(payload, model_name=model_name)) or ""
+
+
+async def _run_search_only(agent_io: AgentIO, mandate: str, model_name: str, max_tokens: int) -> str:
+    """Search-only (no crawl): search-result snippets -> single synthesis call.
+
+    The ``minimal`` tooling rung. Isolates the value of *retrieval without reading*:
+    the model sees search titles/snippets/URLs but never opens a page, so any lift
+    from ``partial``/``full`` is attributable to actually visiting evidence.
+    """
+    search_k = int(os.environ.get("IDEA_TEST_MINIMAL_SEARCH_K", "8"))
+    total_chars = int(os.environ.get("IDEA_TEST_MINIMAL_TOTAL_CHARS", "12000"))
+
+    try:
+        results = await agent_io.search(mandate, count=search_k, timeout_seconds=20) or []
+    except Exception as exc:
+        _logger.warning(f"minimal search failed: {exc}")
+        results = []
+
+    snippets: List[str] = []
+    budget = total_chars
+    for item in results:
+        if budget <= 0:
+            break
+        url = (item.get("url") or "").strip()
+        title = (item.get("title") or "").strip()
+        snippet = (item.get("description") or item.get("snippet") or "").strip()
+        block = f"URL: {url}\nTITLE: {title}\nSNIPPET: {snippet}"[:budget]
+        budget -= len(block)
+        snippets.append(block)
+
+    context = "\n\n---\n\n".join(snippets) if snippets else "(no search results)"
+    messages = [
+        {"role": "system", "content": "You are a research assistant with access ONLY to web search result snippets (you cannot open pages). Answer the task using the snippets plus your own knowledge. Cite source URLs from the snippets where relevant. If the snippets are insufficient, say so explicitly rather than guessing."},
+        {"role": "user", "content": f"TASK:\n{mandate}\n\nSEARCH RESULTS:\n{context}"},
     ]
     payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.3, max_tokens=max_tokens)
     return (await agent_io.query_llm(payload, model_name=model_name)) or ""
@@ -284,6 +326,10 @@ async def run_test_execution(
         try:
             result_id = await engine.step(graph, current_id, step_num)
             if result_id is None:
+                # Soft grounding gate: try to follow through before giving up.
+                if engine._grounding_replan(graph, mandate, step_num, max_steps):
+                    current_id = graph.root_id()
+                    continue
                 _logger.warning(f"Step {step_num} returned None, stopping execution")
                 # Emergency: if root has no children after step 0, expansion completely failed
                 if step_num == 0:
@@ -294,7 +340,11 @@ async def run_test_execution(
             current_id = result_id
             node = graph.get_node(current_id)
             if node and node.status.value == "done" and current_id == graph.root_id():
-                # Only break if the ROOT node is done (all work complete)
+                # Root is done — but if the mandate needs substantiated (visited) evidence
+                # and we are not grounded yet, inject follow-through and keep going (capped).
+                if engine._grounding_replan(graph, mandate, step_num, max_steps):
+                    current_id = graph.root_id()
+                    continue
                 break
         except Exception as exc:
             _logger.error(f"Step {step_num} failed: {exc}", exc_info=True)
@@ -312,6 +362,23 @@ async def run_test_execution(
         )
     else:
         output = {}
+
+    # Grounding verdict for the final answer (substantiation mandates only) — surfaced on
+    # the result so observability/groundedness reflect real visited-page evidence.
+    try:
+        _req = parse_mandate_requirements(mandate)
+        if _req.needs_substantiation:
+            _g = evaluate_grounding(graph, _req)
+            output["grounded"] = bool(_g.grounded)
+            output["missing_requirements"] = _g.missing
+            output["grounding_replans"] = int(getattr(engine, "_grounding_replans", 0))
+            engine._record_decision(
+                "finalize", node_id=graph.root_id(), chosen="finalized",
+                grounded=_g.grounded, rationale=_g.reason,
+                metadata={"replans": int(getattr(engine, "_grounding_replans", 0)), "missing": _g.missing},
+            )
+    except Exception as exc:  # noqa: BLE001 — never crash finalize on grounding
+        _logger.warning(f"[GROUNDING] final grounding check failed: {exc}")
     
     telemetry.finish(success=output.get("success", False))
     tracer.close()

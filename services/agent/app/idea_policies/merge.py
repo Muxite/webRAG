@@ -7,11 +7,13 @@ if TYPE_CHECKING:
     from agent.app.idea_dag import IdeaDag
 
 from agent.app.idea_policies.base import MergePolicy, DetailKey, IdeaActionType, IdeaNodeStatus
+from agent.app.idea_policies.config import IdeaConfig
 
 
 class SimpleMergePolicy(MergePolicy):
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         super().__init__(settings=settings)
+        self._cfg = IdeaConfig.from_settings(self.settings)
         self._logger = logging.getLogger(__name__)
 
     @staticmethod
@@ -49,7 +51,7 @@ class SimpleMergePolicy(MergePolicy):
         return True
 
     def should_create_merge_node(self, graph: IdeaDag, node_id: str) -> bool:
-        if not self.settings.get("enable_recursive_merge", True):
+        if not self._cfg.policy.enable_recursive_merge:
             return False
         
         node = graph.get_node(node_id)
