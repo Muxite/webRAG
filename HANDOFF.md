@@ -90,15 +90,17 @@ register at session START — they were authored this session, so invoke them by
    instruction-dense for the weakest models (nano −0.25, gpt-5-mini −0.10 vs auto). Fix = `task-author`
    simplifies the 054 hand-plan leaves, OR just rely on the auto plan (production path, already 1.000).
    Before any "054 push" spend, confirm which config a remaining 0.75 was seen under (likely thin+vote).
-3. **Thin+vote on the premium reference — TESTED 2026-06-16 (`thinref_20260616`, $0.46): CATASTROPHIC
-   REGRESSION (mean 0.28 vs react 0.97) — but a FIXABLE BUG, not fundamental.** The thin micro-pipeline
-   pins `max_tokens=24` on its query/extract calls (`testing/execution_compiled.py` `_THIN_QUERY_SYS` /
-   `_THIN_EXTRACT_SYS`). Cheap models fit/truncate to a string; `gemini-3.1-pro-preview` returns
-   `content=None` (finish_reason=length) → `llm_backends._extract_content` raises → `_guarded` sets
-   fact="UNKNOWN" → cascades via `{dep_id}` to the 0.25 deliverable floor (all 5 shapes). Fix = model-aware
-   token budget (premium → ~128) and/or graceful `content=None` handling, WITHOUT touching the cheap path
-   (cheap thin stays 0.87–1.0 @ ~half cost). `thin` stays OPT-IN; default stays `react` until re-validated.
-   [fix in progress 2026-06-16]
+3. **Thin on the premium reference — FIXED & RE-VALIDATED 2026-06-16.** Was a catastrophic regression
+   (`thinref_20260616`: mean 0.28 vs react 0.94) from thin micro-prompts pinning `max_tokens=24` —
+   `gemini-3.1-pro-preview` returned `content=None`/finish_reason=length → all-UNKNOWN cascade (0.25 floor).
+   FIX (commit `98818ac`): `_thin_max_tokens_for_model` rides the `_votes_for_model`/`model_costs` buckets
+   (cheap 24 unchanged, mid 64, premium 128) + `_thin_micro_query` absorbs a starved RuntimeError as a "" miss.
+   RE-VALIDATION (`thinref_fixed_20260616`, $0.63): content=None errors **0** (was 18+ on 054); chain 050 &
+   mixed-DAG 054 recovered to react parity (0.88 / 0.94). BUT mean only 0.61 vs react 0.94 — residual gap is
+   on breadth fan-out 052/053, and it's **search WRONG-GROUNDING (ambiguous query → wrong page), NOT token
+   budget** (128 is sufficient; thin amplifies wrong-grounding because it can't re-search after a bad page).
+   Net: content=None bug CLOSED; `thin` safe for chain/mixed on premium; **default stays `react`, thin opt-in.**
+   NEXT LEVER (paid, user-greenlight): thin query disambiguation / hand search fixtures for 052/053 breadth.
 4. ~~Per-cheap-model B-hand lost~~ **RECOVERED 2026-06-16 (`bhand_recovery_20260616`, $0.31, 60 cells,
    pipeline CLEAN).** Hand-vs-auto (052–054 mean): hand WINS pure fan-out 052 (+0.22 flash, +0.13
    flash-lite, +0.10 nano), parity 053, hand DEFICIT on mixed-DAG 054 (nano −0.25, gpt-5-mini −0.10).
@@ -110,9 +112,10 @@ register at session START — they were authored this session, so invoke them by
 
 ## Recommended next order
 (1) ✅ green the suite [4717ab8] → (3) ✅ recover B-hand [bhand_recovery_20260616] →
-(2) ✅ thin+vote reference test [thinref_20260616 — regression found, root-caused] →
-(NEW) ⏳ fix thin `max_tokens`/`content=None` bug + re-validate on reference [NEXT] →
-(4) 054: reframed, low priority [#2] → (5) continue the engine breakup [#5].
+(2) ✅ thin+vote reference test [thinref_20260616] → (NEW) ✅ fix+revalidate thin content=None bug
+[98818ac / thinref_fixed_20260616 — premium content=None CLOSED; chain/mixed at parity; breadth grounding gap remains] →
+(6) ⏳ EvaluationWeights fold (free) → (5) engine breakup (free, careful) →
+[paid, user-greenlight] thin query disambiguation for 052/053 breadth; 054 hand-plan simplify (low pri).
 
 Memory: `project_compiled_scaffold_thesis`, `project_engine_canonical`, `project_cost_benchmark_state`,
 `project_benchmark_run_recipe` (run recipe), `project_typed_config_layer`.
