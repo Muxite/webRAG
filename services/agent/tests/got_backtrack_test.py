@@ -16,82 +16,109 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-def _install_stubs():
-    """Stub the modules `got_operations.py` imports so it loads cleanly."""
-    if "agent.app.idea_memory" in sys.modules:
-        return
+@dataclass
+class _StubIdeaNode:
+    """Local node used by this test's in-memory graph.
 
-    pkg_agent = types.ModuleType("agent")
-    pkg_app = types.ModuleType("agent.app")
-    sys.modules["agent"] = pkg_agent
-    sys.modules["agent.app"] = pkg_app
+    Defined at module scope (not pulled from ``sys.modules``) so the test never
+    depends on import order: in the full suite an earlier test may already have
+    imported the real ``agent.app.idea_dag``, whose ``IdeaNode`` requires a
+    positional ``title``. We always construct nodes from this stub instead.
+    """
+
+    node_id: str
+    title: str = ""
+    score: Optional[float] = None
+    parent_id: Optional[str] = None
+    details: Dict[str, Any] = field(default_factory=dict)
+
+
+def _install_stubs():
+    """Stub the modules `got_operations.py` imports so it loads cleanly.
+
+    Idempotent: keyed on this test's own marker module so it runs once even if
+    the real agent modules were imported first by a sibling test.
+    """
+    if "agent.app._got_backtrack_test_stubs" in sys.modules:
+        return
+    sys.modules["agent.app._got_backtrack_test_stubs"] = types.ModuleType(
+        "agent.app._got_backtrack_test_stubs"
+    )
+
+    pkg_agent = sys.modules.setdefault("agent", types.ModuleType("agent"))
+    pkg_app = sys.modules.setdefault("agent.app", types.ModuleType("agent.app"))
+    _ = (pkg_agent, pkg_app)
 
     # idea_memory: only MemoryManager symbol referenced; provide a stub class.
-    idea_memory = types.ModuleType("agent.app.idea_memory")
+    # Only install when the real module is absent, to avoid polluting other tests.
+    if "agent.app.idea_memory" not in sys.modules:
+        idea_memory = types.ModuleType("agent.app.idea_memory")
 
-    class _StubMemoryManager:
-        async def retrieve_relevant_memories(self, **kw): return []
-        async def write_memory(self, **kw): return True
-    idea_memory.MemoryManager = _StubMemoryManager
-    sys.modules["agent.app.idea_memory"] = idea_memory
+        class _StubMemoryManager:
+            async def retrieve_relevant_memories(self, **kw): return []
+            async def write_memory(self, **kw): return True
+        idea_memory.MemoryManager = _StubMemoryManager
+        sys.modules["agent.app.idea_memory"] = idea_memory
 
     # idea_dag: minimal IdeaDag + IdeaNode so got_operations can type-hint.
-    idea_dag = types.ModuleType("agent.app.idea_dag")
+    # Only install the stub when the real module is absent (full-suite runs may
+    # already provide it); either way the test's own `_IdeaNode` is `_StubIdeaNode`.
+    if "agent.app.idea_dag" not in sys.modules:
+        idea_dag = types.ModuleType("agent.app.idea_dag")
 
-    @dataclass
-    class _StubIdeaNode:
-        node_id: str
-        title: str = ""
-        score: Optional[float] = None
-        parent_id: Optional[str] = None
-        details: Dict[str, Any] = field(default_factory=dict)
+        class _StubIdeaDag: ...
 
-    class _StubIdeaDag: ...
-
-    idea_dag.IdeaDag = _StubIdeaDag
-    idea_dag.IdeaNode = _StubIdeaNode
-    sys.modules["agent.app.idea_dag"] = idea_dag
+        idea_dag.IdeaDag = _StubIdeaDag
+        idea_dag.IdeaNode = _StubIdeaNode
+        sys.modules["agent.app.idea_dag"] = idea_dag
 
     # idea_policies + base. Give the stub package a real __path__ so that
     # genuinely lightweight submodules (e.g. `config`, pure-stdlib dataclasses)
     # load from disk, while heavy ones stay stubbed via sys.modules below.
-    pkg_policies = types.ModuleType("agent.app.idea_policies")
-    pkg_policies.__path__ = [str(Path(__file__).resolve().parent.parent / "app" / "idea_policies")]
-    sys.modules["agent.app.idea_policies"] = pkg_policies
-    base_mod = types.ModuleType("agent.app.idea_policies.base")
+    # Each stub is only installed when the real module is absent, so a full-suite
+    # run that already loaded the real modules keeps using them (and stays clean).
+    if "agent.app.idea_policies" not in sys.modules:
+        pkg_policies = types.ModuleType("agent.app.idea_policies")
+        pkg_policies.__path__ = [str(Path(__file__).resolve().parent.parent / "app" / "idea_policies")]
+        sys.modules["agent.app.idea_policies"] = pkg_policies
 
-    class _StubDetailKey:
-        ACTION = type("E", (), {"value": "action"})
-        JUSTIFICATION = type("E", (), {"value": "justification"})
-        ACTION_RESULT = type("E", (), {"value": "action_result"})
+    if "agent.app.idea_policies.base" not in sys.modules:
+        base_mod = types.ModuleType("agent.app.idea_policies.base")
 
-    class _StubIdeaNodeStatus:
-        class _S:
-            def __init__(self, v): self.value = v
-        DONE = _S("done")
-        SKIPPED = _S("skipped")
-        FAILED = _S("failed")
-        ACTIVE = _S("active")
-        PENDING = _S("pending")
-        BLOCKED = _S("blocked")
+        class _StubDetailKey:
+            ACTION = type("E", (), {"value": "action"})
+            JUSTIFICATION = type("E", (), {"value": "justification"})
+            ACTION_RESULT = type("E", (), {"value": "action_result"})
 
-    base_mod.DetailKey = _StubDetailKey
-    base_mod.IdeaNodeStatus = _StubIdeaNodeStatus
-    sys.modules["agent.app.idea_policies.base"] = base_mod
+        class _StubIdeaNodeStatus:
+            class _S:
+                def __init__(self, v): self.value = v
+            DONE = _S("done")
+            SKIPPED = _S("skipped")
+            FAILED = _S("failed")
+            ACTIVE = _S("active")
+            PENDING = _S("pending")
+            BLOCKED = _S("blocked")
+
+        base_mod.DetailKey = _StubDetailKey
+        base_mod.IdeaNodeStatus = _StubIdeaNodeStatus
+        sys.modules["agent.app.idea_policies.base"] = base_mod
 
     # action_constants
-    ac_mod = types.ModuleType("agent.app.idea_policies.action_constants")
-    class _Extractor:
-        @staticmethod
-        def get_action(d): return (d or {}).get("action")
-    ac_mod.NodeDetailsExtractor = _Extractor
-    sys.modules["agent.app.idea_policies.action_constants"] = ac_mod
+    if "agent.app.idea_policies.action_constants" not in sys.modules:
+        ac_mod = types.ModuleType("agent.app.idea_policies.action_constants")
+        class _Extractor:
+            @staticmethod
+            def get_action(d): return (d or {}).get("action")
+        ac_mod.NodeDetailsExtractor = _Extractor
+        sys.modules["agent.app.idea_policies.action_constants"] = ac_mod
 
     # agent_io
-    io_mod = types.ModuleType("agent.app.agent_io")
-    class _StubAgentIO: ...
-    io_mod.AgentIO = _StubAgentIO
-    sys.modules["agent.app.agent_io"] = io_mod
+    if "agent.app.agent_io" not in sys.modules:
+        io_mod = types.ModuleType("agent.app.agent_io")
+        class _StubAgentIO: ...
+        io_mod.AgentIO = _StubAgentIO
+        sys.modules["agent.app.agent_io"] = io_mod
 
 
 _install_stubs()
@@ -115,8 +142,10 @@ _got_mod = _load_got()
 
 
 # ---- minimal in-memory graph that satisfies what should_backtrack needs ----
+# Use the locally-defined stub node unconditionally (never the real IdeaNode,
+# which requires a positional `title` the tests below do not pass).
 
-from agent.app.idea_dag import IdeaNode as _IdeaNode  # noqa: E402  the stub
+_IdeaNode = _StubIdeaNode
 
 
 class _Graph:

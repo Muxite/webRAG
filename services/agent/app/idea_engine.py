@@ -28,6 +28,7 @@ from agent.app.got_operations import GoTOperations
 from agent.app.idea_checkpointer import Checkpointer, create_checkpointer_from_env
 from agent.app.idea_policies.data_contracts import ContractRegistry, default_contract_registry
 from agent.app.idea_policies.post_expansion_hooks import (
+    MandateUrlInjectionHook,
     PostExpansionHook,
     default_post_expansion_hooks,
     extract_mandate,
@@ -599,6 +600,21 @@ class IdeaDagEngine:
             await self._got.embed_children(graph, node_id)
 
         return node_id
+
+    def _enforce_visit_nodes_for_mandate_urls(
+        self, graph: IdeaDag, node_id: str, step_index: int = 0
+    ) -> None:
+        """Inject VISIT nodes for explicit URLs named in the mandate.
+
+        Thin delegation onto :class:`MandateUrlInjectionHook` (the canonical home
+        for this logic after the god-class breakup). Kept as an engine-level entry
+        point because mandate-URL enforcement is part of the engine's test surface.
+        """
+        mandate = extract_mandate(graph, node_id)
+        telemetry = getattr(self.io, "telemetry", None)
+        MandateUrlInjectionHook().apply(
+            graph, node_id, step_index, mandate, self._logger, telemetry=telemetry
+        )
 
     def _record_decision(self, stage: str, **kwargs) -> None:
         """Proxy a decision onto the telemetry thought-process trace (best-effort)."""

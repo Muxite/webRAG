@@ -42,8 +42,10 @@ def test_agent_task_definition_includes_startup_preflight_env_defaults():
     env = _env_as_dict(container.get("environment"))
 
     assert env["AGENT_START_PREFLIGHT_ENABLED"] == "1"
-    assert env["AGENT_START_PREFLIGHT_URL"].startswith("https://en.wikipedia.org/wiki/")
-    assert int(env["AGENT_START_PREFLIGHT_MIN_CHARS"]) >= 20000
+    # URL default is a comma-separated probe list; it must include a Wikipedia target.
+    assert "en.wikipedia.org/wiki/" in env["AGENT_START_PREFLIGHT_URL"]
+    # Default floor matches the runtime default in interface_agent.py (2000 chars).
+    assert int(env["AGENT_START_PREFLIGHT_MIN_CHARS"]) >= 2000
     assert int(env["AGENT_START_PREFLIGHT_TIMEOUT_SECONDS"]) >= 5
     assert env["AGENT_START_PREFLIGHT_BROWSER"] in ("0", "1")
     assert env["AGENT_START_PREFLIGHT_FAIL_HARD"] in ("0", "1")
@@ -66,5 +68,5 @@ def test_single_service_task_definition_includes_startup_preflight_env_defaults(
     env = _env_as_dict(agent.get("environment"))
 
     assert env["AGENT_START_PREFLIGHT_ENABLED"] == "1"
-    assert int(env["AGENT_START_PREFLIGHT_MIN_CHARS"]) >= 20000
+    assert int(env["AGENT_START_PREFLIGHT_MIN_CHARS"]) >= 2000
 

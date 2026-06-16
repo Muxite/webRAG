@@ -124,7 +124,10 @@ async def test_visit_extracts_urls_from_parent_search_results():
     assert payload[ActionResultKey.SUCCESS.value] is True
     assert payload[ActionResultKey.URL.value] is not None
     assert "wikipedia.org" in payload[ActionResultKey.URL.value]
-    assert io.last_visit is not None
+    # VisitLeafAction fetches raw HTML via io.fetch_url() (it parses links itself),
+    # not io.visit(); the fetch is what we assert actually happened.
+    assert io.last_fetch is not None
+    assert "wikipedia.org" in io.last_fetch["url"]
 
 
 @pytest.mark.asyncio
