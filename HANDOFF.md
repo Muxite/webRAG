@@ -106,15 +106,28 @@ register at session START — they were authored this session, so invoke them by
    flash-lite, +0.10 nano), parity 053, hand DEFICIT on mixed-DAG 054 (nano −0.25, gpt-5-mini −0.10).
    nano hand cost = auto cost = $0.0015/task. Aside: 051 gpt-5-mini=0.25 is wrong-grounding (model
    knowledge, not plan — flash=1.0 on same plan). Summary JSON: `idea_test_results/bhand_recovery_20260616_summary.json`.
-5. **God-class breakup is partial** — action execution (`_execute_action`/`_handle_action_result`)
-   and node `_handle_*` orchestration remain in `idea_engine.py` (stateful; do carefully next).
-6. Optional: fold legacy `EvaluationWeights` into `EvaluationConfig` (small dup).
+5. **God-class breakup — continuing.** 2026-06-16: extracted the pure node-state helpers
+   (`is_action_ready`/`get_pending_executable_nodes`/`select_best_global`/`sanitize_action_result`) to
+   `idea_node_state.py` (commit `7b9ced9`; engine 1343→1297; +10 unit tests for previously-uncovered code).
+   STILL stateful in `idea_engine.py`: `_execute_action` / `_handle_action_result` / the `_handle_*`
+   orchestrators (mutate node.status/details; call io/actions/memory/telemetry; only transitively covered by
+   `idea_dag_recovery_test::test_dag_action_retry_recovery`). NEXT (TEST-FIRST, careful): `_handle_action_result`
+   → new `idea_action_result.py` — largely a pure `(result,node,step,cfg-flags)`→status transition; thread out
+   `actions.get().post_execute_provides`, the `_cfg.action.*` retry flags, and keep `_recover_pruned_sibling`
+   on the engine (invoke from the caller). BEFORE moving it, add offline tests: VISIT empty-content→retryable;
+   retryable-with-attempts→BLOCKED+cooldown; terminal→FAILED+error_details; provides_data contract on success.
+   Then extract `_recover_pruned_sibling` (add its sibling-revival test first). Also: dead `_is_leaf_node`
+   (defined, never called) can be deleted.
+6. ~~Fold legacy `EvaluationWeights` into `EvaluationConfig`~~ **DONE 2026-06-16 (commit `9ecea35`)** —
+   class deleted, both eval policies read `self._cfg.evaluation.*`, `weight_for` made None-safe/case-insensitive;
+   no runtime behavior change (dead 0.1/0.2 defaults dropped in favor of the JSON-true 0.4/0.5). +2 tests.
 
 ## Recommended next order
 (1) ✅ green the suite [4717ab8] → (3) ✅ recover B-hand [bhand_recovery_20260616] →
 (2) ✅ thin+vote reference test [thinref_20260616] → (NEW) ✅ fix+revalidate thin content=None bug
 [98818ac / thinref_fixed_20260616 — premium content=None CLOSED; chain/mixed at parity; breadth grounding gap remains] →
-(6) ⏳ EvaluationWeights fold (free) → (5) engine breakup (free, careful) →
+(6) ✅ EvaluationWeights fold [9ecea35] → (5) ✅ engine breakup slice 1 [7b9ced9 — node-state helpers] →
+REMAINING (next session): (5b) `_handle_action_result` extraction TEST-FIRST (see debt #5) →
 [paid, user-greenlight] thin query disambiguation for 052/053 breadth; 054 hand-plan simplify (low pri).
 
 Memory: `project_compiled_scaffold_thesis`, `project_engine_canonical`, `project_cost_benchmark_state`,
