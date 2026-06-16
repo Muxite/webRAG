@@ -84,17 +84,25 @@ register at session START — they were authored this session, so invoke them by
    = environment guards (missing LLM key / `supabase` deploy dep absent from lean venv). `task_definition_preflight_env`
    ×2 = test drift; MIN_CHARS aligned to config source-of-truth `2000` (test had a never-passing `20000`
    — **confirm whether 20000 was the real deploy intent**, else this is settled).
-2. **054 (mixed-DAG) nano ≈ 0.75** — a genuine task-difficulty floor, not a strategy artifact.
+2. **054 (mixed-DAG) nano ≈ 0.75** — REFRAMED 2026-06-16: **plan/config-specific, NOT a genuine
+   task floor.** `bhand_recovery_20260616` shows nano on 054 = **0.750 under the HAND plan** vs
+   **1.000 under the AUTO (compiler) plan** (both react leaf). The hand plan's 054 leaves are too
+   instruction-dense for the weakest models (nano −0.25, gpt-5-mini −0.10 vs auto). Fix = `task-author`
+   simplifies the 054 hand-plan leaves, OR just rely on the auto plan (production path, already 1.000).
+   Before any "054 push" spend, confirm which config a remaining 0.75 was seen under (likely thin+vote).
 3. **Thin+vote untested on the premium reference** — test before making `thin` the default.
-4. **Per-cheap-model B-hand was lost** in the Round-3 run (driver run-id collision; driver now fixed
-   with `${RUN_ID}_auto`). A small C1-only rerun recovers it.
+4. ~~Per-cheap-model B-hand lost~~ **RECOVERED 2026-06-16 (`bhand_recovery_20260616`, $0.31, 60 cells,
+   pipeline CLEAN).** Hand-vs-auto (052–054 mean): hand WINS pure fan-out 052 (+0.22 flash, +0.13
+   flash-lite, +0.10 nano), parity 053, hand DEFICIT on mixed-DAG 054 (nano −0.25, gpt-5-mini −0.10).
+   nano hand cost = auto cost = $0.0015/task. Aside: 051 gpt-5-mini=0.25 is wrong-grounding (model
+   knowledge, not plan — flash=1.0 on same plan). Summary JSON: `idea_test_results/bhand_recovery_20260616_summary.json`.
 5. **God-class breakup is partial** — action execution (`_execute_action`/`_handle_action_result`)
    and node `_handle_*` orchestration remain in `idea_engine.py` (stateful; do carefully next).
 6. Optional: fold legacy `EvaluationWeights` into `EvaluationConfig` (small dup).
 
 ## Recommended next order
-(1) ✅ green the suite [debt #1 — done 2026-06-16, commit `4717ab8`] → (2) reference test of
-thin+vote [#3] → (3) recover B-hand [#4] → (4) push on 054 [#2] →
+(1) ✅ green the suite [debt #1 — 4717ab8] → (3) ✅ recover B-hand [#4 — bhand_recovery_20260616] →
+(2) reference test of thin+vote [#3 — NEXT] → (4) 054: reframed, lower priority [#2] →
 (5) continue the engine breakup [#5].
 
 Memory: `project_compiled_scaffold_thesis`, `project_engine_canonical`, `project_cost_benchmark_state`,
