@@ -38,6 +38,7 @@ from agent.app.idea_policies.grounding import evaluate_grounding
 from agent.app import idea_chunking
 from agent.app import idea_visit_dedup
 from agent.app import idea_sequencing
+from agent.app import idea_node_state
 
 
 class IdeaDagEngine:
@@ -1232,14 +1233,7 @@ class IdeaDagEngine:
         return idea_chunking.is_chunk_node(graph, node_id)
 
     def _get_pending_executable_nodes(self, graph: IdeaDag) -> List[IdeaNode]:
-        pending = []
-        for node in graph.iter_depth_first():
-            action = NodeDetailsExtractor.get_action(node.details)
-            if action and not NodeDetailsExtractor.is_merge_action(node.details):
-                has_result = node.details.get(DetailKey.ACTION_RESULT.value) is not None
-                if not has_result and node.status not in (IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED):
-                    pending.append(node)
-        return pending
+        return idea_node_state.get_pending_executable_nodes(graph)
     
     def _is_leaf_node(self, graph: IdeaDag, node, step_index: int) -> bool:
         action_type = node.details.get(DetailKey.ACTION.value)
@@ -1260,33 +1254,10 @@ class IdeaDagEngine:
 
     @staticmethod
     def _sanitize_action_result(result: Dict[str, Any]) -> Dict[str, Any]:
-        if not isinstance(result, dict):
-            return {"error": f"Invalid result type: {type(result)}"}
-        
-        sanitized = {}
-        for key, value in result.items():
-            if value is None:
-                sanitized[key] = None
-            elif isinstance(value, (str, int, float, bool)):
-                sanitized[key] = value
-            elif isinstance(value, dict):
-                sanitized[key] = IdeaDagEngine._sanitize_action_result(value)
-            elif isinstance(value, (list, tuple)):
-                sanitized[key] = [
-                    IdeaDagEngine._sanitize_action_result(item) if isinstance(item, dict) else str(item)
-                    for item in value
-                ]
-            else:
-                sanitized[key] = str(value)
-        return sanitized
+        return idea_node_state.sanitize_action_result(result)
 
     def _is_action_ready(self, node, step_index: int) -> bool:
-        if node.status in (IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED):
-            return False
-        cooldown = node.details.get(DetailKey.ACTION_COOLDOWN_UNTIL.value)
-        if isinstance(cooldown, int) and step_index < cooldown:
-            return False
-        return True
+        return idea_node_state.is_action_ready(node, step_index)
 
     def _check_and_create_merge_nodes(self, graph: IdeaDag, node_id: str, step_index: int) -> None:
         node = graph.get_node(node_id)
@@ -1302,26 +1273,9 @@ class IdeaDagEngine:
             self._check_and_create_merge_nodes(graph, node.parent_id, step_index)
 
     def _select_best_global(self, graph: IdeaDag, min_score: float, allow_unscored: bool) -> tuple[Optional[Any], Optional[str]]:
-        best = None
-        for node in graph.iter_depth_first():
-            if node.parent_id is None:
-                continue
-            if node.details.get(DetailKey.ACTION_RESULT.value) is not None and node.status == IdeaNodeStatus.DONE:
-                continue
-            if not self._is_action_ready(node, self._step_index):
-                continue
-            if node.score is None and not allow_unscored:
-                continue
-            if node.score is not None and node.score < min_score:
-                continue
-            if best is None or (node.score or 0.0) > (best.score or 0.0):
-                best = node
-        if not best:
-            return None, None
-        parent_id = best.parent_id
-        if parent_id is None and best.parent_ids:
-            parent_id = best.parent_ids[0]
-        return best, parent_id
+        return idea_node_state.select_best_global(
+            graph, min_score, allow_unscored, self._step_index
+        )
 
     def _maybe_log_dag(self, graph: IdeaDag, step_index: int, force: bool = False) -> None:
         if not self._cfg.engine.log_dag_ascii:
