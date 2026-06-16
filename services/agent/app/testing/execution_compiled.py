@@ -152,6 +152,39 @@ def _votes_for_model(model_name: str) -> int:
     return 1               # premium -> trust a single call
 
 
+def _thin_max_tokens_for_model(model_name: str) -> int:
+    """Price-aware output budget for the thin micro-prompts (search query + value extraction).
+
+    Cheap/weak models happily emit a short STRING in a tiny budget — keeping it tiny is the whole
+    Phase-2 win (0.87–1.0 at ~half the react cost), so they stay at 24. But premium models refuse
+    to *begin* a single-entity answer inside 24 tokens: they return ``content=None`` with
+    ``finish_reason=length``, which cascades to an all-UNKNOWN aggregation (the 0.25 floor). This
+    is model behavior, not answer length — premium needs room to start talking. Override with
+    ``IDEA_TEST_COMPILED_THIN_MAX_TOKENS``.
+
+    Tiers mirror ``_votes_for_model`` exactly (same ``model_costs`` output-price buckets):
+      * dirt cheap (<= $1/Mtok out) -> 24   (unchanged; do NOT regress cheap thin)
+      * mid      (<= $5/Mtok out)  -> 64
+      * premium  (>  $5/Mtok out)  -> 128
+    Unknown price -> 64 (safe room; the dangerous failure mode is a starved premium model).
+    """
+    override = os.environ.get("IDEA_TEST_COMPILED_THIN_MAX_TOKENS", "").strip()
+    if override.isdigit():
+        return max(1, int(override))
+    try:
+        pricing = model_costs._lookup_pricing(model_name) or {}
+        out_price = float(pricing.get("output_per_million") or 0.0)
+    except Exception:  # noqa: BLE001
+        out_price = 0.0
+    if out_price <= 0.0:
+        return 64           # unknown price -> give room; starving a premium model is the failure
+    if out_price <= 1.0:
+        return 24           # dirt cheap -> tiny output, keep the cheap-thin win intact
+    if out_price <= 5.0:
+        return 64
+    return 128              # premium -> enough room to begin a single-entity answer
+
+
 def _vote_key(ans: str) -> str:
     """Normalized voting key so equivalent answers vote together. Prefer the longest number token
     when present ('1,642 m', '1642 metres', 'Max depth: 1,642' -> '1642'); else a cleaned text key."""
@@ -162,14 +195,31 @@ def _vote_key(ans: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", low).strip()
 
 
+async def _thin_micro_query(agent_io: AgentIO, payload: Any, model_name: str) -> str:
+    """Run a thin micro-prompt and return its stripped text, absorbing a starved/None response.
+
+    A backend may raise (e.g. ``content=None`` with ``finish_reason=length`` when a model can't
+    begin its answer in the budget). For a thin prompt that just feeds majority voting, the right
+    behavior is a graceful MISS ("") that the vote can absorb — never a cascading RuntimeError that
+    turns the whole leaf (and the dependent aggregation) UNKNOWN. The token budget is the primary
+    fix; this is defense-in-depth.
+    """
+    try:
+        return (await agent_io.query_llm(payload, model_name=model_name) or "").strip()
+    except RuntimeError as exc:  # starved/None content, truncation — treat as a miss, not a crash
+        _logger.warning(f"thin micro-prompt returned no usable content: {exc}")
+        return ""
+
+
 async def _thin_extract_once(agent_io: AgentIO, page: str, instruction: str, model_name: str,
                              temperature: float) -> str:
     ep = agent_io.build_llm_payload(
         messages=[{"role": "system", "content": _THIN_EXTRACT_SYS},
                   {"role": "user", "content": f"PAGE:\n{page}\n\nQUESTION: {instruction}"}],
-        json_mode=False, model_name=model_name, temperature=temperature, max_tokens=24,
+        json_mode=False, model_name=model_name, temperature=temperature,
+        max_tokens=_thin_max_tokens_for_model(model_name),
     )
-    return (await agent_io.query_llm(ep, model_name=model_name) or "").strip()
+    return await _thin_micro_query(agent_io, ep, model_name)
 
 
 async def _vote_extract(agent_io: AgentIO, page: str, instruction: str, model_name: str, k: int) -> str:
@@ -211,9 +261,10 @@ async def _run_leaf_thin(agent_io: AgentIO, instruction: str, expect: str, model
     # 1) thin search query (tiny output)
     qp = agent_io.build_llm_payload(
         messages=[{"role": "system", "content": _THIN_QUERY_SYS}, {"role": "user", "content": instruction}],
-        json_mode=False, model_name=model_name, temperature=0.0, max_tokens=24,
+        json_mode=False, model_name=model_name, temperature=0.0,
+        max_tokens=_thin_max_tokens_for_model(model_name),
     )
-    raw_q = (await agent_io.query_llm(qp, model_name=model_name) or "").strip()
+    raw_q = await _thin_micro_query(agent_io, qp, model_name)
     query = raw_q.splitlines()[0].strip(' "\'')[:200] if raw_q else " ".join(instruction.split()[:12])
 
     # 2) search

@@ -189,6 +189,116 @@ def test_votes_for_model_price_aware(monkeypatch):
     assert ec._votes_for_model("nonexistent-model-xyz") >= 1  # unknown price -> safe default
 
 
+def _patch_pricing(monkeypatch, table):
+    """Force model_costs._lookup_pricing to a fixed table (no disk cache / network in tests)."""
+    from agent.app import model_costs
+    monkeypatch.setattr(model_costs, "_lookup_pricing",
+                        lambda m: table.get(m))
+
+
+def test_thin_max_tokens_for_model_price_aware(monkeypatch):
+    """Cheap slug keeps the tiny 24-token budget; mid -> 64; premium -> 128 (room to begin)."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_THIN_MAX_TOKENS", raising=False)
+    _patch_pricing(monkeypatch, {
+        "cheap-slug": {"output_per_million": 0.40},
+        "mid-slug": {"output_per_million": 2.00},
+        "google/gemini-3.1-pro-preview": {"output_per_million": 12.00},
+    })
+    # CRITICAL: cheap thin must stay at 24 (the whole Phase-2 win) — do NOT regress it.
+    assert ec._thin_max_tokens_for_model("cheap-slug") == 24
+    assert ec._thin_max_tokens_for_model("mid-slug") == 64
+    # Premium reference model gets enough room to start a single-entity answer.
+    assert ec._thin_max_tokens_for_model("google/gemini-3.1-pro-preview") == 128
+
+
+def test_thin_max_tokens_tiers_match_votes_buckets(monkeypatch):
+    """The thin budget tiers ride the SAME model_costs price buckets as _votes_for_model."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_THIN_MAX_TOKENS", raising=False)
+    monkeypatch.delenv("IDEA_TEST_COMPILED_VOTES", raising=False)
+    _patch_pricing(monkeypatch, {
+        "cheap": {"output_per_million": 0.40},
+        "mid": {"output_per_million": 2.00},
+        "premium": {"output_per_million": 12.00},
+    })
+    # cheap tier: heavy redundancy + tiny tokens; premium: single trustworthy call + room.
+    assert (ec._thin_max_tokens_for_model("cheap"), ec._votes_for_model("cheap")) == (24, 5)
+    assert (ec._thin_max_tokens_for_model("mid"), ec._votes_for_model("mid")) == (64, 3)
+    assert (ec._thin_max_tokens_for_model("premium"), ec._votes_for_model("premium")) == (128, 1)
+
+
+def test_thin_max_tokens_unknown_price_gives_room(monkeypatch):
+    """Unknown price -> 64 (room): the dangerous failure is starving a premium model, not cost."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_THIN_MAX_TOKENS", raising=False)
+    _patch_pricing(monkeypatch, {})  # nothing resolves -> None
+    assert ec._thin_max_tokens_for_model("nonexistent-model-xyz") == 64
+
+
+def test_thin_max_tokens_env_override(monkeypatch):
+    monkeypatch.setenv("IDEA_TEST_COMPILED_THIN_MAX_TOKENS", "200")
+    assert ec._thin_max_tokens_for_model("cheap-slug") == 200
+    assert ec._thin_max_tokens_for_model("google/gemini-3.1-pro-preview") == 200
+
+
+def test_thin_extract_passes_model_aware_budget(monkeypatch):
+    """The extract call must pass the premium budget (128) for a premium slug, 24 for cheap."""
+    _patch_pricing(monkeypatch, {
+        "cheap-slug": {"output_per_million": 0.40},
+        "google/gemini-3.1-pro-preview": {"output_per_million": 12.00},
+    })
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(return_value="42")
+
+    asyncio.run(ec._thin_extract_once(io, "page", "q", "cheap-slug", 0.0))
+    assert io.build_llm_payload.call_args.kwargs["max_tokens"] == 24
+
+    io.build_llm_payload.reset_mock()
+    asyncio.run(ec._thin_extract_once(io, "page", "q", "google/gemini-3.1-pro-preview", 0.0))
+    assert io.build_llm_payload.call_args.kwargs["max_tokens"] == 128
+
+
+def test_thin_query_passes_model_aware_budget(monkeypatch):
+    """The thin search-query call (inside _run_leaf_thin) also rides the model-aware budget."""
+    monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
+    _patch_pricing(monkeypatch, {
+        "google/gemini-3.1-pro-preview": {"output_per_million": 12.00},
+    })
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(side_effect=["lake baikal depth", "1,642 m"])
+    io.search = AsyncMock(return_value=[
+        {"title": "t", "url": "https://en.wikipedia.org/wiki/Lake_Baikal", "description": ""}])
+    io.visit = AsyncMock(return_value="... 1,642 m ...")
+    asyncio.run(ec._run_leaf_thin(io, "depth of Lake Baikal?", "e", "google/gemini-3.1-pro-preview", 6000, 6))
+    # First build_llm_payload call is the search-query micro-prompt; it must carry 128, not 24.
+    budgets = [c.kwargs["max_tokens"] for c in io.build_llm_payload.call_args_list]
+    assert budgets and all(b == 128 for b in budgets)
+
+
+def test_thin_extract_absorbs_none_content_as_miss(monkeypatch):
+    """Defense-in-depth: a starved/None-content RuntimeError becomes a graceful '' miss, not a crash."""
+    _patch_pricing(monkeypatch, {"cheap-slug": {"output_per_million": 0.40}})
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(side_effect=RuntimeError(
+        "LLM returned None content (model=x, finish_reason=length)"))
+    out = asyncio.run(ec._thin_extract_once(io, "page", "q", "cheap-slug", 0.0))
+    assert out == ""  # absorbed, not raised
+
+
+def test_vote_extract_survives_none_content(monkeypatch):
+    """A None-content sample inside k-vote is absorbed; surviving samples still elect a winner."""
+    _patch_pricing(monkeypatch, {"cheap-slug": {"output_per_million": 0.40}})
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    # anchor crashes (starved), two diversity samples agree -> majority still wins.
+    io.query_llm = AsyncMock(side_effect=[
+        RuntimeError("LLM returned None content (finish_reason=length)"),
+        "1,642 m", "1,642 m"])
+    out = asyncio.run(ec._vote_extract(io, "p", "q", "cheap-slug", 3))
+    assert "1,642" in out
+
+
 def test_failing_leaf_does_not_sink_run(monkeypatch):
     async def fake_leaf(agent_io, instruction, *a):
         if "boom" in instruction:
