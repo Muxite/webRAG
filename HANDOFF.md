@@ -101,6 +101,19 @@ register at session START — they were authored this session, so invoke them by
    budget** (128 is sufficient; thin amplifies wrong-grounding because it can't re-search after a bad page).
    Net: content=None bug CLOSED; `thin` safe for chain/mixed on premium; **default stays `react`, thin opt-in.**
    NEXT LEVER (paid, user-greenlight): thin query disambiguation / hand search fixtures for 052/053 breadth.
+   **UPDATE 2026-06-17 (UNCOMMITTED, `execution_compiled.py`+test): pursued the breadth lever → it became a SPEED win.**
+   Added deterministic `_target_entity(instruction)` (the entity a leaf names; strips the resolved
+   "— source: <url>" dep tail) feeding three coupled changes: (a) TITLE-AWARE page-pick `_pick_pages`
+   — A/B `thinab_before/after` (n=3 replay) shows it's ~NEUTRAL on breadth (cheap models already
+   0.94–1.00 on plain wiki-first; the hoped 0.61→0.94 lift did NOT appear; ref 052≈0.34 is **k=1
+   premium-vote coverage dropout, not grounding**); kept because safe + enables (b)/(c). (b) INITIALS
+   BUG FIX (the real find): `_target_entity` truncated "F. Scott Fitzgerald"→"F"→grounded to the
+   `wiki/F` letter page (masked under the LLM query). (c) QUERY-SKIP — delete the per-leaf
+   search-query LLM call, search the entity verbatim. MEASURED (`thinspeed2`, 052 live): **LLM
+   calls/ref-run 26→13; reference 86.8s→~40s (~54%), nano 20.2→15.2s, flash-lite 14.1→11.8s; nano &
+   flash-lite 052 = 1.00 (faster AND more accurate).** Prod `IDEA_TEST_COMPILED_CONCURRENCY`=6 already
+   (script throttles to 3). Offline: 35 compiled / 426 full-suite green. TODO: commit; premium-breadth
+   k≥2 to lift ref 052; `.model_pricing_cache.json` is a gitignored artifact — exclude from the commit.
 4. ~~Per-cheap-model B-hand lost~~ **RECOVERED 2026-06-16 (`bhand_recovery_20260616`, $0.31, 60 cells,
    pipeline CLEAN).** Hand-vs-auto (052–054 mean): hand WINS pure fan-out 052 (+0.22 flash, +0.13
    flash-lite, +0.10 nano), parity 053, hand DEFICIT on mixed-DAG 054 (nano −0.25, gpt-5-mini −0.10).

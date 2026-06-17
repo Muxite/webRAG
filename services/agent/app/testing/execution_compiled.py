@@ -195,6 +195,120 @@ def _vote_key(ans: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", low).strip()
 
 
+# --- Title-aware page-pick: disambiguate the thin grounding so breadth fan-out lands right --------
+# The old pick threw away the search-result TITLE and sorted by URL only ("first wikipedia.org/wiki/
+# wins"). On breadth fan-out that grounds WRONG: a leaf for the novel 'Pride and Prejudice' returns
+# both en.wikipedia.org/wiki/Pride (the concept page) and .../Pride_and_Prejudice — and the URL-only
+# sort grabs the shorter concept page, from which the model extracts a bogus author ("Gilbert Baker")
+# with no way to recover. The fix grounds on the TARGET ENTITY the leaf actually names (the quoted
+# phrase, or the resolved author in a dependent hop) and prefers the result whose TITLE matches it,
+# so the exact-title article beats a truncated-entity concept/disambiguation page. Pure harness logic
+# (no extra LLM call) so the thin cheapness is untouched.
+_STOPWORDS = frozenset({
+    "the", "a", "an", "of", "and", "or", "for", "to", "in", "on", "novel", "book", "page",
+    "wikipedia", "author", "its", "their", "year", "birth", "open", "read", "extract",
+    "exact", "name", "search", "authoritative", "do", "not", "guess", "from", "memory",
+})
+_DISAMBIG_BAD = ("(disambiguation)", "disambiguation")
+
+
+def _norm_tokens(text: str) -> List[str]:
+    """Lowercase alphanumeric tokens with stopwords removed (kept tiny and deterministic)."""
+    toks = re.findall(r"[a-z0-9]+", text.lower())
+    return [t for t in toks if t not in _STOPWORDS]
+
+
+def _strip_source_tail(text: str) -> str:
+    """Drop the '— source: <url>' / bare-URL tail a resolved dependency value carries.
+
+    A finished leaf returns its fact as ``"<value> — source: <url>"`` (see ``_run_leaf_thin``), and
+    a dependent hop substitutes that *whole string* into '... for the author <value> — source:
+    <url>.' If we don't strip the tail, the URL's tokens ('source', 'https', 'en', ...) pollute the
+    target so the CORRECT author page looks like a truncation of it and gets penalised below a wrong
+    adjacent page — the very mis-grounding this pick is meant to prevent. Cut at the em-dash 'source:'
+    separator or the first URL, then trim surrounding punctuation."""
+    head = re.split(r"\s*[—-]\s*source\s*:|https?://", text, maxsplit=1)[0]
+    return head.strip(" .,–—'\"")
+
+
+def _target_entity(instruction: str) -> str:
+    """The entity whose page holds the answer — what the leaf is really about.
+
+    Auto-compiled breadth leaves always name it explicitly: a quoted phrase for the subject
+    ('Pride and Prejudice', 'Lake Baikal'), or the resolved name after 'for the author ' on a
+    dependent birth-year hop. On that hop the substituted value is the upstream leaf's full fact
+    string ('... for the author Jane Austen — source: https://en.wikipedia.org/...'), so capture up
+    to the em-dash/newline/period and strip any '— source: <url>' tail before returning. Prefer the
+    author form when present (the page we must actually land on), else the quoted phrase, else ''.
+    """
+    # Stop at the em-dash 'source:' separator, a newline, or a SENTENCE-ending period — but NOT a
+    # period that is part of an initial ('F. Scott Fitzgerald', 'J. R. R. Tolkien'): a period right
+    # after a capital letter, or not followed by whitespace, is kept. (?i:...) scopes the
+    # case-insensitive match to the literal cue so the [A-Z] initial test stays case-sensitive.
+    m = re.search(r"(?i:for the author)\s+(.+?)(?:\s*—|\n|(?<![A-Z])\.(?=\s|$)|$)", instruction)
+    if m and _strip_source_tail(m.group(1)):
+        return _strip_source_tail(m.group(1))
+    quoted = re.findall(r"['‘’“”\"]([^'‘’“”\"]+)['‘’“”\"]", instruction)
+    if quoted:
+        return max(quoted, key=len).strip()
+    return ""
+
+
+def _title_score(title: str, url: str, target_tokens: List[str], target_norm: str) -> float:
+    """Rank a search result by how well its TITLE matches the target entity (higher = better).
+
+    Rewards an exact title match and full token coverage of the target; penalizes a title that is a
+    strict truncation of the target (the 'Pride' concept-page trap) and disambiguation pages; gives a
+    Wikipedia article a mild bonus so it breaks ties toward the stable source. No target -> Wikipedia
+    bonus only (degrades to the old wiki-first behavior).
+    """
+    title_l = (title or "").lower()
+    title_tokens = _norm_tokens(title or "")
+    is_wiki = "wikipedia.org/wiki/" in (url or "")
+    score = 0.6 if is_wiki else 0.0
+    if any(bad in title_l for bad in _DISAMBIG_BAD):
+        score -= 2.0
+    if not target_tokens:
+        return score
+    tset, ttset = set(target_tokens), set(title_tokens)
+    norm_title = " ".join(title_tokens)
+    if norm_title and norm_title == target_norm:
+        score += 3.0                                  # exact title match — the article we want
+    covered = len(tset & ttset) / max(1, len(tset))   # fraction of target tokens present in title
+    score += 2.0 * covered
+    # Title is a strict truncation of the target (all title tokens are in target, but title misses
+    # target tokens) -> a 'Pride' for 'Pride and Prejudice' concept page; push it down hard.
+    if ttset and ttset < tset:
+        score -= 1.5
+    # Title carries unrelated extra tokens beyond the target -> a wrong adjacent entity; mild penalty.
+    extra = len(ttset - tset)
+    score -= 0.15 * extra
+    return score
+
+
+def _pick_pages(results: List[Dict[str, str]], instruction: str) -> List[str]:
+    """Order candidate URLs best-first by title match to the leaf's target entity (then wiki, then
+    original rank). De-dupes URLs preserving the chosen order. Replaces the old URL-only wiki sort."""
+    target = _target_entity(instruction)
+    target_tokens = _norm_tokens(target)
+    target_norm = " ".join(target_tokens)
+    scored: List[Tuple[float, int, str]] = []
+    for rank, r in enumerate(results or []):
+        url = str(r.get("url", "")).strip()
+        if not url:
+            continue
+        s = _title_score(str(r.get("title", "")), url, target_tokens, target_norm)
+        scored.append((s, rank, url))
+    scored.sort(key=lambda t: (-t[0], t[1]))  # higher score first, stable on original rank
+    ordered: List[str] = []
+    seen = set()
+    for _, _, url in scored:
+        if url not in seen:
+            seen.add(url)
+            ordered.append(url)
+    return ordered
+
+
 async def _thin_micro_query(agent_io: AgentIO, payload: Any, model_name: str) -> str:
     """Run a thin micro-prompt and return its stripped text, absorbing a starved/None response.
 
@@ -258,14 +372,23 @@ async def _run_leaf_thin(agent_io: AgentIO, instruction: str, expect: str, model
     model's noisy extraction reliable via redundancy + majority pruning, and a second candidate page
     is tried (a repeat cycle) if the first yields no consensus. Returns ``"<value> — source:<url>"``.
     """
-    # 1) thin search query (tiny output)
-    qp = agent_io.build_llm_payload(
-        messages=[{"role": "system", "content": _THIN_QUERY_SYS}, {"role": "user", "content": instruction}],
-        json_mode=False, model_name=model_name, temperature=0.0,
-        max_tokens=_thin_max_tokens_for_model(model_name),
-    )
-    raw_q = await _thin_micro_query(agent_io, qp, model_name)
-    query = raw_q.splitlines()[0].strip(' "\'')[:200] if raw_q else " ".join(instruction.split()[:12])
+    # 1) search query — prefer the entity the leaf NAMES (the SAME target the page-pick grounds on),
+    # used verbatim as the query. A breadth leaf always names its subject ('Lake Baikal') or its
+    # resolved author ('Jane Austen'), which is exactly what the LLM query call would emit — so we
+    # skip that call. This drops one LLM round-trip PER LEAF: the dominant serial cost on fan-out
+    # (12 of the 26 calls on task 052), and a flake point — a deterministic thinking tool replacing
+    # a model call. Fall back to a thin LLM query only when the leaf names no explicit entity.
+    target = _target_entity(instruction)
+    if target:
+        query = target
+    else:
+        qp = agent_io.build_llm_payload(
+            messages=[{"role": "system", "content": _THIN_QUERY_SYS}, {"role": "user", "content": instruction}],
+            json_mode=False, model_name=model_name, temperature=0.0,
+            max_tokens=_thin_max_tokens_for_model(model_name),
+        )
+        raw_q = await _thin_micro_query(agent_io, qp, model_name)
+        query = raw_q.splitlines()[0].strip(' "\'')[:200] if raw_q else " ".join(instruction.split()[:12])
 
     # 2) search
     try:
@@ -276,9 +399,10 @@ async def _run_leaf_thin(agent_io: AgentIO, instruction: str, expect: str, model
     if not results:
         return "UNKNOWN"
 
-    # 3) candidate pages — Wikipedia article(s) first (stable), then the rest (more 'nodes' to try)
-    urls = [str(r.get("url", "")) for r in results if str(r.get("url", ""))]
-    urls.sort(key=lambda u: 0 if "wikipedia.org/wiki/" in u else 1)
+    # 3) candidate pages — TITLE-AWARE pick: prefer the result whose title matches the leaf's target
+    # entity (the exact-title article over a truncated-entity concept/disambiguation page), then wiki,
+    # then original rank. Fixes breadth wrong-grounding without an extra LLM call. See _pick_pages.
+    urls = _pick_pages(results, instruction)
     if not urls:
         return "UNKNOWN"
 

@@ -312,3 +312,185 @@ def test_failing_leaf_does_not_sink_run(monkeypatch):
     assert out == "DONE"
     body = _agg_user_content(io)
     assert "Fact 1: UNKNOWN" in body and "Fact 2: ok" in body
+
+
+# --- Title-aware page-pick (disambiguate thin breadth grounding) ---------------------------------
+
+def test_target_entity_from_quoted_subject():
+    """A breadth-subject leaf names the entity in quotes; that is the grounding target."""
+    instr = ("Search for and open the authoritative page (e.g., Wikipedia) for the novel "
+             "'Pride and Prejudice'. Read and extract the exact name of its author.")
+    assert ec._target_entity(instr) == "Pride and Prejudice"
+
+
+def test_target_entity_prefers_resolved_author_on_birth_hop():
+    """A dependent birth-year hop must land on the AUTHOR's page, not the novel's — target = author."""
+    instr = ("Search for and open the authoritative page (e.g., Wikipedia) for the author "
+             "Jane Austen. Read and extract the author's year of birth.")
+    assert ec._target_entity(instr) == "Jane Austen"
+
+
+def test_target_entity_strips_resolved_dep_source_tail():
+    """REAL 052 wave-2 form: the upstream leaf's fact ('<name> — source: <url>') is substituted
+    verbatim, so target must be the bare author name, not 'Jane Austen — source: https://en'."""
+    # Exactly what substitute_deps produces from a wave-1 fact ("<value> — source: <url>").
+    instr = ("Search for and open the authoritative page (e.g., Wikipedia) for the author "
+             "Jane Austen — source: https://en.wikipedia.org/wiki/Pride_and_Prejudice. "
+             "Read and extract the author's year of birth.")
+    assert ec._target_entity(instr) == "Jane Austen"
+
+
+def test_target_entity_keeps_author_initials():
+    """Author names with initials must NOT truncate at the initial's period ('F' bug)."""
+    instr = ("Search for and open the authoritative page (e.g., Wikipedia) for the author "
+             "F. Scott Fitzgerald — source: https://en.wikipedia.org/wiki/The_Great_Gatsby. "
+             "Read and extract the author's year of birth.")
+    assert ec._target_entity(instr) == "F. Scott Fitzgerald"
+
+
+def test_target_entity_keeps_multiple_initials_no_source_tail():
+    """Multiple initials and a plain sentence terminator: keep the full name, drop the sentence."""
+    instr = ("Search for and open the authoritative page for the author J. R. R. Tolkien. "
+             "Read and extract the author's year of birth.")
+    assert ec._target_entity(instr) == "J. R. R. Tolkien"
+
+
+def test_thin_leaf_query_uses_full_initialed_name(monkeypatch):
+    """Query-skip must search the FULL initialed name, not the truncated initial ('F')."""
+    monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(side_effect=["1896"])  # extraction only
+    io.search = AsyncMock(return_value=[
+        {"title": "F. Scott Fitzgerald", "url": "https://en.wikipedia.org/wiki/F._Scott_Fitzgerald",
+         "description": ""},
+    ])
+    io.visit = AsyncMock(return_value="F. Scott Fitzgerald (born September 24, 1896) ...")
+    instr = ("Search for and open the authoritative page for the author F. Scott Fitzgerald — "
+             "source: https://en.wikipedia.org/wiki/The_Great_Gatsby. Read the year of birth.")
+    asyncio.run(ec._run_leaf_thin(io, instr, "birth", "m", 6000, 6))
+    assert io.search.await_args.args[0] == "F. Scott Fitzgerald"
+    assert io.query_llm.await_count == 1
+
+
+def test_pick_pages_birth_hop_with_source_tail_lands_on_author():
+    """End-to-end of the regression: with the resolved '— source: <url>' tail in the instruction,
+    the AUTHOR page must still beat the upstream novel page (the wrong adjacent entity)."""
+    instr = ("Search for and open the authoritative page (e.g., Wikipedia) for the author "
+             "Jane Austen — source: https://en.wikipedia.org/wiki/Pride_and_Prejudice. "
+             "Read and extract the author's year of birth.")
+    results = [
+        # the upstream novel page often re-surfaces in the author search — must NOT win
+        {"title": "Pride and Prejudice", "url": "https://en.wikipedia.org/wiki/Pride_and_Prejudice",
+         "description": ""},
+        {"title": "Jane Austen", "url": "https://en.wikipedia.org/wiki/Jane_Austen", "description": ""},
+    ]
+    ordered = ec._pick_pages(results, instr)
+    assert ordered[0] == "https://en.wikipedia.org/wiki/Jane_Austen"
+
+
+def test_pick_pages_prefers_exact_title_over_truncated_concept_page():
+    """The 'Pride' concept page must lose to the exact-title 'Pride and Prejudice' article."""
+    instr = ("Search for and open the authoritative page for the novel 'Pride and Prejudice'. "
+             "Read and extract the exact name of its author.")
+    results = [
+        {"title": "Pride", "url": "https://en.wikipedia.org/wiki/Pride", "description": ""},
+        {"title": "Pride and Prejudice", "url": "https://en.wikipedia.org/wiki/Pride_and_Prejudice",
+         "description": ""},
+    ]
+    ordered = ec._pick_pages(results, instr)
+    assert ordered[0] == "https://en.wikipedia.org/wiki/Pride_and_Prejudice"
+
+
+def test_pick_pages_deprioritizes_disambiguation_page():
+    """A '(disambiguation)' page is penalized below the real article."""
+    instr = "page for the novel 'Mercury'."
+    results = [
+        {"title": "Mercury (disambiguation)", "url": "https://en.wikipedia.org/wiki/Mercury_(disambiguation)",
+         "description": ""},
+        {"title": "Mercury", "url": "https://en.wikipedia.org/wiki/Mercury", "description": ""},
+    ]
+    ordered = ec._pick_pages(results, instr)
+    assert ordered[0] == "https://en.wikipedia.org/wiki/Mercury"
+
+
+def test_pick_pages_rejects_wrong_adjacent_entity():
+    """'The Old Man (TV series)' must lose to the exact-title 'The Old Man and the Sea' article."""
+    instr = "page for the novel 'The Old Man and the Sea'."
+    results = [
+        {"title": "The Old Man (TV series)", "url": "https://en.wikipedia.org/wiki/The_Old_Man_(TV_series)",
+         "description": ""},
+        {"title": "The Old Man and the Sea", "url": "https://en.wikipedia.org/wiki/The_Old_Man_and_the_Sea",
+         "description": ""},
+    ]
+    ordered = ec._pick_pages(results, instr)
+    assert ordered[0] == "https://en.wikipedia.org/wiki/The_Old_Man_and_the_Sea"
+
+
+def test_pick_pages_no_target_degrades_to_wiki_first():
+    """No quoted/author target -> behave like the old wiki-first pick (don't regress clean leaves)."""
+    instr = "maximum depth of Lake Baikal in metres?"  # no quotes, no 'for the author'
+    results = [
+        {"title": "ad", "url": "https://example.com/ad", "description": ""},
+        {"title": "Lake Baikal", "url": "https://en.wikipedia.org/wiki/Lake_Baikal", "description": ""},
+    ]
+    ordered = ec._pick_pages(results, instr)
+    assert ordered[0] == "https://en.wikipedia.org/wiki/Lake_Baikal"
+
+
+def test_thin_leaf_lands_on_exact_title_page(monkeypatch):
+    """End-to-end: the thin leaf VISITS the exact-title article, not the truncated concept page."""
+    monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    # Only the extraction hits the LLM now — the search query is the deterministic target entity,
+    # so a single query_llm response (the extracted author) is all the pipeline needs.
+    io.query_llm = AsyncMock(side_effect=["Jane Austen"])
+    io.search = AsyncMock(return_value=[
+        {"title": "Pride", "url": "https://en.wikipedia.org/wiki/Pride", "description": ""},
+        {"title": "Pride and Prejudice", "url": "https://en.wikipedia.org/wiki/Pride_and_Prejudice",
+         "description": ""},
+    ])
+    io.visit = AsyncMock(return_value="Pride and Prejudice is a novel by Jane Austen ...")
+    instr = ("Search for and open the authoritative page for the novel 'Pride and Prejudice'. "
+             "Read and extract the exact name of its author.")
+    out = asyncio.run(ec._run_leaf_thin(io, instr, "author", "m", 6000, 6))
+    assert "Jane Austen" in out
+    assert io.visit.await_args.args[0] == "https://en.wikipedia.org/wiki/Pride_and_Prejudice"
+    # Query-skip: no LLM round-trip for the query — the search used the extracted entity verbatim.
+    assert io.search.await_args.kwargs.get("count") == 6 or io.search.await_args.args
+    assert io.search.await_args.args[0] == "Pride and Prejudice"
+    assert io.query_llm.await_count == 1  # extraction only; the query LLM call is gone
+
+
+def test_thin_leaf_skips_query_llm_for_named_entity(monkeypatch):
+    """A leaf naming an explicit entity searches it verbatim and makes NO query LLM call."""
+    monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(side_effect=["1742"])  # extraction only
+    io.search = AsyncMock(return_value=[
+        {"title": "Lake Baikal", "url": "https://en.wikipedia.org/wiki/Lake_Baikal", "description": ""},
+    ])
+    io.visit = AsyncMock(return_value="Lake Baikal ... maximum depth 1642 m ...")
+    instr = ("Search for the authoritative Wikipedia page for 'Lake Baikal', open it, and read its "
+             "MAXIMUM DEPTH in metres directly from the page. Do not guess from memory.")
+    asyncio.run(ec._run_leaf_thin(io, instr, "depth", "m", 6000, 6))
+    assert io.search.await_args.args[0] == "Lake Baikal"
+    assert io.query_llm.await_count == 1  # only the extraction, never a query call
+
+
+def test_thin_leaf_falls_back_to_llm_query_without_entity(monkeypatch):
+    """No quoted subject and no 'for the author' -> the LLM query call still runs (count == 2)."""
+    monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(side_effect=["tallest mountain on earth", "Mount Everest"])
+    io.search = AsyncMock(return_value=[
+        {"title": "Mount Everest", "url": "https://en.wikipedia.org/wiki/Mount_Everest", "description": ""},
+    ])
+    io.visit = AsyncMock(return_value="Mount Everest is the tallest mountain ...")
+    instr = "Find the tallest mountain on Earth and read its name from the page."
+    asyncio.run(ec._run_leaf_thin(io, instr, "name", "m", 6000, 6))
+    assert io.search.await_args.args[0] == "tallest mountain on earth"
+    assert io.query_llm.await_count == 2  # query LLM + extraction
