@@ -46,6 +46,33 @@ def test_react_forced_synthesis_when_no_finish():
     assert out == "FORCED SYNTHESIS"
 
 
+def test_react_dedup_repeated_search_nudges_without_researching():
+    # Breadth-loop guard: a repeated query (modulo case/whitespace) must NOT trigger a second
+    # web search — the loop nudges toward visit/finish instead. Distinct queries are unaffected.
+    decisions = [
+        {"thought": "search", "action": "search", "args": {"query": "deepest lake"}},
+        {"thought": "search again", "action": "search", "args": {"query": "Deepest Lake "}},  # dup
+        {"thought": "done", "action": "finish",
+         "args": {"answer": "Lake Baikal https://en.wikipedia.org/wiki/Lake_Baikal"}},
+    ]
+    io = _agent_io(decisions)
+    out = asyncio.run(seq._run_react(io, "Which lake is deepest?", "m", max_steps=6, max_tokens=512))
+    assert "Baikal" in out
+    io.search.assert_awaited_once()  # the duplicate did NOT re-run search
+
+
+def test_react_dedup_distinct_searches_both_run():
+    # Two DIFFERENT queries (e.g. two authors in a fan-out) must both search — guard is repeat-only.
+    decisions = [
+        {"thought": "a", "action": "search", "args": {"query": "author of Beloved"}},
+        {"thought": "b", "action": "search", "args": {"query": "author of Pride and Prejudice"}},
+        {"thought": "done", "action": "finish", "args": {"answer": "done"}},
+    ]
+    io = _agent_io(decisions)
+    asyncio.run(seq._run_react(io, "two authors", "m", max_steps=6, max_tokens=512))
+    assert io.search.await_count == 2
+
+
 def test_react_invalid_json_does_not_crash():
     io = MagicMock()
     io.build_llm_payload = MagicMock(return_value={})

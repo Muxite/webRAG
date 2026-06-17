@@ -38,7 +38,10 @@ _SYSTEM = (
     "- visit(url): read a page's full text. Use EXACT URLs from search results.\n"
     "- verify(claim): cross-check a claim against the pages you have already read.\n"
     "- finish(answer): output the final answer. Cite the source URLs you used.\n"
-    "Rules: gather evidence by visiting pages before answering; do not guess from memory. "
+    "Strategy: break a multi-part task into its sub-facts and resolve EACH one by searching and "
+    "then visiting its authoritative page (e.g. Wikipedia) before you finish — do not stop after "
+    "the first fact, and never answer any part from memory. Read each value directly off the page "
+    "and cite the exact source URL it came from.\n"
     "Each step, return ONLY JSON: {\"thought\": \"...\", \"action\": \"search|visit|verify|finish\", "
     "\"args\": {\"query|url|claim|answer\": \"...\"}}."
 )
@@ -53,7 +56,7 @@ def _fmt_search(results: List[Dict[str, str]], k: int) -> str:
 
 async def _verify_claim(agent_io: AgentIO, claim: str, evidence: str, model_name: str) -> str:
     messages = [
-        {"role": "system", "content": "Judge whether the CLAIM is supported by the EVIDENCE (text from visited pages). Answer in one line: TRUE/FALSE/UNVERIFIABLE + a brief reason."},
+        {"role": "system", "content": "Judge whether the CLAIM is supported by the EVIDENCE (text from the pages already visited). Reply in one line: TRUE / PARTIALLY_TRUE / FALSE / UNVERIFIABLE, then the supporting-or-contradicting source URL and a brief reason."},
         {"role": "user", "content": f"CLAIM: {claim}\n\nEVIDENCE:\n{evidence[:8000] or '(no evidence gathered yet)'}"},
     ]
     payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.0, max_tokens=300)
@@ -63,8 +66,10 @@ async def _verify_claim(agent_io: AgentIO, claim: str, evidence: str, model_name
 async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps: int, max_tokens: int) -> str:
     page_chars = int(os.environ.get("IDEA_TEST_SEQ_PAGE_CHARS", "6000"))
     search_k = int(os.environ.get("IDEA_TEST_SEQ_SEARCH_K", "6"))
+    dedup_search = os.environ.get("IDEA_TEST_SEQ_DEDUP_SEARCH", "1") not in ("0", "false", "False")
     scratchpad: List[str] = []          # in-context working memory
     evidence: List[str] = []            # visited-page text, for verify
+    seen_queries: set = set()           # normalized queries already searched (breadth-loop guard)
     last_answer = ""
 
     for step in range(max_steps):
@@ -73,7 +78,7 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": f"TASK:\n{mandate}\n\nSCRATCHPAD (your prior steps):\n{history}\n\nReturn the next step as JSON."},
         ]
-        payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name, temperature=0.2, max_tokens=1024)
+        payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name, temperature=0.1, max_tokens=1024)
         raw = await agent_io.query_llm(payload, model_name=model_name)
         try:
             decision = json.loads(raw or "{}")
@@ -89,18 +94,36 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
                 return last_answer
             # forced final synthesis if the model never produced an answer
             messages = [
-                {"role": "system", "content": "Using ONLY the gathered evidence, answer the task completely and cite source URLs."},
+                {"role": "system", "content": (
+                    "Synthesize the FINAL answer using ONLY the gathered evidence. Address every part "
+                    "the task asks for; for each fact quote the exact value from the page and cite the "
+                    "source URL it came from. Do not add facts that are not in the evidence — if a "
+                    "required fact is missing, say so explicitly rather than guessing."
+                )},
                 {"role": "user", "content": f"TASK:\n{mandate}\n\nEVIDENCE:\n{chr(10).join(evidence)[:12000] or '(none)'}"},
             ]
             payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.3, max_tokens=max_tokens)
             return (await agent_io.query_llm(payload, model_name=model_name)) or ""
 
         if action == "search":
-            try:
-                results = await agent_io.search(str(args.get("query", "")), count=search_k, timeout_seconds=20) or []
-                obs = _fmt_search(results, search_k)
-            except Exception as exc:  # noqa: BLE001
-                obs = f"SEARCH ERROR: {exc}"
+            query = str(args.get("query", ""))
+            norm = re.sub(r"\s+", " ", query).strip().lower()
+            if dedup_search and norm and norm in seen_queries:
+                # Breadth failure mode: re-running the same search instead of synthesizing (a 6-way
+                # fan-out cell looped through the same entities, burning ~2.8x the calls). Don't spend
+                # another search on a query already issued — nudge toward visit/finish. Distinct
+                # per-entity queries are unaffected, so legitimate fan-out exploration is preserved.
+                obs = (f"ALREADY SEARCHED '{query[:80]}'. Its results are in your scratchpad above — "
+                       "VISIT one of those result URLs to read it, or FINISH if you have enough. "
+                       "Do not repeat a search you have already run.")
+            else:
+                if norm:
+                    seen_queries.add(norm)
+                try:
+                    results = await agent_io.search(query, count=search_k, timeout_seconds=20) or []
+                    obs = _fmt_search(results, search_k)
+                except Exception as exc:  # noqa: BLE001
+                    obs = f"SEARCH ERROR: {exc}"
         elif action == "visit":
             url = str(args.get("url", "")).strip()
             try:
@@ -153,7 +176,11 @@ async def run_sequential_execution(
         telemetry=telemetry, collection_name=f"idea_test_{test_id}_{run_stamp}",
     )
 
-    max_steps = int(os.environ.get("IDEA_TEST_SEQUENTIAL_MAX_STEPS", "10"))
+    # Step budget parity with graph_compiled's effective ~24 (6 leaves x 4 steps): a strong linear
+    # ReAct agent must be allowed enough turns to resolve every sub-fact of a multi-part task, or the
+    # comparison hamstrings it. Kept a clean LINEAR agent (no k-sample voting / shared memory — those
+    # are graph_compiled's distinctive features, not handicaps to "fix" here).
+    max_steps = int(os.environ.get("IDEA_TEST_SEQUENTIAL_MAX_STEPS", "25"))
     max_tokens = int(os.environ.get("IDEA_TEST_BASELINE_MAX_TOKENS", "8192"))
     started = time.perf_counter()
     deliverable = ""

@@ -142,9 +142,20 @@ async def run_baseline_execution(
 
 
 async def _run_parametric(agent_io: AgentIO, mandate: str, model_name: str, max_tokens: int) -> str:
-    """Single completion with no tools — isolates raw model intelligence."""
+    """Single completion with NO tools — the hardness floor / parametric-knowledge control.
+
+    The prompt must NOT invite fabricated citations (the model has no web access), or the floor is
+    polluted by hallucinated URLs that the validators then credit. Instead: answer only from
+    confident knowledge, say UNKNOWN when unsure, and never invent sources. A low score here is the
+    signal we want — it proves the task needs grounding, not recall.
+    """
     messages = [
-        {"role": "system", "content": "You are a careful research assistant. Answer the task as completely and accurately as possible. If you cite sources, include their URLs."},
+        {"role": "system", "content": (
+            "You are answering from memory ONLY — you have NO web access and cannot look anything up. "
+            "Answer the task as accurately as you can from knowledge you are confident in. For any "
+            "fact you are not sure of, write UNKNOWN rather than guessing. Do NOT invent or cite any "
+            "source URLs — you have not visited any pages."
+        )},
         {"role": "user", "content": mandate},
     ]
     payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.3, max_tokens=max_tokens)
