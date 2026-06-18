@@ -156,6 +156,29 @@ docker compose up -d
 - RabbitMQ UI: `http://localhost:15672` (guest/guest)
 - ChromaDB: `http://localhost:8001`
 
+### Submit Your First Query
+
+With the stack up, submit a mandate and poll for the result. Auth is a Supabase JWT in the
+`Authorization` header — obtain one by signing in through the frontend (or your Supabase
+project) and use it as `$TOKEN`. (`GATEWAY_TEST_MODE=true` in `keys.env` relaxes the daily
+quota check for local dev.)
+
+```bash
+# 1. Submit a task -> returns a correlation_id and status "in_queue"
+curl -s -X POST http://localhost:8080/tasks \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"mandate": "Who wrote the novel Beloved, and where did she earn her master'\''s degree?"}'
+
+# 2. Poll until status is "completed".
+#    result.deliverables[0] is the answer; result.evidence carries the pages actually
+#    visited (sources), the grounding verdict, and the token/cost usage.
+curl -s http://localhost:8080/tasks/<correlation_id> -H "Authorization: Bearer $TOKEN"
+```
+
+Interactive, auto-generated API docs: <http://localhost:8080/docs>. A runnable end-to-end
+client (submit + poll loop, prints the answer + evidence) is in
+[`examples/quickstart.py`](examples/quickstart.py).
+
 ### Running Tests
 
 ```bash
@@ -170,6 +193,10 @@ IDEA_TEST_MODE=benchmark docker compose run --profile test idea-test
 ```
 
 ### Environment Variables
+
+The full registry (required / optional / benchmark-only) is in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md); run `python scripts/list_env_vars.py` for the
+authoritative, always-current list scanned from the code.
 
 Key environment variables for testing:
 - `IDEA_TEST_IDS`: Comma-separated test IDs (e.g., "019,025,033")
@@ -195,6 +222,7 @@ docs/             Architecture, security, benchmark plots
 
 ## Documentation
 
+- [Configuration](docs/CONFIGURATION.md) - Environment variable registry (required / optional / benchmark-only)
 - [System Architecture](docs/ARCHITECTURE.md) - Overall system design and message flow
 - [Agent Architecture](services/agent/app/AGENT_ARCHITECTURE.md) - Graph-of-Thought engine internals
 - [Test Suite](services/agent/app/idea_tests/README.md) - Test structure and validation

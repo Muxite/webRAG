@@ -28,6 +28,7 @@ from agent.app.connector_browser import ConnectorBrowser
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
+from agent.app.idea_evidence import build_evidence, summarize_run_usage
 from agent.app.startup_preflight import run_startup_preflight
 from shared.storage import RedisTaskStorage
 
@@ -522,11 +523,18 @@ class InterfaceAgent:
             if isinstance(result, dict):
                 notes = result.get("notes") or result.get("action_summary") or ""
 
+            try:
+                default_model = self.connector_llm.get_model() if self.connector_llm else ""
+            except Exception:
+                default_model = ""
+            evidence = build_evidence(result, self._telemetry, default_model=default_model)
+
             completion = CompletionResult(
                 correlation_id=self.correlation_id,
                 success=success,
                 deliverables=deliverables,
-                notes=notes
+                notes=notes,
+                evidence=evidence,
             )
 
             self.logger.info(
@@ -553,12 +561,24 @@ class InterfaceAgent:
                     deliverables = []
             notes = f"Internal agent error: {str(e)}"
 
+            # Structured failure detail + usage so a caller learns WHAT went wrong, not just
+            # a bare success:false. (The non-DAG legacy path also lands here.)
+            try:
+                default_model = self.connector_llm.get_model() if self.connector_llm else ""
+            except Exception:
+                default_model = ""
+            failure_evidence = {"failure": {"stage": "execution", "reason": str(e), "retryable": False}}
+            usage = summarize_run_usage(self._telemetry, default_model)
+            if usage.get("llm_calls"):
+                failure_evidence["usage"] = usage
+
             if deliverables:
                 completion = CompletionResult(
                     correlation_id=self.correlation_id,
                     success=False,
                     deliverables=deliverables,
                     notes=notes,
+                    evidence=failure_evidence,
                 )
                 await self._publish_status(
                     StatusType.COMPLETED,

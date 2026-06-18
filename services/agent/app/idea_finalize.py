@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from agent.app.idea_dag import IdeaDag
@@ -104,6 +105,83 @@ def _collect_all_visit_content(graph: IdeaDag, max_chars_per_visit: int = 15000)
     if not sections:
         return ""
     return "\n".join(sections)
+
+
+def _visited_sources(graph: IdeaDag, cap: int = 25) -> List[Dict[str, str]]:
+    """The distinct pages the agent actually read, as ``[{"url","title"}]``.
+
+    Surfaced to the caller so an outside user can spot-check provenance instead of trusting
+    the prose alone. Deduped by normalized URL, first-seen order, capped to keep the result
+    payload small. Mirrors the successful-VISIT selection used by ``_collect_all_visit_content``.
+    """
+    from agent.app.idea_policies.base import IdeaActionType
+    from agent.app.idea_policies.action_constants import ActionResultExtractor
+
+    sources: List[Dict[str, str]] = []
+    seen: set = set()
+    for node in graph.iter_depth_first():
+        if node.details.get(DetailKey.ACTION.value) != IdeaActionType.VISIT.value:
+            continue
+        ar = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not ar or not isinstance(ar, dict) or not ActionResultExtractor.is_success(ar):
+            continue
+        url = (ar.get("url") or "").strip()
+        if not url:
+            continue
+        key = url.split("#", 1)[0].rstrip("/").lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        sources.append({"url": url, "title": (ar.get("title") or "").strip()})
+        if len(sources) >= cap:
+            break
+    return sources
+
+
+_URL_RE = re.compile(r'https?://[^\s<>\)\]"\']+')
+
+
+def _norm_cite(url: str) -> str:
+    """Normalize a URL for citation matching (drop scheme/fragment/trailing slash, lowercase)."""
+    s = str(url or "").strip().lower().rstrip(".,);]")
+    for pre in ("https://", "http://"):
+        if s.startswith(pre):
+            s = s[len(pre):]
+            break
+    return s.split("#", 1)[0].rstrip("/")
+
+
+def _unverified_citations(text: str, sources: List[Dict[str, str]], cap: int = 20) -> List[str]:
+    """URLs cited in the answer that are NOT among the pages the agent actually opened.
+
+    The finalize prompt asks for citations but nothing enforces them, so an LLM can attribute a
+    claim to a page it never read. This surfaces those so a consumer can distrust them. Compares
+    against the visited ``sources`` only (search-result URLs the agent never opened still count
+    as unverified — they were not read)."""
+    if not text:
+        return []
+    visited = {_norm_cite(s.get("url", "")) for s in (sources or [])}
+    out: List[str] = []
+    seen: set = set()
+    for match in _URL_RE.findall(text):
+        key = _norm_cite(match)
+        if not key or key in visited or key in seen:
+            continue
+        seen.add(key)
+        out.append(match.rstrip(".,);]"))
+        if len(out) >= cap:
+            break
+    return out
+
+
+def _looks_truncated(response: Optional[str], max_completion_tokens: int) -> bool:
+    """Heuristic: the finalize completion reached ~the token cap (no finish_reason available).
+
+    Uses ~4 chars/token on the raw completion string; flags at >=90% of the cap so a silently
+    cut-off answer is marked rather than presented as complete."""
+    if not (max_completion_tokens and response):
+        return False
+    return (len(response) / 4.0) >= 0.9 * max_completion_tokens
 
 
 def _build_fallback_deliverable(graph: IdeaDag, merged: list) -> str:
@@ -322,6 +400,7 @@ async def build_final_payload(
     node_summary = _build_node_summary_table(graph)
     event_log = graph.build_event_log_table(graph.root_id(), max_events=100)
     visit_content = _collect_all_visit_content(graph)
+    sources = _visited_sources(graph)
 
     n_final_chroma = cfg.final.chroma_results
     chroma_context = await _retrieve_final_chroma_context(
@@ -452,7 +531,7 @@ async def build_final_payload(
     if not response:
         _logger.warning("[FINALIZE] LLM returned empty response, constructing fallback deliverable")
         fallback = _build_fallback_deliverable(graph, merged)
-        return {"final_deliverable": fallback, "action_summary": "Fallback: LLM finalize call failed", "success": bool(fallback.strip())}
+        return {"final_deliverable": fallback, "action_summary": "Fallback: LLM finalize call failed", "success": bool(fallback.strip()), "sources": sources}
 
     try:
         data = json.loads(response)
@@ -486,13 +565,29 @@ async def build_final_payload(
         else:
             success = bool(deliverable.strip()) and (goal_achieved or not has_critical_failures)
 
-        return {
+        unverified = _unverified_citations(deliverable, sources)
+        truncated = _looks_truncated(response, int(getattr(cfg.final, "max_tokens", 0) or 0))
+        if truncated and deliverable.strip():
+            # The answer hit the length cap — tell the reader instead of letting it look complete.
+            deliverable = deliverable.rstrip() + "\n\n_[Answer may be incomplete: it reached the length limit.]_"
+
+        payload = {
             "final_deliverable": deliverable,
             "action_summary": action_summary,
             "success": success,
             "goal_achieved": goal_achieved,
             "has_failures": has_critical_failures,
+            "sources": sources,
         }
+        if unverified:
+            payload["unverified_citations"] = unverified
+        if truncated:
+            payload["truncated"] = True
+        return payload
     except Exception as e:
         _logger.warning(f"[FINALIZE] Failed to parse response: {e}")
-        return {"final_deliverable": response, "action_summary": "", "success": False}
+        payload = {"final_deliverable": response, "action_summary": "", "success": False, "sources": sources}
+        # A parse failure on a near-cap response is itself a strong truncation signal.
+        if _looks_truncated(response, int(getattr(cfg.final, "max_tokens", 0) or 0)):
+            payload["truncated"] = True
+        return payload

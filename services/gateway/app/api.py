@@ -103,7 +103,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
     if app.state.test_mode:
         logger.info("Gateway running in TEST MODE - some production checks may be relaxed")
 
-    @router.get("/health")
+    @router.get("/health", tags=["System"], summary="Liveness + component health")
     async def health_check():
         """
         Health check endpoint for ALB target group and ECS container health checks.
@@ -142,7 +142,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             monitor.log_status()
         return payload
 
-    @router.get("/version")
+    @router.get("/version", tags=["System"], summary="Gateway version")
     async def version():
         """
         Return gateway version metadata.
@@ -178,7 +178,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
         active_count = sum(1 for value in values if value)
         return active_count
 
-    @router.get("/worker-count")
+    @router.get("/worker-count", tags=["System"], summary="Active worker count")
     async def worker_count():
         """
         Return active worker count.
@@ -187,7 +187,7 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
         count = await _get_active_worker_count()
         return {"activeWorkers": 0 if count is None else count}
 
-    @router.get("/system-info")
+    @router.get("/system-info", tags=["System"], summary="Gateway/worker system metadata")
     async def system_info():
         """
         Return gateway system metadata for the frontend.
@@ -204,7 +204,24 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
             "github": github_url,
         }
 
-    @router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_202_ACCEPTED)
+    @router.post(
+        "/tasks",
+        response_model=TaskResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+        tags=["Tasks"],
+        summary="Submit a research task",
+        description=(
+            "Queue a mandate for the agent and return immediately with a `correlation_id` and "
+            "`status=in_queue`. Poll `GET /tasks/{correlation_id}` until `status` is `completed` "
+            "or `failed`. Requires a Supabase JWT in the `Authorization: Bearer <token>` header. "
+            "Consumes 1 daily credit (429 when exhausted)."
+        ),
+        responses={
+            202: {"description": "Task accepted and queued."},
+            401: {"description": "Missing or invalid bearer token."},
+            429: {"description": "Daily usage limit exceeded."},
+        },
+    )
     async def submit_task(
         req: TaskRequest,
         user: SupabaseUser = Depends(get_current_supabase_user),
@@ -256,7 +273,18 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
                 detail=f"Failed to submit task: {str(e)}",
             )
 
-    @router.get("/tasks/{correlation_id}", response_model=TaskResponse)
+    @router.get(
+        "/tasks/{correlation_id}",
+        response_model=TaskResponse,
+        tags=["Tasks"],
+        summary="Get task status and result",
+        description=(
+            "Return the current state of a task. While running, `status` is `in_queue`/"
+            "`in_progress`; on completion `result` carries the answer (`deliverables`) plus an "
+            "`evidence` block (sources visited, grounding verdict, token/cost usage). Returns "
+            "`status=unknown` for an unrecognised id."
+        ),
+    )
     async def get_task(
         correlation_id: str,
         user: SupabaseUser = Depends(get_current_supabase_user),
