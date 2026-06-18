@@ -32,3 +32,5 @@ desktop.ini
 idea_test_results/
 # Offline-authored compiled-scaffold plan cache (regenerable via scripts/compile_plans.py)
 compiled_plans/
+# Live model-pricing snapshot — rewritten on every priced run; never a source artifact
+.model_pricing_cache.json
