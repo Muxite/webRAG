@@ -220,10 +220,11 @@ def test_thin_max_tokens_tiers_match_votes_buckets(monkeypatch):
         "mid": {"output_per_million": 2.00},
         "premium": {"output_per_million": 12.00},
     })
-    # cheap tier: heavy redundancy + tiny tokens; premium: single trustworthy call + room.
+    # cheap tier: heavy redundancy + tiny tokens; premium: minimal redundancy (k=2, >1 so a
+    # breadth leaf can recover from a bad page) + room to begin the answer.
     assert (ec._thin_max_tokens_for_model("cheap"), ec._votes_for_model("cheap")) == (24, 5)
     assert (ec._thin_max_tokens_for_model("mid"), ec._votes_for_model("mid")) == (64, 3)
-    assert (ec._thin_max_tokens_for_model("premium"), ec._votes_for_model("premium")) == (128, 1)
+    assert (ec._thin_max_tokens_for_model("premium"), ec._votes_for_model("premium")) == (128, 2)
 
 
 def test_thin_max_tokens_unknown_price_gives_room(monkeypatch):

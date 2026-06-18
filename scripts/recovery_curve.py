@@ -24,7 +24,8 @@ import json
 import sys
 from collections import defaultdict
 from pathlib import Path
-from statistics import mean
+from math import sqrt
+from statistics import mean, stdev
 from typing import Any, Dict, List, Optional, Tuple
 
 DEFAULT_REFERENCE = ["google/gemini-3.1-pro-preview", "openai/gpt-5", "google/gemini-2.5-pro"]
@@ -80,13 +81,22 @@ def _aggregate(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         groups[(r["model"], r["variant"], r["tier"])].append(r)
     out: List[Dict[str, Any]] = []
     for (model, variant, tier), bucket in groups.items():
+        scores = [r["score"] for r in bucket]
+        n = len(scores)
+        # Sample stdev (n>=2) of the per-run score, and the 95% CI half-width of the mean
+        # (normal approx, 1.96*sem). These turn a higher REPEATS into reportable error bars;
+        # n<2 -> 0.0 (a single run has no spread).
+        std = round(stdev(scores), 4) if n >= 2 else 0.0
+        ci95 = round(1.96 * std / sqrt(n), 4) if n >= 2 else 0.0
         out.append({
             "model": model,
             "variant": variant,
             "tooling": bucket[0].get("tooling", _VARIANT_TO_TOOLING.get(variant, variant)),
             "tier": tier,
-            "n": len(bucket),
-            "score": round(mean(r["score"] for r in bucket), 4),
+            "n": n,
+            "score": round(mean(scores), 4),
+            "score_std": std,
+            "score_ci95": ci95,
             "usd": round(mean(r["usd"] for r in bucket), 6),
             "visit_chars": int(mean(r["visit_chars"] for r in bucket)),
             "estimated": any(r["cost_estimated"] for r in bucket),
@@ -127,7 +137,7 @@ def _reference_lines(agg: List[Dict[str, Any]], reference_models: List[str]) -> 
 
 def _write_csv(agg: List[Dict[str, Any]], path: Path) -> None:
     with path.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=["model", "variant", "tooling", "tier", "n", "score", "usd", "visit_chars", "estimated"])
+        w = csv.DictWriter(fh, fieldnames=["model", "variant", "tooling", "tier", "n", "score", "score_std", "score_ci95", "usd", "visit_chars", "estimated"])
         w.writeheader()
         for row in agg:
             w.writerow(row)
@@ -227,10 +237,10 @@ def main(argv: List[str]) -> int:
     print(f"Wrote CSV  -> {csv_path}")
 
     print("\n=== Aggregated points (model / variant / tier) ===")
-    print(f"{'Model':<34} {'Variant':<11} {'Tier':>5} {'n':>3} {'Score':>7} {'USD':>10} {'CtxChars':>9}")
+    print(f"{'Model':<34} {'Variant':<11} {'Tier':>5} {'n':>3} {'Score':>7} {'±Std':>6} {'±CI95':>7} {'USD':>10} {'CtxChars':>9}")
     for a in agg:
         est = "*" if a["estimated"] else " "
-        print(f"{a['model']:<34} {a['variant']:<11} {a['tier']:>5} {a['n']:>3} {a['score']:>7.3f} {a['usd']:>9.5f}{est} {a['visit_chars']:>9}")
+        print(f"{a['model']:<34} {a['variant']:<11} {a['tier']:>5} {a['n']:>3} {a['score']:>7.3f} {a['score_std']:>6.3f} {a['score_ci95']:>7.3f} {a['usd']:>9.5f}{est} {a['visit_chars']:>9}")
 
     print("\n=== Pareto frontier (quality per dollar) ===")
     for a in _pareto(agg):

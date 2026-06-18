@@ -595,6 +595,27 @@ def filter_test_files_by_priority(test_files: List[Path], priority_count: int = 
     return filtered
 
 
+def _result_cost_usd(result: Dict[str, Any]) -> float:
+    """Total measured USD for one cell: runtime observability cost + any offline compiler cost.
+
+    Mirrors what ``recovery_curve._load_row`` reads (``execution.observability.cost.usd``) and
+    adds the ``compiler`` block that ``graph_compiled`` records for offline plan authoring, so the
+    spend ceiling reflects true cumulative spend. Missing/unpriced costs count as 0.0.
+    """
+    total = 0.0
+    execution = result.get("execution") or {}
+    try:
+        total += float((execution.get("observability") or {}).get("cost", {}).get("usd") or 0.0)
+    except (AttributeError, TypeError, ValueError):
+        pass
+    try:
+        # graph_compiled records the offline plan-authoring cost under execution.compiler.cost.
+        total += float((execution.get("compiler") or {}).get("cost", {}).get("usd") or 0.0)
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return total
+
+
 async def run_single_test(
     test_file: Path,
     model_name: str,
@@ -856,6 +877,12 @@ async def main() -> None:
     priority_count = _env_int("IDEA_TEST_TOP_N", ["IDEA_TEST_PRIORITY", "IDEA_TEST_BENCHMARK_THIRD_COUNT"], default_top_n)
     repeats = max(1, _env_int("IDEA_TEST_RUNS", ["IDEA_TEST_REPEATS"], default_runs))
     max_parallel = max(1, _env_int("IDEA_TEST_CONCURRENCY", ["IDEA_TEST_MAX_PARALLEL"], default_concurrency))
+    # Spend kill-switch for unattended high-spend runs: abort the matrix once cumulative measured
+    # cost (runtime + offline compiler) crosses this USD ceiling. 0 / unset = no ceiling.
+    try:
+        usd_ceiling = float(os.environ.get("IDEA_TEST_USD_CEILING", "0").strip() or 0.0)
+    except ValueError:
+        usd_ceiling = 0.0
     specific_test_ids = None
     test_ids_env = os.environ.get("IDEA_TEST_IDS", "").strip()
     if test_ids_env:
@@ -897,6 +924,8 @@ async def main() -> None:
     logging.info(f"Top N tests: {priority_count} (0 means all)")
     logging.info(f"Max parallel: {max_parallel}")
     logging.info(f"Repeats: {repeats}")
+    if usd_ceiling > 0:
+        logging.info(f"Spend ceiling: ${usd_ceiling:.4f} (matrix aborts when cumulative cost crosses it)")
     if benchmark_mode:
         logging.info("Benchmark mode enabled: balanced difficulty subset with explicit visit coverage")
     
@@ -996,11 +1025,22 @@ async def main() -> None:
         logging.info(f"Total test tasks: {len(test_tasks)}")
         
         semaphore = asyncio.Semaphore(max_parallel)
-        
+        # Cumulative-spend kill-switch. Shared across cells; once tripped, queued cells
+        # short-circuit (no further LLM spend). Meaningful under concurrency=1 (the barrage
+        # default) where cells run effectively serially through the semaphore.
+        spend_state = {"total_usd": 0.0, "tripped": False}
+
         async def run_with_semaphore(task):
             test_file, model_name, execution_variant, effort_tier, repeat_index = task
             queue_wait_start = time.perf_counter()
             async with semaphore:
+                if usd_ceiling > 0 and spend_state["tripped"]:
+                    logging.warning(
+                        f"[SPEND CEILING] skipping {extract_test_id(test_file)} {model_name} "
+                        f"{execution_variant} t{effort_tier} r{repeat_index} "
+                        f"(cumulative ${spend_state['total_usd']:.4f} >= ${usd_ceiling:.4f})"
+                    )
+                    return None
                 queue_wait_end = time.perf_counter()
                 queue_wait_seconds = max(0.0, queue_wait_end - queue_wait_start)
                 result = await run_single_test(
@@ -1023,6 +1063,14 @@ async def main() -> None:
                     execution_data = result.get("execution", {})
                     if isinstance(execution_data, dict):
                         execution_data["queue_wait_seconds"] = round(queue_wait_seconds, 2)
+                    if usd_ceiling > 0:
+                        spend_state["total_usd"] += _result_cost_usd(result)
+                        if spend_state["total_usd"] >= usd_ceiling and not spend_state["tripped"]:
+                            spend_state["tripped"] = True
+                            logging.error(
+                                f"[SPEND CEILING] cumulative cost ${spend_state['total_usd']:.4f} "
+                                f">= ${usd_ceiling:.4f} — aborting remaining cells."
+                            )
                 return result
         
         logging.info("Starting parallel test execution...")

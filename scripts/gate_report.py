@@ -68,9 +68,13 @@ def main() -> int:
         xs = [x for x in xs if x is not None]
         return statistics.mean(xs) if xs else None
 
+    def _std(xs):
+        xs = [x for x in xs if x is not None]
+        return statistics.stdev(xs) if len(xs) >= 2 else 0.0
+
     for model in models:
         print(f"\n=== {model} ===")
-        print("SCORE (mean, n)")
+        print("SCORE (mean +/- stdev, n)")
         print("test  " + "".join(f"{l:>18}" for l in labels))
         for t in tests:
             row = f"{t:<6}"
@@ -79,8 +83,10 @@ def main() -> int:
                 if not vals:
                     row += f"{'-':>18}"
                 else:
-                    m = _mean([v[0] for v in vals])
-                    row += f"{(f'{m:.2f}' if m is not None else 'na'):>13}(n{len(vals)})"
+                    scores = [v[0] for v in vals]
+                    m = _mean(scores)
+                    cell = f"{m:.2f}±{_std(scores):.2f}(n{len(vals)})" if m is not None else "na"
+                    row += f"{cell:>18}"
             print(row)
         print("RUNTIME USD (mean)")
         print("test  " + "".join(f"{l:>18}" for l in labels))

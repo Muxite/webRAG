@@ -15,10 +15,16 @@
 # COSTS REAL MONEY (OpenRouter) + needs ChromaDB on :8001. User-triggered; not run automatically.
 # Concurrency=1 is MANDATORY (shared connectors). See COST_BENCHMARK_HANDOFF.md.
 #
-# NOTE on fixtures: 050-054 are URL-free (search-driven), so pages are discovered live. We RECORD
-# on the reference pass and REPLAY (replay-or-record, fills misses live) for cheap models. That is
-# not byte-identical evidence across models — acceptable for a first cross-shape pass; tighten to
-# replay_strict only after a prewarm that captures the discovered queries/URLs.
+# FIXTURE PARITY (two-pass): 050-054 are URL-free (search-driven), so pages are discovered at
+# runtime. To make every model see IDENTICAL, frozen evidence (and the run reproducible):
+#   1. DISCOVERY (replay-or-record): the reference records its pages; cheap models then fill any
+#      extra pages they discover -> the fixture cache holds the UNION of pages everyone needs.
+#   2. PREWARM CHECK ($0, replay_strict): prewarm_fixtures.py --from-run verifies every discovered
+#      page is cached before we spend on scoring.
+#   3. SCORED (replay_strict): every model replays the SAME pages; a miss FAILS instead of silently
+#      going live. (The model's own search QUERY still varies — that's behavior under test — but the
+#      page bytes are frozen.) Set FAIR_FIXTURES=0 to fall back to the old record/replay flow.
+# Optional: IDEA_TEST_USD_CEILING aborts the matrix once cumulative spend crosses it.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -32,8 +38,11 @@ TESTS="${TESTS:-050,051,052,053,054}"
 REFERENCE_MODEL="${REFERENCE_MODEL:-google/gemini-3.1-pro-preview}"
 AUTHOR_MODEL="${AUTHOR_MODEL:-$REFERENCE_MODEL}"   # strong model that authors B-auto plans offline
 CHEAP_MODELS="${CHEAP_MODELS:-google/gemini-2.5-flash,openai/gpt-5-mini,openai/gpt-4.1-nano,google/gemini-2.5-flash-lite}"
-REPEATS="${REPEATS:-3}"                            # error bars on the headline cells
+REPEATS="${REPEATS:-3}"                            # error bars on the headline cells (cheap models)
+REF_REPEATS="${REF_REPEATS:-1}"                    # the ceiling is one expensive number; n=1 by default
 RUN_ID="${RUN_ID:-xshape_$(date -u +%Y%m%d_%H%M%S)}"
+DISC_ID="disc_${RUN_ID}"                           # discovery pass tag; NOT a prefix of $RUN_ID so analysis ignores it
+FAIR_FIXTURES="${FAIR_FIXTURES:-1}"               # 1 = two-pass strict parity; 0 = legacy record/replay
 PY=(./.venv/bin/python -m agent.app.idea_test_runner)
 
 export IDEA_TEST_IDS="$TESTS"
@@ -53,21 +62,49 @@ echo "===== STAGE A: author B-auto plans offline (paid once) ====="
 ./.venv/bin/python scripts/compile_plans.py --tests "$TESTS" --author-model "$AUTHOR_MODEL" --max-tokens 4096 || exit 1
 ./.venv/bin/python scripts/compile_plans.py --tests "$TESTS" --dry-run
 
-echo "===== STAGE B: reference ceiling + record fixtures (A / C / B-hand) ====="
+# Scored stages use replay_strict when FAIR_FIXTURES=1 (after discovery seeds the cache), else replay.
+SCORED_FIXTURES=replay; [ "$FAIR_FIXTURES" = "1" ] && SCORED_FIXTURES=replay_strict
+
+echo "===== STAGE B: reference ceiling + seed fixture cache (A / C / B-hand) ====="
+# Reference runs in RECORD: it is the cache author AND the scored ceiling (n=$REF_REPEATS).
 env IDEA_TEST_MODELS="$REFERENCE_MODEL" MODEL_NAME="$REFERENCE_MODEL" \
     IDEA_TEST_EXECUTION_VARIANTS="graph,sequential_react,graph_compiled" \
     IDEA_TEST_COMPILED_PLAN_SOURCE=hand \
-    IDEA_TEST_RUNS=1 IDEA_TEST_FIXTURES=record \
+    IDEA_TEST_RUNS="$REF_REPEATS" IDEA_TEST_FIXTURES=record \
     "${PY[@]}"
 
-echo "===== STAGE C1: cheap models, A / C / B-hand (replay) ====="
+if [ "$FAIR_FIXTURES" = "1" ]; then
+  echo "===== STAGE B2: cheap DISCOVERY (replay-or-record, n=1, NOT scored) -> fills the page union ====="
+  # Tagged DISC_ID so these throwaway discovery files never pollute --run-id $RUN_ID analysis.
+  # Both hand and auto, so pages reached only under the compiler plan also get cached.
+  env IDEA_TEST_MODELS="$CHEAP_MODELS" MODEL_NAME="${CHEAP_MODELS%%,*}" \
+      IDEA_TEST_EXECUTION_VARIANTS="graph,sequential_react,graph_compiled" \
+      IDEA_TEST_COMPILED_PLAN_SOURCE=hand \
+      IDEA_TEST_RUN_ID="$DISC_ID" \
+      IDEA_TEST_RUNS=1 IDEA_TEST_FIXTURES=replay \
+      "${PY[@]}"
+  env IDEA_TEST_MODELS="$CHEAP_MODELS" MODEL_NAME="${CHEAP_MODELS%%,*}" \
+      IDEA_TEST_EXECUTION_VARIANTS="graph_compiled" \
+      IDEA_TEST_COMPILED_PLAN_SOURCE=auto \
+      IDEA_TEST_RUN_ID="${DISC_ID}_auto" \
+      IDEA_TEST_RUNS=1 IDEA_TEST_FIXTURES=replay \
+      "${PY[@]}"
+
+  echo "===== STAGE B3: prewarm cache-completeness CHECK (\$0, replay_strict) ====="
+  # Any miss here = a page some model needs is not cached; fix before the strict scored pass.
+  IDEA_TEST_FIXTURES=replay_strict ./.venv/bin/python scripts/prewarm_fixtures.py \
+      --from-run "$RUN_ID,$DISC_ID,${DISC_ID}_auto" || \
+      echo "  [warn] prewarm check reported gaps — scored strict pass may fail on those pages."
+fi
+
+echo "===== STAGE C1: cheap models, A / C / B-hand (${SCORED_FIXTURES}) ====="
 env IDEA_TEST_MODELS="$CHEAP_MODELS" MODEL_NAME="${CHEAP_MODELS%%,*}" \
     IDEA_TEST_EXECUTION_VARIANTS="graph,sequential_react,graph_compiled" \
     IDEA_TEST_COMPILED_PLAN_SOURCE=hand \
-    IDEA_TEST_RUNS="$REPEATS" IDEA_TEST_FIXTURES=replay \
+    IDEA_TEST_RUNS="$REPEATS" IDEA_TEST_FIXTURES="$SCORED_FIXTURES" \
     "${PY[@]}"
 
-echo "===== STAGE C2: cheap models, B-auto (compiler plans, replay) ====="
+echo "===== STAGE C2: cheap models, B-auto (compiler plans, ${SCORED_FIXTURES}) ====="
 # Distinct run-id suffix: B-auto's graph_compiled files must NOT overwrite C1's B-hand
 # graph_compiled files (same variant name). "$RUN_ID" is still a prefix of "${RUN_ID}_auto",
 # so --run-id "$RUN_ID" analysis picks up both passes.
@@ -75,7 +112,7 @@ env IDEA_TEST_MODELS="$CHEAP_MODELS" MODEL_NAME="${CHEAP_MODELS%%,*}" \
     IDEA_TEST_EXECUTION_VARIANTS="graph_compiled" \
     IDEA_TEST_COMPILED_PLAN_SOURCE=auto \
     IDEA_TEST_RUN_ID="${RUN_ID}_auto" \
-    IDEA_TEST_RUNS="$REPEATS" IDEA_TEST_FIXTURES=replay \
+    IDEA_TEST_RUNS="$REPEATS" IDEA_TEST_FIXTURES="$SCORED_FIXTURES" \
     "${PY[@]}"
 
 echo "===== STAGE D: analysis (by run_id=$RUN_ID) ====="

@@ -132,8 +132,14 @@ _THIN_EXTRACT_SYS = (
 
 def _votes_for_model(model_name: str) -> int:
     """Price-aware redundancy. A dirt-cheap (usually weaker) model spends its cheapness on MORE
-    independent extractions to vote/prune over; a premium model needs only one trustworthy call.
+    independent extractions to vote/prune over; a premium model needs fewer.
     Driven by the model's output price/Mtok (model_costs); override with IDEA_TEST_COMPILED_VOTES.
+
+    Premium floor is ``2`` (not 1): with ``k=1`` there is no consensus check and no repeat-cycle
+    to a 2nd page, so a single bad page on a breadth fan-out leaf yields UNKNOWN with no recovery
+    — the thin-on-reference breadth dropout (ref 052 ≈ 0.34 was *vote coverage*, not grounding).
+    ``k=2`` restores the rescue path while staying far cheaper than the cheap-model k=5. (Only the
+    thin leaf votes; the default react leaf is unaffected.)
     """
     override = os.environ.get("IDEA_TEST_COMPILED_VOTES", "").strip()
     if override.isdigit():
@@ -149,7 +155,7 @@ def _votes_for_model(model_name: str) -> int:
         return 5            # dirt cheap -> heavy redundancy
     if out_price <= 5.0:
         return 3
-    return 1               # premium -> trust a single call
+    return 2               # premium -> minimal redundancy, but >1 so breadth leaves can recover
 
 
 def _thin_max_tokens_for_model(model_name: str) -> int:
