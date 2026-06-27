@@ -143,7 +143,11 @@ def _write_csv(agg: List[Dict[str, Any]], path: Path) -> None:
             w.writerow(row)
 
 
-def _plot(agg: List[Dict[str, Any]], lines: Dict[str, Dict[str, Any]], reference_models: List[str], out: Path) -> bool:
+MIN_SIDE_PX = 1920  # exported plots must be square and at least this on a side
+
+
+def _plot(agg: List[Dict[str, Any]], lines: Dict[str, Dict[str, Any]], reference_models: List[str],
+          out: Path, side_px: int = MIN_SIDE_PX, dpi: int = 160) -> bool:
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -152,40 +156,66 @@ def _plot(agg: List[Dict[str, Any]], lines: Dict[str, Dict[str, Any]], reference
         print(f"[plot skipped] matplotlib unavailable: {exc}", file=sys.stderr)
         return False
 
-    fig, ax = plt.subplots(figsize=(11, 7))
+    def _short(model: str) -> str:  # drop the provider prefix so the legend fits
+        return model.split("/")[-1]
+
+    side_px = max(MIN_SIDE_PX, int(side_px))
+    inches = side_px / float(dpi)
+    fig, ax = plt.subplots(figsize=(inches, inches), dpi=dpi)
+    # Reserve the bottom of the square canvas for the legend so it never overlaps the data.
+    fig.subplots_adjust(left=0.11, right=0.97, top=0.92, bottom=0.24)
+
     cheap = [a for a in agg if a["model"] not in reference_models]
     models = sorted({a["model"] for a in cheap})
     cmap = plt.get_cmap("tab10")
 
     for idx, model in enumerate(models):
         color = cmap(idx % 10)
-        graph_pts = sorted([a for a in cheap if a["model"] == model and a["variant"] in ENGINE_VARIANTS], key=lambda a: a["usd"])
+        graph_pts = sorted([a for a in cheap if a["model"] == model and a["variant"] in ENGINE_VARIANTS],
+                           key=lambda a: a["usd"])
         if graph_pts:
-            ax.plot([p["usd"] for p in graph_pts], [p["score"] for p in graph_pts], "-o", color=color, label=f"{model} (webRAG)")
+            xs = [p["usd"] for p in graph_pts]
+            ys = [p["score"] for p in graph_pts]
+            yerr = [p.get("score_ci95", 0.0) for p in graph_pts]
+            ax.errorbar(xs, ys, yerr=yerr, fmt="-o", color=color, lw=2.4, ms=8, capsize=5,
+                        elinewidth=1.4, label=f"{_short(model)} (webRAG)")
+            best = max(graph_pts, key=lambda a: a["score"])  # annotate each model's best point
+            ax.annotate(f"{best['score']:.2f}", (best["usd"], best["score"]),
+                        textcoords="offset points", xytext=(0, 11), ha="center",
+                        fontsize=12, color=color, fontweight="bold")
         base_pts = [a for a in cheap if a["model"] == model and a["variant"] in BASELINE_VARIANTS]
         if base_pts:
-            ax.scatter([p["usd"] for p in base_pts], [p["score"] for p in base_pts], marker="x", color=color, s=60, label=f"{model} (baseline)")
+            ax.scatter([p["usd"] for p in base_pts], [p["score"] for p in base_pts],
+                       marker="x", color=color, s=120, linewidths=2.4, label=f"{_short(model)} (baseline)")
 
     if "premium_raw" in lines:
         ln = lines["premium_raw"]
-        ax.axhline(ln["score"], linestyle="--", color="gray", linewidth=1.2, label=f"premium-raw ({ln['model']}) = {ln['score']:.2f}")
+        ax.axhline(ln["score"], linestyle="--", color="gray", linewidth=1.8,
+                   label=f"premium-raw ({_short(ln['model'])}) = {ln['score']:.2f}")
     if "premium_webrag" in lines:
         ln = lines["premium_webrag"]
-        ax.axhline(ln["score"], linestyle="-.", color="black", linewidth=1.2, label=f"premium+webRAG ({ln['model']}) = {ln['score']:.2f}")
+        ax.axhline(ln["score"], linestyle="-.", color="black", linewidth=1.8,
+                   label=f"premium+webRAG ({_short(ln['model'])}) = {ln['score']:.2f}")
 
     frontier = _pareto(agg)
     if frontier:
-        ax.plot([p["usd"] for p in frontier], [p["score"] for p in frontier], ":", color="red", linewidth=1.0, alpha=0.7, label="Pareto frontier")
+        ax.plot([p["usd"] for p in frontier], [p["score"] for p in frontier], ":", color="red",
+                linewidth=2.0, alpha=0.75, label="Pareto frontier")
 
-    ax.set_xlabel("Realized cost (USD, mean per run)")
-    ax.set_ylabel("Quality (mean validation score)")
-    ax.set_title("Cost-recovery curve: cheap model + webRAG vs premium reference")
+    ax.set_xlabel("Realized cost (USD, mean per run, log scale)", fontsize=16)
+    ax.set_ylabel("Quality (mean validation score)", fontsize=16)
+    ax.set_title("Cost-recovery curve: cheap model + webRAG vs premium reference",
+                 fontsize=19, fontweight="bold", pad=14)
     ax.set_xscale("log")
-    ax.grid(True, which="both", linestyle=":", alpha=0.4)
-    ax.legend(fontsize=8, loc="lower right")
-    fig.tight_layout()
-    fig.savefig(out, dpi=130)
-    print(f"Wrote plot -> {out}")
+    ax.tick_params(axis="both", labelsize=13)
+    ax.grid(True, which="both", linestyle=":", alpha=0.45)
+    ax.margins(y=0.08)
+    # Legend below the axes, multi-column, so a busy roster stays readable.
+    ncol = 3 if len(models) >= 5 else 2
+    ax.legend(fontsize=12, loc="upper center", bbox_to_anchor=(0.5, -0.10), ncol=ncol,
+              frameon=True, borderaxespad=0.0, columnspacing=1.2, handletextpad=0.5)
+    fig.savefig(out, dpi=dpi)
+    print(f"Wrote plot -> {out} ({side_px}x{side_px}px)")
     return True
 
 
@@ -200,6 +230,9 @@ def main(argv: List[str]) -> int:
     parser.add_argument("--tests", default="", help="Comma-separated test_ids to include (default all)")
     parser.add_argument("--out", default="", help="Plot PNG output path")
     parser.add_argument("--csv", default="", help="CSV output path")
+    parser.add_argument("--size", type=int, default=MIN_SIDE_PX,
+                        help=f"square plot side in px (clamped to >= {MIN_SIDE_PX})")
+    parser.add_argument("--dpi", type=int, default=160)
     args = parser.parse_args(argv)
 
     results_dir = _results_dir()
@@ -258,7 +291,7 @@ def main(argv: List[str]) -> int:
             print(f"    CROSSES: {c['model']} tier={c['tier']} score={c['score']:.3f} at {pct:.0f}% of reference cost")
 
     out_path = Path(args.out) if args.out else results_dir / "recovery_curve.png"
-    _plot(agg, lines, reference_models, out_path)
+    _plot(agg, lines, reference_models, out_path, side_px=args.size, dpi=args.dpi)
     return 0
 
 
