@@ -382,3 +382,77 @@ speedup is probably real but the absolute numbers aren't comparable to nano's ba
 directionally consistent second data point for the speedup, but answer-agreement generalization
 remains unconfirmed** — would need a cell with actual passing/varying outcomes on a second model to
 test that specifically. Still opt-in, default stays sequential.
+
+**Addendum — two more cells (`test_061`/`parallel_merge`, `test_092`/`chain`, both `gpt-4.1-nano`),
+~$0.042 spent:** speedup now **4-for-4** across every cell tested (`test_055`/nano, `test_055`/
+gpt-5-mini, `test_061`/nano −25%, `test_092`/nano −28.5%) — the single most consistent finding in
+the whole ConSol-batching arc. **New wrinkle: cost is a wash, not a clean win.** Batched was
+slightly *more* expensive on both new cells (+12.6% on 061, +15.5% on 092) — opposite of the
+original `test_055`/nano cell where batched was cheapest. Softening the earlier "cost held/improved"
+framing to "cost is a wash, direction cell-dependent." **Answer-agreement still not cleanly
+confirmed**: `test_061` showed real pass/fail variance (good — not near-ceiling) but the pass-rate
+shift (40%→60%, n=5) is within ordinary binomial noise, not a tight replication; `test_092` hit
+**the same wrong-grounding failure floor** as the `test_055`/gpt-5-mini cell — 0/5 pass both
+conditions, identical checkpoint-failure signature every run (nano's thin-leaf extraction never
+reliably grounds the Trujillo elevation figure, e.g. reporting "16" or "approximately 646 m" against
+a true 564m). **This is now a third independent sighting of the same thin-leaf grounding class the
+Phase 5 grounding-fix thread (below) just addressed** — worth a targeted re-test of `test_092` under
+the fixed `execution_compiled.py` once that lands, separate from the `test_055` retest script.
+Verdict unchanged: opt-in, default stays sequential, speedup is real and reproducible, cost/agreement
+claims should stay conservative pending cells that aren't failure-floored.
+
+---
+
+# Phase 6 (2026-07-10): E-valuator instrumentation, grounding fix, 24+ new tasks, connector API
+
+Following a further user request, four more threads landed in the same session:
+
+**E-valuator instrumentation (Priority 2, the missing ingredient from Phase 5).** Built the opt-in
+decorrelated per-step confidence judge Phase 5's pilot verdict called for: `got_step_confidence_
+judge_enabled` (JSON default `false`), a leak-free LLM judge (`got_operations.judge_step_confidence()`,
+sees only task + resolved content, never grep validators or ground truth) fired once per leaf
+completion (subsampled via `got_step_confidence_judge_sample_every`), wired into both the sequential
+`_apply_action_result` hook and the auto-parallel batch path. `evaluator_pilot.py` gained a
+`--source {grep,confidence}` flag. Cost analysis: ~$0.0005-0.001/run, ~40-50% more LLM calls on graph
+runs (bounded by the subsample knob) — trivial in $. **Offline-only proof (no live $ spent)**: a
+synthetic decorrelated substrate (n=400, overlapping-mean confidence sequences) produced **FAR=0.029
+at alpha=0.1 and FAR=0.155 at alpha=0.2** — strictly non-trivial (not the grep substrate's degenerate
+0.000) and within the PAC bound both times, confirming the pilot machinery works correctly once given
+a genuinely decorrelated signal. **A real live pilot against this new signal has not yet been run** —
+turnkey handoff prepared (`IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE=1`, test_095+test_055, nano, R=3,
+graph variant, <$0.05) for whoever picks this up next.
+
+**Thin-leaf grounding fix (root cause found and fixed, not just diagnosed).** Two compounding bugs in
+`execution_compiled.py`: (1) `_target_entity()` grabbed a quoted novel/work title verbatim as the
+search/visit target for INDIRECT two-hop leaves ("find the author of X, then open the author's
+page"), so thin leaves (no self-correcting loop, unlike full `react`) grounded on the wrong page and
+returned UNKNOWN — fixed with an `_INDIRECT_TARGET_CUE` guard that defers to the LLM query instead;
+(2) gpt-5-mini's hidden reasoning tokens were consuming the entire 64-token thin-extraction budget,
+returning `content=None` even on a correctly-grounded page — fixed with a reasoning-model floor on
+the token budget plus `reasoning_effort="minimal"` on thin micro-prompts. Also added `_strip_
+approximators()` to `_vote_key` (strips "approximately"/"~"/unit noise before voting, never rounds or
+fuzzy-matches the actual value) — covers both the fixed-k and ConSol voting paths since both route
+through `_vote_key`. +13 offline tests, offline suite green throughout. **Live re-verification is
+in progress** as of this doc's last edit (turnkey `scripts/retest_055_grounding.sh` dispatched to the
+benchmark agent, plus a targeted `test_092` re-check since that ConSol-matrix cell hit the identical
+grounding cascade this same fix addresses) — update this section once results land.
+
+**24 new "mixed" (branch-eliminate + chain) benchmark tasks (Priority 6, well beyond the "2-3
+standing option" framing).** Orchestrated as: one Opus planning pass (topic ideation + dedup check
+against all 97 existing tasks) then 4 parallel `task-author` agents (6 tasks each, ids 098-121),
+live-verifying every keystone via WebSearch/WebFetch, explicitly calibrated so a premium model using
+plain sequential reasoning should land "decent, not perfect" (matching test_095's own difficulty
+band) rather than trivially acing the task. **Still landing as of this doc's last edit** — update
+final task count/topics once the authoring workflow completes.
+
+**Connector API (new, independent of the benchmark suite).** `services/connector_api/` — a FastAPI
+service wrapping the exact tool surface `idea_engine`'s action layer uses (`ConnectorSearch.
+query_search`, `ConnectorBrowser.fetch_page`/`ConnectorHttp.request`), so task-authoring agents can
+pre-verify a candidate page/query is reachable BEFORE writing a benchmark task around it (per the
+project owner's principle: connector failures are not the engine's fault, and a task shouldn't ship
+whose failure mode is actually infrastructure). `POST /search`, `POST /visit` (returns a real
+reachability verdict + failure reason, never a bare 5xx on an unreachable URL), `GET /health`, free
+OpenAPI docs. No auth, container-network-only on port `13375` (no host port mapping) — matches the
+"local access only is fine" decision. **100% test coverage on the new service** (26 tests, fully
+mocked connectors), 899 passed repo-wide with no regressions. Docker build itself unverified (no
+daemon in this environment) — flagged as a manual follow-up.

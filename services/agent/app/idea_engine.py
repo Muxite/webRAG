@@ -76,13 +76,24 @@ class IdeaDagEngine:
             list(post_expansion_hooks) if post_expansion_hooks is not None else default_post_expansion_hooks()
         )
         self._step_index = 0
+        self._step_confidences: List[Dict[str, Any]] = []
+        self._leaf_completion_count = 0
         self._memory_manager: Optional[MemoryManager] = None
         self._got: Optional[GoTOperations] = None
         self._checkpointer: Optional[Checkpointer] = create_checkpointer_from_env()
 
-    async def run(self, mandate: str, max_steps: int = 50, run_id: Optional[str] = None, fail_soft: bool = False) -> Dict[str, Any]:
-        mandate_short = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate[:100]
-        self._logger.info(f"[RUN] Starting idea DAG engine with mandate: {mandate_short}..., max_steps={max_steps}, run_id={run_id}")
+    async def prepare(self, mandate: str, run_id: Optional[str] = None) -> tuple:
+        """Canonical engine/graph setup shared by `run()` and the interactive debugger.
+
+        Computes the memo namespace, wires the per-run memory manager and GoT
+        operations, resets per-run instrumentation, and produces the starting
+        graph. When ``run_id`` is given and a checkpoint exists it restores the
+        saved snapshot (graph/current_id/steps + dead-end + parallel-leaf counters);
+        otherwise it constructs a fresh graph rooted at the mandate.
+
+        Returns ``(graph, current_id, steps)``. Callers that do not checkpoint
+        (e.g. ``debug_runner``) can ignore ``steps`` and use ``graph`` directly.
+        """
         namespace = self._memo_namespace(mandate)
         self.settings[DetailKey.MEMO_NAMESPACE.value] = namespace
         self._memory_manager = MemoryManager(
@@ -98,6 +109,9 @@ class IdeaDagEngine:
         # Reset the one-time candidate-coverage budget extension for this run (an engine
         # instance can be reused across runs; the extension must never carry over).
         self._candidate_coverage_extension_applied = False
+        # Reset per-run step-confidence instrumentation (opt-in; empty when the flag is off).
+        self._step_confidences = []
+        self._leaf_completion_count = 0
         root_title = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate
 
         graph: Optional[IdeaDag] = None
@@ -132,6 +146,12 @@ class IdeaDagEngine:
             graph = IdeaDag(root_title=root_title, root_details={"mandate": mandate, "memo_namespace": namespace})
             current_id = graph.root_id()
             self._logger.info(f"[RUN] Created graph with root_id={current_id}")
+        return graph, current_id, steps
+
+    async def run(self, mandate: str, max_steps: int = 50, run_id: Optional[str] = None, fail_soft: bool = False) -> Dict[str, Any]:
+        mandate_short = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate[:100]
+        self._logger.info(f"[RUN] Starting idea DAG engine with mandate: {mandate_short}..., max_steps={max_steps}, run_id={run_id}")
+        graph, current_id, steps = await self.prepare(mandate, run_id=run_id)
         # Checkpoint save is a run()-only concern (`run_id` is never passed by the benchmark
         # harness). Wire it as the shared loop's per-step hook so `_run_loop` stays generic.
         on_step = None
@@ -350,6 +370,11 @@ class IdeaDagEngine:
                 "nodes_pruned": pruned_count,
                 "parallel_leaves_total": getattr(self, "_parallel_leaves_total", 0),
             }
+
+        # Opt-in decorrelated per-step confidence trace (empty/absent when the flag is off),
+        # surfaced so the E-valuator pilot can consume it as a real verifier-score sequence.
+        if self._cfg.got.step_confidence_judge_enabled and self._step_confidences:
+            final_payload["step_confidences"] = list(self._step_confidences)
 
         # Grounding verdict for the final answer (substantiation mandates only). Surfaced
         # in the result so observability/groundedness reflect real visited-page evidence.
@@ -1231,6 +1256,13 @@ class IdeaDagEngine:
                     if node and node.status == IdeaNodeStatus.DONE:
                         done_children.append(cid)
 
+            # Opt-in decorrelated per-step confidence judge for the batch-completed siblings
+            # (the auto-parallel path bypasses `_apply_action_result`, so wire it here too —
+            # the same coverage requirement the re-expansion check has). No-op when the flag
+            # is off; per-sibling judge calls run concurrently inside the batch helper.
+            if done_children:
+                await self._maybe_judge_step_confidence_batch(graph, done_children, step_index)
+
             # The per-sibling re-expansion checks are independent LLM calls, so run
             # them concurrently (mirrors the action-execution gather above) instead of
             # one blocking await at a time. Mutation-free `_reexpand_check` is safe to
@@ -1443,8 +1475,55 @@ class IdeaDagEngine:
         status = self._handle_action_result(graph, node_id, step_index)
         node = graph.get_node(node_id)
         if node and node.status == IdeaNodeStatus.DONE:
+            await self._maybe_judge_step_confidence(graph, node_id, step_index)
             await self._maybe_reexpand_leaf(graph, node_id, step_index)
         return status
+
+    async def _maybe_judge_step_confidence(self, graph: IdeaDag, node_id: str, step_index: int) -> None:
+        """Single-leaf wrapper over the batch judge (sequential/merge completion paths)."""
+        await self._maybe_judge_step_confidence_batch(graph, [node_id], step_index)
+
+    async def _maybe_judge_step_confidence_batch(self, graph: IdeaDag, node_ids: List[str], step_index: int) -> None:
+        """Emit an opt-in, decorrelated per-step confidence signal for completed leaves.
+
+        No-op unless ``got.step_confidence_judge_enabled`` is set (JSON default False), so
+        the default path is byte-identical. Fires once per leaf completion across every
+        routing branch (the sequential completion point and the auto-parallel batch).
+        ``sample_every`` subsamples (judge every Nth completion) to bound the added call
+        volume; the counter advances deterministically in the given order so subsampling is
+        reproducible regardless of concurrency. The judge (``GoTOperations.judge_step_confidence``)
+        sees only trajectory-visible context — never the grep validators or ground truth — so the
+        logged sequence is a genuine E-valuator substrate, decorrelated from the final
+        grep-computed label. The per-leaf judge calls run concurrently; this never raises.
+        """
+        if not self._cfg.got.step_confidence_judge_enabled or not self._got:
+            return
+        sample_every = max(1, int(self._cfg.got.step_confidence_judge_sample_every))
+        selected: List[str] = []
+        for node_id in node_ids:
+            self._leaf_completion_count += 1
+            if (self._leaf_completion_count - 1) % sample_every == 0:
+                selected.append(node_id)
+        if not selected:
+            return
+        verdicts = await asyncio.gather(
+            *[self._got.judge_step_confidence(graph, nid, model_name=self.model_name) for nid in selected],
+            return_exceptions=True,
+        )
+        for nid, verdict in zip(selected, verdicts):
+            if isinstance(verdict, Exception):
+                self._logger.warning(f"[STEP {step_index}] step-confidence judge failed (node={nid}): {verdict}")
+                continue
+            if not verdict:
+                continue
+            node = graph.get_node(nid)
+            self._step_confidences.append({
+                "step": step_index,
+                "node_id": nid,
+                "kind": NodeDetailsExtractor.get_action(node.details) if node else None,
+                "confidence": verdict.get("confidence"),
+                "reason": verdict.get("reason", ""),
+            })
 
     def _handle_action_result(self, graph: IdeaDag, node_id: str, step_index: int) -> str:
         node = graph.get_node(node_id)

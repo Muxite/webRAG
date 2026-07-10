@@ -64,6 +64,29 @@ def test_optional_string_models_pass_through():
     ).telemetry_routing_score_model == "gpt-5-mini"
 
 
+def test_step_confidence_judge_fields_default_off():
+    # Opt-in instrumentation: default OFF, sample every step, no model override.
+    cfg = GoTConfig.from_settings({})
+    assert cfg.step_confidence_judge_enabled is False
+    assert cfg.step_confidence_judge_temperature == 0.0
+    assert cfg.step_confidence_judge_sample_every == 1
+    assert cfg.step_confidence_judge_model is None
+
+
+def test_step_confidence_judge_overrides_and_coercion():
+    cfg = GoTConfig.from_settings({
+        "got_step_confidence_judge_enabled": 1,           # truthy -> bool
+        "got_step_confidence_judge_temperature": "0.3",   # str -> float
+        "got_step_confidence_judge_sample_every": "2",    # str -> int
+        "got_step_confidence_judge_model": "gpt-4.1-nano",
+    })
+    assert cfg.step_confidence_judge_enabled is True
+    assert cfg.step_confidence_judge_temperature == 0.3
+    assert isinstance(cfg.step_confidence_judge_sample_every, int)
+    assert cfg.step_confidence_judge_sample_every == 2
+    assert cfg.step_confidence_judge_model == "gpt-4.1-nano"
+
+
 def test_frozen_view_is_immutable():
     import dataclasses
     cfg = GoTConfig.from_settings({})

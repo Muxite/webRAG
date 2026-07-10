@@ -202,6 +202,8 @@ class Renderer:
             f"  {CYN}p{R}         print action result\n"
             f"  {CYN}l{R}         list children\n"
             f"  {CYN}g{R}         graph (full ASCII DAG)\n"
+            f"  {CYN}e{R}         edit (override this node's resolved content)\n"
+            f"  {CYN}f{R} <note>  feedback (one-shot human steer for next expansion)\n"
             f"  {CYN}q{R}         quit\n"
             f"  {CYN}h{R} / {CYN}?{R}     help\n"
         )

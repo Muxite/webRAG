@@ -241,7 +241,49 @@ class DebugSession:
                 self._out(Renderer.ascii_dag(self._graph))
                 continue
 
+            if cmd.action == Action.EDIT:
+                self._apply_edit(node)
+                continue
+
+            if cmd.action == Action.FEEDBACK:
+                self._apply_feedback(node, cmd.arg)
+                continue
+
             return cmd.action
+
+    def _apply_edit(self, node: IdeaNode) -> None:
+        """Override the current node's resolved answer with hand-written text.
+
+        Writes into the node's ACTION_RESULT content — the same detail the rest of
+        the pipeline (finalize, result_card) reads for a leaf's resolved answer.
+        """
+        self._out("  edit: type replacement content; blank line ends, empty cancels.")
+        text = self._ctrl.read_multiline("  edit> ", "  …    ")
+        if not text.strip():
+            self._out("  (edit cancelled)")
+            return
+        existing = self._graph.get_node(node.node_id)
+        if not existing:
+            return
+        result = dict(existing.details.get(DetailKey.ACTION_RESULT.value) or {})
+        result["content"] = text
+        result["success"] = True
+        result["human_edited"] = True
+        self._graph.update_details(node.node_id, {DetailKey.ACTION_RESULT.value: result})
+        self._out(f"  content overridden ({len(text)} chars).")
+
+    def _apply_feedback(self, node: IdeaNode, arg: str = "") -> None:
+        """Inject a single-use human steer for the node's NEXT expansion only.
+
+        Written to DetailKey.HUMAN_FEEDBACK; the expansion policy surfaces it once
+        and immediately consumes-and-clears it (never persists on the subtree).
+        """
+        note = (arg or "").strip() or self._ctrl.read_line("  feedback> ").strip()
+        if not note:
+            self._out("  (feedback cancelled)")
+            return
+        self._graph.update_details(node.node_id, {DetailKey.HUMAN_FEEDBACK.value: note})
+        self._out("  feedback queued for next expansion.")
 
     def _handle_info(self, cmd: Cmd, node: IdeaNode) -> None:
         arg = cmd.arg.strip().lower()

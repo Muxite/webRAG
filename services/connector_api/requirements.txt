@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic>=2
+aiohttp
+playwright
+beautifulsoup4
+httpx
+pytest
+pytest-asyncio
+pytest-cov

@@ -255,6 +255,30 @@ TEST_PRIORITY_ORDER = [
     "095",  # Tier 5: branch-to-eliminate then chain forward — Rivers Avon (English-Channel survivor) -> Dorset Stour catchment (10/10) - level=graph, weight=long
     "096",  # Tier 5: URL-free 3-hop dependent chain C, leak-resistant terminus (Earhart -> Atchison elevation) (9/10) - level=graph, weight=long
     "097",  # Tier 5: URL-free 3-hop dependent chain D, leak-resistant terminus (Goya -> Fuendetodos elevation) (9/10) - level=graph, weight=long
+    "098",  # Tier 5: branch-to-eliminate then chain forward — Royal Observatories (Cape=southern) -> McClean/Victoria refractor aperture (9/10) - level=graph, weight=long
+    "099",  # Tier 5: branch-to-eliminate then chain forward — St. Stephen's cathedrals (Passau=largest organ) -> organ pipe count (9/10) - level=graph, weight=long
+    "100",  # Tier 5: branch-to-eliminate (argmax) then chain forward — F1 street circuits (Baku=longest) -> Maiden Tower height (9/10) - level=graph, weight=long
+    "101",  # Tier 5: branch-to-eliminate then chain forward — Cassini features (Regio on Iapetus) -> Iapetus mean radius (9/10) - level=graph, weight=long
+    "102",  # Tier 5: branch-to-eliminate then chain forward — musician airports (Armstrong=jazz trumpeter) -> longest runway (9/10) - level=graph, weight=long
+    "103",  # Tier 5: branch-to-eliminate then chain forward — Olympic stadiums (Montreal=inclined tower) -> Montreal Tower height (9/10) - level=graph, weight=long
+    "104",  # Tier 5: branch-eliminate then chain — giant titanosaurs -> most-complete Dreadnoughtus -> scapula length 1.74 m (10/10) - level=graph, weight=long
+    "105",  # Tier 5: branch-eliminate then chain — 'Star of ...' gems -> sapphire-at-AMNH Star of India -> 563.35 ct (10/10) - level=graph, weight=long
+    "106",  # Tier 5: branch-eliminate then chain — Royal Botanic Gardens -> largest-canopy Kolkata -> Great Banyan prop roots 3,772 (10/10) - level=graph, weight=long
+    "107",  # Tier 5: branch-eliminate then chain — tall lighthouses -> tallest-stone Île Vierge -> 360 steps / 82.5 m (10/10) - level=graph, weight=long
+    "108",  # Tier 5: branch-eliminate then chain — Ytterby elements -> highest-Z Ytterbium -> melting point 824 °C (10/10) - level=graph, weight=long
+    "109",  # Tier 5: branch-eliminate then chain — record waterfalls -> European Vinnufossen -> tallest single drop 575 m (10/10) - level=graph, weight=long
+    "110",  # Tier 5: branch-eliminate then chain — 'Mark 1' computers -> first-commercial Ferranti Mark 1 -> valve count (9/10) - level=graph, weight=long
+    "111",  # Tier 5: branch-eliminate then chain — World Marathon Majors -> record-ineligible Boston -> net elevation drop (9/10) - level=graph, weight=long
+    "112",  # Tier 5: branch-eliminate then chain — Jupiter probes -> first-to-Jupiter Pioneer 10 -> antenna diameter (9/10) - level=graph, weight=long
+    "113",  # Tier 5: branch-eliminate then chain — largest castles -> largest-by-area Malbork -> enclosed land area (9/10) - level=graph, weight=long
+    "114",  # Tier 5: branch-eliminate then chain — oldest metros -> oldest-continental Budapest Line 1 -> length/stations (9/10) - level=graph, weight=long
+    "115",  # Tier 5: branch-eliminate then chain — largest deserts (polar trap) -> Antarctic -> Vostok record low (9/10) - level=graph, weight=long
+    "116",  # Tier 5: branch-eliminate then chain — impact craters (Chicxulub decoy) -> largest-verified Vredefort -> age 2.023 Ga (10/10) - level=graph, weight=long
+    "117",  # Tier 5: branch-eliminate then chain — forts 'Fort George' -> post-Culloden Highland fort -> £92,673 build budget (10/10) - level=graph, weight=long
+    "118",  # Tier 5: branch-eliminate then chain — ratites (ostrich decoy) -> dangerous cassowary -> inner-toe claw 12 cm (10/10) - level=graph, weight=long
+    "119",  # Tier 5: branch-eliminate then chain — great bells (Tsar Bell decoy) -> ringing Mingun Bell -> 55,555 viss (10/10) - level=graph, weight=long
+    "120",  # Tier 5: branch-eliminate then chain — Cleopatra's Needles (London/Paris traps) -> NY obelisk -> 112-day transit (10/10) - level=graph, weight=long
+    "121",  # Tier 5: branch-eliminate then chain — record caves (Mammoth decoy) -> deepest Krubera -> mapped length 16.058 km (10/10) - level=graph, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12
@@ -1005,9 +1029,20 @@ async def main() -> None:
     _reexpand_override = os.environ.get("IDEA_TEST_GOT_REEXPAND", "").strip()
     if _reexpand_override:
         idea_settings["got_reexpand_enabled"] = _is_enabled(_reexpand_override)
+    # IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE: per-run toggle for the opt-in decorrelated
+    # per-step LLM-judge confidence instrumentation (got_step_confidence_judge_enabled).
+    # Off by default; enable it only for the E-valuator substrate pilot so a real,
+    # partially-informative verifier-score sequence is logged into observability.
+    _stepconf_override = os.environ.get("IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE", "").strip()
+    if _stepconf_override:
+        idea_settings["got_step_confidence_judge_enabled"] = _is_enabled(_stepconf_override)
+    _stepconf_every = os.environ.get("IDEA_TEST_GOT_STEP_CONFIDENCE_SAMPLE_EVERY", "").strip()
+    if _stepconf_every:
+        idea_settings["got_step_confidence_judge_sample_every"] = max(1, int(_stepconf_every))
     logging.info(
         f"Idea DAG settings source: {_settings_path_override or '(default idea_dag_settings.json)'} "
         f"| got_reexpand_enabled={idea_settings.get('got_reexpand_enabled')}"
+        f" | got_step_confidence_judge_enabled={idea_settings.get('got_step_confidence_judge_enabled')}"
     )
     idea_settings["log_dag_ascii"] = False
     idea_settings["log_dag_step_interval"] = 0

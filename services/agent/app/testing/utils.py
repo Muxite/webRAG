@@ -136,6 +136,30 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
         replans = int(result.get("grounding_replans", 0) or 0)
     stage_counts = Counter(d.get("stage") for d in decisions if isinstance(d, dict))
 
+    # Opt-in decorrelated per-step confidence trace (present only when the engine ran with
+    # got_step_confidence_judge_enabled). Summarized here so the E-valuator pilot can read an
+    # ordered S1..S_T verifier-score sequence per run alongside the grep-validation substrate.
+    step_confidence = None
+    if isinstance(output, dict):
+        raw_confidences = output.get("step_confidences")
+        if isinstance(raw_confidences, list) and raw_confidences:
+            seq = []
+            for entry in raw_confidences:
+                if not isinstance(entry, dict):
+                    continue
+                val = entry.get("confidence")
+                try:
+                    seq.append(float(val))
+                except (TypeError, ValueError):
+                    continue
+            if seq:
+                step_confidence = {
+                    "count": len(seq),
+                    "mean": round(sum(seq) / len(seq), 4),
+                    "sequence": seq,
+                    "trace": raw_confidences[:200],
+                }
+
     timings_summary = {}
     timings_per_call = []
     for timing in telemetry.timings:
@@ -264,5 +288,6 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
         },
         "timings": timings_summary,
         "timings_per_call": timings_per_call,
+        "step_confidence": step_confidence,
         "events_count": len(telemetry.events),
     }

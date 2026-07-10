@@ -297,6 +297,20 @@ services:
     networks:
       - enet
 
+  connector-api:
+    # Local-only reachability API: wraps the search/browser connectors so task
+    # authors can pre-verify a query/URL is reachable before writing a task.
+    # No host port mapping (container-network access only).
+    build:
+      context: .
+      dockerfile: connector_api/.dockerfile
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "13375"]
+    env_file:
+      - .env
+      - keys.env
+    networks:
+      - enet
+
   redis:
     image: redis:7-alpine
     ports:

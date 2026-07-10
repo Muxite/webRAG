@@ -77,6 +77,10 @@ class GoTConfig:
     reexpand_enabled: bool = False
     reexpand_max_iterations: int = 1
     reexpand_temperature: float = 0.2
+    step_confidence_judge_enabled: bool = False
+    step_confidence_judge_temperature: float = 0.0
+    step_confidence_judge_sample_every: int = 1
+    step_confidence_judge_model: Optional[str] = None
     candidate_coverage_enabled: bool = False
     candidate_coverage_budget_extension: int = 10
     adaptive_policies: bool = True

@@ -2,8 +2,45 @@ import pytest
 
 from agent.app.connector_base import ConnectorBase
 from agent.app.connector_search import ConnectorSearch
+from agent.app.testing.utils import summarize_observability
 from shared.connector_config import ConnectorConfig
 from shared.request_result import RequestResult
+
+
+class _EmptyTelemetry:
+    """Minimal telemetry with the empty collections summarize_observability reads."""
+
+    events = []
+    llm_usage = []
+    chroma_stored = []
+    chroma_retrieved = []
+    documents_seen = []
+    timings = []
+    decisions = []
+
+
+def test_summarize_observability_omits_step_confidence_when_absent():
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, _EmptyTelemetry())
+    assert obs["step_confidence"] is None
+
+
+def test_summarize_observability_summarizes_step_confidence_sequence():
+    output = {
+        "final_deliverable": "x",
+        "step_confidences": [
+            {"step": 0, "node_id": "a", "kind": "search", "confidence": 0.2, "reason": "weak"},
+            {"step": 1, "node_id": "b", "kind": "visit", "confidence": 0.8, "reason": "strong"},
+            {"step": 2, "node_id": "c", "kind": "visit", "confidence": "bad", "reason": "skip"},
+        ],
+    }
+    obs = summarize_observability({"output": output}, _EmptyTelemetry())
+    sc = obs["step_confidence"]
+    assert sc is not None
+    # The unparseable third entry is dropped from the numeric sequence but kept in the trace.
+    assert sc["sequence"] == [0.2, 0.8]
+    assert sc["count"] == 2
+    assert sc["mean"] == 0.5
+    assert len(sc["trace"]) == 3
 
 
 class FakeTelemetry:

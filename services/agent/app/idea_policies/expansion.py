@@ -498,6 +498,20 @@ class LlmExpansionPolicy(ExpansionPolicy):
             rules_block = _auto_reasoning_rules(self._root_mandate(graph))
         if rules_block:
             prefix_blocks.append(rules_block)
+        # Single-use human steer injected via the interactive debugger (agent-debug
+        # `f`/`feedback`). Surface it once, clearly labeled as a human steer, then
+        # consume-and-clear it so it never appears on a later expansion. No-op /
+        # byte-identical prompt when no feedback was ever injected.
+        if DetailKey.HUMAN_FEEDBACK.value in node.details:
+            # Consume-and-clear: remove the key from the live graph node so it never
+            # surfaces on a later expansion (of this or any other node). A blank
+            # value is cleared without surfacing, so it can't pollute later prompts.
+            feedback = node.details.pop(DetailKey.HUMAN_FEEDBACK.value, None)
+            if isinstance(feedback, str) and feedback.strip():
+                prefix_blocks.append(
+                    "HUMAN STEER (operator guidance for THIS expansion only; not part of "
+                    f"the task itself):\n{feedback.strip()}"
+                )
         if prefix_blocks:
             prefix = "\n".join(prefix_blocks)
             system = f"{prefix}\n{system}" if system else prefix

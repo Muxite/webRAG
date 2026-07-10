@@ -248,6 +248,33 @@ def _price_tier(model_name: str) -> str:
     return "premium"
 
 
+def _is_reasoning_model(model_name: str) -> bool:
+    """True for models that spend a HIDDEN reasoning budget out of the same completion allowance —
+    the gpt-5 family (and OpenAI o-series o1/o3/o4). These misbehave when classified by output
+    PRICE alone: gpt-5-mini is only ``mid`` ($2/Mtok) yet, being a reasoning model, drains a small
+    ``max_completion_tokens`` on reasoning before writing any visible content (``content=None`` /
+    ``finish_reason=length``). Callers floor such models to the premium token budget and hint
+    ``reasoning_effort=minimal`` on trivial perception prompts, independent of their price tier."""
+    bare = model_name.split("/", 1)[-1] if "/" in model_name else model_name
+    name, bare = model_name.lower(), bare.lower()
+    return any(s.startswith(("gpt-5", "o1", "o3", "o4-mini", "o4")) for s in (name, bare))
+
+
+def _thin_reasoning_effort(model_name: str) -> Optional[str]:
+    """Reasoning-effort hint for the thin micro-prompts (search query + value extraction). Thin
+    prompts are trivial perception ("read this value off the page") that need NO deliberation, so a
+    reasoning model should spend almost nothing on hidden reasoning — otherwise it starves its own
+    completion budget and returns empty content. ``minimal`` for reasoning models, else ``None``
+    (no-op; the connector only emits the hint for the gpt-5 family anyway). Override with
+    ``IDEA_TEST_COMPILED_THIN_REASONING_EFFORT`` (minimal|low|medium|high; empty/off -> disabled)."""
+    override = os.environ.get("IDEA_TEST_COMPILED_THIN_REASONING_EFFORT", "").strip().lower()
+    if override in ("0", "false", "off", "no", "none"):
+        return None
+    if override in ("minimal", "low", "medium", "high"):
+        return override
+    return "minimal" if _is_reasoning_model(model_name) else None
+
+
 def _thin_max_tokens_for_model(model_name: str) -> int:
     """Price-aware output budget for the thin micro-prompts (search query + value extraction).
 
@@ -267,6 +294,12 @@ def _thin_max_tokens_for_model(model_name: str) -> int:
     override = os.environ.get("IDEA_TEST_COMPILED_THIN_MAX_TOKENS", "").strip()
     if override.isdigit():
         return max(1, int(override))
+    # Reasoning models drain the completion budget on HIDDEN reasoning before any visible answer
+    # (gpt-5-mini is only ``mid`` by price yet starves a 64-token budget -> content=None). Floor
+    # them to the premium allowance regardless of price tier; the minimal-effort hint keeps the
+    # actual reasoning spend tiny, so this is headroom, not extra cost.
+    if _is_reasoning_model(model_name):
+        return 128
     tier = _price_tier(model_name)
     if tier == "unknown":
         return 64           # unknown price -> give room; starving a premium model is the failure
@@ -296,6 +329,10 @@ def _react_max_tokens_for_model(model_name: str, base: int) -> int:
     override = os.environ.get("IDEA_TEST_COMPILED_REACT_MAX_TOKENS", "").strip()
     if override.isdigit():
         return max(1, int(override))
+    # Reasoning models (gpt-5 family, o-series) get the premium multiplier regardless of price tier
+    # — a cheap-priced reasoning model like gpt-5-mini still needs the room its hidden reasoning eats.
+    if _is_reasoning_model(model_name):
+        return int(base * 4.4)
     tier = _price_tier(model_name)
     if tier == "cheap":
         return base
@@ -306,10 +343,33 @@ def _react_max_tokens_for_model(model_name: str, base: int) -> int:
     return int(base * 2.2)  # unknown -> mid-tier headroom
 
 
+# Superficial phrasing wrappers a model sprinkles around the SAME answer ('approximately 265 m',
+# 'about 265', '~265m'). Stripping them keeps one real answer in ONE vote bucket instead of
+# splitting the majority across format variants — WITHOUT touching the answer value itself (we
+# never round or fuzzy-match the digits: '265' and '275' stay distinct). Conservative on purpose.
+_VOTE_APPROX_WRAPPERS = re.compile(
+    r"\b(?:approximately|approx|about|around|roughly|nearly|almost|estimated|est|circa|ca|"
+    r"over|under|approx\.)\b\.?",
+    re.I,
+)
+_VOTE_TILDE = re.compile(r"[~≈]")
+
+
+def _strip_approximators(text: str) -> str:
+    """Remove leading/inline approximator wrappers and the '~'/'≈' prefixes ('approximately 265m',
+    '~265') so a value and its hedged phrasings share a vote bucket. Whitespace-collapsed; the
+    numeric/entity value is untouched — only the surrounding noise words go."""
+    cleaned = _VOTE_TILDE.sub(" ", text)
+    cleaned = _VOTE_APPROX_WRAPPERS.sub(" ", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
 def _vote_key(ans: str) -> str:
-    """Normalized voting key so equivalent answers vote together. Prefer the longest number token
-    when present ('1,642 m', '1642 metres', 'Max depth: 1,642' -> '1642'); else a cleaned text key."""
-    low = ans.strip().lower()
+    """Normalized voting key so equivalent answers vote together. Strips superficial phrasing noise
+    (approximators, '~', units/whitespace/case) FIRST, then prefers the longest number token when
+    present ('approximately 1,642 m', '1642 metres', 'Max depth: ~1,642' -> '1642'); else a cleaned
+    text key. Never rounds or fuzzy-matches the value, so genuinely different answers stay distinct."""
+    low = _strip_approximators(ans.strip().lower())
     nums = re.findall(r"\d[\d,]*", low)
     if nums:
         return max((n.replace(",", "") for n in nums), key=len)
@@ -331,6 +391,24 @@ _STOPWORDS = frozenset({
     "exact", "name", "search", "authoritative", "do", "not", "guess", "from", "memory",
 })
 _DISAMBIG_BAD = ("(disambiguation)", "disambiguation")
+
+# --- Indirect-pointer guard: a quoted subject can be a POINTER, not the answer-bearing page ------
+# A leaf like "Find the author of the novel 'The Shining', then open THAT AUTHOR's Wikipedia page
+# and read the university they attended" names the novel in quotes, but the answer (the university)
+# lives on the AUTHOR's page, not the novel's. The old ``_target_entity`` grabbed the quoted novel
+# and used it VERBATIM as both the search query and the page-pick grounding target, so the fixed
+# thin one-search/one-visit pipeline landed on the novel page and returned UNKNOWN (never reaching
+# the author). When the instruction redirects to a *different* entity's page ("that author's page",
+# "their Wikipedia page"), the quoted subject is only a pointer: return no target so the thin leaf
+# defers to the LLM query (which names the intermediate entity, e.g. "Stephen King alma mater") and
+# page-pick degrades to wiki-first ordering. A leaf that reads the answer off the quoted subject's
+# OWN page (".. for the novel 'Pride and Prejudice'. Read its author.") has no such cue and is
+# unchanged. Mirrors the existing "for the author <name>" dependent-hop fix for the intra-leaf hop.
+_INDIRECT_TARGET_CUE = re.compile(
+    r"\b(?:that\s+(?:author|writer|novelist|poet|director|creator|composer|founder|inventor|"
+    r"person|artist|actor|actress|painter|scientist|musician|singer)['’]?s|their)\b[^.]*\bpage\b",
+    re.I,
+)
 
 
 def _norm_tokens(text: str) -> List[str]:
@@ -378,6 +456,10 @@ def _target_entity(instruction: str) -> str:
         return _strip_source_tail(m.group(1))
     quoted = re.findall(r"['‘’“”\"]([^'‘’“”\"]+)['‘’“”\"]", instruction)
     if quoted:
+        # An indirect-pointer leaf ("author of '<quoted>' ... then open THAT AUTHOR's page") reads
+        # its answer off a redirected page, not the quoted subject's — defer to the LLM query.
+        if _INDIRECT_TARGET_CUE.search(instruction):
+            return ""
         return max(quoted, key=len).strip()
     return ""
 
@@ -460,6 +542,7 @@ async def _thin_extract_once(agent_io: AgentIO, page: str, instruction: str, mod
                   {"role": "user", "content": f"PAGE:\n{page}\n\nQUESTION: {instruction}"}],
         json_mode=False, model_name=model_name, temperature=temperature,
         max_tokens=_thin_max_tokens_for_model(model_name),
+        reasoning_effort=_thin_reasoning_effort(model_name),
     )
     return await _thin_micro_query(agent_io, ep, model_name)
 
@@ -521,6 +604,7 @@ async def _run_leaf_thin(agent_io: AgentIO, instruction: str, expect: str, model
             messages=[{"role": "system", "content": _THIN_QUERY_SYS}, {"role": "user", "content": instruction}],
             json_mode=False, model_name=model_name, temperature=0.0,
             max_tokens=_thin_max_tokens_for_model(model_name),
+            reasoning_effort=_thin_reasoning_effort(model_name),
         )
         raw_q = await _thin_micro_query(agent_io, qp, model_name)
         query = raw_q.splitlines()[0].strip(' "\'')[:200] if raw_q else " ".join(instruction.split()[:12])

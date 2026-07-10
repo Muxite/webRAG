@@ -6,11 +6,25 @@ Euglena is an agent with web crawling and retrieval-augmented generation. Tasks 
 
 **Live:** <https://euglena.vercel.app/>
 
-**Ops (2026-03):** Project is winding down. Production uses a local backend instead of AWS: ECS deploy scripts in-repo still work if needed.
+**Ops (2026-03):** The Euglena product is winding down. Current production runs on the **local
+backend** (this host, via Docker Compose + Tailscale Funnel), not AWS — see Quick Start below. The
+ECS/ECR/CloudWatch deploy path remains in-repo and functional as a secondary/legacy option, not
+the documented default anymore.
 
 **LLM provider (2026-05):** Default provider is OpenRouter — set `LLM_PROVIDER=openrouter`, `OPENROUTER_API_KEY=...` in `services/keys.env`, and use OR slugs like `openai/gpt-5-mini` or `anthropic/claude-opus-4.7` as `MODEL_NAME`. To bypass OR and call OpenAI directly, set `LLM_PROVIDER=openai_compatible` and revert `MODEL_API_URL` to `https://api.openai.com/v1`.
 
-## Benchmark Results
+## Two things live in this repo
+
+1. **Euglena, the product** — a hosted GoT web-research agent (frontend, gateway, quotas,
+   auth). Winding down; kept running on the local backend, low-maintenance mode.
+2. **The compiled-scaffold benchmark/research line** — an active, actively-developed research
+   platform (built on top of the same agent engine) proving a cheap model executing an
+   expensive-model-authored plan can match premium-model quality at a fraction of the cost. This
+   is where current development effort goes; see `HANDOFF.md` for the latest session-by-session
+   state. The **Benchmark Results** section immediately below belongs to this research line, not
+   the product.
+
+## Benchmark Results (active research line)
 
 **The compiled scaffold thesis:** instead of letting a cheap model improvise its own research
 plan step-by-step, split the job in two — an expensive model authors an execution plan (a DAG:
@@ -60,9 +74,9 @@ Full package (9 charts, raw + aggregated CSVs, significance tables, honest cavea
 - **Long-term memory (RAG)**: Crawled content is chunked and embedded into ChromaDB, queryable across tasks and reasoning steps
 - **Dynamic beam width**: Branching factor adapts to score quality. Expands exploration when scores are low, narrows when confident
 - **Deduplication and pruning**: Candidate thoughts are deduplicated by embedding similarity. Low-scoring nodes are pruned to save budget
-- **Elastic worker fleet**: ECS autoscaling matches demand via CloudWatch queue-depth metrics, winds down when idle
+- **Elastic worker fleet**: ECS autoscaling matches demand via CloudWatch queue-depth metrics, winds down when idle (legacy/secondary deploy path — see Quick Start; current production scales via `docker compose ... --scale agent=N` on the local backend)
 - **User-scoped quotas**: Supabase enforces per-user daily usage limits with JWT authentication
-- **Comprehensive test suite**: 89 priority-ordered test modules with programmatic and LLM-based validation; 38 are curated, live-verified discriminators used in the benchmark campaign above
+- **Comprehensive test suite**: 97 priority-ordered task modules (`services/agent/app/idea_tests/`) with programmatic and LLM-based validation, plus an 849-passed/18-skipped/0-failed offline `pytest` suite (`services/agent/tests/`); 38 of the 97 tasks are the curated, live-verified discriminators used in the benchmark campaign above
 
 ## Observability
 
@@ -88,7 +102,7 @@ idea_test_runner  >  JSON results  >  visualization_summary  >  terminal report
                                    >  visualization_plots    >  detailed plot gallery
 ```
 
-Results are written to `agent/idea_test_results/` as timestamped JSON. The visualizer can filter by run ID (`--latest`, `--run-id`) and generates executive dashboards, heatmaps, efficiency frontiers, and per-test breakdowns.
+Results are written to `services/agent/idea_test_results/` as timestamped JSON (gitignored, not a repo-root directory). The visualizer can filter by run ID (`--latest`, `--run-id`) and generates executive dashboards, heatmaps, efficiency frontiers, and per-test breakdowns.
 
 **Regenerating Visualizations:**
 
@@ -130,7 +144,7 @@ is the shared Magma-family house style — titles/labels/marks are sized to stay
 4K image is viewed small, e.g. embedded in a doc or a slide). The curated, packaged copy for
 external sharing is [`linkedin_package_38tests_2026-07-08/`](linkedin_package_38tests_2026-07-08/README_LINKEDIN.md).
 
-Visualizations are automatically generated after test runs and saved to `agent/idea_test_results/plots_<run_id>/`.
+Visualizations are automatically generated after test runs and saved to `services/agent/idea_test_results/plots_<run_id>/`.
 
 ## Tech Stack
 
@@ -139,17 +153,13 @@ Visualizations are automatically generated after test runs and saved to `agent/i
 | Frontend | React, Vite, Supabase Auth |
 | Backend | FastAPI, RabbitMQ, Redis, ChromaDB, Supabase |
 | Agent | Graph-of-Thought engine, OpenAI LLMs, Brave Search, undetected-chromedriver |
-| Infra | AWS ECS, ECR, CloudWatch, Lambda autoscaling; optional local Docker |
+| Infra | Local Docker Compose on-host (current production path, via Tailscale Funnel); AWS ECS, ECR, CloudWatch, Lambda autoscaling remain available as a secondary/legacy path |
 
 ## Quick Start
 
-### Production (AWS)
+### Production (current: local backend + Vercel UI)
 
-Use the existing ECS deploy path. If `VITE_GATEWAY_URL` is unset, the app uses the default hosted API URL in `frontend/src/api/config.ts`.
-
-### Local backend (Docker) and Vercel UI
-
-Same Supabase keys. Run the stack without nginx:
+This is the path production actually runs today. Same Supabase keys. Run the stack without nginx:
 
 ```bash
 cd services
@@ -169,6 +179,13 @@ python scripts/deploy_local_stack.py up-spa
 ```
 
 Start on boot (systemd): from `services/` run `./install-webrag-service.sh` once (sets `WorkingDirectory` and enables `webrag.service`). Build images before first boot: `docker compose -f docker-compose.yml -f docker-compose.local.yml build`.
+
+### Legacy/secondary: AWS ECS
+
+The original production path. Deploy scripts (`scripts/deploy.py`, `deploy_ecs.py`,
+`deploy_autoscale.py`, etc.) remain in-repo and functional, but ECS is no longer the documented
+default — use it only if you specifically need managed autoscaling infra. If `VITE_GATEWAY_URL`
+is unset, the app uses the default hosted API URL in `frontend/src/api/config.ts`.
 
 ### Local Development
 

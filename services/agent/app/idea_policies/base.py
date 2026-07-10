@@ -133,3 +133,7 @@ class DetailKey(str, Enum):
     CHUNK_CONTENT = "chunk_content"
     ORIGINAL_GOAL = "original_goal"
     CLAIM = "claim"
+    # Single-use human steer injected via the interactive debugger (agent-debug
+    # `f`/`feedback`). Surfaced in the next expansion of the node and immediately
+    # consumed-and-cleared, so it never persists onto the node/subtree afterward.
+    HUMAN_FEEDBACK = "human_feedback"

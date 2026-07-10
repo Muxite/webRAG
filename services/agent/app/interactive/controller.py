@@ -13,6 +13,8 @@ class Action(Enum):
     PRINT = auto()
     LIST = auto()
     GRAPH = auto()
+    EDIT = auto()
+    FEEDBACK = auto()
     HELP = auto()
     QUIT = auto()
 
@@ -41,6 +43,10 @@ _ALIASES = {
     "list": Action.LIST,
     "g": Action.GRAPH,
     "graph": Action.GRAPH,
+    "e": Action.EDIT,
+    "edit": Action.EDIT,
+    "f": Action.FEEDBACK,
+    "feedback": Action.FEEDBACK,
     "h": Action.HELP,
     "help": Action.HELP,
     "?": Action.HELP,
@@ -68,9 +74,33 @@ class Controller:
             return Cmd(Action.QUIT)
         return self._parse(raw)
 
+    def read_line(self, prompt: str = "  > ") -> str:
+        """Capture a single line of free-text input (EOF/interrupt -> empty)."""
+        try:
+            return self._prompt(prompt).rstrip("\n")
+        except (EOFError, KeyboardInterrupt):
+            return ""
+
+    def read_multiline(self, prompt: str = "  > ", cont: str = "  … ") -> str:
+        """Capture multi-line free-text input; a blank line ends the block.
+
+        Mirrors debug_runner._resolve_mandate()'s capture loop. EOF/interrupt
+        ends capture and returns whatever was gathered so far.
+        """
+        lines: list[str] = []
+        while True:
+            try:
+                line = self._prompt(prompt if not lines else cont)
+            except (EOFError, KeyboardInterrupt):
+                break
+            if not line.strip():
+                break
+            lines.append(line)
+        return "\n".join(lines)
+
     @staticmethod
     def _parse(raw: str) -> Cmd:
-        if not raw:
+        if not raw or not raw.strip():
             return Cmd(Action.STEP)
         parts = raw.split(None, 1)
         word = parts[0].lower()

@@ -96,15 +96,74 @@ def extract_run(result: dict) -> Optional[tuple[list[float], list[str], int]]:
     return scores, names, solved
 
 
+def extract_run_confidence(result: dict) -> Optional[tuple[list[float], list[str], int]]:
+    """Pull the ordered *decorrelated* per-step confidence sequence and binary outcome.
+
+    This is the second, genuinely-decorrelated substrate (see the module docstring's caveats
+    for why the ``grep_validations`` path is trivially label-determining). It reads the opt-in
+    ``got_step_confidence_judge`` trace, which an LLM judge emits from only what is visible at
+    each GoT step — never the grep validators or the ground-truth answer — so the score
+    sequence is NOT a deterministic function of ``overall_passed``. The trace is logged under
+    ``execution.observability.step_confidence.sequence`` (with the per-step detail under
+    ``.trace``); we also fall back to the raw engine payload ``execution.output.step_confidences``.
+
+    Returns ``(scores, kinds, solved)`` or ``None`` when no confidence trace is present.
+    ``solved`` is still ``int(validation.overall_passed)`` — the label may come from grep; it is
+    the per-step *sequence* that must be decorrelated from it, which this substrate provides.
+    """
+    execution = (result or {}).get("execution") or {}
+    obs = execution.get("observability") or {}
+    step_conf = obs.get("step_confidence") if isinstance(obs, dict) else None
+    scores: list[float] = []
+    kinds: list[str] = []
+    if isinstance(step_conf, dict) and isinstance(step_conf.get("sequence"), list):
+        trace = step_conf.get("trace") if isinstance(step_conf.get("trace"), list) else []
+        for i, raw in enumerate(step_conf["sequence"]):
+            try:
+                scores.append(float(raw))
+            except (TypeError, ValueError):
+                scores.append(0.0)
+            kind = ""
+            if i < len(trace) and isinstance(trace[i], dict):
+                kind = str(trace[i].get("kind", ""))
+            kinds.append(kind)
+    else:
+        raw_list = (execution.get("output") or {}).get("step_confidences")
+        if not isinstance(raw_list, list) or not raw_list:
+            return None
+        for entry in raw_list:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                scores.append(float(entry.get("confidence")))
+            except (TypeError, ValueError):
+                scores.append(0.0)
+            kinds.append(str(entry.get("kind", "")))
+    if not scores:
+        return None
+    validation = (result or {}).get("validation") or {}
+    solved = 1 if validation.get("overall_passed") else 0
+    return scores, kinds, solved
+
+
+_EXTRACTORS = {"grep": extract_run, "confidence": extract_run_confidence}
+
+
 def load_trajectories(
     csv_path: str,
     model: str,
     variants: Optional[Sequence[str]] = None,
+    source: str = "grep",
 ) -> list[Trajectory]:
     """Load archived runs for ``model`` (optionally restricted to ``variants``) from the
-    combined-stats CSV, resolving each ``path`` to its result JSON and extracting the
-    check-score sequence. Rows whose JSON is missing or lacks grep validations are skipped.
+    combined-stats CSV, resolving each ``path`` to its result JSON and extracting a per-step
+    score sequence. ``source`` picks the substrate: ``"grep"`` (the label-determining
+    validator scores) or ``"confidence"`` (the decorrelated per-step LLM-judge trace). Rows
+    whose JSON is missing or lacks the chosen sequence are skipped.
     """
+    extractor = _EXTRACTORS.get(source)
+    if extractor is None:
+        raise ValueError(f"unknown source {source!r}; expected one of {sorted(_EXTRACTORS)}")
     want = set(variants) if variants else None
     out: list[Trajectory] = []
     with open(csv_path, newline="") as fh:
@@ -121,7 +180,7 @@ def load_trajectories(
                     data = json.load(jf)
             except (OSError, json.JSONDecodeError):
                 continue
-            got = extract_run(data)
+            got = extractor(data)
             if got is None:
                 continue
             scores, names, solved = got
@@ -241,6 +300,7 @@ def run_pilot(
     seed: int = 42,
     transfer_model: Optional[str] = None,
     transfer_variants: Optional[Sequence[str]] = None,
+    source: str = "grep",
 ) -> dict:
     """Full pilot for one calibration cell.
 
@@ -248,10 +308,11 @@ def run_pilot(
     false-alarm rate on the held-out slice of the SAME distribution. If ``transfer_model`` is
     given, ALSO applies the same fitted models/thresholds to that model's runs — a deliberate
     cross-model transfer stress test (the paper warns calibration does not transfer).
+    ``source`` selects the per-step substrate (``"grep"`` vs the decorrelated ``"confidence"``).
     """
     from evaluator import EValuator  # pilot-only dependency
 
-    trajs = load_trajectories(csv_path, model, variants)
+    trajs = load_trajectories(csv_path, model, variants, source=source)
     cell = summarize(trajs)
     calib, held = stratified_split(trajs, calib_frac, seed)
     report = {
@@ -281,7 +342,7 @@ def run_pilot(
     report["heldout_far"] = [false_alarm_rate(applied, a) for a in alphas]
 
     if transfer_model:
-        t_trajs = load_trajectories(csv_path, transfer_model, transfer_variants)
+        t_trajs = load_trajectories(csv_path, transfer_model, transfer_variants, source=source)
         t_applied = ev.apply(build_frame(t_trajs))
         report["transfer"] = {
             "model": transfer_model,
@@ -337,6 +398,9 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--transfer-model", default=None)
     ap.add_argument("--transfer-variants", nargs="*", default=None)
+    ap.add_argument("--source", choices=sorted(_EXTRACTORS), default="grep",
+                    help="per-step substrate: 'grep' (label-determining validator scores) or "
+                         "'confidence' (decorrelated per-step LLM-judge trace)")
     ap.add_argument("--json", action="store_true", help="dump the raw report dict as JSON")
     args = ap.parse_args(argv)
 
@@ -349,6 +413,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         seed=args.seed,
         transfer_model=args.transfer_model,
         transfer_variants=args.transfer_variants,
+        source=args.source,
     )
     if args.json:
         print(json.dumps(rep, indent=2, default=str))

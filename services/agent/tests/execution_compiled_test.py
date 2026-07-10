@@ -761,3 +761,133 @@ def test_run_leaf_lean_passes_reasoning_and_prompt(monkeypatch):
     sys_prompt2, payload2 = seen[0]
     assert "ONLY the JSON action object" not in sys_prompt2
     assert "extra_body" not in payload2
+
+
+# --- Indirect-pointer grounding fix (test_055 thin-leaf wrong-grounding cascade) ------------------
+
+def test_target_entity_indirect_pointer_defers_on_redirected_page():
+    """055-shaped intra-leaf 2-hop: the quoted novel is only a POINTER — the answer lives on the
+    AUTHOR's page ('then open that author's Wikipedia page ...'). ``_target_entity`` must return ''
+    so the thin leaf defers to the LLM query (which names the author) instead of locking the search
+    and page-pick onto the novel page."""
+    instr = ("Find the author of the novel 'The Shining', then open that author's Wikipedia page "
+             "and read the UNIVERSITY they attended (their alma mater). Do not guess from memory.")
+    assert ec._target_entity(instr) == ""
+    instr_b = ("Find the author of the novel 'The Great Gatsby', then open that author's Wikipedia "
+               "page and read the UNIVERSITY they attended. Do not guess from memory.")
+    assert ec._target_entity(instr_b) == ""
+
+
+def test_target_entity_indirect_pointer_their_page_variant():
+    """The 'their ... page' phrasing is also an indirect pointer."""
+    instr = ("Find the director of the film 'Inception', then read their Wikipedia page for the "
+             "university they attended.")
+    assert ec._target_entity(instr) == ""
+
+
+def test_target_entity_quoted_subject_still_wins_when_answer_on_its_own_page():
+    """Regression: a leaf that reads the answer off the QUOTED subject's OWN page ('for the novel
+    <X>. Read its author.') has no redirect cue, so the quoted subject stays the grounding target."""
+    instr = ("Search for and open the authoritative page (e.g., Wikipedia) for the novel "
+             "'Pride and Prejudice'. Read and extract the exact name of its author.")
+    assert ec._target_entity(instr) == "Pride and Prejudice"
+
+
+def test_target_entity_resolved_author_hop_unaffected_by_pointer_guard():
+    """Regression: the dependent 'for the author <name> ... their page' hop still lands on the
+    resolved author (the guard must not eat the resolved-name branch, which runs first)."""
+    instr = ("Search for and open the authoritative page (e.g., Wikipedia) for the author "
+             "Jane Austen. Read and extract the author's year of birth from their page.")
+    assert ec._target_entity(instr) == "Jane Austen"
+
+
+# --- Reasoning-model token budget + effort hint (gpt-5-mini finish_reason=length squeeze) ---------
+
+def test_is_reasoning_model_detects_gpt5_and_o_series():
+    for slug in ("gpt-5-mini", "openai/gpt-5-mini", "gpt-5", "openai/gpt-5", "o1", "o3-mini", "o4-mini"):
+        assert ec._is_reasoning_model(slug), slug
+    for slug in ("gpt-4.1-nano", "google/gemini-3.1-pro-preview", "claude-3-5", "mistral-large"):
+        assert not ec._is_reasoning_model(slug), slug
+
+
+def test_thin_max_tokens_floors_reasoning_model_regardless_of_price(monkeypatch):
+    """gpt-5-mini is priced 'mid' ($2/Mtok) but, as a reasoning model, must get the premium
+    128-token thin budget so hidden reasoning can't starve it to content=None."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_THIN_MAX_TOKENS", raising=False)
+    _patch_pricing(monkeypatch, {"openai/gpt-5-mini": {"output_per_million": 2.00}})
+    assert ec._price_tier("openai/gpt-5-mini") == "mid"     # cheap by price...
+    assert ec._thin_max_tokens_for_model("openai/gpt-5-mini") == 128  # ...but floored for reasoning
+
+
+def test_react_max_tokens_floors_reasoning_model_regardless_of_price(monkeypatch):
+    """The react leaf budget also gets the premium 4.4x multiplier for a cheap-priced reasoning model."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_REACT_MAX_TOKENS", raising=False)
+    _patch_pricing(monkeypatch, {"openai/gpt-5-mini": {"output_per_million": 2.00}})
+    assert ec._react_max_tokens_for_model("openai/gpt-5-mini", 700) == int(700 * 4.4)
+
+
+def test_thin_reasoning_effort_minimal_for_reasoning_models(monkeypatch):
+    monkeypatch.delenv("IDEA_TEST_COMPILED_THIN_REASONING_EFFORT", raising=False)
+    assert ec._thin_reasoning_effort("openai/gpt-5-mini") == "minimal"
+    assert ec._thin_reasoning_effort("gpt-5") == "minimal"
+    assert ec._thin_reasoning_effort("gpt-4.1-nano") is None
+    assert ec._thin_reasoning_effort("google/gemini-3.1-pro-preview") is None
+
+
+def test_thin_reasoning_effort_env_override(monkeypatch):
+    monkeypatch.setenv("IDEA_TEST_COMPILED_THIN_REASONING_EFFORT", "low")
+    assert ec._thin_reasoning_effort("openai/gpt-5-mini") == "low"
+    assert ec._thin_reasoning_effort("gpt-4.1-nano") == "low"  # explicit override applies to all
+    monkeypatch.setenv("IDEA_TEST_COMPILED_THIN_REASONING_EFFORT", "off")
+    assert ec._thin_reasoning_effort("openai/gpt-5-mini") is None
+
+
+def test_thin_extract_passes_reasoning_effort_hint(monkeypatch):
+    """The thin extract micro-prompt carries reasoning_effort='minimal' for a gpt-5 model, and no
+    hint (None) for a non-reasoning model."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_THIN_REASONING_EFFORT", raising=False)
+    _patch_pricing(monkeypatch, {
+        "openai/gpt-5-mini": {"output_per_million": 2.00},
+        "cheap-slug": {"output_per_million": 0.40},
+    })
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(return_value="42")
+
+    asyncio.run(ec._thin_extract_once(io, "page", "q", "openai/gpt-5-mini", 0.0))
+    assert io.build_llm_payload.call_args.kwargs["reasoning_effort"] == "minimal"
+    assert io.build_llm_payload.call_args.kwargs["max_tokens"] == 128
+
+    io.build_llm_payload.reset_mock()
+    asyncio.run(ec._thin_extract_once(io, "page", "q", "cheap-slug", 0.0))
+    assert io.build_llm_payload.call_args.kwargs["reasoning_effort"] is None
+
+
+# --- Vote normalization: superficial phrasing noise must not split the majority (Issue 2) ---------
+
+def test_vote_key_merges_numeric_format_and_approximator_variants():
+    """All of these are the SAME real answer (265) with format/hedge noise — one vote bucket."""
+    variants = ["265 m", "265m", "265 meters", "approximately 265 meters", "~265 m",
+                "about 265 metres", "around 265 m", "roughly 265", "~265"]
+    keys = {ec._vote_key(v) for v in variants}
+    assert keys == {"265"}, keys
+
+
+def test_vote_key_keeps_genuinely_different_numbers_distinct():
+    """Conservative: never round/fuzzy-match — different values stay in different buckets."""
+    assert ec._vote_key("265 m") != ec._vote_key("275 m")
+    assert ec._vote_key("119") != ec._vote_key("191")
+    assert ec._vote_key("1865") != ec._vote_key("1746")
+    assert ec._vote_key("approximately 1865") != ec._vote_key("about 1746")
+
+
+def test_vote_key_merges_text_approximator_and_punctuation_noise():
+    """Entity/text answers with wrapper words and trailing punctuation collapse together."""
+    assert ec._vote_key("University of Maine") == ec._vote_key("University of Maine.")
+    assert ec._vote_key("about Princeton University") == ec._vote_key("Princeton University")
+
+
+def test_vote_key_preserves_existing_numeric_behavior():
+    """The original documented behavior is unchanged for the non-hedged cases."""
+    assert ec._vote_key("1,642 m") == ec._vote_key("1642 metres") == "1642"
+    assert ec._vote_key("Max depth: 1,642") == "1642"

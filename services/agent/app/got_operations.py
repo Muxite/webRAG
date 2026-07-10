@@ -217,6 +217,119 @@ class GoTOperations:
             _logger.warning(f"[GoT:REEXPAND] Follow-up check failed for node {node_id}: {exc}")
             return None
 
+    async def judge_step_confidence(
+        self,
+        graph: IdeaDag,
+        node_id: str,
+        model_name: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Emit a decorrelated per-step LLM-judge confidence for a completed leaf.
+
+        Opt-in instrumentation (gated by ``got.step_confidence_judge_enabled``): a
+        lightweight judge estimates, from ONLY what is visible at this point in the
+        trajectory (the mandate + this node's resolved content), how confident it is
+        that the step's output is correct and on-track. It is deliberately never shown
+        the grep validators nor the ground-truth answer, so the resulting score is a
+        genuinely *decorrelated* per-step signal — a real substrate for the E-valuator
+        sequential-stopping pilot, unlike ``validation.grep_validations`` (which is what
+        *computes* the final pass/fail label). This method never mutates the graph and
+        never raises; it returns ``{"confidence": float, "reason": str}`` or ``None``.
+        """
+        if not self._cfg.got.step_confidence_judge_enabled:
+            return None
+
+        node = graph.get_node(node_id)
+        if not node:
+            return None
+
+        result = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not isinstance(result, dict):
+            return None
+        from agent.app.idea_policies.action_constants import ActionResultExtractor
+        if not ActionResultExtractor.is_success(result):
+            return None
+
+        # Compact the resolved content so the judge stays cheap.
+        content = (
+            result.get("content")
+            or result.get("content_full")
+            or ""
+        )
+        if isinstance(content, str) and len(content) > 3000:
+            content = content[:3000] + "... [truncated]"
+        results_summary = result.get("results")
+        if isinstance(results_summary, list):
+            results_summary = results_summary[:5]
+
+        root = graph.get_node(graph.root_id())
+        mandate = ""
+        if root and isinstance(root.details, dict):
+            mandate = str(root.details.get("mandate") or "")[:1500]
+
+        goal = (
+            node.details.get(DetailKey.GOAL.value)
+            or node.details.get(DetailKey.ORIGINAL_GOAL.value)
+            or node.title
+        )
+
+        system_prompt = (
+            "You are a step-level verifier in a Graph-of-Thought research system. A single "
+            "sub-task has just produced an output. Estimate, on a 0-1 scale, how confident you "
+            "are that this step's output is CORRECT and ON-TRACK toward the overall task, using "
+            "ONLY what is visible below. You do NOT know the ground-truth answer and must not "
+            "assume one; judge from the resolved content alone. Return JSON: "
+            "{\"confidence\": number between 0 and 1, \"reason\": string}."
+        )
+        user_content = json.dumps({
+            "task": mandate,
+            "sub_task_goal": goal,
+            "sub_task_title": node.title,
+            "action": node.details.get(DetailKey.ACTION.value),
+            "resolved_content": content,
+            "resolved_results": results_summary,
+        }, ensure_ascii=True, default=str)
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+
+        judge_model = model_name or self._cfg.got.step_confidence_judge_model or self._cfg.evaluation.model or None
+        temperature = self._cfg.got.step_confidence_judge_temperature
+
+        payload = self.io.build_llm_payload(
+            messages=messages,
+            json_mode=True,
+            model_name=judge_model,
+            temperature=temperature,
+        )
+
+        try:
+            response = await self.io.query_llm_with_fallback(
+                payload,
+                model_name=judge_model,
+                fallback_model=self._cfg.generation.fallback_model,
+                timeout_seconds=self._cfg.timeouts.llm,
+            )
+            if not response:
+                return None
+            data = json.loads(response)
+            raw = data.get("confidence")
+            try:
+                confidence = float(raw)
+            except (TypeError, ValueError):
+                return None
+            confidence = max(0.0, min(1.0, confidence))
+            verdict = {"confidence": confidence, "reason": str(data.get("reason", ""))}
+            _logger.info(
+                f"[GoT:STEPCONF] Step confidence for node {node_id}: "
+                f"{confidence:.3f} ({verdict['reason'][:80]})"
+            )
+            return verdict
+        except Exception as exc:
+            _logger.warning(f"[GoT:STEPCONF] Confidence judge failed for node {node_id}: {exc}")
+            return None
+
     def _adaptive_dedup_threshold(self, graph: IdeaDag) -> float:
         """
         Pick a similarity cutoff based on graph density. Sparse graphs tolerate

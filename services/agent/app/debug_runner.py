@@ -17,7 +17,6 @@ INTERACTIVE_LOG_LEVEL   Python log level for agent internals (default WARNING).
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import os
 import sys
@@ -28,11 +27,9 @@ from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.agent_io import AgentIO
-from agent.app.idea_dag import IdeaDag
 from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.idea_engine import IdeaDagEngine
 from agent.app.idea_finalize import build_final_payload
-from agent.app.idea_memory import MemoryManager
 from agent.app.telemetry import TelemetrySession
 from shared.connector_config import ConnectorConfig
 
@@ -110,9 +107,10 @@ async def _shutdown_connectors(*connectors) -> None:
             pass
 
 
-def _build(llm, search, http, chroma, model, settings, mandate):
-    ns = f"idea_dag:{hashlib.sha256(mandate.encode()).hexdigest()[:10]}"
-    settings["memo_namespace"] = ns
+async def _build(llm, search, http, chroma, model, settings, mandate):
+    # Namespace is derived exactly as the engine does (via the shared helper), so
+    # the debug collection/telemetry ids line up with what engine.prepare() wires.
+    ns = IdeaDagEngine._memo_namespace(mandate)
     telem = TelemetrySession(enabled=True, mandate=mandate, correlation_id=f"debug_{ns}")
     io = AgentIO(
         connector_llm=llm,
@@ -123,9 +121,8 @@ def _build(llm, search, http, chroma, model, settings, mandate):
         collection_name=f"debug_{ns}",
     )
     engine = IdeaDagEngine(io=io, settings=settings, model_name=model)
-    engine._current_mandate = mandate
-    engine._memory_manager = MemoryManager(connector_chroma=chroma, namespace=ns)
-    graph = IdeaDag(root_title=mandate[:200], root_details={"mandate": mandate, "memo_namespace": ns})
+    # Single source of truth for engine/graph setup — same helper run() uses.
+    graph, _current_id, _steps = await engine.prepare(mandate)
     return engine, graph
 
 
@@ -144,7 +141,7 @@ async def _main() -> None:
     llm, search, http, chroma = await _boot_connectors(config)
 
     try:
-        engine, graph = _build(llm, search, http, chroma, model, settings, mandate)
+        engine, graph = await _build(llm, search, http, chroma, model, settings, mandate)
         session = DebugSession(engine=engine, graph=graph, ctrl=Controller(), max_steps=max_steps)
         result = await session.run()
 
