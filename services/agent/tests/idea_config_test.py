@@ -24,7 +24,6 @@ def test_defaults_match_legacy_fallbacks():
     # mirrors the hard-coded fallback previously used at each call site.
     cfg = GoTConfig.from_settings({})
     assert cfg.embed_on_create is True
-    assert cfg.improve_enabled is False
     assert cfg.dedup_similarity_threshold == 0.85
     assert cfg.beam_min == 2
     assert cfg.beam_max == 5

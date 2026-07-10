@@ -345,14 +345,9 @@ class IdeaDagEngine:
                 1 for n in graph.iter_depth_first()
                 if n.details.get("_got_pruned")
             )
-            improved_count = sum(
-                1 for n in graph.iter_depth_first()
-                if n.details.get("_got_improve_iterations", 0) > 0
-            )
             final_payload["got_stats"] = {
                 "dead_ends_detected": self._got.dead_end_count,
                 "nodes_pruned": pruned_count,
-                "nodes_improved": improved_count,
                 "parallel_leaves_total": getattr(self, "_parallel_leaves_total", 0),
             }
 
@@ -599,7 +594,7 @@ class IdeaDagEngine:
         Returns True if new children were created (caller should stay on this node
         so the normal leaf lifecycle drives the new children). Bounded by
         `got.reexpand_max_iterations` (tracked via `_got_reexpand_count`) and the
-        global `max_total_nodes` ceiling. Never touches `try_improve_node`.
+        global `max_total_nodes` ceiling.
 
         Composed of two phases split out so batch callers can parallelize the
         expensive read-only `_reexpand_check` (an independent LLM call per sibling)

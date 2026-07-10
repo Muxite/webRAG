@@ -275,3 +275,95 @@ this pass — worth doing before any broader rollout.
 before trusting it — bigger lift, deferred to a future session).
 
 **Campaign spend: ~$1.08 of $12.**
+
+---
+
+# Phase 5 (2026-07-10): control-loop consolidation, cleanup debt, E-valuator pilot
+
+Plan: `/home/muk/.claude/plans/plan-next-steps-and-functional-dusk.md` (post-consolidation roadmap;
+supersedes the "Priority 1/3" framing in the original plan file — Priority 1 is retired above,
+Priority 3 landed this phase).
+
+**Control-loop consolidation (Priority 3, was deferred, now landed):** `idea_engine.py`'s `run()`
+and `testing/execution.py`'s `run_test_execution()` — previously two independent reimplementations
+of the same step/prune/backtrack/finalize loop (the root cause of Phase 2's bug #4) — are now one
+implementation via Strangler Fig: shared `IdeaDagEngine._run_loop()` and `.finalize()`, an explicit
+`fail_soft` parameter replacing what was a silent fail-fast/fail-soft divergence between the two
+paths, and a dedicated parity suite (`services/agent/tests/control_loop_parity_test.py`). Committed
+as `bbea37b`.
+
+**Cleanup debt (Priority 5):**
+- Fixed the 3 pre-existing `test_063_strict_csv_validators_test.py` failures — a day-one authoring
+  bug (the validators test was written against a phantom element set that never matched the source
+  file's real `ENTRIES`), not drift over time. Offline suite: 3 failed → 0.
+- Added a config-drift guard test (`services/agent/tests/config_drift_test.py`) asserting every
+  `*Config` dataclass group in `idea_policies/config.py` can't silently disagree with
+  `idea_dag_settings.json`'s shipped values — the bug class that's hit 3 times previously. No 4th
+  real drift found; only benign `None`/`""` "no override" sentinel non-differences.
+- Deleted the dead `got_improve_enabled`/`try_improve_node` mechanism entirely (code, settings
+  keys, config fields, docs) — confirmed zero call sites, per the campaign's stop-rule discipline
+  against carrying unwired/unproven mechanisms indefinitely.
+
+**E-valuator pilot (Priority 2, second half):** piloted the real PyPI package (`e-valuator` v1.0.0,
+confirmed to match the paper's math exactly) against this repo's archived benchmark data
+(`linkedin_package_38tests_2026-07-08/` + local `idea_test_results/`), $0, no live runs needed.
+Used `validation.grep_validations` (an ordered per-check score list + `overall_passed` outcome) as
+the best available substitute for the paper's per-timestep verifier-score trace — this repo has no
+literal per-execution-step verifier signal recorded anywhere.
+
+**Result: the machinery works, but the substrate can't prove it earns its keep.** On a pooled nano
+cell (570 runs) at α=0.2, held-out false-alarm rate was **0.000 across all 4 seeds** (well under
+target) with 0.79-0.90 power — but FAR being *exactly* zero, not just under target, is itself the
+finding: `grep_validations` scores are what *compute* `overall_score`, which *sets*
+`overall_passed`, so the "verifier" is near-deterministic of the label. The paper's actual value
+proposition (controlling FAR against a noisy, partially-informative judge, where naive
+calibrated-score thresholding fails) is never stressed by data this clean. A single-agent cell
+(nano `sequential_react`, 114 runs) hit the paper's own min-calibration-size wall at tighter α
+(threshold → +∞, zero power) — a real, useful illustration of the method's stated limitation, not a
+bug. Cross-model transfer (nano→gpt-5-mini) also held FAR=0, but for the same weak-substrate reason.
+
+**Verdict: not worth production integration on the current data.** Would only become genuinely
+useful if the harness first recorded a real, partially-informative per-step signal decorrelated
+from the final grep outcome (e.g. a lightweight LLM-judge confidence per GoT step, logged into
+`execution.observability`) — that's an instrumentation task, not a calibration one, and not
+attempted this phase. Consistent with the campaign's discipline: sound method, wrong data shape to
+prove value here. Code kept for reference (`testing/evaluator_pilot.py`,
+`tests/evaluator_pilot_test.py`), package deps in a throwaway scratch venv only, not added to
+`services/agent/requirements.txt`.
+
+**`deepseek/deepseek-v4-flash` clean R=3 baseline (Priority 2 leftover):** ran `test_095`
+(`tier5_branch_eliminate_chain`), native `graph` variant, coverage gate off, now that the harness is
+consolidated and bug-#1/#4-fixed. Scores: **1.00 / 0.00 / 0.27 (mean 0.423)**, ~$0.0148 spent. No
+sign of the old coverage-gate confound — the R2 zero-visit run correctly scored 0 straight down the
+line (the earlier confound let 0-visit runs pass via root-title text matching; that's gone). R3
+illustrates a dependent-check cascade: a partial run (3/4 Avon candidates resolved) still zeroed 3
+of 5 checks because the one required keystone-page visit (Dorset Stour) was skipped. Qualitatively
+higher than nano's Phase 2 R=3 baseline (mean 0.163) — n=3 only, data-gathering, no decision drawn.
+Result JSONs: `services/agent/idea_test_results/20260710_120830_deepseek095_*` (note: this repo has
+result JSONs under both `services/agent/idea_test_results/` and a repo-root `idea_test_results/`
+path referenced in some older docs — worth reconciling, flagged here rather than silently ignored).
+
+**ConSol batched-early-cutoff variant (Priority 2 wall-clock fix):** added an opt-in
+`IDEA_TEST_CONSOL_BATCH` env var to `testing/consol_pilot.py`'s `consol_vote()` — when `>1`, draws
+`batch_size` samples concurrently per round via `asyncio.gather` and checks the SPRT stopping
+condition once per batch instead of once per sample (default stays `1`, byte-identical to the
+existing sequential path, no behavior change unless explicitly opted into). 8 new offline tests
+(true-concurrency check, early-stop-across-batches, cap-never-exceeded, error tolerance). Live
+3-condition pilot (fixed-k / sequential ConSol / batched ConSol, test_055, gpt-4.1-nano,
+`graph_compiled`+thin leaves, R=5 each, ~$0.041 spent): **wall-clock fix validated.** Batched
+(batch=2) cut ConSol's overhead over the non-ConSol baseline roughly in half — sequential was 74%
+slower than baseline (18.91s vs 10.87s), batched was only 37% slower (14.89s) — a 21.3% wall-clock
+reduction from sequential→batched. Cost held: batched was actually the cheapest of the three
+conditions this pilot ($0.00246/run vs baseline's $0.00297 and sequential's $0.00283). Answer
+agreement/score distribution: sequential and batched statistically indistinguishable (avg score
+0.280 both, same shape). **Verdict: validated for opt-in use** (`IDEA_TEST_CONSOL_BATCH=2` alongside
+`IDEA_TEST_USE_CONSOL=1`) — single test/model cell, n=5, so directional not a broad statistical
+confirmation; a wider matrix would be needed before considering a default-on flip, not recommended
+at this evidence level. Default stays sequential (`batch_size=1`) unless explicitly set.
+
+**Offline suite at end of Phase 5 (pre-ConSol-live-pilot): 827 passed, 18 skipped, 0 failed** (up
+from 809/18/3 at the start of this phase — the 3 pre-existing failures are now fixed, plus 18 new
+tests across the drift guard, E-valuator pilot, and ConSol batching).
+
+**Campaign spend: ~$1.09 of $12** (Phase 5 so far: ~$0.0148 on the deepseek run; everything else
+this phase was $0).

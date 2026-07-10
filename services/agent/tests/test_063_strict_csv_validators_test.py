@@ -95,10 +95,10 @@ def test_spaced_csv_keeps_keystone_but_fails_strict_format():
 
 
 def test_hallucinated_keystone_value_zero():
-    # Correct shape, but the Thulium kelvin melting point is wrong (1817, not 1818) -> keystone
-    # 0.0, and coverage drops to 3/4 because the verified 1818 is absent for Thulium.
+    # Correct shape, but the Erbium (keystone) kelvin melting point is wrong (1801, not 1802) ->
+    # keystone 0.0, and coverage drops to 3/4 because the verified 1802 is absent for Erbium.
     rows = list(_ROWS)
-    rows[3] = f"{t.ENTRIES[3]['name']},{t.ENTRIES[3]['atomic_number']},1817"
+    rows[2] = f"{t.ENTRIES[2]['name']},{t.ENTRIES[2]['atomic_number']},1801"
     blob = "\n".join([t.HEADER] + rows)
     assert t.validate_keystone_csv(_r(blob), _OBS)["score"] == 0.0
     assert abs(t.validate_coverage(_r(blob), _OBS)["score"] - 3.0 / 4.0) < 1e-9
@@ -134,8 +134,8 @@ def test_no_visits_gates_visit_count_only():
 
 def test_partial_coverage_scores_fraction():
     # Only two of the four elements present (prose dump, not CSV).
-    text = ("Praseodymium has atomic number 59 and melts at 1204 K. "
-            "Terbium: atomic number 65, melting point 1629 K.")
+    text = ("Samarium has atomic number 62 and melts at 1345 K. "
+            "Gadolinium: atomic number 64, melting point 1585 K.")
     assert abs(t.validate_coverage(_r(text), _OBS)["score"] - 2.0 / 4.0) < 1e-9
     assert t.validate_keystone_csv(_r(text), _OBS)["score"] == 0.0       # not CSV at all
 
@@ -147,7 +147,7 @@ def test_compiled_plan_is_pure_fanout_and_leaks_nothing():
     assert struct["leaf_count"] == 4
     assert struct["edge_count"] == 0
     assert struct["is_pure_fanout"] is True
-    assert struct["waves"] == [["praseodymium", "terbium", "holmium", "thulium"]]
+    assert struct["waves"] == [["samarium", "gadolinium", "erbium", "lutetium"]]
     # The aggregation owns the rigid format and names the exact header columns.
     agg = plan["aggregation"].lower()
     assert "csv" in agg

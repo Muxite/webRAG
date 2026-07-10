@@ -74,10 +74,6 @@ class GoTConfig:
     """
 
     embed_on_create: bool = True
-    improve_enabled: bool = False
-    improve_score_threshold: float = 0.3
-    improve_max_iterations: int = 2
-    improve_temperature: float = 0.3
     reexpand_enabled: bool = False
     reexpand_max_iterations: int = 1
     reexpand_temperature: float = 0.2

@@ -77,7 +77,6 @@ Sequential generates the same candidates as graph but explores a single path, ma
 | Deduplication | `got_dedup_enabled = true` | Rejects candidates with >0.85 similarity |
 | Dynamic beam | `got_dynamic_beam_enabled = true` | Branching adapts to scores (min 2, max 5) |
 | Pruning | `got_prune_enabled = true` | Removes nodes scoring <0.15 when graph >6 nodes |
-| Improve | `got_improve_enabled = false` | Disabled for efficiency |
 | Backtracking | `got_backtrack_enabled = false` | Disabled for efficiency |
 
 ## Data Flow

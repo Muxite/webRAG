@@ -96,113 +96,6 @@ class GoTOperations:
             _logger.debug(f"[GoT:EMBED] Embedded {count} child thoughts for parent {parent_id}")
         return count
 
-    async def try_improve_node(
-        self,
-        graph: IdeaDag,
-        node_id: str,
-        model_name: Optional[str] = None,
-    ) -> Optional[float]:
-        if not self._cfg.got.improve_enabled:
-            return None
-
-        node = graph.get_node(node_id)
-        if not node or node.score is None:
-            return None
-
-        threshold = self._cfg.got.improve_score_threshold
-        if node.score >= threshold:
-            return None
-
-        max_iters = self._cfg.got.improve_max_iterations
-        iteration_count = int(node.details.get("_got_improve_iterations", 0))
-        if iteration_count >= max_iters:
-            _logger.debug(f"[GoT:IMPROVE] Node {node_id} already improved {iteration_count} times, skipping")
-            return None
-
-        evaluation = node.details.get(DetailKey.EVALUATION.value) or {}
-        rationale = evaluation.get("rationale", "Low score")
-
-        memories_text = ""
-        if self.memory_manager:
-            memories = await self.memory_manager.retrieve_relevant_memories(
-                query=f"{node.title} {rationale}",
-                n_results=5,
-            )
-            if memories:
-                memories_text = self.memory_manager.format_memories_for_llm(memories, max_chars=4000)
-
-        system_prompt = self.settings.get(
-            "got_improve_system_prompt",
-            "You are a self-refinement function. Given a thought and feedback, produce an improved version. "
-            "Return JSON: {\"improved_title\": string, \"improved_details\": object, \"refinement_rationale\": string}.",
-        )
-        user_content = json.dumps({
-            "current_title": node.title,
-            "current_score": node.score,
-            "scorer_feedback": rationale,
-            "action": node.details.get(DetailKey.ACTION.value),
-            "goal": node.details.get(DetailKey.GOAL.value) or node.title,
-            "relevant_memories": memories_text,
-        }, ensure_ascii=True)
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content},
-        ]
-
-        improve_model = model_name or self._cfg.evaluation.model or None
-        temperature = self._cfg.got.improve_temperature
-
-        payload = self.io.build_llm_payload(
-            messages=messages,
-            json_mode=True,
-            model_name=improve_model,
-            temperature=temperature,
-        )
-
-        try:
-            response = await self.io.query_llm_with_fallback(
-                payload,
-                model_name=improve_model,
-                fallback_model=self._cfg.generation.fallback_model,
-                timeout_seconds=self._cfg.timeouts.llm,
-            )
-            if not response:
-                return None
-
-            data = json.loads(response)
-            improved_title = data.get("improved_title") or node.title
-            improved_details = data.get("improved_details") or {}
-            refinement_rationale = data.get("refinement_rationale", "")
-
-            old_title = node.title
-            node.title = str(improved_title)
-
-            for key, value in improved_details.items():
-                if key not in (
-                    DetailKey.ACTION_RESULT.value,
-                    DetailKey.MERGED_RESULTS.value,
-                    DetailKey.EVALUATION.value,
-                ):
-                    node.details[key] = value
-
-            node.details["_got_improve_iterations"] = iteration_count + 1
-            node.details["_got_last_refinement"] = refinement_rationale
-            node.details["_got_pre_improve_score"] = node.score
-
-            node.score = None
-            node.details.pop(DetailKey.EVALUATION.value, None)
-
-            _logger.info(
-                f"[GoT:IMPROVE] Refined node {node_id}: '{old_title[:40]}' -> '{node.title[:40]}' "
-                f"(was {node.details.get('_got_pre_improve_score'):.2f}, iteration {iteration_count + 1})"
-            )
-            return node.details.get("_got_pre_improve_score")
-
-        except Exception as exc:
-            _logger.warning(f"[GoT:IMPROVE] Failed to improve node {node_id}: {exc}")
-            return None
-
     async def check_needs_followup(
         self,
         graph: IdeaDag,
@@ -211,9 +104,9 @@ class GoTOperations:
     ) -> Optional[Dict[str, Any]]:
         """Ask whether a completed leaf's resolved content reveals a genuine follow-up.
 
-        Mirrors :meth:`try_improve_node`'s structure but is a *separate* capability:
-        instead of rewriting the node in place it returns a structured verdict the
-        engine reads to decide whether to re-expand the leaf into new children.
+        Returns a structured verdict the engine reads to decide whether to
+        re-expand the leaf into new children (rather than rewriting the node in
+        place).
         Returns ``{"needs_followup": bool, "reason": str}`` (or ``None`` on
         error / when the flag is off). Gated by ``got.reexpand_enabled`` so the
         default-off path never issues an LLM call.

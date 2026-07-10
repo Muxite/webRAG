@@ -53,7 +53,7 @@ Conceptually the engine is **a step-driven controller that owns a DAG and a memo
 2. Tries to restore from a checkpoint if one exists (`idea_engine.py:79–101`).
 3. Drives the main loop until `max_steps`, node-cap, or quiescence (`idea_engine.py:107–155`).
 4. Calls `build_final_payload(...)` (`idea_finalize.py:301`) to produce the deliverable (`idea_engine.py:167–174`).
-5. Attaches GoT post-run stats: `dead_ends_detected`, `nodes_pruned`, `nodes_improved`, `parallel_leaves_total` (`idea_engine.py:176–190`).
+5. Attaches GoT post-run stats: `dead_ends_detected`, `nodes_pruned`, `parallel_leaves_total` (`idea_engine.py:176–190`).
 
 ---
 
@@ -263,11 +263,10 @@ Links discovered during a visit are *not* stored in per-URL collections (despite
 | Beam | `compute_dynamic_beam_width()` (300–344) | Narrows on tight p25/p75 score spread, widens on broad spread | `[got_beam_min=2, got_beam_max=5]` |
 | Prune | `identify_prune_candidates()` (346–385), `prune_nodes()` (387–402) | Removes low-scoring nodes once the graph is large enough; skips root, done, failed, skipped | trigger >6 nodes, score < 0.15 (or adaptive σ) |
 | Backtrack | `should_backtrack()` (404–430), `find_backtrack_target()` (432–442) | Detects 3+ consecutive low-score nodes; targets nearest parent with score ≥ 0.3 | `got_backtrack_enabled=false` |
-| Improve | `try_improve_node()` (97–202) | LLM-driven refinement of low-score nodes | `got_improve_enabled=false` |
 | Hybrid retrieve | `hybrid_retrieve()` (444–490) | Combines ChromaDB vector hits with graph-path context | — |
 | Model routing | `get_model_for_operation()` (492–529) | Lets scoring and generation use different models | — |
 
-Notably, **improve and backtrack are off by default** — the engine relies on dedup + dynamic beam + prune for quality, and on the dependency-edge + REQUIRES_DATA system for correctness.
+Notably, **backtrack is off by default** — the engine relies on dedup + dynamic beam + prune for quality, and on the dependency-edge + REQUIRES_DATA system for correctness.
 
 ---
 
@@ -350,7 +349,6 @@ Token budgets are overridable via env vars `IDEA_DAG_EXPANSION_MAX_TOKENS`, `IDE
 | `got_dedup_enabled` / `got_dedup_similarity_threshold` | true / 0.85 | reject near-duplicate candidates |
 | `got_dynamic_beam_enabled` / `got_beam_min` / `got_beam_max` | true / 2 / 5 | adaptive branching |
 | `got_prune_enabled` / `got_prune_score_threshold` / `got_prune_min_nodes_before_prune` | true / 0.15 / 6 | prune low-score branches once graph is large |
-| `got_improve_enabled` | false | refinement loop disabled |
 | `got_backtrack_enabled` | false | no backwards recovery |
 
 **Prompt overrides** (166–207) — the JSON embeds *complete* system prompts per phase. The expansion prompt enforces visit requirements ("If mandate says 'must visit' … you MUST create a visit action node"), and the final prompt requires the LLM to include verbatim quotes from raw visit content to prove facts came from the actual page.
@@ -472,7 +470,7 @@ These are the gotchas a reader should know before debugging or extending the eng
 | `idea_policies/actions.py` | 1,777 | Leaf actions (search/visit/think/save/merge) |
 | `idea_policies/action_constants.py` | 468 | Result keys, error types, builders, extractors |
 | `idea_memory.py` | 428 | `MemoryManager` — ChromaDB read/write, chunking |
-| `got_operations.py` | ~530 | Embedding, dedup, beam, prune, backtrack, improve |
+| `got_operations.py` | ~530 | Embedding, dedup, beam, prune, backtrack |
 | `idea_finalize.py` | 496 | `build_final_payload` — last-mile LLM call |
 | `idea_checkpointer.py` | 197 | File + Redis checkpoint backends |
 | `idea_dag_log.py` | 133 | ASCII + JSON DAG visualization |

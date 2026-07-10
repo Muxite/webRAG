@@ -97,6 +97,46 @@ inputs to trusted, tamper-proof signals, and adversarially red-team your own gat
 3. Learned (embedding-similarity) vs. deterministic (regex/keyword) shape classifiers — no
    production evidence found either way for task-shape routing specifically.
 
+## E-valuator implementation detail (2026-07-10 follow-up, primary source re-read)
+
+Re-verified directly against the arXiv PDF (2512.03109, Sadhuka/Prinster/Fannjiang/Scalia/Berger/
+Regev/Wang — Genentech/MIT/JHU/Stanford) after an earlier secondhand summary in this session turned
+out to contain unverified/fabricated specifics. The following is confirmed from the primary text:
+
+- **Calibration example = trajectory-level, not per-step.** Each example is `(S, Y)` where
+  `S = (S₁,...,S_T)` is the full per-timestep verifier-score sequence for one trajectory and
+  `Y ∈ {0,1}` is a single success/failure label for the whole trajectory. No per-step labels needed.
+- **Calibration size**: the "few hundred" headline holds up — the paper's own ablation (Fig. 6, MATH,
+  5000 trajectories) tests n=100/200/500/1000 and finds little effect on false-alarm-rate/power at
+  n≥200; n=100 (2%) is noticeably noisier. A separate exact theoretical minimum exists (Appendix
+  8.1.2): for target error levels (α, δ), need calibration successes `n ≥ ⌈log δ / log(1−α)⌉`, else
+  the algorithm returns `c_α = ∞` (never rejects, zero power).
+- **Real reference implementation, independently confirmed reachable**: GitHub
+  `shuvom-s/e-valuator` and PyPI package `e-valuator` (both URLs returned HTTP 200 when checked
+  directly — this is a real released artifact, not an invented name).
+- **Mechanism**: per-timestep logistic-regression classifier `ĝ_t(S₁:t)` trained on a calibration
+  split, density ratio via Bayes' rule `M̂_t = [(1−ĝ_t)/ĝ_t]·[π̂₁/(1−π̂₁)]`; **a separate classifier
+  per timestep** (not one shared model), fixed max trajectory length `T_max` with the ratio held
+  constant beyond it. Stop/reject when `M_t` first exceeds a threshold `c_α` set via a
+  distribution-free PAC procedure (order statistic of calibration-set maxima, binomial tail bound)
+  on a disjoint threshold-calibration split.
+- **Recalibration is per dataset×agent×verifier combination, not universal** — the paper calibrates
+  separately for each of 6 setups; no claim that one calibration transfers across agent types. This
+  directly confirms this project's existing caution in Priority 2/Experiment 4 (do not calibrate
+  once and apply broadly across our own 3-model roster without checking).
+
+**Rule-mining small-sample follow-up**: RIMRULE (arXiv 2601.00086, ACL 2026) does have a low-sample
+ablation (§4.4) — BFCL `multi_turn_base`, 90 training samples, only 4 rules induced, still improved
+accuracy 55.2%→62.1% (test-rand) / 46.0%→60.0% (test-unseen). Not literally "2-3 failures" (that's
+90 training queries yielding 4 rules), and the paper's own footnote 3 explicitly defers a formal
+treatment of the sparse-failure regime to future work — gap #1 above still stands as genuinely open,
+just with one adjacent data point now on record.
+
+**Shape-classifier gap (#3) still open** — no 2025-2026 paper found comparing learned/embedding
+classifiers against deterministic regex/keyword classifiers specifically for execution-shape
+routing. One unverified blog-grade claim ("syntactic features match >93% of embedding-router
+accuracy") surfaced but could not be traced to a citable source — not to be used as evidence.
+
 ## Local/open-weight model landscape (OpenRouter availability, as of 2026-07-10)
 
 | Family | OpenRouter access | Notes |

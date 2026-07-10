@@ -253,6 +253,8 @@ TEST_PRIORITY_ORDER = [
     "093",  # Tier 5: CVE advisory -> C source root-cause chain B (curl SOCKS5 CVE-2023-38545) (10/10) - level=graph
     "094",  # Tier 5: two-constraint numeric AND-filter — Norwegian fjords; Trondheimsfjord long-but-shallow (9/10) - level=graph, weight=long
     "095",  # Tier 5: branch-to-eliminate then chain forward — Rivers Avon (English-Channel survivor) -> Dorset Stour catchment (10/10) - level=graph, weight=long
+    "096",  # Tier 5: URL-free 3-hop dependent chain C, leak-resistant terminus (Earhart -> Atchison elevation) (9/10) - level=graph, weight=long
+    "097",  # Tier 5: URL-free 3-hop dependent chain D, leak-resistant terminus (Goya -> Fuendetodos elevation) (9/10) - level=graph, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12

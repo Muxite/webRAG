@@ -165,3 +165,154 @@ def test_explicit_confidence_model_bypasses_import(monkeypatch):
     assert result.answer == "Berlin"
     assert result.num_samples == 2
     assert state["calls"] == 2
+
+
+# --- batched (parallel) sampling ---------------------------------------------------------------
+
+class _StubConfig:
+    max_trials = 40
+
+
+def _stub_model(stop_at):
+    """Confidence model that stops once the top answer reaches ``stop_at`` agreements."""
+
+    class _StubModel:
+        config = _StubConfig()
+
+        def test(self, first, second):
+            return first >= stop_at
+
+    return _StubModel()
+
+
+def _batch_tracking_sampler(answers):
+    """Sampler recording total calls AND the max in-flight concurrency (proves true parallelism)."""
+    state = {"calls": 0, "in_flight": 0, "max_in_flight": 0}
+
+    async def sample(_temp):
+        i = state["calls"]
+        state["calls"] += 1
+        state["in_flight"] += 1
+        state["max_in_flight"] = max(state["max_in_flight"], state["in_flight"])
+        await asyncio.sleep(0)  # yield so a whole batch overlaps before any resolves
+        state["in_flight"] -= 1
+        return answers[i] if i < len(answers) else answers[-1]
+
+    return sample, state
+
+
+def test_batch_size_resolution(monkeypatch):
+    # explicit arg wins over env
+    monkeypatch.setenv(consol_pilot.BATCH_ENV, "7")
+    assert consol_pilot._resolve_batch_size(3) == 3
+    assert consol_pilot._resolve_batch_size(None) == 7
+    monkeypatch.delenv(consol_pilot.BATCH_ENV, raising=False)
+    assert consol_pilot._resolve_batch_size(None) == 1     # default sequential
+    assert consol_pilot._resolve_batch_size(0) == 1        # clamped to >= 1
+    monkeypatch.setenv(consol_pilot.BATCH_ENV, "garbage")
+    assert consol_pilot._resolve_batch_size(None) == 1     # non-numeric -> default
+
+
+def test_batched_draws_samples_concurrently(monkeypatch):
+    """A batch really runs in parallel (max in-flight == batch_size), not one at a time."""
+    monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
+    monkeypatch.setenv(consol_pilot.MAX_SAMPLES_ENV, "10")
+    sample, state = _batch_tracking_sampler(["Paris"] * 10)
+    result = _run(consol_pilot.consol_vote(
+        sample, k=5, key_fn=_key, batch_size=3, confidence_model=_stub_model(stop_at=3)))
+    assert result is not None
+    assert result.answer == "Paris"
+    assert result.confident is True
+    # First batch of 3 unanimous "Paris" already reaches stop_at=3 -> exactly one batch drawn.
+    assert result.num_samples == 3
+    assert state["calls"] == 3
+    assert state["max_in_flight"] == 3  # all three drawn concurrently
+
+
+def test_batched_env_default_is_used(monkeypatch):
+    """With no explicit batch_size, the IDEA_TEST_CONSOL_BATCH env selects the batched path."""
+    monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
+    monkeypatch.setenv(consol_pilot.MAX_SAMPLES_ENV, "10")
+    monkeypatch.setenv(consol_pilot.BATCH_ENV, "3")
+    sample, state = _batch_tracking_sampler(["Paris"] * 10)
+    result = _run(consol_pilot.consol_vote(
+        sample, k=5, key_fn=_key, confidence_model=_stub_model(stop_at=3)))
+    assert result is not None
+    assert state["max_in_flight"] == 3
+
+
+def test_batched_stops_across_batches(monkeypatch):
+    """Convergence spanning multiple batches: test runs once per batch, continues if not stopped."""
+    monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
+    monkeypatch.setenv(consol_pilot.MAX_SAMPLES_ENV, "10")
+    sample, state = _counting_sampler(["Rome"] * 10)
+    # stop_at=3 with batch_size=2: batch1 (2) not enough, batch2 makes it 4 >= 3 -> stop.
+    result = _run(consol_pilot.consol_vote(
+        sample, k=5, key_fn=_key, batch_size=2, confidence_model=_stub_model(stop_at=3)))
+    assert result is not None
+    assert result.answer == "Rome"
+    assert result.confident is True
+    assert result.num_samples == 4  # two batches of 2
+    assert state["calls"] == 4
+
+
+def test_batched_overshoots_convergence_point(monkeypatch):
+    """A batch checks convergence only once, so it can draw extra samples past the exact stop.
+
+    stop_at=2 would stop after 2 sequential draws; batch_size=5 draws all 5 before the first
+    check — the deliberate precision-for-parallelism trade. Still never exceeds the cap."""
+    monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
+    monkeypatch.setenv(consol_pilot.MAX_SAMPLES_ENV, "5")
+    sample, state = _counting_sampler(["Oslo"] * 10)
+    result = _run(consol_pilot.consol_vote(
+        sample, k=5, key_fn=_key, batch_size=5, confidence_model=_stub_model(stop_at=2)))
+    assert result is not None
+    assert result.answer == "Oslo"
+    assert result.num_samples == 5  # overshot 2 -> 5 (one full batch), but capped at 5
+    assert state["calls"] == 5
+
+
+def test_batched_never_exceeds_cap(monkeypatch):
+    """batch_size larger than the remaining cap is truncated — never spends more than fixed-k."""
+    monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
+    monkeypatch.delenv(consol_pilot.MAX_SAMPLES_ENV, raising=False)  # cap = k = 5
+    # Every answer distinct -> never converges; batch of 20 must clamp to the 5-sample cap.
+    sample, state = _counting_sampler([f"answer-{i}" for i in range(20)])
+    result = _run(consol_pilot.consol_vote(
+        sample, k=5, key_fn=_key, batch_size=20, confidence_model=_stub_model(stop_at=99)))
+    assert result is not None
+    assert result.confident is False
+    assert result.num_samples == 5
+    assert state["calls"] == 5
+    assert result.answer == "answer-0"  # tie -> anchor (first sample)
+
+
+def test_batched_sample_error_does_not_abort(monkeypatch):
+    """An erroring draw inside a parallel batch is skipped; the rest of the batch still counts."""
+    monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
+    monkeypatch.setenv(consol_pilot.MAX_SAMPLES_ENV, "10")
+    calls = {"n": 0}
+
+    async def flaky(_temp):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("transient")
+        return "Cairo"
+
+    result = _run(consol_pilot.consol_vote(
+        flaky, k=5, key_fn=_key, batch_size=3, confidence_model=_stub_model(stop_at=2)))
+    assert result is not None
+    assert result.answer == "Cairo"
+    assert result.confident is True  # 2 good "Cairo" in the batch of 3 still reaches stop_at=2
+
+
+def test_batched_all_unknown_returns_empty(monkeypatch):
+    monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
+    monkeypatch.delenv(consol_pilot.MAX_SAMPLES_ENV, raising=False)
+    sample, state = _counting_sampler(["UNKNOWN"] * 5)
+    result = _run(consol_pilot.consol_vote(
+        sample, k=5, key_fn=_key, batch_size=3, confidence_model=_stub_model(stop_at=2)))
+    assert result is not None
+    assert result.answer == ""
+    assert result.confident is False
+    assert state["calls"] == 5

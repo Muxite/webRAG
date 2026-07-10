@@ -106,11 +106,6 @@
   "enable_recursive_merge": true,
 
   "got_embed_on_create": true,
-  "got_improve_enabled": false,
-  "got_improve_score_threshold": 0.3,
-  "got_improve_max_iterations": 2,
-  "got_improve_system_prompt": "You are a self-refinement function in a Graph-of-Thought system. Given a thought node and feedback from the scorer, produce an improved version. Return JSON: {\"improved_title\": string, \"improved_details\": object, \"refinement_rationale\": string}.",
-  "got_improve_temperature": 0.3,
   "got_reexpand_enabled": false,
   "got_reexpand_max_iterations": 1,
   "got_reexpand_temperature": 0.2,

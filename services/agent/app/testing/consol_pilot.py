@@ -34,6 +34,7 @@ replace ``_vote_extract``'s logic wholesale.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from collections import Counter
@@ -44,6 +45,7 @@ _logger = logging.getLogger(__name__)
 ENABLE_ENV = "IDEA_TEST_USE_CONSOL"
 MODEL_ENV = "IDEA_TEST_CONSOL_MODEL"          # msprt|sprt|pvalue|bayesian_posterior
 MAX_SAMPLES_ENV = "IDEA_TEST_CONSOL_MAX_SAMPLES"
+BATCH_ENV = "IDEA_TEST_CONSOL_BATCH"          # samples drawn concurrently per SPRT check (default 1)
 
 _CONFIDENCE_MODELS = {
     "msprt": "MsprtConfidenceModel",
@@ -94,6 +96,18 @@ def _max_samples(k: int, max_trials: int) -> int:
     return min(cap, max_trials)
 
 
+def _resolve_batch_size(override: Optional[int]) -> int:
+    """Number of samples drawn concurrently between SPRT checks. ``1`` (default) reproduces the
+    strictly-sequential path (test after every draw). ``>1`` draws that many samples in parallel
+    via ``asyncio.gather`` and checks convergence once per batch — trading a little early-stopping
+    precision (a batch may overshoot the exact convergence point) for real wall-clock parallelism.
+    Explicit ``override`` wins; otherwise read ``IDEA_TEST_CONSOL_BATCH``; otherwise ``1``."""
+    if override is not None:
+        return max(1, int(override))
+    raw = os.environ.get(BATCH_ENV, "").strip()
+    return max(1, int(raw)) if raw.isdigit() else 1
+
+
 def _default_is_unknown(ans: str) -> bool:
     return (not ans) or ans.strip().upper().startswith("UNKNOWN")
 
@@ -110,6 +124,28 @@ class ConsolVoteResult:
         self.confident = confident
 
 
+def _finalize_vote(
+    answers: list[str],
+    counts: "Counter[str]",
+    n: int,
+    confident: bool,
+    key_fn: Callable[[str], str],
+    is_unknown_fn: Callable[[str], bool],
+) -> ConsolVoteResult:
+    """Aggregate the drawn samples exactly like ``_vote_extract``: majority value, ties break to
+    the anchor (the first sample), '' if every sample was UNKNOWN. Shared by both the sequential
+    and batched sampling loops so they can never disagree on the winner given the same tally."""
+    cands = [a for a in answers if not is_unknown_fn(a)]
+    if not cands:
+        return ConsolVoteResult("", n, confident)
+    top_count = counts.most_common(1)[0][1]
+    tied = {key for key, c in counts.items() if c == top_count}
+    anchor = answers[0] if (answers and not is_unknown_fn(answers[0])) else ""
+    chosen_key = key_fn(anchor) if anchor and key_fn(anchor) in tied else counts.most_common(1)[0][0]
+    chosen = next(a for a in cands if key_fn(a) == chosen_key)
+    return ConsolVoteResult(chosen, n, confident)
+
+
 async def consol_vote(
     sample: Callable[[float], Awaitable[str]],
     *,
@@ -119,11 +155,21 @@ async def consol_vote(
     anchor_temp: float = 0.0,
     diverse_temp: float = 0.3,
     confidence_model=None,
+    batch_size: Optional[int] = None,
 ) -> Optional[ConsolVoteResult]:
-    """Sequentially draw samples and stop as soon as ConSol's SPRT test is confident in the
-    leading answer, aggregating exactly like ``_vote_extract`` (anchor-at-temp-0, ties break to
-    the anchor). Sampling is sequential (not the fixed-k parallel gather) because early stopping
-    needs to inspect the running tally after each draw.
+    """Draw samples and stop as soon as ConSol's SPRT test is confident in the leading answer,
+    aggregating exactly like ``_vote_extract`` (anchor-at-temp-0, ties break to the anchor).
+
+    Two sampling regimes, selected by ``batch_size`` (explicit arg wins, else
+    ``IDEA_TEST_CONSOL_BATCH``, else ``1``):
+
+    * ``batch_size == 1`` (default): strictly sequential — one draw at a time, ``cm.test`` after
+      every draw. Maximal early-stopping precision, but no intra-vote parallelism (the confirmed
+      cause of the pilot's ~60% slower wall-clock vs the fixed-k parallel gather).
+    * ``batch_size > 1``: draw that many samples concurrently via ``asyncio.gather``, then run
+      ``cm.test`` ONCE per batch. Real parallelism at the cost of possibly overshooting the exact
+      convergence point (a batch may draw a couple extra samples before the check triggers), which
+      slightly reduces the sample/cost savings but never exceeds the cap.
 
     Returns ``None`` — meaning "caller keeps its fixed-k behavior" — when the opt-in flag is off
     or ConSol is unavailable. Otherwise returns a :class:`ConsolVoteResult`.
@@ -138,23 +184,50 @@ async def consol_vote(
         return None
 
     cap = _max_samples(k, cm.config.max_trials)
+    bsize = _resolve_batch_size(batch_size)
     answers: list[str] = []
     counts: Counter[str] = Counter()
     confident = False
     n = 0
-    while n < cap:
-        temp = anchor_temp if n == 0 else diverse_temp
-        try:
-            raw = await sample(temp)
-        except Exception as exc:  # noqa: BLE001 - a flaky sample shouldn't abort the vote
-            _logger.warning("ConSol sample %d/%d errored (%s); continuing", n + 1, cap, exc)
+
+    if bsize == 1:
+        # Sequential path (unchanged): test after every single draw.
+        while n < cap:
+            temp = anchor_temp if n == 0 else diverse_temp
+            try:
+                raw = await sample(temp)
+            except Exception as exc:  # noqa: BLE001 - a flaky sample shouldn't abort the vote
+                _logger.warning("ConSol sample %d/%d errored (%s); continuing", n + 1, cap, exc)
+                n += 1
+                continue
             n += 1
-            continue
-        n += 1
-        answers.append(raw)
-        if is_unknown_fn(raw):
-            continue
-        counts[key_fn(raw)] += 1
+            answers.append(raw)
+            if is_unknown_fn(raw):
+                continue
+            counts[key_fn(raw)] += 1
+            top = counts.most_common(2)
+            first = top[0][1] if top else 0
+            second = top[1][1] if len(top) > 1 else 0
+            if first > 0 and cm.test(first, second):
+                confident = True
+                break
+        return _finalize_vote(answers, counts, n, confident, key_fn, is_unknown_fn)
+
+    # Batched path: draw up to ``bsize`` samples concurrently, never exceeding the cap, then run
+    # the SPRT check once for the whole batch.
+    while n < cap:
+        take = min(bsize, cap - n)
+        temps = [anchor_temp if (n + j) == 0 else diverse_temp for j in range(take)]
+        raws = await asyncio.gather(*(sample(t) for t in temps), return_exceptions=True)
+        for raw in raws:
+            n += 1
+            if isinstance(raw, BaseException):
+                _logger.warning("ConSol batched sample %d/%d errored (%s); continuing", n, cap, raw)
+                continue
+            answers.append(raw)
+            if is_unknown_fn(raw):
+                continue
+            counts[key_fn(raw)] += 1
         top = counts.most_common(2)
         first = top[0][1] if top else 0
         second = top[1][1] if len(top) > 1 else 0
@@ -162,12 +235,4 @@ async def consol_vote(
             confident = True
             break
 
-    cands = [a for a in answers if not is_unknown_fn(a)]
-    if not cands:
-        return ConsolVoteResult("", n, confident)
-    top_count = counts.most_common(1)[0][1]
-    tied = {key for key, c in counts.items() if c == top_count}
-    anchor = answers[0] if (answers and not is_unknown_fn(answers[0])) else ""
-    chosen_key = key_fn(anchor) if anchor and key_fn(anchor) in tied else counts.most_common(1)[0][0]
-    chosen = next(a for a in cands if key_fn(a) == chosen_key)
-    return ConsolVoteResult(chosen, n, confident)
+    return _finalize_vote(answers, counts, n, confident, key_fn, is_unknown_fn)
