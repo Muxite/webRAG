@@ -71,6 +71,38 @@ class LLMBackend(ABC):
         """
 
 
+def json_instruction_from_response_format(rf: Any) -> Optional[str]:
+    """Build a plain-text JSON instruction from an OpenAI ``response_format``.
+
+    Reused by (a) the Anthropic backend, which cannot pass ``response_format`` on
+    the wire, and (b) the expansion stage, whose schema has a free-form
+    ``details`` object that strict structured output cannot express — so the
+    candidate shape is conveyed as text while the request uses ``json_object``.
+
+    :param rf: response_format dict or None.
+    :returns: Instruction string or None.
+    """
+    if not rf or not isinstance(rf, dict):
+        return None
+    rtype = rf.get("type")
+    if rtype == "json_object":
+        return "Respond with valid JSON only. No markdown fences or commentary."
+    if rtype == "json_schema":
+        schema = rf.get("json_schema")
+        if isinstance(schema, dict):
+            try:
+                schema_text = json.dumps(schema, indent=2)[:12000]
+            except (TypeError, ValueError):
+                schema_text = str(schema)[:12000]
+        else:
+            schema_text = str(schema)[:12000]
+        return (
+            "Respond with valid JSON only that conforms to this JSON Schema. "
+            "No markdown fences or commentary.\n\n" + schema_text
+        )
+    return None
+
+
 def create_llm_backend(config: ConnectorConfig, logger: logging.Logger) -> LLMBackend:
     """
     Factory for LLM backends from ConnectorConfig.llm_provider.
@@ -424,31 +456,8 @@ class AnthropicMessagesBackend(LLMBackend):
         return system, out
 
     def _json_instruction_from_response_format(self, rf: Any) -> Optional[str]:
-        """
-        Build a plain-text JSON instruction from OpenAI response_format.
-
-        :param rf: response_format dict or None.
-        :returns: Instruction string or None.
-        """
-        if not rf or not isinstance(rf, dict):
-            return None
-        rtype = rf.get("type")
-        if rtype == "json_object":
-            return "Respond with valid JSON only. No markdown fences or commentary."
-        if rtype == "json_schema":
-            schema = rf.get("json_schema")
-            if isinstance(schema, dict):
-                try:
-                    schema_text = json.dumps(schema, indent=2)[:12000]
-                except (TypeError, ValueError):
-                    schema_text = str(schema)[:12000]
-            else:
-                schema_text = str(schema)[:12000]
-            return (
-                "Respond with valid JSON only that conforms to this JSON Schema. "
-                "No markdown fences or commentary.\n\n" + schema_text
-            )
-        return None
+        """Thin instance wrapper around :func:`json_instruction_from_response_format`."""
+        return json_instruction_from_response_format(rf)
 
     async def complete(self, payload: dict, model_name: str) -> Tuple[str, Any]:
         """

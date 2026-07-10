@@ -67,6 +67,11 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
     page_chars = int(os.environ.get("IDEA_TEST_SEQ_PAGE_CHARS", "6000"))
     search_k = int(os.environ.get("IDEA_TEST_SEQ_SEARCH_K", "6"))
     dedup_search = os.environ.get("IDEA_TEST_SEQ_DEDUP_SEARCH", "1") not in ("0", "false", "False")
+    # Per-step decision budget. Reasoning models (e.g. gemini-3.1-pro) emit reasoning
+    # before the action JSON, so a small cap truncates the JSON mid-object -> garbage
+    # decisions. Default to a reasoning-adequate floor (matches the 4096 preflight-JSON
+    # convention); overridable via env so the runner can raise it per model.
+    step_max_tokens = int(os.environ.get("IDEA_TEST_SEQ_STEP_MAX_TOKENS", "4096"))
     scratchpad: List[str] = []          # in-context working memory
     evidence: List[str] = []            # visited-page text, for verify
     seen_queries: set = set()           # normalized queries already searched (breadth-loop guard)
@@ -78,14 +83,23 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": f"TASK:\n{mandate}\n\nSCRATCHPAD (your prior steps):\n{history}\n\nReturn the next step as JSON."},
         ]
-        payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name, temperature=0.1, max_tokens=1024)
+        payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name, temperature=0.1, max_tokens=step_max_tokens)
         raw = await agent_io.query_llm(payload, model_name=model_name)
         try:
             decision = json.loads(raw or "{}")
         except (json.JSONDecodeError, TypeError):
             decision = {}
+        # Models sometimes wrap the step in a list (e.g. ``[{...}]`` or a list of
+        # actions) instead of a bare object; take the first dict and never let a
+        # non-dict reach ``.get`` (would crash the whole react run).
+        if isinstance(decision, list):
+            decision = next((item for item in decision if isinstance(item, dict)), {})
+        if not isinstance(decision, dict):
+            decision = {}
         action = str(decision.get("action", "")).strip().lower()
-        args = decision.get("args") or {}
+        args = decision.get("args")
+        if not isinstance(args, dict):
+            args = {}
         thought = str(decision.get("thought", ""))[:300]
 
         if action == "finish" or step == max_steps - 1:

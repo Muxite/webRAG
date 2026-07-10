@@ -22,7 +22,7 @@ BENCHMARK_ROSTER = {
     "reference": ["google/gemini-3.1-pro-preview"],
     "reference_cached": ["openai/gpt-5", "google/gemini-2.5-pro"],
     "cheap": ["google/gemini-2.5-flash", "openai/gpt-5-mini", "openai/gpt-4.1-nano"],
-    "experiment": ["google/gemini-2.5-flash-lite", "openai/gpt-5-nano"],
+    "experiment": ["google/gemini-2.5-flash-lite", "openai/gpt-5-nano", "deepseek/deepseek-v4-flash"],
 }
 
 MODEL_ALIASES = {
@@ -38,6 +38,7 @@ MODEL_ALIASES = {
     "gemini-2.5-flash-lite": "google/gemini-2.5-flash-lite",
     "flash": "google/gemini-2.5-flash",
     "flash-lite": "google/gemini-2.5-flash-lite",
+    "deepseek-v4-flash": "deepseek/deepseek-v4-flash",
 }
 
 VALIDATION_MODEL = "gpt-5-mini"

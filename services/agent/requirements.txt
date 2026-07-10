@@ -13,3 +13,7 @@ pytest
 pytest-asyncio
 pytest-repeat
 asciidag
+# Optional: standalone OpenAI-compatible shim (agent.app.completions_api) + DAG visualizer.
+fastapi
+uvicorn[standard]
+matplotlib

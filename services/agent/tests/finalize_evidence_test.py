@@ -9,7 +9,7 @@ Covers the three new pieces of Phase 1:
 from agent.app.idea_finalize import _visited_sources, _unverified_citations, _looks_truncated
 from agent.app.idea_evidence import summarize_run_usage as _summarize_run_usage, build_evidence as _build_evidence
 from agent.app.idea_policies.base import DetailKey, IdeaActionType
-from shared.models import CompletionResult
+from shared.models import CompletionResult, TaskResult
 
 
 class _Node:
@@ -149,6 +149,22 @@ def test_unverified_citations_matches_scheme_and_slash_variants():
     assert _unverified_citations(text, sources) == []
 
 
+def test_unverified_citations_keeps_balanced_path_paren_with_fragment():
+    """A correctly-grounded citation to a parenthesized title page with a #fragment must NOT be
+    flagged: visited and cited sides have to normalize identically (the old regex truncated at '('
+    while _norm_cite kept the visited ')', so they mismatched -> false UNVERIFIED)."""
+    sources = [{"url": "https://en.wikipedia.org/wiki/Mercury_(element)#Properties", "title": "Mercury"}]
+    text = "Mercury melts at -38.8C (https://en.wikipedia.org/wiki/Mercury_(element)#Properties)."
+    assert _unverified_citations(text, sources) == []
+
+
+def test_unverified_citations_surfaces_clean_paren_url():
+    """A genuinely-unread parenthesized URL is surfaced WITHOUT being truncated mid-paren."""
+    sources = [{"url": "https://en.wikipedia.org/wiki/Toni_Morrison", "title": "T"}]
+    text = "An unread page https://en.wikipedia.org/wiki/Beloved_(novel)."
+    assert _unverified_citations(text, sources) == ["https://en.wikipedia.org/wiki/Beloved_(novel)"]
+
+
 def test_unverified_citations_none_when_no_urls():
     assert _unverified_citations("plain answer, no links", [{"url": "https://a.com"}]) == []
 
@@ -186,3 +202,21 @@ def test_completion_result_round_trips_evidence():
 def test_completion_result_omits_absent_evidence():
     payload = CompletionResult(success=True, deliverables=["x"]).result()
     assert "evidence" not in payload
+
+
+def test_error_path_failure_evidence_rides_in_result_and_reads_as_taskresult():
+    """No-deliverables ERROR path: structured failure detail + usage must survive to the API
+    read model via `result` (not be discarded), so a caller learns WHAT went wrong."""
+    failure_evidence = {
+        "failure": {"stage": "execution", "reason": "boom", "retryable": False},
+        "usage": {"llm_calls": 3, "total_tokens": 1200, "cost_usd": 0.004},
+    }
+    payload = CompletionResult(success=False, deliverables=[], notes="Internal agent error: boom",
+                               evidence=failure_evidence).result()
+    assert payload["success"] is False
+    assert payload["evidence"]["failure"]["reason"] == "boom"
+    # Validates as exactly what GET /tasks/{id} returns inside `result`.
+    tr = TaskResult(**payload)
+    assert tr.evidence is not None
+    assert tr.evidence.failure["stage"] == "execution"
+    assert tr.evidence.usage["llm_calls"] == 3

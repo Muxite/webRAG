@@ -1,0 +1,102 @@
+"""Tests for the deterministic task-shape classifier and its expansion.py wiring."""
+
+from __future__ import annotations
+
+import importlib
+import os
+
+import pytest
+
+from agent.app.idea_policies.shape_classifier import classify_shape
+from agent.app.idea_policies import expansion
+
+
+def _stmt(module_name: str) -> str:
+    mod = importlib.import_module(f"agent.app.idea_tests.{module_name}")
+    return mod.get_task_statement()
+
+
+# ---------------------------------------------------------------------------
+# Classification against REAL task statements in the repo
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "module_name, expected",
+    [
+        ("test_095_tier5_branch_eliminate_chain", "branch_eliminate"),
+        ("test_065_tier5_leak_resistant_chain", "chain"),
+        ("test_051_tier4_dependent_chain", "chain"),
+        ("test_055_tier5_multichain_arithmetic", "parallel_merge"),
+        ("test_061_tier5_director_birthyear_arithmetic", "parallel_merge"),
+        # Fan-out / breadth shapes that are none of the three -> fail open to None.
+        ("test_052_tier5_breadth_aggregation", None),
+        ("test_059_tier5_computed_ratio_argmax", None),
+    ],
+)
+def test_classify_shape_real_tasks(module_name, expected):
+    assert classify_shape(_stmt(module_name)) == expected
+
+
+def test_classify_shape_empty_fails_open():
+    assert classify_shape("") is None
+    assert classify_shape(None) is None  # type: ignore[arg-type]
+
+
+def test_classify_shape_plain_prose_none():
+    assert classify_shape("Find the capital of France and report it.") is None
+
+
+# ---------------------------------------------------------------------------
+# Auto-selection wiring in expansion.py
+# ---------------------------------------------------------------------------
+
+def _clear_env(monkeypatch):
+    monkeypatch.delenv("IDEA_TEST_REASONING_RULES", raising=False)
+
+
+def test_auto_injects_branch_eliminate_when_env_unset(monkeypatch):
+    _clear_env(monkeypatch)
+    block = expansion._auto_reasoning_rules(_stmt("test_095_tier5_branch_eliminate_chain"))
+    assert "Mandatory reasoning rules" in block
+    # A distinctive line from reasoning_rules/branch_eliminate.md.
+    assert "before you may name a survivor" in block
+
+
+def test_auto_no_injection_for_chain_shape_no_rule_file(monkeypatch):
+    # chain is classified correctly but has no rule file yet -> no block, no crash.
+    _clear_env(monkeypatch)
+    assert classify_shape(_stmt("test_065_tier5_leak_resistant_chain")) == "chain"
+    assert expansion._auto_reasoning_rules(_stmt("test_065_tier5_leak_resistant_chain")) == ""
+
+
+def test_auto_no_injection_for_parallel_shape_no_rule_file(monkeypatch):
+    _clear_env(monkeypatch)
+    assert classify_shape(_stmt("test_055_tier5_multichain_arithmetic")) == "parallel_merge"
+    assert expansion._auto_reasoning_rules(_stmt("test_055_tier5_multichain_arithmetic")) == ""
+
+
+def test_auto_no_injection_for_unclassified(monkeypatch):
+    _clear_env(monkeypatch)
+    assert expansion._auto_reasoning_rules("Just report a plain fact.") == ""
+
+
+def test_manual_env_overrides_auto_classification(monkeypatch):
+    # Mandate classifies as branch_eliminate, but the operator explicitly set the env
+    # var; the manual selection must win. Here the manual value is a valid name that
+    # differs in mechanism (explicit) from auto — confirm _load_reasoning_rules is what
+    # drives the block when the env var is set.
+    monkeypatch.setenv("IDEA_TEST_REASONING_RULES", "branch_eliminate")
+    manual = expansion._load_reasoning_rules()
+    assert "Mandatory reasoning rules" in manual
+    # When the env var is set to a shape that has no file / is invalid, the manual path
+    # returns "" and auto is NOT consulted (the call site only auto-selects when unset).
+    monkeypatch.setenv("IDEA_TEST_REASONING_RULES", "chain")
+    assert expansion._load_reasoning_rules() == ""
+
+
+def test_manual_none_disables_and_does_not_auto(monkeypatch):
+    # Explicit "none" disables injection; the call-site guard also blocks auto because
+    # the env var is set (non-empty).
+    monkeypatch.setenv("IDEA_TEST_REASONING_RULES", "none")
+    assert expansion._load_reasoning_rules() == ""
+    assert os.environ.get("IDEA_TEST_REASONING_RULES", "").strip() != ""

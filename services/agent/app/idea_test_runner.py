@@ -25,6 +25,7 @@ import asyncio
 import json
 import os
 import time
+from contextlib import AsyncExitStack
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
@@ -51,6 +52,34 @@ from agent.app.testing.utils import summarize_observability
 from agent.app.testing.tooling import profile_for_variant
 from agent.app.idea_graph_analyzer import add_graph_visualization
 from agent.app.testing.report import TestReportGenerator, Verbosity
+
+
+def _make_connector_set(config: ConnectorConfig) -> Dict[str, Any]:
+    """
+    Build one independent set of the four connectors used by a single concurrent
+    test-run slot. Each set owns its own ConnectorLLM (whose ``set_model`` mutates
+    mutable per-instance state), so isolating one set per slot lets us run test-runs
+    for DIFFERENT models concurrently without racing on model attribution.
+    :param config: Shared connector configuration (read-only, safe to share).
+    :return: Dict with keys ``llm``, ``search``, ``http``, ``chroma``.
+    """
+    return {
+        "llm": ConnectorLLM(config),
+        "search": ConnectorSearch(config),
+        "http": ConnectorHttp(config),
+        "chroma": ConnectorChroma(config),
+    }
+
+
+def _build_connector_pool(config: ConnectorConfig, pool_size: int) -> List[Dict[str, Any]]:
+    """
+    Build a pool of independent connector sets sized to the resolved concurrency.
+    A pool of size 1 degenerates to exactly one shared set (today's behavior).
+    :param config: Shared connector configuration.
+    :param pool_size: Number of concurrent slots (resolved IDEA_TEST_CONCURRENCY).
+    :return: List of connector-set dicts, length == max(1, pool_size).
+    """
+    return [_make_connector_set(config) for _ in range(max(1, int(pool_size)))]
 
 
 async def preflight_check_llm(connector_llm: ConnectorLLM, model_name: str) -> bool:
@@ -203,6 +232,27 @@ TEST_PRIORITY_ORDER = [
     "052",  # Tier 5: 6-way fan-out & aggregation / argmin (8/10) - level=graph, weight=long
     "053",  # Tier 5: 6-way fan-out & aggregation / argmax, page-only depths (8/10) - level=graph
     "054",  # Tier 5: mixed DAG — parallel gather + dependent final hop (8/10) - level=graph
+    "055",  # Reasoning+math: two 2-hop chains + terminal arithmetic difference (9/10) - level=graph
+    "056",  # Cross-source contradiction resolution — fact-check w/ verify leaf (8/10) - level=integration
+    "057",  # Strict JSON structured output under research load (7/10) - level=integration, weight=long
+    "058",  # Long-context needle-in-haystack — buried late-section detail (7/10) - level=navigation, weight=long
+    "059",  # Reasoning+math: argmax over a COMPUTED ratio (goals/caps), ranking ≠ raw (9/10) - level=graph
+    "060",  # Reasoning+math: percentage-change comparison, absolute≠percent winner (9/10) - level=graph
+    "061",  # Reasoning+math: two 2-hop chains (film->director->birth year) + terminal arithmetic difference (9/10) - level=graph
+    "062",  # Tier 5: page-only prominence argmax; prominence≠elevation, tallest is a decoy (8/10) - level=graph
+    "063",  # Strict CSV structured output under research load (7/10) - level=integration, weight=long
+    "064",  # Reasoning+math: argmax over a COMPUTED ratio (volume/area), WIDE-margin double-decoy (9/10) - level=graph
+    "065",  # Tier 5: URL-free 3-hop dependent chain, leak-resistant terminus (town elevation) (9/10) - level=graph, weight=long
+    "066",  # Cross-source contradiction — popular-wrong vs authoritative revised record (8/10) - level=integration
+    "073",  # Tier 5: temporal range filter — COUNT of founding-years within [1940,1963] (9/10) - level=integration
+    "080",  # Tier 5: odd-one-out / negation B — New Guinea river drainage; Sepik is the exception (9/10) - level=integration
+    "081",  # Tier 5: two-constraint numeric AND-filter — reworked to 6 self-describing leaves (9/10) - level=graph, weight=long
+    "090",  # Tier 5: count-with-condition — Icelandic tunnels with length > 4,500 m (8/10) - level=graph
+    "091",  # Tier 5: page-only height argmax, wide-margin fame-decoy — tallest of six Turkish dams (8/10) - level=graph
+    "092",  # Tier 5: URL-free 3-hop dependent chain B, leak-resistant terminus (Pizarro -> Trujillo elevation) (9/10) - level=graph, weight=long
+    "093",  # Tier 5: CVE advisory -> C source root-cause chain B (curl SOCKS5 CVE-2023-38545) (10/10) - level=graph
+    "094",  # Tier 5: two-constraint numeric AND-filter — Norwegian fjords; Trondheimsfjord long-but-shallow (9/10) - level=graph, weight=long
+    "095",  # Tier 5: branch-to-eliminate then chain forward — Rivers Avon (English-Channel survivor) -> Dorset Stour catchment (10/10) - level=graph, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12
@@ -683,7 +733,18 @@ async def run_single_test(
             execution.pop("telemetry_raw", None)
         
         out_path.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
-        
+
+        # Opt-in: emit a square >=1920px PNG of the run's DAG (compiled plan or runtime graph)
+        # alongside the result JSON. Best-effort — visualization must never fail a run.
+        if os.environ.get("IDEA_TEST_RENDER_DAG", "").lower() in ("1", "true", "yes"):
+            try:
+                from agent.app.testing.dag_visualizer import render_result_file
+                dag_px = _env_int("IDEA_TEST_DAG_PX", [], 1920)
+                render_result_file(str(out_path), out_path=str(out_path.with_suffix(".dag.png")),
+                                   side_px=dag_px)
+            except Exception as exc:  # noqa: BLE001
+                logging.debug(f"[{test_id}] DAG render skipped: {exc}")
+
         validation = result.get("validation", {})
         passed = validation.get("overall_passed", False)
         score = validation.get("overall_score", 0.0)
@@ -930,7 +991,22 @@ async def main() -> None:
         logging.info("Benchmark mode enabled: balanced difficulty subset with explicit visit coverage")
     
     config = ConnectorConfig()
-    idea_settings = load_idea_dag_settings()
+    # IDEA_DAG_SETTINGS_PATH: optional path to an alternate settings JSON (e.g. an
+    # experimental prompt variant), so A/B prompt experiments never touch the
+    # production idea_dag_settings.json default.
+    _settings_path_override = os.environ.get("IDEA_DAG_SETTINGS_PATH", "").strip()
+    idea_settings = load_idea_dag_settings(Path(_settings_path_override) if _settings_path_override else None)
+    # IDEA_TEST_GOT_REEXPAND: per-run toggle for the dormant adaptive re-expansion
+    # mechanism (got_reexpand_enabled). Lets experiments flip it on/off without editing
+    # the checked-in idea_dag_settings.json default (which stays false). Truthy values
+    # (1/true/yes/on) enable it; explicit falsey values force it off.
+    _reexpand_override = os.environ.get("IDEA_TEST_GOT_REEXPAND", "").strip()
+    if _reexpand_override:
+        idea_settings["got_reexpand_enabled"] = _is_enabled(_reexpand_override)
+    logging.info(
+        f"Idea DAG settings source: {_settings_path_override or '(default idea_dag_settings.json)'} "
+        f"| got_reexpand_enabled={idea_settings.get('got_reexpand_enabled')}"
+    )
     idea_settings["log_dag_ascii"] = False
     idea_settings["log_dag_step_interval"] = 0
     idea_settings["allowed_actions"] = ["search", "visit", "save", "think", "merge", "verify"]
@@ -956,15 +1032,31 @@ async def main() -> None:
         )
         os.environ["IDEA_TEST_MANDATE_SUFFIX"] = visit_prompt_suffix
     
-    connector_llm = ConnectorLLM(config)
-    connector_search = ConnectorSearch(config)
-    connector_http = ConnectorHttp(config)
-    connector_chroma = ConnectorChroma(config)
-    
-    async with connector_search, connector_http, connector_llm:
-        await connector_search.init_search_api()
-        await connector_chroma.init_chroma()
-        
+    # One independent connector set per concurrent slot. IDEA_TEST_CONCURRENCY has been
+    # historically pinned to 1 because a single shared ConnectorLLM.set_model() mutates
+    # shared model state and races when two different-model runs overlap. A pool of size
+    # `max_parallel` gives each concurrent task its own ConnectorLLM/Search/Http/Chroma,
+    # so distinct-model runs can execute simultaneously without corrupting attribution.
+    # Chroma clients are isolated too (err toward isolation); the underlying Chroma server
+    # is shared and handles concurrent requests, so only ONE warmup is needed server-side.
+    pool_size = max(1, int(max_parallel))
+    connector_pool = _build_connector_pool(config, pool_size)
+    # Preflight/warmup run on the first set; its populated model_profiles are copied to
+    # the rest so every slot shares the same per-model runtime profiles.
+    primary = connector_pool[0]
+    connector_llm = primary["llm"]
+    connector_search = primary["search"]
+    connector_http = primary["http"]
+    connector_chroma = primary["chroma"]
+
+    async with AsyncExitStack() as stack:
+        for cset in connector_pool:
+            await stack.enter_async_context(cset["search"])
+            await stack.enter_async_context(cset["http"])
+            await stack.enter_async_context(cset["llm"])
+            await cset["search"].init_search_api()
+            await cset["chroma"].init_chroma()
+
         logging.info("Warming up ChromaDB to pre-install embedding models...")
         try:
             warmup_collection_name = "warmup_test"
@@ -986,7 +1078,7 @@ async def main() -> None:
                 logging.warning("ChromaDB warmup collection creation failed, but continuing")
         except Exception as warmup_exc:
             logging.warning(f"ChromaDB warmup failed (non-fatal): {warmup_exc}")
-        
+
         execution_models_requested = _unique_models(models)
         preflight_models = list(execution_models_requested)
         if validation_model not in preflight_models:
@@ -1007,7 +1099,21 @@ async def main() -> None:
             return
         valid_models = _unique_models(execution_models + [validation_model])
         logging.info(f"Valid models: {', '.join(valid_models)}")
-        
+
+        # Preflight populated per-model runtime profiles on the primary connector only.
+        # Copy them to every other slot so all pooled ConnectorLLMs share the same
+        # profiles (payload normalization reads self.model_profiles per-instance).
+        for cset in connector_pool[1:]:
+            for _mname, _profile in connector_llm.model_profiles.items():
+                cset["llm"].set_model_profile(_mname, _profile)
+
+        # Checkout queue of connector sets, one per concurrent slot. A task borrows a set
+        # for the duration of its run and returns it, guaranteeing no two concurrent tasks
+        # ever share a ConnectorLLM (whose set_model mutates instance state).
+        connector_queue: asyncio.Queue = asyncio.Queue()
+        for cset in connector_pool:
+            connector_queue.put_nowait(cset)
+
         all_results = []
         results_dir = Path(__file__).resolve().parent.parent / "idea_test_results"
         results_dir.mkdir(parents=True, exist_ok=True)
@@ -1043,22 +1149,26 @@ async def main() -> None:
                     return None
                 queue_wait_end = time.perf_counter()
                 queue_wait_seconds = max(0.0, queue_wait_end - queue_wait_start)
-                result = await run_single_test(
-                    test_file=test_file,
-                    model_name=model_name,
-                    connector_llm=connector_llm,
-                    connector_search=connector_search,
-                    connector_http=connector_http,
-                    connector_chroma=connector_chroma,
-                    idea_settings=idea_settings,
-                    run_id=run_id,
-                    results_dir=results_dir,
-                    validation_model=validation_model,
-                    execution_variant=execution_variant,
-                    repeat_index=repeat_index,
-                    total_repeats=repeats,
-                    effort_tier=effort_tier,
-                )
+                cset = await connector_queue.get()
+                try:
+                    result = await run_single_test(
+                        test_file=test_file,
+                        model_name=model_name,
+                        connector_llm=cset["llm"],
+                        connector_search=cset["search"],
+                        connector_http=cset["http"],
+                        connector_chroma=cset["chroma"],
+                        idea_settings=idea_settings,
+                        run_id=run_id,
+                        results_dir=results_dir,
+                        validation_model=validation_model,
+                        execution_variant=execution_variant,
+                        repeat_index=repeat_index,
+                        total_repeats=repeats,
+                        effort_tier=effort_tier,
+                    )
+                finally:
+                    connector_queue.put_nowait(cset)
                 if result and isinstance(result, dict):
                     execution_data = result.get("execution", {})
                     if isinstance(execution_data, dict):

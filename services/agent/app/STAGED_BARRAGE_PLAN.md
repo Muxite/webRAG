@@ -1,5 +1,10 @@
 # Staged Barrage Plan — slow start → cost estimate → full run → stat report
 
+> **DONE (2026-07-08).** This plan's phases were executed; the campaign closed out as `barrage24b`
+> (38 tests, 1,026 runs, ≈$38). See the banner at the top of `COST_BENCHMARK_HANDOFF.md` and
+> [`linkedin_package_38tests_2026-07-08/`](../../../linkedin_package_38tests_2026-07-08/README_LINKEDIN.md)
+> for final numbers. Kept below for the phase-by-phase methodology, not current status.
+
 Goal: don't fire the whole matrix blind. Walk up in cheap, abortable stages; confirm the
 **early-phase runs say what we expect**; derive a **real cost projection** before committing
 the expensive runs; then run the rest and come back with **one full statistical report**.

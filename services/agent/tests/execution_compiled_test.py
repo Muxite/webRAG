@@ -113,6 +113,80 @@ def test_cyclic_plan_rejected_before_any_leaf(monkeypatch):
     assert ran == []  # validation fails fast, no leaf executes
 
 
+# --- diverse-ground aggregation (opt-in scattered candidates + grounded reranker) -----------
+
+def _seq_io(responses):
+    """AgentIO mock whose query_llm yields the given responses in order (per call)."""
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(side_effect=list(responses))
+    return io
+
+
+_DIVERSE_PLAN = {"leaves": [{"id": "a", "instruction": "do A"},
+                            {"id": "b", "instruction": "do B"}], "aggregation": "compute the answer"}
+
+
+def test_diverse_ground_generates_candidates_then_reranks(monkeypatch):
+    monkeypatch.setenv("IDEA_TEST_COMPILED_AGG_MODE", "diverse_ground")
+    monkeypatch.setenv("IDEA_TEST_COMPILED_AGG_N", "3")
+    _stub_leaf(monkeypatch, lambda ins: f"FACT[{ins}]")
+    io = _seq_io(["FINAL ANSWER: 10", "FINAL ANSWER: 12", "FINAL ANSWER: 10", "SELECTED 10"])
+    out = asyncio.run(ec._execute_plan(io, _DIVERSE_PLAN, "m", 256))
+    assert out == "SELECTED 10"
+    assert io.query_llm.call_count == 4          # 3 scattered candidates + 1 grounded reranker
+    last = io.build_llm_payload.call_args_list[-1].kwargs["messages"]
+    assert "CANDIDATE 1:" in last[-1]["content"] and "CANDIDATE 3:" in last[-1]["content"]
+    assert "VERIFIER" in last[0]["content"]      # the reranker is the grounded verifier prompt
+
+
+def test_diverse_ground_single_candidate_skips_rerank(monkeypatch):
+    monkeypatch.setenv("IDEA_TEST_COMPILED_AGG_MODE", "diverse_ground")
+    monkeypatch.setenv("IDEA_TEST_COMPILED_AGG_N", "1")
+    _stub_leaf(monkeypatch, lambda ins: "FACT")
+    io = _seq_io(["only one"])
+    out = asyncio.run(ec._execute_plan(io, _DIVERSE_PLAN, "m", 256))
+    assert out == "only one" and io.query_llm.call_count == 1   # nothing to rerank
+
+
+def test_diverse_ground_empty_candidates_fall_back_to_single(monkeypatch):
+    monkeypatch.setenv("IDEA_TEST_COMPILED_AGG_MODE", "diverse_ground")
+    monkeypatch.setenv("IDEA_TEST_COMPILED_AGG_N", "3")
+    _stub_leaf(monkeypatch, lambda ins: "FACT")
+    io = _seq_io(["", "", "", "FALLBACK"])
+    out = asyncio.run(ec._execute_plan(io, _DIVERSE_PLAN, "m", 256))
+    assert out == "FALLBACK" and io.query_llm.call_count == 4   # 3 empty -> single fallback
+
+
+def test_default_agg_mode_is_single_one_call(monkeypatch):
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    _stub_leaf(monkeypatch, lambda ins: "FACT")
+    io = _seq_io(["ONE"])
+    out = asyncio.run(ec._execute_plan(io, _DIVERSE_PLAN, "m", 256))
+    assert out == "ONE" and io.query_llm.call_count == 1        # proven default unchanged
+
+
+def test_plan_agg_mode_single_overrides_diverse_env(monkeypatch):
+    # A precision task pins "single" in its plan; the global diverse_ground default must NOT apply.
+    monkeypatch.setenv("IDEA_TEST_COMPILED_AGG_MODE", "diverse_ground")
+    _stub_leaf(monkeypatch, lambda ins: "FACT")
+    plan = {"leaves": [{"id": "a", "instruction": "do A"}], "aggregation": "x", "agg_mode": "single"}
+    io = _seq_io(["PINNED"])
+    out = asyncio.run(ec._execute_plan(io, plan, "m", 256))
+    assert out == "PINNED" and io.query_llm.call_count == 1     # forced single, no rerank
+
+
+def test_plan_agg_mode_diverse_overrides_default(monkeypatch):
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    monkeypatch.setenv("IDEA_TEST_COMPILED_AGG_N", "3")
+    _stub_leaf(monkeypatch, lambda ins: "FACT")
+    plan = {"leaves": [{"id": "a", "instruction": "do A"}], "aggregation": "x",
+            "agg_mode": "diverse_ground"}
+    io = _seq_io(["c1", "c2", "c3", "RERANKED"])
+    out = asyncio.run(ec._execute_plan(io, plan, "m", 256))
+    assert out == "RERANKED" and io.query_llm.call_count == 4   # 3 candidates + rerank
+
+
 def test_thin_leaf_pipeline_extracts_and_cites(monkeypatch):
     """Thin leaf: search -> pick the wiki result -> visit -> extract the value; URL is carried."""
     monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")  # single-shot for a deterministic assert
@@ -240,6 +314,35 @@ def test_thin_max_tokens_env_override(monkeypatch):
     assert ec._thin_max_tokens_for_model("google/gemini-3.1-pro-preview") == 200
 
 
+def test_react_max_tokens_for_model_price_aware(monkeypatch):
+    """Cheap slug keeps the base budget unchanged (do not regress the proven cheap-react cost);
+    mid/premium get a multiplier so reasoning models have room before finish_reason=length."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_REACT_MAX_TOKENS", raising=False)
+    _patch_pricing(monkeypatch, {
+        "cheap-slug": {"output_per_million": 0.40},
+        "mid-slug": {"output_per_million": 2.00},
+        "google/gemini-3.1-pro-preview": {"output_per_million": 12.00},
+    })
+    assert ec._react_max_tokens_for_model("cheap-slug", 700) == 700
+    assert ec._react_max_tokens_for_model("mid-slug", 700) == int(700 * 2.2)
+    assert ec._react_max_tokens_for_model("google/gemini-3.1-pro-preview", 700) == int(700 * 4.4)
+    # Fallback single-shot extraction base (300) scales the same way.
+    assert ec._react_max_tokens_for_model("cheap-slug", 300) == 300
+    assert ec._react_max_tokens_for_model("google/gemini-3.1-pro-preview", 300) == int(300 * 4.4)
+
+
+def test_react_max_tokens_unknown_price_gives_room(monkeypatch):
+    monkeypatch.delenv("IDEA_TEST_COMPILED_REACT_MAX_TOKENS", raising=False)
+    _patch_pricing(monkeypatch, {})
+    assert ec._react_max_tokens_for_model("nonexistent-model-xyz", 700) == int(700 * 2.2)
+
+
+def test_react_max_tokens_env_override(monkeypatch):
+    monkeypatch.setenv("IDEA_TEST_COMPILED_REACT_MAX_TOKENS", "9999")
+    assert ec._react_max_tokens_for_model("cheap-slug", 700) == 9999
+    assert ec._react_max_tokens_for_model("google/gemini-3.1-pro-preview", 300) == 9999
+
+
 def test_thin_extract_passes_model_aware_budget(monkeypatch):
     """The extract call must pass the premium budget (128) for a premium slug, 24 for cheap."""
     _patch_pricing(monkeypatch, {
@@ -354,6 +457,15 @@ def test_target_entity_keeps_multiple_initials_no_source_tail():
     instr = ("Search for and open the authoritative page for the author J. R. R. Tolkien. "
              "Read and extract the author's year of birth.")
     assert ec._target_entity(instr) == "J. R. R. Tolkien"
+
+
+def test_target_entity_keeps_honorific_prefix():
+    """A leading honorific must NOT truncate at its period ('Dr. Seuss' -> 'Dr' was the bug):
+    same class as the initials regression, but the honorific's tail is lowercase."""
+    instr = ("Search for and open the authoritative page (e.g., Wikipedia) for the author "
+             "Dr. Seuss — source: https://en.wikipedia.org/wiki/Dr._Seuss. "
+             "Read and extract the author's year of birth.")
+    assert ec._target_entity(instr) == "Dr. Seuss"
 
 
 def test_thin_leaf_query_uses_full_initialed_name(monkeypatch):
@@ -495,3 +607,157 @@ def test_thin_leaf_falls_back_to_llm_query_without_entity(monkeypatch):
     asyncio.run(ec._run_leaf_thin(io, instr, "name", "m", 6000, 6))
     assert io.search.await_args.args[0] == "tallest mountain on earth"
     assert io.query_llm.await_count == 2  # query LLM + extraction
+
+
+# --- Arm B: price-aware leaf-mode routing (_leaf_mode_for_model) ----------------------------------
+
+def test_leaf_mode_auto_routes_reasoning_tiers_to_thin(monkeypatch):
+    """Default 'auto' routes mid + premium -> thin; cheap + unknown keep react."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_LEAF_MODE", raising=False)
+    _patch_pricing(monkeypatch, {
+        "cheap-slug": {"output_per_million": 0.40},
+        "openai/gpt-5-mini": {"output_per_million": 2.00},
+        "google/gemini-3.1-pro-preview": {"output_per_million": 12.00},
+    })
+    assert ec._leaf_mode_for_model("cheap-slug") == "react"
+    assert ec._leaf_mode_for_model("openai/gpt-5-mini") == "thin"      # mid -> thin
+    assert ec._leaf_mode_for_model("google/gemini-3.1-pro-preview") == "thin"  # premium -> thin
+    assert ec._leaf_mode_for_model("nonexistent-model-xyz") == "react"  # unknown -> react
+
+
+def test_leaf_mode_hard_overrides_win(monkeypatch):
+    """Explicit react/thin override the price tier entirely (test-suite + manual A/B pinning)."""
+    _patch_pricing(monkeypatch, {"google/gemini-3.1-pro-preview": {"output_per_million": 12.00}})
+    monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_MODE", "react")
+    assert ec._leaf_mode_for_model("google/gemini-3.1-pro-preview") == "react"  # premium forced react
+    monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_MODE", "thin")
+    assert ec._leaf_mode_for_model("cheap-slug") == "thin"                       # cheap forced thin
+
+
+def test_leaf_mode_unrecognized_value_falls_back_to_auto(monkeypatch):
+    """A junk mode string is treated as 'auto' (route by tier), never crashes."""
+    monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_MODE", "banana")
+    _patch_pricing(monkeypatch, {"google/gemini-3.1-pro-preview": {"output_per_million": 12.00}})
+    assert ec._leaf_mode_for_model("google/gemini-3.1-pro-preview") == "thin"
+
+
+def test_execute_plan_auto_routes_premium_to_thin_leaf(monkeypatch):
+    """End-to-end: under 'auto', a premium model runs the THIN leaf, not react."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_LEAF_MODE", raising=False)
+    _patch_pricing(monkeypatch, {"google/gemini-3.1-pro-preview": {"output_per_million": 12.00}})
+    react_calls, thin_calls = [], []
+
+    async def fake_react(agent_io, instruction, *a):
+        react_calls.append(instruction); return "REACT"
+
+    async def fake_thin(agent_io, instruction, *a):
+        thin_calls.append(instruction); return "THIN — source: http://x"
+
+    monkeypatch.setattr(ec, "_run_leaf", fake_react)
+    monkeypatch.setattr(ec, "_run_leaf_thin", fake_thin)
+    plan = {"leaves": [{"id": "a", "instruction": "do A"}], "aggregation": "merge"}
+    io = _agg_io("OUT")
+    asyncio.run(ec._execute_plan(io, plan, "google/gemini-3.1-pro-preview", 256))
+    assert thin_calls == ["do A"] and react_calls == []
+
+
+def test_execute_plan_auto_keeps_cheap_on_react_leaf(monkeypatch):
+    """Under 'auto', a cheap model still runs the proven react leaf (bug never touched it)."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_LEAF_MODE", raising=False)
+    _patch_pricing(monkeypatch, {"cheap-slug": {"output_per_million": 0.40}})
+    react_calls, thin_calls = [], []
+
+    async def fake_react(agent_io, instruction, *a):
+        react_calls.append(instruction); return "REACT"
+
+    async def fake_thin(agent_io, instruction, *a):
+        thin_calls.append(instruction); return "THIN"
+
+    monkeypatch.setattr(ec, "_run_leaf", fake_react)
+    monkeypatch.setattr(ec, "_run_leaf_thin", fake_thin)
+    plan = {"leaves": [{"id": "a", "instruction": "do A"}], "aggregation": "merge"}
+    io = _agg_io("OUT")
+    asyncio.run(ec._execute_plan(io, plan, "cheap-slug", 256))
+    assert react_calls == ["do A"] and thin_calls == []
+
+
+# --- Arm C: lean react (reasoning-effort hint + tightened prompt) ---------------------------------
+
+def test_react_lean_effort_only_mid_premium_when_enabled(monkeypatch):
+    """Lean hint fires for mid/premium; never for cheap/unknown; off entirely when the flag is unset."""
+    _patch_pricing(monkeypatch, {
+        "cheap-slug": {"output_per_million": 0.40},
+        "openai/gpt-5-mini": {"output_per_million": 2.00},
+        "google/gemini-3.1-pro-preview": {"output_per_million": 12.00},
+    })
+    monkeypatch.delenv("IDEA_TEST_COMPILED_REACT_LEAN", raising=False)
+    assert ec._react_lean_effort("google/gemini-3.1-pro-preview") is None  # Arm A: untouched
+    monkeypatch.setenv("IDEA_TEST_COMPILED_REACT_LEAN", "1")
+    assert ec._react_lean_effort("cheap-slug") is None                      # cheap never gets a hint
+    assert ec._react_lean_effort("openai/gpt-5-mini") == "low"              # 1/on -> low
+    assert ec._react_lean_effort("google/gemini-3.1-pro-preview") == "low"
+    monkeypatch.setenv("IDEA_TEST_COMPILED_REACT_LEAN", "minimal")
+    assert ec._react_lean_effort("google/gemini-3.1-pro-preview") == "minimal"  # explicit level honored
+    monkeypatch.setenv("IDEA_TEST_COMPILED_REACT_LEAN", "off")
+    assert ec._react_lean_effort("google/gemini-3.1-pro-preview") is None
+
+
+def test_leaf_system_prompt_appends_lean_suffix_only_when_engaged(monkeypatch):
+    _patch_pricing(monkeypatch, {"google/gemini-3.1-pro-preview": {"output_per_million": 12.00},
+                                 "cheap-slug": {"output_per_million": 0.40}})
+    monkeypatch.delenv("IDEA_TEST_COMPILED_REACT_LEAN", raising=False)
+    assert ec._leaf_system_prompt("google/gemini-3.1-pro-preview") == ec._LEAF_SYSTEM  # Arm A byte-identical
+    monkeypatch.setenv("IDEA_TEST_COMPILED_REACT_LEAN", "low")
+    assert ec._leaf_system_prompt("google/gemini-3.1-pro-preview").startswith(ec._LEAF_SYSTEM)
+    assert "ONLY the JSON action object" in ec._leaf_system_prompt("google/gemini-3.1-pro-preview")
+    assert ec._leaf_system_prompt("cheap-slug") == ec._LEAF_SYSTEM  # cheap unchanged even with flag on
+
+
+def test_apply_react_reasoning_injects_extra_body(monkeypatch):
+    """The reasoning hint rides extra_body (survives simplify_payload); no-op off / for cheap."""
+    _patch_pricing(monkeypatch, {"google/gemini-3.1-pro-preview": {"output_per_million": 12.00},
+                                 "cheap-slug": {"output_per_million": 0.40}})
+    monkeypatch.setenv("IDEA_TEST_COMPILED_REACT_LEAN", "low")
+    p = {"messages": [], "max_tokens": 700}
+    ec._apply_react_reasoning(p, "google/gemini-3.1-pro-preview")
+    assert p["extra_body"]["reasoning"] == {"effort": "low"}
+    # cheap: untouched
+    p2 = {"messages": []}
+    ec._apply_react_reasoning(p2, "cheap-slug")
+    assert "extra_body" not in p2
+    # flag off: untouched even for premium
+    monkeypatch.setenv("IDEA_TEST_COMPILED_REACT_LEAN", "off")
+    p3 = {"messages": []}
+    ec._apply_react_reasoning(p3, "google/gemini-3.1-pro-preview")
+    assert "extra_body" not in p3
+
+
+def test_run_leaf_lean_passes_reasoning_and_prompt(monkeypatch):
+    """Integration: with the flag on, a premium react leaf's step call carries extra_body.reasoning
+    and the lean system prompt; the SAME call with the flag off carries neither (Arm A)."""
+    _patch_pricing(monkeypatch, {"google/gemini-3.1-pro-preview": {"output_per_million": 12.00}})
+    seen = []
+
+    def build(**kw):
+        payload = {"messages": kw["messages"], "max_tokens": kw.get("max_tokens")}
+        seen.append((kw["messages"][0]["content"], payload))
+        return payload
+
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(side_effect=build)
+    # First step: model finishes immediately so the loop ends after one decision call.
+    io.query_llm = AsyncMock(return_value='{"action":"finish","args":{"answer":"42"}}')
+
+    monkeypatch.setenv("IDEA_TEST_COMPILED_REACT_LEAN", "low")
+    asyncio.run(ec._run_leaf(io, "q", "e", "google/gemini-3.1-pro-preview", 4, 6000, 6))
+    sys_prompt, payload = seen[0]
+    assert "ONLY the JSON action object" in sys_prompt
+    assert payload["extra_body"]["reasoning"] == {"effort": "low"}
+
+    seen.clear()
+    io.query_llm = AsyncMock(return_value='{"action":"finish","args":{"answer":"42"}}')
+    monkeypatch.delenv("IDEA_TEST_COMPILED_REACT_LEAN", raising=False)
+    asyncio.run(ec._run_leaf(io, "q", "e", "google/gemini-3.1-pro-preview", 4, 6000, 6))
+    sys_prompt2, payload2 = seen[0]
+    assert "ONLY the JSON action object" not in sys_prompt2
+    assert "extra_body" not in payload2

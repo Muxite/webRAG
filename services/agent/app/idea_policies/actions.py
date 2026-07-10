@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 from agent.app.agent_io import AgentIO
 from agent.app.observation import clean_operation
+from agent.app.llm_backends import json_instruction_from_response_format
 from agent.app.idea_policies.base import IdeaActionType, DetailKey, IdeaNodeStatus
 from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.action_constants import (
@@ -1604,7 +1605,7 @@ class ThinkLeafAction(LeafAction):
                 if matches:
                     return matches[0].strip()
             
-            links = source_result.get(ActionResultKey.LINKS.value) or source_result.get(ActionResultKey.LINKS_FULL.value) or []
+            links = source_result.get("links") or source_result.get("links_full") or []
             if isinstance(links, list) and len(links) > 0:
                 for link in links:
                     if isinstance(link, str) and link.startswith(("http://", "https://")):
@@ -1816,23 +1817,36 @@ class MergeLeafAction(LeafAction):
                 parent_justification=parent_justification
             )
             
+            # The merge schema declares optional fields (goal_evaluation,
+            # missing_requirements) that are not in ``required``. OpenAI/Azure strict
+            # structured output requires ``required`` to enumerate every property, so
+            # convey the shape as a prompt instruction and use ``json_object`` mode
+            # instead (mirrors the expansion stage; provider-agnostic).
+            json_schema = self.settings.get("merge_json_schema")
+            schema_hint = (
+                json_instruction_from_response_format({"type": "json_schema", "json_schema": json_schema})
+                if json_schema
+                else None
+            )
+            if schema_hint:
+                system_template = f"{system_template}\n\n{schema_hint}" if system_template else schema_hint
+
             messages = PromptBuilder.build_messages(
                 system_content=system_template,
                 user_content=user_content,
             )
-            
+
             model_name = self._cfg.merge.model or self._cfg.final.model
-            json_schema = self.settings.get("merge_json_schema")
             reasoning_effort = self._cfg.generation.reasoning_effort
             text_verbosity = self._cfg.generation.text_verbosity
-            
+
             payload = io.build_llm_payload(
                 messages=messages,
                 json_mode=True,
                 model_name=model_name,
                 temperature=self._cfg.merge.temperature,
                 max_tokens=self._cfg.merge.max_tokens,
-                json_schema=json_schema,
+                json_schema=None,
                 reasoning_effort=reasoning_effort,
                 text_verbosity=text_verbosity,
             )

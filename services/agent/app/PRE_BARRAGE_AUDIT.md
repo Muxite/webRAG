@@ -7,6 +7,10 @@ improve observability; make webRAG a drop-in replacement for a completions endpo
 This doc is the audit + a record of what was built. Companion: `COST_BENCHMARK_HANDOFF.md`
 (the run recipe and prior rounds). Everything below is offline / no live-$ unless noted.
 
+> **Campaign closed out (2026-07-08)** — see the banner at the top of `COST_BENCHMARK_HANDOFF.md`
+> and [`linkedin_package_38tests_2026-07-08/`](../../../linkedin_package_38tests_2026-07-08/README_LINKEDIN.md).
+> §5 below (performance follow-ups) is still open/deferred, not done.
+
 ---
 
 ## 1. Built this session (all offline-verified)
@@ -93,3 +97,35 @@ decomposition (logged via `plan_structure`); 052 needs author `--max-tokens 4096
 - SSE streaming for the completions endpoint (chose non-streaming; the agent isn't a token
   streamer — would stream coarse node/tick progress then the answer).
 - Per-model (not pooled) significance with a real paired test once repeats are higher.
+
+## 5. Performance follow-ups (deferred, diagnosed 2026-07-06 — do NOT apply mid-barrage)
+
+Root causes of barrage wall-clock time, from a read-only investigation of a live `barrage24b`
+run. Safe to pick up once the current barrage (and any rescoring off it) is fully done, since
+any of these could change measured latency/cost and must not be mixed into an in-flight run.
+
+- **No per-task connector instances.** `ConnectorLLM`/`ConnectorHttp`/`ConnectorSearch` are one
+  shared, mutable instance across the whole runner process (`set_model()` mutates
+  `self.model_name` in place; `last_usage`/`total_usage` are plain attributes). This is *why*
+  `IDEA_TEST_CONCURRENCY=1` is mandatory today — concurrent test-runs would clobber each other's
+  model selection and cost/telemetry attribution. Fix: give each test-run its own connector
+  instances (or at least per-task model/telemetry scoping) so concurrency can be raised safely.
+  This contradicts an older memory note ("per-task connectors unneeded") — that note is stale
+  against the current shared-connector code and should be corrected when this is picked up.
+- **`sequential_react` has no fixture cache for search.** `IDEA_TEST_FIXTURES=replay` only covers
+  `ConnectorHttp` page visits (`web_fixtures.py`); `connector_search.py` has no fixture integration
+  at all, so every repeat run (including R=3 reruns of the identical test) pays full live search
+  latency every time. Adding search fixtures would cut repeat-run wall-clock without touching
+  scored behavior (search results would need to be identical across replayed runs, same
+  replay-vs-record semantics as the existing HTTP fixtures).
+- **`sequential_react`'s per-step loop is serial by construction** (`execution_sequential.py`,
+  plain `for step in range(max_steps)`, ~30 LLM calls/test at ~6.9s avg latency each, up to 24.8s
+  under retry) — the single biggest wall-clock driver in a batch. Not a bug, just worth knowing
+  it's the long pole; any future speed-up here (batching steps, shorter default `max_steps`) needs
+  care since it would change the baseline's own behavior, not just harness overhead.
+
+**Do NOT touch as part of any of the above:** `IDEA_TEST_CONCURRENCY=1` /
+`IDEA_TEST_PARALLEL_ACTION_LIMIT=1` (correctness-load-bearing until per-task connectors exist),
+`_votes_for_model` / price-aware voting k, `IDEA_TEST_COMPILED_CONCURRENCY`, and retry/backoff
+settings (`DEFAULT_DELAY`/`JITTER_SECONDS`) — these are either core to the thesis being measured
+or rate-limit resilience, not incidental slowness.

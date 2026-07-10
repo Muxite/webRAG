@@ -137,10 +137,15 @@ def create_app(service: Optional[GatewayService] = None) -> FastAPI:
         payload = monitor.payload()
         if queue_depths:
             payload["queue_depths"] = queue_depths
-        
+
         if os.environ.get("GATEWAY_HEALTH_LOG", "false").lower() in ("1", "true", "yes"):
             monitor.log_status()
         return payload
+
+    # OpenAI-compatible drop-in: /v1/models + /v1/chat/completions (queue-backed, sync).
+    if os.environ.get("GATEWAY_OPENAI_COMPAT", "true").lower() in ("1", "true", "yes"):
+        from gateway.app.openai_router import register_openai_routes
+        register_openai_routes(router, logger)
 
     @router.get("/version", tags=["System"], summary="Gateway version")
     async def version():

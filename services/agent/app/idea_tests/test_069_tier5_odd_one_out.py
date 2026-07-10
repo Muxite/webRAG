@@ -129,7 +129,7 @@ _GROUP = r"\b(?:rest|others?|remaining|four|all|each)\b"
 # "Bosnia is the odd one out because it is landlocked" do.
 _BOS_LL = re.compile(
     _BOSNIA + r"(?:(?!" + _NEG + r"|" + _BREAK + r"|" + _GROUP + r"|" + _OTHERS
-    + r")[^.;]){0,40}\blandlocked\b",
+    + r")[^.;\n]){0,40}\blandlocked\b",
     re.IGNORECASE,
 )
 
@@ -143,8 +143,8 @@ _NOTLL = (
     r"breaks?\s+the\s+pattern|stands?\s+out"
 )
 _BOSNIA_IS_ODD = re.compile(
-    _BOSNIA + r"(?:(?!" + _OTHERS + r")[^.;]){0,80}\b(?:" + _NOTLL + r")\b"
-    + r"|\b(?:" + _NOTLL + r")\b(?:(?!" + _OTHERS + r")[^.;]){0,80}" + _BOSNIA,
+    _BOSNIA + r"(?:(?!" + _OTHERS + r")[^.;\n]){0,80}\b(?:" + _NOTLL + r")\b"
+    + r"|\b(?:" + _NOTLL + r")\b(?:(?!" + _OTHERS + r")[^.;\n]){0,80}" + _BOSNIA,
     re.IGNORECASE,
 )
 
@@ -158,8 +158,8 @@ _RIVAL_MARK = (
     r"has\s+a\s+coast|coastal|coastline"
 )
 _RIVAL_ODD = re.compile(
-    _OTHERS + r"(?:(?!" + _NEG + r"|" + _BREAK + r"|" + _BOSNIA + r")[^.;]){0,60}\b(?:" + _RIVAL_MARK + r")\b"
-    + r"|\b(?:" + _RIVAL_MARK + r")\b(?:(?!" + _NEG + r"|" + _BREAK + r"|" + _BOSNIA + r")[^.;]){0,60}" + _OTHERS,
+    _OTHERS + r"(?:(?!" + _NEG + r"|" + _BREAK + r"|" + _BOSNIA + r")[^.;\n]){0,60}\b(?:" + _RIVAL_MARK + r")\b"
+    + r"|\b(?:" + _RIVAL_MARK + r")\b(?:(?!" + _NEG + r"|" + _BREAK + r"|" + _BOSNIA + r")[^.;\n]){0,60}" + _OTHERS,
     re.IGNORECASE,
 )
 
@@ -179,8 +179,8 @@ _STATUS = r"\b(?:landlocked|coast(?:al|line|s)?|adriatic|neum|sea|maritime|seabo
 for _e in ENTITIES:
     _others_rx = "|".join(o["name_rx"] for o in ENTITIES if o is not _e)
     _e["cov_rx"] = re.compile(
-        _e["name_rx"] + r"(?:(?!" + _others_rx + r")[^.;]){0,55}" + _STATUS
-        + r"|" + _STATUS + r"(?:(?!" + _others_rx + r")[^.;]){0,55}" + _e["name_rx"],
+        _e["name_rx"] + r"(?:(?!" + _others_rx + r")[^.;\n]){0,55}" + _STATUS
+        + r"|" + _STATUS + r"(?:(?!" + _others_rx + r")[^.;\n]){0,55}" + _e["name_rx"],
         re.IGNORECASE,
     )
 
@@ -385,11 +385,13 @@ def get_compiled_plan() -> Dict[str, Any]:
             "instruction": (
                 f"Open the Wikipedia page for {e['name']} and determine, from the lead sentence and "
                 f"the infobox, whether {e['name']} is a LANDLOCKED country (it has NO sea coastline) "
-                f"or whether it HAS a sea coastline. Answer strictly with 'landlocked' or 'not "
-                f"landlocked' and, if not landlocked, name the sea it borders. Give the source URL. "
-                "Do not guess from memory."
+                f"or whether it HAS a sea coastline. Answer strictly with '{e['name']}: landlocked' or "
+                f"'{e['name']}: not landlocked (coastline on <sea>)' -- ALWAYS repeat the country name "
+                f"'{e['name']}' at the start of your answer so the fact is self-contained even if read "
+                "out of context. Give the source URL. Do not guess from memory."
             ),
-            "expect": "'landlocked' OR 'not landlocked (coastline on <sea>)' -- source URL",
+            "expect": f"'{e['name']}: landlocked' OR '{e['name']}: not landlocked (coastline on <sea>)' "
+                      "-- source URL",
             "depends_on": [],
         })
     return {

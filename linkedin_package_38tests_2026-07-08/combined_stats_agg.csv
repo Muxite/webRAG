@@ -1,0 +1,10 @@
+model,variant,tooling,tier,n,score_mean,score_ci95,usd_mean,visits_mean,tokens_mean,grounded_mean
+google/gemini-3.1-pro-preview,graph_compiled,graph_compiled,0,114,0.8229,0.0487,0.109856,4.89,20712.3,0.696
+google/gemini-3.1-pro-preview,sequential_react,sequential,0,114,0.8964,0.0355,0.168963,4.92,55917.4,0.815
+openai/gpt-4.1-nano,graph,full,0,114,0.6067,0.0491,0.005259,1.9,49087.7,0.909
+openai/gpt-4.1-nano,graph_compiled,graph_compiled,0,114,0.8372,0.0403,0.001982,6.52,15379.9,0.599
+openai/gpt-4.1-nano,naive_rag,partial,0,114,0.387,0.0549,0.000223,0.05,870.1,0.463
+openai/gpt-4.1-nano,parametric,parametric,0,114,0.2528,0.048,0.000176,0,691.8,0.121
+openai/gpt-4.1-nano,sequential_react,sequential,0,114,0.6189,0.0517,0.003221,3.62,28835.9,0.432
+openai/gpt-5-mini,graph_compiled,graph_compiled,0,114,0.8964,0.0418,0.017386,5.99,18487.6,0.827
+openai/gpt-5-mini,sequential_react,sequential,0,114,0.8468,0.0453,0.025676,6.21,62990.5,0.691

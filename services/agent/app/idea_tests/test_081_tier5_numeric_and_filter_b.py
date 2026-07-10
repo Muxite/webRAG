@@ -27,9 +27,11 @@ Why it discriminates (per REASONING_TEST_DESIGN.md — the differential-lift tar
     388 km); or defaults to a famous name from memory without reading any page.
   * frontier sequential (ReAct): looks up all twelve attribute values, applies both filters,
     returns the single survivor → decent.
-  * graph_compiled: twelve parallel leaves each fetch ONE attribute for ONE river; the aggregation
-    owns the entire AND-filter and is forced to WRITE OUT each river's constraint-by-constraint
-    check before concluding → the cheap executor is rescued by structure and cannot short-circuit.
+  * graph_compiled: SIX parallel leaves each fetch BOTH attributes for ONE river and RESTATE that
+    river's name in the answer (so the aggregation's numbered, id-stripped facts_block keeps every
+    length/basin figure bound to its river); the aggregation owns the entire AND-filter and is
+    forced to WRITE OUT each river's constraint-by-constraint check before concluding → the cheap
+    executor is rescued by structure and cannot short-circuit OR mis-bind a scattered figure.
 
 The trap is engineered two ways — EACH constraint is necessary (drop one → wrong, larger set):
   (1) drop LENGTH constraint  → {Prut, Vardar, Neretva} satisfy basin < 35,000 km²  → 3 rivers
@@ -479,10 +481,16 @@ def get_llm_validation_function() -> callable:
 def get_compiled_plan() -> Dict[str, Any]:
     """Offline-authored fan-out/aggregate scaffold for the ``graph_compiled`` variant.
 
-    TWELVE INDEPENDENT parallel leaves: for each of the six GIVEN rivers, one leaf reads its
-    LENGTH in km, and one reads its DRAINAGE BASIN AREA in km² — one atomic attribute per leaf.
-    ALL filtering — applying both numeric constraints and intersecting them — lives only in the
-    aggregation step, which is forced to WRITE OUT each river's constraint-by-constraint check
+    SIX INDEPENDENT parallel leaves — ONE per GIVEN river, and each leaf reads BOTH of that
+    river's attributes (its LENGTH in km AND its DRAINAGE BASIN AREA in km²) in a single page
+    read, then RESTATES the river's name alongside both figures in its answer. Consolidating both
+    attributes into one per-river leaf (instead of twelve attribute-per-leaf leaves) and forcing
+    each leaf to self-describe its river fixes the aggregation mis-bind: the executor's facts_block
+    numbers facts and STRIPS leaf ids, so a bare "953" figure with no river name could be reattached
+    to the wrong river when twelve scattered numbers are reassembled. With six self-describing
+    per-river leaves, every length/basin pair stays bound to its river name through aggregation.
+    ALL filtering — applying both numeric constraints and intersecting them — still lives only in
+    the aggregation step, which is forced to WRITE OUT each river's constraint-by-constraint check
     explicitly before concluding. Encodes STRUCTURE only: it names the six GIVEN rivers and the
     two GIVEN thresholds (length > 800 km / basin < 35,000 km²), but leaks no attribute value
     and never states which river wins.
@@ -490,25 +498,20 @@ def get_compiled_plan() -> Dict[str, Any]:
     leaves: List[Dict[str, Any]] = []
     for e in ENTITIES:
         leaves.append({
-            "id": f"{e['key']}_length",
+            "id": f"{e['key']}_attributes",
             "instruction": (
-                f"Open the English Wikipedia page for {e['name']} and read its LENGTH in "
-                "km directly from the infobox ('Length' row under Physical characteristics). "
-                "Report ONLY that single number (in km) and the source URL. "
-                "Do not guess from memory."
+                f"Open the English Wikipedia page for {e['name']} and read TWO numeric attributes "
+                "directly from its infobox: (A) its LENGTH in km (the 'Length' row under Physical "
+                "characteristics), and (B) its DRAINAGE BASIN AREA in km² (the 'Basin size', "
+                "'Drainage basin', or 'Watershed area' row). "
+                f"Report your finding in the exact form '{e['name']}: length = <number> km; "
+                "drainage basin area = <number> km²' followed by the source URL, so the river's "
+                "name stays attached to both of its figures. Do not guess from memory."
             ),
-            "expect": "LENGTH in km (a single number) — source URL",
-            "depends_on": [],
-        })
-        leaves.append({
-            "id": f"{e['key']}_basin",
-            "instruction": (
-                f"Open the English Wikipedia page for {e['name']} and read its DRAINAGE "
-                "BASIN AREA in km² directly from the infobox ('Basin size', 'Drainage basin', "
-                "or 'Watershed area' row). Report ONLY that single number (in km²) and the "
-                "source URL. Do not guess from memory."
+            "expect": (
+                f"'{e['name']}: length = <number> km; drainage basin area = <number> km²' — "
+                "source URL"
             ),
-            "expect": "DRAINAGE BASIN AREA in km² (a single number) — source URL",
             "depends_on": [],
         })
     return {

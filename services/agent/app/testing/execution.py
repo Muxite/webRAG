@@ -14,12 +14,8 @@ from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.idea_engine import IdeaDagEngine
-from agent.app.idea_dag import IdeaDag
-from agent.app.idea_finalize import build_final_payload
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
-from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
-from agent.app.idea_policies.grounding import evaluate_grounding
 from agent.app.trace_recorder import TraceRecorder
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
@@ -314,83 +310,23 @@ async def run_test_execution(
     mandate_suffix = os.environ.get("IDEA_TEST_MANDATE_SUFFIX", "").strip()
     if mandate_suffix:
         mandate = f"{mandate}\n\n{mandate_suffix}"
-    
-    # Initialize memory manager and mandate context (mirrors engine.run())
-    import hashlib
-    namespace = f"idea_dag:{hashlib.sha256(mandate.encode('utf-8')).hexdigest()[:10]}"
-    engine.settings["memo_namespace"] = namespace
-    engine._current_mandate = mandate
-    from agent.app.idea_memory import MemoryManager
-    engine._memory_manager = MemoryManager(
-        connector_chroma=connector_chroma,
-        namespace=namespace,
-    )
-    
-    graph = IdeaDag(root_title=mandate, root_details={"mandate": mandate, "memo_namespace": namespace})
-    current_id = graph.root_id()
-    
+
     started = time.perf_counter()
     # Effort tiers set settings["max_steps"]; fall back to env then default.
     max_steps = int(idea_settings.get("max_steps") or os.environ.get("IDEA_TEST_MAX_STEPS", "50"))
-    
-    for step_num in range(max_steps):
-        try:
-            result_id = await engine.step(graph, current_id, step_num)
-            if result_id is None:
-                # Soft grounding gate: try to follow through before giving up.
-                if engine._grounding_replan(graph, mandate, step_num, max_steps):
-                    current_id = graph.root_id()
-                    continue
-                _logger.warning(f"Step {step_num} returned None, stopping execution")
-                # Emergency: if root has no children after step 0, expansion completely failed
-                if step_num == 0:
-                    root = graph.get_node(graph.root_id())
-                    if root and not root.children:
-                        _logger.error("ROOT EXPANSION FAILED on step 0 - no children created")
-                break
-            current_id = result_id
-            node = graph.get_node(current_id)
-            if node and node.status.value == "done" and current_id == graph.root_id():
-                # Root is done — but if the mandate needs substantiated (visited) evidence
-                # and we are not grounded yet, inject follow-through and keep going (capped).
-                if engine._grounding_replan(graph, mandate, step_num, max_steps):
-                    current_id = graph.root_id()
-                    continue
-                break
-        except Exception as exc:
-            _logger.error(f"Step {step_num} failed: {exc}", exc_info=True)
-            break
-    
-    final_node = graph.get_node(current_id)
-    if final_node:
-        output = await build_final_payload(
-            io=engine.io,
-            settings=idea_settings,
-            graph=graph,
-            mandate=mandate,
-            model_name=model_name,
-            memory_manager=engine._memory_manager,
-        )
-    else:
-        output = {}
 
-    # Grounding verdict for the final answer (substantiation mandates only) — surfaced on
-    # the result so observability/groundedness reflect real visited-page evidence.
-    try:
-        _req = parse_mandate_requirements(mandate)
-        if _req.needs_substantiation:
-            _g = evaluate_grounding(graph, _req)
-            output["grounded"] = bool(_g.grounded)
-            output["missing_requirements"] = _g.missing
-            output["grounding_replans"] = int(getattr(engine, "_grounding_replans", 0))
-            engine._record_decision(
-                "finalize", node_id=graph.root_id(), chosen="finalized",
-                grounded=_g.grounded, rationale=_g.reason,
-                metadata={"replans": int(getattr(engine, "_grounding_replans", 0)), "missing": _g.missing},
-            )
-    except Exception as exc:  # noqa: BLE001 — never crash finalize on grounding
-        _logger.warning(f"[GROUNDING] final grounding check failed: {exc}")
-    
+    # The benchmark harness delegates the ENTIRE control loop + finalize to the same
+    # `IdeaDagEngine.run()` that production callers use, instead of hand-rolling engine setup,
+    # the step loop and finalize (which historically let the two implementations drift —
+    # "Phase 2 bug #4"). `run()` performs its own memo-namespace / memory-manager / GoT setup,
+    # runs the shared `_run_loop`, and returns the fully-annotated final payload (graph,
+    # pending_nodes_count, candidate_coverage_*, got_stats, grounding). `fail_soft=True`
+    # preserves the harness's long-standing fail-soft contract: a mid-run `step()` exception
+    # is logged and the run still finalizes with partial state (production `run()` is
+    # fail-fast). No `run_id` is passed, so the checkpointer is never touched.
+    output = await engine.run(mandate, max_steps=max_steps, fail_soft=True)
+    graph_dict = output.get("graph") if isinstance(output, dict) else None
+
     telemetry.finish(success=output.get("success", False))
     tracer.close()
     
@@ -413,7 +349,7 @@ async def run_test_execution(
     
     return {
         "output": output,
-        "graph": graph.to_dict() if hasattr(graph, "to_dict") else None,
+        "graph": graph_dict,
         "observability": observability,
         "duration_seconds": round(max(0.0, ended - started), 2),
         "telemetry": {

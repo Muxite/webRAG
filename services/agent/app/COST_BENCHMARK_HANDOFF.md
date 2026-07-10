@@ -1,5 +1,20 @@
 # Cost-Recovery Benchmark — Handoff
 
+> **NEW TRACK (2026-07-09/10): native adaptive engine + Opus-exemplar distillation — DONE, mixed/
+> inconclusive result, not adopted as default.** Full writeup:
+> [`ADAPTIVE_DISTILLATION_HANDOFF.md`](ADAPTIVE_DISTILLATION_HANDOFF.md). Total spend: $0.70 / $12
+> ceiling. Both new mechanisms (`IDEA_TEST_GOT_REEXPAND=1`, `IDEA_TEST_REASONING_EXEMPLAR=chain|
+> mixed|parallel`) ship opt-in, JSON defaults unchanged — nothing here altered default behavior.
+>
+> **CAMPAIGN CLOSED OUT (2026-07-08), thesis proven.** Final run `barrage24b`: 38 curated tasks x
+> 3 models x R=3 (1,026 live runs, ≈$38 real OpenRouter spend). Headline: `gpt-5-mini` +
+> compiled scaffold **exactly ties** the `gemini-3.1-pro` premium reference (0.896 vs 0.896) at
+> **10% of the cost**; `gpt-4.1-nano` + compiled scaffold reaches **~93%** of reference quality
+> at **~1/85th the cost**. Significant on the hardest task tier (95% CI-disjoint, n=270/arm).
+> Packaged results + gallery: [`linkedin_package_38tests_2026-07-08/`](../../../linkedin_package_38tests_2026-07-08/README_LINKEDIN.md)
+> at the repo root. Everything below this line is the historical build-up (rounds 1-5) that got
+> the campaign to that point — kept for context, not the current state.
+
 **Goal (the thesis):** prove webRAG's graph turns a cheap model's larger token budget into
 premium-model quality at a fraction of the dollar cost — "gpt-4.1-nano/gemini-flash ≈
 premium reference at single-digit % cost, with a benchmark to back it." Reference plan:

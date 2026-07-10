@@ -38,6 +38,7 @@ from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.testing.execution import _empty_graph
 from agent.app.testing.execution_sequential import _fmt_search
+from agent.app.testing import consol_pilot
 from agent.app.testing.compiled_plan import (
     plan_structure,
     substitute_deps,
@@ -60,6 +61,77 @@ _LEAF_SYSTEM = (
 )
 
 
+# --- Arm C: "lean react" — cut a reasoning model's HIDDEN reasoning instead of paying for it -----
+# The truncation bug (finish_reason=length on near-empty completions) is caused by reasoning models
+# spending their whole budget on hidden reasoning tokens before writing any visible JSON/answer. The
+# blunt fix (``_react_max_tokens_for_model``, Arm A) buys more budget so verbose reasoning survives.
+# Arm C instead ASKS FOR LESS reasoning: (1) a tightened system prompt discouraging visible
+# deliberation, and (2) an OpenRouter-native ``reasoning.effort`` hint injected via ``extra_body`` on
+# mid/premium leaf calls. Both are OFF by default (Arm A stays byte-identical) and gate behind
+# ``IDEA_TEST_COMPILED_REACT_LEAN`` (values: low|minimal|medium|high, or 1/on -> "low"; 0/off -> disabled).
+# The hint rides ``extra_body`` because the OpenAI-style ``reasoning_effort`` key is (a) only emitted
+# by ``connector_llm.build_payload`` for the gpt-5 family and (b) unconditionally stripped by the
+# backend's ``simplify_payload`` before the wire — so it never reaches OpenRouter for gemini at all.
+# ``extra_body`` survives ``simplify_payload`` untouched and is the OpenRouter-documented escape hatch.
+_LEAF_SYSTEM_LEAN_SUFFIX = (
+    "\n\nOutput speed matters: respond with ONLY the JSON action object and nothing else. Do NOT "
+    "narrate or deliberate before it; keep \"thought\" to at most one short clause."
+)
+
+
+def _react_lean_effort(model_name: str) -> Optional[str]:
+    """Resolve the Arm-C reasoning-effort hint for a react leaf call, or ``None`` to leave the call
+    untouched (Arm A behavior). Only mid/premium tiers get a hint — cheap models don't emit the
+    hidden reasoning that starves the budget, and the proven cheap-react behavior must not change.
+    Controlled by ``IDEA_TEST_COMPILED_REACT_LEAN`` (low|minimal|medium|high; 1/true/on -> low)."""
+    lean = os.environ.get("IDEA_TEST_COMPILED_REACT_LEAN", "").strip().lower()
+    if lean in ("", "0", "false", "off", "no"):
+        return None
+    if _price_tier(model_name) not in ("mid", "premium"):
+        return None
+    return lean if lean in ("low", "minimal", "medium", "high") else "low"
+
+
+def _leaf_system_prompt(model_name: str) -> str:
+    """Leaf system prompt: the proven ``_LEAF_SYSTEM`` (Arm A), plus the lean anti-deliberation
+    suffix when Arm C is engaged for a mid/premium model."""
+    return _LEAF_SYSTEM + (_LEAF_SYSTEM_LEAN_SUFFIX if _react_lean_effort(model_name) else "")
+
+
+def _apply_react_reasoning(payload: Any, model_name: str) -> Any:
+    """Inject the Arm-C ``reasoning.effort`` hint into a built react payload via ``extra_body``
+    (OpenRouter-native; survives the backend's ``simplify_payload`` strip). No-op when Arm C is off
+    or the tier is cheap/unknown, so Arm A payloads are unchanged. Mutates and returns ``payload``."""
+    effort = _react_lean_effort(model_name)
+    if not effort or not isinstance(payload, dict):
+        return payload
+    extra = dict(payload.get("extra_body") or {})
+    extra["reasoning"] = {"effort": effort}
+    payload["extra_body"] = extra
+    return payload
+
+
+def _leaf_mode_for_model(model_name: str) -> str:
+    """Resolve which leaf executor to use for ``model_name`` (Arm B: price-aware auto-routing).
+
+    ``IDEA_TEST_COMPILED_LEAF_MODE``:
+      * ``react`` / ``thin`` — HARD override (test-suite compatibility + manual A/B pinning).
+      * unset or ``auto`` (default) — route by price tier: the reasoning-verbose tiers **mid and
+        premium** use ``thin`` (the harness owns control flow, so there is no per-step JSON-ReAct
+        reasoning to starve the token budget — the failure mode that truncates completions on
+        mid/premium models, never on cheap ones). **Cheap and unknown** keep ``react``, where it
+        is proven and unaffected by that bug.
+
+    Mid is included (not just premium) because thin's proven cheap-model win plausibly extends
+    down to a $2/Mtok reasoning model like gpt-5-mini. The live A/B decides whether the ``auto``
+    default should ship; the mechanism lands here regardless.
+    """
+    override = os.environ.get("IDEA_TEST_COMPILED_LEAF_MODE", "auto").strip().lower()
+    if override in ("react", "thin"):
+        return override
+    return "thin" if _price_tier(model_name) in ("mid", "premium") else "react"
+
+
 async def _run_leaf(agent_io: AgentIO, instruction: str, expect: str, model_name: str,
                     leaf_steps: int, page_chars: int, search_k: int) -> str:
     """Gather a single leaf fact with a small bounded ReAct loop. Returns the fact text."""
@@ -69,10 +141,12 @@ async def _run_leaf(agent_io: AgentIO, instruction: str, expect: str, model_name
     for step in range(leaf_steps):
         history = "\n\n".join(scratchpad[-6:]) if scratchpad else "(no actions yet)"
         messages = [
-            {"role": "system", "content": _LEAF_SYSTEM},
+            {"role": "system", "content": _leaf_system_prompt(model_name)},
             {"role": "user", "content": f"FACT TO RESOLVE:\n{task}\n\nYOUR STEPS SO FAR:\n{history}\n\nReturn the next step as JSON."},
         ]
-        payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name, temperature=0.1, max_tokens=700)
+        payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name,
+                                             temperature=0.1, max_tokens=_react_max_tokens_for_model(model_name, 700))
+        _apply_react_reasoning(payload, model_name)
         raw = await agent_io.query_llm(payload, model_name=model_name)
         try:
             decision = json.loads(raw or "{}")
@@ -90,7 +164,9 @@ async def _run_leaf(agent_io: AgentIO, instruction: str, expect: str, model_name
                 {"role": "system", "content": "Using ONLY the page text, answer the fact and include the source URL. If unknown, say UNKNOWN."},
                 {"role": "user", "content": f"FACT:\n{task}\n\nPAGE TEXT:\n{last_evidence[:page_chars] or '(none)'}"},
             ]
-            payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.0, max_tokens=300)
+            payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name,
+                                                 temperature=0.0, max_tokens=_react_max_tokens_for_model(model_name, 300))
+            _apply_react_reasoning(payload, model_name)
             return (await agent_io.query_llm(payload, model_name=model_name)) or "UNKNOWN"
 
         if action == "search":
@@ -144,18 +220,32 @@ def _votes_for_model(model_name: str) -> int:
     override = os.environ.get("IDEA_TEST_COMPILED_VOTES", "").strip()
     if override.isdigit():
         return max(1, int(override))
+    tier = _price_tier(model_name)
+    if tier == "unknown":
+        return 3            # unknown price -> a little redundancy is cheap insurance
+    if tier == "cheap":
+        return 5            # dirt cheap -> heavy redundancy
+    if tier == "mid":
+        return 3
+    return 2               # premium -> minimal redundancy, but >1 so breadth leaves can recover
+
+
+def _price_tier(model_name: str) -> str:
+    """Classify a model into 'cheap' / 'mid' / 'premium' by output $/Mtok — the same
+    ``model_costs`` output-price buckets ``_votes_for_model`` uses. Shared by every price-aware
+    token/redundancy knob so the tiers stay consistent across the module."""
     try:
         pricing = model_costs._lookup_pricing(model_name) or {}
         out_price = float(pricing.get("output_per_million") or 0.0)
     except Exception:  # noqa: BLE001
         out_price = 0.0
     if out_price <= 0.0:
-        return 3            # unknown price -> a little redundancy is cheap insurance
+        return "unknown"
     if out_price <= 1.0:
-        return 5            # dirt cheap -> heavy redundancy
+        return "cheap"
     if out_price <= 5.0:
-        return 3
-    return 2               # premium -> minimal redundancy, but >1 so breadth leaves can recover
+        return "mid"
+    return "premium"
 
 
 def _thin_max_tokens_for_model(model_name: str) -> int:
@@ -177,18 +267,43 @@ def _thin_max_tokens_for_model(model_name: str) -> int:
     override = os.environ.get("IDEA_TEST_COMPILED_THIN_MAX_TOKENS", "").strip()
     if override.isdigit():
         return max(1, int(override))
-    try:
-        pricing = model_costs._lookup_pricing(model_name) or {}
-        out_price = float(pricing.get("output_per_million") or 0.0)
-    except Exception:  # noqa: BLE001
-        out_price = 0.0
-    if out_price <= 0.0:
+    tier = _price_tier(model_name)
+    if tier == "unknown":
         return 64           # unknown price -> give room; starving a premium model is the failure
-    if out_price <= 1.0:
+    if tier == "cheap":
         return 24           # dirt cheap -> tiny output, keep the cheap-thin win intact
-    if out_price <= 5.0:
+    if tier == "mid":
         return 64
     return 128              # premium -> enough room to begin a single-entity answer
+
+
+def _react_max_tokens_for_model(model_name: str, base: int) -> int:
+    """Price-aware output budget for the default REACT leaf's calls (per-step JSON decision,
+    default ``base=700``; forced single-shot extraction fallback, default ``base=300``).
+
+    Reasoning models (e.g. gemini-3.1-pro-preview, gpt-5-mini) can spend their entire fixed budget
+    on hidden reasoning before writing any visible JSON/answer, hitting ``finish_reason=length``
+    with a near-empty completion — this only happens on mid/premium tiers, never cheap ones.
+    Override with ``IDEA_TEST_COMPILED_REACT_MAX_TOKENS`` (applies a flat multiplier to every
+    tier, useful only for debugging — prefer the tiering below for real runs).
+
+    Tiers (multiplier on ``base``, cheap unchanged so its proven cost/behavior doesn't regress):
+      * dirt cheap (<= $1/Mtok out) -> 1x   (unchanged)
+      * mid      (<= $5/Mtok out)  -> ~2.2x
+      * premium  (>  $5/Mtok out)  -> ~4.4x
+    Unknown price -> ~2.2x (safe room; the dangerous failure mode is a starved premium model).
+    """
+    override = os.environ.get("IDEA_TEST_COMPILED_REACT_MAX_TOKENS", "").strip()
+    if override.isdigit():
+        return max(1, int(override))
+    tier = _price_tier(model_name)
+    if tier == "cheap":
+        return base
+    if tier == "mid":
+        return int(base * 2.2)
+    if tier == "premium":
+        return int(base * 4.4)
+    return int(base * 2.2)  # unknown -> mid-tier headroom
 
 
 def _vote_key(ans: str) -> str:
@@ -249,9 +364,16 @@ def _target_entity(instruction: str) -> str:
     """
     # Stop at the em-dash 'source:' separator, a newline, or a SENTENCE-ending period — but NOT a
     # period that is part of an initial ('F. Scott Fitzgerald', 'J. R. R. Tolkien'): a period right
-    # after a capital letter, or not followed by whitespace, is kept. (?i:...) scopes the
-    # case-insensitive match to the literal cue so the [A-Z] initial test stays case-sensitive.
-    m = re.search(r"(?i:for the author)\s+(.+?)(?:\s*—|\n|(?<![A-Z])\.(?=\s|$)|$)", instruction)
+    # after a capital letter, or not followed by whitespace, is kept. Also keep the period of a
+    # leading honorific ('Dr. Seuss', 'Mr.'/'Mrs.'/'Ms.'/'Prof.'/'St.') or a trailing suffix
+    # ('Jr.'/'Sr.') whose tail is lowercase and would otherwise read as a sentence end and truncate
+    # the name to 'Dr'. (?i:...) scopes the case-insensitive match to the literal cue so the [A-Z]
+    # initial test stays case-sensitive.
+    m = re.search(
+        r"(?i:for the author)\s+(.+?)"
+        r"(?:\s*—|\n|(?<![A-Z])(?<!\bDr)(?<!\bMr)(?<!\bMrs)(?<!\bMs)(?<!\bJr)(?<!\bSr)(?<!\bSt)(?<!\bProf)\.(?=\s|$)|$)",
+        instruction,
+    )
     if m and _strip_source_tail(m.group(1)):
         return _strip_source_tail(m.group(1))
     quoted = re.findall(r"['‘’“”\"]([^'‘’“”\"]+)['‘’“”\"]", instruction)
@@ -354,6 +476,13 @@ async def _vote_extract(agent_io: AgentIO, page: str, instruction: str, model_na
     if k <= 1:
         a = await _thin_extract_once(agent_io, page, instruction, model_name, 0.0)
         return a if a and not a.upper().startswith("UNKNOWN") else ""
+    # Opt-in ConSol SPRT early-stop pilot (IDEA_TEST_USE_CONSOL=1). Returns None -> keep fixed-k.
+    if consol_pilot.consol_enabled():
+        async def _sample(temp: float) -> str:
+            return await _thin_extract_once(agent_io, page, instruction, model_name, temp)
+        result = await consol_pilot.consol_vote(_sample, k=k, key_fn=_vote_key)
+        if result is not None:
+            return result.answer
     temps = [0.0] + [0.3] * (k - 1)
     answers = await asyncio.gather(*[
         _thin_extract_once(agent_io, page, instruction, model_name, t) for t in temps
@@ -426,6 +555,93 @@ async def _run_leaf_thin(agent_io: AgentIO, instruction: str, expect: str, model
     return f"UNKNOWN — {urls[0]}"
 
 
+_AGG_SINGLE_SYSTEM = (
+    "You are an aggregation step. Follow the AGGREGATION INSTRUCTION exactly, using ONLY the "
+    "gathered facts. Cite ONLY the http(s) source URLs that appear inside those facts — never "
+    "output the 'Fact N' labels or any bracketed internal identifiers as if they were citations."
+)
+
+# "Scattered thoughts": a weak model is told to be explicit and ground every step, then sampled at
+# several temperatures so independent attempts diverge — betting one derivation is right.
+_AGG_GEN_SYSTEM = (
+    "You are completing a research task and you are a SMALL model — do not rely on intuition, work "
+    "it out EXPLICITLY and back every step with evidence. Rules: (1) follow the AGGREGATION "
+    "INSTRUCTION exactly; (2) use ONLY the GATHERED FACTS — quote the specific fact/number behind "
+    "each step; (3) if the task needs computation, show each arithmetic step separately and "
+    "re-check it; (4) cite ONLY http(s) source URLs found inside the facts, never the 'Fact N' "
+    "labels. End with one line: 'FINAL ANSWER: <answer>'."
+)
+
+# The reasoning reranker: it knows the candidates came from a weaker model, so it re-derives from
+# the evidence and only then selects (or produces) the best-grounded answer.
+_AGG_SELECT_SYSTEM = (
+    "You are a careful VERIFIER reviewing answers from a weaker model. Do NOT trust the candidates. "
+    "First re-derive the answer yourself, step by step, using ONLY the GATHERED FACTS — redo any "
+    "arithmetic from the source numbers. Then pick the candidate whose FINAL ANSWER matches your "
+    "grounded derivation; if none match, produce your own grounded answer. Follow the original "
+    "TASK's required output format and cite ONLY http(s) source URLs from the facts. Output only the "
+    "final answer (and any required citations), not your scratch work."
+)
+
+_AGG_DIVERSE_TEMPS = [0.0, 0.5, 0.7, 0.9, 1.0, 0.6, 0.8, 0.4]
+
+
+def _agg_candidate_count(model_name: str) -> int:
+    """How many scattered candidates to draw. Price-aware (cheaper model -> more redundancy),
+    min 3 so there is something to rerank; override with ``IDEA_TEST_COMPILED_AGG_N``."""
+    override = os.environ.get("IDEA_TEST_COMPILED_AGG_N", "").strip()
+    if override.isdigit() and int(override) > 0:
+        return int(override)
+    return max(3, _votes_for_model(model_name))
+
+
+async def _aggregate_single(agent_io: AgentIO, aggregation: str, facts_block: str,
+                            model_name: str, max_tokens: int) -> str:
+    """The default one-shot aggregation call (proven behavior — kept byte-identical)."""
+    messages = [
+        {"role": "system", "content": _AGG_SINGLE_SYSTEM},
+        {"role": "user", "content": f"AGGREGATION INSTRUCTION:\n{aggregation}\n\nGATHERED FACTS:\n{facts_block}"},
+    ]
+    payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name,
+                                         temperature=0.2, max_tokens=max_tokens)
+    return (await agent_io.query_llm(payload, model_name=model_name)) or ""
+
+
+async def _aggregate_diverse_ground(agent_io: AgentIO, aggregation: str, facts_block: str,
+                                    model_name: str, max_tokens: int) -> str:
+    """Scattered generation + grounded reasoning reranker (opt-in via
+    ``IDEA_TEST_COMPILED_AGG_MODE=diverse_ground``). Draw N grounding-heavy candidate derivations at
+    diverse temperatures, then have the same model re-derive from the facts and select/produce the
+    best-supported answer. Targets multi-step reasoning/arithmetic where one shot is brittle but a
+    grounded check over several attempts recovers the right one."""
+    n = _agg_candidate_count(model_name)
+    user_msg = f"AGGREGATION INSTRUCTION:\n{aggregation}\n\nGATHERED FACTS:\n{facts_block}"
+
+    async def _one(temp: float) -> str:
+        messages = [{"role": "system", "content": _AGG_GEN_SYSTEM},
+                    {"role": "user", "content": user_msg}]
+        payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name,
+                                             temperature=temp, max_tokens=max_tokens)
+        return (await agent_io.query_llm(payload, model_name=model_name)) or ""
+
+    temps = [_AGG_DIVERSE_TEMPS[i % len(_AGG_DIVERSE_TEMPS)] for i in range(n)]
+    candidates = [c for c in await asyncio.gather(*[_one(t) for t in temps]) if c.strip()]
+    if not candidates:
+        return await _aggregate_single(agent_io, aggregation, facts_block, model_name, max_tokens)
+    if len(candidates) == 1:
+        return candidates[0]
+
+    cand_block = "\n\n".join(f"CANDIDATE {i + 1}:\n{c}" for i, c in enumerate(candidates))
+    messages = [
+        {"role": "system", "content": _AGG_SELECT_SYSTEM},
+        {"role": "user", "content": f"TASK:\n{aggregation}\n\nGATHERED FACTS:\n{facts_block}\n\n"
+                                    f"CANDIDATE ANSWERS:\n{cand_block}"},
+    ]
+    payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name,
+                                         temperature=0.0, max_tokens=max_tokens)
+    return (await agent_io.query_llm(payload, model_name=model_name)) or candidates[0]
+
+
 async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str, max_tokens: int) -> str:
     """Execute a compiled DAG plan topologically, then run the aggregation call.
 
@@ -448,9 +664,12 @@ async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str
     page_chars = int(os.environ.get("IDEA_TEST_COMPILED_PAGE_CHARS", "6000"))
     search_k = int(os.environ.get("IDEA_TEST_COMPILED_SEARCH_K", "6"))
     concurrency = max(1, int(os.environ.get("IDEA_TEST_COMPILED_CONCURRENCY", "6")))
-    # "react" (default): per-leaf JSON ReAct loop. "thin": fixed micro-prompt pipeline (cheaper,
-    # more robust for weak models — the harness owns control flow, the LLM only perceives).
-    leaf_mode = os.environ.get("IDEA_TEST_COMPILED_LEAF_MODE", "react").strip().lower()
+    # Leaf executor (Arm B price-aware routing): "auto" (default) routes mid/premium -> "thin"
+    # (fixed micro-prompt pipeline; harness owns control flow, no per-step JSON-ReAct reasoning to
+    # starve the budget) and keeps cheap/unknown on "react" (proven, bug-free). "react"/"thin" are
+    # hard overrides. See ``_leaf_mode_for_model``. Resolved PER MODEL, not once, so a mixed matrix
+    # routes correctly.
+    leaf_mode = _leaf_mode_for_model(model_name)
     sem = asyncio.Semaphore(concurrency)
 
     results: Dict[str, str] = {}
@@ -490,16 +709,18 @@ async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str
     # the recipe reads with resolved values, not literal placeholders (facts_block still carries them).
     aggregation = substitute_deps(aggregation, results)
 
-    messages = [
-        {"role": "system", "content": (
-            "You are an aggregation step. Follow the AGGREGATION INSTRUCTION exactly, using ONLY the "
-            "gathered facts. Cite ONLY the http(s) source URLs that appear inside those facts — never "
-            "output the 'Fact N' labels or any bracketed internal identifiers as if they were citations."
-        )},
-        {"role": "user", "content": f"AGGREGATION INSTRUCTION:\n{aggregation}\n\nGATHERED FACTS:\n{facts_block}"},
-    ]
-    payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.2, max_tokens=max_tokens)
-    return (await agent_io.query_llm(payload, model_name=model_name)) or ""
+    # Aggregation mode: "single" (default, proven) or "diverse_ground" (scattered candidates +
+    # grounded reasoning reranker — lifts multi-step reasoning/arithmetic, but HURTS exact-value
+    # retrieval). A plan may set "agg_mode" to pin its own choice (e.g. a precision/needle task
+    # forces "single"); the plan-level value overrides the IDEA_TEST_COMPILED_AGG_MODE default so a
+    # single barrage matrix can mix modes per task.
+    agg_mode = os.environ.get("IDEA_TEST_COMPILED_AGG_MODE", "single").strip().lower()
+    plan_override = plan.get("agg_mode") if isinstance(plan, dict) else None
+    if plan_override:
+        agg_mode = str(plan_override).strip().lower()
+    if agg_mode in ("diverse_ground", "diverse", "scatter"):
+        return await _aggregate_diverse_ground(agent_io, aggregation, facts_block, model_name, max_tokens)
+    return await _aggregate_single(agent_io, aggregation, facts_block, model_name, max_tokens)
 
 
 async def _resolve_plan(

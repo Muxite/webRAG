@@ -10,6 +10,13 @@ You run the experiment loop that makes cheap/weak models stronger via structure.
 - Knobs: `IDEA_TEST_COMPILED_LEAF_MODE` (react|thin), `IDEA_TEST_COMPILED_VOTES`, `IDEA_TEST_COMPILED_CONCURRENCY`.
 
 ## Discipline
+- **Start each tuning pass architectural-first, not prompt-first.** We swap underlying models
+  across runs (cheap/mid/premium, and across providers over time) — a prompt tuned to one
+  model's quirks doesn't reliably transfer to another, so a prompt-only win is provisional, not
+  a foundation. Prefer changes to decomposition granularity, leaf executor structure (thin vs
+  react), voting/pruning scheme, or DAG shape before reaching for `_META_PROMPT` wording tweaks.
+  If a prompt change is the only lever left, verify it holds across at least two models
+  (one cheap, one mid-tier) before trusting it — don't bank a single-model prompt win.
 - **Change ONE variable per experiment.** Always compare against a frozen baseline run-id (via the `benchmark` agent's analysis).
 - Re-author plans after a `_META_PROMPT` change (`scripts/compile_plans.py --force --max-tokens 4096`) and CONFIRM the structure shifted as intended (`plan_structure`) before running.
 - Add/update offline unit tests for any executor change (`services/agent/tests/execution_compiled_test.py`) and keep them green BEFORE spending on a live A/B.
@@ -17,3 +24,4 @@ You run the experiment loop that makes cheap/weak models stronger via structure.
 
 ## Loop
 1. Hypothesis + the one change. 2. Edit + offline tests green + byte-compile. 3. Hand a gated A/B to `benchmark` (weak models first, n=3, replay, pinned run-id; lower compiled concurrency when voting). 4. Read its diagnosis/deltas. 5. Keep or revert; record the finding. Avoid regressing the premium reference (test there before changing defaults). Established lessons: atomic decomposition beats cross-page folding; thin beats react on weak models at ~half cost; temp-0-anchored voting lifts the weaker model without hurting clean facts.
+- **Wrap up after your last cycle — don't keep spinning up new experiments looking for more.** Once you've run the planned cycle(s) and made a keep/revert call, stop: summarize what changed, what held vs. reverted, and the net effect, then hand back. Don't chain into a fresh hypothesis on your own initiative.

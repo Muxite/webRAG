@@ -74,10 +74,15 @@ class GoTConfig:
     """
 
     embed_on_create: bool = True
-    improve_enabled: bool = True
+    improve_enabled: bool = False
     improve_score_threshold: float = 0.3
     improve_max_iterations: int = 2
     improve_temperature: float = 0.3
+    reexpand_enabled: bool = False
+    reexpand_max_iterations: int = 1
+    reexpand_temperature: float = 0.2
+    candidate_coverage_enabled: bool = False
+    candidate_coverage_budget_extension: int = 10
     adaptive_policies: bool = True
     dedup_enabled: bool = True
     dedup_similarity_threshold: float = 0.85
@@ -94,8 +99,8 @@ class GoTConfig:
     prune_min_nodes_before_prune: int = 6
     prune_stddev_factor: float = 1.0
     prune_score_threshold: float = 0.15
-    backtrack_enabled: bool = True
-    backtrack_dead_end_threshold: int = 3
+    backtrack_enabled: bool = False
+    backtrack_dead_end_threshold: int = 5
     backtrack_low_score_threshold: float = 0.3
     telemetry_routing_enabled: bool = False
     telemetry_routing_score_model: Optional[str] = None

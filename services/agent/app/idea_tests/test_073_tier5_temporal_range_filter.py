@@ -1,5 +1,5 @@
 """
-Test 073: Tier 5 (integration) — TEMPORAL RANGE FILTER (founding-year in-range subset).
+Test 073: Tier 5 (integration) — TEMPORAL RANGE FILTER (count of founding-years in range).
 Level: integration   Weight: long   Difficulty: 9/10
 
 A temporal-reasoning and set-filtering task that exposes two cheap-model failure modes at once:
@@ -9,8 +9,14 @@ the range filter is applied. The agent is given SIX solid-but-obscure institutio
 zoo, a university, an academy, a theatre, and a history museum) from Kosovo, North Macedonia, and
 Albania — none famous enough for their specific founding year to be recalled from parametric memory.
 For each, the agent must look up the Wikipedia article and read the infobox "Established" / "Opened"
-/ "Founded" year. It must then identify WHICH of the six were founded within the year range
-[1940, 1963] (inclusive), and state how many.
+/ "Founded" year. It must then COUNT how many of the six were founded within the year range
+[1940, 1963] (inclusive).
+
+The keystone is a COUNT (an integer 0–6) rather than the exact named subset: the count-with-condition
+keystone shape is the one that is reliably scorable for a cheap compiled-leaf executor (matching the
+validated pattern of tests 072/078/082/087/089), whereas naming the EXACT in-range subset exceeds a
+cheap executor's reliability. The in-range names remain an un-gated / gated diagnostic below, but the
+0/1 gate is the computed count.
 
 The design engineers a clean 3-of-6 in-range split with all margins ≥ 6 years from each boundary:
 
@@ -23,8 +29,9 @@ The design engineers a clean 3-of-6 in-range split with all margins ≥ 6 years 
   Academy of Sciences of Albania           1972   NO  (above range)  9 yrs above B
   National History Museum (Albania)        1981   NO  (above range) 18 yrs above B
   ───────────────────────────────────────────────────────────────────────────────────────────
-  KEYSTONE = the exact in-range SET: {National Theatre of Kosovo, Kosovo Museum,
-             Luigj Gurakuqi University of Shkodra}   COUNT = 3
+  KEYSTONE = the COUNT of in-range institutions = 3 (a single integer 0–6 in deliverables[0]).
+  The three in-range institutions are {National Theatre of Kosovo, Kosovo Museum,
+             Luigj Gurakuqi University of Shkodra}.
 
 Every year is separated from the range boundaries by at least 6 years: a ±5-year misread on any
 single founding year cannot flip that entity's in-range/out-of-range membership. All six years are
@@ -45,7 +52,7 @@ ANTI-PARAMETRIC: none of these six founding years is a commonly memorised fact:
   * National History Museum (Albania) (1981): opened under the Hoxha regime on 28 October 1981;
     its exact year is not commonly memorised.
 
-GROUND TRUTH (verified against live English Wikipedia, 2026-06-27 — each infobox
+GROUND TRUTH (verified against live English Wikipedia, 2026-07-07 — each infobox
 "Established" / "Opened" / "Founded" field on each institution's own Wikipedia article):
   National Theatre of Kosovo     1946  en.wikipedia.org/wiki/National_Theatre_of_Kosovo
   Kosovo Museum                  1949  en.wikipedia.org/wiki/Kosovo_Museum
@@ -55,22 +62,23 @@ GROUND TRUTH (verified against live English Wikipedia, 2026-06-27 — each infob
   Nat. History Museum Albania    1981  en.wikipedia.org/wiki/National_History_Museum_(Albania)
 
 Why it discriminates (per REASONING_TEST_DESIGN.md — the differential-lift target):
-  * cheap native (parametric / graph): hallucinates one or more founding years → wrong in-range
-    set. Typical errors: guessing Academy of Sciences founded ~1950 (a plausible communist-era
-    date) drags an out-of-range entity into the range; guessing the National Theatre founded ~1975
-    (post-range) pushes an in-range entity out. Even a single wrong year scrambles membership.
+  * cheap native (parametric / graph): hallucinates one or more founding years → wrong count.
+    Typical errors: guessing Academy of Sciences founded ~1950 (a plausible communist-era date)
+    drags an out-of-range entity into the range and pushes the count to 4; guessing the National
+    Theatre founded ~1975 (post-range) pushes an in-range entity out and drops the count to 2.
+    Even a single wrong year moves the count off 3.
   * frontier sequential (ReAct): reads all six Wikipedia infoboxes, applies the range filter,
-    names the correct three → decent.
+    counts the correct three → decent.
   * graph_compiled: six independent parallel leaves each read ONE institution's founding year from
     its own article (one atomic fact per leaf, routing around the risk of hallucination); the
     aggregation is forced to RESTATE each entity → year explicitly before applying [1940, 1963],
     so the cheap executor cannot mis-bind a year to the wrong entity → the cheap executor is
-    rescued from both hallucinated dates and year-entity mis-binding.
+    rescued from both hallucinated dates and year-entity mis-binding when computing the count.
 
-KEYSTONE = the exact in-range SUBSET (all three in-range names present in deliverables[0] and no
-  out-of-range name present there). The keystone check is robust: it requires the correct complete
-  set — a model that lists only two in-range entities, or includes an out-of-range entity, fails.
-  Secondary (gated) = COUNT = 3 AND each in-range entity's founding year (1946, 1949, 1957).
+KEYSTONE = the COUNT of in-range institutions = 3 (a single integer 0–6 in deliverables[0]). The
+  count keystone is the reliably-scorable shape for a cheap compiled-leaf executor: a model that
+  hallucinates a founding year, drops an entity, or mis-binds a year lands on a count ≠ 3 and fails.
+  Secondary (gated) = the three in-range NAMES + each in-range founding year (1946, 1949, 1957).
   Coverage (ungated, collision-free) = all 6 founding years gathered.
 """
 
@@ -177,9 +185,9 @@ _NUM_TOKEN_RX = re.compile(r"\d[\d.,]*\d|\d")
 def get_test_metadata() -> Dict[str, Any]:
     return {
         "test_id": "073",
-        "test_name": "Tier 5: Temporal range filter (founding-year in-range subset identification)",
+        "test_name": "Tier 5: Temporal range filter (count of founding-years within date range)",
         "difficulty_level": "9/10",
-        "category": "Temporal reasoning + set filtering (founding-year subset identification)",
+        "category": "Temporal reasoning + count-with-condition (founding-years in date range)",
         "level": "integration",
         "weight": "long",
     }
@@ -195,11 +203,12 @@ def get_task_statement() -> str:
         "For EACH of the six institutions, open its Wikipedia article and read, from the infobox, "
         "the year it was founded, established, or officially opened (whichever field is present). "
         "You MUST read the article — do not estimate or guess the year from memory.\n\n"
-        f"Then identify WHICH of the six institutions were founded or established within the year "
-        f"range {RANGE_A} to {RANGE_B} (inclusive), and state how many that is.\n\n"
-        "Report (a) the names of the institutions whose founding year falls within "
-        f"[{RANGE_A}, {RANGE_B}] — list only those names in your primary answer (the keystone); "
-        "(b) the count of in-range institutions; "
+        f"Then COUNT how many of the six institutions were founded or established within the year "
+        f"range {RANGE_A} to {RANGE_B} (inclusive).\n\n"
+        "Report (a) the COUNT — how many of the six institutions have a founding year within "
+        f"[{RANGE_A}, {RANGE_B}] (a single integer 0–6; this is the keystone answer and belongs "
+        "in your primary answer); "
+        "(b) the names of the in-range institutions; "
         "(c) the founding year of each in-range institution; "
         "(d) the founding year of ALL SIX institutions; and "
         "(e) the source URL of every Wikipedia article you read."
@@ -208,9 +217,9 @@ def get_task_statement() -> str:
 
 def get_required_deliverables() -> List[str]:
     return [
-        f"The names of the institutions founded within [{RANGE_A}, {RANGE_B}] "
-        f"(list only the in-range institution names — the keystone answer)",
-        f"The count of in-range institutions",
+        f"The count of institutions founded within [{RANGE_A}, {RANGE_B}] "
+        f"(the keystone integer, 0–6)",
+        f"The names of the in-range institutions",
         "The founding year of each in-range institution",
         "The founding year of all six institutions",
         "Source URL for each institution's Wikipedia article",
@@ -222,9 +231,9 @@ def get_success_criteria() -> List[str]:
     in_years = "; ".join(f"{e['name']} → {e['year']}" for e in IN_RANGE)
     return [
         "At least 5 pages visited (target 6: one Wikipedia article per institution)",
-        f"Correctly identifies the in-range set: {{{in_names}}} — the three institutions founded "
-        f"within [{RANGE_A}, {RANGE_B}] — and places only those names in the primary answer slot",
-        f"States the count = {IN_RANGE_COUNT}",
+        f"Correctly reports the count = {IN_RANGE_COUNT} (the number of institutions founded "
+        f"within [{RANGE_A}, {RANGE_B}]) as the primary answer",
+        f"Identifies the {IN_RANGE_COUNT} in-range institutions: {in_names}",
         f"Reports each in-range founding year: {in_years}",
         "Gathers all six founding years",
         "Cites each institution's source URL",
@@ -269,23 +278,13 @@ def _int_values(text: str) -> List[int]:
 
 
 def _keystone_ok(result: Dict[str, Any]) -> bool:
-    """KEYSTONE gate: ``deliverables[0]`` names exactly the three in-range institutions and no
-    out-of-range institution.
+    """KEYSTONE gate: ``deliverables[0]`` contains the integer ``IN_RANGE_COUNT`` (= 3).
 
-    Pass conditions (both required):
-      (1) ALL three in-range entity name patterns are found in primary_text.
-      (2) NONE of the three out-of-range entity name patterns are found in primary_text.
-
-    The task instructs the agent to place only the in-range institution names in deliverables[0]
-    (the keystone slot), so a correct terse listing of the three names passes cleanly, while any
-    answer that omits an in-range entity or includes an out-of-range entity fails.
+    The primary answer slot must hold the computed count of institutions founded within
+    [1940, 1963]. A model that hallucinates a founding year, drops an entity, or mis-binds a
+    year lands on a count ≠ 3 (typically 2 or 4) and fails. Only the correct value 3 passes.
     """
-    text = _primary_text(result)
-    if not all(re.search(e["name_rx"], text, re.IGNORECASE) for e in IN_RANGE):
-        return False   # at least one in-range entity missing from primary answer
-    if any(re.search(e["name_rx"], text, re.IGNORECASE) for e in OUT_RANGE):
-        return False   # an out-of-range entity appears in the keystone slot → wrong set
-    return True
+    return IN_RANGE_COUNT in _int_values(_primary_text(result))
 
 
 # ── validation functions ──────────────────────────────────────────────────────
@@ -301,27 +300,28 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
     }
 
 
-def validate_keystone_inrange_set(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """KEYSTONE (hard 0/1): the exact in-range SUBSET — the three institutions whose founding year
-    falls within [1940, 1963] — named in deliverables[0], with no out-of-range entity present.
+def validate_keystone_count(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
+    """KEYSTONE (hard 0/1): the exact COUNT of institutions founded within [1940, 1963], reported
+    as a single integer in deliverables[0].
 
-    A model that hallucinates a founding year for any institution may pull an out-of-range entity
-    inside the set (e.g. 'Academy of Sciences of Albania founded ~1950') or push an in-range entity
-    outside it (e.g. 'National Theatre founded ~1975'), failing the set-match. Even one wrong year
-    scrambles membership.
+    Correct answer = 3. Any other value (2, 4, 6, …) fails. A model that hallucinates a founding
+    year for any institution may pull an out-of-range entity into the range (e.g. 'Academy of
+    Sciences of Albania founded ~1950' → count 4) or push an in-range entity out (e.g. 'National
+    Theatre founded ~1975' → count 2). Even one wrong year moves the count off 3. Only a model that
+    reads all six infoboxes, applies the range, and counts correctly passes.
     """
     passed = _keystone_ok(result)
     in_names = ", ".join(e["name"] for e in IN_RANGE)
-    out_names = ", ".join(e["name"] for e in OUT_RANGE)
     return {
-        "check": "keystone_inrange_set",
+        "check": "keystone_count",
         "passed": passed,
         "score": 1.0 if passed else 0.0,
         "reason": (
-            f"In-range set {{{in_names}}} correctly identified in deliverables[0]" if passed
-            else f"In-range set missing or incorrect in deliverables[0]. "
-                 f"Correct set (3 institutions): {{{in_names}}}. "
-                 f"Must NOT appear in deliverables[0]: {out_names}. "
+            f"Count {IN_RANGE_COUNT} (institutions founded within [{RANGE_A}, {RANGE_B}]) present "
+            f"in primary answer" if passed
+            else f"Count {IN_RANGE_COUNT} absent or wrong in primary answer. The {IN_RANGE_COUNT} "
+                 f"in-range institutions are: {in_names}. Beware: dragging an out-of-range entity "
+                 f"in (e.g. via a hallucinated year) gives 4; dropping an in-range entity gives 2. "
                  f"Reading all six Wikipedia infoboxes and applying [{RANGE_A}, {RANGE_B}] is required."
         ),
     }
@@ -347,10 +347,37 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
     }
 
 
+def validate_inrange_names(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
+    """GATED secondary: all three in-range institution NAMES present in the answer.
+
+    Short-circuits to 0 when the keystone (count) is absent, so a run that reports the wrong count
+    cannot bank partial credit for naming some of the in-range institutions. After the keystone
+    gate, checks that all three in-range names appear anywhere in the reported text."""
+    if not _keystone_ok(result):
+        return {
+            "check": "inrange_names",
+            "passed": False,
+            "score": 0.0,
+            "reason": "Keystone absent → in-range name list not credited",
+        }
+    text = _all_text(result)
+    hits = [e["name"] for e in IN_RANGE if re.search(e["name_rx"], text, re.IGNORECASE)]
+    n = len(IN_RANGE)
+    return {
+        "check": "inrange_names",
+        "passed": len(hits) == n,
+        "score": len(hits) / n,
+        "reason": (
+            f"{len(hits)}/{n} in-range institution names identified "
+            f"({', '.join(hits) if hits else 'none'})"
+        ),
+    }
+
+
 def validate_inrange_years(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: all three in-range founding years (1946, 1949, 1957) explicitly reported.
-    Short-circuits to 0 when the keystone is absent, so a wrong/guessed in-range set cannot bank
-    credit for the per-institution founding years."""
+    Short-circuits to 0 when the keystone is absent, so a wrong count cannot bank credit for the
+    per-institution founding years."""
     if not _keystone_ok(result):
         return {
             "check": "inrange_years",
@@ -367,32 +394,6 @@ def validate_inrange_years(result: Dict[str, Any], observability: Dict[str, Any]
         "passed": len(hits) == n,
         "score": len(hits) / n,
         "reason": f"{len(hits)}/{n} in-range founding years present ({summary})",
-    }
-
-
-def validate_count(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """GATED secondary: the count of in-range institutions (= 3) is stated. Short-circuits to 0
-    when the keystone is absent."""
-    if not _keystone_ok(result):
-        return {
-            "check": "count",
-            "passed": False,
-            "score": 0.0,
-            "reason": "Keystone absent → count not credited",
-        }
-    text = _all_text(result)
-    # Accept the digit "3" or the word "three"
-    ok = (IN_RANGE_COUNT in _int_values(text)) or bool(
-        re.search(r"\bthree\b", text, re.IGNORECASE)
-    )
-    return {
-        "check": "count",
-        "passed": ok,
-        "score": 1.0 if ok else 0.0,
-        "reason": (
-            f"Count = {IN_RANGE_COUNT} stated" if ok
-            else f"Count = {IN_RANGE_COUNT} not found in answer"
-        ),
     }
 
 
@@ -420,10 +421,10 @@ def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 def get_validation_functions() -> List[callable]:
     return [
         validate_visits,
-        validate_keystone_inrange_set,
+        validate_keystone_count,
         validate_coverage,
+        validate_inrange_names,
         validate_inrange_years,
-        validate_count,
         validate_citation,
     ]
 
@@ -447,9 +448,11 @@ def get_compiled_plan() -> Dict[str, Any]:
           different institution's name;
       (2) APPLY the range filter [{RANGE_A}, {RANGE_B}] explicitly for each institution, writing
           'IN RANGE' or 'OUT OF RANGE' for each one before drawing any conclusion;
-      (3) COLLECT the in-range names, state the count, and report all required deliverables.
+      (3) COUNT the IN-RANGE institutions (that integer is the keystone answer), then report the
+          in-range names, years, and all required deliverables.
 
-    Nothing about which institution is in-range, or any founding year, is embedded in this plan.
+    Nothing about which institution is in-range, the count, or any founding year is embedded in
+    this plan.
     """
     leaves: List[Dict[str, Any]] = []
     for e in ENTITIES:
@@ -483,10 +486,10 @@ def get_compiled_plan() -> Dict[str, Any]:
             f"  <institution name>: <year> — OUT OF RANGE  (otherwise)\n"
             f"Complete this for ALL SIX institutions before drawing any conclusion.\n\n"
 
-            f"STEP 3 — COLLECT and REPORT:\n"
-            f"  (a) The names of the in-range institutions only "
-            f"(place these in deliverables[0] — the keystone answer);\n"
-            f"  (b) the count of in-range institutions;\n"
+            f"STEP 3 — COUNT and REPORT:\n"
+            f"  (a) COUNT how many institutions you marked IN RANGE and report that single integer "
+            f"(0–6) as the primary keystone answer (place it in deliverables[0]);\n"
+            f"  (b) the names of the in-range institutions;\n"
             f"  (c) each in-range institution's founding year;\n"
             f"  (d) the founding year of all six institutions;\n"
             f"  (e) each institution's source URL."

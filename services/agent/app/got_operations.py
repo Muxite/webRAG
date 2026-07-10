@@ -203,6 +203,127 @@ class GoTOperations:
             _logger.warning(f"[GoT:IMPROVE] Failed to improve node {node_id}: {exc}")
             return None
 
+    async def check_needs_followup(
+        self,
+        graph: IdeaDag,
+        node_id: str,
+        model_name: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Ask whether a completed leaf's resolved content reveals a genuine follow-up.
+
+        Mirrors :meth:`try_improve_node`'s structure but is a *separate* capability:
+        instead of rewriting the node in place it returns a structured verdict the
+        engine reads to decide whether to re-expand the leaf into new children.
+        Returns ``{"needs_followup": bool, "reason": str}`` (or ``None`` on
+        error / when the flag is off). Gated by ``got.reexpand_enabled`` so the
+        default-off path never issues an LLM call.
+        """
+        if not self._cfg.got.reexpand_enabled:
+            return None
+
+        node = graph.get_node(node_id)
+        if not node:
+            return None
+
+        result = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not isinstance(result, dict):
+            return None
+        from agent.app.idea_policies.action_constants import ActionResultExtractor
+        if not ActionResultExtractor.is_success(result):
+            return None
+
+        # Compact the resolved content so the check stays cheap.
+        content = (
+            result.get("content")
+            or result.get("content_full")
+            or ""
+        )
+        if isinstance(content, str) and len(content) > 3000:
+            content = content[:3000] + "... [truncated]"
+        results_summary = result.get("results")
+        if isinstance(results_summary, list):
+            results_summary = results_summary[:5]
+
+        root = graph.get_node(graph.root_id())
+        mandate = ""
+        if root and isinstance(root.details, dict):
+            mandate = str(root.details.get("mandate") or "")[:1500]
+
+        goal = (
+            node.details.get(DetailKey.GOAL.value)
+            or node.details.get(DetailKey.ORIGINAL_GOAL.value)
+            or node.title
+        )
+        parent_goal = node.details.get(DetailKey.PARENT_GOAL.value) or ""
+
+        sibling_titles: List[str] = []
+        if node.parent_id:
+            parent = graph.get_node(node.parent_id)
+            if parent:
+                for cid in parent.children:
+                    if cid == node_id:
+                        continue
+                    sib = graph.get_node(cid)
+                    if sib:
+                        sibling_titles.append(sib.title[:80])
+
+        system_prompt = self.settings.get(
+            "got_reexpand_followup_system_prompt",
+            "You are a follow-up detector in a Graph-of-Thought research system. A leaf "
+            "task has just completed and produced a result. Decide whether that result "
+            "reveals a GENUINE, concrete follow-up investigation required to satisfy the "
+            "parent goal and not already covered by existing sibling tasks. Return JSON: "
+            "{\"needs_followup\": boolean, \"reason\": string}.",
+        )
+        user_content = json.dumps({
+            "mandate": mandate,
+            "parent_goal": parent_goal,
+            "completed_task_title": node.title,
+            "completed_task_goal": goal,
+            "action": node.details.get(DetailKey.ACTION.value),
+            "resolved_content": content,
+            "resolved_results": results_summary,
+            "existing_sibling_tasks": sibling_titles,
+        }, ensure_ascii=True, default=str)
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+
+        check_model = model_name or self._cfg.evaluation.model or None
+        temperature = self._cfg.got.reexpand_temperature
+
+        payload = self.io.build_llm_payload(
+            messages=messages,
+            json_mode=True,
+            model_name=check_model,
+            temperature=temperature,
+        )
+
+        try:
+            response = await self.io.query_llm_with_fallback(
+                payload,
+                model_name=check_model,
+                fallback_model=self._cfg.generation.fallback_model,
+                timeout_seconds=self._cfg.timeouts.llm,
+            )
+            if not response:
+                return None
+            data = json.loads(response)
+            verdict = {
+                "needs_followup": bool(data.get("needs_followup", False)),
+                "reason": str(data.get("reason", "")),
+            }
+            _logger.info(
+                f"[GoT:REEXPAND] Follow-up check for node {node_id}: "
+                f"needs_followup={verdict['needs_followup']} ({verdict['reason'][:80]})"
+            )
+            return verdict
+        except Exception as exc:
+            _logger.warning(f"[GoT:REEXPAND] Follow-up check failed for node {node_id}: {exc}")
+            return None
+
     def _adaptive_dedup_threshold(self, graph: IdeaDag) -> float:
         """
         Pick a similarity cutoff based on graph density. Sparse graphs tolerate
@@ -535,3 +656,7 @@ class GoTOperations:
     @property
     def dead_end_count(self) -> int:
         return self._dead_end_count
+
+    @dead_end_count.setter
+    def dead_end_count(self, value: int) -> None:
+        self._dead_end_count = int(value)

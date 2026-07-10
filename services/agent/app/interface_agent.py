@@ -586,10 +586,24 @@ class InterfaceAgent:
                     result=completion.result(),
                 )
             else:
+                # No deliverables: status stays ERROR, but carry the structured failure detail +
+                # usage in `result` — the SAME channel the COMPLETED branch uses — so a caller
+                # learns WHAT went wrong, not just a bare error string. `result` flows through
+                # redis -> supabase -> GET /tasks/{id} automatically (TaskResult.evidence already
+                # exists), whereas a bespoke top-level envelope field would be dropped at the
+                # gateway sync / read boundaries.
+                completion = CompletionResult(
+                    correlation_id=self.correlation_id,
+                    success=False,
+                    deliverables=[],
+                    notes=notes,
+                    evidence=failure_evidence,
+                )
                 await self._publish_status(
                     StatusType.ERROR,
                     max_ticks=max_ticks,
                     error=str(e),
+                    result=completion.result(),
                 )
             self._finalize_telemetry(success=False)
         finally:

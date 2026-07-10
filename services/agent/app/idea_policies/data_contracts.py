@@ -77,13 +77,7 @@ def _urls_from_search_is_ready(result: Dict[str, Any], _source_node: "IdeaNode")
 
 
 def _urls_from_visit_is_ready(result: Dict[str, Any], _source_node: "IdeaNode") -> bool:
-    from agent.app.idea_policies.action_constants import ActionResultKey
-
-    links = (
-        result.get(ActionResultKey.LINKS.value)
-        or result.get(ActionResultKey.LINKS_FULL.value)
-        or []
-    )
+    links = result.get("links") or result.get("links_full") or []
     return bool(links)
 
 

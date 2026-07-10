@@ -138,12 +138,33 @@ def _visited_sources(graph: IdeaDag, cap: int = 25) -> List[Dict[str, str]]:
     return sources
 
 
-_URL_RE = re.compile(r'https?://[^\s<>\)\]"\']+')
+_URL_RE = re.compile(r'https?://[^\s<>"\']+')
+
+
+def _clean_url(raw: str) -> str:
+    """Trim trailing punctuation a URL collects when scanned out of prose/markdown, WITHOUT eating
+    a balanced path paren (``.../Mercury_(element)`` / ``.../Beloved_(novel)`` stay intact). Mirrors
+    the scanner in scripts/prewarm_fixtures so a cited URL normalizes identically to the visited one;
+    a path paren must survive here because ``_norm_cite`` compares the two and a strict-prefix
+    mismatch would false-flag a correctly-grounded citation as UNVERIFIED."""
+    u = str(raw or "").strip()
+    trail = ".,;:'\"<>"
+    while True:
+        while u and u[-1] in trail:
+            u = u[:-1]
+        if u.endswith(")") and u.count("(") < u.count(")"):
+            u = u[:-1]
+            continue
+        break
+    return u
 
 
 def _norm_cite(url: str) -> str:
-    """Normalize a URL for citation matching (drop scheme/fragment/trailing slash, lowercase)."""
-    s = str(url or "").strip().lower().rstrip(".,);]")
+    """Normalize a URL for citation matching (drop scheme/fragment/trailing slash, lowercase).
+
+    Cleans trailing prose punctuation FIRST (incl. balanced-paren handling) so the comparison key is
+    stable whether or not a ``#fragment`` follows a path paren."""
+    s = _clean_url(url).lower()
     for pre in ("https://", "http://"):
         if s.startswith(pre):
             s = s[len(pre):]
@@ -168,7 +189,7 @@ def _unverified_citations(text: str, sources: List[Dict[str, str]], cap: int = 2
         if not key or key in visited or key in seen:
             continue
         seen.add(key)
-        out.append(match.rstrip(".,);]"))
+        out.append(_clean_url(match))
         if len(out) >= cap:
             break
     return out

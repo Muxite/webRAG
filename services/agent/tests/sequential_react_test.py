@@ -81,3 +81,42 @@ def test_react_invalid_json_does_not_crash():
     io.visit = AsyncMock(return_value="")
     out = asyncio.run(seq._run_react(io, "task", "m", max_steps=1, max_tokens=256))
     assert out == "FINAL"  # invalid decision on the last step -> forced synthesis
+
+
+def test_react_list_shaped_decision_does_not_crash():
+    # Reasoning models sometimes return the step as a LIST (e.g. [{...}]) instead of a
+    # dict; the loop must take the first dict and act on it, not crash on .get().
+    decisions = [[{"thought": "wrapped in a list", "action": "finish", "args": {"answer": "LIST ANSWER"}}]]
+    io = _agent_io(decisions)
+    out = asyncio.run(seq._run_react(io, "task", "m", max_steps=3, max_tokens=512))
+    assert out == "LIST ANSWER"
+    io.search.assert_not_awaited()
+    io.visit.assert_not_awaited()
+
+
+def test_react_non_dict_decision_falls_through_to_invalid_action():
+    # A bare scalar (or a list with no dict) must not crash; it becomes an empty
+    # decision -> INVALID ACTION observation, then forced synthesis at max_steps.
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(side_effect=["[1, 2, 3]", "FORCED"])
+    io.search = AsyncMock(return_value=[])
+    io.visit = AsyncMock(return_value="")
+    out = asyncio.run(seq._run_react(io, "task", "m", max_steps=1, max_tokens=256))
+    assert out == "FORCED"
+
+
+def test_react_step_token_budget_default_is_reasoning_adequate(monkeypatch):
+    # Per-step decision budget must default to >=4096 so a reasoning model's action
+    # JSON is not truncated, and must honor the env override.
+    monkeypatch.delenv("IDEA_TEST_SEQ_STEP_MAX_TOKENS", raising=False)
+    decisions = [{"thought": "done", "action": "finish", "args": {"answer": "A"}}]
+    io = _agent_io(decisions)
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=2, max_tokens=512))
+    step_call = io.build_llm_payload.call_args_list[0]
+    assert step_call.kwargs["max_tokens"] == 4096
+
+    monkeypatch.setenv("IDEA_TEST_SEQ_STEP_MAX_TOKENS", "9000")
+    io2 = _agent_io(decisions)
+    asyncio.run(seq._run_react(io2, "task", "m", max_steps=2, max_tokens=512))
+    assert io2.build_llm_payload.call_args_list[0].kwargs["max_tokens"] == 9000

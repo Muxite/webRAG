@@ -35,6 +35,7 @@ from agent.app.idea_policies.post_expansion_hooks import (
 )
 from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
 from agent.app.idea_policies.grounding import evaluate_grounding
+from agent.app.idea_policies.candidate_coverage import evaluate_candidate_coverage
 from agent.app import idea_chunking
 from agent.app import idea_visit_dedup
 from agent.app import idea_sequencing
@@ -79,7 +80,7 @@ class IdeaDagEngine:
         self._got: Optional[GoTOperations] = None
         self._checkpointer: Optional[Checkpointer] = create_checkpointer_from_env()
 
-    async def run(self, mandate: str, max_steps: int = 50, run_id: Optional[str] = None) -> Dict[str, Any]:
+    async def run(self, mandate: str, max_steps: int = 50, run_id: Optional[str] = None, fail_soft: bool = False) -> Dict[str, Any]:
         mandate_short = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate[:100]
         self._logger.info(f"[RUN] Starting idea DAG engine with mandate: {mandate_short}..., max_steps={max_steps}, run_id={run_id}")
         namespace = self._memo_namespace(mandate)
@@ -94,6 +95,9 @@ class IdeaDagEngine:
             memory_manager=self._memory_manager,
         )
         self._current_mandate = mandate
+        # Reset the one-time candidate-coverage budget extension for this run (an engine
+        # instance can be reused across runs; the extension must never carry over).
+        self._candidate_coverage_extension_applied = False
         root_title = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate
 
         graph: Optional[IdeaDag] = None
@@ -128,9 +132,80 @@ class IdeaDagEngine:
             graph = IdeaDag(root_title=root_title, root_details={"mandate": mandate, "memo_namespace": namespace})
             current_id = graph.root_id()
             self._logger.info(f"[RUN] Created graph with root_id={current_id}")
-        while steps < max_steps:
+        # Checkpoint save is a run()-only concern (`run_id` is never passed by the benchmark
+        # harness). Wire it as the shared loop's per-step hook so `_run_loop` stays generic.
+        on_step = None
+        if run_id and self._checkpointer:
+            async def on_step(graph, current_id, steps):  # noqa: A002 — mirror caller names
+                try:
+                    await self._checkpointer.save(
+                        run_id,
+                        steps - 1,
+                        {
+                            "graph": graph.to_dict(),
+                            "current_id": current_id,
+                            "parallel_leaves_total": getattr(self, "_parallel_leaves_total", 0),
+                            "got_dead_end_count": getattr(self._got, "dead_end_count", 0) if self._got else 0,
+                        },
+                    )
+                except Exception as exc:  # noqa: BLE001 — checkpoint save must never crash a run
+                    self._logger.warning(f"[RUN] Checkpoint save failed at step {steps - 1}: {exc}")
+
+        graph, current_id, steps = await self._run_loop(
+            graph, current_id, mandate, max_steps, steps=steps,
+            on_step=on_step, fail_soft=fail_soft,
+        )
+        final_payload = await self.finalize(graph, mandate)
+        self._maybe_log_dag(graph, steps, force=True)
+        return final_payload
+
+    async def _run_loop(
+        self,
+        graph: IdeaDag,
+        current_id: Optional[str],
+        mandate: str,
+        max_steps: int,
+        steps: int = 0,
+        on_step=None,
+        fail_soft: bool = False,
+    ) -> tuple:
+        """Shared budget / step / prune-backtrack / None-handling control loop.
+
+        The single source of truth for the DAG execution loop, called by both `run()`
+        (production, ``fail_soft=False``, ``on_step``=checkpoint save) and the benchmark
+        harness ``run_test_execution`` (via ``run()``, ``fail_soft=True``). Keeping one
+        implementation is what prevents the two call sites from drifting ("bug #4").
+
+        :param on_step: optional ``async (graph, current_id, steps)`` hook run after each
+            step's prune/backtrack (checkpoint save in production, unused by the harness).
+        :param fail_soft: when True, an exception raised by ``step()`` is logged and the
+            loop breaks (so the caller can still finalize with partial state); when False
+            (production default) the exception propagates.
+        :return: the final ``(graph, current_id, steps)``.
+        """
+        while True:
+            if steps >= max_steps:
+                # Step budget exhausted. Grant a one-time, fixed, capped extension IFF the
+                # visit-backed candidate-coverage gate is unsatisfied, so the forced re-check
+                # actually has room to add the missing visits instead of finalizing
+                # under-resolved. Applied at most once (see `_candidate_coverage_extension`).
+                _cov_ext = self._candidate_coverage_extension(graph, mandate)
+                if _cov_ext <= 0:
+                    break
+                max_steps += _cov_ext
+                current_id = graph.root_id()
+                self._logger.info(
+                    f"[COVERAGE] Granting one-time +{_cov_ext}-step budget extension "
+                    f"(max_steps now {max_steps}) so unchecked candidates can be resolved"
+                )
             self._logger.info(f"[RUN] === STEP {steps}/{max_steps} ===")
-            current_id = await self.step(graph, current_id, steps)
+            try:
+                current_id = await self.step(graph, current_id, steps)
+            except Exception as exc:  # noqa: BLE001 — fail_soft callers finalize partial state
+                if not fail_soft:
+                    raise
+                self._logger.error(f"[RUN] Step {steps} failed: {exc}", exc_info=True)
+                break
             steps += 1
             self._step_index = steps
             self._maybe_log_dag(graph, steps)
@@ -157,20 +232,8 @@ class IdeaDagEngine:
                     )
                     current_id = target
 
-            if run_id and self._checkpointer:
-                try:
-                    await self._checkpointer.save(
-                        run_id,
-                        steps - 1,
-                        {
-                            "graph": graph.to_dict(),
-                            "current_id": current_id,
-                            "parallel_leaves_total": getattr(self, "_parallel_leaves_total", 0),
-                            "got_dead_end_count": getattr(self._got, "dead_end_count", 0) if self._got else 0,
-                        },
-                    )
-                except Exception as exc:  # noqa: BLE001 — checkpoint save must never crash a run
-                    self._logger.warning(f"[RUN] Checkpoint save failed at step {steps - 1}: {exc}")
+            if on_step is not None:
+                await on_step(graph, current_id, steps)
 
             if steps == 1:
                 root = graph.get_node(graph.root_id())
@@ -184,13 +247,12 @@ class IdeaDagEngine:
                         current_id = emergency_result
                     else:
                         self._logger.error(f"[RUN] Emergency expansion failed - root still has no children")
-            
-            
+
             if steps == 3:
                 action_count = sum(1 for n in graph.iter_depth_first() if NodeDetailsExtractor.get_action(n.details))
                 if action_count == 0:
                     self._logger.warning(f"[RUN] VALIDATION WARNING: No actions created after step 3 (total nodes: {graph.node_count()})")
-            
+
             if current_id is None:
                 # Soft grounding gate: if the mandate needs substantiated (visited)
                 # evidence and we are not grounded yet, inject the missing follow-through
@@ -198,11 +260,45 @@ class IdeaDagEngine:
                 if self._grounding_replan(graph, mandate, steps, max_steps):
                     current_id = graph.root_id()
                     continue
+                # Same one-time coverage budget extension for the `step()`-returned-None exit
+                # path (distinct from top-of-loop budget exhaustion). Re-activates the root so
+                # the extended budget can re-check the missing candidates.
+                _cov_ext = self._candidate_coverage_extension(graph, mandate)
+                if _cov_ext > 0:
+                    max_steps += _cov_ext
+                    current_id = graph.root_id()
+                    self._logger.info(
+                        f"[COVERAGE] Granting one-time +{_cov_ext}-step budget extension "
+                        f"(max_steps now {max_steps}) so unchecked candidates can be resolved"
+                    )
+                    continue
                 self._logger.warning(f"[RUN] Step {steps} returned None, breaking loop")
                 break
-        self._logger.info(f"[RUN] Completed {steps} steps, checking for pending nodes before finalizing")
-        
-        pending_nodes = self._get_pending_executable_nodes(graph)
+            else:
+                # Root-done early exit (folded in from the benchmark harness so both paths
+                # share it). If step() handed control back to a DONE root the plan is
+                # complete — but a substantiation mandate that is not yet grounded earns one
+                # more capped follow-through pass before we stop. In production step()
+                # returns None for a done root, so this branch is effectively harness-only;
+                # keeping it here means run() and the harness cannot diverge on it.
+                node = graph.get_node(current_id)
+                if node and node.status == IdeaNodeStatus.DONE and current_id == graph.root_id():
+                    if self._grounding_replan(graph, mandate, steps, max_steps):
+                        current_id = graph.root_id()
+                        continue
+                    break
+        return graph, current_id, steps
+
+    async def finalize(self, graph: IdeaDag, mandate: str, pending_check: bool = True) -> Dict[str, Any]:
+        """Build the final payload and attach every derived signal.
+
+        Shared by `run()` and the benchmark harness (via `run()`) so both emit an identical
+        output shape: `graph`, `pending_nodes_count`, `warning`, `candidate_coverage_*`,
+        `got_stats`, `grounded`, `missing_requirements`, `grounding_replans`.
+        """
+        self._logger.info("[RUN] Finalizing: checking for pending nodes before building payload")
+
+        pending_nodes = self._get_pending_executable_nodes(graph) if pending_check else []
         if pending_nodes:
             pending_ids = [n.node_id for n in pending_nodes]
             self._logger.warning(f"[RUN] GUARDRAIL: {len(pending_nodes)} nodes still pending execution: {pending_ids[:5]}...")
@@ -210,7 +306,24 @@ class IdeaDagEngine:
             for node in pending_nodes[:5]:
                 action = NodeDetailsExtractor.get_action(node.details)
                 self._logger.warning(f"[RUN]   - {node.node_id}: {node.title[:60]}... (action={action}, status={node.status.value})")
-        
+
+        # Unconditional pre-finalize candidate-coverage check (opt-in). The mid-loop
+        # `_grounding_replan` hook (the only other place this gate runs) fires ONLY when
+        # `step()` returns None; a run that exits via step-budget exhaustion
+        # (`steps >= max_steps`) never gets that second chance, so a short plan can starve
+        # the gate. Guarantee an honest signal here regardless of the exit path: we are
+        # out of budget to force another pass at this point, so annotate the final payload
+        # when named candidates remain unchecked rather than finalizing as if grounded.
+        # Byte-identical when `got_candidate_coverage_enabled` is off.
+        _coverage_incomplete = None
+        if self._cfg.got.candidate_coverage_enabled:
+            try:
+                _cov = evaluate_candidate_coverage(graph, mandate)
+                if not _cov.satisfied:
+                    _coverage_incomplete = _cov
+            except Exception as exc:  # noqa: BLE001 — the gate must never crash finalize
+                self._logger.warning(f"[COVERAGE] pre-finalize check failed: {exc}")
+
         final_payload = await build_final_payload(
             self.io, self.settings, graph, mandate, self.model_name,
             memory_manager=self._memory_manager,
@@ -219,6 +332,13 @@ class IdeaDagEngine:
         final_payload["pending_nodes_count"] = len(pending_nodes) if pending_nodes else 0
         if pending_nodes:
             final_payload["warning"] = f"Finalized with {len(pending_nodes)} pending nodes - execution incomplete"
+
+        if _coverage_incomplete is not None:
+            final_payload["candidate_coverage_incomplete"] = True
+            final_payload["candidate_coverage_missing"] = list(_coverage_incomplete.missing)
+            self._logger.warning(
+                f"[COVERAGE] Finalizing with unchecked candidates: {_coverage_incomplete.missing}"
+            )
 
         if self._got:
             pruned_count = sum(
@@ -257,7 +377,6 @@ class IdeaDagEngine:
             self._logger.warning(f"[GROUNDING] final grounding check failed: {exc}")
 
         self._logger.info(f"[RUN] Final payload created, graph has {graph.node_count()} nodes, {len(pending_nodes) if pending_nodes else 0} pending")
-        self._maybe_log_dag(graph, steps, force=True)
         return final_payload
 
     async def step(self, graph: IdeaDag, current_id: str, step_index: int) -> Optional[str]:
@@ -292,7 +411,12 @@ class IdeaDagEngine:
         is_leaf = node.details.get(DetailKey.IS_LEAF.value, False)
         action = NodeDetailsExtractor.get_action(node.details)
         has_action = action and not NodeDetailsExtractor.is_merge_action(node.details)
-        if is_leaf or has_action:
+        # Re-expansion escape hatch: a completed leaf that was re-expanded now has
+        # real children to drive; route it through the children-processing path
+        # instead of the leaf handler (which would short-circuit back to parent).
+        # Only fires for nodes explicitly marked by `_maybe_reexpand_leaf`.
+        reexpanded = bool(node.details.get("_got_reexpanded")) and bool(node.children)
+        if (is_leaf or has_action) and not reexpanded:
             self._logger.info(f"[STEP {step_index}] Node is leaf node (is_leaf={is_leaf}, has_action={has_action}, action={action}), executing action")
             return await self._handle_leaf_node(graph, current_id, step_index, None)
         
@@ -307,6 +431,27 @@ class IdeaDagEngine:
                 self._logger.info(f"[STEP {step_index}] Expansion created {len(node.children)} children")
             return result
         
+        # Re-expansion descent: if any child was re-expanded and now owns an
+        # in-progress subtree, hand control down to it so step()'s escape hatch
+        # drives that subtree. Without this, the children-processing below would
+        # treat the re-expanded child (ACTIVE, with an action_result AND its own
+        # children) as an executable leaf and re-run its action — clobbering its
+        # status back to DONE and orphaning the freshly-spawned children.
+        for child_id in node.children:
+            child = graph.get_node(child_id)
+            if (
+                child
+                and child.details.get("_got_reexpanded")
+                and child.children
+                and child.status not in (
+                    IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED)
+            ):
+                self._logger.info(
+                    f"[STEP {step_index}] REEXPAND DESCENT: routing into re-expanded "
+                    f"child {child_id[:8]} to drive its new subtree"
+                )
+                return child_id
+
         leaf_children = []
         merge_children = []
         for child_id in node.children:
@@ -339,6 +484,21 @@ class IdeaDagEngine:
             branch_pair = find_branch_pair(graph, current_id)
             leaf_statuses = {cid: graph.get_node(cid).status.value for cid in leaf_children if graph.get_node(cid)}
             self._logger.info(f"[STEP {step_index}] ALL LEAVES COMPLETE ({len(leaf_children)}): {leaf_statuses} — creating merge")
+            if (
+                node.details.get("_got_reexpanded")
+                and not self.merge.should_create_merge_node(graph, current_id)
+            ):
+                # This node is a re-expanded leaf whose new children are all done
+                # and don't form a mergeable set (e.g. a single follow-up child):
+                # its follow-up work is complete. Mark it DONE and hand back to the
+                # parent so the new subtree's results reach finalize — instead of
+                # looping forever on a merge the merge policy will never create.
+                self._logger.info(
+                    f"[STEP {step_index}] REEXPAND COMPLETE: node {current_id[:8]} "
+                    f"children done, marking DONE"
+                )
+                node.status = IdeaNodeStatus.DONE
+                return node.parent_id if node.parent_id else None
             if branch_pair and branch_pair.needs_merge():
                 return await self._handle_merge_creation(graph, current_id, step_index, branch_pair)
         elif not all_leaves_complete and leaf_children:
@@ -380,7 +540,7 @@ class IdeaDagEngine:
                 self._logger.info(f"[STEP {step_index}] Executing merge action for node {node_id}")
                 result = await self._execute_action(graph, node.parent_id or graph.root_id(), node_id)
                 if result is not None:
-                    self._handle_action_result(graph, node_id, step_index)
+                    await self._apply_action_result(graph, node_id, step_index)
                 else:
                     self._logger.warning(f"[STEP {step_index}] Merge action for {node_id} returned None; marking DONE")
                     node.status = IdeaNodeStatus.DONE
@@ -412,8 +572,10 @@ class IdeaDagEngine:
             if self._is_action_ready(node, step_index):
                 result = await self._execute_action(graph, node.parent_id or graph.root_id(), node_id)
                 if result is not None:
-                    self._handle_action_result(graph, node_id, step_index)
-        
+                    # Shared completion point: records the result and, when the
+                    # leaf lands DONE, offers the bounded re-expansion check.
+                    await self._apply_action_result(graph, node_id, step_index)
+
         if node.status == IdeaNodeStatus.DONE:
             should_chunk = self._should_chunk_document(graph, node)
             if should_chunk:
@@ -422,11 +584,129 @@ class IdeaDagEngine:
                 if chunk_nodes:
                     return chunk_nodes[0] if chunk_nodes else node.parent_id
         
+        # Re-expansion (when enabled) already fired from the shared completion
+        # point in `_apply_action_result` above: a leaf that revealed a genuine
+        # follow-up is now ACTIVE with children, so it falls through to
+        # `return node_id` and the step() escape hatch drives its new children.
         if node.status == IdeaNodeStatus.DONE and node.parent_id:
             return node.parent_id
-        
+
         return node_id
-    
+
+    async def _maybe_reexpand_leaf(self, graph: IdeaDag, node_id: str, step_index: int) -> bool:
+        """Re-expand a completed leaf when its result reveals a real follow-up.
+
+        Returns True if new children were created (caller should stay on this node
+        so the normal leaf lifecycle drives the new children). Bounded by
+        `got.reexpand_max_iterations` (tracked via `_got_reexpand_count`) and the
+        global `max_total_nodes` ceiling. Never touches `try_improve_node`.
+
+        Composed of two phases split out so batch callers can parallelize the
+        expensive read-only `_reexpand_check` (an independent LLM call per sibling)
+        while keeping the mutating `_apply_reexpand` phase sequential — the latter
+        re-checks the shared `max_total_nodes` ceiling so concurrent siblings can
+        never overshoot it. The single-node path (this method) composes them
+        sequentially, so its behavior is byte-identical to the pre-split version.
+        """
+        verdict = await self._reexpand_check(graph, node_id, step_index)
+        if not verdict:
+            return False
+        return await self._apply_reexpand(graph, node_id, step_index, verdict)
+
+    async def _reexpand_check(self, graph: IdeaDag, node_id: str, step_index: int) -> Optional[Dict[str, Any]]:
+        """Read-only re-expansion gate + follow-up LLM check. No graph mutation.
+
+        Returns the positive verdict dict when the node should be re-expanded, else
+        None. Being mutation-free (aside from the LLM call) makes this safe to run
+        concurrently across sibling leaves via `asyncio.gather`.
+        """
+        if not self._cfg.got.reexpand_enabled or not self._got:
+            return None
+
+        node = graph.get_node(node_id)
+        if not node:
+            return None
+        # Merge nodes reach the shared completion point too; they are never
+        # re-expansion candidates (they aggregate branches, they don't reveal
+        # a fresh follow-up). Guard explicitly so the centralized call site is
+        # safe to fire unconditionally from every path (incl. merge paths).
+        if NodeDetailsExtractor.is_merge_action(node.details):
+            return None
+        if node.children:
+            return None
+
+        result = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not isinstance(result, dict):
+            return None
+        from agent.app.idea_policies.action_constants import ActionResultExtractor
+        if not ActionResultExtractor.is_success(result):
+            return None
+
+        max_iters = self._cfg.got.reexpand_max_iterations
+        count = int(node.details.get("_got_reexpand_count", 0))
+        if count >= max_iters:
+            return None
+        if graph.node_count() >= self._cfg.engine.max_total_nodes:
+            return None
+
+        verdict = await self._got.check_needs_followup(graph, node_id, model_name=self.model_name)
+        if not verdict or not verdict.get("needs_followup"):
+            return None
+        return verdict
+
+    async def _apply_reexpand(self, graph: IdeaDag, node_id: str, step_index: int, verdict: Dict[str, Any]) -> bool:
+        """Mutating expansion given a positive verdict from `_reexpand_check`.
+
+        Must be called sequentially (never inside a gather): it re-reads the
+        `max_total_nodes` ceiling immediately before expanding so that when several
+        siblings passed the read-only gate concurrently, only as many as the budget
+        allows actually expand — the counter/ceiling accounting stays correct because
+        there is no `await` between this ceiling read and the graph-growing expansion
+        for any *other* node (each apply runs to completion before the next starts).
+        """
+        node = graph.get_node(node_id)
+        if not node:
+            return False
+        if node.children:
+            return False
+        # Re-check the ceiling here (not only in _reexpand_check): under the batch
+        # path multiple siblings may have cleared the read-only gate before any of
+        # them expanded, so enforce the budget at the mutation point.
+        if graph.node_count() >= self._cfg.engine.max_total_nodes:
+            return False
+
+        max_iters = self._cfg.got.reexpand_max_iterations
+        count = int(node.details.get("_got_reexpand_count", 0))
+        if count >= max_iters:
+            return False
+
+        self._logger.info(
+            f"[STEP {step_index}] REEXPAND: leaf {node_id[:8]} completed with a genuine "
+            f"follow-up (iter {count + 1}/{max_iters}): {str(verdict.get('reason', ''))[:80]}"
+        )
+        node.details["_got_reexpand_reason"] = verdict.get("reason", "")
+        # Mark before expanding so the step() escape hatch routes this node through
+        # the children-processing path on subsequent steps.
+        node.details["_got_reexpanded"] = True
+        node.status = IdeaNodeStatus.ACTIVE
+
+        before = len(node.children)
+        expand_result = await self._handle_expansion_node(graph, node_id, step_index, None)
+        if not expand_result or len(node.children) <= before:
+            # Expansion produced nothing — revert markers so the node finalizes normally.
+            node.details.pop("_got_reexpanded", None)
+            node.status = IdeaNodeStatus.DONE
+            self._logger.info(f"[STEP {step_index}] REEXPAND: no children produced for {node_id[:8]}; reverting")
+            return False
+
+        node.details["_got_reexpand_count"] = count + 1
+        self._record_decision(
+            "reexpand", node_id=node_id, chosen=f"{len(node.children) - before} follow-up sub-problems",
+            rationale=str(verdict.get("reason", ""))[:200],
+            metadata={"step": step_index, "iteration": count + 1},
+        )
+        return True
+
     def _has_required_data(self, graph: IdeaDag, node: IdeaNode) -> bool:
         requires_data = node.details.get(DetailKey.REQUIRES_DATA.value)
         if not requires_data or not isinstance(requires_data, dict):
@@ -627,6 +907,41 @@ class IdeaDagEngine:
             except Exception:  # noqa: BLE001 — tracing must never crash a run
                 pass
 
+    def _candidate_coverage_extension(self, graph: IdeaDag, mandate: str) -> int:
+        """Return a ONE-TIME, FIXED, CAPPED step-budget extension (in steps) when the
+        visit-backed candidate-coverage gate is unsatisfied; 0 otherwise.
+
+        Design (do not scale or repeat):
+        * Triggered ONLY by ``evaluate_candidate_coverage`` — a deterministic, visit-backed
+          check that ignores node titles and search snippets and the model's own self-report
+          of progress/confidence. Nothing the model *says* about itself can earn this budget.
+        * FIXED size (``got_candidate_coverage_budget_extension``), never proportional to how
+          incomplete coverage is, and applied AT MOST ONCE per run (tracked via
+          ``_candidate_coverage_extension_applied``). A scaled or repeatable extension would
+          create an incentive gradient to deliberately under-resolve early to "earn" budget; a
+          fixed one-time bonus removes that gradient. Returns 0 (no extension) when the gate is
+          disabled, the extension is <= 0, it was already applied this run, or coverage is
+          already satisfied.
+        """
+        if not self._cfg.got.candidate_coverage_enabled:
+            return 0
+        ext = self._cfg.got.candidate_coverage_budget_extension
+        if ext <= 0 or getattr(self, "_candidate_coverage_extension_applied", False):
+            return 0
+        try:
+            cov = evaluate_candidate_coverage(graph, mandate)
+        except Exception:  # noqa: BLE001 — the gate must never crash a run
+            return 0
+        if cov.satisfied:
+            return 0
+        self._candidate_coverage_extension_applied = True
+        # Re-activate the root so the extended budget re-expands and re-checks the missing
+        # candidates (mirrors `_grounding_replan`'s forced-pass behavior).
+        root = graph.get_node(graph.root_id())
+        if root is not None:
+            root.status = IdeaNodeStatus.ACTIVE
+        return ext
+
     def _grounding_replan(self, graph: IdeaDag, mandate: str, steps: int, max_steps: int) -> bool:
         """Soft grounding gate. Returns True if another pass should run.
 
@@ -646,22 +961,47 @@ class IdeaDagEngine:
                     metadata=meta,
                 )
 
+        # Deterministic candidate-coverage gate (opt-in). For "branch-eliminate" task
+        # shapes (K similarly-named candidates, one distinguishing criterion), require
+        # that every named candidate has been touched before finalizing — otherwise a
+        # weak model tends to elect the most familiar one and stop early. Fails open on
+        # any non-enumerated mandate. Guarded so behavior is byte-identical when off.
+        cov = None
+        if self._cfg.got.candidate_coverage_enabled:
+            try:
+                cov = evaluate_candidate_coverage(graph, mandate)
+            except Exception:  # noqa: BLE001 — the gate must never crash a run
+                cov = None
+
         try:
             req = parse_mandate_requirements(mandate)
         except Exception:
-            return False
-        if not req.needs_substantiation:
-            return False
+            req = None
+        cov_unsatisfied = cov is not None and not cov.satisfied
 
-        res = evaluate_grounding(graph, req)
-        if res.grounded:
-            _decide("grounded", res, distinct_visits=res.distinct_visits)
-            return False
+        if req is None or not req.needs_substantiation:
+            if not cov_unsatisfied:
+                return False
+            # Coverage gate wants another pass even without substantiation needs; use a
+            # placeholder grounding result for telemetry/budget bookkeeping below.
+            res = evaluate_grounding(graph, req) if req is not None else None
+        else:
+            res = evaluate_grounding(graph, req)
+            if res.grounded and not cov_unsatisfied:
+                _decide("grounded", res, distinct_visits=res.distinct_visits)
+                return False
+
+        res_missing = list(getattr(res, "missing", []) or [])
+        res_reason = getattr(res, "reason", "")
+        if cov_unsatisfied:
+            res_missing = res_missing + [f"candidate not checked: {c}" for c in cov.missing]
+            cov_reason = "candidate coverage incomplete: " + ", ".join(cov.missing)
+            res_reason = f"{res_reason}; {cov_reason}" if res_reason else cov_reason
 
         replans = getattr(self, "_grounding_replans", 0)
         cap = self._cfg.engine.grounding_max_replans
         if replans >= cap or steps >= max_steps:
-            _decide("ungrounded-finalize", res, replans=replans, missing=res.missing)
+            _decide("ungrounded-finalize", res, replans=replans, missing=res_missing)
             return False
 
         root_id = graph.root_id()
@@ -672,7 +1012,10 @@ class IdeaDagEngine:
             except Exception as exc:  # noqa: BLE001 — a hook must never crash a run
                 self._logger.warning(f"[GROUNDING] hook failed: {exc}")
         injected = graph.node_count() - before
-        if injected <= 0:
+        # No follow-through injected: normally we finalize (nothing would change). But an
+        # unsatisfied coverage gate still forces a pass — re-activating the root lets the
+        # executor re-expand and check the remaining candidates. Bounded by the replan cap.
+        if injected <= 0 and not cov_unsatisfied:
             _decide("ungrounded-no-followup", res, replans=replans)
             return False
 
@@ -680,10 +1023,11 @@ class IdeaDagEngine:
         root = graph.get_node(root_id)
         if root:
             root.status = IdeaNodeStatus.ACTIVE
-        _decide("replan", res, attempt=self._grounding_replans, injected=injected)
+        _decide("replan", res, attempt=self._grounding_replans, injected=injected,
+                missing=res_missing)
         self._logger.info(
             f"[GROUNDING] Re-plan {self._grounding_replans}/{cap}: injected {injected} "
-            f"follow-through node(s) ({res.reason})"
+            f"follow-through node(s) ({res_reason})"
         )
         return True
 
@@ -747,7 +1091,7 @@ class IdeaDagEngine:
                 
                 result = await self._execute_action(graph, node_id, merge_node_id)
                 if result is not None:
-                    self._handle_action_result(graph, merge_node_id, step_index)
+                    await self._apply_action_result(graph, merge_node_id, step_index)
                 
                 goal_achieved = merge_node.details.get(DetailKey.GOAL_ACHIEVED.value, False)
                 if not goal_achieved and merge_node.details.get("merge_should_skip", False):
@@ -859,6 +1203,7 @@ class IdeaDagEngine:
 
             self._parallel_leaves_total = getattr(self, "_parallel_leaves_total", 0) + len(ready_children)
 
+            done_children: List[str] = []
             for cid, res in zip(ready_children, results):
                 if isinstance(res, asyncio.TimeoutError):
                     child = graph.get_node(cid)
@@ -882,7 +1227,35 @@ class IdeaDagEngine:
                         child.details["action_error"] = f"{type(res).__name__}: {res}"
                     continue
                 if res is not None:
+                    # Shared completion point: record the result's status bookkeeping
+                    # synchronously (no awaits here, so status writes can't interleave).
+                    # The bounded re-expansion follow-up check is deferred and run
+                    # concurrently across siblings below.
                     self._handle_action_result(graph, cid, step_index)
+                    node = graph.get_node(cid)
+                    if node and node.status == IdeaNodeStatus.DONE:
+                        done_children.append(cid)
+
+            # The per-sibling re-expansion checks are independent LLM calls, so run
+            # them concurrently (mirrors the action-execution gather above) instead of
+            # one blocking await at a time. Mutation-free `_reexpand_check` is safe to
+            # gather; the graph-growing `_apply_reexpand` is applied SEQUENTIALLY after
+            # so the shared `max_total_nodes` ceiling can't be overshot by concurrent
+            # siblings (each apply re-reads the ceiling before expanding).
+            if done_children and self._cfg.got.reexpand_enabled and self._got:
+                verdicts = await asyncio.gather(
+                    *[self._reexpand_check(graph, cid, step_index) for cid in done_children],
+                    return_exceptions=True,
+                )
+                for cid, verdict in zip(done_children, verdicts):
+                    if isinstance(verdict, Exception):
+                        self._logger.warning(
+                            f"[STEP {step_index}] Re-expansion check raised (node={cid}): "
+                            f"{type(verdict).__name__}: {verdict}"
+                        )
+                        continue
+                    if verdict:
+                        await self._apply_reexpand(graph, cid, step_index, verdict)
             return node_id
 
         needs_evaluation = any(
@@ -951,7 +1324,9 @@ class IdeaDagEngine:
         )
         result = await self._execute_action(graph, parent_id or node_id, selected.node_id)
         if result is not None:
-            self._handle_action_result(graph, selected.node_id, step_index)
+            # Shared completion point: the sequential-dependency branch now gets
+            # the same bounded re-expansion check as every other execution path.
+            await self._apply_action_result(graph, selected.node_id, step_index)
 
         if self._cfg.engine.sequential_prune_siblings:
             for cid in scored_eligible:
@@ -1054,6 +1429,27 @@ class IdeaDagEngine:
             graph.mark_action_executed(node_id, str(action_type), node.details)
         
         return result
+
+    async def _apply_action_result(self, graph: IdeaDag, node_id: str, step_index: int) -> str:
+        """Single shared completion point for every executed action.
+
+        All execution paths (`_handle_leaf_node`, the auto-parallel batch loop,
+        the sequential-dependency branch, and the two merge paths) route a
+        successful `_execute_action` through here rather than calling
+        `_handle_action_result` directly. This records the result's status
+        bookkeeping and — when the node lands DONE — offers it the bounded
+        re-expansion follow-up check. Centralizing here means the re-expansion
+        escape hatch fires regardless of which routing branch drove the node to
+        completion, with no per-branch duplication. `_maybe_reexpand_leaf` is a
+        no-op unless `got.reexpand_enabled` is set and the node is a genuine
+        successful leaf (merge nodes and nodes with children are gated out),
+        so flag-off behavior is byte-identical to calling `_handle_action_result`.
+        """
+        status = self._handle_action_result(graph, node_id, step_index)
+        node = graph.get_node(node_id)
+        if node and node.status == IdeaNodeStatus.DONE:
+            await self._maybe_reexpand_leaf(graph, node_id, step_index)
+        return status
 
     def _handle_action_result(self, graph: IdeaDag, node_id: str, step_index: int) -> str:
         node = graph.get_node(node_id)

@@ -12,35 +12,45 @@ Euglena is an agent with web crawling and retrieval-augmented generation. Tasks 
 
 ## Benchmark Results
 
-64 runs across 16 tests x 2 models x 2 execution variants.
+**The compiled scaffold thesis:** instead of letting a cheap model improvise its own research
+plan step-by-step, split the job in two — an expensive model authors an execution plan (a DAG:
+which sub-facts to gather, in what order, what depends on what) **once, offline**; a cheap model
+executes that fixed plan **live, on every request**. The plan is the expensive part, paid for
+once and reused forever; the part that runs on every request is cheap.
 
-### Graph vs Sequential
+1,026 live runs (`barrage24b`, ≈$38 real OpenRouter spend) across 38 hand-designed discriminating
+tasks x 3 models x 3 repeats, comparing the compiled scaffold (`graph_compiled`) against a native
+graph-of-thoughts build-it-yourself baseline, a plain ReAct loop (`sequential_react`), and
+tool-free baselines (`naive_rag`, `parametric`).
 
-Graph-of-Thought scores **26.8% higher** than sequential and uses **29% fewer tokens**.
+| Model | Strategy | Score | Cost/task |
+|---|---|---|---|
+| **gpt-4.1-nano** (cheapest) | compiled plan | **0.837** | **$0.002** |
+| **gpt-5-mini** (mid-tier) | compiled plan | **0.896** | **$0.017** |
+| **gemini-3.1-pro** (premium, the reference ceiling) | best baseline | 0.896 | $0.169 |
 
-| Metric | Graph | Sequential | Delta | % Change |
-|---|---|---|---|---|
-| Avg Score | **0.921** | 0.727 | +0.195 | **+26.8%** |
-| Pass Rate | **90.6%** | 46.9% | +43.8pp | |
-| Avg Cost | **$0.04** | $0.06 | -$0.01 | -22.5% |
-| Avg Tokens | **22.6k** | 32.0k | -9.4k | -29.3% |
-| Avg Duration | 688s | **349s** | +339s | +97.2% |
+The mid-tier model, given the compiled plan, **exactly matches** the premium model's score at
+**10% of the cost**. The cheapest model reaches 93% of premium quality at **~1/85th the cost**.
+This holds up under real statistics, not just a favorable average: on the hardest task tier, the
+compiled scaffold beats the plain ReAct baseline with a 95% confidence-interval-disjoint
+significant margin (n=270 runs per arm).
 
+![Score heatmap: every task x (model, strategy)](docs/benchmark/compiled_scaffold_heatmap.png)
 
-![Executive Summary](docs/benchmark/executive_summary.png)
+### Cost recovery
 
-### Overall Leaderboard
+![Cost-recovery Pareto curve](docs/benchmark/compiled_scaffold_pareto.png)
 
-| Rank | System | Avg Score | Median | Std | Pass % | $/run | Time |
-|---|---|---|---|---|---|---|---|
-| 1 | **gpt-5.2 [graph]** | **0.930** | 0.979 | 0.094 | **93.8%** | $0.07 | 471s |
-| 2 | gpt-5-mini [graph] | 0.912 | 0.931 | 0.097 | 87.5% | $0.01 | 904s |
-| 3 | gpt-5.2 [sequential] | 0.729 | 0.746 | 0.172 | 50.0% | $0.09 | 200s |
-| 4 | gpt-5-mini [sequential] | 0.724 | 0.697 | 0.164 | 43.8% | $0.03 | 497s |
+### Efficiency — how much work each strategy actually does
 
-### Efficiency
+The compiled scaffold spends its LLM calls filling in a fixed plan's leaves, not re-deciding
+what to do next at every step — which is why it's both cheaper AND more consistent than a
+from-scratch ReAct loop on the harder tasks.
 
-![Efficiency Dashboard](docs/benchmark/efficiency_dashboard.png)
+![Work per execution strategy](docs/benchmark/compiled_scaffold_work_by_variant.png)
+
+Full package (9 charts, raw + aggregated CSVs, significance tables, honest caveats) lives in
+[`linkedin_package_38tests_2026-07-08/`](linkedin_package_38tests_2026-07-08/README_LINKEDIN.md).
 
 ## Features
 
@@ -52,7 +62,7 @@ Graph-of-Thought scores **26.8% higher** than sequential and uses **29% fewer to
 - **Deduplication and pruning**: Candidate thoughts are deduplicated by embedding similarity. Low-scoring nodes are pruned to save budget
 - **Elastic worker fleet**: ECS autoscaling matches demand via CloudWatch queue-depth metrics, winds down when idle
 - **User-scoped quotas**: Supabase enforces per-user daily usage limits with JWT authentication
-- **Comprehensive test suite**: 39 priority-ordered tests with programmatic and LLM-based validation
+- **Comprehensive test suite**: 89 priority-ordered test modules with programmatic and LLM-based validation; 38 are curated, live-verified discriminators used in the benchmark campaign above
 
 ## Observability
 
@@ -102,6 +112,23 @@ python scripts/generate_benchmark_plots.py
 - **Larger fonts**: All text increased for better readability (titles 32-48pt, labels 18-22pt)
 - **All datapoints visible**: Individual test runs shown as scatter points overlaid on distributions
 - **Clear trends**: Graph vs Sequential advantage highlighted with annotations and visual comparisons
+
+### Compiled-Scaffold Benchmark Gallery (`barrage24b`)
+
+The docker-based pipeline above works on any test run. The compiled-scaffold campaign (the
+Benchmark Results above) has its own dedicated, $0-to-regenerate gallery pipeline, run locally
+against the on-disk result JSONs — no docker, no live model calls:
+
+```bash
+PYTHONPATH=services:services/agent python3 scripts/render_gallery.py
+```
+
+Reads every `barrage24b_*.json` under `services/agent/idea_test_results/`, writes 9 square 4K
+(3840×3840) PNGs plus raw/aggregated CSVs to `services/agent/idea_test_results/barrage24b_gallery/`
+(`scripts/bench_common.py` is the shared, run-id-scoped data loader; `services/agent/app/testing/plot_style.py`
+is the shared Magma-family house style — titles/labels/marks are sized to stay readable when the
+4K image is viewed small, e.g. embedded in a doc or a slide). The curated, packaged copy for
+external sharing is [`linkedin_package_38tests_2026-07-08/`](linkedin_package_38tests_2026-07-08/README_LINKEDIN.md).
 
 Visualizations are automatically generated after test runs and saved to `agent/idea_test_results/plots_<run_id>/`.
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -11,7 +13,9 @@ if TYPE_CHECKING:
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import ExpansionPolicy, DetailKey, IdeaActionType
 from agent.app.idea_policies.config import IdeaConfig
+from agent.app.idea_policies.shape_classifier import classify_shape
 from agent.app.idea_dag_settings import load_idea_dag_settings
+from agent.app.llm_backends import json_instruction_from_response_format
 
 
 def _safe_serialize_details(details: Dict[str, Any]) -> str:
@@ -19,6 +23,133 @@ def _safe_serialize_details(details: Dict[str, Any]) -> str:
         return json.dumps(details, ensure_ascii=True, default=str)
     except Exception as e:
         return json.dumps({"error": f"Serialization failed: {str(e)}"}, ensure_ascii=True)
+
+
+# IDEA_TEST_REASONING_EXEMPLAR: per-run toggle that injects a general reasoning
+# demonstration (a task-shape few-shot) into the expansion system prompt, so a
+# cheap executor model learns HOW to reason through a chain/mixed/parallel task
+# without leaking any answer. Follows the IDEA_TEST_GOT_REEXPAND convention: unset
+# or "none" means byte-identical prompt behavior. Exemplars are read from disk once
+# and cached per name for the process lifetime.
+_EXEMPLAR_NAMES = ("chain", "mixed", "parallel")
+_EXEMPLAR_DIR = Path(__file__).resolve().parent.parent / "reasoning_exemplars"
+_EXEMPLAR_CACHE: Dict[str, str] = {}
+_EXEMPLAR_WARNED: set = set()
+
+
+def _load_reasoning_exemplar() -> str:
+    """Return the labeled few-shot exemplar block for IDEA_TEST_REASONING_EXEMPLAR,
+    or "" when unset/none/invalid. Reads and caches the .md content once per name."""
+    name = os.environ.get("IDEA_TEST_REASONING_EXEMPLAR", "").strip().lower()
+    if not name or name == "none":
+        return ""
+    if name not in _EXEMPLAR_NAMES:
+        if name not in _EXEMPLAR_WARNED:
+            _EXEMPLAR_WARNED.add(name)
+            logging.getLogger("LlmExpansionPolicy").warning(
+                "[EXPANSION] Ignoring invalid IDEA_TEST_REASONING_EXEMPLAR=%r "
+                "(expected one of %s or 'none')",
+                name,
+                ", ".join(_EXEMPLAR_NAMES),
+            )
+        return ""
+    if name in _EXEMPLAR_CACHE:
+        return _EXEMPLAR_CACHE[name]
+    try:
+        text = (_EXEMPLAR_DIR / f"{name}.md").read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        if name not in _EXEMPLAR_WARNED:
+            _EXEMPLAR_WARNED.add(name)
+            logging.getLogger("LlmExpansionPolicy").warning(
+                "[EXPANSION] Could not read reasoning exemplar %r: %s", name, exc
+            )
+        _EXEMPLAR_CACHE[name] = ""
+        return ""
+    block = (
+        "## Reference reasoning pattern (a general demonstration, not this task's answer)\n\n"
+        f"{text}\n\n"
+        "## Now apply that reasoning pattern to the current task below.\n"
+    )
+    _EXEMPLAR_CACHE[name] = block
+    return block
+
+
+# IDEA_TEST_REASONING_RULES: per-run toggle that injects a FLAT IMPERATIVE checklist
+# (not a narrative) into the expansion system prompt, to enforce a discipline (e.g.
+# "check ALL candidates before electing a survivor") that a weak executor tends to
+# skip. Fully independent of IDEA_TEST_REASONING_EXEMPLAR; either can be set alone.
+# Follows the same convention: unset/none/invalid means byte-identical prompt behavior.
+# Rule files are read from disk once and cached per name for the process lifetime.
+_RULES_NAMES = ("branch_eliminate",)
+_RULES_DIR = Path(__file__).resolve().parent.parent / "reasoning_rules"
+_RULES_CACHE: Dict[str, str] = {}
+_RULES_WARNED: set = set()
+
+
+def _read_rules_block(name: str) -> str:
+    """Read, cache and wrap the rule-checklist .md for ``name`` (already validated as a
+    member of ``_RULES_NAMES``). Returns "" and warns once if the file is unreadable."""
+    if name in _RULES_CACHE:
+        return _RULES_CACHE[name]
+    try:
+        text = (_RULES_DIR / f"{name}.md").read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        if name not in _RULES_WARNED:
+            _RULES_WARNED.add(name)
+            logging.getLogger("LlmExpansionPolicy").warning(
+                "[EXPANSION] Could not read reasoning rules %r: %s", name, exc
+            )
+        _RULES_CACHE[name] = ""
+        return ""
+    block = (
+        "## Mandatory reasoning rules (follow every rule literally)\n\n"
+        f"{text}\n"
+    )
+    _RULES_CACHE[name] = block
+    return block
+
+
+def _load_reasoning_rules() -> str:
+    """Return the imperative rule-checklist block for IDEA_TEST_REASONING_RULES,
+    or "" when unset/none/invalid. Reads and caches the .md content once per name."""
+    name = os.environ.get("IDEA_TEST_REASONING_RULES", "").strip().lower()
+    if not name or name == "none":
+        return ""
+    if name not in _RULES_NAMES:
+        if name not in _RULES_WARNED:
+            _RULES_WARNED.add(name)
+            logging.getLogger("LlmExpansionPolicy").warning(
+                "[EXPANSION] Ignoring invalid IDEA_TEST_REASONING_RULES=%r "
+                "(expected one of %s or 'none')",
+                name,
+                ", ".join(_RULES_NAMES),
+            )
+        return ""
+    return _read_rules_block(name)
+
+
+def _auto_reasoning_rules(mandate: str) -> str:
+    """Auto-select a rule-checklist block from the mandate's classified shape.
+
+    Only invoked when IDEA_TEST_REASONING_RULES is UNSET (the manual override always
+    wins). Uses the deterministic ``classify_shape``. Today only ``branch_eliminate``
+    has a matching rule file, so a correctly-classified ``chain``/``parallel_merge``
+    mandate intentionally yields NO block (documented gap — no placeholder files are
+    fabricated). Fails open to "" for unclassified mandates."""
+    shape = classify_shape(mandate or "")
+    if not shape:
+        return ""
+    if shape not in _RULES_NAMES or not (_RULES_DIR / f"{shape}.md").exists():
+        logging.getLogger("LlmExpansionPolicy").info(
+            "[EXPANSION] Auto-classified mandate shape=%s but no reasoning rule file "
+            "exists yet; skipping auto-injection.",
+            shape,
+        )
+        return ""
+    logging.getLogger("LlmExpansionPolicy").info(
+        "[EXPANSION] Auto-selected reasoning rules for classified shape=%s", shape
+    )
+    return _read_rules_block(shape)
 
 
 class LlmExpansionPolicy(ExpansionPolicy):
@@ -36,13 +167,27 @@ class LlmExpansionPolicy(ExpansionPolicy):
         if not node:
             return []
         messages = self._build_messages(graph, node, memories=memories)
-        
+
+        # The expansion schema's candidate ``details`` is a free-form, per-action
+        # object. Strict structured output (OpenAI/Azure) rejects any object lacking
+        # ``additionalProperties: false``, which we cannot add without forbidding the
+        # action keys (query/url/mandate/...). So convey the candidate shape as a
+        # text instruction and drop to ``json_object`` mode (provider-agnostic — no
+        # model-name special-casing).
+        json_schema = self.settings.get("expansion_json_schema")
+        schema_hint = (
+            json_instruction_from_response_format({"type": "json_schema", "json_schema": json_schema})
+            if json_schema
+            else None
+        )
+        if schema_hint:
+            messages = self._inject_schema_hint(messages, schema_hint)
+
         total_prompt_size = sum(len(msg.get("content", "")) for msg in messages)
         if total_prompt_size > 50000:
             self._logger.warning(f"[EXPANSION] Large prompt detected ({total_prompt_size} chars) for node {node_id} - may cause slow expansion")
-        
+
         model_name = self.model_name or self._cfg.expansion.model
-        json_schema = self.settings.get("expansion_json_schema")
         reasoning_effort = self._cfg.generation.reasoning_effort
         text_verbosity = self._cfg.generation.text_verbosity
         max_tokens = self._cfg.expansion.max_tokens
@@ -53,7 +198,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
             model_name=model_name,
             temperature=self._cfg.expansion.temperature,
             max_tokens=max_tokens,
-            json_schema=json_schema,
+            json_schema=None,
             reasoning_effort=reasoning_effort,
             text_verbosity=text_verbosity,
         )
@@ -104,6 +249,23 @@ class LlmExpansionPolicy(ExpansionPolicy):
             self._logger.error(f"[EXPANSION] Exception during expansion: {e}", exc_info=True)
             return []
 
+    def _inject_schema_hint(self, messages: List[Dict[str, str]], hint: str) -> List[Dict[str, str]]:
+        """Append the candidate-shape instruction to the system message.
+
+        The expansion schema cannot ride on the wire as strict structured output
+        (free-form ``details``), so its shape is folded into the prompt instead.
+        Operates on a copy and keeps the message count stable (system + user);
+        if there is no system message, one is prepended.
+        """
+        out = [dict(msg) for msg in messages]
+        for msg in out:
+            if msg.get("role") == "system":
+                existing = msg.get("content") or ""
+                msg["content"] = f"{existing}\n\n{hint}" if existing else hint
+                return out
+        out.insert(0, {"role": "system", "content": hint})
+        return out
+
     def _enhance_details_with_inline_links(self, details: Dict[str, Any]) -> Dict[str, Any]:
         from agent.app.idea_policies.action_constants import ActionResultKey
         enhanced = dict(details)
@@ -120,7 +282,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
         if not success:
             return enhanced
         
-        links = action_result.get(ActionResultKey.LINKS.value) or action_result.get(ActionResultKey.LINKS_FULL.value) or []
+        links = action_result.get("links") or action_result.get("links_full") or []
         if not isinstance(links, list) or len(links) == 0:
             return enhanced
         
@@ -179,10 +341,10 @@ class LlmExpansionPolicy(ExpansionPolicy):
             if isinstance(content, str) and len(content) > 1000:
                 compact_result[ActionResultKey.CONTENT.value] = content[:1000] + "... [truncated]"
         
-        if ActionResultKey.LINKS_FULL.value in compact_result:
-            links_full = compact_result.get(ActionResultKey.LINKS_FULL.value, [])
+        if "links_full" in compact_result:
+            links_full = compact_result.get("links_full", [])
             if isinstance(links_full, list) and len(links_full) > 20:
-                compact_result[ActionResultKey.LINKS_FULL.value] = links_full[:20]
+                compact_result["links_full"] = links_full[:20]
                 compact_result["_links_full_truncated"] = f"... and {len(links_full) - 20} more links"
         
         compact[DetailKey.ACTION_RESULT.value] = compact_result
@@ -303,6 +465,23 @@ class LlmExpansionPolicy(ExpansionPolicy):
         ).strip()
         if planning_addendum:
             system = f"{system}\n\n{planning_addendum}" if system else planning_addendum
+        # Optional prompt prefixes, ordered top-to-bottom: reasoning exemplar (a
+        # narrative demonstration) then the imperative rule checklist, then the existing
+        # system template. The two env vars are fully independent — either may be set alone.
+        prefix_blocks = []
+        exemplar_block = _load_reasoning_exemplar()
+        if exemplar_block:
+            prefix_blocks.append(exemplar_block)
+        rules_block = _load_reasoning_rules()
+        if not rules_block and not os.environ.get("IDEA_TEST_REASONING_RULES", "").strip():
+            # Env var UNSET: fall back to deterministic auto-classification of the root
+            # mandate. Manual IDEA_TEST_REASONING_RULES (set) always takes priority.
+            rules_block = _auto_reasoning_rules(self._root_mandate(graph))
+        if rules_block:
+            prefix_blocks.append(rules_block)
+        if prefix_blocks:
+            prefix = "\n".join(prefix_blocks)
+            system = f"{prefix}\n{system}" if system else prefix
         format_kwargs = dict(
             path_json=path_json,
             parent_id=node.node_id,
@@ -359,6 +538,18 @@ class LlmExpansionPolicy(ExpansionPolicy):
         
         return None
     
+    def _root_mandate(self, graph: Optional["IdeaDag"]) -> str:
+        """The root node's mandate text (the task statement), or "" if unavailable."""
+        if graph is None:
+            return ""
+        try:
+            root = graph.get_node(graph.root_id())
+        except Exception:
+            return ""
+        if root and isinstance(root.details, dict):
+            return str(root.details.get("mandate") or "")
+        return ""
+
     def _mandate_urls(self, graph: Optional["IdeaDag"]) -> List[str]:
         """URLs named in the root mandate (the task statement), in order.
 

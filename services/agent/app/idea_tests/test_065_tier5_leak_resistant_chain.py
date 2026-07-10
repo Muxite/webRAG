@@ -49,7 +49,11 @@ from agent.app.idea_test_utils import extract_final_text
 # (the comma breaks the token) nor "1620" (no \b between "162" and the trailing "0").
 KEYSTONE_ELEVATION = r"\b162\b"
 # UN-gated breadth: the two INTERMEDIATE hops of the chain (how far it was actually walked).
-HOP_POET = r"\bneruda\b"
+# Accepts the pen name OR the birth name (Ricardo Eliecer Neftali Reyes Basoalto) -- a correct
+# report shouldn't lose credit for using either. Matched against underscore-normalized text (see
+# validate_chain_coverage) so a cited URL slug like "Pablo_Neruda" also counts: \b treats "_" as a
+# word character, so "\bneruda\b" alone never matches inside "pablo_neruda".
+HOP_POET = r"\bneruda\b|\breyes basoalto\b"
 HOP_TOWN = r"\bparral\b"
 # GATED citation: the two pages the chain had to read (poet page, town page).
 CITE_POET = r"wiki/pablo_neruda"

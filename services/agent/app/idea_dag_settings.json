@@ -7,6 +7,13 @@
   "selection_strategy": "best_score",
   "min_score_threshold": 0.0,
   "allow_unscored_selection": true,
+  "leaf_statuses": [
+    "done",
+    "skipped",
+    "failed"
+  ],
+  "active_status": "active",
+  "pending_status": "pending",
   "decomposition_threshold": 0.5,
   "merge_strategy": "concat",
   "memoization_enabled": true,
@@ -97,13 +104,6 @@
   "verify_temperature": 0.2,
   "verify_max_tokens": 1024,
   "enable_recursive_merge": true,
-  "leaf_statuses": [
-    "done",
-    "skipped",
-    "failed"
-  ],
-  "active_status": "active",
-  "pending_status": "pending",
 
   "got_embed_on_create": true,
   "got_improve_enabled": false,
@@ -111,6 +111,12 @@
   "got_improve_max_iterations": 2,
   "got_improve_system_prompt": "You are a self-refinement function in a Graph-of-Thought system. Given a thought node and feedback from the scorer, produce an improved version. Return JSON: {\"improved_title\": string, \"improved_details\": object, \"refinement_rationale\": string}.",
   "got_improve_temperature": 0.3,
+  "got_reexpand_enabled": false,
+  "got_reexpand_max_iterations": 1,
+  "got_reexpand_temperature": 0.2,
+  "got_reexpand_followup_system_prompt": "You are a follow-up detector in a Graph-of-Thought research system. A leaf task has just completed and produced a result. Decide whether that result reveals a GENUINE, concrete follow-up investigation that is required to satisfy the parent goal and is not already covered by existing sibling tasks. Only answer true when the resolved content names a specific new entity, page, or question that must be investigated next (e.g. a disambiguation survivor that points to a further target). Answer false for vague, speculative, or already-answered follow-ups. Return JSON: {\"needs_followup\": boolean, \"reason\": string}.",
+  "got_candidate_coverage_enabled": false,
+  "got_candidate_coverage_budget_extension": 10,
   "got_dedup_enabled": true,
   "got_dedup_similarity_threshold": 0.85,
   "got_dedup_max_query": 5,

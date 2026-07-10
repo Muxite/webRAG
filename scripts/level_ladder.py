@@ -19,7 +19,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
 from collections import defaultdict
@@ -27,63 +26,23 @@ from pathlib import Path
 from statistics import mean, stdev
 from typing import Any, Dict, List, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import bench_common  # noqa: E402  (path insert must precede this import)
+
 LEVEL_ORDER = ["micro", "integration", "navigation", "graph", "legacy"]
 
 
 def _results_dir() -> Path:
-    return Path(__file__).resolve().parent.parent / "services" / "agent" / "idea_test_results"
+    return bench_common.results_dir()
 
 
 def _load_row(p: Path) -> Optional[Dict[str, Any]]:
-    try:
-        j = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    """Thin adapter over bench_common's canonical row (same fields, level_ladder's names)."""
+    row = bench_common.load_row(p)
+    if not row:
         return None
-    meta = j.get("test_metadata", {}) or {}
-    ex = j.get("execution", {}) or {}
-    val = j.get("validation", {}) or {}
-    obs = ex.get("observability", {}) or {}
-    fn = p.name
-    # Prefer the explicit field on the result; fall back to filename heuristics for
-    # legacy results that predate the field.
-    variant = j.get("execution_variant") or (
-        "minimal" if "_minimal" in fn else "graph_compiled" if "_graph_compiled" in fn
-        else "graph" if "_graph" in fn
-        else "naive_rag" if "naive_rag" in fn else "parametric" if "parametric" in fn
-        else "sequential" if "_sequential" in fn else "graph")
-    _v2t = {"minimal": "minimal", "naive_rag": "partial", "graph": "full",
-            "sequential_react": "sequential", "graph_compiled": "compiled"}
-    tooling = j.get("tooling_profile") or _v2t.get(variant, variant)
-    score = val.get("overall_score")
-    if score is None:
-        return None
-    # groundedness: prefer the engine's real grounding verdict (visited-page evidence);
-    # fall back to a validation-check proxy for legacy results without it.
-    grounded = None
-    gflag = (obs.get("grounding", {}) or {}).get("grounded")
-    if gflag is not None:
-        grounded = 1.0 if gflag else 0.0
-    else:
-        grounded = 0.0
-        for c in val.get("grep_validations", []) or []:
-            name = str(c.get("check", "")).lower()
-            if any(t in name for t in ("citation", "grounding", "source", "adjacency", "url")):
-                grounded = max(grounded, float(c.get("score", 0.0)))
-    return {
-        "level": (meta.get("level") or "legacy"),
-        "weight": (meta.get("weight") or "-"),
-        "test_id": meta.get("test_id"),
-        "variant": variant,
-        "tooling": tooling,
-        "score": float(score),
-        "visits": int(obs.get("visit", {}).get("count", 0) or 0),
-        "tool_calls": int(obs.get("llm", {}).get("calls", 0) or 0)
-                      + int(obs.get("search", {}).get("count", 0) or 0)
-                      + int(obs.get("visit", {}).get("count", 0) or 0),
-        "usd": float((obs.get("cost", {}) or {}).get("usd") or 0.0),
-        "secs": float(ex.get("duration_seconds") or 0.0),
-        "grounded": grounded,
-    }
+    row["usd"] = row.get("usd") or 0.0
+    return row
 
 
 def _mean(xs: List[float]) -> float:
@@ -143,13 +102,11 @@ def main(argv: List[str]) -> int:
     args = ap.parse_args(argv)
 
     rd = _results_dir()
-    run_prefix = f"{args.run_id}_" if args.run_id else ""
-    files = sorted(
-        p for p in rd.glob("*_r*.json")
-        if "_report_" not in p.name
-        and (not run_prefix or p.name.startswith(run_prefix))
-        and (not args.since or p.name >= args.since)
-    )
+    # Empty run_ids => no run-id scoping (matches every file, filtered only by --since),
+    # preserving level_ladder's long-standing "analyze everything unless told otherwise"
+    # default. Pass --run-id barrage24b explicitly to scope to the final dataset.
+    run_ids = [args.run_id] if args.run_id else []
+    files = bench_common.discover_files(run_ids, since=args.since)
     rows = [r for r in (_load_row(p) for p in files) if r]
     if not rows:
         print(f"No result rows found (dir={rd}, run_id={args.run_id!r}, since={args.since!r})", file=sys.stderr)

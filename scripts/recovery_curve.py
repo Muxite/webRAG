@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -28,50 +27,16 @@ from math import sqrt
 from statistics import mean, stdev
 from typing import Any, Dict, List, Optional, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import bench_common  # noqa: E402  (path insert must precede this import)
+
 DEFAULT_REFERENCE = ["google/gemini-3.1-pro-preview", "openai/gpt-5", "google/gemini-2.5-pro"]
 ENGINE_VARIANTS = {"graph", "sequential", "sequential_react", "graph_compiled"}
 BASELINE_VARIANTS = {"parametric", "naive_rag", "minimal"}
-# Internal variant -> tooling-ablation rung (mirrors testing/tooling.py). Used to
-# back-fill the tooling column for runs launched via the legacy variant axis.
-_VARIANT_TO_TOOLING = {"minimal": "minimal", "naive_rag": "partial", "graph": "full",
-                       "sequential_react": "sequential", "graph_compiled": "compiled"}
 
 
 def _results_dir() -> Path:
-    for cand in (Path("services/agent/idea_test_results"), Path("agent/idea_test_results")):
-        if cand.is_dir():
-            return cand
-    return Path("services/agent/idea_test_results")
-
-
-def _load_row(path: Path) -> Optional[Dict[str, Any]]:
-    """Extract the fields we need from one result file, or None if unusable."""
-    try:
-        d = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    execution = d.get("execution") or {}
-    obs = execution.get("observability") or {}
-    cost = obs.get("cost") or {}
-    validation = d.get("validation") or {}
-    meta = d.get("test_metadata") or {}
-    score = validation.get("overall_score")
-    usd = cost.get("usd")
-    if score is None or usd is None:
-        return None
-    variant = d.get("execution_variant")
-    return {
-        "model": d.get("model"),
-        "variant": variant,
-        "tooling": d.get("tooling_profile") or _VARIANT_TO_TOOLING.get(variant, variant),
-        "tier": int(d.get("effort_tier") or 0),
-        "test_id": meta.get("test_id"),
-        "score": float(score),
-        "usd": float(usd),
-        "cost_estimated": bool(cost.get("estimated")),
-        "total_tokens": int((obs.get("llm") or {}).get("total_tokens") or 0),
-        "visit_chars": int((obs.get("visit") or {}).get("chars") or 0),
-    }
+    return bench_common.results_dir()
 
 
 def _aggregate(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -91,7 +56,7 @@ def _aggregate(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         out.append({
             "model": model,
             "variant": variant,
-            "tooling": bucket[0].get("tooling", _VARIANT_TO_TOOLING.get(variant, variant)),
+            "tooling": bucket[0].get("tooling", bench_common._VARIANT_TO_TOOLING.get(variant, variant)),
             "tier": tier,
             "n": n,
             "score": round(mean(scores), 4),
@@ -156,65 +121,91 @@ def _plot(agg: List[Dict[str, Any]], lines: Dict[str, Dict[str, Any]], reference
         print(f"[plot skipped] matplotlib unavailable: {exc}", file=sys.stderr)
         return False
 
+    # House style (dataviz skill): fixed categorical palette + fonts that scale with the
+    # canvas so this plot reads the same at 1920px or the gallery's 3840px 4K standard.
+    # Falls back to a plain tab10 + fixed fonts if the agent package isn't on the path
+    # (this script must keep working standalone, without PYTHONPATH=services:services/agent).
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services" / "agent"))
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services"))
+        from agent.app.testing import plot_style
+        # Axes fill the frame; a tight legend band sits directly under the x-axis label.
+        fig, ax, fs = plot_style.square_fig(side_px, dpi, margins=(0.13, 0.965, 0.935, 0.185))
+        palette = plot_style.CATEGORICAL
+        mk = plot_style.mark_sizes(side_px)
+    except Exception:
+        plot_style = None
+        side_px = max(MIN_SIDE_PX, int(side_px))
+        inches = side_px / float(dpi)
+        fig, ax = plt.subplots(figsize=(inches, inches), dpi=dpi)
+        fig.subplots_adjust(left=0.13, right=0.965, top=0.935, bottom=0.185)
+        fs = {"title": 19, "label": 16, "tick": 13, "legend": 12, "annot": 12}
+        palette = [plt.get_cmap("tab10")(i) for i in range(10)]
+        mk = {"line": 2.4, "marker": 8, "scatter": 120, "edge": 1.4, "cap": 5, "eline": 1.4}
+
     def _short(model: str) -> str:  # drop the provider prefix so the legend fits
         return model.split("/")[-1]
 
     side_px = max(MIN_SIDE_PX, int(side_px))
-    inches = side_px / float(dpi)
-    fig, ax = plt.subplots(figsize=(inches, inches), dpi=dpi)
-    # Reserve the bottom of the square canvas for the legend so it never overlaps the data.
-    fig.subplots_adjust(left=0.11, right=0.97, top=0.92, bottom=0.24)
-
     cheap = [a for a in agg if a["model"] not in reference_models]
     models = sorted({a["model"] for a in cheap})
-    cmap = plt.get_cmap("tab10")
+    # Colours pulled from the well-separated interior of the magma family.
+    model_color = {m: palette[(i * 3) % len(palette)] for i, m in enumerate(models)}
 
-    for idx, model in enumerate(models):
-        color = cmap(idx % 10)
+    for model in models:
+        color = model_color[model]
         graph_pts = sorted([a for a in cheap if a["model"] == model and a["variant"] in ENGINE_VARIANTS],
                            key=lambda a: a["usd"])
         if graph_pts:
             xs = [p["usd"] for p in graph_pts]
             ys = [p["score"] for p in graph_pts]
             yerr = [p.get("score_ci95", 0.0) for p in graph_pts]
-            ax.errorbar(xs, ys, yerr=yerr, fmt="-o", color=color, lw=2.4, ms=8, capsize=5,
-                        elinewidth=1.4, label=f"{_short(model)} (webRAG)")
+            ax.errorbar(xs, ys, yerr=yerr, fmt="-o", color=color, lw=mk["line"], ms=mk["marker"],
+                        capsize=mk["cap"], elinewidth=mk["eline"], markeredgecolor="white",
+                        markeredgewidth=mk["edge"], label=f"{_short(model)} (webRAG)", zorder=5)
             best = max(graph_pts, key=lambda a: a["score"])  # annotate each model's best point
             ax.annotate(f"{best['score']:.2f}", (best["usd"], best["score"]),
-                        textcoords="offset points", xytext=(0, 11), ha="center",
-                        fontsize=12, color=color, fontweight="bold")
+                        textcoords="offset points", xytext=(0, 22), ha="center",
+                        fontsize=fs["annot"], color=color, fontweight="bold", zorder=6)
         base_pts = [a for a in cheap if a["model"] == model and a["variant"] in BASELINE_VARIANTS]
         if base_pts:
             ax.scatter([p["usd"] for p in base_pts], [p["score"] for p in base_pts],
-                       marker="x", color=color, s=120, linewidths=2.4, label=f"{_short(model)} (baseline)")
+                       marker="X", color=color, s=mk["scatter"], linewidths=mk["edge"],
+                       edgecolors="white", label=f"{_short(model)} (baseline)", zorder=4)
+
+    def _tiny(model: str) -> str:  # ultra-short model tag so reference labels stay narrow
+        s = _short(model)
+        return s.replace("-preview", "").replace("gemini-3.1-pro", "gemini-pro")
 
     if "premium_raw" in lines:
         ln = lines["premium_raw"]
-        ax.axhline(ln["score"], linestyle="--", color="gray", linewidth=1.8,
-                   label=f"premium-raw ({_short(ln['model'])}) = {ln['score']:.2f}")
+        ax.axhline(ln["score"], linestyle="--", color="#8a8880", linewidth=mk["eline"] * 1.5,
+                   label=f"premium raw ({_tiny(ln['model'])}) = {ln['score']:.2f}")
     if "premium_webrag" in lines:
         ln = lines["premium_webrag"]
-        ax.axhline(ln["score"], linestyle="-.", color="black", linewidth=1.8,
-                   label=f"premium+webRAG ({_short(ln['model'])}) = {ln['score']:.2f}")
+        ax.axhline(ln["score"], linestyle="-.", color="#0b0b0b", linewidth=mk["eline"] * 1.5,
+                   label=f"premium+webRAG ({_tiny(ln['model'])}) = {ln['score']:.2f}")
 
     frontier = _pareto(agg)
     if frontier:
-        ax.plot([p["usd"] for p in frontier], [p["score"] for p in frontier], ":", color="red",
-                linewidth=2.0, alpha=0.75, label="Pareto frontier")
+        ax.plot([p["usd"] for p in frontier], [p["score"] for p in frontier], ":",
+                color="#b5179e", linewidth=mk["line"], alpha=0.85, label="Pareto frontier", zorder=3)
 
-    ax.set_xlabel("Realized cost (USD, mean per run, log scale)", fontsize=16)
-    ax.set_ylabel("Quality (mean validation score)", fontsize=16)
-    ax.set_title("Cost-recovery curve: cheap model + webRAG vs premium reference",
-                 fontsize=19, fontweight="bold", pad=14)
+    ax.set_xlabel("Realized cost (USD, mean per run, log scale)", fontsize=fs["label"])
+    ax.set_ylabel("Quality (mean validation score)", fontsize=fs["label"])
+    ax.set_title("Cost recovery: cheap + webRAG vs premium",
+                 fontsize=fs["title"] * 0.9, fontweight="bold", pad=18)
     ax.set_xscale("log")
-    ax.tick_params(axis="both", labelsize=13)
+    ax.tick_params(axis="both", labelsize=fs["tick"])
     ax.grid(True, which="both", linestyle=":", alpha=0.45)
-    ax.margins(y=0.08)
-    # Legend below the axes, multi-column, so a busy roster stays readable.
-    ncol = 3 if len(models) >= 5 else 2
-    ax.legend(fontsize=12, loc="upper center", bbox_to_anchor=(0.5, -0.10), ncol=ncol,
-              frameon=True, borderaxespad=0.0, columnspacing=1.2, handletextpad=0.5)
-    fig.savefig(out, dpi=dpi)
+    ax.margins(y=0.06)
+    # Legend below the axes in two columns so a busy roster stays inside the frame.
+    ax.legend(fontsize=fs["legend"] * 0.86, loc="upper center", bbox_to_anchor=(0.5, -0.10), ncol=2,
+              frameon=True, borderaxespad=0.0, columnspacing=1.4, handletextpad=0.5)
+    if plot_style is not None:
+        plot_style.savefig_square(fig, out, dpi=dpi)
+    else:
+        fig.savefig(out, dpi=dpi)
     print(f"Wrote plot -> {out} ({side_px}x{side_px}px)")
     return True
 
@@ -236,22 +227,19 @@ def main(argv: List[str]) -> int:
     args = parser.parse_args(argv)
 
     results_dir = _results_dir()
-    if args.files:
-        files = [Path(p) for p in args.files]
-    else:
-        run_prefix = f"{args.run_id}_" if args.run_id else ""
-        files = sorted(
-            p for p in results_dir.glob("*_r*.json")
-            if "_report_" not in p.name
-            and (not run_prefix or p.name.startswith(run_prefix))
-            and (not args.since or p.name >= args.since)
-        )
+    # Empty run_ids list => no run-id scoping (matches every file, filtered only by
+    # --since / --files) -- this preserves recovery_curve's long-standing "analyze
+    # everything unless told otherwise" default. Pass --run-id barrage24b explicitly
+    # (or use render_gallery.py, which defaults to it) to scope to the final dataset.
+    run_ids = [args.run_id] if args.run_id else []
+    files = bench_common.discover_files(run_ids, since=args.since, files=args.files)
     if not files:
         print(f"No result files found (dir={results_dir}, run_id={args.run_id!r}, since={args.since!r})",
               file=sys.stderr)
         return 2
 
-    rows = [r for r in (_load_row(p) for p in files) if r and r["model"] and r["variant"]]
+    rows = [r for r in (bench_common.load_row(p) for p in files)
+            if r and r["model"] and r["variant"] and r.get("usd") is not None]
     test_filter = {t.strip() for t in args.tests.split(",") if t.strip()}
     if test_filter:
         rows = [r for r in rows if r["test_id"] in test_filter]

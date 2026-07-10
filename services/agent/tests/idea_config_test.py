@@ -24,7 +24,7 @@ def test_defaults_match_legacy_fallbacks():
     # mirrors the hard-coded fallback previously used at each call site.
     cfg = GoTConfig.from_settings({})
     assert cfg.embed_on_create is True
-    assert cfg.improve_enabled is True
+    assert cfg.improve_enabled is False
     assert cfg.dedup_similarity_threshold == 0.85
     assert cfg.beam_min == 2
     assert cfg.beam_max == 5
@@ -33,10 +33,10 @@ def test_defaults_match_legacy_fallbacks():
     assert cfg.dedup_threshold_min == 0.75
     assert cfg.beam_target_spread == 0.4
     assert cfg.prune_stddev_factor == 1.0
-    # backtrack default is enabled=True / threshold=3 at the code level even
-    # though the shipped JSON disables it; the typed view keeps the code default.
-    assert cfg.backtrack_enabled is True
-    assert cfg.backtrack_dead_end_threshold == 3
+    # Defaults now mirror the shipped JSON (got_backtrack_enabled=False,
+    # got_backtrack_dead_end_threshold=5).
+    assert cfg.backtrack_enabled is False
+    assert cfg.backtrack_dead_end_threshold == 5
 
 
 def test_settings_override_and_coercion():
