@@ -365,5 +365,20 @@ at this evidence level. Default stays sequential (`batch_size=1`) unless explici
 from 809/18/3 at the start of this phase — the 3 pre-existing failures are now fixed, plus 18 new
 tests across the drift guard, E-valuator pilot, and ConSol batching).
 
-**Campaign spend: ~$1.09 of $12** (Phase 5 so far: ~$0.0148 on the deepseek run; everything else
-this phase was $0).
+**Campaign spend: ~$1.11 of $12** (Phase 5 so far: ~$0.0148 on the deepseek run + ~$0.0173 on the
+ConSol cross-model addendum below; everything else this phase was $0).
+
+**Addendum — ConSol batching cross-model check (gpt-5-mini):** to address the "single cell, n=5"
+caveat above, re-ran sequential-vs-batched ConSol on `test_055`/`gpt-5-mini` (5 runs each, $0.017
+spent). **Wall-clock speedup generalized**: batching cut mean duration 189.0s→133.9s (**−29%**),
+consistent in direction with nano's finding, with no cost regression. **But this cell can't validate
+answer-agreement**: both conditions hit an identical 0/5 wrong-grounding failure floor (score 0.20
+every run, same cascade signature — thin leaves grounded to irrelevant pages, keystone step
+correctly reported "unknown" rather than hallucinating) unrelated to ConSol — a pre-existing
+gpt-5-mini/thin-leaf issue, not something this pilot introduced. gpt-5-mini also hit a known
+`finish_reason=length` retry-storm pathology (reasoning tokens consuming the completion budget)
+that inflated both conditions' absolute wall-clock roughly proportionally, so the relative
+speedup is probably real but the absolute numbers aren't comparable to nano's baseline. **Net:
+directionally consistent second data point for the speedup, but answer-agreement generalization
+remains unconfirmed** — would need a cell with actual passing/varying outcomes on a second model to
+test that specifically. Still opt-in, default stays sequential.
