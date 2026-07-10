@@ -31,6 +31,16 @@ def _safe_serialize_details(details: Dict[str, Any]) -> str:
 # without leaking any answer. Follows the IDEA_TEST_GOT_REEXPAND convention: unset
 # or "none" means byte-identical prompt behavior. Exemplars are read from disk once
 # and cached per name for the process lifetime.
+#
+# DISPROVEN, kept only for reference — do not reach for this as a default. Live R=3
+# validation (ADAPTIVE_DISTILLATION_HANDOFF.md Phase 1) found narrative exemplars
+# unreliable on weak models: they backfired twice on the branch_eliminate/mixed
+# shape (the model copied the exemplar's surface structure, not its intent, and
+# under-decomposed the task further) and a seeming win on the parallel shape
+# dissolved to noise at R=3. Prefer `IDEA_TEST_REASONING_RULES` (a flat imperative
+# checklist) instead, which this project's research found narrative few-shot
+# reasoning demonstrations are unusually sensitive to being copied for shape, not
+# intent (see RESEARCH_NOTES.md, "Why narrative few-shot exemplars backfired").
 _EXEMPLAR_NAMES = ("chain", "mixed", "parallel")
 _EXEMPLAR_DIR = Path(__file__).resolve().parent.parent / "reasoning_exemplars"
 _EXEMPLAR_CACHE: Dict[str, str] = {}
@@ -53,6 +63,15 @@ def _load_reasoning_exemplar() -> str:
                 ", ".join(_EXEMPLAR_NAMES),
             )
         return ""
+    if name not in _EXEMPLAR_WARNED:
+        _EXEMPLAR_WARNED.add(name)
+        logging.getLogger("LlmExpansionPolicy").warning(
+            "[EXPANSION] IDEA_TEST_REASONING_EXEMPLAR=%r is a DISPROVEN mechanism "
+            "(see ADAPTIVE_DISTILLATION_HANDOFF.md Phase 1) — it backfired on the "
+            "hardest task shape in live R=3 validation. Kept for reference only; "
+            "prefer IDEA_TEST_REASONING_RULES instead.",
+            name,
+        )
     if name in _EXEMPLAR_CACHE:
         return _EXEMPLAR_CACHE[name]
     try:
