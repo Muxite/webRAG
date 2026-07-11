@@ -93,6 +93,17 @@ class Retry:
                     self.logger.info(f"{self.name}: success on attempt {attempt}")
                 return result
 
+            # A caller-supplied ``should_retry`` predicate that returns False on a FAILURE
+            # means "this error is not worth retrying" — stop now instead of looping to
+            # max_attempts (which only burns time on a deterministic failure). Scoped to the
+            # explicit-predicate path so the default ``retry_exceptions`` behavior is unchanged.
+            if not do_retry and exc is not None and self.should_retry is not None:
+                if self.logger:
+                    self.logger.info(f"{self.name}: should_retry=False on attempt {attempt}; not retrying")
+                if self.raise_on_fail:
+                    raise exc
+                return result
+
             last_exception = exc
             last_result = result
 

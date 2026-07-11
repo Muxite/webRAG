@@ -14,6 +14,36 @@ from openai import APIError, APIStatusError, AsyncOpenAI
 from shared.connector_config import ConnectorConfig
 
 
+class LLMContentError(RuntimeError):
+    """Deterministic content-extraction failure — None/empty content or a truncated
+    ``finish_reason=length`` completion.
+
+    Non-retryable on purpose: re-issuing the SAME payload yields the SAME truncation, so
+    the default retry loop only burns the per-call budget (~13.5s of backoff + re-calls)
+    before failing anyway. ``ConnectorLLM.should_retry`` short-circuits on this type so a
+    starved call fails fast. Subclasses ``RuntimeError`` so existing ``except RuntimeError``
+    handlers (e.g. the thin-extract graceful-miss path) still absorb it unchanged.
+    """
+
+
+def accepts_reasoning_effort(model_name: Optional[str]) -> bool:
+    """True for models whose endpoint accepts the OpenAI-style ``reasoning_effort`` param.
+
+    Only the gpt-5 / gpt-4.1 family (bare or ``provider/`` prefixed, e.g. ``openai/gpt-5-mini``
+    via OpenRouter) understands ``reasoning_effort``; other OpenAI-compatible servers 400 on
+    it, so it must be stripped for them. This is the SINGLE shared predicate: ``ConnectorLLM``
+    only ADDS ``reasoning_effort`` (and ``text`` verbosity) for these models, and
+    ``OpenAICompatibleBackend.simplify_payload`` strips it for everyone else — the two must
+    agree, or a value added by the connector gets stripped before the wire (the gpt-5-mini
+    ``content=None`` starvation bug).
+    """
+    name = (model_name or "").strip()
+    if not name:
+        return False
+    bare = name.split("/", 1)[-1] if "/" in name else name
+    return name.startswith(("gpt-5", "gpt-4.1")) or bare.startswith(("gpt-5", "gpt-4.1"))
+
+
 class LLMBackend(ABC):
     """
     Abstract LLM backend: normalize request payloads and execute chat completion.
@@ -242,7 +272,13 @@ class OpenAICompatibleBackend(LLMBackend):
         :returns: Payload for chat.completions.create.
         """
         safe_payload = dict(payload)
-        safe_payload.pop("reasoning_effort", None)
+        # Preserve ``reasoning_effort`` for the models whose endpoint accepts it (gpt-5 /
+        # gpt-4.1 family); strip it only for servers that would 400 on it. Stripping it
+        # unconditionally defeated the Phase-6 ``reasoning_effort="minimal"`` hint on
+        # gpt-5-mini, which then spent its whole completion budget on hidden reasoning and
+        # returned ``content=None``. Uses the SAME predicate ConnectorLLM used to ADD it.
+        if not accepts_reasoning_effort(safe_payload.get("model")):
+            safe_payload.pop("reasoning_effort", None)
         safe_payload.pop("text", None)
         return safe_payload
 
@@ -275,7 +311,9 @@ class OpenAICompatibleBackend(LLMBackend):
         content = getattr(message, "content", None)
         finish_reason = getattr(response.choices[0], "finish_reason", None)
         if content is None:
-            raise RuntimeError(f"LLM returned None content (model={model_name}, finish_reason={finish_reason})")
+            # None content is a deterministic starvation/truncation (esp. finish_reason=length):
+            # raise the non-retryable content error so the call fails fast instead of retrying.
+            raise LLMContentError(f"LLM returned None content (model={model_name}, finish_reason={finish_reason})")
         if not isinstance(content, str):
             raise RuntimeError(f"LLM returned non-string content (model={model_name}, type={type(content)})")
         stripped_content = content.strip()
@@ -285,10 +323,10 @@ class OpenAICompatibleBackend(LLMBackend):
                     "Response truncated (model=%s). Consider increasing max_completion_tokens.",
                     model_name,
                 )
-                raise RuntimeError(
+                raise LLMContentError(
                     f"LLM returned empty/whitespace content (model={model_name}, finish_reason={finish_reason})"
                 )
-            raise RuntimeError(f"LLM returned empty/whitespace content (model={model_name}, finish_reason={finish_reason})")
+            raise LLMContentError(f"LLM returned empty/whitespace content (model={model_name}, finish_reason={finish_reason})")
         if finish_reason == "length":
             self.logger.warning(
                 "Response truncated (model=%s). Content length: %s.",

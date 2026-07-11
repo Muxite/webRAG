@@ -67,6 +67,12 @@ MODELS=("openai/gpt-4.1-nano" "openai/gpt-5-mini")
 
 log "retest_055 grounding — models=${MODELS[*]} variant=graph_compiled leaf_mode=thin R=$IDEA_TEST_RUNS fixtures=live"
 
+# NOTE (attribution mode, intentionally kept): this per-model loop runs a SEPARATE runner
+# invocation for each model, so it pays a FULL preflight (~40s: plain + JSON gate for the
+# model + validation model) PER model — 2x here. That's the price of clean, isolated per-model
+# timing attribution (IDEA_TEST_CONCURRENCY=1). For THROUGHPUT (not attribution), prefer a
+# SINGLE invocation with IDEA_TEST_MODELS="m1,m2" + IDEA_TEST_CONCURRENCY=N: it preflights
+# once (fanned out across the pooled connectors) and overlaps cells. See scripts/throughput_run.sh.
 for m in "${MODELS[@]}"; do
   log "RUN model=$m"
   IDEA_TEST_MODELS="$m" "$PY" -m agent.app.idea_test_runner >>"$LOG" 2>&1

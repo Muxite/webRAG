@@ -204,6 +204,59 @@ async def _preflight_json_capable(connector_llm: ConnectorLLM, model_name: str, 
         return False
 
 
+async def _warmup_chroma(connector_chroma) -> None:
+    """Warm ChromaDB (pre-install embedding models). Safe to run concurrently with preflight;
+    the underlying server is shared so a single warmup suffices. Never raises."""
+    logging.info("Warming up ChromaDB to pre-install embedding models...")
+    try:
+        warmup_collection_name = "warmup_test"
+        warmup_collection = await connector_chroma.get_or_create_collection(warmup_collection_name)
+        if warmup_collection:
+            await connector_chroma.add_to_chroma(
+                collection=warmup_collection_name,
+                ids=["warmup_1"],
+                metadatas=[{"type": "warmup"}],
+                documents=["ChromaDB warmup document to trigger model installation"],
+            )
+            await connector_chroma.query_chroma(
+                collection=warmup_collection_name,
+                query_texts=["warmup query"],
+                n_results=1,
+            )
+            logging.info("ChromaDB warmup completed - embedding models ready")
+        else:
+            logging.warning("ChromaDB warmup collection creation failed, but continuing")
+    except Exception as warmup_exc:
+        logging.warning(f"ChromaDB warmup failed (non-fatal): {warmup_exc}")
+
+
+async def _run_preflight_parallel(
+    connector_pool: List[Dict[str, Any]], preflight_models: List[str]
+) -> Dict[str, bool]:
+    """Preflight every model, fanning out across the pooled connector slots.
+
+    Each concurrent check runs on a DISTINCT pooled ``ConnectorLLM`` (its ``set_model``
+    mutates instance state, so two checks may never share one). Models are processed in
+    waves of ``len(connector_pool)`` so a slot is only ever used by one in-flight check.
+    With a pool of size 1 (IDEA_TEST_CONCURRENCY=1) this degenerates to the original serial
+    loop — byte-identical attribution-mode behavior. Returns ``{model: passed}``.
+    """
+    pool_size = max(1, len(connector_pool))
+    results: Dict[str, bool] = {}
+    for i in range(0, len(preflight_models), pool_size):
+        wave = preflight_models[i:i + pool_size]
+        checks = [
+            preflight_check_llm(connector_pool[j]["llm"], model_name)
+            for j, model_name in enumerate(wave)
+        ]
+        wave_results = await asyncio.gather(*checks)
+        for model_name, ok in zip(wave, wave_results):
+            results[model_name] = ok
+            if not ok:
+                logging.warning(f"Skipping {model_name} - pre-flight check failed")
+    return results
+
+
 TEST_PRIORITY_ORDER = [
     "026",  # Deterministic Page Facts (1/10) - Priority 1 (baseline easy)
     "002",  # Basic Fact Retrieval (1/10) - Priority 2 (baseline easy)
@@ -1076,11 +1129,14 @@ async def main() -> None:
     _pal = os.environ.get("IDEA_TEST_PARALLEL_ACTION_LIMIT")
     if _pal:
         idea_settings["parallel_action_limit"] = max(1, int(_pal))
-    # Optional visit/fetch/action timeout overrides for slow or contended fetches.
+    # Optional visit/fetch/action/LLM timeout overrides for slow or contended calls.
+    # IDEA_TEST_LLM_TIMEOUT lowers the per-call LLM wire timeout for faster-fail throughput
+    # runs; unset -> the shipped llm_timeout_seconds default (success path unchanged).
     for _env, _key in (
         ("IDEA_TEST_VISIT_TIMEOUT", "visit_timeout_seconds"),
         ("IDEA_TEST_FETCH_TIMEOUT", "fetch_timeout_seconds"),
         ("IDEA_TEST_ACTION_TIMEOUT", "action_timeout_seconds"),
+        ("IDEA_TEST_LLM_TIMEOUT", "llm_timeout_seconds"),
     ):
         _val = os.environ.get(_env)
         if _val:
@@ -1117,39 +1173,19 @@ async def main() -> None:
             await cset["search"].init_search_api()
             await cset["chroma"].init_chroma()
 
-        logging.info("Warming up ChromaDB to pre-install embedding models...")
-        try:
-            warmup_collection_name = "warmup_test"
-            warmup_collection = await connector_chroma.get_or_create_collection(warmup_collection_name)
-            if warmup_collection:
-                await connector_chroma.add_to_chroma(
-                    collection=warmup_collection_name,
-                    ids=["warmup_1"],
-                    metadatas=[{"type": "warmup"}],
-                    documents=["ChromaDB warmup document to trigger model installation"],
-                )
-                await connector_chroma.query_chroma(
-                    collection=warmup_collection_name,
-                    query_texts=["warmup query"],
-                    n_results=1,
-                )
-                logging.info("ChromaDB warmup completed - embedding models ready")
-            else:
-                logging.warning("ChromaDB warmup collection creation failed, but continuing")
-        except Exception as warmup_exc:
-            logging.warning(f"ChromaDB warmup failed (non-fatal): {warmup_exc}")
-
         execution_models_requested = _unique_models(models)
         preflight_models = list(execution_models_requested)
         if validation_model not in preflight_models:
             preflight_models.append(validation_model)
         logging.info(f"Pre-flight target models: {', '.join(preflight_models)}")
-        preflight_passed: Dict[str, bool] = {}
-        for model_name in preflight_models:
-            ok = await preflight_check_llm(connector_llm, model_name)
-            preflight_passed[model_name] = ok
-            if not ok:
-                logging.warning(f"Skipping {model_name} - pre-flight check failed")
+
+        # Overlap the ChromaDB warmup with preflight (both are fixed setup latency), and fan
+        # preflight out across the pooled connector slots. At concurrency=1 the pool has one
+        # slot so preflight stays serial (byte-identical); the warmup still just runs alongside.
+        warmup_task = asyncio.create_task(_warmup_chroma(connector_chroma))
+        preflight_passed = await _run_preflight_parallel(connector_pool, preflight_models)
+        await warmup_task
+
         execution_models = [model for model in execution_models_requested if preflight_passed.get(model, False)]
         if not execution_models:
             logging.error("No valid execution models after pre-flight checks. Aborting.")
@@ -1160,11 +1196,15 @@ async def main() -> None:
         valid_models = _unique_models(execution_models + [validation_model])
         logging.info(f"Valid models: {', '.join(valid_models)}")
 
-        # Preflight populated per-model runtime profiles on the primary connector only.
-        # Copy them to every other slot so all pooled ConnectorLLMs share the same
-        # profiles (payload normalization reads self.model_profiles per-instance).
-        for cset in connector_pool[1:]:
-            for _mname, _profile in connector_llm.model_profiles.items():
+        # Parallel preflight populated per-model runtime profiles on WHICHEVER slot ran each
+        # model, so consolidate: merge every slot's profiles, then broadcast the union to all
+        # slots. Payload normalization reads self.model_profiles per-instance, so every pooled
+        # ConnectorLLM must carry the full set. (At pool size 1 this is a no-op self-copy.)
+        merged_profiles: Dict[str, Any] = {}
+        for cset in connector_pool:
+            merged_profiles.update(cset["llm"].model_profiles)
+        for cset in connector_pool:
+            for _mname, _profile in merged_profiles.items():
                 cset["llm"].set_model_profile(_mname, _profile)
 
         # Checkout queue of connector sets, one per concurrent slot. A task borrows a set

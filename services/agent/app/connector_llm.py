@@ -7,7 +7,51 @@ from openai import APIStatusError
 from shared.connector_config import ConnectorConfig
 from shared.retry import Retry
 from agent.app.connector_base import ConnectorBase
-from agent.app.llm_backends import create_llm_backend, retryable_llm_exceptions
+import os
+
+from agent.app.llm_backends import (
+    create_llm_backend,
+    retryable_llm_exceptions,
+    accepts_reasoning_effort,
+    LLMContentError,
+)
+
+
+# --- Process-wide in-flight LLM limiter (throughput-mode rate-limit safeguard) ----------
+# When the benchmark runs cells concurrently (IDEA_TEST_CONCURRENCY>1), N cells x up-to-6
+# parallel leaves can stampede the provider into 429s. A single process-global semaphore
+# caps the total number of concurrent LLM WIRE calls across every pooled ConnectorLLM.
+# Ceiling via ``IDEA_TEST_LLM_MAX_INFLIGHT`` (default 32 — high enough to be a no-op at
+# concurrency=1, so the attribution-mode path is byte-identical). The semaphore is created
+# lazily per running event loop so pytest's per-test loops each get a fresh one.
+_INFLIGHT_STATE: dict = {"loop": None, "limit": None, "sem": None}
+
+
+def llm_max_inflight() -> int:
+    """Resolve the global in-flight LLM ceiling from ``IDEA_TEST_LLM_MAX_INFLIGHT`` (default 32)."""
+    raw = os.environ.get("IDEA_TEST_LLM_MAX_INFLIGHT", "").strip()
+    if raw.isdigit() and int(raw) > 0:
+        return int(raw)
+    return 32
+
+
+def _inflight_semaphore() -> asyncio.Semaphore:
+    """The process-global in-flight semaphore bound to the current running loop.
+
+    Recreated when the running loop or the configured limit changes, so it is always valid
+    for the loop making the call (and honors a mid-process env change in tests).
+    """
+    loop = asyncio.get_event_loop()
+    limit = llm_max_inflight()
+    if (
+        _INFLIGHT_STATE["sem"] is None
+        or _INFLIGHT_STATE["loop"] is not loop
+        or _INFLIGHT_STATE["limit"] != limit
+    ):
+        _INFLIGHT_STATE["loop"] = loop
+        _INFLIGHT_STATE["limit"] = limit
+        _INFLIGHT_STATE["sem"] = asyncio.Semaphore(limit)
+    return _INFLIGHT_STATE["sem"]
 
 
 class ConnectorLLM(ConnectorBase):
@@ -85,17 +129,13 @@ class ConnectorLLM(ConnectorBase):
             if model_name and model_name.strip():
                 payload["model"] = model_name.strip()
             return self._normalize_payload(payload)
-        def _is_gpt5_family(name: str) -> bool:
-            bare = name.split("/", 1)[-1] if "/" in name else name
-            return name.startswith(("gpt-5", "gpt-4.1")) or bare.startswith(("gpt-5", "gpt-4.1"))
-
         if reasoning_effort:
             model_name_check = (model_name or self.model_name or "").strip()
-            if _is_gpt5_family(model_name_check):
+            if accepts_reasoning_effort(model_name_check):
                 payload["reasoning_effort"] = reasoning_effort
         if text_verbosity:
             model_name_check = (model_name or self.model_name or "").strip()
-            if _is_gpt5_family(model_name_check):
+            if accepts_reasoning_effort(model_name_check):
                 payload["text"] = {"verbosity": text_verbosity}
         if model_name and model_name.strip():
             payload["model"] = model_name.strip()
@@ -201,12 +241,19 @@ class ConnectorLLM(ConnectorBase):
 
         async def do_call() -> Optional[str]:
             safe_payload = self._backend.simplify_payload(payload)
-            content, usage = await self._backend.complete(safe_payload, model_name)
+            # Bound total concurrent wire calls across all pooled connectors (no-op at
+            # concurrency=1 with the default high ceiling).
+            async with _inflight_semaphore():
+                content, usage = await self._backend.complete(safe_payload, model_name)
             self._record_usage(usage)
             return content
 
         def should_retry(result: Optional[str], exc: Optional[BaseException], attempt: int) -> bool:
             if exc is None:
+                return False
+            # Deterministic content truncation (finish_reason=length / None content): retrying
+            # the same payload reproduces it, so fail fast instead of burning the retry budget.
+            if isinstance(exc, LLMContentError):
                 return False
             status = getattr(exc, "status_code", None)
             if isinstance(status, int):

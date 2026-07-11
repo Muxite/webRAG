@@ -430,6 +430,24 @@ def _strip_source_tail(text: str) -> str:
     return head.strip(" .,–—'\"")
 
 
+# Matched-quote extraction that ignores a POSSESSIVE apostrophe. A straight apostrophe in
+# "university's" is not a quote delimiter, but the old ``['‘’“”"]([^...]+)['‘’“”"]`` treated it
+# as an opening quote and paired it with a later genuine quote (".. university's Wikipedia page,
+# the 'Established' field") -> a garbage target ("s Wikipedia page, the "). We now match only
+# genuine pairs: double quotes (straight/curly), and single quotes whose OPENING is not preceded
+# by a word char (so a possessive/contraction apostrophe can never open a quote) and whose CLOSING
+# is not followed by a word char.
+_DOUBLE_QUOTED = re.compile(r'["“”]([^"“”]+)["“”]')
+_SINGLE_QUOTED = re.compile(r"(?<!\w)['‘]([^'‘’]+?)['’](?!\w)")
+
+
+def _quoted_phrases(instruction: str) -> List[str]:
+    """Genuine matched-quote phrases in ``instruction`` (double + non-possessive single)."""
+    phrases = list(_DOUBLE_QUOTED.findall(instruction))
+    phrases += _SINGLE_QUOTED.findall(instruction)
+    return [p.strip() for p in phrases if p.strip()]
+
+
 def _target_entity(instruction: str) -> str:
     """The entity whose page holds the answer — what the leaf is really about.
 
@@ -454,7 +472,7 @@ def _target_entity(instruction: str) -> str:
     )
     if m and _strip_source_tail(m.group(1)):
         return _strip_source_tail(m.group(1))
-    quoted = re.findall(r"['‘’“”\"]([^'‘’“”\"]+)['‘’“”\"]", instruction)
+    quoted = _quoted_phrases(instruction)
     if quoted:
         # An indirect-pointer leaf ("author of '<quoted>' ... then open THAT AUTHOR's page") reads
         # its answer off a redirected page, not the quoted subject's — defer to the LLM query.

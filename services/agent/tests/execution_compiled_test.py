@@ -468,6 +468,43 @@ def test_target_entity_keeps_honorific_prefix():
     assert ec._target_entity(instr) == "Dr. Seuss"
 
 
+def test_target_entity_ignores_possessive_apostrophe():
+    """Bug #2: a possessive apostrophe ("university's") must NOT be read as an opening quote
+    that pairs with a later genuine quote ('Established') to yield a garbage target."""
+    instr = ("Open the university's Wikipedia page and read the value in the "
+             "'Established' field. Report the exact year.")
+    target = ec._target_entity(instr)
+    # The old regex returned the garbage span from the possessive apostrophe to the quote
+    # ("s Wikipedia page and read the value in the "); the fix must not.
+    assert "Wikipedia page" not in target
+    assert not target.startswith("s ")
+    # Only the genuine matched-quote phrase survives.
+    assert target == "Established"
+
+
+def test_target_entity_possessive_only_no_quotes_returns_empty():
+    """A possessive with NO genuine quotes anywhere yields no quoted target."""
+    instr = "Read the observatory's founding year from its official page."
+    assert ec._quoted_phrases(instr) == []
+    assert ec._target_entity(instr) == ""
+
+
+def test_quoted_phrases_matches_double_and_single_but_not_possessive():
+    instr = ("The author's note about \"War and Peace\" and the novel 'Anna Karenina' "
+             "predates Tolstoy's later work.")
+    phrases = ec._quoted_phrases(instr)
+    assert "War and Peace" in phrases
+    assert "Anna Karenina" in phrases
+    # No possessive fragment leaked in as a phrase.
+    assert all("author" not in p and "Tolstoy" not in p for p in phrases)
+
+
+def test_target_entity_quoted_subject_still_works_with_possessive_present():
+    """A genuine quoted subject is still returned even when a possessive appears nearby."""
+    instr = ("Find the novel's author: open the page for 'Wuthering Heights' and read it.")
+    assert ec._target_entity(instr) == "Wuthering Heights"
+
+
 def test_thin_leaf_query_uses_full_initialed_name(monkeypatch):
     """Query-skip must search the FULL initialed name, not the truncated initial ('F')."""
     monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
