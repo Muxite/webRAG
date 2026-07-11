@@ -493,6 +493,121 @@ async def _drive(engine, graph, start_id, max_steps=40):
     return max_steps
 
 
+class _AlwaysPositiveVerdict:
+    """Follow-up check that ALWAYS reports a genuine follow-up.
+
+    Used to prove the lineage re-expansion budget is what bounds a persistently-positive
+    investigative thread — with an always-yes detector the ONLY thing that can stop the
+    chain is `reexpand_max_iterations` (via the inherited `_got_reexpand_count`) or the
+    `max_total_nodes` ceiling."""
+
+    def __init__(self):
+        self.calls = 0
+
+    async def __call__(self, graph, node_id, model_name=None):
+        self.calls += 1
+        return {"needs_followup": True, "reason": "another genuine follow-up"}
+
+
+def _reexpanded_lineage(graph: IdeaDag):
+    """Depth-ordered chain of re-expanded nodes reachable from the root, root-first.
+
+    A lineage node is one that carries `_got_reexpanded` (it performed a re-expansion)
+    OR any node produced by such a re-expansion. We collect every node with a
+    `_got_reexpand_count` set (the seed leaf gets one on re-expand; each spawned child
+    inherits one) plus their descendants, then return the chain of nodes that actually
+    re-expanded, ordered by graph depth."""
+    reexpanded = [n for n in graph.iter_depth_first() if n.details.get("_got_reexpanded")]
+    return sorted(reexpanded, key=lambda n: graph.depth(n.node_id))
+
+
+@pytest.mark.asyncio
+async def test_max_iterations_two_yields_two_lineage_cycles():
+    """max_iterations=2 -> a single investigative lineage re-expands EXACTLY twice.
+
+    With an always-positive detector and a one-child expansion, the lineage is
+    seed-leaf -> child -> grandchild. The inherited `_got_reexpand_count` bounds it:
+    the seed leaf (count 0) re-expands (cycle 1), its child inherits count 1 and
+    re-expands (cycle 2), its grandchild inherits count 2 == max and does NOT re-expand.
+    So exactly two nodes carry `_got_reexpanded`, and the chain terminates well under
+    `max_total_nodes` (proving the ITERATION knob bounded it, not the node ceiling)."""
+    engine, expansion = _make_engine(
+        reexpand_enabled=True, max_iters=2, extra={"max_total_nodes": 50},
+    )
+    checker = _AlwaysPositiveVerdict()
+    ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
+    ops.check_needs_followup = checker  # type: ignore[assignment]
+    engine._got = ops
+    graph = IdeaDag(root_title="root")
+    parent, leaf = _completed_leaf(graph)
+
+    await _drive(engine, graph, parent.node_id, max_steps=60)
+
+    lineage = _reexpanded_lineage(graph)
+    assert len(lineage) == 2, (
+        f"max_iterations=2 must allow exactly 2 re-expansion cycles on one lineage, "
+        f"got {len(lineage)}"
+    )
+    # The seed leaf is the shallowest re-expanded node; its re-expanded descendant is deeper.
+    assert lineage[0].node_id == leaf.node_id
+    assert graph.depth(lineage[1].node_id) > graph.depth(lineage[0].node_id)
+    # The lineage terminated at a leaf whose inherited count reached the cap.
+    tip_ids = _all_descendant_leaves(graph, leaf.node_id)
+    assert any(
+        int(graph.get_node(t).details.get("_got_reexpand_count", 0)) == 2
+        and not graph.get_node(t).details.get("_got_reexpanded")
+        for t in tip_ids
+    ), "the lineage tip should carry the exhausted budget (count==2) and NOT re-expand"
+    # Bounded by the iteration knob, not the node ceiling.
+    assert graph.node_count() < 50, "iteration knob (not max_total_nodes) must bound the lineage"
+
+
+@pytest.mark.asyncio
+async def test_max_iterations_one_yields_single_lineage_cycle():
+    """Default max_iterations=1 -> the lineage re-expands EXACTLY once, even when the
+    detector is always-positive. The seed leaf re-expands (cycle 1); its child inherits
+    count 1 == max and does not re-expand. This pins the single-shot follow-up semantics
+    (and proves the previously-inert knob now bounds the lineage instead of it growing
+    until max_total_nodes)."""
+    engine, expansion = _make_engine(
+        reexpand_enabled=True, max_iters=1, extra={"max_total_nodes": 50},
+    )
+    checker = _AlwaysPositiveVerdict()
+    ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
+    ops.check_needs_followup = checker  # type: ignore[assignment]
+    engine._got = ops
+    graph = IdeaDag(root_title="root")
+    parent, leaf = _completed_leaf(graph)
+
+    await _drive(engine, graph, parent.node_id, max_steps=60)
+
+    lineage = _reexpanded_lineage(graph)
+    assert len(lineage) == 1, (
+        f"max_iterations=1 must re-expand a lineage exactly once, got {len(lineage)}"
+    )
+    assert lineage[0].node_id == leaf.node_id
+    # The single spawned child inherited the exhausted budget and stayed terminal.
+    child = graph.get_node(leaf.children[0])
+    assert int(child.details.get("_got_reexpand_count", 0)) == 1
+    assert not child.details.get("_got_reexpanded")
+
+
+def _all_descendant_leaves(graph: IdeaDag, root_id: str):
+    """Every childless descendant of `root_id` (inclusive)."""
+    out = []
+    stack = [root_id]
+    while stack:
+        nid = stack.pop()
+        node = graph.get_node(nid)
+        if not node:
+            continue
+        if node.children:
+            stack.extend(node.children)
+        else:
+            out.append(nid)
+    return out
+
+
 @pytest.mark.asyncio
 async def test_reexpanded_child_is_driven_to_done_end_to_end():
     """The engine's step loop must actually traverse INTO a re-expanded node's new

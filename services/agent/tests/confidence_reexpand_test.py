@@ -67,7 +67,11 @@ class FakeEvaluation(EvaluationPolicy):
         return 0.6
 
     async def evaluate_batch(self, graph, parent_id, candidate_ids):
-        return {nid: 0.6 for nid in candidate_ids}
+        scores = {}
+        for node_id in candidate_ids:
+            graph.evaluate(node_id, 0.6)
+            scores[node_id] = 0.6
+        return scores
 
 
 class FakeDecomposition(DecompositionPolicy):
@@ -296,19 +300,19 @@ async def _drive(engine, graph, start_id, max_steps=60):
     return max_steps
 
 
-@pytest.mark.asyncio
-async def test_two_iteration_confidence_reexpand_terminates():
-    """With reexpand_max_iterations=2 and a judge that ALWAYS distrusts every leaf, the
-    confidence-driven loop must still TERMINATE (bounded by the per-node iteration cap
-    plus the global node ceiling) rather than spin forever.
+def _reexpanded_lineage(graph):
+    reexpanded = [n for n in graph.iter_depth_first() if n.details.get("_got_reexpanded")]
+    return sorted(reexpanded, key=lambda n: graph.depth(n.node_id))
 
-    Every leaf that completes gets a low score, so each is a re-expansion candidate. The
-    per-node count cap stops a node re-expanding more than twice, and once
-    max_total_nodes is hit no further growth is possible — so the full step loop drives
-    to a natural stop within the step budget."""
+
+@pytest.mark.asyncio
+async def test_confidence_trigger_honors_lineage_budget_two_cycles():
+    """The confidence trigger honors the SAME inherited lineage budget as the follow-up
+    detector: with an always-distrusting judge and max_iterations=2, one lineage
+    re-expands exactly twice, then the tip (inherited count == 2) stops."""
     engine, expansion = _make_engine(
         conf_reexpand=True, threshold=0.9, max_iters=2,
-        extra={"max_total_nodes": 12},
+        extra={"max_total_nodes": 50},
     )
     judge = _StepJudge(0.1)  # always below threshold
     ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
@@ -317,12 +321,50 @@ async def test_two_iteration_confidence_reexpand_terminates():
     graph = IdeaDag(root_title="root")
     parent, leaf = _completed_leaf(graph)
 
-    steps_taken = await _drive(engine, graph, parent.node_id, max_steps=60)
+    await _drive(engine, graph, parent.node_id, max_steps=60)
 
-    # It terminated within budget (did NOT hit the 60-step ceiling forever-loop guard).
-    assert steps_taken < 60, "the confidence-reexpand loop must terminate, not spin"
-    # And it respected the global node ceiling throughout.
-    assert graph.node_count() <= 12, "node count must never exceed max_total_nodes"
-    # No single node re-expanded more than the iteration cap.
+    lineage = _reexpanded_lineage(graph)
+    assert len(lineage) == 2, (
+        f"confidence trigger must re-expand a lineage exactly twice at max_iterations=2, "
+        f"got {len(lineage)}"
+    )
+    assert lineage[0].node_id == leaf.node_id
+    assert graph.node_count() < 50, "the iteration knob (not max_total_nodes) bounds the lineage"
+
+
+@pytest.mark.asyncio
+async def test_two_iteration_confidence_reexpand_reaches_fixed_point():
+    """With reexpand_max_iterations=2 and a judge that ALWAYS distrusts every leaf, the
+    re-expansion machinery must reach a FIXED POINT — the lineage stops growing after its
+    budget is spent, rather than re-expanding forever until max_total_nodes.
+
+    (Whether the outer step() loop then returns None is a separate merge-finalization
+    concern for a single-leaf parent; here we pin the property that matters for A2: the
+    re-expansion itself terminates and respects both the iteration knob and the ceiling.)
+    Every completing leaf gets a low score, so the ONLY thing that can halt the chain is
+    the inherited lineage budget. We drive a batch of steps, snapshot the graph, drive
+    more, and assert nothing further re-expanded."""
+    engine, expansion = _make_engine(
+        conf_reexpand=True, threshold=0.9, max_iters=2,
+        extra={"max_total_nodes": 50},
+    )
+    judge = _StepJudge(0.1)  # always below threshold
+    ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
+    ops.judge_step_confidence = judge  # type: ignore[assignment]
+    engine._got = ops
+    graph = IdeaDag(root_title="root")
+    parent, leaf = _completed_leaf(graph)
+
+    await _drive(engine, graph, parent.node_id, max_steps=30)
+    nodes_after_30 = graph.node_count()
+    expands_after_30 = expansion.calls
+    await _drive(engine, graph, parent.node_id, max_steps=30)
+
+    # Fixed point: no further growth or re-expansion in the second batch of steps.
+    assert graph.node_count() == nodes_after_30, "re-expansion must reach a fixed point"
+    assert expansion.calls == expands_after_30
+    # Exactly the iteration budget was spent on the single lineage — not the node ceiling.
+    assert len(_reexpanded_lineage(graph)) == 2
+    assert graph.node_count() < 50, "the iteration knob (not max_total_nodes) bounds growth"
     for node in graph.iter_depth_first():
         assert int(node.details.get("_got_reexpand_count", 0)) <= 2

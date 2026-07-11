@@ -720,6 +720,22 @@ class IdeaDagEngine:
             return False
 
         node.details["_got_reexpand_count"] = count + 1
+        # Propagate the lineage re-expansion budget DOWN to the freshly spawned children.
+        # A re-expanded node immediately owns children, so it can never re-expand a second
+        # time itself (both re-expand gates skip nodes WITH children) — without this, the
+        # `reexpand_max_iterations` knob was inert for any value > 1, because each new child
+        # leaf started at count 0 and the lineage only stopped growing when it hit
+        # `max_total_nodes`. Seeding each new child with the parent's post-increment count
+        # makes `max_iterations` actually govern how many observe->decide->re-expand cycles
+        # a single investigative thread may take: a lineage re-expands at most
+        # `max_iterations` times end-to-end. With the default `max_iterations=1` a lineage
+        # re-expands exactly once (the first leaf), which is the intended single-shot
+        # follow-up. Both triggers (the follow-up detector and the confidence loop) route
+        # through here, so both honor the same lineage budget.
+        for child_id in node.children[before:]:
+            child = graph.get_node(child_id)
+            if child is not None:
+                child.details["_got_reexpand_count"] = count + 1
         self._record_decision(
             "reexpand", node_id=node_id, chosen=f"{len(node.children) - before} follow-up sub-problems",
             rationale=str(verdict.get("reason", ""))[:200],
