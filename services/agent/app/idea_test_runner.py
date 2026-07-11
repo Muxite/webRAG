@@ -28,7 +28,7 @@ import time
 from contextlib import AsyncExitStack
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Mapping
 
 import logging
 
@@ -310,6 +310,41 @@ def _is_enabled(value: str) -> bool:
     :return: True if enabled.
     """
     return value.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _apply_got_experiment_overrides(
+    idea_settings: Dict[str, Any], environ: Optional[Mapping[str, str]] = None
+) -> Dict[str, Any]:
+    """Apply the per-run ``IDEA_TEST_GOT_*`` toggles onto a loaded settings dict.
+
+    These let a research run flip a dormant adaptive mechanism on/off without editing the
+    checked-in ``idea_dag_settings.json`` default (which stays OFF). Each toggle: truthy
+    (1/true/yes/on) enables, explicit falsey forces off, ABSENT leaves the JSON default
+    untouched. Mutates and returns ``idea_settings``.
+
+    Extracted from ``main()`` so the flag parsing is unit-testable without the harness.
+    """
+    env = os.environ if environ is None else environ
+
+    # IDEA_TEST_GOT_REEXPAND: the follow-up-detector re-expansion (got_reexpand_enabled).
+    _reexpand_override = env.get("IDEA_TEST_GOT_REEXPAND", "").strip()
+    if _reexpand_override:
+        idea_settings["got_reexpand_enabled"] = _is_enabled(_reexpand_override)
+    # IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE: the decorrelated per-step confidence judge
+    # (got_step_confidence_judge_enabled) — the E-valuator substrate instrumentation.
+    _stepconf_override = env.get("IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE", "").strip()
+    if _stepconf_override:
+        idea_settings["got_step_confidence_judge_enabled"] = _is_enabled(_stepconf_override)
+    _stepconf_every = env.get("IDEA_TEST_GOT_STEP_CONFIDENCE_SAMPLE_EVERY", "").strip()
+    if _stepconf_every:
+        idea_settings["got_step_confidence_judge_sample_every"] = max(1, int(_stepconf_every))
+    # IDEA_TEST_GOT_CONFIDENCE_REEXPAND: the confidence->action loop
+    # (got_step_confidence_reexpand_enabled) — a low decorrelated step-confidence score
+    # drives a bounded re-expansion of the distrusted leaf. Requires the judge to be on.
+    _confreexp_override = env.get("IDEA_TEST_GOT_CONFIDENCE_REEXPAND", "").strip()
+    if _confreexp_override:
+        idea_settings["got_step_confidence_reexpand_enabled"] = _is_enabled(_confreexp_override)
+    return idea_settings
 
 
 def _unique_models(models: List[str]) -> List[str]:
@@ -1022,27 +1057,15 @@ async def main() -> None:
     # production idea_dag_settings.json default.
     _settings_path_override = os.environ.get("IDEA_DAG_SETTINGS_PATH", "").strip()
     idea_settings = load_idea_dag_settings(Path(_settings_path_override) if _settings_path_override else None)
-    # IDEA_TEST_GOT_REEXPAND: per-run toggle for the dormant adaptive re-expansion
-    # mechanism (got_reexpand_enabled). Lets experiments flip it on/off without editing
-    # the checked-in idea_dag_settings.json default (which stays false). Truthy values
-    # (1/true/yes/on) enable it; explicit falsey values force it off.
-    _reexpand_override = os.environ.get("IDEA_TEST_GOT_REEXPAND", "").strip()
-    if _reexpand_override:
-        idea_settings["got_reexpand_enabled"] = _is_enabled(_reexpand_override)
-    # IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE: per-run toggle for the opt-in decorrelated
-    # per-step LLM-judge confidence instrumentation (got_step_confidence_judge_enabled).
-    # Off by default; enable it only for the E-valuator substrate pilot so a real,
-    # partially-informative verifier-score sequence is logged into observability.
-    _stepconf_override = os.environ.get("IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE", "").strip()
-    if _stepconf_override:
-        idea_settings["got_step_confidence_judge_enabled"] = _is_enabled(_stepconf_override)
-    _stepconf_every = os.environ.get("IDEA_TEST_GOT_STEP_CONFIDENCE_SAMPLE_EVERY", "").strip()
-    if _stepconf_every:
-        idea_settings["got_step_confidence_judge_sample_every"] = max(1, int(_stepconf_every))
+    # Per-run IDEA_TEST_GOT_* toggles for the dormant adaptive mechanisms (re-expansion,
+    # step-confidence judge, confidence->action loop). Each stays OFF in the checked-in
+    # JSON default; an env toggle flips it for a research run without editing that file.
+    _apply_got_experiment_overrides(idea_settings)
     logging.info(
         f"Idea DAG settings source: {_settings_path_override or '(default idea_dag_settings.json)'} "
         f"| got_reexpand_enabled={idea_settings.get('got_reexpand_enabled')}"
         f" | got_step_confidence_judge_enabled={idea_settings.get('got_step_confidence_judge_enabled')}"
+        f" | got_step_confidence_reexpand_enabled={idea_settings.get('got_step_confidence_reexpand_enabled')}"
     )
     idea_settings["log_dag_ascii"] = False
     idea_settings["log_dag_step_interval"] = 0

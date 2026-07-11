@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Tuple
 import asyncio
 import hashlib
 import logging
@@ -1261,7 +1261,13 @@ class IdeaDagEngine:
             # the same coverage requirement the re-expansion check has). No-op when the flag
             # is off; per-sibling judge calls run concurrently inside the batch helper.
             if done_children:
-                await self._maybe_judge_step_confidence_batch(graph, done_children, step_index)
+                confidences = await self._maybe_judge_step_confidence_batch(graph, done_children, step_index)
+                # Confidence->action loop for the batch-completed siblings (no-op unless
+                # got.step_confidence_reexpand_enabled). Applied sequentially so the shared
+                # max_total_nodes ceiling can't be overshot by concurrent siblings. Runs
+                # before the follow-up re-expansion block below, whose read-only
+                # `_reexpand_check` then skips any sibling already re-expanded here.
+                await self._maybe_confidence_reexpand_batch(graph, confidences, step_index)
 
             # The per-sibling re-expansion checks are independent LLM calls, so run
             # them concurrently (mirrors the action-execution gather above) instead of
@@ -1475,15 +1481,24 @@ class IdeaDagEngine:
         status = self._handle_action_result(graph, node_id, step_index)
         node = graph.get_node(node_id)
         if node and node.status == IdeaNodeStatus.DONE:
-            await self._maybe_judge_step_confidence(graph, node_id, step_index)
+            confidences = await self._maybe_judge_step_confidence(graph, node_id, step_index)
+            # Confidence->action loop: a low step-confidence can itself drive re-expansion
+            # (no-op unless got.step_confidence_reexpand_enabled). Runs before the follow-up
+            # path so a node re-expanded here is gated out of `_maybe_reexpand_leaf`
+            # (which skips nodes that already have children).
+            await self._maybe_confidence_reexpand_batch(graph, confidences, step_index)
             await self._maybe_reexpand_leaf(graph, node_id, step_index)
         return status
 
-    async def _maybe_judge_step_confidence(self, graph: IdeaDag, node_id: str, step_index: int) -> None:
+    async def _maybe_judge_step_confidence(
+        self, graph: IdeaDag, node_id: str, step_index: int
+    ) -> List[Tuple[str, float]]:
         """Single-leaf wrapper over the batch judge (sequential/merge completion paths)."""
-        await self._maybe_judge_step_confidence_batch(graph, [node_id], step_index)
+        return await self._maybe_judge_step_confidence_batch(graph, [node_id], step_index)
 
-    async def _maybe_judge_step_confidence_batch(self, graph: IdeaDag, node_ids: List[str], step_index: int) -> None:
+    async def _maybe_judge_step_confidence_batch(
+        self, graph: IdeaDag, node_ids: List[str], step_index: int
+    ) -> List[Tuple[str, float]]:
         """Emit an opt-in, decorrelated per-step confidence signal for completed leaves.
 
         No-op unless ``got.step_confidence_judge_enabled`` is set (JSON default False), so
@@ -1495,9 +1510,14 @@ class IdeaDagEngine:
         sees only trajectory-visible context — never the grep validators or ground truth — so the
         logged sequence is a genuine E-valuator substrate, decorrelated from the final
         grep-computed label. The per-leaf judge calls run concurrently; this never raises.
+
+        Returns the ``(node_id, confidence)`` pairs actually judged this call so a caller
+        can close the confidence->action loop (drive re-expansion off a low score). The
+        return value is ignored on the default path.
         """
+        judged: List[Tuple[str, float]] = []
         if not self._cfg.got.step_confidence_judge_enabled or not self._got:
-            return
+            return judged
         sample_every = max(1, int(self._cfg.got.step_confidence_judge_sample_every))
         selected: List[str] = []
         for node_id in node_ids:
@@ -1505,7 +1525,7 @@ class IdeaDagEngine:
             if (self._leaf_completion_count - 1) % sample_every == 0:
                 selected.append(node_id)
         if not selected:
-            return
+            return judged
         verdicts = await asyncio.gather(
             *[self._got.judge_step_confidence(graph, nid, model_name=self.model_name) for nid in selected],
             return_exceptions=True,
@@ -1517,13 +1537,87 @@ class IdeaDagEngine:
             if not verdict:
                 continue
             node = graph.get_node(nid)
+            confidence = verdict.get("confidence")
             self._step_confidences.append({
                 "step": step_index,
                 "node_id": nid,
                 "kind": NodeDetailsExtractor.get_action(node.details) if node else None,
-                "confidence": verdict.get("confidence"),
+                "confidence": confidence,
                 "reason": verdict.get("reason", ""),
             })
+            if confidence is not None:
+                try:
+                    judged.append((nid, float(confidence)))
+                except (TypeError, ValueError):
+                    pass
+        return judged
+
+    def _confidence_triggers_reexpand(
+        self, graph: IdeaDag, node_id: str, confidence: float
+    ) -> bool:
+        """Gate: does a completed leaf's *low* step-confidence justify re-expanding it?
+
+        This is the confidence->action loop. Unlike ``_reexpand_check`` (which asks a
+        separate follow-up-detector LLM whether the result *reveals* a new target), this
+        trigger is a genuine "observe the step's trustworthiness, then decide to take
+        another step": a leaf the step-judge distrusts (confidence below
+        ``got.step_confidence_reexpand_threshold``) is re-investigated by re-expanding it
+        into follow-up sub-problems. Reuses the same childless-successful-leaf guards and
+        the same ``reexpand_max_iterations`` / ``max_total_nodes`` bounds as the follow-up
+        path, so termination is guaranteed identically. No LLM call, no mutation.
+        """
+        if not self._cfg.got.step_confidence_reexpand_enabled:
+            return False
+        if confidence is None or confidence >= self._cfg.got.step_confidence_reexpand_threshold:
+            return False
+        node = graph.get_node(node_id)
+        if not node:
+            return False
+        if NodeDetailsExtractor.is_merge_action(node.details):
+            return False
+        if node.children:
+            return False
+        result = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not isinstance(result, dict):
+            return False
+        from agent.app.idea_policies.action_constants import ActionResultExtractor
+        if not ActionResultExtractor.is_success(result):
+            return False
+        max_iters = self._cfg.got.reexpand_max_iterations
+        count = int(node.details.get("_got_reexpand_count", 0))
+        if count >= max_iters:
+            return False
+        if graph.node_count() >= self._cfg.engine.max_total_nodes:
+            return False
+        return True
+
+    async def _maybe_confidence_reexpand_batch(
+        self, graph: IdeaDag, confidences: List[Tuple[str, float]], step_index: int
+    ) -> None:
+        """Drive bounded re-expansion off low per-step confidence scores.
+
+        No-op unless ``got.step_confidence_reexpand_enabled`` is set (JSON default False),
+        so flag-off behavior is byte-identical. Applied SEQUENTIALLY (never inside a
+        gather): each ``_apply_reexpand`` re-reads the ``max_total_nodes`` ceiling before
+        growing the graph, so concurrent siblings can never overshoot it — mirroring the
+        follow-up re-expansion path. Independent of ``got.reexpand_enabled``: the shared
+        ``_apply_reexpand`` machinery is trigger-agnostic, so a run can drive re-expansion
+        from confidence alone, from the follow-up detector, or from both.
+        """
+        if not self._cfg.got.step_confidence_reexpand_enabled or not self._got:
+            return
+        threshold = self._cfg.got.step_confidence_reexpand_threshold
+        for node_id, confidence in confidences:
+            if not self._confidence_triggers_reexpand(graph, node_id, confidence):
+                continue
+            verdict = {
+                "needs_followup": True,
+                "reason": (
+                    f"low step confidence {confidence:.3f} < {threshold:.3f}; "
+                    f"re-investigating the distrusted leaf"
+                ),
+            }
+            await self._apply_reexpand(graph, node_id, step_index, verdict)
 
     def _handle_action_result(self, graph: IdeaDag, node_id: str, step_index: int) -> str:
         node = graph.get_node(node_id)

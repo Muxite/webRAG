@@ -116,6 +116,8 @@
   "got_step_confidence_judge_temperature": 0.0,
   "got_step_confidence_judge_sample_every": 1,
   "got_step_confidence_judge_model": "",
+  "got_step_confidence_reexpand_enabled": false,
+  "got_step_confidence_reexpand_threshold": 0.5,
   "got_dedup_enabled": true,
   "got_dedup_similarity_threshold": 0.85,
   "got_dedup_max_query": 5,

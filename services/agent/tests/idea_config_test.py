@@ -87,6 +87,28 @@ def test_step_confidence_judge_overrides_and_coercion():
     assert cfg.step_confidence_judge_model == "gpt-4.1-nano"
 
 
+def test_step_confidence_reexpand_fields_default_off():
+    # Confidence->action loop: default OFF with a 0.5 threshold. A settings load that
+    # omits both keys must preserve the current (off) behavior byte-for-byte.
+    cfg = GoTConfig.from_settings({})
+    assert cfg.step_confidence_reexpand_enabled is False
+    assert cfg.step_confidence_reexpand_threshold == 0.5
+    # The shipped production JSON ships both keys OFF too.
+    prod = GoTConfig.from_settings(load_idea_dag_settings())
+    assert prod.step_confidence_reexpand_enabled is False
+    assert prod.step_confidence_reexpand_threshold == 0.5
+
+
+def test_step_confidence_reexpand_overrides_and_coercion():
+    cfg = GoTConfig.from_settings({
+        "got_step_confidence_reexpand_enabled": 1,        # truthy -> bool
+        "got_step_confidence_reexpand_threshold": "0.4",  # str -> float
+    })
+    assert cfg.step_confidence_reexpand_enabled is True
+    assert cfg.step_confidence_reexpand_threshold == 0.4
+    assert isinstance(cfg.step_confidence_reexpand_threshold, float)
+
+
 def test_frozen_view_is_immutable():
     import dataclasses
     cfg = GoTConfig.from_settings({})
