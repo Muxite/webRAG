@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 from agent.app.agent_io import AgentIO
 from agent.app.observation import clean_operation
-from agent.app.llm_backends import json_instruction_from_response_format
+from agent.app.llm_backends import json_instruction_from_response_format, accepts_reasoning_effort
+from agent.app.model_tiers import tier_token_multiplier
 from agent.app.idea_policies.base import IdeaActionType, DetailKey, IdeaNodeStatus
 from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.action_constants import (
@@ -84,6 +85,54 @@ class LeafAction(ABC):
         if isinstance(intent, str) and intent.strip():
             return f"{intent.strip()}\n{contract}"
         return contract
+
+    def _effective_model(self, io: AgentIO, model_name: Optional[str]) -> Optional[str]:
+        """The model a micro-prompt actually runs on: the explicit override, else the
+        connector's current execution model (so price/reasoning tiering keys on the real
+        executor even when the call passes ``model_name=None``)."""
+        if model_name:
+            return model_name
+        try:
+            return io.connector_llm.get_model()
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _micro_prompt_reasoning_effort(
+        self, model_name: Optional[str], default: Optional[str] = None
+    ) -> Optional[str]:
+        """A3b: a reasoning model's PERCEPTION/selection micro-prompt should spend minimal
+        hidden reasoning so it can't starve its own completion budget (the compiled-path
+        content=None bug). Returns ``"minimal"`` when the discipline flag is on and the model
+        is a reasoning model; otherwise the caller's ``default`` (byte-identical when off)."""
+        if (
+            self._cfg.action.native_reasoning_effort_discipline_enabled
+            and accepts_reasoning_effort(model_name)
+        ):
+            return "minimal"
+        return default
+
+    def _executor_max_tokens(
+        self, model_name: Optional[str], base: Optional[int], *, price_tier: bool = True
+    ) -> Optional[int]:
+        """Resolve a native micro-prompt token budget under the opt-in tiering flags.
+
+        A5 (``price_tier_param_tiering_enabled``): scale ``base`` by the executor's price-tier
+        multiplier (cheap ``1.0`` -> unchanged; mid/premium get headroom). A3b
+        (``native_reasoning_effort_discipline_enabled``): floor a reasoning model's budget to
+        ``native_reasoning_min_tokens_floor`` so a tight micro-prompt budget can't starve it.
+        Returns ``base`` unchanged when both flags are off (byte-identical). ``price_tier=False``
+        skips the A5 multiplier (used where only the anti-starvation floor is wanted)."""
+        if base is None:
+            return base
+        tokens = int(base)
+        if price_tier and self._cfg.action.price_tier_param_tiering_enabled:
+            tokens = int(round(tokens * tier_token_multiplier(model_name)))
+        if (
+            self._cfg.action.native_reasoning_effort_discipline_enabled
+            and accepts_reasoning_effort(model_name)
+        ):
+            tokens = max(tokens, self._cfg.action.native_reasoning_min_tokens_floor)
+        return tokens
 
     def _timeout_seconds(self, key: str) -> Optional[float]:
         # Accepts a full settings key (e.g. "search_timeout_seconds"); resolves
@@ -949,14 +998,19 @@ class VisitLeafAction(LeafAction):
             candidates_text = "\n".join([f"{i+1}. {url}" for i, url in enumerate(candidate_urls)])
             system_content = f"Select the top {link_count} URLs that best match the user's request. Return JSON with a 'selected' array of URLs in order of preference."
             user_content = f"User wants: {link_idea}\n\nCandidate URLs:\n{candidates_text}\n\nReturn JSON: {{\"selected\": [\"url1\", \"url2\", ...]}}"
-            
+
             messages = PromptBuilder.build_messages(system_content=system_content, user_content=user_content)
+            # A3b/A5 discipline for this perception/selection micro-prompt (opt-in; no-op default):
+            # minimal reasoning-effort + a token floor for reasoning models, and price-tier budget
+            # scaling — so a small 500-token budget can't starve a reasoning executor.
+            _effective_model = self._effective_model(io, model_name)
             payload = io.build_llm_payload(
                 messages=messages,
                 json_mode=True,
                 model_name=model_name,
                 temperature=0.2,
-                max_tokens=500,
+                max_tokens=self._executor_max_tokens(_effective_model, 500),
+                reasoning_effort=self._micro_prompt_reasoning_effort(_effective_model),
             )
             
             timeout_seconds = self._timeout_seconds("llm_timeout_seconds")
@@ -1858,12 +1912,18 @@ class MergeLeafAction(LeafAction):
             reasoning_effort = self._cfg.generation.reasoning_effort
             text_verbosity = self._cfg.generation.text_verbosity
 
+            # A3b anti-starvation floor for the merge aggregation call (opt-in; no-op default —
+            # merge's budget is already large). Keeps the configured reasoning_effort (merge is
+            # aggregation/reasoning, not perception) and skips the A5 multiplier to avoid
+            # ballooning aggregation cost.
             payload = io.build_llm_payload(
                 messages=messages,
                 json_mode=True,
                 model_name=model_name,
                 temperature=self._cfg.merge.temperature,
-                max_tokens=self._cfg.merge.max_tokens,
+                max_tokens=self._executor_max_tokens(
+                    self._effective_model(io, model_name), self._cfg.merge.max_tokens, price_tier=False
+                ),
                 json_schema=None,
                 reasoning_effort=reasoning_effort,
                 text_verbosity=text_verbosity,
@@ -2064,12 +2124,17 @@ class VerifyLeafAction(LeafAction):
             messages = PromptBuilder.build_messages(system_content=system_content, user_content=user_content)
 
             model_name = self._cfg.verify.model  # None -> connector's current execution model
+            # A3b anti-starvation floor for the verify micro-prompt (opt-in; no-op default): the
+            # 1024-token verify budget can starve a reasoning executor, so floor it when the flag
+            # is on. No effort override (verify is a reasoning check, not perception).
             payload = io.build_llm_payload(
                 messages=messages,
                 json_mode=True,
                 model_name=model_name,
                 temperature=self._cfg.verify.temperature,
-                max_tokens=self._cfg.verify.max_tokens,
+                max_tokens=self._executor_max_tokens(
+                    self._effective_model(io, model_name), self._cfg.verify.max_tokens, price_tier=False
+                ),
             )
             timeout_seconds = self._timeout_seconds("llm_timeout_seconds")
             response = await io.query_llm_with_fallback(

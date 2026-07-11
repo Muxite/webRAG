@@ -133,6 +133,28 @@ def test_expansion_expect_contract_defaults_off():
     ).expect_contract_enabled is True
 
 
+def test_native_tiering_flags_default_off():
+    # A3b + A5 executor-tiering flags: default OFF from an empty load and the shipped JSON,
+    # so the native micro-prompt token/effort path stays byte-identical.
+    from agent.app.idea_policies.config import ActionConfig
+    empty = ActionConfig.from_settings({})
+    assert empty.native_reasoning_effort_discipline_enabled is False
+    assert empty.native_reasoning_min_tokens_floor == 2048
+    assert empty.price_tier_param_tiering_enabled is False
+    prod = ActionConfig.from_settings(load_idea_dag_settings())
+    assert prod.native_reasoning_effort_discipline_enabled is False
+    assert prod.price_tier_param_tiering_enabled is False
+    # Overrides coerce.
+    on = ActionConfig.from_settings({
+        "native_reasoning_effort_discipline_enabled": 1,
+        "native_reasoning_min_tokens_floor": "4096",
+        "price_tier_param_tiering_enabled": "true",
+    })
+    assert on.native_reasoning_effort_discipline_enabled is True
+    assert on.native_reasoning_min_tokens_floor == 4096
+    assert on.price_tier_param_tiering_enabled is True
+
+
 def test_aggregate_builds_from_production_settings():
     # The shipped JSON must build cleanly and reflect its production values.
     cfg = IdeaConfig.from_settings(load_idea_dag_settings())

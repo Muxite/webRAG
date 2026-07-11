@@ -303,6 +303,16 @@ class ActionConfig:
     visit_page_concurrency: int = 5
     visit_link_selection_model: Optional[str] = None
     visit_empty_content_retryable: bool = True
+    # A3b — reasoning-effort/token discipline for native leaf micro-prompts (opt-in). When on,
+    # a reasoning-model executor's perception/selection micro-prompt uses reasoning_effort=minimal
+    # and its token budget is floored so hidden reasoning can't starve the completion (the
+    # content=None bug fixed on the compiled path). Default OFF -> byte-identical.
+    native_reasoning_effort_discipline_enabled: bool = False
+    native_reasoning_min_tokens_floor: int = 2048
+    # A5 — price-tier parameter tiering for native executor micro-prompts (opt-in). When on, a
+    # micro-prompt's token budget scales by the executor model's price tier (cheap stays tight,
+    # mid/premium get headroom). Default OFF -> byte-identical.
+    price_tier_param_tiering_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "max_retries": "action_max_retries",

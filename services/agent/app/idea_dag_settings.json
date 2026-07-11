@@ -140,5 +140,8 @@
   "parallel_action_limit": 4,
   "auto_parallel_siblings": true,
   "sequential_sibling_recovery_enabled": true,
-  "visit_empty_content_retryable": true
+  "visit_empty_content_retryable": true,
+  "native_reasoning_effort_discipline_enabled": false,
+  "native_reasoning_min_tokens_floor": 2048,
+  "price_tier_param_tiering_enabled": false
 }
