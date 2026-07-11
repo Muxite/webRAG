@@ -67,6 +67,24 @@ class LeafAction(ABC):
     def _max_observation_chars(self) -> int:
         return self._cfg.action.max_observation_chars
 
+    def _effective_intent(self, node: "IdeaNode") -> Optional[str]:
+        """Resolve the extraction intent for a leaf, folding in an optional ``expect``
+        contract (``expansion_expect_contract_enabled``).
+
+        When a leaf carries a measurable-output contract (``DetailKey.EXPECT``), append it
+        to the free-text intent as an explicit "Report exactly: ..." target so the executor
+        grounds on the exact declared value + source URL. Returns the plain intent UNCHANGED
+        when no ``expect`` is present, so the default path is byte-identical.
+        """
+        intent = node.details.get(DetailKey.INTENT.value)
+        expect = node.details.get(DetailKey.EXPECT.value)
+        if not isinstance(expect, str) or not expect.strip():
+            return intent
+        contract = f"Report exactly: {expect.strip()}"
+        if isinstance(intent, str) and intent.strip():
+            return f"{intent.strip()}\n{contract}"
+        return contract
+
     def _timeout_seconds(self, key: str) -> Optional[float]:
         # Accepts a full settings key (e.g. "search_timeout_seconds"); resolves
         # it against TimeoutConfig, falling back to the generic action timeout.
@@ -197,7 +215,7 @@ class SearchLeafAction(LeafAction):
                 raise ValueError(f"Unknown node_id: {node_id}")
             from agent.app.idea_policies.action_constants import NodeDetailsExtractor
             query = NodeDetailsExtractor.get_query(node.details, fallback_title=node.title)
-            intent = node.details.get(DetailKey.INTENT.value)
+            intent = self._effective_intent(node)
             count = int(node.details.get(DetailKey.COUNT.value, self._cfg.action.default_search_count))
             
             chunk_content = node.details.get(DetailKey.CHUNK_CONTENT.value)
@@ -1183,9 +1201,9 @@ class VisitLeafAction(LeafAction):
             
             from agent.app.idea_policies.action_constants import NodeDetailsExtractor
             from agent.app.idea_policies.action_constants import ErrorType
-            
-            intent = node.details.get(DetailKey.INTENT.value)
-            
+
+            intent = self._effective_intent(node)
+
             link_count = node.details.get("link_count")
             if link_count is None:
                 link_count = 1

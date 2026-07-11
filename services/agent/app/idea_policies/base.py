@@ -118,6 +118,12 @@ class DetailKey(str, Enum):
     EXECUTE_ALL_CHILDREN = "execute_all_children"
     MEMO_NAMESPACE = "memo_namespace"
     INTENT = "intent"
+    # Optional structured output contract for a LEAF candidate (opt-in, gated by
+    # ``expansion_expect_contract_enabled``): a one-line measurable target — the exact
+    # value to report AND that its source URL must accompany it. Threads from the
+    # expansion candidate into leaf execution (as an extraction-target addendum to the
+    # intent) and is auto-serialized into the evaluation context. Absent by default.
+    EXPECT = "expect"
     PARENT_GOAL = "parent_goal"
     IS_LEAF = "is_leaf"
     JUSTIFICATION = "justification"

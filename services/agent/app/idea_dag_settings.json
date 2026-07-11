@@ -63,6 +63,7 @@
   "expansion_max_tokens": 8192,
   "expansion_max_context_nodes": 5,
   "expansion_max_detail_chars": 5000,
+  "expansion_expect_contract_enabled": false,
   "expansion_timeout_seconds": 180,
   "expansion_planning_addendum": "Before producing candidates, build an internal plan that identifies target facts, likely sources, and verification steps. Every candidate should include concrete extraction intent, measurable output fields, and a clear reason why this step reduces uncertainty. Prefer candidates that produce verifiable evidence over narrative-only steps.",
   "evaluation_system_prompt": "You are the Score operation in a Graph-of-Thought system. Rate the candidate thought 0-1. Reward: independent subproblem decomposition, evidence-gathering (search+visit), comprehensive actions. Penalize: redundancy, tiny steps, skipping visit after search. Nodes with actions but no action_result must score <=0.2 (unexecuted work). Prefer larger steps that gather verifiable evidence. Return JSON: {{score: float, rationale: string}}.",

@@ -25,6 +25,20 @@ def _safe_serialize_details(details: Dict[str, Any]) -> str:
         return json.dumps({"error": f"Serialization failed: {str(e)}"}, ensure_ascii=True)
 
 
+# Opt-in expansion addendum (``expansion_expect_contract_enabled``): borrows the compiled
+# path's leaf discipline — one atomic fact per leaf, read off an authoritative page (never
+# guessed from memory), reported as an EXACT value alongside its source URL. Injected into
+# the expansion system prompt only when the flag is on (default path is byte-identical).
+_EXPECT_CONTRACT_ADDENDUM = (
+    "MEASURABLE OUTPUT CONTRACT: for every LEAF candidate (a concrete search/visit/think "
+    "sub-task that resolves ONE fact), add an \"expect\" field at the candidate's top level: "
+    "a single line naming the EXACT value to report AND requiring its source URL alongside "
+    "it. Keep each leaf to ONE atomic fact read off an authoritative page — never guessed "
+    "from memory. Example: \"expect\": \"the exact founding year (e.g. 1861) AND the source "
+    "URL it was read from\". Omit \"expect\" for non-leaf or aggregation candidates."
+)
+
+
 # IDEA_TEST_REASONING_EXEMPLAR: per-run toggle that injects a general reasoning
 # demonstration (a task-shape few-shot) into the expansion system prompt, so a
 # cheap executor model learns HOW to reason through a chain/mixed/parallel task
@@ -194,6 +208,13 @@ class LlmExpansionPolicy(ExpansionPolicy):
         # text instruction and drop to ``json_object`` mode (provider-agnostic — no
         # model-name special-casing).
         json_schema = self.settings.get("expansion_json_schema")
+        # Opt-in: when the measurable-output contract is enabled, use the schema variant
+        # that advertises the optional per-candidate ``expect`` field, so the text schema
+        # hint tells the model it may declare a leaf's measurable target. Default path is
+        # byte-identical (the plain schema from settings).
+        if self._cfg.expansion.expect_contract_enabled:
+            from agent.app.idea_dag_schemas import EXPANSION_JSON_SCHEMA_WITH_EXPECT
+            json_schema = EXPANSION_JSON_SCHEMA_WITH_EXPECT
         schema_hint = (
             json_instruction_from_response_format({"type": "json_schema", "json_schema": json_schema})
             if json_schema
@@ -484,6 +505,10 @@ class LlmExpansionPolicy(ExpansionPolicy):
         ).strip()
         if planning_addendum:
             system = f"{system}\n\n{planning_addendum}" if system else planning_addendum
+        # Opt-in measurable-output contract: append the leaf ``expect`` discipline only when
+        # ``expansion_expect_contract_enabled`` is set. Default path is byte-identical.
+        if self._cfg.expansion.expect_contract_enabled:
+            system = f"{system}\n\n{_EXPECT_CONTRACT_ADDENDUM}" if system else _EXPECT_CONTRACT_ADDENDUM
         # Optional prompt prefixes, ordered top-to-bottom: reasoning exemplar (a
         # narrative demonstration) then the imperative rule checklist, then the existing
         # system template. The two env vars are fully independent — either may be set alone.
@@ -819,6 +844,19 @@ class LlmExpansionPolicy(ExpansionPolicy):
             justification = NodeDetailsExtractor.get_justification(candidate)
             if justification:
                 details[DetailKey.JUSTIFICATION.value] = str(justification)
+
+            # Opt-in: capture a leaf's measurable output contract. The model may place
+            # ``expect`` at the candidate's top level or inside ``details``; both are
+            # accepted. No-op when the flag is off or the field is absent (optional).
+            if self._cfg.expansion.expect_contract_enabled:
+                expect = candidate.get("expect")
+                if expect is None:
+                    expect = details.get(DetailKey.EXPECT.value)
+                if isinstance(expect, str) and expect.strip():
+                    details[DetailKey.EXPECT.value] = expect.strip()
+                elif DetailKey.EXPECT.value in details:
+                    # Drop a non-string/empty expect so it never reaches execution.
+                    details.pop(DetailKey.EXPECT.value, None)
 
             candidate_goal = candidate.get("goal")
             local_goal: Optional[str] = None

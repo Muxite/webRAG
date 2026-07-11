@@ -119,6 +119,20 @@ def test_frozen_view_is_immutable():
         pass
 
 
+def test_expansion_expect_contract_defaults_off():
+    # Opt-in decomposition contract: default OFF, both from an empty load and from the
+    # shipped production JSON (so the default expansion prompt/schema stay byte-identical).
+    from agent.app.idea_policies.config import ExpansionConfig
+    assert ExpansionConfig.from_settings({}).expect_contract_enabled is False
+    assert ExpansionConfig.from_settings(
+        load_idea_dag_settings()
+    ).expect_contract_enabled is False
+    # Truthy override coerces to bool.
+    assert ExpansionConfig.from_settings(
+        {"expansion_expect_contract_enabled": 1}
+    ).expect_contract_enabled is True
+
+
 def test_aggregate_builds_from_production_settings():
     # The shipped JSON must build cleanly and reflect its production values.
     cfg = IdeaConfig.from_settings(load_idea_dag_settings())

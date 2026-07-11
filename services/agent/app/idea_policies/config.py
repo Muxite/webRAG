@@ -174,6 +174,7 @@ class ExpansionConfig:
     max_tokens: Optional[int] = 8192
     max_context_nodes: int = 5
     max_detail_chars: int = 5000
+    expect_contract_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "expansion_model",
@@ -181,6 +182,7 @@ class ExpansionConfig:
         "max_tokens": "expansion_max_tokens",
         "max_context_nodes": "expansion_max_context_nodes",
         "max_detail_chars": "expansion_max_detail_chars",
+        "expect_contract_enabled": "expansion_expect_contract_enabled",
     }
 
     @classmethod

@@ -58,6 +58,65 @@ EXPANSION_JSON_SCHEMA: Dict[str, Any] = {
     }
 }
 
+# Opt-in variant (``expansion_expect_contract_enabled``) that permits an OPTIONAL,
+# per-candidate ``expect`` string — a one-line measurable output contract for a leaf
+# ("report exactly <value> AND its source URL"). ``expect`` is NOT in ``required`` so a
+# candidate may omit it (aggregation/non-leaf nodes). Kept separate from
+# ``EXPANSION_JSON_SCHEMA`` so the default schema hint is byte-identical when the flag is off.
+EXPANSION_JSON_SCHEMA_WITH_EXPECT: Dict[str, Any] = {
+    "name": "expansion_result",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "candidates": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string"
+                        },
+                        "action": {
+                            "type": "string"
+                        },
+                        "details": {
+                            "type": "object"
+                        },
+                        "expect": {
+                            "type": "string",
+                            "description": (
+                                "Optional. For a LEAF candidate only: a one-line measurable "
+                                "output contract — the exact value to report AND that its "
+                                "source URL must accompany it. Omit for non-leaf/aggregation "
+                                "candidates."
+                            )
+                        }
+                    },
+                    "required": [
+                        "title",
+                        "action",
+                        "details"
+                    ],
+                    "additionalProperties": False
+                }
+            },
+            "meta": {
+                "type": "object",
+                "properties": {
+                    "execute_all_children": {
+                        "type": "boolean"
+                    }
+                },
+                "additionalProperties": False
+            }
+        },
+        "required": [
+            "candidates"
+        ],
+        "additionalProperties": False
+    }
+}
+
 EVALUATION_JSON_SCHEMA: Dict[str, Any] = {
     "name": "evaluation_result",
     "schema": {
