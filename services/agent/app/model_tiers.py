@@ -31,6 +31,22 @@ def price_tier(model_name: Optional[str]) -> str:
     return "premium"
 
 
+def is_reasoning_model(model_name: Optional[str]) -> bool:
+    """True for models that spend a HIDDEN reasoning budget out of the same completion allowance —
+    the gpt-5 family and the OpenAI o-series (o1/o3/o4). These starve a small ``max_completion_tokens``
+    on reasoning before writing visible content (``content=None`` / ``finish_reason=length``).
+
+    This is the "does it starve?" predicate — distinct from ``llm_backends.accepts_reasoning_effort``
+    (the "does the wire accept the ``reasoning_effort`` param?" predicate). The anti-starvation TOKEN
+    FLOOR keys on THIS (every starving model needs headroom, incl. o-series which the wire allowlist
+    omits); the ``reasoning_effort="minimal"`` HINT needs BOTH this AND wire-acceptance. Mirrors the
+    frozen ``execution_compiled._is_reasoning_model`` set so native and compiled agree on coverage."""
+    if not model_name:
+        return False
+    bare = model_name.split("/", 1)[-1] if "/" in model_name else model_name
+    return any(s.lower().startswith(("gpt-5", "o1", "o3", "o4")) for s in (model_name, bare))
+
+
 # Token-budget multipliers by price tier for native executor micro-prompts. Mirrors the compiled
 # react tiering intent (cheap stays tight so its proven cost/behavior is untouched; mid/premium
 # get headroom so a verbose/reasoning model can begin its answer without starving the budget).

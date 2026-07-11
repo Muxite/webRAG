@@ -368,3 +368,39 @@ async def test_two_iteration_confidence_reexpand_reaches_fixed_point():
     assert graph.node_count() < 50, "the iteration knob (not max_total_nodes) bounds growth"
     for node in graph.iter_depth_first():
         assert int(node.details.get("_got_reexpand_count", 0)) <= 2
+
+
+@pytest.mark.asyncio
+async def test_both_triggers_enabled_confidence_wins_no_double_reexpand():
+    """When BOTH the confidence trigger and the follow-up detector are enabled and a
+    completed leaf trips both (low confidence AND a positive follow-up verdict), the
+    node re-expands EXACTLY ONCE. `_handle_leaf_node` runs the confidence trigger
+    first; the follow-up path's read-only `_reexpand_check` then sees the node
+    already has children (both checks guard on `node.children`) and skips it without
+    even consulting the follow-up detector."""
+    engine, expansion = _make_engine(
+        conf_reexpand=True, threshold=0.5, followup_enabled=True, max_iters=1,
+    )
+    _attach_judge(engine, 0.1)  # below threshold -> confidence trigger fires
+
+    followup_calls = {"count": 0}
+
+    async def _followup_stub(*args, **kwargs):
+        followup_calls["count"] += 1
+        return {"needs_followup": True, "reason": "stub follow-up"}
+
+    engine._got.check_needs_followup = _followup_stub  # type: ignore[assignment]
+
+    graph = IdeaDag(root_title="root")
+    parent, leaf = _completed_leaf(graph)
+
+    result = await engine._handle_leaf_node(graph, leaf.node_id, 0, None)
+
+    assert expansion.calls == 1, "only ONE re-expansion despite both triggers tripping"
+    assert len(leaf.children) == 1
+    assert leaf.details.get("_got_reexpand_count") == 1
+    assert followup_calls["count"] == 0, (
+        "the follow-up detector must never be consulted once the confidence trigger "
+        "already gave the node children"
+    )
+    assert result == leaf.node_id

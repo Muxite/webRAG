@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 from agent.app.agent_io import AgentIO
 from agent.app.observation import clean_operation
 from agent.app.llm_backends import json_instruction_from_response_format, accepts_reasoning_effort
-from agent.app.model_tiers import tier_token_multiplier
+from agent.app.model_tiers import tier_token_multiplier, is_reasoning_model
 from agent.app.idea_policies.base import IdeaActionType, DetailKey, IdeaNodeStatus
 from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.action_constants import (
@@ -103,9 +103,13 @@ class LeafAction(ABC):
         """A3b: a reasoning model's PERCEPTION/selection micro-prompt should spend minimal
         hidden reasoning so it can't starve its own completion budget (the compiled-path
         content=None bug). Returns ``"minimal"`` when the discipline flag is on and the model
-        is a reasoning model; otherwise the caller's ``default`` (byte-identical when off)."""
+        is a reasoning model; otherwise the caller's ``default`` (byte-identical when off).
+
+        The hint needs BOTH: the model must actually be a reasoning model (else minimal effort is
+        meaningless) AND the wire must accept the ``reasoning_effort`` param (else it's stripped)."""
         if (
             self._cfg.action.native_reasoning_effort_discipline_enabled
+            and is_reasoning_model(model_name)
             and accepts_reasoning_effort(model_name)
         ):
             return "minimal"
@@ -121,7 +125,11 @@ class LeafAction(ABC):
         (``native_reasoning_effort_discipline_enabled``): floor a reasoning model's budget to
         ``native_reasoning_min_tokens_floor`` so a tight micro-prompt budget can't starve it.
         Returns ``base`` unchanged when both flags are off (byte-identical). ``price_tier=False``
-        skips the A5 multiplier (used where only the anti-starvation floor is wanted)."""
+        skips the A5 multiplier (used where only the anti-starvation floor is wanted).
+
+        The floor keys on ``is_reasoning_model`` (the "does it starve?" predicate) — NOT on
+        wire-acceptance — so o-series models (which the wire allowlist omits) still get headroom,
+        and a non-reasoning model like gpt-4.1 is not needlessly floored."""
         if base is None:
             return base
         tokens = int(base)
@@ -129,7 +137,7 @@ class LeafAction(ABC):
             tokens = int(round(tokens * tier_token_multiplier(model_name)))
         if (
             self._cfg.action.native_reasoning_effort_discipline_enabled
-            and accepts_reasoning_effort(model_name)
+            and is_reasoning_model(model_name)
         ):
             tokens = max(tokens, self._cfg.action.native_reasoning_min_tokens_floor)
         return tokens

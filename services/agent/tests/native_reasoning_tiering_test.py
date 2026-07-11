@@ -63,23 +63,33 @@ def test_helpers_default_off_are_byte_identical():
 # ---------------------------------------------------------------------------
 # A3b — reasoning discipline when ON
 # ---------------------------------------------------------------------------
-def test_a3b_minimal_effort_for_reasoning_model_only():
+def test_a3b_minimal_effort_needs_reasoning_model_AND_wire_acceptance():
     a = _action(native_reasoning_effort_discipline_enabled=True)
-    # gpt-5-mini is a reasoning model (accepts_reasoning_effort) -> minimal.
+    # gpt-5-mini: reasoning model AND wire accepts reasoning_effort -> minimal.
     assert a._micro_prompt_reasoning_effort("gpt-5-mini") == "minimal"
-    assert a._micro_prompt_reasoning_effort("openai/gpt-4.1-nano") == "minimal"
-    # A non-reasoning model is untouched (falls back to the caller default).
+    # gpt-4.1-nano: the wire accepts the param but it is NOT a reasoning model -> no hint (default).
+    assert a._micro_prompt_reasoning_effort("openai/gpt-4.1-nano") is None
+    # o-series: a reasoning model, but the wire allowlist omits it -> no hint (the token FLOOR,
+    # not the effort hint, is what protects o-series from starvation; see the floor test below).
+    assert a._micro_prompt_reasoning_effort("o3-mini") is None
+    # A plain non-reasoning model is untouched (falls back to the caller default).
     assert a._micro_prompt_reasoning_effort("gemini-3.1-pro-preview", default="high") == "high"
     assert a._micro_prompt_reasoning_effort("anthropic/claude-opus-4.7") is None
 
 
-def test_a3b_floors_reasoning_model_tokens():
+def test_a3b_floors_every_reasoning_model_incl_o_series():
     a = _action(native_reasoning_effort_discipline_enabled=True, native_reasoning_min_tokens_floor=2048)
     # A small budget is floored up for a reasoning model...
     assert a._executor_max_tokens("gpt-5-mini", 500) == 2048
+    # ...including o-series (the wire omits the effort param, but the floor still applies —
+    # this is the coverage gap the shared is_reasoning_model predicate fixes)...
+    assert a._executor_max_tokens("o3-mini", 500) == 2048
+    assert a._executor_max_tokens("openai/o1", 500) == 2048
     # ...but a budget already above the floor is unchanged.
     assert a._executor_max_tokens("gpt-5-mini", 8192) == 8192
-    # A non-reasoning model is never floored.
+    # gpt-4.1 accepts the wire param but is NOT a reasoning model -> NOT floored (no needless bump).
+    assert a._executor_max_tokens("openai/gpt-4.1-nano", 500) == 500
+    # A plain non-reasoning model is never floored.
     assert a._executor_max_tokens("gemini-3.1-pro-preview", 500) == 500
 
 
@@ -115,3 +125,14 @@ def test_a3b_and_a5_compose(monkeypatch):
     assert a._executor_max_tokens("gpt-5-mini", 500) == 2048
     # A larger base where the scaled value already clears the floor: 2000 * 2 = 4000 (> 2048).
     assert a._executor_max_tokens("gpt-5-mini", 2000) == 4000
+
+
+def test_is_reasoning_model_predicate():
+    from agent.app.model_tiers import is_reasoning_model
+    # gpt-5 family + o-series (bare and provider-prefixed) starve on hidden reasoning.
+    for m in ("gpt-5", "gpt-5-mini", "openai/gpt-5-nano", "o1", "openai/o1", "o3-mini", "o4-mini"):
+        assert is_reasoning_model(m), m
+    # gpt-4.1 accepts the wire param but is NOT a reasoning model; other families are not either.
+    for m in ("openai/gpt-4.1-nano", "gpt-4.1", "gemini-3.1-pro-preview",
+              "anthropic/claude-opus-4.7", "", None):
+        assert not is_reasoning_model(m), m
