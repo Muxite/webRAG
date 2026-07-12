@@ -338,6 +338,85 @@ class MandateNavigationHook:
                             "mandate navigation target not yet visited")
 
 
+class GroundingEvidenceEnforcementHook:
+    """Enforce the plain-grounding contract ``evaluate_grounding`` already documents but
+    that neither of the two hooks above cover: a mandate phrased as "do not guess" /
+    "based on the page you open" (``requirements.grounding``) without an explicit
+    "must visit" phrase (``MandatePhraseEnforcementHook``) or a navigation target
+    (``MandateNavigationHook``) can otherwise be planned as search-only children, run
+    to completion, and finalize with zero visited pages — the exact "0 visits, grounded:
+    False" failure `evaluate_grounding` is meant to catch but that nothing upstream
+    prevents. Once a search has completed, inject a visit seeded from its results;
+    idempotent (skips once any visit child exists or a visit has already succeeded).
+    """
+
+    def apply(
+        self,
+        graph: "IdeaDag",
+        node_id: str,
+        step_index: int,
+        mandate: str,
+        logger: logging.Logger,
+        telemetry: Optional[Any] = None,
+    ) -> None:
+        node = graph.get_node(node_id)
+        if not node or not mandate:
+            return
+
+        req = parse_mandate_requirements(mandate)
+        # The other two hooks already handle these trigger phrasings; don't double-inject.
+        if not req.grounding or req.must_visit or req.navigation:
+            return
+
+        if _has_successful_visit(graph):
+            return
+        for child_id in node.children:
+            child = graph.get_node(child_id)
+            if child and NodeDetailsExtractor.get_action(child.details) == IdeaActionType.VISIT.value:
+                return  # a visit is already planned (or ran and failed); let it play out
+
+        search_node_id = None
+        for child_id in node.children:
+            child = graph.get_node(child_id)
+            if not child:
+                continue
+            if (
+                NodeDetailsExtractor.get_action(child.details) == IdeaActionType.SEARCH.value
+                and child.details.get(DetailKey.ACTION_RESULT.value)
+            ):
+                search_node_id = child_id
+                break
+        if not search_node_id:
+            return  # nothing to visit yet; wait for a search to complete
+
+        visit_node = graph.add_child(
+            parent_id=node_id,
+            title="Visit a source page for grounded evidence",
+            details={
+                DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+                DetailKey.IS_LEAF.value: True,
+                DetailKey.JUSTIFICATION.value: (
+                    "Mandate requires grounded ('do not guess') evidence but no page has "
+                    "been visited yet; visiting a search result to substantiate the answer."
+                ),
+                DetailKey.GOAL.value: f"Visit a source page to substantiate: {mandate[:100]}",
+                "link_idea": "URL from search results or mandate",
+                "link_count": 1,
+                DetailKey.REQUIRES_DATA.value: {
+                    "type": URLS_FROM_SEARCH.name,
+                    "source_node_id": search_node_id,
+                },
+            },
+        )
+        logger.info(
+            f"[STEP {step_index}] ENFORCE: Injected grounding-evidence visit node "
+            f"{visit_node.node_id} (search source {search_node_id})"
+        )
+        _record_enforce(telemetry, step_index, visit_node.node_id,
+                        "visit (grounding evidence)",
+                        "mandate requires 'do not guess' evidence but 0 visits exist")
+
+
 def _nav_link_count() -> int:
     """How many links the follow-up visit should open. Default 1: open the single best
     candidate (the visit action surfaces a wide candidate pool and the LLM picks the one
@@ -376,6 +455,7 @@ WEB_POST_EXPANSION_HOOKS: tuple[PostExpansionHook, ...] = (
     MandateUrlInjectionHook(),
     MandatePhraseEnforcementHook(),
     MandateNavigationHook(),
+    GroundingEvidenceEnforcementHook(),
 )
 
 
