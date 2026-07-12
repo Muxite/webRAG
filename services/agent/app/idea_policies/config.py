@@ -242,6 +242,13 @@ class FinalConfig:
     chroma_results: int = 10
     max_prompt_chars: int = 200000  # absent from JSON; original call-site default
     allow_partial_success: bool = True
+    # C1b — approximator-stripped k-sample vote for the terminal answer (opt-in). When
+    # ``native_vote_k_enabled`` and ``native_vote_k`` >= 2, the finalize answer is extracted k
+    # times (anchor temp-0 + diverse temps), normalized via the approximator-stripped vote key,
+    # and the majority wins (tie-break toward the anchor). k=1 (or the flag off) == exactly one
+    # extraction, the current behavior -> byte-identical default.
+    native_vote_k_enabled: bool = False
+    native_vote_k: int = 1
 
     _KEYS: ClassVar[dict] = {
         "model": "final_model",

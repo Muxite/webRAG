@@ -179,6 +179,20 @@ def test_tool_failure_recovery_flags_default_off():
     assert on.tool_failure_recovery_enabled is True
 
 
+def test_native_vote_k_flags_default_off():
+    # C1b terminal-answer vote flags: default OFF / k=1 (single extraction = current behavior).
+    from agent.app.idea_policies.config import FinalConfig
+    empty = FinalConfig.from_settings({})
+    assert empty.native_vote_k_enabled is False
+    assert empty.native_vote_k == 1
+    prod = FinalConfig.from_settings(load_idea_dag_settings())
+    assert prod.native_vote_k_enabled is False
+    assert prod.native_vote_k == 1
+    on = FinalConfig.from_settings({"native_vote_k_enabled": 1, "native_vote_k": "3"})
+    assert on.native_vote_k_enabled is True
+    assert on.native_vote_k == 3
+
+
 def test_aggregate_builds_from_production_settings():
     # The shipped JSON must build cleanly and reflect its production values.
     cfg = IdeaConfig.from_settings(load_idea_dag_settings())

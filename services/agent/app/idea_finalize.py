@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 from typing import Any, Dict, List, Optional
+
+from agent.app.answer_vote import vote_key, majority_vote
 
 from agent.app.idea_dag import IdeaDag
 from agent.app.agent_io import AgentIO
@@ -398,6 +401,67 @@ async def _retrieve_final_chroma_context(
     return memory_manager.format_memories_for_llm(unique, max_chars=80000)
 
 
+def _deliverable_of(response: str) -> str:
+    """The terminal-answer text to vote on: the parsed ``deliverable`` field, else the raw
+    response (a non-JSON completion still carries the answer text)."""
+    try:
+        return str(json.loads(response).get("deliverable", "") or response)
+    except Exception:  # noqa: BLE001
+        return response
+
+
+async def _vote_finalize_response(
+    io: AgentIO,
+    *,
+    final_messages: list,
+    model_name: Optional[str],
+    max_tokens: Optional[int],
+    json_schema: Any,
+    reasoning_effort: Optional[str],
+    text_verbosity: Optional[str],
+    fallback_model: Optional[str],
+    timeout_seconds: int,
+    k: int,
+) -> Optional[str]:
+    """C1b: run k INDEPENDENT finalize extractions and return the response whose terminal answer
+    wins an approximator-stripped majority vote (tie-break toward the temp-0 anchor).
+
+    The first sample is anchored at temperature 0 (the deterministic best read); the remaining
+    k-1 add mild diversity (temp 0.3) to surface alternatives. Voting normalizes only the answer
+    VALUE via ``vote_key`` (approximator/units/case stripped) — it never rounds or fuzzy-matches,
+    so distinct values never merge. Returns the winning full response string (so summary/citations
+    stay consistent), or ``None`` if every sample was empty/failed (caller falls back to a single
+    call). Only reached when the flag is on and k>=2, so the default path never calls this.
+    """
+    temps = [0.0] + [0.3] * (k - 1)
+
+    async def _one(temp: float) -> Optional[str]:
+        payload = io.build_llm_payload(
+            messages=final_messages,
+            json_mode=True,
+            model_name=model_name,
+            temperature=temp,
+            max_tokens=max_tokens,
+            json_schema=json_schema,
+            reasoning_effort=reasoning_effort,
+            text_verbosity=text_verbosity,
+        )
+        return await io.query_llm_with_fallback(
+            payload, model_name=model_name, fallback_model=fallback_model,
+            timeout_seconds=timeout_seconds,
+        )
+
+    outcomes = await asyncio.gather(*[_one(t) for t in temps], return_exceptions=True)
+    # Keep valid responses in temp order so index 0 is the temp-0 anchor when it succeeded.
+    candidates = [r for r in outcomes if isinstance(r, str) and r.strip()]
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+    winner = majority_vote(candidates, key_fn=lambda r: vote_key(_deliverable_of(r)), anchor_index=0)
+    return winner
+
+
 async def build_final_payload(
     io: AgentIO,
     settings: Dict[str, Any],
@@ -541,12 +605,31 @@ async def build_final_payload(
     final_timeout = min(final_timeout, 600)
     _logger.info(f"[FINALIZE] timeout={final_timeout}s prompt_material={total_prompt_size}c")
 
-    response = await io.query_llm_with_fallback(
-        payload,
-        model_name=model_name,
-        fallback_model=cfg.generation.fallback_model,
-        timeout_seconds=final_timeout,
-    )
+    # C1b: opt-in approximator-stripped k-sample vote for the terminal answer. Default (flag off
+    # or k<2) is the single call below, byte-identical. When enabled with k>=2, the voted response
+    # replaces it (falling back to the single call only if every sample failed).
+    response = None
+    _vote_k = int(getattr(cfg.final, "native_vote_k", 1) or 1)
+    if cfg.final.native_vote_k_enabled and _vote_k >= 2:
+        response = await _vote_finalize_response(
+            io,
+            final_messages=final_messages,
+            model_name=model_name,
+            max_tokens=cfg.final.max_tokens,
+            json_schema=json_schema,
+            reasoning_effort=reasoning_effort,
+            text_verbosity=text_verbosity,
+            fallback_model=cfg.generation.fallback_model,
+            timeout_seconds=final_timeout,
+            k=_vote_k,
+        )
+    if response is None:
+        response = await io.query_llm_with_fallback(
+            payload,
+            model_name=model_name,
+            fallback_model=cfg.generation.fallback_model,
+            timeout_seconds=final_timeout,
+        )
     _logger.info(f"[FINALIZE] response={len(response) if response else 0}c")
     _logger.debug(f"[FINALIZE] response preview: {response[:500] if response else 'None'}")
     if not response:
