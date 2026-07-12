@@ -661,6 +661,19 @@ class IdeaDagEngine:
         from agent.app.idea_policies.action_constants import ActionResultExtractor
         if not ActionResultExtractor.is_success(result):
             return None
+        # C1a routing: mirrors `_confidence_triggers_reexpand`'s tool-failure gate. If the
+        # leaf's "success" is actually a tool failure (empty search results, empty visit
+        # content), a fresh subtree would just repeat the same failing fetch — the bounded
+        # in-place connector retry (`_maybe_retry_tool_failure`, already run before this
+        # point) is the correct recovery, not re-expansion. Without this the follow-up
+        # detector could still be asked to judge a tool-failure result and re-expand off
+        # it, defeating the suppression the confidence-trigger path already enforces.
+        # No-op unless `tool_failure_recovery_enabled` (default off -> byte-identical).
+        if (
+            self._cfg.action.tool_failure_recovery_enabled
+            and ActionResultExtractor.is_tool_failure(result)
+        ):
+            return None
 
         max_iters = self._cfg.got.reexpand_max_iterations
         count = int(node.details.get("_got_reexpand_count", 0))

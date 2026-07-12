@@ -272,3 +272,92 @@ def test_routing_on_still_reexpands_genuine_insufficiency():
     graph = IdeaDag(root_title="root")
     node = _node_with_result(graph, _GOOD_VISIT)
     assert engine._confidence_triggers_reexpand(graph, node.node_id, 0.1) is True
+
+
+# ---------------------------------------------------------------------------
+# Routing — the same suppression must also cover the follow-up-detector path
+# (`_reexpand_check`, driven by `got_reexpand_enabled`), not just the
+# confidence-trigger path. Regression for a composition gap: previously
+# `tool_failure_recovery_enabled` only gated `_confidence_triggers_reexpand`,
+# so a tool-failure leaf (e.g. an empty SEARCH) could still be handed to the
+# follow-up detector and re-expanded — defeating "retry, don't re-expand".
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_followup_path_off_still_consults_detector_for_tool_failure():
+    # Baseline (flag off): the follow-up detector is consulted even for a tool-failure
+    # result — this is the pre-existing (unchanged) behavior.
+    action = _CountingAction([_GOOD_SEARCH])
+    engine = _make_engine(action, got_reexpand_enabled=True, got_reexpand_max_iterations=1)
+    graph = IdeaDag(root_title="root")
+    node = _node_with_result(graph, _EMPTY_SEARCH)
+
+    calls = {"n": 0}
+
+    async def _checker(graph, node_id, model_name=None):
+        calls["n"] += 1
+        return {"needs_followup": True, "reason": "stub"}
+
+    from agent.app.got_operations import GoTOperations
+    ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
+    ops.check_needs_followup = _checker  # type: ignore[assignment]
+    engine._got = ops
+
+    verdict = await engine._reexpand_check(graph, node.node_id, 0)
+    assert calls["n"] == 1
+    assert verdict is not None
+
+
+@pytest.mark.asyncio
+async def test_followup_path_on_suppresses_reexpand_for_tool_failure():
+    # With BOTH `got_reexpand_enabled` and `tool_failure_recovery_enabled` on, a
+    # tool-failure leaf must be gated out BEFORE the follow-up detector is even
+    # consulted (mirrors the confidence-trigger suppression).
+    action = _CountingAction([_GOOD_SEARCH])
+    engine = _make_engine(
+        action,
+        got_reexpand_enabled=True,
+        got_reexpand_max_iterations=1,
+        tool_failure_recovery_enabled=True,
+    )
+    graph = IdeaDag(root_title="root")
+    node = _node_with_result(graph, _EMPTY_SEARCH)
+
+    calls = {"n": 0}
+
+    async def _checker(graph, node_id, model_name=None):
+        calls["n"] += 1
+        return {"needs_followup": True, "reason": "stub"}
+
+    from agent.app.got_operations import GoTOperations
+    ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
+    ops.check_needs_followup = _checker  # type: ignore[assignment]
+    engine._got = ops
+
+    verdict = await engine._reexpand_check(graph, node.node_id, 0)
+    assert verdict is None, "a tool-failure leaf must not re-expand when routing is on"
+    assert calls["n"] == 0, "the follow-up detector must never be consulted for a tool failure"
+
+
+@pytest.mark.asyncio
+async def test_followup_path_on_still_reexpands_genuine_insufficiency():
+    # Genuine content-insufficiency (not a tool failure) still reaches the detector.
+    action = _CountingAction([_GOOD_SEARCH])
+    engine = _make_engine(
+        action,
+        got_reexpand_enabled=True,
+        got_reexpand_max_iterations=1,
+        tool_failure_recovery_enabled=True,
+    )
+    graph = IdeaDag(root_title="root")
+    node = _node_with_result(graph, _GOOD_VISIT)
+
+    async def _checker(graph, node_id, model_name=None):
+        return {"needs_followup": True, "reason": "stub"}
+
+    from agent.app.got_operations import GoTOperations
+    ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
+    ops.check_needs_followup = _checker  # type: ignore[assignment]
+    engine._got = ops
+
+    verdict = await engine._reexpand_check(graph, node.node_id, 0)
+    assert verdict is not None
