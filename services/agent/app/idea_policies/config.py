@@ -83,6 +83,7 @@ class GoTConfig:
     step_confidence_judge_model: Optional[str] = None
     step_confidence_reexpand_enabled: bool = False
     step_confidence_reexpand_threshold: float = 0.5
+    reexpand_corrective_context_enabled: bool = False
     candidate_coverage_enabled: bool = False
     candidate_coverage_budget_extension: int = 10
     adaptive_policies: bool = True

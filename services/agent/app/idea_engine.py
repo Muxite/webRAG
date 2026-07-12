@@ -705,6 +705,15 @@ class IdeaDagEngine:
             f"follow-up (iter {count + 1}/{max_iters}): {str(verdict.get('reason', ''))[:80]}"
         )
         node.details["_got_reexpand_reason"] = verdict.get("reason", "")
+        # Opt-in (`got_reexpand_corrective_context_enabled`, JSON default False): thread the
+        # triggering judge/detector's own reason onto the node as a single-use expansion
+        # detail so the re-expansion prompt can course-correct instead of blindly re-targeting
+        # the same inadequate source. `_build_messages` consumes-and-clears it, mirroring
+        # `HUMAN_FEEDBACK`. No-op (byte-identical) when the flag is off.
+        if self._cfg.got.reexpand_corrective_context_enabled:
+            reason_text = str(verdict.get("reason", "")).strip()
+            if reason_text:
+                node.details[DetailKey.REEXPAND_REASON.value] = reason_text
         # Mark before expanding so the step() escape hatch routes this node through
         # the children-processing path on subsequent steps.
         node.details["_got_reexpanded"] = True

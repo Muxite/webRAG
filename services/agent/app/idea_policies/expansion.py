@@ -537,6 +537,20 @@ class LlmExpansionPolicy(ExpansionPolicy):
                     "HUMAN STEER (operator guidance for THIS expansion only; not part of "
                     f"the task itself):\n{feedback.strip()}"
                 )
+        # Corrective re-expansion context (opt-in via `got_reexpand_corrective_context_enabled`;
+        # engine only writes this detail when the flag is on, so the default path never sees
+        # it). Surfaces the triggering confidence-judge/follow-up-detector reason once, then
+        # consume-and-clear so it never leaks into a later, unrelated expansion of this or any
+        # other node — mirroring the HUMAN_FEEDBACK single-use pattern above.
+        if DetailKey.REEXPAND_REASON.value in node.details:
+            reexpand_reason = node.details.pop(DetailKey.REEXPAND_REASON.value, None)
+            if isinstance(reexpand_reason, str) and reexpand_reason.strip():
+                prefix_blocks.append(
+                    "CORRECTIVE CONTEXT (the previous step at this node was inadequate for "
+                    f"this reason):\n{reexpand_reason.strip()}\n"
+                    "Target a source that actually provides the required attribute; do not "
+                    "re-read the same insufficient page."
+                )
         if prefix_blocks:
             prefix = "\n".join(prefix_blocks)
             system = f"{prefix}\n{system}" if system else prefix

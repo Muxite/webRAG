@@ -143,3 +143,9 @@ class DetailKey(str, Enum):
     # `f`/`feedback`). Surfaced in the next expansion of the node and immediately
     # consumed-and-cleared, so it never persists onto the node/subtree afterward.
     HUMAN_FEEDBACK = "human_feedback"
+    # Single-use corrective hint threaded onto a re-expanded node (opt-in, gated by
+    # ``got_reexpand_corrective_context_enabled``): the triggering judge/detector's own
+    # ``reason`` for why the prior step was inadequate (low confidence or a genuine
+    # follow-up), surfaced once in the re-expansion prompt and immediately
+    # consumed-and-cleared, mirroring ``HUMAN_FEEDBACK``. Absent by default.
+    REEXPAND_REASON = "reexpand_reason"
