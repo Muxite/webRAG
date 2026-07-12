@@ -313,6 +313,17 @@ class ActionConfig:
     # micro-prompt's token budget scales by the executor model's price tier (cheap stays tight,
     # mid/premium get headroom). Default OFF -> byte-identical.
     price_tier_param_tiering_enabled: bool = False
+    # C1a — tool-failure recovery (opt-in). ``connector_retry_on_failure_enabled``: when a leaf
+    # action returns a TOOL failure (empty/timeout/HTTP-error fetch, no search results), retry the
+    # SAME action in place with bounded backoff before deciding the node's fate — so a TRANSIENT
+    # failure recovers at the source instead of the re-expansion loop spawning a subtree that
+    # repeats the failing fetch. ``tool_failure_recovery_enabled``: route the low-confidence
+    # re-expansion trigger AWAY from re-expanding a leaf whose low score was caused by a tool
+    # failure (a fresh subtree would just repeat it). Both default OFF -> byte-identical.
+    connector_retry_on_failure_enabled: bool = False
+    connector_retry_max_attempts: int = 2
+    connector_retry_backoff_seconds: float = 0.5
+    tool_failure_recovery_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "max_retries": "action_max_retries",

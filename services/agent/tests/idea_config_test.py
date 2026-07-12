@@ -155,6 +155,30 @@ def test_native_tiering_flags_default_off():
     assert on.price_tier_param_tiering_enabled is True
 
 
+def test_tool_failure_recovery_flags_default_off():
+    # C1a tool-failure recovery flags: default OFF from an empty load and the shipped JSON.
+    from agent.app.idea_policies.config import ActionConfig
+    empty = ActionConfig.from_settings({})
+    assert empty.connector_retry_on_failure_enabled is False
+    assert empty.connector_retry_max_attempts == 2
+    assert empty.connector_retry_backoff_seconds == 0.5
+    assert empty.tool_failure_recovery_enabled is False
+    prod = ActionConfig.from_settings(load_idea_dag_settings())
+    assert prod.connector_retry_on_failure_enabled is False
+    assert prod.tool_failure_recovery_enabled is False
+    # Overrides coerce.
+    on = ActionConfig.from_settings({
+        "connector_retry_on_failure_enabled": 1,
+        "connector_retry_max_attempts": "3",
+        "connector_retry_backoff_seconds": "1.5",
+        "tool_failure_recovery_enabled": "true",
+    })
+    assert on.connector_retry_on_failure_enabled is True
+    assert on.connector_retry_max_attempts == 3
+    assert on.connector_retry_backoff_seconds == 1.5
+    assert on.tool_failure_recovery_enabled is True
+
+
 def test_aggregate_builds_from_production_settings():
     # The shipped JSON must build cleanly and reflect its production values.
     cfg = IdeaConfig.from_settings(load_idea_dag_settings())

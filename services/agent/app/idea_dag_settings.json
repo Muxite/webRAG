@@ -143,5 +143,9 @@
   "visit_empty_content_retryable": true,
   "native_reasoning_effort_discipline_enabled": false,
   "native_reasoning_min_tokens_floor": 2048,
-  "price_tier_param_tiering_enabled": false
+  "price_tier_param_tiering_enabled": false,
+  "connector_retry_on_failure_enabled": false,
+  "connector_retry_max_attempts": 2,
+  "connector_retry_backoff_seconds": 0.5,
+  "tool_failure_recovery_enabled": false
 }

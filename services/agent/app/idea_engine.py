@@ -1454,6 +1454,10 @@ class IdeaDagEngine:
         )
         node.status = IdeaNodeStatus.ACTIVE
         result = await action.execute(graph, node_id, self.io)
+        # C1a: opt-in bounded in-place retry of a TOOL failure (empty/timeout/HTTP-error fetch,
+        # no search results) so a transient failure recovers at the source instead of surfacing
+        # as empty grounding. No-op unless `connector_retry_on_failure_enabled`.
+        result = await self._maybe_retry_tool_failure(graph, node_id, action, result)
         sanitized_result = self._sanitize_action_result(result) if result else None
         graph.update_details(node_id, {DetailKey.ACTION_RESULT.value: sanitized_result})
         self._record_decision(
@@ -1476,8 +1480,62 @@ class IdeaDagEngine:
         from agent.app.idea_policies.action_constants import ActionResultExtractor
         if result and ActionResultExtractor.is_success(result):
             graph.mark_action_executed(node_id, str(action_type), node.details)
-        
+
         return result
+
+    async def _maybe_retry_tool_failure(self, graph: IdeaDag, node_id: str, action, result):
+        """Bounded in-place retry of a TOOL failure (opt-in; no-op unless
+        ``connector_retry_on_failure_enabled``).
+
+        A tool failure is a fetch/search that returned no usable evidence — a timeout, an
+        HTTP error, or an EMPTY payload (no search results / no extractable content). The
+        re-expansion loop is the wrong response to a *transient* one: a fresh subtree just
+        repeats the same failing call. Here we simply re-run the SAME action, up to
+        ``connector_retry_max_attempts`` times with a small growing backoff, returning the
+        first non-failure result (or the last attempt's result if all fail). Fully bounded,
+        so it can never hang or loop; permanent failures (``retryable=False`` and not a
+        success-with-empty) are not retried.
+        """
+        if not self._cfg.action.connector_retry_on_failure_enabled:
+            return result
+        from agent.app.idea_policies.action_constants import ActionResultExtractor
+        max_attempts = max(0, int(self._cfg.action.connector_retry_max_attempts))
+        backoff = max(0.0, float(self._cfg.action.connector_retry_backoff_seconds))
+        attempt = 0
+        while (
+            attempt < max_attempts
+            and self._should_retry_tool_failure(result)
+        ):
+            attempt += 1
+            if backoff > 0:
+                await asyncio.sleep(backoff * attempt)
+            self._logger.info(
+                f"[TOOL-RETRY] node {node_id[:8]} tool_failure; retrying same action "
+                f"(attempt {attempt}/{max_attempts})"
+            )
+            retry_result = await action.execute(graph, node_id, self.io)
+            if retry_result is not None:
+                result = retry_result
+            if not ActionResultExtractor.is_tool_failure(result):
+                break
+        return result
+
+    def _should_retry_tool_failure(self, result) -> bool:
+        """Whether a tool-failure result is worth a bounded in-place retry.
+
+        Retry a transient-ish failure: a success-with-EMPTY payload (search/visit returned
+        nothing) OR an explicit failure flagged ``retryable`` (timeout / 5xx / network /
+        empty-content). Do NOT retry a permanent failure (``retryable=False``, e.g. HTTP
+        403/404/401) — re-running it just burns the budget.
+        """
+        from agent.app.idea_policies.action_constants import ActionResultExtractor
+        if not ActionResultExtractor.is_tool_failure(result):
+            return False
+        if not isinstance(result, dict):
+            return True
+        if result.get("success"):
+            return True  # success-with-empty payload: worth a transient retry
+        return ActionResultExtractor.is_retryable(result)
 
     async def _apply_action_result(self, graph: IdeaDag, node_id: str, step_index: int) -> str:
         """Single shared completion point for every executed action.
@@ -1598,6 +1656,16 @@ class IdeaDagEngine:
             return False
         from agent.app.idea_policies.action_constants import ActionResultExtractor
         if not ActionResultExtractor.is_success(result):
+            return False
+        # C1a routing: if the low confidence was caused by a TOOL failure (the fetch/search
+        # returned no usable evidence), do NOT re-expand — a fresh subtree would just repeat
+        # the failing fetch. The bounded in-place connector retry is the right recovery for
+        # that; re-expansion is reserved for a page that genuinely loaded but lacks the answer.
+        # No-op unless `tool_failure_recovery_enabled` (default off -> byte-identical).
+        if (
+            self._cfg.action.tool_failure_recovery_enabled
+            and ActionResultExtractor.is_tool_failure(result)
+        ):
             return False
         max_iters = self._cfg.got.reexpand_max_iterations
         count = int(node.details.get("_got_reexpand_count", 0))

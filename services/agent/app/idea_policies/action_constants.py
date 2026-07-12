@@ -460,8 +460,43 @@ class ActionResultExtractor:
     def is_retryable(result: Dict[str, Any]) -> bool:
         """
         Check if action result indicates it's retryable.
-        
+
         :param result: Action result dictionary
         :returns: True if retryable
         """
         return bool(result.get(ActionResultKey.RETRYABLE.value))
+
+    @staticmethod
+    def is_tool_failure(result: Dict[str, Any]) -> bool:
+        """Classify a leaf outcome as a TOOL failure vs. real content returned.
+
+        A tool failure is a fetch/search that did not return usable evidence — as opposed
+        to a page that genuinely loaded but simply lacks the answer (content-insufficiency,
+        which the re-expansion loop handles). Covers:
+
+        * a missing/non-dict result;
+        * an explicit failure (``success=False`` — timeouts, HTTP 4xx/5xx/403, network/parse
+          errors, the VISIT empty-content flip);
+        * a "successful" call that nonetheless returned an EMPTY payload — a SEARCH with no
+          results, or a VISIT with no extractable content. These are the cases currently
+          indistinguishable from real content: the tool "worked" yet grounded nothing.
+
+        Deliberately conservative: a search WITH results or a visit WITH any non-whitespace
+        content is NOT a tool failure, even if the content is off-target (that is insufficiency,
+        not a tool failure).
+        """
+        if not isinstance(result, dict):
+            return True
+        if not result.get(ActionResultKey.SUCCESS.value):
+            return True
+        action = result.get(ActionResultKey.ACTION.value)
+        if action == "search":
+            return not result.get(ActionResultKey.RESULTS.value)
+        if action == "visit":
+            content = (
+                result.get(ActionResultKey.CONTENT.value)
+                or result.get(ActionResultKey.CONTENT_FULL.value)
+                or ""
+            )
+            return not (isinstance(content, str) and content.strip())
+        return False
