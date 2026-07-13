@@ -235,7 +235,7 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Jervis Inlet as the 3rd deepest entity.
 
     Not satisfied by merely listing Jervis Inlet among the six: when another entity is also
@@ -248,7 +248,14 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
       * naming Milford Sound (MIN decoy, 6th / shallowest) as the answer;
       * naming Hardangerfjord (2nd deepest) as the answer;
       * any response that names a rival as the 3rd without placing Jervis Inlet there.
+
+    Also requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -280,7 +287,7 @@ def validate_keystone_kth(
     """KEYSTONE (hard 0/1): the 3rd deepest entity is Jervis Inlet — NOT the deepest
     (Sognefjorden, the MAX decoy that a shortcut model names) and NOT the shallowest
     (Milford Sound, the MIN decoy / most famous tourist site)."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_kth",
         "passed": passed,
@@ -328,7 +335,7 @@ def validate_winner_depth(
     """GATED secondary: the keystone's depth (~670 m, within +/- 2.5%).
     Short-circuits to 0 when the keystone is absent, so a wrong / guessed 3rd-deepest entity
     cannot bank the value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "winner_depth",
             "passed": False,
@@ -356,7 +363,7 @@ def validate_citation(
     result: Dict[str, Any], observability: Dict[str, Any]
 ) -> Dict[str, Any]:
     """GATED secondary: cites the entity pages. Short-circuits to 0 when keystone absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation",
             "passed": False,

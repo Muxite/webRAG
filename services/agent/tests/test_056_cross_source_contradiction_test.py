@@ -102,6 +102,28 @@ def test_no_visits_gate_zero():
     assert v["score"] == 0.0 and not v["passed"]
 
 
+def test_ungrounded_correct_value_gates_to_zero():
+    """Grounding requirement: the correct keystone VALUE STRING alone must NOT earn credit if the
+    agent never actually visited a page (visit.count == 0) — an ungrounded parametric-memory guess
+    of the precise 8,848.86 figure must collapse the keystone gate (and everything gated on it) to
+    0, not just the value match."""
+    r = _r(_FULL)
+    ungrounded_obs = {"visit": {"count": 0}}
+    assert t.validate_keystone_height(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_keystone_height(r, ungrounded_obs)["passed"] is False
+    assert t.validate_identifies_wrong_value(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_authoritative_citation(r, ungrounded_obs)["score"] == 0.0
+    # UN-gated coverage is unaffected by the grounding gate (it scans raw text, not the keystone).
+    assert t.validate_contradiction_coverage(r, ungrounded_obs)["score"] == 1.0
+    scores = [
+        t.validate_visits(r, ungrounded_obs)["score"],
+        t.validate_keystone_height(r, ungrounded_obs)["score"],
+        t.validate_identifies_wrong_value(r, ungrounded_obs)["score"],
+        t.validate_authoritative_citation(r, ungrounded_obs)["score"],
+    ]
+    assert sum(scores) / len(scores) < 0.75
+
+
 def test_compiled_plan_is_wellformed_has_verify_leaf_and_leaks_nothing():
     plan = t.get_compiled_plan()
     # Well-formed DAG (no cycle / missing dep).

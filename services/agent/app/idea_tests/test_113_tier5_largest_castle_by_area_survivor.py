@@ -141,8 +141,11 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    return bool(KEYSTONE_RX.search(_primary_text(result)))
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Grounding requirement: a correct-but-ungrounded parametric-memory guess (zero page
+    visits) must not earn keystone credit."""
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    return grounded and bool(KEYSTONE_RX.search(_primary_text(result)))
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
@@ -152,7 +155,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 
 def validate_keystone_area(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_area", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Malbork area 21 ha / 52 acres (or 18.038 ha) present" if passed
                       else "Keystone area (21 ha / 52 acres / 18.038 ha, Malbork) missing/incorrect"}
@@ -174,7 +177,7 @@ def validate_branch_exploration(result: Dict[str, Any], observability: Dict[str,
 
 def validate_survivor(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: correctly names the survivor (Malbork Castle)."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "survivor", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> survivor identification not credited"}
     has = bool(re.search(SURVIVOR["name_rx"], _all_text(result), re.IGNORECASE))
@@ -183,7 +186,7 @@ def validate_survivor(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

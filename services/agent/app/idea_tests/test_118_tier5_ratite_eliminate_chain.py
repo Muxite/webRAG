@@ -140,8 +140,11 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    return bool(KEYSTONE_RX.search(_primary_text(result)))
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Grounding requirement: a correct-but-ungrounded parametric-memory guess (zero page
+    visits) must not earn keystone credit."""
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    return grounded and bool(KEYSTONE_RX.search(_primary_text(result)))
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
@@ -153,7 +156,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 def validate_keystone(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE (hard 0/1): the cassowary's inner-toe claw length (up to 12 cm / 4.7 in). A memory guess
     or the wrong (famous) survivor ostrich cannot produce it."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_claw", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Inner-toe claw length 12 cm (4.7 in) present" if passed
                       else "Keystone claw length (up to 12 cm / 4.7 in, southern cassowary) missing/incorrect"}
@@ -174,7 +177,7 @@ def validate_candidate_coverage(result: Dict[str, Any], observability: Dict[str,
 
 
 def validate_survivor(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "survivor", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> survivor election not credited"}
     has = bool(re.search(SURVIVOR["name_rx"], _all_text(result), re.IGNORECASE))
@@ -183,7 +186,7 @@ def validate_survivor(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

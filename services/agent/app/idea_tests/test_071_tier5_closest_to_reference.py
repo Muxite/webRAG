@@ -262,7 +262,7 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Great Slave Lake as the candidate closest in depth to
     Lake Matano.
 
@@ -271,7 +271,13 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
     difference' assertion (tempered so a rival named as the winner — or 'closer than Great Slave
     Lake' — never counts). A terse primary answer that names only the winner (Great Slave Lake,
     with no rival in the slot) also passes. Mentioning the reference (Lake Matano) is always allowed.
-    """
+
+    Also requires GROUNDING: the value string alone is insufficient — the agent must have actually
+    visited at least one page (visit.count > 0), else an ungrounded parametric-memory guess would
+    earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -292,7 +298,7 @@ def validate_keystone_closest(result: Dict[str, Any], observability: Dict[str, A
     NOT the deepest (Lake Malawi), NOT the shallowest (Lake Superior), and NOT the most familiar
     (Lake Superior / Lake Malawi / Lake Tahoe). A model that shortcuts to a raw extreme or guesses
     a famous name mis-picks."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_closest", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": ("Great Slave Lake named as the candidate closest in depth to Lake Matano"
                        if passed else
@@ -324,7 +330,7 @@ def validate_closest_value(result: Dict[str, Any], observability: Dict[str, Any]
     """GATED secondary: the closest candidate's depth (614 m) OR the computed absolute difference
     (~24 m). Short-circuits to 0 when the keystone is absent, so a wrong/guessed winner can't bank
     the value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "closest_value", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> value not credited"}
     text = _all_text(result)
@@ -341,7 +347,7 @@ def validate_closest_value(result: Dict[str, Any], observability: Dict[str, Any]
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the lake pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

@@ -158,8 +158,11 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    return bool(KEYSTONE_RX.search(_primary_text(result)))
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Grounding requirement: a correct-but-ungrounded parametric-memory guess (zero page
+    visits) must not earn keystone credit."""
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    return grounded and bool(KEYSTONE_RX.search(_primary_text(result)))
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
@@ -172,7 +175,7 @@ def validate_keystone_pipes(result: Dict[str, Any], observability: Dict[str, Any
     """KEYSTONE (hard 0/1): the Passau organ's total pipe count (17,774). Leak-resistant — reachable
     only by electing the largest-organ survivor (Passau, not famous Vienna) and reading the pipe
     count. A memory guess or a wrong survivor cannot produce it."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_pipes", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Organ pipe count 17,774 present" if passed
                       else "Keystone pipe count (17,774, Passau Cathedral organ) missing/incorrect"}
@@ -198,7 +201,7 @@ def validate_branch_exploration(result: Dict[str, Any], observability: Dict[str,
 def validate_survivor_and_chain(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: names the survivor (Passau) AND states its organ is the largest (or the 233
     registers). Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "survivor_and_chain", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> survivor/organ resolution not credited"}
     text = _all_text(result)
@@ -211,7 +214,7 @@ def validate_survivor_and_chain(result: Dict[str, Any], observability: Dict[str,
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the source pages read. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

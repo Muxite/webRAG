@@ -117,7 +117,13 @@ def get_success_criteria() -> List[str]:
     ]
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Also requires GROUNDING: the exact identifier string alone is insufficient — the agent
+    must have actually visited at least one page (visit.count > 0), else an ungrounded
+    parametric-memory guess would earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return bool(KEYSTONE_VARIABLE.search(extract_final_text(result)))
 
 
@@ -138,7 +144,7 @@ def validate_keystone_variable(result: Dict[str, Any], observability: Dict[str, 
     an agent that read only a summary page (or answered from memory) cannot produce the exact
     identifier — it must read the seeded C source.
     """
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_flag_variable",
         "passed": passed,
@@ -179,7 +185,7 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Source URLs + CVE id cited. Short-circuits to 0.0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citations not credited"}
     text = extract_final_text(result)

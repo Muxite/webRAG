@@ -124,6 +124,30 @@ def test_partial_coverage_scores_fraction():
     assert cov["passed"] is False
 
 
+# ── grounding gate ──────────────────────────────────────────────────────────────
+
+def test_ungrounded_correct_count_gates_to_zero():
+    """Grounding requirement: the correct keystone COUNT alone must NOT earn credit if the agent
+    never actually visited a page (visit.count == 0) — an ungrounded parametric-memory guess must
+    collapse the keystone gate (and everything gated on it) to 0, not just the value match."""
+    r = _result("3", _BODY_SINGLE)
+    ungrounded_obs = {"visit": {"count": 0}}
+    assert t.validate_keystone_count(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_keystone_count(r, ungrounded_obs)["passed"] is False
+    assert t.validate_inrange_names(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_inrange_years(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_citation(r, ungrounded_obs)["score"] == 0.0
+    scores = [
+        t.validate_visits(r, ungrounded_obs)["score"],
+        t.validate_keystone_count(r, ungrounded_obs)["score"],
+        t.validate_coverage(r, ungrounded_obs)["score"],
+        t.validate_inrange_names(r, ungrounded_obs)["score"],
+        t.validate_inrange_years(r, ungrounded_obs)["score"],
+        t.validate_citation(r, ungrounded_obs)["score"],
+    ]
+    assert sum(scores) / len(scores) < 0.75
+
+
 # ── process metric ─────────────────────────────────────────────────────────────
 
 def test_no_visits_gates_visit_metric():

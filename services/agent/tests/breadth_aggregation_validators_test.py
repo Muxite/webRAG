@@ -73,9 +73,11 @@ def test_partial_coverage_scores_fraction():
 
 
 def test_no_visits_loses_visit_credit():
+    # GROUNDING-GATE fix: a correct-but-ungrounded (parametric-memory) answer must NOT earn
+    # keystone credit when there is no evidence of any page visit.
     obs = {"visit": {"count": 0}}
-    assert t5.validate_keystone_earliest(_r(_FULL), obs)["passed"]  # parametric leak possible
-    assert t5.validate_visits(_r(_FULL), obs)["score"] == 0.0       # but no evidence visits
+    assert not t5.validate_keystone_earliest(_r(_FULL), obs)["passed"]  # parametric leak blocked
+    assert t5.validate_visits(_r(_FULL), obs)["score"] == 0.0           # no evidence of visits
 
 
 def test_multiline_earliest_layout_still_credited():

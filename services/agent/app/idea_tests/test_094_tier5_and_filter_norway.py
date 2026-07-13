@@ -83,6 +83,9 @@ English-language article):
     misread or source-rounding can flip membership.
 
   ANTI-PARAMETRIC:
+    GROUNDING: keystone credit additionally requires observability.visit.count > 0 — a correct
+    keystone value reported with zero page visits (a parametric-memory guess) is rejected.
+
     Sognefjord is the longest of the six (205 km) AND the deepest (1,308 m) — a model that picks
     "the longest fjord" or the most famous one is wrong; its depth far exceeds the 750 m threshold.
     Hardangerfjord is Norway's second-longest fjord (179 km) but at 860 m is too deep.
@@ -342,9 +345,10 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names the Trondheimsfjord as the unique both-constraint
-    satisfier.
+    satisfier, AND the agent actually visited at least one page (grounding requirement — a
+    correct-but-ungrounded parametric-memory guess must not earn credit).
 
     Three acceptance paths (any one suffices):
       1. Terse: only Trondheimsfjord named (no other fjord present) — assumed to be the answer.
@@ -354,8 +358,12 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
          while no other fjord's row shows the same (handles table-style aggregation output).
 
     Rejected outright if Trondheimsfjord is absent, or if another fjord is explicitly asserted as
-    the answer, or if the enumeration table is hallucinated (a decoy also shows both-positive).
+    the answer, or if the enumeration table is hallucinated (a decoy also shows both-positive), or
+    if the agent visited zero pages.
     """
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    if not grounded:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -381,7 +389,7 @@ def validate_keystone_filter(result: Dict[str, Any], observability: Dict[str, An
     Sognefjord (205 km but 1,308 m deep) or Hardangerfjord (179 km but 860 m deep); chasing a
     shallow fjord lands on Lysefjord (422 m but only 42 km); Tysfjorden is short (62 km) and deep
     (897 m); Romsdalsfjord is shallow enough (550 m) but only 88 km long."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_filter", "passed": passed, "score": 1.0 if passed else 0.0,
         "reason": ("Trondheimsfjord named as the unique both-constraint satisfier" if passed
@@ -417,7 +425,7 @@ def validate_winner_attributes(result: Dict[str, Any], observability: Dict[str, 
     """GATED secondary: the winner's length (~130 km) and max depth (~617 m) are both stated.
     Short-circuits to 0 when the keystone is absent, so a wrong or guessed winner cannot bank the
     attribute-value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "winner_attributes", "passed": False, "score": 0.0,
             "reason": "Keystone absent -> attribute values not credited",
@@ -440,7 +448,7 @@ def validate_winner_attributes(result: Dict[str, Any], observability: Dict[str, 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites at least 3 of the 6 fjord Wikipedia pages. Short-circuits to 0
     when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation", "passed": False, "score": 0.0,
             "reason": "Keystone absent -> source URLs not credited",

@@ -100,7 +100,14 @@ def get_success_criteria() -> List[str]:
     ]
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Keystone credit requires GROUNDING: the value string alone is insufficient — the agent
+    must have actually visited at least one page (visit.count > 0), else an ungrounded
+    parametric-memory guess would earn credit. (The un-gated ``validate_coverage`` diagnostic
+    below is deliberately NOT gated on grounding — it measures breadth regardless.)"""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = extract_final_text(result)
     return bool(_EARLIEST_NEAR_AUSTEN.search(text) and _KEYSTONE_YEAR.search(text))
 
@@ -113,7 +120,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 def validate_keystone_earliest(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE: the argmin answer — Jane Austen identified as the earliest-born (1775). Hard 0/1."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_earliest", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Earliest-born = Jane Austen (1775)" if passed
                       else "Earliest-born author (Jane Austen, 1775) missing/incorrect"}
@@ -141,7 +148,7 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = extract_final_text(result).lower()

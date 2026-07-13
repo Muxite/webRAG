@@ -60,6 +60,22 @@ def test_full_answer_multi_line_scores_all():
     assert t.validate_citation(r, _OBS)["score"] == 1.0
 
 
+def test_ungrounded_correct_value_gates_keystone_but_keeps_breadth():
+    # GROUNDING-GATE fix: the correct keystone VALUE STRING alone must NOT earn credit if the
+    # agent never actually visited a page (visit.count == 0) — an ungrounded parametric-memory
+    # guess must collapse the keystone gate (and everything gated on it), while the UN-gated
+    # breadth diagnostic (both founding years) is deliberately preserved.
+    r = _r(_FULL_SINGLE)
+    ungrounded_obs = {"visit": {"count": 0}}
+    assert t.validate_keystone_difference(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_keystone_difference(r, ungrounded_obs)["passed"] is False
+    assert t.validate_chains_resolved(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_citation(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_breadth_years(r, ungrounded_obs)["score"] == 1.0
+    all_scores = [f(r, ungrounded_obs)["score"] for f in t.get_validation_functions()]
+    assert sum(all_scores) / len(all_scores) < 0.75
+
+
 def test_wrong_parametric_answer_gates_to_zero():
     # A confident-but-wrong answer: wrong universities/years and a wrong difference. Even though
     # it *mentions* both universities, every credit-bearing check must be 0 (keystone absent).

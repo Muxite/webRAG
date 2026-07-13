@@ -95,7 +95,13 @@ def _count_values(text: str) -> int:
     return found
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Keystone credit requires GROUNDING: the value string alone is insufficient — the agent
+    must have actually visited at least one page (visit.count > 0), else an ungrounded
+    parametric-memory guess would earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = extract_final_text(result).lower()
     names_longest = "akashi" in text
     has_value = bool(re.search(r"1[,\s]?991", text))
@@ -115,7 +121,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 def validate_keystone_longest(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE: correctly identify the longest-span bridge AND its value. Hard 0/1."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_longest_span",
         "passed": passed,
@@ -126,7 +132,7 @@ def validate_keystone_longest(result: Dict[str, Any], observability: Dict[str, A
 
 def validate_span_values(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """How many of the 6 exact values are present. Short-circuits when keystone absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "span_values", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> span values not credited"}
     found = _count_values(extract_final_text(result).lower())
@@ -140,7 +146,7 @@ def validate_span_values(result: Dict[str, Any], observability: Dict[str, Any]) 
 
 def validate_table(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Markdown table covering the bridges. Short-circuits when keystone absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "result_table", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> table not credited"}
     text = extract_final_text(result)

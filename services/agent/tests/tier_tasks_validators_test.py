@@ -59,10 +59,11 @@ def test_t2_full_answer_scores_all_checks():
 
 
 def test_t2_minimal_rung_loses_visit_credit_even_if_correct():
-    # Snippet-only rung can sometimes state the right answer but never visited a page.
+    # GROUNDING-GATE fix: snippet-only rung can sometimes state the right answer but never
+    # visited a page — this must NOT earn keystone credit (blocks parametric-memory leakage).
     r = _result(_FULL_ANSWER)
     obs = {"visit": {"count": 0}}
-    assert t2.validate_keystone_combination(r, obs)["passed"]
+    assert not t2.validate_keystone_combination(r, obs)["passed"]
     vb = t2.validate_visited_both(r, obs)
     assert not vb["passed"] and vb["score"] == 0.0
 

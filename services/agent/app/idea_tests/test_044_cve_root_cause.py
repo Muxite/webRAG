@@ -95,7 +95,13 @@ def get_success_criteria() -> List[str]:
     ]
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Keystone credit requires GROUNDING: the value string alone is insufficient — the agent
+    must have actually visited at least one page (visit.count > 0), else an ungrounded
+    parametric-memory guess would earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return bool(re.search(KEYSTONE_FUNCTION, extract_final_text(result), re.IGNORECASE))
 
 
@@ -112,7 +118,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 def validate_keystone_function(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE: the exact vulnerable function name. Hard 0/1."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_vulnerable_function",
         "passed": passed,
@@ -127,7 +133,7 @@ def validate_root_cause(result: Dict[str, Any], observability: Dict[str, Any]) -
     The seeded source is the *fixed* file (uses strcmp); match_list only appears in the
     vulnerable version / diff, so it is credited as a bonus but not required.
     """
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "root_cause", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> root cause not credited"}
     text = extract_final_text(result)
@@ -144,7 +150,7 @@ def validate_root_cause(result: Dict[str, Any], observability: Dict[str, Any]) -
 
 def validate_file_and_fix(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Source file, fix version, and affected config. Short-circuits when keystone absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "file_fix_config", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> file/fix/config not credited"}
     text = extract_final_text(result)
@@ -163,7 +169,7 @@ def validate_file_and_fix(result: Dict[str, Any], observability: Dict[str, Any])
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Source URLs cited. Short-circuits when keystone absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citations not credited"}
     text = extract_final_text(result)

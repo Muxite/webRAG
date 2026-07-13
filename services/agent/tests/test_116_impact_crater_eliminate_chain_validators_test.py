@@ -106,6 +106,26 @@ def test_no_visits_scores_fraction_and_gate():
     assert t.validate_visits(r, {"visit": {"count": 0}})["score"] == 0.0
 
 
+def test_ungrounded_correct_value_gates_to_zero():
+    """Grounding requirement: the correct keystone VALUE STRING alone must NOT earn credit if the
+    agent never actually visited a page (visit.count == 0) — an ungrounded parametric-memory guess
+    must collapse the keystone gate (and everything gated on it) to 0, not just the value match."""
+    r = _r(_FULL_SINGLE)
+    ungrounded_obs = {"visit": {"count": 0}}
+    assert t.validate_keystone(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_keystone(r, ungrounded_obs)["passed"] is False
+    assert t.validate_survivor(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_citations(r, ungrounded_obs)["score"] == 0.0
+    scores = [
+        t.validate_visits(r, ungrounded_obs)["score"],
+        t.validate_keystone(r, ungrounded_obs)["score"],
+        t.validate_candidate_coverage(r, ungrounded_obs)["score"],
+        t.validate_survivor(r, ungrounded_obs)["score"],
+        t.validate_citations(r, ungrounded_obs)["score"],
+    ]
+    assert sum(scores) / len(scores) < 0.75
+
+
 def test_deliverables_slot_is_primary_for_keystone():
     r = {"output": {"final_deliverable": "see structured answer"},
          "deliverables": ["Vredefort age: 2.023 Ga", "survivor: Vredefort"]}

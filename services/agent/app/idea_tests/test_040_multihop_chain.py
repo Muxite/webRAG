@@ -88,9 +88,10 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 
 def validate_keystone_district(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """KEYSTONE: the final hop's district must be correct. Hard 0/1."""
-    text = extract_final_text(result).lower()
-    passed = bool(re.search(KEYSTONE_DISTRICT, text))
+    """KEYSTONE: the final hop's district must be correct. Hard 0/1. Requires GROUNDING: the
+    value string alone is insufficient — the agent must have actually visited at least one
+    page (visit.count > 0), else an ungrounded parametric-memory guess would earn credit."""
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_final_district",
         "passed": passed,
@@ -99,13 +100,16 @@ def validate_keystone_district(result: Dict[str, Any], observability: Dict[str, 
     }
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return bool(re.search(KEYSTONE_DISTRICT, extract_final_text(result).lower()))
 
 
 def validate_chain_intermediate(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Intermediate hops. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "chain_intermediate", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> intermediate hops not credited"}
     text = extract_final_text(result).lower()
@@ -122,7 +126,7 @@ def validate_chain_intermediate(result: Dict[str, Any], observability: Dict[str,
 
 def validate_chain_urls(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """The 3 source URLs. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "chain_urls", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = extract_final_text(result).lower()

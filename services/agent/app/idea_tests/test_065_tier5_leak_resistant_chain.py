@@ -117,7 +117,13 @@ def _primary_text(result: Dict[str, Any]) -> str:
     return extract_final_text(result)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Credit requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess of the town's elevation would earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return bool(re.search(KEYSTONE_ELEVATION, _primary_text(result)))
 
 
@@ -130,7 +136,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 def validate_keystone_elevation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE: the birthplace town's infobox elevation (162 m). Hard 0/1, leak-resistant gate."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_elevation", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Elevation 162 m present" if passed
                       else "Elevation (162 m, Parral, Chile) missing/incorrect"}
@@ -157,7 +163,7 @@ def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) ->
     """GATED secondary: cites the source pages the chain had to read. Short-circuits to 0 when the
     keystone is absent so a wrong-terminus run cannot bank partial credit here (keeps scores bimodal).
     """
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _primary_text(result).lower()

@@ -186,11 +186,18 @@ def _int_values(text: str) -> List[int]:
     return vals
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] reports the first-four-season SUM inside the tight band
     [77, 79] (= 78 +/- 1). The band ACCEPTS the exact total (and a single +/-1 misread) but REJECTS
     the printed whole-series aggregate (91, the distractor), every drop-one partial sum (<= 65) and
-    the all-five sum (91)."""
+    the all-five sum (91).
+
+    Also requires GROUNDING: the value string alone is insufficient — the agent must have actually
+    visited at least one page (visit.count > 0), else an ungrounded parametric-memory guess would
+    earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return any(n in KEYSTONE_BAND for n in _int_values(_primary_text(result)))
 
 
@@ -205,7 +212,7 @@ def validate_keystone_subset_sum(result: Dict[str, Any], observability: Dict[str
     """KEYSTONE (hard 0/1): the COMPUTED first-four-season subset sum, 78 = 13 + 22 + 19 + 24,
     reported in deliverables[0] within [77, 79]. A model that grabs the salient whole-series total
     (91, the aggregate distractor), drops a season, or mis-adds lands outside the band and fails."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_subset_sum", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": ("First-four-season sum (78 = 13+22+19+24) present in band [77,79]" if passed
                        else "First-four-season sum (78) missing/incorrect (beware the whole-series "
@@ -230,7 +237,7 @@ def validate_perseason_figures(result: Dict[str, Any], observability: Dict[str, 
     """GATED secondary: are ALL four per-season counts (13, 22, 19, 24) reported? Short-circuits to
     0 when the keystone is absent, so a run that grabs the distractor or mis-adds cannot bank credit
     for the per-item figures."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "perseason_figures", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> per-season figures not credited"}
     present = set(_int_values(_all_text(result)))
@@ -242,7 +249,7 @@ def validate_perseason_figures(result: Dict[str, Any], observability: Dict[str, 
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the season pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

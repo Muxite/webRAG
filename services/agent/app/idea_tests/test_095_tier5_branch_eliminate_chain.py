@@ -188,9 +188,12 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    """KEYSTONE gate: the Dorset Stour's catchment area (1,240 km² / 480 sq mi) in the primary text."""
-    return bool(KEYSTONE_RX.search(_primary_text(result)))
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """KEYSTONE gate: the Dorset Stour's catchment area (1,240 km² / 480 sq mi) in the primary text,
+    AND the agent actually visited at least one page (grounding requirement — a correct-but-
+    ungrounded parametric-memory guess must not earn credit)."""
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    return grounded and bool(KEYSTONE_RX.search(_primary_text(result)))
 
 
 # ── validation functions ─────────────────────────────────────────────────────────────────────
@@ -210,7 +213,7 @@ def validate_keystone_catchment(result: Dict[str, Any], observability: Dict[str,
     survivor), read that it merges with the Stour, disambiguate to the Dorset Stour, read its
     catchment. A memory guess, a wrong survivor (famous Warwickshire/Bristol decoy), or the wrong
     Stour cannot produce 1,240 km²."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_catchment", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Dorset Stour catchment 1,240 km² (480 sq mi) present" if passed
                       else "Keystone catchment (1,240 km² / 480 sq mi, River Stour, Dorset) missing/incorrect"}
@@ -249,7 +252,7 @@ def validate_survivor_and_stour(result: Dict[str, Any], observability: Dict[str,
     """GATED secondary: the chain was resolved correctly — the output names the survivor (the
     Hampshire/Salisbury Avon) AND the Dorset Stour. Short-circuits to 0 when the keystone is absent,
     keeping scores bimodal so an incidental mention cannot bank partial credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "survivor_and_stour", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> survivor/Stour resolution not credited"}
     text = _all_text(result)
@@ -264,7 +267,7 @@ def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) ->
     """GATED secondary: cites the source pages the chain had to read (the survivor Avon page and the
     Dorset Stour page count double; the other Avon pages also count). Short-circuits to 0 when the
     keystone is absent so a wrong-terminus run cannot bank citation credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

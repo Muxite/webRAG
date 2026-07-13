@@ -115,7 +115,13 @@ def _primary_text(result: Dict[str, Any]) -> str:
     return extract_final_text(result)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Also requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return bool(re.search(KEYSTONE_DIFF, _primary_text(result)))
 
 
@@ -134,7 +140,7 @@ def validate_keystone_difference(
     result: Dict[str, Any], observability: Dict[str, Any]
 ) -> Dict[str, Any]:
     """KEYSTONE: the COMPUTED terminal difference 966 − 647 = 319. Hard 0/1 gate."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_difference",
         "passed": passed,
@@ -173,7 +179,7 @@ def validate_chains_resolved(
 ) -> Dict[str, Any]:
     """GATED secondary: did the response name BOTH rivers? Short-circuits to 0 when the
     keystone is absent so a wrong-arithmetic run cannot bank partial credit here."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "chains_resolved",
             "passed": False,
@@ -196,7 +202,7 @@ def validate_citation(
     result: Dict[str, Any], observability: Dict[str, Any]
 ) -> Dict[str, Any]:
     """GATED secondary: cites at least one of the two Wikipedia river pages."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation",
             "passed": False,

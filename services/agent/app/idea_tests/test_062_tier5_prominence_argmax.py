@@ -201,14 +201,21 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Jengish Chokusu as the most prominent peak.
 
     Word-bounded, and NOT satisfied by merely listing Jengish among the six: when another peak is
     also named, Jengish must be the one tied to a 'most / highest prominence' assertion (tempered so
     a rival named as the winner — or 'more prominent than Jengish' — never counts). A terse primary
     answer that names only the winner (Jengish, with no rival in the slot) also passes.
+
+    Credit requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -228,7 +235,7 @@ def validate_keystone_argmax(result: Dict[str, Any], observability: Dict[str, An
     """KEYSTONE (hard 0/1): the most topographically prominent peak is Jengish Chokusu — NOT the
     tallest peak (Kongur Tagh). A model that shortcuts to elevation/fame, or guesses the most
     famous name, mis-picks Kongur Tagh (the elevation decoy)."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_argmax", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Jengish Chokusu named as the most topographically prominent peak" if passed
                       else "Most-prominent peak (Jengish Chokusu) missing/incorrect (beware: Kongur "
@@ -256,7 +263,7 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 def validate_winner_prominence(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: the winner's prominence (~4,148 m, within +/- 2.5%). Short-circuits to 0
     when the keystone is absent, so a wrong/guessed winner can't bank the value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "winner_prominence", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> prominence value not credited"}
     text = _all_text(result)
@@ -271,7 +278,7 @@ def validate_winner_prominence(result: Dict[str, Any], observability: Dict[str, 
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the peak pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

@@ -277,13 +277,20 @@ def _int_values(text: str) -> List[int]:
     return vals
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: ``deliverables[0]`` contains the integer ``IN_RANGE_COUNT`` (= 3).
 
     The primary answer slot must hold the computed count of institutions founded within
     [1940, 1963]. A model that hallucinates a founding year, drops an entity, or mis-binds a
     year lands on a count ≠ 3 (typically 2 or 4) and fails. Only the correct value 3 passes.
+
+    Also requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return IN_RANGE_COUNT in _int_values(_primary_text(result))
 
 
@@ -310,7 +317,7 @@ def validate_keystone_count(result: Dict[str, Any], observability: Dict[str, Any
     Theatre founded ~1975' → count 2). Even one wrong year moves the count off 3. Only a model that
     reads all six infoboxes, applies the range, and counts correctly passes.
     """
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     in_names = ", ".join(e["name"] for e in IN_RANGE)
     return {
         "check": "keystone_count",
@@ -353,7 +360,7 @@ def validate_inrange_names(result: Dict[str, Any], observability: Dict[str, Any]
     Short-circuits to 0 when the keystone (count) is absent, so a run that reports the wrong count
     cannot bank partial credit for naming some of the in-range institutions. After the keystone
     gate, checks that all three in-range names appear anywhere in the reported text."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "inrange_names",
             "passed": False,
@@ -378,7 +385,7 @@ def validate_inrange_years(result: Dict[str, Any], observability: Dict[str, Any]
     """GATED secondary: all three in-range founding years (1946, 1949, 1957) explicitly reported.
     Short-circuits to 0 when the keystone is absent, so a wrong count cannot bank credit for the
     per-institution founding years."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "inrange_years",
             "passed": False,
@@ -400,7 +407,7 @@ def validate_inrange_years(result: Dict[str, Any], observability: Dict[str, Any]
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: source URLs for the six institution pages cited. Short-circuits to 0 when
     the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation",
             "passed": False,

@@ -208,7 +208,7 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Jan Koller as the highest-ratio player.
 
     Word-bounded, and NOT satisfied by merely listing Koller among the five: when another player is
@@ -216,6 +216,9 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
     rival named as the winner — or 'more than Koller' — never counts). A terse primary answer that
     names only the winner (Koller, with no rival in the slot) also passes.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -236,7 +239,7 @@ def validate_keystone_argmax(result: Dict[str, Any], observability: Dict[str, An
     most-goals player (Miroslav Klose) and NOT the most-caps player (Robbie Keane). A model that
     shortcuts to a raw quantity, inverts the ratio (caps/goals -> Larsson), or guesses the most
     famous name (Klose) mis-picks."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_argmax", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Jan Koller named as the highest goals-per-appearance ratio" if passed
                       else "Highest-ratio player (Jan Koller) missing/incorrect (beware: Klose has "
@@ -264,7 +267,7 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 def validate_winner_ratio(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: the winner's computed ratio (~0.60, within +/- 3%). Short-circuits to 0
     when the keystone is absent, so a wrong/guessed winner can't bank the value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "winner_ratio", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> ratio value not credited"}
     text = _all_text(result)
@@ -279,7 +282,7 @@ def validate_winner_ratio(result: Dict[str, Any], observability: Dict[str, Any])
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the player pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

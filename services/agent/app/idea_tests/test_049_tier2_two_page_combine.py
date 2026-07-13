@@ -66,15 +66,20 @@ def _gap_ok(text: str) -> bool:
     return bool(re.search(r"(\b3\b|three)\s*year", text))
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    """KEYSTONE: the combined answer — both years AND the 3-year gap."""
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """KEYSTONE: the combined answer — both years AND the 3-year gap. Requires GROUNDING: the
+    value string alone is insufficient — the agent must have actually visited at least one
+    page (visit.count > 0), else an ungrounded parametric-memory guess would earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = extract_final_text(result).lower()
     return _both_years_present(text) and _gap_ok(text)
 
 
 def validate_keystone_combination(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE: both years present and the derived 3-year gap. Hard 0/1."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_combination",
         "passed": passed,
@@ -85,7 +90,7 @@ def validate_keystone_combination(result: Dict[str, Any], observability: Dict[st
 
 def validate_ordering(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Statue of Liberty named as the earlier of the two. Short-circuits on keystone."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "ordering", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> ordering not credited"}
     text = extract_final_text(result).lower()
@@ -103,7 +108,7 @@ def validate_ordering(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 
 def validate_grounding(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Cited BOTH source pages. Short-circuits when keystone absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "grounding", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> grounding not credited"}
     text = extract_final_text(result).lower()
@@ -121,7 +126,7 @@ def validate_grounding(result: Dict[str, Any], observability: Dict[str, Any]) ->
 def validate_visited_both(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Evidence the answer came from reading both pages (>=2 visits). Discriminates the
     snippet-only ``minimal`` rung from rungs that actually crawl."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "visited_both", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> visit credit withheld"}
     visits = int(observability.get("visit", {}).get("count", 0) or 0)

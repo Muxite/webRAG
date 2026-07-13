@@ -123,9 +123,16 @@ def get_success_criteria() -> List[str]:
     ]
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] (the primary answer text) carries the buried reopening date
-    with day+month+year precision (15 December 2001), in any common formatting."""
+    with day+month+year precision (15 December 2001), in any common formatting.
+
+    Credit requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit for this buried, page-only detail."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return bool(KEYSTONE_DATE.search(extract_final_text(result)))
 
 
@@ -141,7 +148,7 @@ def validate_keystone_reopen_date(result: Dict[str, Any], observability: Dict[st
     """KEYSTONE (hard 0/1): the buried reopening date (15 December 2001) reported with full
     day+month+year precision. The bare year alone does NOT pass — that keeps a parametric guess
     from scoring; only actually reading the late section yields '15 December'."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_reopen_date", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": ("Buried reopening date (15 December 2001) reported precisely" if passed
                        else "Buried reopening date (15 December 2001) missing or imprecise")}
@@ -166,7 +173,7 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """SECONDARY (gated on keystone): cites the Leaning Tower of Pisa page. Short-circuits to 0
     when the keystone is absent, so a wrong needle cannot earn citation credit (bimodal)."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citation not credited"}
     cited = bool(re.search(ARTICLE_SLUG, extract_final_text(result).lower()))

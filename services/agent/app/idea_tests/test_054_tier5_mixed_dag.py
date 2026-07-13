@@ -68,7 +68,14 @@ def get_success_criteria() -> List[str]:
     ]
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Keystone credit requires GROUNDING: the value string alone is insufficient — the agent
+    must have actually visited at least one page (visit.count > 0), else an ungrounded
+    parametric-memory guess would earn credit. (The un-gated ``validate_breadth_authors``
+    diagnostic below is deliberately NOT gated on grounding — it measures breadth regardless.)"""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return bool(re.search(KEYSTONE_UNIV, extract_final_text(result).lower()))
 
 
@@ -80,7 +87,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 def validate_keystone_university(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE: the dependent hop's fact — the master's university (Cornell). Hard 0/1."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_university", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Cornell present" if passed else "Master's university (Cornell) missing/incorrect"}
 
@@ -101,7 +108,7 @@ def validate_breadth_authors(result: Dict[str, Any], observability: Dict[str, An
 
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citations not credited"}
     text = extract_final_text(result).lower()

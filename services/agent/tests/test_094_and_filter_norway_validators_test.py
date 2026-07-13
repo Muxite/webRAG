@@ -91,8 +91,27 @@ def test_partial_coverage_scores_fraction():
 
 def test_no_visits_loses_visit_credit():
     obs = {"visit": {"count": 0}}
-    assert t.validate_keystone_filter(_r(_FULL), obs)["passed"]     # parametric leak possible
-    assert t.validate_visits(_r(_FULL), obs)["score"] == 0.0        # but no evidence visits
+    assert t.validate_visits(_r(_FULL), obs)["score"] == 0.0        # no evidence visits
+
+
+def test_ungrounded_correct_value_gates_to_zero():
+    """Grounding requirement: the correct keystone VALUE/TABLE alone must NOT earn credit if the
+    agent never actually visited a page (visit.count == 0) — an ungrounded parametric-memory guess
+    must collapse the keystone gate (and everything gated on it) to 0, not just the value match."""
+    ungrounded_obs = {"visit": {"count": 0}}
+    r = _r(_FULL)
+    assert t.validate_keystone_filter(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_keystone_filter(r, ungrounded_obs)["passed"] is False
+    assert t.validate_winner_attributes(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_citation(r, ungrounded_obs)["score"] == 0.0
+    scores = [
+        t.validate_visits(r, ungrounded_obs)["score"],
+        t.validate_keystone_filter(r, ungrounded_obs)["score"],
+        t.validate_coverage(r, ungrounded_obs)["score"],
+        t.validate_winner_attributes(r, ungrounded_obs)["score"],
+        t.validate_citation(r, ungrounded_obs)["score"],
+    ]
+    assert sum(scores) / len(scores) < 0.75
 
 
 def test_compiled_plan_is_six_selfdescribing_leaves_and_leaks_nothing():

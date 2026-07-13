@@ -140,6 +140,28 @@ def test_visit_gate():
     assert t.validate_visits(r, {"visit": {"count": 2}})["score"] == 1.0
 
 
+def test_ungrounded_correct_value_gates_to_zero():
+    """Grounding requirement: the correct keystone VALUE STRING alone must NOT earn credit if the
+    agent never actually visited a page (visit.count == 0) — an ungrounded parametric-memory guess
+    of Frisco as the larger-percentage city must collapse the keystone gate (and everything gated
+    on it) to 0."""
+    r = _r(_FULL_SINGLE)
+    ungrounded_obs = {"visit": {"count": 0}}
+    assert t.validate_keystone_percent_winner(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_keystone_percent_winner(r, ungrounded_obs)["passed"] is False
+    assert t.validate_winner_percentage(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_citation(r, ungrounded_obs)["score"] == 0.0
+    # UN-gated coverage is unaffected by the grounding gate (it scans raw text, not the keystone).
+    assert t.validate_coverage(r, ungrounded_obs)["score"] == 1.0
+    scores = [
+        t.validate_visits(r, ungrounded_obs)["score"],
+        t.validate_keystone_percent_winner(r, ungrounded_obs)["score"],
+        t.validate_winner_percentage(r, ungrounded_obs)["score"],
+        t.validate_citation(r, ungrounded_obs)["score"],
+    ]
+    assert sum(scores) / len(scores) < 0.75
+
+
 def test_compiled_plan_validates_and_is_four_leaf_fanout():
     plan = t.get_compiled_plan()
     cp.validate_plan(plan)  # must not raise (well-formed, acyclic, deps resolve)

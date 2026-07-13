@@ -222,14 +222,21 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names the Salto Grande Dam as the median by opening year.
 
     Word-bounded, and NOT satisfied by merely listing Salto Grande among the five: when another dam
     is also named, Salto Grande must be the one tied to a 'median / middle / 3rd' assertion
     (tempered so a rival named as the median — or '... than Salto Grande' — never counts). A terse
     primary answer that names only the winner (Salto Grande, with no rival in the slot) also passes.
+
+    Credit requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -250,7 +257,7 @@ def validate_keystone_median(result: Dict[str, Any], observability: Dict[str, An
     (Bhumibol Dam), NOT the latest (Bakun Dam), and NOT the engineering record-holder (Daniel-Johnson
     Dam, world's largest arch-and-buttress dam). A model that shortcuts to an extreme or guesses a
     notable name mis-picks."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_median", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Salto Grande Dam named as the median by opening year" if passed
                       else "Median dam (Salto Grande Dam, 1979) missing/incorrect (beware: "
@@ -279,7 +286,7 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 def validate_median_year(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: the median dam's opening year (1979). Short-circuits to 0 when the
     keystone is absent, so a wrong/guessed median can't bank the value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "median_year", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> opening-year value not credited"}
     text = _all_text(result)
@@ -291,7 +298,7 @@ def validate_median_year(result: Dict[str, Any], observability: Dict[str, Any]) 
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the dam pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

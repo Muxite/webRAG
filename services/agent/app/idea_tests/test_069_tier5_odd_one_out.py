@@ -262,7 +262,7 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate (negation-robust): deliverables[0] names Bosnia and Herzegovina as the country
     that does NOT satisfy the shared property "is landlocked".
 
@@ -274,7 +274,14 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
         asserted as the odd-one-out / exception, and (b) Bosnia must be the one tied to the
         not-landlocked / has-a-coast / is-the-exception assertion (window not crossing another
         country's name).
+
+    Credit requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_BOSNIA, text, re.IGNORECASE):
         return False
@@ -299,7 +306,7 @@ def validate_keystone_odd_one_out(result: Dict[str, Any], observability: Dict[st
     NOT satisfy the shared property "is landlocked" (it has a 20 km Adriatic coast at Neum). A model
     that flips the negation and names a landlocked country (Austria / North Macedonia / Serbia /
     Slovakia), or that names Bosnia but asserts Bosnia IS landlocked, gets no credit."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_odd_one_out", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Bosnia and Herzegovina named as the one that is NOT landlocked (the odd one "
                       "out)" if passed
@@ -329,7 +336,7 @@ def validate_why_exception(result: Dict[str, Any], observability: Dict[str, Any]
     """GATED secondary: states WHY Bosnia is the exception -- the property value that differs (its
     Adriatic / Neum coastline / that it is not landlocked). Short-circuits to 0 when the keystone is
     absent, so a wrong/guessed odd-one-out cannot bank the reason credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "why_exception", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> reason (why it is the exception) not credited"}
     ok = bool(_WHY.search(_all_text(result)))
@@ -341,7 +348,7 @@ def validate_why_exception(result: Dict[str, Any], observability: Dict[str, Any]
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the country pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

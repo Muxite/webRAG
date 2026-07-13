@@ -94,6 +94,26 @@ def test_visits_gate():
     assert t.validate_visits(r, {"visit": {"count": 3}})["passed"] is False
 
 
+def test_ungrounded_correct_value_gates_to_zero():
+    """Grounding requirement: the correct keystone VALUE STRING alone must NOT earn credit if the
+    agent never actually visited a page (visit.count == 0) — an ungrounded parametric-memory guess
+    must collapse the keystone gate (and everything gated on it) to 0, not just the value match."""
+    r = _r(_FULL_SINGLE)
+    ungrounded_obs = {"visit": {"count": 0}}
+    assert t.validate_keystone_area(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_keystone_area(r, ungrounded_obs)["passed"] is False
+    assert t.validate_survivor(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_citations(r, ungrounded_obs)["score"] == 0.0
+    scores = [
+        t.validate_visits(r, ungrounded_obs)["score"],
+        t.validate_keystone_area(r, ungrounded_obs)["score"],
+        t.validate_branch_exploration(r, ungrounded_obs)["score"],
+        t.validate_survivor(r, ungrounded_obs)["score"],
+        t.validate_citations(r, ungrounded_obs)["score"],
+    ]
+    assert sum(scores) / len(scores) < 0.75
+
+
 def test_compiled_plan_is_branch_then_chain():
     plan = t.get_compiled_plan()
     cp.validate_plan(plan)

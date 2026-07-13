@@ -107,6 +107,24 @@ def test_partial_coverage_scores_fraction():
     assert t.validate_keystone_variable(r, _OBS)["score"] == 0.0
 
 
+def test_ungrounded_correct_variable_gates_to_zero():
+    """Grounding requirement: the correct keystone IDENTIFIER STRING alone must NOT earn credit if
+    the agent never actually visited a page (visit.count == 0) — an ungrounded parametric-memory
+    guess must collapse the keystone gate (and the citation secondary) to 0, not just the value
+    match. Coverage remains un-gated by design."""
+    r = _r(_FULL_SINGLE)
+    ungrounded_obs = {"visit": {"count": 0}}
+    assert t.validate_keystone_variable(r, ungrounded_obs)["score"] == 0.0
+    assert t.validate_keystone_variable(r, ungrounded_obs)["passed"] is False
+    assert t.validate_citations(r, ungrounded_obs)["score"] == 0.0
+    scores = [
+        t.validate_visits(r, ungrounded_obs)["score"],
+        t.validate_keystone_variable(r, ungrounded_obs)["score"],
+        t.validate_citations(r, ungrounded_obs)["score"],
+    ]
+    assert sum(scores) / len(scores) < 0.75
+
+
 def test_no_visits_scores_fraction_and_gate():
     r = _r(_FULL_SINGLE)
     assert t.validate_visits(r, {"visit": {"count": 3}})["score"] == 1.0

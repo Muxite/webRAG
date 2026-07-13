@@ -261,14 +261,21 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Deriner Dam as the tallest of the six.
 
     Word-bounded, and NOT satisfied by merely listing Deriner among the six: when another dam is
     also named, Deriner must be the one tied to a 'tallest / greatest height' assertion (tempered
     so a rival named as the winner — or 'taller than Deriner' — never counts). A terse primary
     answer naming only the winner (Deriner, with no rival in the slot) also passes.
+
+    Also requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -308,7 +315,7 @@ def validate_keystone_argmax(
     name (Atatürk Dam, 169 m, only 4th). A model that guesses the salient name or the national
     height record (Yusufeli, not in the set) mis-picks.
     """
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_argmax",
         "passed": passed,
@@ -356,7 +363,7 @@ def validate_winner_height(
     """GATED secondary: the winner's height (~249 m, accepted 244–254 m). Short-circuits to 0
     when the keystone is absent, so a guessed winner cannot bank the value credit.
     """
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "winner_height",
             "passed": False,
@@ -380,7 +387,7 @@ def validate_citation(
     result: Dict[str, Any], observability: Dict[str, Any]
 ) -> Dict[str, Any]:
     """GATED secondary: cites the dam pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation",
             "passed": False,

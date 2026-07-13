@@ -221,14 +221,21 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Russky Bridge as having the longest main span.
 
     Not satisfied by merely listing Russky Bridge among the six: when another bridge is also
     named, Russky must be the one tied to a 'longest / greatest span' assertion (tempered so a
     rival named as winner — or 'longer than Russky' — never counts). A terse primary answer that
     names only the winner (Russky, with no rival in the slot) also passes.
+
+    Also requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -254,7 +261,7 @@ def validate_keystone_argmax(
     """KEYSTONE (hard 0/1): the bridge with the longest main span is Russky Bridge — NOT the most
     famous bridge (Pont de Normandie, which is only 4th at 856 m). A model that shortcuts to
     fame, or vaguely recalls the 1994 record-holder, mis-picks Pont de Normandie."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_argmax",
         "passed": passed,
@@ -298,7 +305,7 @@ def validate_winner_span(
 ) -> Dict[str, Any]:
     """GATED secondary: the winner's span (~1,104 m, within +/-2.5%). Short-circuits to 0 when
     the keystone is absent, so a wrong/guessed winner can't bank the value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "winner_span",
             "passed": False,
@@ -326,7 +333,7 @@ def validate_citation(
 ) -> Dict[str, Any]:
     """GATED secondary: cites the bridge pages. Short-circuits to 0 when the keystone is
     absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation",
             "passed": False,

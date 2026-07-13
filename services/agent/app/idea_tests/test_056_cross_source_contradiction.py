@@ -113,8 +113,15 @@ def get_success_criteria() -> List[str]:
     ]
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    """KEYSTONE: the authoritative-correct current height (8,848.86 m / 29,031.7 ft) is present."""
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """KEYSTONE: the authoritative-correct current height (8,848.86 m / 29,031.7 ft) is present.
+
+    Credit requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess of the precise ``.86`` figure would earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return bool(_CORRECT_RE.search(extract_final_text(result)))
 
 
@@ -126,7 +133,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 def validate_keystone_height(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE: authoritative-correct current official height present. Hard 0/1."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_height", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Current official height (8,848.86 m / 29,031.7 ft) present" if passed
                       else "Authoritative-correct current height (8,848.86 m / 29,031.7 ft) missing"}
@@ -152,7 +159,7 @@ def validate_identifies_wrong_value(result: Dict[str, Any], observability: Dict[
     """SECONDARY (gated): the agent identifies the commonly-cited 8,848 m / 29,029 ft as the
     OUTDATED / superseded figure (the wrong value flagged near an outdated marker), not merely
     echoed. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "identifies_wrong_value", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> wrong-value identification not credited"}
     flagged = bool(_IDENT_RE.search(extract_final_text(result)))
@@ -163,7 +170,7 @@ def validate_identifies_wrong_value(result: Dict[str, Any], observability: Dict[
 def validate_authoritative_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """SECONDARY (gated): the authoritative Mount Everest page is cited. Short-circuits to 0 when
     the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "authoritative_citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citation not credited"}
     cited = bool(re.search(r"wiki/mount_everest", extract_final_text(result).lower()))

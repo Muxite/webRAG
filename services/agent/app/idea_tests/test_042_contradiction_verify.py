@@ -97,7 +97,13 @@ def _antikythera_refuted(text: str) -> bool:
     return ("antikythera" in text) and ("1901" in text) and bool(re.search(_FALSE_MARKER, text))
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Keystone credit requires GROUNDING: the value string alone is insufficient — the agent
+    must have actually visited at least one page (visit.count > 0), else an ungrounded
+    parametric-memory guess would earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = extract_final_text(result).lower()
     return _vesta_refuted(text) and _antikythera_refuted(text)
 
@@ -114,11 +120,12 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 
 def validate_keystone_refutations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """KEYSTONE: both planted-false claims refuted with the correct obscure year. Hard 0/1."""
+    """KEYSTONE: both planted-false claims refuted with the correct obscure year. Hard 0/1.
+    Requires GROUNDING (visit.count > 0); an ungrounded parametric guess earns nothing."""
     text = extract_final_text(result).lower()
     v_ok = _vesta_refuted(text)
     a_ok = _antikythera_refuted(text)
-    passed = v_ok and a_ok
+    passed = v_ok and a_ok and _keystone_ok(result, observability)
     return {
         "check": "keystone_refutations",
         "passed": passed,
@@ -129,7 +136,7 @@ def validate_keystone_refutations(result: Dict[str, Any], observability: Dict[st
 
 def validate_true_claims(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Control claims must be flagged TRUE. Short-circuits when keystone absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "true_controls", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> control claims not credited"}
     text = extract_final_text(result).lower()
@@ -146,7 +153,7 @@ def validate_true_claims(result: Dict[str, Any], observability: Dict[str, Any]) 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Contradicting source URLs for the false claims. Short-circuits when keystone absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "contradiction_citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citations not credited"}
     text = extract_final_text(result).lower()

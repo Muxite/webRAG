@@ -318,7 +318,7 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Slovakia as the unique all-three satisfier.
 
     Three acceptance paths (any one suffices):
@@ -332,7 +332,14 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
 
     Rejected outright if Slovakia is absent, or if another country is explicitly asserted as the
     answer, or if Slovakia's row shows a wrong attribute.
+
+    Credit requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -355,7 +362,7 @@ def validate_keystone_filter(result: Dict[str, Any], observability: Dict[str, An
     euro is Slovakia. A model that drops a constraint mis-picks (Czech Republic = largest landlocked;
     Portugal/Greece = big euro countries with coastlines; Kosovo = landlocked euro user under
     4 million), as does a fame / single-attribute shortcut."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_filter", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Slovakia named as the unique all-three satisfier" if passed
                       else "Unique all-three satisfier (Slovakia) missing/incorrect (beware: Czech "
@@ -390,7 +397,7 @@ def validate_winner_attributes(result: Dict[str, Any], observability: Dict[str, 
     """GATED secondary: the winner's three attribute values are stated — landlocked, a population
     figure ~5.4M (over the 4M threshold), and the euro. Short-circuits to 0 when the keystone is
     absent, so a wrong/guessed winner can't bank the value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "winner_attributes", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> attribute values not credited"}
     text = _all_text(result)
@@ -408,7 +415,7 @@ def validate_winner_attributes(result: Dict[str, Any], observability: Dict[str, 
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the country pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

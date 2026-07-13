@@ -160,7 +160,7 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Frisco as the larger-PERCENTAGE-change city.
 
     Word-bounded, and NOT satisfied by merely naming both cities: when both names appear, Frisco
@@ -168,6 +168,9 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
     — where Frisco is the loser — does not count). A terse primary answer that names only the
     winner (Frisco, with Phoenix absent) also passes.
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     has_winner = bool(re.search(r"\bfrisco\b", text, re.IGNORECASE))
     if not has_winner:
@@ -188,7 +191,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 def validate_keystone_percent_winner(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE (hard 0/1): the larger-PERCENTAGE-change city is Frisco, NOT the larger-absolute
     city (Phoenix). A model that compares absolute deltas or divides by the wrong base mis-picks."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_percent_winner", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Frisco named as the larger percentage change" if passed
                       else "Larger-percentage-change city (Frisco) missing/incorrect "
@@ -213,7 +216,7 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 def validate_winner_percentage(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: the winning city's percentage change (~71.4%, +/- 2 points). Short-circuits
     to 0 when the keystone is absent, so a wrong/guessed winner can't bank the value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "winner_percentage", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> percentage value not credited"}
     text = _all_text(result)
@@ -229,7 +232,7 @@ def validate_winner_percentage(result: Dict[str, Any], observability: Dict[str, 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites at least one of the two city pages. Short-circuits to 0 when the
     keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citations not credited"}
     text = _all_text(result)
