@@ -365,24 +365,129 @@ def _is_enabled(value: str) -> bool:
     return value.strip().lower() in ("1", "true", "yes", "on")
 
 
+# Named IDEA_TEST_ARM profiles: a curated flag set applied before the individual
+# IDEA_TEST_* overrides below, so an explicit per-flag env var still wins (lets a
+# researcher start from a named arm and tweak one axis without a hand-written
+# settings file). Values are jsonkey -> literal value (mirrors idea_dag_settings.json
+# types); "baseline" documents the shipped JSON defaults for every opt-in flag this
+# module knows how to override.
+_GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
+    "baseline": {
+        "got_reexpand_enabled": False,
+        "got_reexpand_max_iterations": 1,
+        "got_step_confidence_judge_enabled": False,
+        "got_step_confidence_reexpand_enabled": False,
+        "got_step_confidence_reexpand_threshold": 0.5,
+        "got_reexpand_corrective_context_enabled": False,
+        "got_backtrack_enabled": False,
+        "connector_retry_on_failure_enabled": False,
+        "tool_failure_recovery_enabled": False,
+        "native_vote_k_enabled": False,
+        "native_vote_k": 1,
+        "expansion_expect_contract_enabled": False,
+        "native_reasoning_effort_discipline_enabled": False,
+        "price_tier_param_tiering_enabled": False,
+    },
+    "good_adaptive": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+    },
+    "reexpand_only": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+    },
+    "confidence_only": {
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+    },
+    "backtrack_only": {
+        "got_backtrack_enabled": True,
+    },
+    "kvote_only": {
+        "native_vote_k_enabled": True,
+        "native_vote_k": 3,
+    },
+    "full": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "native_vote_k_enabled": True,
+        "native_vote_k": 3,
+        "got_backtrack_enabled": True,
+        "expansion_expect_contract_enabled": True,
+        "native_reasoning_effort_discipline_enabled": True,
+        "price_tier_param_tiering_enabled": True,
+    },
+}
+
+
+def _apply_got_arm_profile(
+    idea_settings: Dict[str, Any], environ: Optional[Mapping[str, str]] = None
+) -> Optional[str]:
+    """Apply the ``IDEA_TEST_ARM`` named profile (if any) onto ``idea_settings``.
+
+    :param idea_settings: Settings dict to mutate in place.
+    :param environ: Optional environment mapping (defaults to ``os.environ``).
+    :return: The resolved arm name if a known profile was applied, else ``None``.
+    """
+    env = os.environ if environ is None else environ
+    arm_name = env.get("IDEA_TEST_ARM", "").strip()
+    if not arm_name:
+        return None
+    profile = _GOT_ARM_PROFILES.get(arm_name)
+    if profile is None:
+        logging.warning(
+            f"Unknown IDEA_TEST_ARM={arm_name!r}; known arms: "
+            f"{sorted(_GOT_ARM_PROFILES.keys())}. No profile applied."
+        )
+        return None
+    idea_settings.update(profile)
+    return arm_name
+
+
 def _apply_got_experiment_overrides(
     idea_settings: Dict[str, Any], environ: Optional[Mapping[str, str]] = None
 ) -> Dict[str, Any]:
-    """Apply the per-run ``IDEA_TEST_GOT_*`` toggles onto a loaded settings dict.
+    """Apply the per-run ``IDEA_TEST_GOT_*``/adaptive-mechanism toggles onto a loaded
+    settings dict.
 
     These let a research run flip a dormant adaptive mechanism on/off without editing the
     checked-in ``idea_dag_settings.json`` default (which stays OFF). Each toggle: truthy
-    (1/true/yes/on) enables, explicit falsey forces off, ABSENT leaves the JSON default
-    untouched. Mutates and returns ``idea_settings``.
+    (1/true/yes/on) enables, explicit falsey forces off, ABSENT leaves the current value
+    (JSON default, or an ``IDEA_TEST_ARM`` profile applied first) untouched. Mutates and
+    returns ``idea_settings``.
+
+    If ``IDEA_TEST_ARM`` names a known profile, its flags are applied first; the
+    individual ``IDEA_TEST_*`` overrides below are then layered on top, so an explicit
+    per-flag env var always wins over the profile.
 
     Extracted from ``main()`` so the flag parsing is unit-testable without the harness.
     """
     env = os.environ if environ is None else environ
 
+    _apply_got_arm_profile(idea_settings, env)
+
     # IDEA_TEST_GOT_REEXPAND: the follow-up-detector re-expansion (got_reexpand_enabled).
     _reexpand_override = env.get("IDEA_TEST_GOT_REEXPAND", "").strip()
     if _reexpand_override:
         idea_settings["got_reexpand_enabled"] = _is_enabled(_reexpand_override)
+    # IDEA_TEST_GOT_REEXPAND_MAX_ITER: bound on re-expansion iterations
+    # (got_reexpand_max_iterations).
+    _reexpand_max_iter = env.get("IDEA_TEST_GOT_REEXPAND_MAX_ITER", "").strip()
+    if _reexpand_max_iter:
+        idea_settings["got_reexpand_max_iterations"] = max(1, int(_reexpand_max_iter))
+    # IDEA_TEST_GOT_CORRECTIVE_CONTEXT: whether a re-expansion attaches corrective
+    # context from the failed attempt (got_reexpand_corrective_context_enabled).
+    _corrective_ctx = env.get("IDEA_TEST_GOT_CORRECTIVE_CONTEXT", "").strip()
+    if _corrective_ctx:
+        idea_settings["got_reexpand_corrective_context_enabled"] = _is_enabled(_corrective_ctx)
     # IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE: the decorrelated per-step confidence judge
     # (got_step_confidence_judge_enabled) — the E-valuator substrate instrumentation.
     _stepconf_override = env.get("IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE", "").strip()
@@ -397,6 +502,50 @@ def _apply_got_experiment_overrides(
     _confreexp_override = env.get("IDEA_TEST_GOT_CONFIDENCE_REEXPAND", "").strip()
     if _confreexp_override:
         idea_settings["got_step_confidence_reexpand_enabled"] = _is_enabled(_confreexp_override)
+    # IDEA_TEST_GOT_CONFIDENCE_THRESHOLD: the score below which a step triggers the
+    # confidence->action loop (got_step_confidence_reexpand_threshold).
+    _confthresh_override = env.get("IDEA_TEST_GOT_CONFIDENCE_THRESHOLD", "").strip()
+    if _confthresh_override:
+        idea_settings["got_step_confidence_reexpand_threshold"] = float(_confthresh_override)
+    # IDEA_TEST_GOT_BACKTRACK: whether the graph can backtrack off a dead-end branch
+    # (got_backtrack_enabled).
+    _backtrack_override = env.get("IDEA_TEST_GOT_BACKTRACK", "").strip()
+    if _backtrack_override:
+        idea_settings["got_backtrack_enabled"] = _is_enabled(_backtrack_override)
+    # IDEA_TEST_CONNECTOR_RETRY: whether a failed connector call is retried
+    # (connector_retry_on_failure_enabled).
+    _connretry_override = env.get("IDEA_TEST_CONNECTOR_RETRY", "").strip()
+    if _connretry_override:
+        idea_settings["connector_retry_on_failure_enabled"] = _is_enabled(_connretry_override)
+    # IDEA_TEST_TOOL_FAILURE_RECOVERY: whether a failed tool call triggers a recovery
+    # path (tool_failure_recovery_enabled).
+    _toolrecov_override = env.get("IDEA_TEST_TOOL_FAILURE_RECOVERY", "").strip()
+    if _toolrecov_override:
+        idea_settings["tool_failure_recovery_enabled"] = _is_enabled(_toolrecov_override)
+    # IDEA_TEST_NATIVE_VOTE_K: self-consistency vote count (native_vote_k); a value
+    # >=2 also flips native_vote_k_enabled on (a k of 1 is a no-op vote, so it leaves
+    # the enabled flag alone rather than forcing it off).
+    _votek_override = env.get("IDEA_TEST_NATIVE_VOTE_K", "").strip()
+    if _votek_override:
+        _votek = max(1, int(_votek_override))
+        idea_settings["native_vote_k"] = _votek
+        if _votek >= 2:
+            idea_settings["native_vote_k_enabled"] = True
+    # IDEA_TEST_EXPECT_CONTRACT: the expansion "expect contract" schema requirement
+    # (expansion_expect_contract_enabled).
+    _expectcontract_override = env.get("IDEA_TEST_EXPECT_CONTRACT", "").strip()
+    if _expectcontract_override:
+        idea_settings["expansion_expect_contract_enabled"] = _is_enabled(_expectcontract_override)
+    # IDEA_TEST_NATIVE_REASONING_DISCIPLINE: native reasoning-effort discipline
+    # (native_reasoning_effort_discipline_enabled).
+    _reasondisc_override = env.get("IDEA_TEST_NATIVE_REASONING_DISCIPLINE", "").strip()
+    if _reasondisc_override:
+        idea_settings["native_reasoning_effort_discipline_enabled"] = _is_enabled(_reasondisc_override)
+    # IDEA_TEST_PRICE_TIER_TIERING: per-price-tier parameter tiering
+    # (price_tier_param_tiering_enabled).
+    _pricetier_override = env.get("IDEA_TEST_PRICE_TIER_TIERING", "").strip()
+    if _pricetier_override:
+        idea_settings["price_tier_param_tiering_enabled"] = _is_enabled(_pricetier_override)
     return idea_settings
 
 
@@ -1110,15 +1259,27 @@ async def main() -> None:
     # production idea_dag_settings.json default.
     _settings_path_override = os.environ.get("IDEA_DAG_SETTINGS_PATH", "").strip()
     idea_settings = load_idea_dag_settings(Path(_settings_path_override) if _settings_path_override else None)
-    # Per-run IDEA_TEST_GOT_* toggles for the dormant adaptive mechanisms (re-expansion,
-    # step-confidence judge, confidence->action loop). Each stays OFF in the checked-in
-    # JSON default; an env toggle flips it for a research run without editing that file.
+    # IDEA_TEST_ARM: optional named profile (e.g. "good_adaptive", "full") applied
+    # before the per-flag IDEA_TEST_* overrides below, so an explicit flag still wins.
+    _resolved_arm = os.environ.get("IDEA_TEST_ARM", "").strip() or None
+    # Per-run IDEA_TEST_GOT_*/adaptive-mechanism toggles for the dormant adaptive
+    # mechanisms (re-expansion, step-confidence judge, confidence->action loop,
+    # backtrack, self-consistency voting, etc). Each stays OFF in the checked-in JSON
+    # default; an env toggle (or IDEA_TEST_ARM profile) flips it for a research run
+    # without editing that file.
     _apply_got_experiment_overrides(idea_settings)
+    _enabled_adaptive_flags = sorted(
+        key
+        for key in _GOT_ARM_PROFILES["full"].keys()
+        if idea_settings.get(key) is True
+    )
     logging.info(
         f"Idea DAG settings source: {_settings_path_override or '(default idea_dag_settings.json)'} "
-        f"| got_reexpand_enabled={idea_settings.get('got_reexpand_enabled')}"
+        f"| arm={_resolved_arm or '(none)'}"
+        f" | got_reexpand_enabled={idea_settings.get('got_reexpand_enabled')}"
         f" | got_step_confidence_judge_enabled={idea_settings.get('got_step_confidence_judge_enabled')}"
         f" | got_step_confidence_reexpand_enabled={idea_settings.get('got_step_confidence_reexpand_enabled')}"
+        f" | enabled_adaptive_flags={_enabled_adaptive_flags}"
     )
     idea_settings["log_dag_ascii"] = False
     idea_settings["log_dag_step_interval"] = 0
