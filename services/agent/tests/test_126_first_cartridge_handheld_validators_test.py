@@ -56,6 +56,22 @@ def test_spacing_and_unicode_times_satisfy_keystone():
     assert t.validate_keystone_resolution(_r("screen 16×16 pixels"), _OBS)["score"] == 1.0
 
 
+def test_ungrounded_correct_value_scores_near_zero():
+    """Right keystone value present, but zero visits (no grounding) -> keystone and every
+    keystone-gated secondary must collapse to 0, even though the value string matches."""
+    r = _r(_FULL_SINGLE)
+    ungrounded = {"visit": {"count": 0}}
+    assert t.validate_keystone_resolution(r, ungrounded)["score"] == 0.0
+    assert t.validate_survivor(r, ungrounded)["score"] == 0.0
+    assert t.validate_citations(r, ungrounded)["score"] == 0.0
+    overall = sum(v["score"] for v in [
+        t.validate_keystone_resolution(r, ungrounded),
+        t.validate_survivor(r, ungrounded),
+        t.validate_citations(r, ungrounded),
+    ]) / 3.0
+    assert overall < 0.75
+
+
 def test_famous_decoy_gates_to_zero_but_keeps_breadth():
     wrong = (
         "Nintendo Game Boy -> 1989; Atari Lynx -> 1989 colour; Sega Game Gear -> 1990 colour; Milton "

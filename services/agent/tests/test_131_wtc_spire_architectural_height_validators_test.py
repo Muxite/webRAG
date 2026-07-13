@@ -51,6 +51,23 @@ def test_full_answer_multi_line_scores_all():
     assert t.validate_citation(r, _OBS)["passed"] is True
 
 
+def test_ungrounded_correct_value_scores_near_zero():
+    """Right keystone value present, but zero visits (no grounding) and no source citation in text
+    -> keystone and every keystone-gated secondary must collapse to 0, even though the value string
+    matches."""
+    r = _r(_FULL_SINGLE)
+    ungrounded = {"visit": {"count": 0}}
+    assert t.validate_keystone_height(r, ungrounded)["score"] == 0.0
+    assert t.validate_identifies_correct_source(r, ungrounded)["score"] == 0.0
+    assert t.validate_citation(r, ungrounded)["score"] == 0.0
+    overall = sum(v["score"] for v in [
+        t.validate_keystone_height(r, ungrounded),
+        t.validate_identifies_correct_source(r, ungrounded),
+        t.validate_citation(r, ungrounded),
+    ]) / 3.0
+    assert overall < 0.75
+
+
 def test_wrong_source_pick_gates_but_keeps_coverage():
     wrong = (
         "The roof is 1,368 ft and the architectural top is 1,776 ft. I report 1 WTC as 1,368 ft "

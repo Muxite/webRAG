@@ -127,9 +127,13 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE: the revised leader's batting average (.371/.372) AND the name Josh Gibson — both
-    required so neither a bare number nor a bare name (nor the reflex Ty Cobb) passes."""
+    required so neither a bare number nor a bare name (nor the reflex Ty Cobb) passes. Also requires
+    grounding evidence (at least one visit) so a parametric guess cannot bank keystone credit."""
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    if not grounded:
+        return False
     txt = _primary_text(result)
     return bool(_CORRECT_RE.search(txt)) and bool(_GIBSON_RE.search(txt))
 
@@ -148,7 +152,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 def validate_keystone_leader(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE (hard 0/1): Josh Gibson AND .371/.372. Rejects the reflex Ty Cobb / .367 and the
     average .369 (the correct token family shares no digits with the wrong one)."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_leader", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Revised leader Josh Gibson (.371) present" if passed
                       else "Revised leader (Josh Gibson, .371) missing/incorrect"}
@@ -174,7 +178,7 @@ def validate_identifies_correct_source(result: Dict[str, Any], observability: Di
     """GATED secondary: the agent FLAGS Ty Cobb / .367 as the former (pre-2024) consensus leader who
     was supplanted (rule marker within a sentence of Cobb / .367). Short-circuits to 0 without the
     keystone or read-evidence."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "identifies_correct_source", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> revision reconciliation not credited"}
     if not _read_evidence(result, observability):
@@ -187,7 +191,7 @@ def validate_identifies_correct_source(result: Dict[str, Any], observability: Di
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: authoritative leaders list (or Josh Gibson page) cited. Gated on keystone."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citation not credited"}
     cited = bool(re.search(_SLUG_RX, _all_text(result).lower()))

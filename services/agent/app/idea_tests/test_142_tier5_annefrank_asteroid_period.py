@@ -105,7 +105,13 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    """Keystone credit requires GROUNDING: the value string alone is insufficient — the agent
+    must have actually visited at least one page (visit.count > 0), else an ungrounded
+    parametric-memory guess would earn credit."""
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return bool(KEYSTONE_RX.search(_primary_text(result)))
 
 
@@ -119,7 +125,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 def validate_keystone_period(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE (hard 0/1): the asteroid's orbital period. Rejects the diameter/rotation decoys and
     any UNKNOWN/insufficient-first-page answer. Leak-resistant."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_period", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Orbital period 3.29 yr present" if passed
                       else "Keystone orbital period (3.29 yr, 5535 Annefrank) missing/incorrect"}
@@ -141,7 +147,7 @@ def validate_reexpansion_coverage(result: Dict[str, Any], observability: Dict[st
 def validate_target_resolution(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: the eponym was resolved to the correct asteroid (5535 Annefrank). Short-
     circuits to 0 when the keystone is absent (bimodal)."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "target_resolution", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> eponym resolution not credited"}
     passed = bool(STEP2_RX.search(_all_text(result)))
@@ -151,7 +157,7 @@ def validate_target_resolution(result: Dict[str, Any], observability: Dict[str, 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the minor-planet page. Short-circuits to 0 without keystone."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citations", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URL not credited"}
     passed = bool(TARGET_SLUG_RX.search(_all_text(result)))

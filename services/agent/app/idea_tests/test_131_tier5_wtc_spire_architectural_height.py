@@ -123,8 +123,9 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    return bool(_CORRECT_RE.search(_primary_text(result)))
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    return grounded and bool(_CORRECT_RE.search(_primary_text(result)))
 
 
 def _read_evidence(result: Dict[str, Any], observability: Dict[str, Any]) -> bool:
@@ -141,7 +142,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 def validate_keystone_height(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE (hard 0/1): the architectural height incl. spire (1,776 ft / 541.3 m). Rejects the
     roof 1,368 ft / 417 m, the observatory 1,268 / 386, and the averages (families share no digits)."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_height", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Architectural height 1,776 ft / 541.3 m present" if passed
                       else "Architectural height (1,776 ft / 541.3 m, incl. spire) missing/incorrect"}
@@ -165,7 +166,7 @@ def validate_reconciliation_coverage(result: Dict[str, Any], observability: Dict
 def validate_identifies_correct_source(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: the agent FLAGS 1,368 ft / 417 m as the ROOF height (not architectural).
     Short-circuits to 0 without the keystone or read-evidence."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "identifies_correct_source", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> scope reconciliation not credited"}
     if not _read_evidence(result, observability):
@@ -178,7 +179,7 @@ def validate_identifies_correct_source(result: Dict[str, Any], observability: Di
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: authoritative 1 WTC page cited. Short-circuits to 0 without keystone."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citation not credited"}
     cited = bool(re.search(_SLUG_RX, _all_text(result).lower()))

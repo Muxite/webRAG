@@ -121,8 +121,9 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    return bool(_CORRECT_RE.search(_primary_text(result)))
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    return grounded and bool(_CORRECT_RE.search(_primary_text(result)))
 
 
 def _read_evidence(result: Dict[str, Any], observability: Dict[str, Any]) -> bool:
@@ -139,7 +140,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 def validate_keystone_diameter(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE (hard 0/1): the REFINED final diameter (2,376.6 km / radius 1,188.3 km). Rejects the
     preliminary 2,370/2,372/2,374 and the average 2,373 (the correct token family shares no digits)."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_diameter", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Refined diameter 2,376.6 km / radius 1,188.3 km present" if passed
                       else "Refined final diameter (2,376.6 km / 1,188.3 km radius) missing/incorrect"}
@@ -165,7 +166,7 @@ def validate_identifies_correct_source(result: Dict[str, Any], observability: Di
     """GATED secondary: the agent FLAGS the ~2,370 km value as the preliminary/superseded figure
     (rule marker within a sentence of the wrong token). Short-circuits to 0 without the keystone or
     without read-evidence."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "identifies_correct_source", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source reconciliation not credited"}
     if not _read_evidence(result, observability):
@@ -178,7 +179,7 @@ def validate_identifies_correct_source(result: Dict[str, Any], observability: Di
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: authoritative Pluto page cited. Short-circuits to 0 without the keystone."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citation not credited"}
     cited = bool(re.search(_SLUG_RX, _all_text(result).lower()))

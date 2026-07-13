@@ -119,8 +119,9 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    return bool(_CORRECT_RE.search(_primary_text(result)))
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    return grounded and bool(_CORRECT_RE.search(_primary_text(result)))
 
 
 def _read_evidence(result: Dict[str, Any], observability: Dict[str, Any]) -> bool:
@@ -137,7 +138,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 def validate_keystone_elevation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE (hard 0/1): the 2015 resurvey elevation (20,310 ft / 6,190 m). Rejects the older
     20,320 ft / 6,194 m and the average 20,315 ft / 6,192 m (the token families share no digits)."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_elevation", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Current elevation 20,310 ft / 6,190 m present" if passed
                       else "Current elevation (20,310 ft / 6,190 m, 2015 USGS) missing/incorrect"}
@@ -161,7 +162,7 @@ def validate_reconciliation_coverage(result: Dict[str, Any], observability: Dict
 def validate_identifies_correct_source(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: the agent FLAGS 20,320 ft / 6,194 m as the older (1952) superseded value.
     Short-circuits to 0 without the keystone or read-evidence."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "identifies_correct_source", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> recency reconciliation not credited"}
     if not _read_evidence(result, observability):
@@ -174,7 +175,7 @@ def validate_identifies_correct_source(result: Dict[str, Any], observability: Di
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: authoritative Denali page cited. Short-circuits to 0 without keystone."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citation not credited"}
     cited = bool(re.search(_SLUG_RX, _all_text(result).lower()))

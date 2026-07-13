@@ -118,8 +118,9 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
-    return bool(_CORRECT_RE.search(_primary_text(result)))
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
+    return grounded and bool(_CORRECT_RE.search(_primary_text(result)))
 
 
 def _read_evidence(result: Dict[str, Any], observability: Dict[str, Any]) -> bool:
@@ -136,7 +137,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 def validate_keystone_population(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE (hard 0/1): the city-proper 2021 census population (2,794,356). Rejects the metro
     6,202,225 / 6,712,341 and the average (~4.5M); the figures share no leading digits."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_population", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "City-proper population 2,794,356 present" if passed
                       else "City-proper population (2,794,356, 2021 census) missing/incorrect"}
@@ -160,7 +161,7 @@ def validate_reconciliation_coverage(result: Dict[str, Any], observability: Dict
 def validate_identifies_correct_source(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: the agent FLAGS the ~6.2M (or GTA 6,712,341) figure as the metropolitan-area
     population (a different scope). Short-circuits to 0 without the keystone or read-evidence."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "identifies_correct_source", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> scope reconciliation not credited"}
     if not _read_evidence(result, observability):
@@ -173,7 +174,7 @@ def validate_identifies_correct_source(result: Dict[str, Any], observability: Di
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: authoritative Toronto page cited. Short-circuits to 0 without keystone."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citation not credited"}
     cited = bool(re.search(_SLUG_RX, _all_text(result).lower()))
