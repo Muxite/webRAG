@@ -29,8 +29,23 @@ def by_task(rows):
     return m
 
 
+def cmean(xs):
+    """Mean of numeric scores, but NaN (not 0.0) for an EMPTY cell.
+
+    aba.mean([]) returns 0.0, which made missing (task,arm) cells masquerade as a real 0.0 score —
+    the artifact that produced the spurious "spam beats skill" reading (a populated cell compared
+    against an empty one). NaN keeps missing data visibly missing.
+    """
+    xs = [x for x in xs if isinstance(x, (int, float))]
+    return sum(xs) / len(xs) if xs else float("nan")
+
+
+def fnum(v, w=6, p=2):
+    return f"{'—':>{w}}" if (v != v) else f"{v:>{w}.{p}f}"  # v!=v is True only for NaN
+
+
 def pct(a, b):
-    return (a / b * 100.0) if b else float("nan")
+    return (a / b * 100.0) if (b and b == b) else float("nan")
 
 
 def main():
@@ -60,18 +75,18 @@ def main():
     print(hdr); print("-" * len(hdr))
     csv = ["task,archetype,arm,score_mean,score_ci95,usd_mean,pct_of_skill"]
     for t in tasks:
-        sk = mean([r["score"] for r in grp["skill"].get(t, [])])
-        line = f"{t:>5} {archetype(t):<11} {sk:>7.2f}"
+        sk = cmean([r["score"] for r in grp["skill"].get(t, [])])
+        line = f"{t:>5} {archetype(t):<11} {fnum(sk, 7)}"
         for a in spam_arms:
-            sm = mean([r["score"] for r in grp[a].get(t, [])])
-            line += f" {sm:>6.2f} ({pct(sm, sk):>5.0f}%)   "
+            sm = cmean([r["score"] for r in grp[a].get(t, [])])
+            line += f" {fnum(sm)} ({pct(sm, sk):>5.0f}%)   "
         print(line)
         for a in arms:
             sc = [r["score"] for r in grp[a].get(t, [])]
-            skm = mean([r["score"] for r in grp["skill"].get(t, [])])
-            csv.append(f"{t},{archetype(t)},{a},{mean(sc):.3f},{ci95(sc):.3f},"
-                       f"{mean([r['usd'] for r in grp[a].get(t, [])]):.4f},"
-                       f"{pct(mean(sc), skm):.1f}")
+            skm = cmean([r["score"] for r in grp["skill"].get(t, [])])
+            scm, usdm = cmean(sc), cmean([r["usd"] for r in grp[a].get(t, [])])
+            csv.append(f"{t},{archetype(t)},{a},{scm:.3f},{ci95(sc):.3f},"
+                       f"{usdm:.4f},{pct(scm, skm):.1f}")
     open(f"{args.out}/xtier_rows.csv", "w").write("\n".join(csv) + "\n")
 
     # ---- per-archetype + overall ----
@@ -81,18 +96,18 @@ def main():
         sk = [r["score"] for r in arms["skill"] if r["archetype"] == name]
         if not sk:
             continue
-        skm = mean(sk)
-        row = f"{name:<12} {skm:>7.2f}"
+        skm = cmean(sk)
+        row = f"{name:<12} {fnum(skm, 7)}"
         for a in spam_arms:
-            sm = mean([r["score"] for r in arms[a] if r["archetype"] == name])
-            row += f" {sm:>7.2f} ({pct(sm, skm):>4.0f}%)   "
+            sm = cmean([r["score"] for r in arms[a] if r["archetype"] == name])
+            row += f" {fnum(sm, 7)} ({pct(sm, skm):>4.0f}%)   "
         print(row)
     print("-" * 60)
-    sk_all = mean([r["score"] for r in arms["skill"]])
-    row = f"{'OVERALL':<12} {sk_all:>7.2f}"
+    sk_all = cmean([r["score"] for r in arms["skill"]])
+    row = f"{'OVERALL':<12} {fnum(sk_all, 7)}"
     for a in spam_arms:
-        sm = mean([r["score"] for r in arms[a]])
-        row += f" {sm:>7.2f} ({pct(sm, sk_all):>4.0f}%)   "
+        sm = cmean([r["score"] for r in arms[a]])
+        row += f" {fnum(sm, 7)} ({pct(sm, sk_all):>4.0f}%)   "
     print(row)
 
     # ---- cost story ----
