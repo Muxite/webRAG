@@ -10,6 +10,7 @@ agent app (see `actions.py`).
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict, Optional
 
 from agent.app.idea_policies.actions import LeafAction
@@ -22,6 +23,48 @@ def _meta(soup, *, name: Optional[str] = None, prop: Optional[str] = None) -> Op
     if tag and tag.get("content"):
         return tag["content"].strip()
     return None
+
+
+def _extract_metadata(body: str) -> Dict[str, Any]:
+    """Parse HTML and pull out title / OpenGraph / Twitter Card metadata.
+
+    Pure and CPU-bound: it is run in a thread executor by ``execute`` because a
+    ``BeautifulSoup`` parse of up to 200 KB blocks the event loop, which would stall
+    every sibling coroutine AND defeat the per-action timeout watchdog (a starved loop
+    cannot fire the timer). Mirrors the main visit path's ``run_in_executor`` offload.
+    """
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(body[:200_000], "html.parser")
+    title = (soup.title.string.strip() if soup.title and soup.title.string else "")
+    og = {
+        "title": _meta(soup, prop="og:title"),
+        "description": _meta(soup, prop="og:description"),
+        "image": _meta(soup, prop="og:image"),
+        "site_name": _meta(soup, prop="og:site_name"),
+        "type": _meta(soup, prop="og:type"),
+        "url": _meta(soup, prop="og:url"),
+    }
+    twitter = {
+        "card": _meta(soup, name="twitter:card"),
+        "title": _meta(soup, name="twitter:title"),
+        "description": _meta(soup, name="twitter:description"),
+        "image": _meta(soup, name="twitter:image"),
+    }
+    description = (
+        og.get("description")
+        or twitter.get("description")
+        or _meta(soup, name="description")
+        or ""
+    )
+    return {
+        "title": og.get("title") or title,
+        "description": description,
+        "image": og.get("image") or twitter.get("image"),
+        "site_name": og.get("site_name"),
+        "og": {k: v for k, v in og.items() if v},
+        "twitter": {k: v for k, v in twitter.items() if v},
+    }
 
 
 class UrlMetadataAction(LeafAction):
@@ -51,37 +94,7 @@ class UrlMetadataAction(LeafAction):
         if not body:
             return fail(self.name, "empty response body", retryable=True)
 
-        from bs4 import BeautifulSoup
-
-        soup = BeautifulSoup(body[:200_000], "html.parser")
-        title = (soup.title.string.strip() if soup.title and soup.title.string else "")
-        og = {
-            "title": _meta(soup, prop="og:title"),
-            "description": _meta(soup, prop="og:description"),
-            "image": _meta(soup, prop="og:image"),
-            "site_name": _meta(soup, prop="og:site_name"),
-            "type": _meta(soup, prop="og:type"),
-            "url": _meta(soup, prop="og:url"),
-        }
-        twitter = {
-            "card": _meta(soup, name="twitter:card"),
-            "title": _meta(soup, name="twitter:title"),
-            "description": _meta(soup, name="twitter:description"),
-            "image": _meta(soup, name="twitter:image"),
-        }
-        description = (
-            og.get("description")
-            or twitter.get("description")
-            or _meta(soup, name="description")
-            or ""
+        meta = await asyncio.get_running_loop().run_in_executor(
+            None, _extract_metadata, body
         )
-        return ok(
-            self.name,
-            url=url,
-            title=og.get("title") or title,
-            description=description,
-            image=og.get("image") or twitter.get("image"),
-            site_name=og.get("site_name"),
-            og={k: v for k, v in og.items() if v},
-            twitter={k: v for k, v in twitter.items() if v},
-        )
+        return ok(self.name, url=url, **meta)

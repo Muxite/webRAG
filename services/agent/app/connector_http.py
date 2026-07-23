@@ -43,6 +43,11 @@ class ConnectorHttp(ConnectorBase):
     def __init__(self, config: ConnectorConfig):
         super().__init__(config)
         self.session: Optional[aiohttp.ClientSession] = None
+        # Serializes session create/close so concurrent visit fetches (which share this
+        # one connector under visit_page_concurrency) can't race _ensure_session into
+        # building two sessions — leaking one — or reset a session another coroutine is
+        # mid-creating. Constructed here; binds to the running loop on first use (3.10+).
+        self._session_lock = asyncio.Lock()
 
     async def __aenter__(self):
         if self.session is None or self.session.closed:
@@ -80,18 +85,23 @@ class ConnectorHttp(ConnectorBase):
         Ensure an HTTP session exists for requests.
         :returns: None
         """
-        if self.session is None or self.session.closed:
-            await self.__aenter__()
+        if self.session is not None and not self.session.closed:
+            return  # fast path: healthy session, no lock contention on the hot path
+        async with self._session_lock:
+            # Re-check under the lock: a sibling may have created it while we waited.
+            if self.session is None or self.session.closed:
+                await self.__aenter__()
 
     async def _reset_session(self) -> None:
         """
         Close and reset the HTTP session.
         :returns: None
         """
-        try:
-            await self.__aexit__(None, None, None)
-        except Exception:
-            self.session = None
+        async with self._session_lock:
+            try:
+                await self.__aexit__(None, None, None)
+            except Exception:
+                self.session = None
 
     async def request(self, method: str, url: str, retries: int = 2, **kwargs) -> RequestResult:
         """

@@ -10,8 +10,28 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Tuple
 
+import httpx
 from openai import APIError, APIStatusError, AsyncOpenAI
 from shared.connector_config import ConnectorConfig
+
+
+def _sdk_client_kwargs(config: ConnectorConfig) -> dict[str, Any]:
+    """Shared timeout/retry kwargs for the AsyncOpenAI / AsyncAnthropic SDK clients.
+
+    A bounded read timeout turns a stalled completion (the barrage's "llm_query that
+    never returns") into a retryable ``TimeoutError`` instead of an indefinite hang
+    that only ends at the cell cap, and ``connect`` bounds DNS/TCP setup. ``max_retries=0``
+    disables the SDK's own hidden exponential-backoff retries so ConnectorLLM.Retry
+    stays the single retry authority — otherwise two retry layers stack and a transient
+    failure silently multiplies latency.
+
+    :param config: Shared connector configuration.
+    :returns: kwargs to pass to the SDK client constructor.
+    """
+    return {
+        "timeout": httpx.Timeout(config.llm_read_timeout, connect=config.llm_connect_timeout),
+        "max_retries": 0,
+    }
 
 
 class LLMContentError(RuntimeError):
@@ -171,7 +191,7 @@ class OpenAICompatibleBackend(LLMBackend):
         :returns: AsyncOpenAI client instance.
         """
         api_key = self.config.llm_api_key if self.config.llm_api_key is not None else ""
-        kwargs: dict[str, Any] = {"api_key": api_key}
+        kwargs: dict[str, Any] = {"api_key": api_key, **_sdk_client_kwargs(self.config)}
         if self.config.llm_api_url:
             kwargs["base_url"] = self.config.llm_api_url
         return AsyncOpenAI(**kwargs)
@@ -381,7 +401,12 @@ class OpenRouterBackend(OpenAICompatibleBackend):
             "HTTP-Referer": getattr(self.config, "openrouter_http_referer", "") or "https://euglena.vercel.app",
             "X-Title": getattr(self.config, "openrouter_x_title", "") or "Euglena",
         }
-        return AsyncOpenAI(api_key=api_key, base_url=base_url, default_headers=default_headers)
+        return AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            default_headers=default_headers,
+            **_sdk_client_kwargs(self.config),
+        )
 
 
 class AnthropicMessagesBackend(LLMBackend):
@@ -406,7 +431,7 @@ class AnthropicMessagesBackend(LLMBackend):
         import anthropic
 
         api_key = self.config.llm_api_key if self.config.llm_api_key is not None else ""
-        kwargs: dict[str, Any] = {"api_key": api_key}
+        kwargs: dict[str, Any] = {"api_key": api_key, **_sdk_client_kwargs(self.config)}
         if self.config.llm_api_url:
             kwargs["base_url"] = self.config.llm_api_url
         return anthropic.AsyncAnthropic(**kwargs)

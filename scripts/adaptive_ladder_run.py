@@ -29,12 +29,23 @@ Usage (from repo root):
       --run-id ladder --jobs 6 --budget 22 --reps 5 --ref-reps 3
 Resume-safe: cells whose result JSON already exists are skipped.
 """
-import argparse, glob, json, os, subprocess, time
+import argparse, glob, json, os, shutil, subprocess, time
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 
 REPO = "/home/muk/projects/webRAG"
 RESULTS_DIR = f"{REPO}/services/agent/idea_test_results"
 LADDER_ARMS = ["baseline", "good_adaptive", "full"]
+
+# Chroma isolation/embedding config for this run, populated in main() from CLI args.
+# embedded mode gives each cell subprocess its OWN SQLite file (no cross-subprocess
+# write-lock contention) and runs embedding off the loop via to_thread; embed_device
+# 'cuda'/'auto' pushes embedding to the GPU. Defaults chosen for the barrage relaunch.
+RUN_CFG = {"chroma_mode": "embedded", "embed_device": "auto", "embedded_root": None}
+
+
+def cell_db_path(cell):
+    """Unique per-cell embedded-chroma dir (fresh memory per run_id+task)."""
+    return os.path.join(RUN_CFG["embedded_root"], f"{cell['run_id']}_{cell['task']}")
 
 # Named task sets (see services/agent/app/BENCHMARK_SUITE_50.md). All ids are validated + deduped.
 TASK_SETS = {
@@ -99,6 +110,13 @@ def cell_env(cell):
         env["IDEA_TEST_ARM"] = cell["arm"]
     else:
         env.pop("IDEA_TEST_ARM", None)
+    # Chroma isolation + embedding device. In embedded mode each cell gets its own
+    # SQLite file (no shared-server contention) at a unique path; embedding runs on the
+    # chosen device (GPU under 'cuda'/'auto').
+    env["CHROMA_MODE"] = RUN_CFG["chroma_mode"]
+    env["CHROMA_EMBED_DEVICE"] = RUN_CFG["embed_device"]
+    if RUN_CFG["chroma_mode"] == "embedded":
+        env["CHROMA_EMBEDDED_PATH"] = cell_db_path(cell)
     # per-cell "burn" env (e.g. deepseek's full arm: extra k-vote + deeper re-expansion)
     for k, v in (cell.get("burn") or {}).items():
         env[k] = str(v)
@@ -198,6 +216,9 @@ def run_cell(cell):
     dt = time.time() - t0
     usd, score = cell_usd_and_score(cell["run_id"], cell["task"])
     status = "ok" if rc == 0 else f"{rc}"
+    # Reclaim the per-cell embedded DB (fresh memory is per-run; results already scraped).
+    if RUN_CFG["chroma_mode"] == "embedded" and RUN_CFG["embedded_root"]:
+        shutil.rmtree(cell_db_path(cell), ignore_errors=True)
     return cell, status, (usd or 0.0), score, dt
 
 
@@ -217,8 +238,15 @@ def main():
     ap.add_argument("--tasks", default="", help="explicit space/comma task ids; overrides --task-set")
     ap.add_argument("--axis", default="", choices=[""] + list(AXES),
                     help="multi-model axis (e.g. 'final3'); overrides --model/--ref-* single-model mode")
+    ap.add_argument("--chroma-mode", default="embedded", choices=["http", "embedded"],
+                    help="embedded = per-cell isolated SQLite (no shared-server contention); http = shared server")
+    ap.add_argument("--embed-device", default="auto", choices=["cpu", "cuda", "auto"],
+                    help="chroma embedding device; auto = GPU if available else CPU")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+
+    RUN_CFG["chroma_mode"] = args.chroma_mode
+    RUN_CFG["embed_device"] = args.embed_device
 
     tasks = ([t for t in args.tasks.replace(",", " ").split()] if args.tasks
              else TASK_SETS[args.task_set])
@@ -229,6 +257,9 @@ def main():
                             args.ref_model, args.ref_variant, not args.no_ref, tasks)
     out_dir = f"{RESULTS_DIR}/_{args.run_id}"
     os.makedirs(out_dir, exist_ok=True)
+    RUN_CFG["embedded_root"] = f"{out_dir}/_chroma"
+    if RUN_CFG["chroma_mode"] == "embedded":
+        os.makedirs(RUN_CFG["embedded_root"], exist_ok=True)
     logpath = f"{out_dir}/driver.log"
     log = open(logpath, "a")
 
@@ -239,7 +270,7 @@ def main():
 
     n_done = sum(1 for c in cells if result_files(c["run_id"], c["task"]))
     emit(f"run_id={args.run_id} cells={len(cells)} (already-done={n_done}) jobs={args.jobs} "
-         f"budget=${args.budget:.2f} tasks={len(tasks)} "
+         f"budget=${args.budget:.2f} tasks={len(tasks)} chroma={RUN_CFG['chroma_mode']}/{RUN_CFG['embed_device']} "
          f"{'axis='+args.axis if args.axis else 'model='+args.model}")
     from collections import Counter
     by_mc = Counter((c["model"].split("/")[-1], c["arm"] or "ref") for c in cells)

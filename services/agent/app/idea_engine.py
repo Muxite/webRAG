@@ -558,7 +558,7 @@ class IdeaDagEngine:
         if node.details.get(DetailKey.ACTION_RESULT.value) is None:
             if self._is_action_ready(node, step_index):
                 self._logger.info(f"[STEP {step_index}] Executing merge action for node {node_id}")
-                result = await self._execute_action(graph, node.parent_id or graph.root_id(), node_id)
+                result = await self._execute_action_guarded(graph, node.parent_id or graph.root_id(), node_id)
                 if result is not None:
                     await self._apply_action_result(graph, node_id, step_index)
                 else:
@@ -590,7 +590,7 @@ class IdeaDagEngine:
         
         if not has_result or is_blocked_ready:
             if self._is_action_ready(node, step_index):
-                result = await self._execute_action(graph, node.parent_id or graph.root_id(), node_id)
+                result = await self._execute_action_guarded(graph, node.parent_id or graph.root_id(), node_id)
                 if result is not None:
                     # Shared completion point: records the result and, when the
                     # leaf lands DONE, offers the bounded re-expansion check.
@@ -1147,7 +1147,7 @@ class IdeaDagEngine:
                     merge_node.details["merge_skipped_reason"] = "Goal not achieved according to evaluation"
                     return node_id
                 
-                result = await self._execute_action(graph, node_id, merge_node_id)
+                result = await self._execute_action_guarded(graph, node_id, merge_node_id)
                 if result is not None:
                     await self._apply_action_result(graph, merge_node_id, step_index)
                 
@@ -1393,7 +1393,7 @@ class IdeaDagEngine:
             rationale=(selected.details.get(DetailKey.EVALUATION.value) or {}).get("rationale", ""),
             metadata={"step": step_index, "action": NodeDetailsExtractor.get_action(selected.details)},
         )
-        result = await self._execute_action(graph, parent_id or node_id, selected.node_id)
+        result = await self._execute_action_guarded(graph, parent_id or node_id, selected.node_id)
         if result is not None:
             # Shared completion point: the sequential-dependency branch now gets
             # the same bounded re-expansion check as every other execution path.
@@ -1412,6 +1412,38 @@ class IdeaDagEngine:
             return selected.node_id
 
         return node_id
+
+    async def _execute_action_guarded(
+        self, graph: IdeaDag, parent_id: str, node_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Run ``_execute_action`` under the per-action timeout watchdog.
+
+        The per-type action cap (``_action_timeout_for``, default 20s) must bound EVERY
+        routing path, not only the auto-parallel gather — which already wraps its calls
+        in ``asyncio.wait_for`` (see ``_run_one``). Leaf, merge, and single-best-child
+        selection previously called ``_execute_action`` bare, so on those paths (the
+        default engine variant, with auto-parallel off) a slow action — e.g. a ``visit``
+        fanning out to many URLs on slow sites, times the in-place tool-retry loop — could
+        wedge the whole cell, since there is no run-level watchdog to catch it. On expiry
+        we mark the node FAILED (so the step loop does not re-execute it) and return None,
+        matching how the auto-parallel path degrades a timed-out child.
+        """
+        node = graph.get_node(node_id)
+        action_name = NodeDetailsExtractor.get_action(node.details) if node else None
+        timeout_s = self._action_timeout_for(action_name)
+        try:
+            return await asyncio.wait_for(
+                self._execute_action(graph, parent_id, node_id), timeout=timeout_s
+            )
+        except asyncio.TimeoutError:
+            self._logger.warning(
+                f"[ACTION] timed out after {timeout_s}s (node={node_id}, action={action_name})"
+            )
+            timed_out = graph.get_node(node_id)
+            if timed_out:
+                timed_out.status = IdeaNodeStatus.FAILED
+                timed_out.details["action_error"] = f"timeout after {timeout_s}s"
+            return None
 
     async def _execute_action(self, graph: IdeaDag, parent_id: str, node_id: str) -> Optional[Dict[str, Any]]:
         node = graph.get_node(node_id)

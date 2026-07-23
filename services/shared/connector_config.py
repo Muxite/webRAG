@@ -28,6 +28,40 @@ class ConnectorConfig:
         # ~0.5s, not the 2s+ politeness pause. Set RETRY_BASE_DELAY=0 for speed.
         self.retry_base_delay = float(os.environ.get("RETRY_BASE_DELAY", "0.5"))
 
+        # --- Concurrency-hygiene bounds (added after the barrage ChromaDB hang) ---
+        # Hard per-op timeout for raw ChromaDB awaits. The AsyncHttpClient can block
+        # indefinitely when the shared SQLite-backed server is stuck on a write lock
+        # (the barrage's ~1789s-silence hang). Bounding each op means it fails OPEN in
+        # seconds and the run degrades gracefully instead of hitting the cell cap.
+        self.chroma_op_timeout = float(os.environ.get("CHROMA_OP_TIMEOUT", "15"))
+        # Bounded chroma (re)connect attempts. The old Retry(max_attempts=10,
+        # base_delay=default_delay=2, max_delay=60) summed to a ~302s silent-sleep
+        # storm under contention — one storm per subprocess that lost the client.
+        # 2 attempts at retry_base_delay caps a dead-server probe to ~1s.
+        self.chroma_init_attempts = int(os.environ.get("CHROMA_INIT_ATTEMPTS", "2"))
+        # LLM HTTP timeouts. connect bounds DNS/TCP setup; read bounds a stalled
+        # completion (the "llm_query that never returns" — 40 barrage orphans). The
+        # SDK's own retries are disabled (max_retries=0 in llm_backends) so
+        # ConnectorLLM.Retry stays the single retry authority (no hidden amplification).
+        self.llm_connect_timeout = float(os.environ.get("LLM_CONNECT_TIMEOUT", "10"))
+        self.llm_read_timeout = float(os.environ.get("LLM_READ_TIMEOUT", "90"))
+
+        # --- Chroma client mode + embedding device (added with GPU + isolation) ---
+        # "http" (default): shared AsyncHttpClient → the Docker server (production path,
+        # unchanged). "embedded": a per-process PersistentClient with its OWN SQLite file
+        # — eliminates the cross-subprocess write-lock contention entirely AND lets the
+        # (sync) client run under asyncio.to_thread, so embedding finally happens OFF the
+        # event loop. The benchmark driver sets embedded + a unique path per cell.
+        self.chroma_mode = (os.environ.get("CHROMA_MODE") or "http").strip().lower()
+        # Persist dir for embedded mode. Empty → the connector mints a unique temp dir
+        # (fresh per-run memory, which is also cleaner for an A/B).
+        self.chroma_embedded_path = (os.environ.get("CHROMA_EMBEDDED_PATH") or "").strip()
+        # Embedding compute device: "cpu" (default, chroma's built-in ONNX MiniLM),
+        # "cuda" (SentenceTransformers on GPU), or "auto" (cuda iff torch sees a GPU,
+        # else cpu). Falls back to cpu automatically if the GPU stack is missing.
+        self.chroma_embed_device = (os.environ.get("CHROMA_EMBED_DEVICE") or "cpu").strip().lower()
+        self.chroma_embed_model = (os.environ.get("CHROMA_EMBED_MODEL") or "all-MiniLM-L6-v2").strip()
+
         self.rabbitmq_url = os.environ.get("RABBITMQ_URL")
         self.input_queue = os.environ.get("AGENT_INPUT_QUEUE", "agent.mandates")
         self.status_queue = os.environ.get("AGENT_STATUS_QUEUE", "agent.status")
