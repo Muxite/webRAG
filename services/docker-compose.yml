@@ -13,6 +13,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    # The six default-profile services carry restart: unless-stopped (STANDARDS
+    # rule 2). Without it they survived a reboot only because webrag.service
+    # re-ran `compose up`; a dockerd restart or crash left the stack down and the
+    # Tailscale funnel pointing at a dead :18080. The test/cli/debug profiles
+    # below stay restart-less — rule 2 exempts one-shot containers.
+    restart: unless-stopped
     networks:
       - enet
 
@@ -62,6 +68,7 @@ services:
       timeout: 10s
       retries: 8
       start_period: 120s
+    restart: unless-stopped
     networks:
       - enet
 
@@ -82,6 +89,7 @@ services:
       - keys.env
     environment:
       - AGENT_STATUS_TIME=0.6
+    restart: unless-stopped
     networks:
       - enet
 
@@ -278,6 +286,7 @@ services:
     env_file:
       - .env
       - keys.env
+    restart: unless-stopped
     networks:
       - enet
 
@@ -308,6 +317,7 @@ services:
     env_file:
       - .env
       - keys.env
+    restart: unless-stopped
     networks:
       - enet
 
@@ -323,6 +333,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - enet
 
