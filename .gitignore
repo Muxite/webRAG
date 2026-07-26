@@ -34,3 +34,4 @@ idea_test_results/
 compiled_plans/
 # Live model-pricing snapshot — rewritten on every priced run; never a source artifact
 .model_pricing_cache.json
+.barrage_prep/
