@@ -27,14 +27,36 @@ pairs on (task,rep). A hard global BUDGET stops enqueueing, and a per-run USD ce
 Usage (from repo root):
   PYTHONPATH=services:services/agent ./.venv/bin/python scripts/adaptive_ladder_run.py \
       --run-id ladder --jobs 6 --budget 22 --reps 5 --ref-reps 3
-Resume-safe: cells whose result JSON already exists are skipped.
+Resume-safe: cells with a COMPLETE, parseable result JSON are skipped; a cell that has failed
+`--max-attempts` times with no complete result is marked dead in a durable ledger and skipped too
+(instead of being retried forever). Only ONE driver may run against a given `--run-id` at a time
+(cross-process PID lock in the run's output dir).
 """
-import argparse, glob, json, os, shutil, subprocess, time
+import argparse
+import atexit
+import glob
+import json
+import os
+import shutil
+import signal
+import subprocess
+import threading
+import time
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+
+try:
+    # Reuse the SAME price table the runner uses so recovered cost matches observability.cost.usd.
+    from agent.app.model_costs import estimate_cost as _estimate_cost
+except Exception:  # pragma: no cover - keep the driver runnable even if the import path shifts
+    _estimate_cost = None
 
 REPO = "/home/muk/projects/webRAG"
 RESULTS_DIR = f"{REPO}/services/agent/idea_test_results"
-LADDER_ARMS = ["baseline", "good_adaptive", "full"]
+# Default ladder: floor -> proven winner -> productive max-burn. `full` (k-vote + backtrack +
+# expect-contract) was measured NET-NEGATIVE for cheap models and is dropped; `max_burn` cranks the
+# ONE productive lever (re-expansion depth) instead. Override with --arms for a different shape.
+LADDER_ARMS = ["baseline", "good_adaptive", "max_burn"]
 
 # Chroma isolation/embedding config for this run, populated in main() from CLI args.
 # embedded mode gives each cell subprocess its OWN SQLite file (no cross-subprocess
@@ -82,7 +104,12 @@ def base_env():
         "LLM_PROVIDER": "openrouter",
         "MODEL_API_URL": "https://openrouter.ai/api/v1",
         "CHROMA_URL": "http://localhost:8001",
-        "DEFAULT_TIMEOUT": "45", "DEFAULT_DELAY": "2", "JITTER_SECONDS": "0.5",
+        # F19: 45 was a dead knob — the outer per-action budget (fetch/visit/search_timeout_seconds,
+        # all 20 in idea_dag_settings.json) always binds before this inner aiohttp timeout, so it never
+        # protected anything and only misled anyone tuning it. 20 makes the declared and effective caps
+        # match; retries still get 2 attempts inside the 20s window instead of losing the whole budget
+        # to one hung attempt.
+        "DEFAULT_TIMEOUT": "20", "DEFAULT_DELAY": "2", "JITTER_SECONDS": "0.5",
         # fixed harness controls (identical to native_ab_run.sh) ---------------------------------
         "IDEA_TEST_CONCURRENCY": "1",            # isolate: one run per process
         "IDEA_TEST_PARALLEL_ACTION_LIMIT": "1",  # mandatory for wide-breadth tasks
@@ -123,10 +150,184 @@ def cell_env(cell):
     return env
 
 
+def cell_key(cell):
+    """Durable per-cell identity for the attempt ledger. `run_id` already encodes the model
+    tag/arm/rep, and `task` is the test id, so the pair uniquely identifies one matrix cell."""
+    return f"{cell['run_id']}_{cell['task']}"
+
+
+def load_ledger(path):
+    try:
+        with open(path) as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+def save_ledger(path, ledger):
+    """Atomic write (temp + os.replace): a crash mid-write must never leave a corrupt ledger that
+    then mis-reports attempt counts — either wrongly resurrecting a dead cell or, worse, wrongly
+    declaring a live one dead and abandoning it."""
+    tmp = path + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump(ledger, fh, indent=0, sort_keys=True)
+    os.replace(tmp, path)  # atomic on POSIX
+
+
+def openrouter_key_usage(api_key):
+    """Cumulative USD used on this OpenRouter key, all-time, or None on any error (never raises).
+
+    Verified against OpenRouter's current API docs (2026-07): ``GET /api/v1/key`` ->
+    ``{"data": {"usage": <cumulative USD, all-time>, "limit": ..., "limit_remaining": ..., ...}}``.
+    NOT ``/api/v1/credits`` (that path 404s today) and the field is ``usage``, not ``total_usage``.
+    Because this is a live, ever-growing counter (not scoped to this campaign), callers baseline it
+    once and compare the delta — see --real-budget wiring in main().
+    """
+    if not api_key:
+        return None
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/key",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.load(r).get("data", {}) or {}
+        usage = data.get("usage")
+        return float(usage) if usage is not None else None
+    except Exception:
+        return None
+
+
+def is_dead(cell, ledger, max_attempts):
+    """True if this cell has been attempted `max_attempts`+ times with no complete result yet —
+    i.e. it is hopeless and should be given up on rather than resubmitted forever. A cell that
+    eventually DID produce a complete result is never dead, no matter its attempt count (checked
+    first in `run_cell`, but re-checked here so a stale ledger entry can't override a real result)."""
+    rec = ledger.get(cell_key(cell))
+    if not rec or rec.get("attempts", 0) < max_attempts:
+        return False
+    return not has_complete_result(cell["run_id"], cell["task"])
+
+
+def acquire_pid_lock(lock_path):
+    """Cross-process guard: refuse to start a second driver against the same run-id/out_dir.
+
+    Two drivers racing the same run-id would both see "no result yet" for a cell and submit it
+    twice — running the SAME task concurrently, which cross-contaminates the chroma working memory
+    the per-task serialization exists to protect (mem_<sha256(mandate)> is shared across all
+    arms/reps of one task), and wastes money on a duplicate run. Raises SystemExit if the lock is
+    held by a live process; otherwise claims it and registers an atexit release.
+    """
+    if os.path.exists(lock_path):
+        old_pid = None
+        try:
+            old_pid = int(open(lock_path).read().strip())
+        except (ValueError, OSError):
+            old_pid = None
+        if old_pid is not None:
+            try:
+                os.kill(old_pid, 0)  # raises if not alive; no-op signal otherwise
+            except ProcessLookupError:
+                pass  # stale lock left by a dead process — safe to reclaim
+            except PermissionError:
+                raise SystemExit(
+                    f"lock held by a live pid we can't signal in {lock_path}; refusing to start")
+            else:
+                raise SystemExit(
+                    f"another driver (pid {old_pid}) holds {lock_path}; refusing to start. "
+                    f"If that process is really gone, remove the lock file and retry.")
+    with open(lock_path, "w") as fh:
+        fh.write(str(os.getpid()))
+    atexit.register(lambda: os.path.exists(lock_path) and os.remove(lock_path))
+
+
+def check_run_meta(meta_path, this_meta):
+    """Refuse to silently mix results from different run configs under one run-id/out_dir.
+
+    Confirmed live on a prior barrage: one run-id accumulated a single-model run AND two different
+    axis configs in one shared log, making per-model tallies meaningless. Raises SystemExit on an
+    axis/model mismatch against a previously recorded invocation; otherwise (re)writes meta_path.
+    """
+    if os.path.exists(meta_path):
+        try:
+            prev_meta = json.load(open(meta_path))
+        except Exception:
+            prev_meta = {}
+        if prev_meta and (prev_meta.get("axis"), prev_meta.get("model")) != \
+                (this_meta.get("axis"), this_meta.get("model")):
+            raise SystemExit(
+                f"run-id already used for axis={prev_meta.get('axis')!r} "
+                f"model={prev_meta.get('model')!r}; refusing to mix with "
+                f"axis={this_meta.get('axis')!r} model={this_meta.get('model')!r} under the same "
+                f"run-id. Use a fresh --run-id.")
+    with open(meta_path, "w") as fh:
+        json.dump(this_meta, fh, indent=2)
+
+
 def result_files(run_id, task):
     fs = [f for f in glob.glob(f"{RESULTS_DIR}/{run_id}_{task}_*.json")
-          if not f.endswith("_summary.json")]
+          if not (f.endswith("_summary.json") or "_report_" in os.path.basename(f))]
     return fs
+
+
+def has_complete_result(run_id, task):
+    """A cell is 'done' only if a result JSON exists AND parses AND carries a real outcome.
+
+    Guards against a truncated/partial JSON (e.g. killed mid-write by the 1800s timeout kill)
+    being mistaken for a finished cell and skipped forever with no score or cost ever recorded.
+    The runner now writes results atomically (temp + os.replace), so a partial file should no
+    longer occur going forward — this also protects any result written before that fix landed.
+    """
+    for f in result_files(run_id, task):
+        try:
+            d = json.load(open(f))
+        except Exception:
+            continue  # truncated / corrupt -> not done, allow re-run
+        if ("validation" in d and d.get("validation", {}).get("overall_score") is not None) \
+                or ("error" in d) or ("execution" in d):
+            return True
+    return False
+
+
+def recover_cell_usd(run_id, task):
+    """Best-effort USD for a cell with NO result JSON (timeout/crash/kill), from its trace jsonl.
+
+    The runner streams `llm_usage` events to `{run_id}_{task}_{raw_model}[_variant].jsonl`; because
+    raw model slugs contain '/' (e.g. openai/gpt-4.1-nano), the trace can land in a spurious subdir
+    (`{run_id}_{task}_openai/gpt-4.1-nano.jsonl`) — a runner quirk, not this driver's to fix, so
+    this globs both forms. This is a LOWER BOUND: an LLM call in flight at kill-time emits no usage
+    event, and non-LLM spend (search) is not in this trace. Still far better than booking $0 for a
+    cell that really spent money.
+    """
+    if _estimate_cost is None:
+        return None
+    traces = (glob.glob(f"{RESULTS_DIR}/{run_id}_{task}_*.jsonl")
+              + glob.glob(f"{RESULTS_DIR}/{run_id}_{task}_*/*.jsonl"))
+    total = None
+    for t in traces:
+        inp = out = 0
+        model = None
+        try:
+            with open(t) as fh:
+                for line in fh:
+                    try:
+                        d = json.loads(line)
+                    except Exception:
+                        continue
+                    if d.get("event") != "llm_usage":
+                        continue
+                    pay = d.get("payload") or {}
+                    u = pay.get("usage") or {}
+                    model = pay.get("model") or model
+                    inp += int(u.get("prompt_tokens") or 0)
+                    out += int(u.get("completion_tokens") or 0)
+        except Exception:
+            continue
+        if model and (inp or out):
+            c = _estimate_cost(model, inp, out)
+            if c is not None:
+                total = (total or 0.0) + c
+    return total
 
 
 def cell_usd_and_score(run_id, task):
@@ -152,9 +353,9 @@ AXES = {
     "final3": {
         "ladders": [
             {"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 5, "burn": None},
-            {"model": "deepseek/deepseek-v4-flash", "tag": "ds", "reps": 5,
-             # "ridiculous burn" on deepseek's full arm only (output is $0.196/1M): k-vote 3→5, reexpand 2→3
-             "burn": {"IDEA_TEST_NATIVE_VOTE_K": 5, "IDEA_TEST_GOT_REEXPAND_MAX_ITER": 3}},
+            # The productive burn now lives in the `max_burn` ARM profile (uniform, deeper
+            # re-expansion), not a per-model k-vote override — k-vote was net-negative.
+            {"model": "deepseek/deepseek-v4-flash", "tag": "ds", "reps": 5, "burn": None},
         ],
         "reference": {"model": "anthropic/claude-sonnet-5", "tag": "sonnet",
                       "variant": "sequential_react", "reps": 3},
@@ -162,12 +363,13 @@ AXES = {
 }
 
 
-def build_cells(run_id, reps, ref_reps, model, ref_model, ref_variant, include_ref, tasks):
+def build_cells(run_id, reps, ref_reps, model, ref_model, ref_variant, include_ref, tasks, arms=None):
     """Single-model ladder + optional reference (legacy/simple mode)."""
+    arms = arms or LADDER_ARMS
     cells = []
     for task in tasks:
         for rep in range(1, reps + 1):
-            for arm in LADDER_ARMS:
+            for arm in arms:
                 cells.append({"task": task, "rep": rep, "arm": arm, "model": model,
                               "variant": "graph", "burn": None, "run_id": f"{run_id}_{arm}_rep{rep}"})
     if include_ref:
@@ -179,17 +381,19 @@ def build_cells(run_id, reps, ref_reps, model, ref_model, ref_variant, include_r
     return cells
 
 
-def build_axis_cells(run_id, axis, tasks):
+def build_axis_cells(run_id, axis, tasks, arms=None):
     """Full multi-model axis. Ordered task-major so same-task cells are adjacent (per-task lock +
-    shared window). burn applies only to the 'full' arm of a ladder that declares it."""
+    shared window). Any per-model `burn` override applies only to the top (most-burn) arm."""
+    arms = arms or LADDER_ARMS
+    top_arm = arms[-1]
     cells = []
     for task in tasks:
         for lad in axis["ladders"]:
             for rep in range(1, lad["reps"] + 1):
-                for arm in LADDER_ARMS:
+                for arm in arms:
                     cells.append({"task": task, "rep": rep, "arm": arm, "model": lad["model"],
                                   "variant": "graph",
-                                  "burn": lad.get("burn") if arm == "full" else None,
+                                  "burn": lad.get("burn") if arm == top_arm else None,
                                   "run_id": f"{run_id}_{lad['tag']}_{arm}_rep{rep}"})
         ref = axis.get("reference")
         if ref:
@@ -200,21 +404,53 @@ def build_axis_cells(run_id, axis, tasks):
     return cells
 
 
-def run_cell(cell):
-    if result_files(cell["run_id"], cell["task"]):
-        return cell, "skip", 0.0, None, 0.0  # already have a result → resume-safe
-    t0 = time.time()
+_CHILDREN_LOCK = threading.Lock()
+_CHILDREN = {}  # pid -> subprocess.Popen; lets a repeated SIGINT/SIGTERM hard-kill in-flight cells
+
+
+def _kill_process_group(proc):
+    """Best-effort SIGKILL of a cell subprocess's whole process group. Each cell is spawned with
+    start_new_session=True (its own group), so this reaches any grandchildren too (e.g. a stray
+    browser process) instead of only the direct child."""
     try:
-        # 1800s (was 1200): the 'full' arm's longest runs are its highest-scorers; a too-tight cap
-        # dropped them and biased 'full' downward (survivorship). Give heavy runs room to finish.
-        proc = subprocess.run([f"{REPO}/.venv/bin/python", "-m", "agent.app.idea_test_runner"],
-                              cwd=REPO, env=cell_env(cell), stdout=subprocess.DEVNULL,
-                              stderr=subprocess.STDOUT, timeout=1800)
-        rc = proc.returncode
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+    try:
+        proc.wait(timeout=10)
+    except Exception:
+        pass
+
+
+def run_cell(cell):
+    if has_complete_result(cell["run_id"], cell["task"]):
+        return cell, "skip", 0.0, None, 0.0  # already have a real result → resume-safe
+    t0 = time.time()
+    # 1800s (was 1200): the 'full'/'max_burn' arm's longest runs are its highest-scorers; a too-tight
+    # cap dropped them and biased the heavy arms downward (survivorship). Give heavy runs room to
+    # finish. start_new_session=True puts each cell in its OWN process group so a timeout or a
+    # hard-abort (repeated SIGINT/SIGTERM) can kill it and any children as a unit.
+    proc = subprocess.Popen(
+        [f"{REPO}/.venv/bin/python", "-m", "agent.app.idea_test_runner"],
+        cwd=REPO, env=cell_env(cell), stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    with _CHILDREN_LOCK:
+        _CHILDREN[proc.pid] = proc
+    try:
+        rc = proc.wait(timeout=1800)
     except subprocess.TimeoutExpired:
+        _kill_process_group(proc)
         rc = "timeout"
+    finally:
+        with _CHILDREN_LOCK:
+            _CHILDREN.pop(proc.pid, None)
     dt = time.time() - t0
     usd, score = cell_usd_and_score(cell["run_id"], cell["task"])
+    if usd is None:
+        # No result JSON (timeout/crash/kill) — recover real spend from the live trace so --budget
+        # and --real-budget stay honest instead of booking $0 for a cell that really spent money.
+        usd = recover_cell_usd(cell["run_id"], cell["task"])
     status = "ok" if rc == 0 else f"{rc}"
     # Reclaim the per-cell embedded DB (fresh memory is per-run; results already scraped).
     if RUN_CFG["chroma_mode"] == "embedded" and RUN_CFG["embedded_root"]:
@@ -226,7 +462,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-id", default="ladder")
     ap.add_argument("--jobs", type=int, default=8, help="max parallel cells; effective cap = #distinct tasks (per-task serialized)")
-    ap.add_argument("--budget", type=float, default=22.0, help="hard global USD stop (stops enqueueing)")
+    ap.add_argument("--budget", type=float, default=22.0,
+                    help="hard global USD stop (stops enqueueing); now includes recovered "
+                         "timeout/abort spend, not just booked result-JSON cost")
     ap.add_argument("--reps", type=int, default=5)
     ap.add_argument("--ref-reps", type=int, default=3)
     ap.add_argument("--model", default="openai/gpt-5-mini")
@@ -242,25 +480,45 @@ def main():
                     help="embedded = per-cell isolated SQLite (no shared-server contention); http = shared server")
     ap.add_argument("--embed-device", default="auto", choices=["cpu", "cuda", "auto"],
                     help="chroma embedding device; auto = GPU if available else CPU")
+    ap.add_argument("--arms", default="", help="space/comma ladder arms (IDEA_TEST_ARM profiles), "
+                    "top arm gets any per-model burn; default: " + " ".join(LADDER_ARMS))
+    ap.add_argument("--max-attempts", type=int, default=3,
+                    help="give up on a cell (mark it dead in the ledger) after this many non-skip "
+                         "attempts with no complete result, instead of retrying it forever on "
+                         "every resume")
+    ap.add_argument("--real-budget", type=float, default=0.0,
+                    help="hard stop on TRUE cumulative OpenRouter key spend (USD; delta of the "
+                         "key's all-time usage since this campaign's baseline; 0=off). The "
+                         "baseline persists in the ledger across resumes, so restarting the "
+                         "driver never resets the clock, and it can't be fooled by timeouts or "
+                         "in-flight calls the way the local --budget estimate can.")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
     RUN_CFG["chroma_mode"] = args.chroma_mode
     RUN_CFG["embed_device"] = args.embed_device
+    arms = [a for a in args.arms.replace(",", " ").split()] or LADDER_ARMS
 
     tasks = ([t for t in args.tasks.replace(",", " ").split()] if args.tasks
              else TASK_SETS[args.task_set])
     if args.axis:
-        cells = build_axis_cells(args.run_id, AXES[args.axis], tasks)
+        cells = build_axis_cells(args.run_id, AXES[args.axis], tasks, arms=arms)
     else:
         cells = build_cells(args.run_id, args.reps, args.ref_reps, args.model,
-                            args.ref_model, args.ref_variant, not args.no_ref, tasks)
+                            args.ref_model, args.ref_variant, not args.no_ref, tasks, arms=arms)
     out_dir = f"{RESULTS_DIR}/_{args.run_id}"
     os.makedirs(out_dir, exist_ok=True)
     RUN_CFG["embedded_root"] = f"{out_dir}/_chroma"
     if RUN_CFG["chroma_mode"] == "embedded":
         os.makedirs(RUN_CFG["embedded_root"], exist_ok=True)
-    logpath = f"{out_dir}/driver.log"
+
+    # Per-invocation timestamped log: a long barrage is restarted/resumed many times, and a single
+    # shared driver.log across invocations (worse, across DIFFERENT axis/model configs reusing a
+    # run-id) made tallies meaningless — confirmed live on a prior run (3 invocations, 2 different
+    # axis configs, one shared log, no way to tell which lines belonged to which). One file per
+    # invocation makes each run's log unambiguous.
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    logpath = f"{out_dir}/driver_{stamp}.log"
     log = open(logpath, "a")
 
     def emit(msg):
@@ -268,9 +526,10 @@ def main():
         print(line, flush=True)
         log.write(line + "\n"); log.flush()
 
-    n_done = sum(1 for c in cells if result_files(c["run_id"], c["task"]))
+    n_done = sum(1 for c in cells if has_complete_result(c["run_id"], c["task"]))
     emit(f"run_id={args.run_id} cells={len(cells)} (already-done={n_done}) jobs={args.jobs} "
-         f"budget=${args.budget:.2f} tasks={len(tasks)} chroma={RUN_CFG['chroma_mode']}/{RUN_CFG['embed_device']} "
+         f"budget=${args.budget:.2f} max_attempts={args.max_attempts} tasks={len(tasks)} "
+         f"chroma={RUN_CFG['chroma_mode']}/{RUN_CFG['embed_device']} "
          f"{'axis='+args.axis if args.axis else 'model='+args.model}")
     from collections import Counter
     by_mc = Counter((c["model"].split("/")[-1], c["arm"] or "ref") for c in cells)
@@ -278,6 +537,36 @@ def main():
         emit(f"  {m:<24} {arm:<14} {n} cells")
     if args.dry_run:
         emit("dry-run — not executing"); return
+
+    # --- Cross-process run lock (F9/S6): refuse a second driver instance against this run-id.
+    acquire_pid_lock(f"{out_dir}/driver.lock")
+
+    # --- run-id/axis guard (F9/S4): refuse to silently mix results from different run configs
+    # under one run-id.
+    check_run_meta(f"{out_dir}/run_meta.json",
+                   {"axis": args.axis or "", "model": "" if args.axis else args.model,
+                    "task_set": args.task_set, "arms": arms})
+
+    # --- durable attempt ledger (F6/S1): survives process restart so resume can give up on a
+    # hopeless cell instead of re-burning its full timeout cost forever.
+    ledger_path = f"{out_dir}/ledger.json"
+    ledger = load_ledger(ledger_path)
+
+    # --- true cumulative ceiling (F8/S2): baseline the OpenRouter key's real all-time usage once
+    # per campaign (persisted in the ledger so a restart never resets the clock), then hard-stop
+    # enqueueing on the REAL delta — the only spend number timeouts/kills/in-flight calls can't fool.
+    or_key = keyval("OPENROUTER_API_KEY")
+    real_baseline = (ledger.get("_meta") or {}).get("real_baseline")
+    if args.real_budget > 0 and real_baseline is None:
+        real_baseline = openrouter_key_usage(or_key)
+        if real_baseline is not None:
+            ledger.setdefault("_meta", {})["real_baseline"] = real_baseline
+            save_ledger(ledger_path, ledger)
+            emit(f"real-budget armed: baseline key usage=${real_baseline:.4f} "
+                 f"ceiling=+${args.real_budget:.2f}")
+        else:
+            emit("!! --real-budget requested but GET /api/v1/key was unreachable; real-budget "
+                 "stays disarmed until a later poll succeeds (local --budget still applies)")
 
     # Per-task serialization: at most ONE in-flight cell per task, because the engine's working
     # memory lives in a chroma collection keyed by mandate hash (idea_engine._memo_namespace →
@@ -292,11 +581,38 @@ def main():
     busy_tasks = set()
     futs = {}  # future -> cell
 
+    def _drain(signum, _frame):
+        # F9/S8: graceful drain on the first signal (stop enqueueing, let in-flight cells finish
+        # naturally); a repeated signal hard-aborts in-flight subprocesses instead of waiting up to
+        # 1800s each. Either way the ledger keeps flushing after every finished cell (see below), so
+        # no partial/unaccounted state is left behind.
+        nonlocal stopped
+        if not stopped:
+            stopped = True
+            emit(f"!! signal {signum} — draining: no new cells enqueued, in-flight cells finish "
+                 f"naturally (send the signal again to hard-abort in-flight subprocesses)")
+        else:
+            with _CHILDREN_LOCK:
+                procs = list(_CHILDREN.values())
+            emit(f"!! signal {signum} again — hard-aborting {len(procs)} in-flight subprocess(es)")
+            for p in procs:
+                _kill_process_group(p)
+
+    signal.signal(signal.SIGINT, _drain)
+    signal.signal(signal.SIGTERM, _drain)
+
     def fill(ex):
         for c in list(pending):
             if len(futs) >= args.jobs:
                 break
             if c["task"] in busy_tasks:
+                continue
+            if is_dead(c, ledger, args.max_attempts):
+                pending.remove(c)
+                rec = ledger.get(cell_key(c), {})
+                emit(f"  DEAD   task={c['task']} {cell_key(c)} attempts={rec.get('attempts')} "
+                     f"last_status={rec.get('last_status')} — giving up "
+                     f"(max-attempts={args.max_attempts})")
                 continue
             pending.remove(c)
             busy_tasks.add(c["task"])
@@ -309,18 +625,42 @@ def main():
             for fut in finished:
                 cell = futs.pop(fut)
                 busy_tasks.discard(cell["task"])
-                _, status, usd, score, dt = fut.result()
+                try:
+                    _, status, usd, score, dt = fut.result()
+                except Exception as exc:
+                    # F9/S7: one cell's exception (subprocess spawn failure, a glob/JSON error, ...)
+                    # must never crash the whole driver and orphan every other in-flight cell.
+                    status, usd, score, dt = f"error:{type(exc).__name__}", 0.0, None, 0.0
+                    emit(f"  !! task={cell['task']} {cell_key(cell)} raised "
+                         f"{type(exc).__name__}: {exc}")
                 if status != "skip":
                     spent += usd
                     done += 1
+                    # F6: record the attempt durably so a future resume converges instead of
+                    # retrying a hopeless cell forever.
+                    k = cell_key(cell)
+                    rec = ledger.get(k, {"attempts": 0})
+                    rec["attempts"] = rec.get("attempts", 0) + 1
+                    rec["last_status"] = status
+                    rec["est_usd"] = round(rec.get("est_usd", 0.0) + (usd or 0.0), 6)
+                    rec["ts"] = time.time()
+                    ledger[k] = rec
+                    save_ledger(ledger_path, ledger)
                 sc = f"{score:.2f}" if isinstance(score, (int, float)) else "?"
                 tag = cell["arm"] or "reference"
-                emit(f"  task={cell['task']} rep={cell['rep']} {tag:<13} "
-                     f"{status:<6} score={sc:<5} ${usd:.3f} {dt:>5.0f}s  | done={done}/{len(cells)} "
+                mdl = cell["model"].split("/")[-1]      # disambiguate nano vs ds vs sonnet
+                emit(f"  task={cell['task']} rep={cell['rep']} {mdl:<18} {tag:<13} "
+                     f"{status:<8} score={sc:<5} ${usd:.3f} {dt:>5.0f}s  | done={done}/{len(cells)} "
                      f"inflight={len(futs)} spent≈${spent:.2f}")
                 if spent >= args.budget and not stopped:
                     stopped = True
                     emit(f"!! BUDGET ${args.budget:.2f} reached (spent≈${spent:.2f}) — no new cells enqueued")
+                if args.real_budget > 0 and not stopped and real_baseline is not None:
+                    cur = openrouter_key_usage(or_key)  # polled once per finished cell (cheap)
+                    if cur is not None and (cur - real_baseline) >= args.real_budget:
+                        stopped = True
+                        emit(f"!! REAL-BUDGET ${args.real_budget:.2f} reached (true key spend "
+                             f"+${cur - real_baseline:.2f}) — no new cells enqueued")
             if not stopped:
                 fill(ex)
     emit(f"DONE — executed {done} cells, spent≈${spent:.2f}, {len(pending)} unstarted. "

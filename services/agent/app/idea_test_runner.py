@@ -995,7 +995,15 @@ async def run_single_test(
             execution = result.get("execution", {})
             execution.pop("telemetry_raw", None)
         
-        out_path.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
+        # Atomic write: a crash mid-write (Ctrl-C, OOM, the driver's 1800s timeout kill) must never
+        # leave a truncated/partial result JSON on disk. A partial file there would still satisfy a
+        # naive "does the file exist" resume check, so the cell would be silently skipped forever
+        # with no score and no cost ever recorded. Write to a sibling temp file, then atomically
+        # rename into place (os.replace) so the final path is always either absent or complete.
+        result_text = json.dumps(result, indent=2, default=str)
+        tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+        tmp_path.write_text(result_text, encoding="utf-8")
+        os.replace(tmp_path, out_path)
 
         # Opt-in: emit a square >=1920px PNG of the run's DAG (compiled plan or runtime graph)
         # alongside the result JSON. Best-effort — visualization must never fail a run.
