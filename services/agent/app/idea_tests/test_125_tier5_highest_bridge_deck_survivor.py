@@ -41,7 +41,7 @@ cannot produce it.
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, unit_value_matches
 
 
 CANDIDATES: List[Dict[str, Any]] = [
@@ -73,7 +73,10 @@ CANDIDATES: List[Dict[str, Any]] = [
 SURVIVOR = next(c for c in CANDIDATES if c["survivor"])  # Huajiang Canyon Bridge
 
 # ── keystone: Huajiang Canyon Bridge deck height, 625 m (2,051 ft) above the river ──
-KEYSTONE_RX = re.compile(r"\b625\s*m\b|\b2[,\s]?051\b", re.IGNORECASE)
+# The imperial alternative (2,051 ft) is matched literally; the metric form is unit-tolerant via
+# ``unit_value_matches`` below, so "625 metres"/"625 meters"/"625-metre" all satisfy it too — not
+# just the bare "625 m" abbreviation.
+_IMPERIAL_RX = re.compile(r"\b2[,\s]?051\b", re.IGNORECASE)
 
 
 def get_test_metadata() -> Dict[str, Any]:
@@ -147,7 +150,10 @@ def _all_text(result: Dict[str, Any]) -> str:
 
 def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
-    return grounded and bool(KEYSTONE_RX.search(_primary_text(result)))
+    if not grounded:
+        return False
+    text = _primary_text(result)
+    return unit_value_matches(text, 625, r"m\b|met(?:er|re)s?") or bool(_IMPERIAL_RX.search(text))
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

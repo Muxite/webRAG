@@ -30,12 +30,16 @@ element page yields it — the exact re-expansion this task forces.
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, numeric_value_matches
 
 
-# Keystone: curium's density, 13.51 g/cm3. \b-anchored; distinct from melting/boiling (1340/3110)
-# and immune to embedded/near-miss digits (13.510 / 113.51 rejected by \b).
-KEYSTONE_RX = re.compile(r"\b13\.51\b", re.IGNORECASE)
+# Keystone: curium's density, 13.51 g/cm3. Matched via ``numeric_value_matches`` with a 1%
+# relative-tolerance band, so standard roundings ("13.5") and extra precision ("13.510") both
+# satisfy it, while a genuinely different value ("113.51", or the melting/boiling decoys
+# 1340/3110) is correctly rejected because it is parsed and compared as its own number, not a
+# fixed-literal substring.
+KEYSTONE_VALUE = 13.51
+KEYSTONE_REL_TOL = 0.01
 # STEP1 obvious entity (the eponym couple); STEP2 the resolved element.
 STEP1_RX = re.compile(r"curie", re.IGNORECASE)          # Marie/Pierre Curie
 STEP2_RX = re.compile(r"curium", re.IGNORECASE)          # the resolved element
@@ -112,7 +116,7 @@ def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -
     n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
     if n_visits <= 0:
         return False
-    return bool(KEYSTONE_RX.search(_primary_text(result)))
+    return numeric_value_matches(_primary_text(result), KEYSTONE_VALUE, KEYSTONE_REL_TOL)
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

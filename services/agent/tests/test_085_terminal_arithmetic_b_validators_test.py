@@ -69,6 +69,9 @@ def test_ungrounded_correct_difference_gates_to_zero():
     assert t.validate_keystone_difference(r, ungrounded_obs)["passed"] is False
     assert t.validate_chains_resolved(r, ungrounded_obs)["score"] == 0.0
     assert t.validate_citation(r, ungrounded_obs)["score"] == 0.0
+    # Breadth is CAPPED BY visit count (F29-style fix): a 0-visit run banks 0 breadth credit
+    # even though the raw text names both lengths, closing the "parametric recall" leak.
+    assert t.validate_breadth_lengths(r, ungrounded_obs)["score"] == 0.0
     scores = [
         t.validate_visits(r, ungrounded_obs)["score"],
         t.validate_keystone_difference(r, ungrounded_obs)["score"],

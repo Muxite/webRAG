@@ -308,7 +308,7 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Churchill Falls as the highest-ratio station.
 
     Word-bounded, and NOT satisfied by merely listing Churchill Falls among the five: when
@@ -316,7 +316,13 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
     efficient ratio' assertion (tempered so a rival named as the winner — or 'higher than
     Churchill Falls' — never counts). A terse primary answer naming only the winner (Churchill
     Falls, with no rival in the slot) also passes.
+
+    GROUNDING: an ungrounded parametric-memory guess must not earn credit, so the winner is only
+    credited when the agent actually visited at least one page (visit.count > 0).
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -375,7 +381,7 @@ def validate_keystone_argmax(
     NOT the largest station by generation nor by capacity (both Guri Dam). A model that
     shortcuts to a raw quantity or guesses the most salient name (Guri / Bratsk) mis-picks.
     """
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_argmax",
         "passed": passed,
@@ -428,7 +434,7 @@ def validate_winner_ratio(
     within ±3%). Short-circuits to 0 when the keystone is absent, so a guessed winner cannot
     bank the value credit.
     """
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "winner_ratio",
             "passed": False,
@@ -457,7 +463,7 @@ def validate_citation(
 ) -> Dict[str, Any]:
     """GATED secondary: cites the station pages. Short-circuits to 0 when the keystone is
     absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation",
             "passed": False,

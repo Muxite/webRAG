@@ -254,14 +254,20 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
     gated on the keystone — it measures whether the agent actually fanned out to all five players
     and collected both figures even when it botches the division or the argmax, the axis that
     separates a structured (multi-leaf) agent from a linear one that drops an entity.
+
+    Credit is CAPPED BY visit count (``min(hits, n_visits)``) so a 0-visit parametric-memory
+    answer that merely recalls the figures cannot bank partial credit here without ever browsing.
     """
     text = _all_text(result)
     hits = [e["name"] for e in ENTITIES
             if re.search(e["name_rx"], text, re.IGNORECASE)
             and re.search(e["goals_rx"], text) and re.search(e["caps_rx"], text)]
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    credited = min(len(hits), n_visits)
     n = len(ENTITIES)
-    return {"check": "coverage", "passed": len(hits) == n, "score": len(hits) / n,
-            "reason": f"{len(hits)}/{n} players' goals+caps gathered ({', '.join(hits) or 'none'})"}
+    return {"check": "coverage", "passed": credited == n, "score": credited / n,
+            "reason": f"{credited}/{n} players' goals+caps gathered ({', '.join(hits[:credited]) or 'none'}; "
+                      f"{len(hits)} text-matched, {n_visits} visit(s))"}
 
 
 def validate_winner_ratio(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

@@ -211,8 +211,9 @@ def test_ungrounded_correct_value_gates_to_zero():
     assert t.validate_keystone_argmax(r, ungrounded_obs)["passed"] is False
     assert t.validate_winner_prominence(r, ungrounded_obs)["score"] == 0.0
     assert t.validate_citation(r, ungrounded_obs)["score"] == 0.0
-    # UN-gated coverage is unaffected by the grounding gate (it scans raw text, not the keystone).
-    assert t.validate_coverage(r, ungrounded_obs)["score"] == 1.0
+    # Coverage is CAPPED BY visit count (F29 fix): a 0-visit run banks 0 coverage credit even
+    # though the raw text names all six peaks, closing the "parametric recall" leak.
+    assert t.validate_coverage(r, ungrounded_obs)["score"] == 0.0
     scores = [
         t.validate_visits(r, ungrounded_obs)["score"],
         t.validate_keystone_argmax(r, ungrounded_obs)["score"],

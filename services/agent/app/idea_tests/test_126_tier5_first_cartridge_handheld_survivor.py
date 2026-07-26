@@ -40,7 +40,7 @@ famous Game Boy — or naming the Microvision without reading its page — canno
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, dimension_value_matches
 
 
 CANDIDATES: List[Dict[str, Any]] = [
@@ -72,7 +72,9 @@ CANDIDATES: List[Dict[str, Any]] = [
 SURVIVOR = next(c for c in CANDIDATES if c["survivor"])  # Milton Bradley Microvision
 
 # ── keystone: Microvision LCD resolution, 16 x 16 pixels ──
-KEYSTONE_RX = re.compile(r"\b16\s*[x×]\s*16\b", re.IGNORECASE)
+# Joiner-tolerant via ``dimension_value_matches`` below: accepts "16x16" / "16 x 16" / "16×16"
+# AND the spelled-out "16 by 16" — a correctly grounded answer must not false-fail merely for
+# using a word instead of the "x"/"×" operator.
 
 
 def get_test_metadata() -> Dict[str, Any]:
@@ -144,7 +146,7 @@ def _all_text(result: Dict[str, Any]) -> str:
 
 def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     grounded = int((observability or {}).get("visit", {}).get("count", 0) or 0) > 0
-    return grounded and bool(KEYSTONE_RX.search(_primary_text(result)))
+    return grounded and dimension_value_matches(_primary_text(result), 16, 16)
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

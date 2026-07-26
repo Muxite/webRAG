@@ -243,14 +243,20 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Issyk-Kul as the highest-ratio lake.
 
     Word-bounded, and NOT satisfied by merely listing Issyk-Kul among the five: when another lake is
     also named, Issyk-Kul must be the one tied to a 'highest / deepest ratio' assertion (tempered so
     a rival named as the winner — or 'deeper than Issyk-Kul' — never counts). A terse primary answer
     that names only the winner (Issyk-Kul, with no rival in the slot) also passes.
+
+    GROUNDING: an ungrounded parametric-memory guess must not earn credit, so the winner is only
+    credited when the agent actually visited at least one page (visit.count > 0).
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -281,7 +287,7 @@ def validate_keystone_argmax(result: Dict[str, Any], observability: Dict[str, An
     """KEYSTONE (hard 0/1): the highest volume-to-surface-area ratio is Issyk-Kul — NOT the largest
     lake by volume nor by surface area (both Lake Victoria). A model that shortcuts to a raw quantity
     or guesses the most salient name (Victoria / Erie) mis-picks."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {"check": "keystone_argmax", "passed": passed, "score": 1.0 if passed else 0.0,
             "reason": "Issyk-Kul named as the highest volume-to-surface-area ratio" if passed
                       else "Highest-ratio lake (Issyk-Kul) missing/incorrect (beware: Lake Victoria "
@@ -310,7 +316,7 @@ def validate_winner_ratio(result: Dict[str, Any], observability: Dict[str, Any])
     """GATED secondary: the winner's computed ratio (~278 m, within +/- 3%, or ~0.278 km).
     Short-circuits to 0 when the keystone is absent, so a wrong/guessed winner can't bank the
     value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "winner_ratio", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> ratio value not credited"}
     ok = _ratio_value_present(_all_text(result))
@@ -322,7 +328,7 @@ def validate_winner_ratio(result: Dict[str, Any], observability: Dict[str, Any])
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the lake pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> source URLs not credited"}
     text = _all_text(result).lower()

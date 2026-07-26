@@ -342,6 +342,9 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
     response. The six lengths (7,400 / 5,770 / 5,600 / 5,426 / 3,400 / 1,300 m) are all distinct,
     so there is no cross-crediting. Deliberately NOT gated on the keystone — this axis measures
     whether the agent fanned out to all six pages even if it miscounts or misapplies the threshold.
+
+    Credit is CAPPED BY visit count (``min(hits, n_visits)``) so a 0-visit parametric-memory
+    answer that merely recalls the figures cannot bank partial credit here without ever browsing.
     """
     text = _all_text(result)
     hits = [
@@ -349,14 +352,17 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
         if re.search(e["name_rx"], text, re.IGNORECASE)
         and re.search(e["len_rx"], text)
     ]
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    credited = min(len(hits), n_visits)
     n = len(ENTITIES)
     return {
         "check":  "coverage",
-        "passed": len(hits) == n,
-        "score":  len(hits) / n,
+        "passed": credited == n,
+        "score":  credited / n,
         "reason": (
-            f"{len(hits)}/{n} (tunnel, length) pairs gathered "
-            f"({', '.join(hits) if hits else 'none'})"
+            f"{credited}/{n} (tunnel, length) pairs gathered "
+            f"({', '.join(hits[:credited]) if credited else 'none'}; "
+            f"{len(hits)} text-matched, {n_visits} visit(s))"
         ),
     }
 

@@ -72,7 +72,10 @@ CANDIDATES: List[Dict[str, Any]] = [
 SURVIVOR = next(c for c in CANDIDATES if c["survivor"])  # FAST
 
 # ── keystone: FAST's illuminated/effective aperture, 300 m (984 ft 3 in) ──
-KEYSTONE_RX = re.compile(r"\b300\s*m\b|\b984\b", re.IGNORECASE)
+# Unit-tolerant: matches the abbreviation ("300 m") AND spelled-out forms ("300 metres" /
+# "300 meters" / "300-meter"), not just the bare abbreviation (a correctly grounded answer
+# phrased in words must not false-fail merely for not echoing the page's "m" abbreviation).
+KEYSTONE_RX = re.compile(r"\b300[\s-]*(?:m\b|met(?:er|re)s?)|\b984\b", re.IGNORECASE)
 
 
 def get_test_metadata() -> Dict[str, Any]:

@@ -29,12 +29,15 @@ page yields it — the exact re-expansion this task forces.
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, numeric_value_matches
 
 
-# Keystone: 5535 Annefrank's orbital period, 3.29 yr. \b-anchored; distinct from diameter (4.34)
-# and rotation (15.12), immune to embedded/near-miss digits (3.290 / 13.29 rejected by \b).
-KEYSTONE_RX = re.compile(r"\b3\.29\b", re.IGNORECASE)
+# Keystone: 5535 Annefrank's orbital period, 3.29 yr. Matched via ``numeric_value_matches`` with a
+# 1% relative-tolerance band, so standard roundings ("3.3") and extra precision ("3.290") both
+# satisfy it, while a genuinely different value ("13.29", or the diameter/rotation decoys
+# 4.34/4.8/4.94/15.12) is correctly rejected because it is parsed and compared as its own number.
+KEYSTONE_VALUE = 3.29
+KEYSTONE_REL_TOL = 0.01
 # STEP1 obvious entity (the diarist); STEP2 the resolved asteroid designation.
 STEP1_RX = re.compile(r"anne\s+frank", re.IGNORECASE)
 STEP2_RX = re.compile(r"\b5535\b|annefrank", re.IGNORECASE)
@@ -112,7 +115,7 @@ def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -
     n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
     if n_visits <= 0:
         return False
-    return bool(KEYSTONE_RX.search(_primary_text(result)))
+    return numeric_value_matches(_primary_text(result), KEYSTONE_VALUE, KEYSTONE_REL_TOL)
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

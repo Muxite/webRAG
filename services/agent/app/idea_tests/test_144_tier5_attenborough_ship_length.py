@@ -29,12 +29,15 @@ ship page yields it — the re-expansion this task forces.
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, numeric_value_matches
 
 
-# Keystone: the ship's length, 128.9 m. \b-anchored; distinct from beam (24) and tonnage (15,000),
-# immune to embedded/near-miss digits (1128.9 / 128.90 rejected by \b).
-KEYSTONE_RX = re.compile(r"\b128\.9\b", re.IGNORECASE)
+# Keystone: the ship's length, 128.9 m. Matched via ``numeric_value_matches`` with a 1%
+# relative-tolerance band, so a standard rounding ("129 m") satisfies it, while a genuinely
+# different value (embedded/near-miss "1128.9", or the beam/tonnage decoys 24/15,000/4,475) is
+# correctly rejected because it is parsed and compared as its own number, not a fixed literal.
+KEYSTONE_VALUE = 128.9
+KEYSTONE_REL_TOL = 0.01
 # STEP1 obvious entity (the naturalist); STEP2 the resolved ship.
 STEP1_RX = re.compile(r"attenborough", re.IGNORECASE)
 STEP2_RX = re.compile(r"\brrs\b|research\s+vessel|research\s+ship|polar\s+research|icebreaker", re.IGNORECASE)
@@ -112,7 +115,7 @@ def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -
     n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
     if n_visits <= 0:
         return False
-    return bool(KEYSTONE_RX.search(_primary_text(result)))
+    return numeric_value_matches(_primary_text(result), KEYSTONE_VALUE, KEYSTONE_REL_TOL)
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

@@ -5,6 +5,11 @@ _The curated set of 64 valid, non-repeating benchmark tasks whose purpose is to 
 Every task here is held to the same validity bar as the adaptive-targeted suite (see below).
 Last updated 2026-07-13._
 
+_**Superseded by `BENCHMARK_SUITE_50.md`** (2026-07-22), which is the current source of truth for
+active suite membership for the compute-ladder barrage (now 59 tasks after the 2026-07-23 growth
+to 60 and the 2026-07-25 drop of task 024 — see F27 there). This 64-task list never included 024,
+so F27 required no edit here; kept for historical reference only._
+
 ## Validity bar (what "valid" means here)
 
 1. **Grounding-required + grounding-gated.** The answer cannot be produced from parametric memory —

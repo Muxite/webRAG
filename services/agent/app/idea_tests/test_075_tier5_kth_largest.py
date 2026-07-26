@@ -311,6 +311,9 @@ def validate_coverage(
     reported text; the six depth values are all distinct, so there is no cross-crediting.
     Deliberately NOT gated on the keystone — it measures whether the agent fanned out to all
     six entities and read each depth even when it botches the rank selection.
+
+    Credit is CAPPED BY visit count (``min(hits, n_visits)``) so a 0-visit parametric-memory
+    answer that merely recalls the figures cannot bank partial credit here without ever browsing.
     """
     text = _all_text(result)
     hits = [
@@ -318,13 +321,16 @@ def validate_coverage(
         if re.search(e["name_rx"], text, re.IGNORECASE)
         and re.search(e["depth_rx"], text)
     ]
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    credited = min(len(hits), n_visits)
     n = len(ENTITIES)
     return {
         "check": "coverage",
-        "passed": len(hits) == n,
-        "score": len(hits) / n,
+        "passed": credited == n,
+        "score": credited / n,
         "reason": (
-            f"{len(hits)}/{n} entities' depths gathered ({', '.join(hits) or 'none'})"
+            f"{credited}/{n} entities' depths gathered ({', '.join(hits[:credited]) or 'none'}; "
+            f"{len(hits)} text-matched, {n_visits} visit(s))"
         ),
     }
 

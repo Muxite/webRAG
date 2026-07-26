@@ -91,9 +91,13 @@ def test_unknown_insufficient_first_page_answer_gates_to_zero():
     assert t.validate_citations(r, _OBS)["score"] == 0.0
 
 
-def test_keystone_token_rejects_embedded_and_near_miss():
+def test_keystone_rejects_near_miss_but_accepts_standard_roundings():
+    """Unit-tolerance fix (F26): a standard rounding ("3.3") or extra precision ("3.290") is a
+    CORRECT grounded answer and must now score 1.0 -- only a genuinely different value (an
+    embedded/near-miss digit run, or the diameter/rotation decoys) is rejected."""
+    assert t.validate_keystone_period(_r("value 3.290 marker"), _OBS)["score"] == 1.0
+    assert t.validate_keystone_period(_r("about 3.3 years"), _OBS)["score"] == 1.0
     assert t.validate_keystone_period(_r("code 13.29 xj"), _OBS)["score"] == 0.0
-    assert t.validate_keystone_period(_r("value 3.290 marker"), _OBS)["score"] == 0.0
     assert t.validate_keystone_period(_r("diameter 4.34 km"), _OBS)["score"] == 0.0
 
 

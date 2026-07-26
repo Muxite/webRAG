@@ -89,10 +89,14 @@ def test_partial_coverage_scores_fraction():
     assert t.validate_visits(_r(text), obs)["score"] == 0.5
 
 
-def test_no_visits_loses_visit_credit():
+def test_no_visits_gates_keystone_to_zero():
+    """Grounding fix (F28/F30): a 0-visit run must NOT bank keystone credit even with a fully
+    correct, well-formed answer -- previously ``_keystone_ok`` never checked ``observability``,
+    so a pure parametric-memory guess could pass this gate (caught by the validator_lint [GATE]
+    check); it is now gated the same way as its siblings (078/079/082/084/064/121)."""
     obs = {"visit": {"count": 0}}
-    assert t.validate_keystone_filter(_r(_FULL), obs)["passed"]     # parametric leak possible
-    assert t.validate_visits(_r(_FULL), obs)["score"] == 0.0        # but no evidence visits
+    assert not t.validate_keystone_filter(_r(_FULL), obs)["passed"]
+    assert t.validate_visits(_r(_FULL), obs)["score"] == 0.0        # no evidence of visits either
 
 
 def test_compiled_plan_is_six_selfdescribing_leaves_and_leaks_nothing():

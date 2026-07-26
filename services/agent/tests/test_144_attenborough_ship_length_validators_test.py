@@ -93,10 +93,14 @@ def test_unknown_insufficient_first_page_answer_gates_to_zero():
     assert t.validate_citations(r, _OBS)["score"] == 0.0
 
 
-def test_keystone_token_rejects_embedded_and_near_miss():
+def test_keystone_rejects_near_miss_but_accepts_standard_roundings():
+    """Unit-tolerance fix (F26): a standard rounding ("129 m") or extra precision ("128.90") is a
+    CORRECT grounded answer and must now score 1.0 -- only a genuinely different value (an
+    embedded/near-miss digit run, or the beam/tonnage decoys) is rejected."""
+    assert t.validate_keystone_length(_r("value 128.90 marker"), _OBS)["score"] == 1.0
+    assert t.validate_keystone_length(_r("length 129 m"), _OBS)["score"] == 1.0
     assert t.validate_keystone_length(_r("code 1128.9 xj"), _OBS)["score"] == 0.0
-    assert t.validate_keystone_length(_r("value 128.90 marker"), _OBS)["score"] == 0.0
-    assert t.validate_keystone_length(_r("about 128 m"), _OBS)["score"] == 0.0
+    assert t.validate_keystone_length(_r("beam 24 m"), _OBS)["score"] == 0.0
 
 
 def test_partial_coverage_scores_half_and_gate_zero():

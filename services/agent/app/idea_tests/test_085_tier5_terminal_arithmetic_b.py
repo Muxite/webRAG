@@ -161,16 +161,22 @@ def validate_breadth_lengths(
     it measures whether the agent fetched BOTH infoboxes even when it botches the terminal
     subtraction, the axis that separates a structured (two parallel leaves) agent from one
     that visits only a single river page.
+
+    Credit is CAPPED BY visit count (``min(hits, n_visits)``) so a 0-visit parametric-memory
+    answer that merely recalls both figures cannot bank partial credit here without browsing.
     """
     text = _primary_text(result)
     has_a = bool(re.search(LENGTH_A, text))
     has_b = bool(re.search(LENGTH_B, text))
     hits = int(has_a) + int(has_b)
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    credited = min(hits, n_visits)
     return {
         "check": "breadth_lengths",
-        "passed": hits == 2,
-        "score": hits / 2.0,
-        "reason": f"966 km (Tisza)={has_a}, 647 km (Siret)={has_b}",
+        "passed": credited == 2,
+        "score": credited / 2.0,
+        "reason": f"966 km (Tisza)={has_a}, 647 km (Siret)={has_b}, "
+                  f"{credited}/2 credited ({n_visits} visit(s))",
     }
 
 

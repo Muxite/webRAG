@@ -55,6 +55,15 @@ def test_imperial_alternative_satisfies_keystone():
     assert t.validate_keystone_aperture(_r("illuminated diameter 984 ft 3 in"), _OBS)["score"] == 1.0
 
 
+def test_spelled_out_metric_unit_satisfies_keystone():
+    """Unit-tolerance fix (F26): a correctly grounded answer phrased with the spelled-out unit
+    ("300 metres"/"300 meters"/"300-meter") must not false-fail merely for not echoing the page's
+    bare "m" abbreviation."""
+    assert t.validate_keystone_aperture(_r("illuminated aperture 300 metres"), _OBS)["score"] == 1.0
+    assert t.validate_keystone_aperture(_r("only a 300 meters circle is used"), _OBS)["score"] == 1.0
+    assert t.validate_keystone_aperture(_r("a 300-meter illuminated aperture"), _OBS)["score"] == 1.0
+
+
 def test_ungrounded_correct_value_scores_near_zero():
     """Right keystone value present, but zero visits (no grounding) -> keystone and every
     keystone-gated secondary must collapse to 0, even though the value string matches."""

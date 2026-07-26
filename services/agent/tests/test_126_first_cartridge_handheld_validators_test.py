@@ -56,6 +56,12 @@ def test_spacing_and_unicode_times_satisfy_keystone():
     assert t.validate_keystone_resolution(_r("screen 16×16 pixels"), _OBS)["score"] == 1.0
 
 
+def test_spelled_out_joiner_satisfies_keystone():
+    """Unit-tolerance fix (F26): a correctly grounded answer phrased with the spelled-out joiner
+    ("16 by 16") must not false-fail merely for not using the "x"/"×" operator."""
+    assert t.validate_keystone_resolution(_r("a resolution of 16 by 16 pixels"), _OBS)["score"] == 1.0
+
+
 def test_ungrounded_correct_value_scores_near_zero():
     """Right keystone value present, but zero visits (no grounding) -> keystone and every
     keystone-gated secondary must collapse to 0, even though the value string matches."""

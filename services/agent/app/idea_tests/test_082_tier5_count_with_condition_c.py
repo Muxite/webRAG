@@ -288,13 +288,19 @@ def _int_values(text: str) -> List[int]:
     return vals
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] contains the integer KEYSTONE_COUNT (= 4).
 
     Checks that the primary answer slot holds exactly the correct count of rivers exceeding
     the threshold. Count=7 ('all of them'), count=3 (one river dropped), and count=5 (one extra
     river wrongly included) all fail — only the computed value 4 passes.
+
+    GROUNDING: an ungrounded parametric-memory guess must not earn credit, so the count is only
+    credited when the agent actually visited at least one page (visit.count > 0).
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     return KEYSTONE_COUNT in _int_values(_primary_text(result))
 
 
@@ -319,7 +325,7 @@ def validate_keystone_count(result: Dict[str, Any], observability: Dict[str, Any
     scores 0; a model that drops a river and reports 3 also scores 0.  Only a model that opens
     all seven pages, reads each length, applies the threshold, and counts correctly passes.
     """
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     passing_names = ", ".join(e["name"] for e in PASSING)
     return {
         "check":  "keystone_count",
@@ -372,7 +378,7 @@ def validate_passing_rivers(result: Dict[str, Any], observability: Dict[str, Any
     cannot bank partial credit for naming some of the correct rivers. After the keystone gate,
     checks that Benue River, Madre de Dios River, Guaporé River, and Sepik River all appear.
     """
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check":  "passing_rivers",
             "passed": False,
@@ -398,7 +404,7 @@ def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 
     Short-circuits to 0 when the keystone is absent.
     """
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check":  "citation",
             "passed": False,

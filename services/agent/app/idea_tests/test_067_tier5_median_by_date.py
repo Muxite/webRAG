@@ -274,13 +274,19 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
     measures whether the agent actually fanned out to all five dams and collected each date even
     when it botches the sort or the median selection, the axis that separates a structured
     (five-leaf) agent from a linear one that drops an entity.
+
+    Credit is CAPPED BY visit count (``min(hits, n_visits)``) so a 0-visit parametric-memory
+    answer that merely recalls the figures cannot bank partial credit here without ever browsing.
     """
     text = _all_text(result)
     hits = [e["name"] for e in ENTITIES
             if re.search(e["name_rx"], text, re.IGNORECASE) and re.search(e["year_rx"], text)]
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    credited = min(len(hits), n_visits)
     n = len(ENTITIES)
-    return {"check": "coverage", "passed": len(hits) == n, "score": len(hits) / n,
-            "reason": f"{len(hits)}/{n} dams' opening years gathered ({', '.join(hits) or 'none'})"}
+    return {"check": "coverage", "passed": credited == n, "score": credited / n,
+            "reason": f"{credited}/{n} dams' opening years gathered ({', '.join(hits[:credited]) or 'none'}; "
+                      f"{len(hits)} text-matched, {n_visits} visit(s))"}
 
 
 def validate_median_year(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

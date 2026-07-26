@@ -1,12 +1,20 @@
-# The 50-task benchmark suite — validated + deduped (2026-07-22)
+# The 59-task benchmark suite — validated + deduped + expanded (2026-07-22 → 2026-07-25)
 
 _Supersedes the ad-hoc BENCHMARK_SUITE_64. Every task here was re-validated on 2026-07-22 by 5 parallel
 sonnet agents against the validity bar (grounding-required, **grounding-gated keystone**, leak-free,
-discriminating, live-reachable). Of 145 task files, **74 passed**; this suite keeps 50 after DEDUPE —
+discriminating, live-reachable). Of 145 task files, **74 passed**; this suite kept 50 after DEDUPE —
 the 4 adaptive archetypes as the spine (32) + 18 diverse-shape tasks — dropping ~24 near-duplicate
 shapes (esp. the oversaturated branch-eliminate family). Purpose: measure whether ONE cheap model gets
 materially better by burning more compute (the ladder, below). See [[project_ladder_benchmark]],
 [[feedback_adaptive_cost_framing]]._
+
+_**2026-07-23:** grown 50 → 60 with 10 diverse-shape additions from the pool (breadth/argmax/count/
+reconciliation thin areas) — see "Growing to 60" below and `.barrage_prep/AGENT4_suite_expansion.md`.
+**2026-07-25 (F27):** task **024** (breadth, LLM-judge-scored) dropped from the active list — AGENT5's
+validator-integrity audit found it un-gated: a 0-visit hallucination scores 0.786 and PASSES the 0.75
+bar (`.barrage_prep/AGENT5_validator_integrity.md`). The file is kept (not deleted) for a future
+grounding-gated deterministic rebuild; it is simply no longer counted in the active suite below.
+Net: 50 → 60 → **59**, and the breadth archetype drops from 2 (024+052) to 1 (052 only) — expected._
 
 ## What forms the ladder (the compute-scaling axis)
 
@@ -21,7 +29,7 @@ Same single cheap agent model at every rung; each rung burns strictly more of it
 
 Optional ablation rungs available for mechanism isolation: `reexpand_only`, `confidence_only`, `kvote_only`, `backtrack_only`.
 
-## The 50 valid tasks
+## The original 50 valid tasks (024 since dropped — see below)
 
 ### Tier A — adaptive-targeted core (24) — the spine, 4 archetypes × 6, all grounding-gated
 **A survivor / branch-eliminate (6):** 122 radio-telescopes/FAST · 123 nuclear-ships/USS Long Beach · 124 SST-airliners/Tu-144 · 125 bridges/Huajiang Canyon · 126 handhelds/Microvision · 127 land-speed/ThrustSSC
@@ -29,11 +37,11 @@ Optional ablation rungs available for mechanism isolation: `reexpand_only`, `con
 **C stop/continue chain (6):** 134 Eiffel→Garabit · 135 Roebling→Cincinnati · 136 Brunel→SS Great Eastern · 137 Telford→Pontcysyllte · 138 Everest→Waugh 1856 · 139 Gaudí→Casa Milà
 **D re-expansion trigger (6):** 140 Mount Adams disambig · 141 Curium density · 142 Annefrank asteroid period · 143 Beethoven crater · 144 RRS Sir David Attenborough length · 145 Tower Bridge disambig
 
-### Tier B — diverse-shape coverage (15) — one/two exemplars per non-core shape
+### Tier B — diverse-shape coverage (15 originally, **14 active** — 024 dropped) — one/two exemplars per non-core shape
 **computation-over-values (4):** 049 Eiffel/Liberty year-gap · 055 Shining/Gatsby |diff|=119 · 059 footballer goals/appearance argmax · 060 Frisco/Phoenix %-change trap
 **count/set/selection (3):** 067 median dam by year · 072 lakes depth>480m count · 075 3rd-deepest fjord ordinal
 **argmax/prominence (2):** 041 suspension-bridge span argmax · 062 peak topographic prominence
-**breadth-grounding (1):** 024 ML-interpretability/XAI papers
+**breadth-grounding (0 here, 1 via the 60-additions below):** ~~024 ML-interpretability/XAI papers~~ — DROPPED 2026-07-25 (F27): un-gated + LLM-judge-scored, a 0-visit hallucination scored 0.786 and passed the 0.75 bar (AGENT5 audit). File kept, not deleted, for a future grounding-gated rebuild.
 **security-CVE (2):** 044 OpenSSH CVE-2026-35414 root-cause · 093 curl CVE-2023-38545 socks5
 **navigation (2):** 046 Apollo 11→Saturn V traversal · 047 wiki-race Pizza→Roman Empire
 **temporal/recency (1):** 073 institutions founded 1940–1963 count
@@ -45,14 +53,78 @@ Optional ablation rungs available for mechanism isolation: `reexpand_only`, `con
 **computation (2):** 061 director birth-year diff · 070 Chuck subset-sum distractor
 **count (1):** 090 Icelandic tunnels >4500m count
 
-**Shape balance (50):** survivor 9 · chain 9 · conflicting 8 · re-expansion 6 · computation 6 · count 4 · argmax 2 · CVE 2 · navigation 2 · breadth 1 · temporal 1.
+**Shape balance (the original 49 active, i.e. 50 minus 024):** survivor 9 · chain 9 · conflicting 8 · re-expansion 6 · computation 6 · count 4 · argmax 2 · CVE 2 · navigation 2 · breadth 0 · temporal 1. See "Growing to 60" below for the full 59-task shape balance (breadth restored to 1 via 052).
 
 ## The other 24 valid tasks (dropped as redundant shapes, available if N needs to grow)
-Branch-eliminate/survivor overflow: 069, 099, 104, 110, 113, 116, 118, 121. Chain overflow: 023, 050, 096. Argmax: 052, 077, 091. Computation: 064, 071, 085, 094. Count: — . Breadth: 012, 015, 021. CVE: 028. Nav: — . (Full 74-valid list in the validation run.)
+Branch-eliminate/survivor overflow: 069, 099, 104, 110, 113, 116, 118, 121 (121's gate fixed 2026-07-25, still pool — see F28 below). Chain overflow: 023, 050, 096. Argmax: 077 (091 promoted 2026-07-23, see below). Computation: 064 (gate fixed 2026-07-25, still pool — see F28 below; 071/085/094 promoted 2026-07-23, see below). Count: — . Breadth: 012, 015, 021 (052 promoted 2026-07-23, see below). CVE: 028. Nav: — . (Full 74-valid list in the validation run.)
+
+## Growing to 60 — the 10 additions (2026-07-23, AGENT4 suite-expansion audit)
+
+Ten **bounded parallel fan-outs** added to the thin diverse-shape tiers — no new survivor/chain,
+by design (those are the slow, timeout-prone families). Six were already grounding-gated (offline
+tests green); four needed the one-line visit-gate fix, applied 2026-07-25 as part of F28 below.
+
+**Additions:** breadth argmin **052** (literary birth-years) · page-only argmax **091** (Turkish
+dams, fame-decoy) & **084** (lake max-depth, fame-decoy) · count-with-condition **078** (islands by
+area) & **082** (rivers by length) · closest-to-reference **071** (lake depth vs ref — new shape) ·
+numeric AND-filter **081** (rivers len∧basin) & **094** (Norwegian fjords len∧depth — new shape) ·
+computed-ratio argmax **079** (hydro stations gen÷cap) · terminal arithmetic **085** (river-length
+difference).
+
+**Shape balance (60, before the 024 drop):** survivor 9 · chain 9 · conflicting 8 · computation 8
+(+079, +085) · count 6 (+078, +082) · re-expansion 6 · argmax 4 (+091, +084) · numeric-AND-filter 2
+(+081, +094 — new line) · CVE 2 · navigation 2 · breadth 2 (+052) · nearest/selection 1 (+071 — new
+line) · temporal 1.
+
+**Gate-fix applied 2026-07-25 (F28):** 078, 079, 082, 084 (the four AGENT4 flagged as needing it),
+plus **081** — a fifth addition the AGENT4 audit had marked "already gated" but the F30
+`validator_lint.py` CI gate caught as still un-gated (`_keystone_ok(result)` missing the
+`observability` thread) — and, for hygiene, the two pool tasks **064** and **121** that carry the
+same gap. All five/seven now require `visit.count > 0` before crediting the keystone, matching
+073/091/094's canonical pattern. 085's un-capped `validate_breadth_lengths` diagnostic (a
+0-visit run could bank full breadth credit from recalled figures alone) was also capped by
+`min(hits, n_visits)` as part of the same pass (F29-style fix).
+
+## F27 (2026-07-25) — task 024 dropped, suite is now 59
+
+AGENT5's validator-integrity audit (`.barrage_prep/AGENT5_validator_integrity.md`) found **024**
+(the suite's only breadth task before the 60-expansion) is un-gated AND carries a real LLM judge:
+a pure 0-visit hallucination scores **0.786 and PASSES** the 0.75 bar. It is dropped from the
+active list (kept as a file, not deleted, for a future grounding-gated deterministic rebuild).
+
+**Net effect: 50 → 60 (2026-07-23 growth) → 59 (2026-07-25, 024 dropped).** Breadth drops from 2
+(024 + 052) to 1 (052 only) — expected, since 052 alone already fills that shape with a gated,
+offline-tested task.
+
+**Final shape balance (the active 59):** survivor 9 · chain 9 · conflicting 8 · computation 8 ·
+count 6 · re-expansion 6 · argmax 4 · numeric-AND-filter 2 · CVE 2 · navigation 2 · breadth 1 ·
+nearest/selection 1 · temporal 1. (9+9+8+8+6+6+4+2+2+2+1+1+1 = 59.)
+
+**F26 (2026-07-25) — brittle-keystone fixes (same pass, no task-count change):** six in-suite
+keystones that false-failed correct grounded answers were fixed: **122** (unit-tolerant "300
+metres"/"300 meters"/"300-meter", not just "300 m"), **125** (same, "625 metres"), **126**
+(joiner-tolerant "16 by 16", not just "16x16"/"16×16"), **141/142/144** (numeric-tolerance band via
+a shared `numeric_value_matches` helper in `idea_test_utils.py`, accepting standard roundings like
+"13.5"/"3.3"/"129" instead of only the exact literal decimal). See `.barrage_prep/
+AGENT5_validator_integrity.md` §2 for the false-negative proofs and §5 for the proposed diffs.
+
+**F29 (2026-07-25) — breadth-diagnostic visit cap (same pass, no task-count change):** the
+un-gated breadth/coverage diagnostics in 059, 062, 065, 067, 072, 075, 090 (and, discovered via the
+F30 lint gate, 085) handed partial credit to a 0-visit parametric-memory answer that merely recalls
+the looked-up figures. Each now caps credit at `min(hits, n_visits)`, mirroring the canonical
+pattern already used by 122/125/126/141/142/144's un-gated breadth diagnostics.
+
+**F30 (2026-07-25) — validator lint wired into CI:** `.barrage_prep/validator_lint.py` (AGENT5's
+static integrity linter — flags `[GATE]` grounding-independent answer validators, `[LLM]` non-None
+judges, `[UNIT]`/`[DEC]` brittle unit/decimal keystones) is now tracked at `scripts/validator_lint.py`
+and gated by `services/agent/tests/validator_lint_test.py`, which asserts **zero `[GATE]`/`[LLM]`
+findings across the active 59-task suite** (the two score-corrupting severities). Pool/legacy tasks
+outside the 59 (e.g. 024, the un-gated branch-eliminate overflow) are intentionally excluded from
+that hard gate — see the test file's docstring for the scoping rationale.
 
 ## Invalid (71) — do NOT run
 - **Substance failures (drop permanently, ~41):** 001–011, 013–020, 026, 027, 029–039, 043, 045, 048, 053, 063, 066 (single-fact / format-only / memorized-trivia / non-discriminating / leaked-URLs-in-prompt).
-- **Grounding-gate regression (~30, ONE-LINE FIXABLE):** 051, 057, 074, 076, 078–084, 086–089, 092, 097, 098, 100–103, 105–107, 109, 111, 112, 114, 115, 117, 119, 120 — `_keystone_ok(result)` is missing the `observability`/`visit.count>0` gate its siblings have. Copying the gate flips them valid, BUT most are duplicate shapes (branch-eliminate / count / computation), so patch only ones that ADD a shape.
+- **Grounding-gate regression (~30 → ~25 after F28, ONE-LINE FIXABLE):** 051, 057, 074, 076, 080, 083, 086–089, 092, 097, 098, 100–103, 105–107, 109, 111, 112, 114, 115, 117, 119, 120 — `_keystone_ok(result)` is missing the `observability`/`visit.count>0` gate its siblings have (078, 079, 081, 082, 084, 064, 121 were fixed 2026-07-25 as part of F28; **024** was separately dropped, see F27 above, not gate-fixed). Copying the gate flips the remainder valid, BUT most are duplicate shapes (branch-eliminate / count / computation), so patch only ones that ADD a shape.
 
 ## Model axis — which cheap models to test (researched 2026-07-22)
 
@@ -84,7 +156,7 @@ worst-priced cheap model for this; better candidates (per capability + tool/JSON
 - **No premium ceiling / cost claim yet:** the gemini-3.1-pro reference completed only 4/8 tasks (invalid 0.645), and gpt-5-mini's $2/1M output gave NO cost win. Re-run the reference on all tasks (with sonnet) and run the cheap-output tiers before any "% of premium at 1/N cost" claim.
 - **Next:** run the full 50-suite (not the 8-task smoke) with the 3-model axis, reference on all tasks, task-level stats. This is a validated PILOT, not a proven headline.
 
-## Path to grow the suite (if 50 → more)
-1. Cheapest: promote from the 24-dropped-redundant pool (above).
-2. Salvage: gate-fix the ~30 regression tasks (only the shape-adding ones).
-3. Author net-new shapes under-covered here: temporal/recency (only 1), breadth (only 1), multi-source numeric reconciliation.
+## Path to grow the suite (if 59 → more)
+1. Cheapest: promote from the remaining ~19-dropped-redundant pool (above; 052/071/077/091/064/085/094 already resolved — either promoted 2026-07-23 or noted as duplicate/still-pool).
+2. Salvage: gate-fix the remaining ~25 regression tasks (only the shape-adding ones; 078/079/081/082/084/064/121 already fixed 2026-07-25).
+3. Author net-new shapes under-covered here: temporal/recency (only 1), multi-source numeric reconciliation (thin beyond the 60-additions).

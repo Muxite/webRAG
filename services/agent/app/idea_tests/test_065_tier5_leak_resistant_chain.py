@@ -150,13 +150,19 @@ def validate_chain_coverage(result: Dict[str, Any], observability: Dict[str, Any
     even when the obscure terminus is botched, which is the axis that separates a structured agent
     (which carries each hop's result forward) from a linear/parametric one that never reaches the
     intermediate pages at all.
+
+    Credit is CAPPED BY visit count (``min(hits, n_visits)``) so a 0-visit parametric-memory
+    answer that merely recalls the poet/town cannot bank partial credit here without ever browsing.
     """
     text = _primary_text(result).lower()
     has_poet = bool(re.search(HOP_POET, text))
     has_town = bool(re.search(HOP_TOWN, text))
     hits = int(has_poet) + int(has_town)
-    return {"check": "chain_coverage", "passed": hits == 2, "score": hits / 2.0,
-            "reason": f"poet(Neruda)={has_poet}, town(Parral)={has_town}"}
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    credited = min(hits, n_visits)
+    return {"check": "chain_coverage", "passed": credited == 2, "score": credited / 2.0,
+            "reason": f"poet(Neruda)={has_poet}, town(Parral)={has_town}, "
+                      f"{credited}/2 credited ({n_visits} visit(s))"}
 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

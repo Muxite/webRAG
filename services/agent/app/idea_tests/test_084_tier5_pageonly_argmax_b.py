@@ -204,13 +204,19 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Lake O'Higgins / San Martín as the deepest lake.
 
     NOT satisfied by merely listing O'Higgins among the six: when another lake is also named,
     O'Higgins must be the one tied to a 'deepest / greatest / maximum depth' assertion. A terse
     primary answer that names only the winner (O'Higgins, with no rival in the slot) also passes.
+
+    GROUNDING: an ungrounded parametric-memory guess must not earn credit, so the winner is only
+    credited when the agent actually visited at least one page (visit.count > 0).
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -233,7 +239,7 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 def validate_keystone_argmax(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE (hard 0/1): the deepest lake is Lake O'Higgins / San Martín, NOT the fame decoy
     (Crater Lake). A model that shortcuts to fame / reputation mis-picks Crater Lake."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_argmax",
         "passed": passed,
@@ -271,7 +277,7 @@ def validate_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> 
 def validate_winner_depth(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: the winner's maximum depth (~836 m, within +/- 2.5%). Short-circuits to
     0 when the keystone is absent, so a guessed winner can't bank the value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "winner_depth",
             "passed": False,
@@ -296,7 +302,7 @@ def validate_winner_depth(result: Dict[str, Any], observability: Dict[str, Any])
 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites the lake pages. Short-circuits to 0 when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation",
             "passed": False,

@@ -348,7 +348,7 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names the Prut River as the unique both-constraint
     satisfier.
 
@@ -362,7 +362,13 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
 
     Rejected outright if Prut is absent, or if another river is explicitly asserted as the
     answer, or if the enumeration table is hallucinated (a decoy also shows both-positive).
+
+    GROUNDING: an ungrounded parametric-memory guess must not earn credit, so the winner is
+    only credited when the agent actually visited at least one page (visit.count > 0).
     """
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
     text = _primary_text(result)
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
@@ -388,7 +394,7 @@ def validate_keystone_filter(result: Dict[str, Any], observability: Dict[str, An
     Dniester (1,362 km but basin 68,627 km²) or Sava (992 km but basin 97,713 km²); chasing
     a small basin lands on Neretva (11,798 km² but only 225 km) or Vardar (~25,000 km² but
     only 388 km); Tisza is long enough at 966 km but has an enormous basin (157,186 km²)."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_filter", "passed": passed, "score": 1.0 if passed else 0.0,
         "reason": ("Prut River named as the unique both-constraint satisfier" if passed
@@ -426,7 +432,7 @@ def validate_winner_attributes(result: Dict[str, Any], observability: Dict[str, 
     """GATED secondary: the winner's length (~953 km) and basin (~27,540 km²) are both stated.
     Short-circuits to 0 when the keystone is absent, so a wrong or guessed winner cannot bank
     the attribute-value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "winner_attributes", "passed": False, "score": 0.0,
             "reason": "Keystone absent -> attribute values not credited",
@@ -449,7 +455,7 @@ def validate_winner_attributes(result: Dict[str, Any], observability: Dict[str, 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites at least 3 of the 6 river Wikipedia pages. Short-circuits to 0
     when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation", "passed": False, "score": 0.0,
             "reason": "Keystone absent -> source URLs not credited",

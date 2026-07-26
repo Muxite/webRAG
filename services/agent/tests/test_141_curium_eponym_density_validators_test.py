@@ -91,10 +91,14 @@ def test_unknown_insufficient_first_page_answer_gates_to_zero():
     assert t.validate_citations(r, _OBS)["score"] == 0.0
 
 
-def test_keystone_token_rejects_embedded_and_near_miss():
-    assert t.validate_keystone_density(_r("value 13.510 xj"), _OBS)["score"] == 0.0
+def test_keystone_rejects_near_miss_but_accepts_standard_roundings():
+    """Unit-tolerance fix (F26): a standard rounding ("13.5") or extra precision ("13.510") is a
+    CORRECT grounded answer and must now score 1.0 -- only a genuinely different value (an
+    embedded/near-miss digit run, or an unrelated number) is rejected."""
+    assert t.validate_keystone_density(_r("value 13.510 xj"), _OBS)["score"] == 1.0
+    assert t.validate_keystone_density(_r("about 13.5 g/cm3"), _OBS)["score"] == 1.0
     assert t.validate_keystone_density(_r("code 113.51"), _OBS)["score"] == 0.0
-    assert t.validate_keystone_density(_r("about 13.5 g/cm3"), _OBS)["score"] == 0.0
+    assert t.validate_keystone_density(_r("value 20.5"), _OBS)["score"] == 0.0
 
 
 def test_partial_coverage_scores_half_and_gate_zero():
