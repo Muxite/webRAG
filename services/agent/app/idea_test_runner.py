@@ -397,7 +397,10 @@ def _is_enabled(value: str) -> bool:
 # researcher start from a named arm and tweak one axis without a hand-written
 # settings file). Values are jsonkey -> literal value (mirrors idea_dag_settings.json
 # types); "baseline" documents the shipped JSON defaults for every opt-in flag this
-# module knows how to override.
+# module knows how to override — EXCEPT `final_require_grounding`, which every arm turns
+# on: it is a validity gate, not a lever. A run that opened zero pages and answers from the
+# model's weights is a hallucination whatever arm produced it, so refusing to present it as
+# a researched result must not be something one arm gets and another does not.
 _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
     "baseline": {
         "got_reexpand_enabled": False,
@@ -405,6 +408,7 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "got_step_confidence_judge_enabled": False,
         "got_step_confidence_reexpand_enabled": False,
         "got_step_confidence_reexpand_threshold": 0.5,
+        "got_contract_reexpand_enabled": False,
         "got_reexpand_corrective_context_enabled": False,
         "got_backtrack_enabled": False,
         "connector_retry_on_failure_enabled": False,
@@ -414,14 +418,20 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "expansion_expect_contract_enabled": False,
         "native_reasoning_effort_discipline_enabled": False,
         "price_tier_param_tiering_enabled": False,
+        "final_require_grounding": True,   # validity gate, on in every arm
     },
     "good_adaptive": {
         "got_reexpand_enabled": True,
         "got_reexpand_max_iterations": 2,
         "got_step_confidence_judge_enabled": True,
         "got_step_confidence_reexpand_enabled": True,
+        # F33: contract satisfaction, not the anti-calibrated judge score, decides when a
+        # leaf re-expands. The judge stays on as decorrelated instrumentation and still
+        # decides where the (free, deterministic) contract check has no verdict.
+        "got_contract_reexpand_enabled": True,
         "got_reexpand_corrective_context_enabled": True,
         "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
     },
     "reexpand_only": {
         "got_reexpand_enabled": True,
@@ -451,6 +461,61 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "expansion_expect_contract_enabled": True,
         "native_reasoning_effort_discipline_enabled": True,
         "price_tier_param_tiering_enabled": True,
+    },
+    # "max_burn": the PRODUCTIVE ~5x-burn arm. It is `good_adaptive` (the proven winner)
+    # with the ONE lever that carries the accuracy gain cranked — re-expansion DEPTH — plus
+    # the supporting knobs that lever needs to actually execute (more steps to run the
+    # deeper observe→re-expand cycles, wider hop/beam so there is more page/link space to
+    # re-expand INTO), and one extra forced-grounding pass. The burn is self-limiting: it
+    # only spends on the ~50-60% of runs where the follow-up detector fires, concentrating
+    # compute on the chain/re-expansion archetypes where depth pays. Deliberately EXCLUDES
+    # everything the barrage measured as net-negative or inert: k-vote (re-reads the same
+    # evidence, overturns a correct temp-0 anchor), backtrack (never fires), expect-contract
+    # (rewrites goals the cheap model can't meet → unproductive re-expansion), reasoning-effort
+    # discipline (a no-op/wrong-direction here), and the price-tier 2x multiplier (a cost bug).
+    # The Mode-1 residual ("right page, wrong value", ~30-42% of visited runs) is NOT reachable by
+    # any grounding knob above — re-expansion fixes the wrong PAGE, not the wrong VALUE on the right
+    # page. It is attacked here by the post-synthesis reconcile chain (recompute + verify + a
+    # decorrelated variation ensemble), which runs only on answer-shaped tasks and fails open. Burn
+    # now spends on BOTH gaps: grounding (deeper re-expansion) and synthesis (the reconcile chain).
+    "max_burn": {
+        # inherit good_adaptive verbatim (the proven-winning base)
+        "got_reexpand_enabled": True,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "connector_retry_on_failure_enabled": True,   # keep ON in all arms (infra fairness)
+        # the productive burn: deeper re-expansion + room + coverage to execute it
+        "got_reexpand_max_iterations": 4,             # 2 -> 4 (the core accuracy lever)
+        "max_steps": 90,                              # 50 -> 90 (or depth-4 re-expansion starves)
+        "got_candidate_coverage_enabled": True,       # auto-extends steps so late re-expansions resolve
+        # wider page/link space to re-expand into — cheap hops, not paid searches
+        "visit_link_query_top_k": 25,                 # 15 -> 25
+        "max_links_per_visit": 30,                    # 20 -> 30
+        "got_beam_max": 7,                            # 5 -> 7 (effective fan-out cap under dynamic beam)
+        "max_branching": 7,                           # raise the hard cap to match beam
+        # one extra forced-grounding pass (attacks Mode-2 gate-zero)
+        "grounding_max_replans": 3,                   # 2 -> 3
+        # confidence trigger: nudge only — the judge is anti-calibrated, do not crank. F33
+        # supersedes it as the control signal: contract satisfaction decides re-expansion and
+        # protects a leaf that DID deliver its datum from the judge's mood.
+        "got_step_confidence_reexpand_threshold": 0.55,
+        "got_contract_reexpand_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        # the synthesis-gap fix: post-synthesis reconcile chain (answer-shaped tasks only). The
+        # variation ensemble supersedes k-vote, so k-vote stays OFF (they overlap; k-vote lost).
+        "final_recompute_enabled": True,
+        "final_verify_enabled": True,
+        "final_variations_enabled": True,
+        "final_variations_k": 3,
+        # explicitly OFF: net-negative / inert / bugged (see comment above)
+        "native_vote_k_enabled": False,
+        "native_vote_k": 1,
+        "got_backtrack_enabled": False,
+        "expansion_expect_contract_enabled": False,
+        "native_reasoning_effort_discipline_enabled": False,
+        "price_tier_param_tiering_enabled": False,
     },
 }
 

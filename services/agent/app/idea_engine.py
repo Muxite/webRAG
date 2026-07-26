@@ -1300,6 +1300,10 @@ class IdeaDagEngine:
             # is off; per-sibling judge calls run concurrently inside the batch helper.
             if done_children:
                 confidences = await self._maybe_judge_step_confidence_batch(graph, done_children, step_index)
+                # F33 contract->action loop for the batch-completed siblings (no-op unless
+                # got.contract_reexpand_enabled). Free and deterministic, so it runs for every
+                # completed sibling regardless of whether the judge sampled it.
+                await self._maybe_contract_reexpand_batch(graph, done_children, step_index)
                 # Confidence->action loop for the batch-completed siblings (no-op unless
                 # got.step_confidence_reexpand_enabled). Applied sequentially so the shared
                 # max_total_nodes ceiling can't be overshot by concurrent siblings. Runs
@@ -1610,6 +1614,11 @@ class IdeaDagEngine:
         node = graph.get_node(node_id)
         if node and node.status == IdeaNodeStatus.DONE:
             confidences = await self._maybe_judge_step_confidence(graph, node_id, step_index)
+            # F33 contract->action loop: a leaf that did not deliver its contract's required
+            # payload/datum/subject re-expands (no-op unless got.contract_reexpand_enabled).
+            # Runs FIRST because it is free and better-targeted than the judge; a node it
+            # re-expands is then gated out of both paths below (they skip nodes with children).
+            await self._maybe_contract_reexpand_batch(graph, [node_id], step_index)
             # Confidence->action loop: a low step-confidence can itself drive re-expansion
             # (no-op unless got.step_confidence_reexpand_enabled). Runs before the follow-up
             # path so a node re-expanded here is gated out of `_maybe_reexpand_leaf`
@@ -1680,24 +1689,15 @@ class IdeaDagEngine:
                     pass
         return judged
 
-    def _confidence_triggers_reexpand(
-        self, graph: IdeaDag, node_id: str, confidence: float
-    ) -> bool:
-        """Gate: does a completed leaf's *low* step-confidence justify re-expanding it?
+    def _reexpand_guards_ok(self, graph: IdeaDag, node_id: str) -> bool:
+        """The trigger-agnostic guards every re-expansion path shares.
 
-        This is the confidence->action loop. Unlike ``_reexpand_check`` (which asks a
-        separate follow-up-detector LLM whether the result *reveals* a new target), this
-        trigger is a genuine "observe the step's trustworthiness, then decide to take
-        another step": a leaf the step-judge distrusts (confidence below
-        ``got.step_confidence_reexpand_threshold``) is re-investigated by re-expanding it
-        into follow-up sub-problems. Reuses the same childless-successful-leaf guards and
-        the same ``reexpand_max_iterations`` / ``max_total_nodes`` bounds as the follow-up
-        path, so termination is guaranteed identically. No LLM call, no mutation.
+        A candidate must be an existing, childless, non-merge leaf with a SUCCESSFUL action
+        result, inside both the per-lineage ``reexpand_max_iterations`` budget and the global
+        ``max_total_nodes`` ceiling — so termination is guaranteed identically no matter which
+        trigger (step-confidence, contract satisfaction, or the follow-up detector) fired.
+        No LLM call, no mutation.
         """
-        if not self._cfg.got.step_confidence_reexpand_enabled:
-            return False
-        if confidence is None or confidence >= self._cfg.got.step_confidence_reexpand_threshold:
-            return False
         node = graph.get_node(node_id)
         if not node:
             return False
@@ -1711,7 +1711,7 @@ class IdeaDagEngine:
         from agent.app.idea_policies.action_constants import ActionResultExtractor
         if not ActionResultExtractor.is_success(result):
             return False
-        # C1a routing: if the low confidence was caused by a TOOL failure (the fetch/search
+        # C1a routing: if the leaf's "success" is actually a TOOL failure (the fetch/search
         # returned no usable evidence), do NOT re-expand — a fresh subtree would just repeat
         # the failing fetch. The bounded in-place connector retry is the right recovery for
         # that; re-expansion is reserved for a page that genuinely loaded but lacks the answer.
@@ -1726,6 +1726,65 @@ class IdeaDagEngine:
         if count >= max_iters:
             return False
         if graph.node_count() >= self._cfg.engine.max_total_nodes:
+            return False
+        return True
+
+    def _contract_verdict(self, graph: IdeaDag, node_id: str):
+        """F33: deterministic contract-satisfaction verdict for a completed leaf.
+
+        Returns ``None`` when the lever is off or the check has NO verdict (the leaf
+        retrieved nothing checkable, or its contract text yields neither a measurable datum
+        nor an identity token) — callers then fall back to the previous signal. Never raises
+        and never mutates; costs no LLM call.
+        """
+        if not self._cfg.got.contract_reexpand_enabled:
+            return None
+        node = graph.get_node(node_id)
+        if not node:
+            return None
+        root = graph.get_node(graph.root_id())
+        mandate = ""
+        if root and isinstance(root.details, dict):
+            mandate = str(root.details.get("mandate") or "")
+        try:
+            from agent.app.idea_policies.contract_satisfaction import evaluate_step_contract
+            verdict = evaluate_step_contract(node, mandate)
+        except Exception as exc:  # noqa: BLE001 — a gate must never crash a run
+            self._logger.warning(f"[CONTRACT] check failed (node={node_id}): {exc}")
+            return None
+        return verdict if verdict.applicable else None
+
+    def _confidence_triggers_reexpand(
+        self, graph: IdeaDag, node_id: str, confidence: float
+    ) -> bool:
+        """Gate: does a completed leaf's *low* step-confidence justify re-expanding it?
+
+        This is the confidence->action loop. Unlike ``_reexpand_check`` (which asks a
+        separate follow-up-detector LLM whether the result *reveals* a new target), this
+        trigger is a genuine "observe the step's trustworthiness, then decide to take
+        another step": a leaf the step-judge distrusts (confidence below
+        ``got.step_confidence_reexpand_threshold``) is re-investigated by re-expanding it
+        into follow-up sub-problems. Reuses ``_reexpand_guards_ok``, so it terminates on
+        exactly the same bounds as every other trigger. No LLM call, no mutation.
+
+        F33 corrective (no-op unless ``got.contract_reexpand_enabled``): the judge's number
+        is anti-calibrated — a coherent WRONG page scores high and a correct-but-partial page
+        scores low — so it may not overrule a leaf whose CONTRACT is demonstrably satisfied
+        (the required payload/datum/subject is present in the retrieved evidence). Where the
+        contract check has no verdict, the judge still decides, exactly as before.
+        """
+        if not self._cfg.got.step_confidence_reexpand_enabled:
+            return False
+        if confidence is None or confidence >= self._cfg.got.step_confidence_reexpand_threshold:
+            return False
+        if not self._reexpand_guards_ok(graph, node_id):
+            return False
+        verdict = self._contract_verdict(graph, node_id)
+        if verdict is not None and verdict.satisfied:
+            self._logger.info(
+                f"[CONTRACT] leaf {node_id[:8]} satisfies its contract; ignoring the "
+                f"low step-confidence {confidence:.3f} (anti-calibrated trigger suppressed)"
+            )
             return False
         return True
 
@@ -1756,6 +1815,34 @@ class IdeaDagEngine:
                 ),
             }
             await self._apply_reexpand(graph, node_id, step_index, verdict)
+
+    async def _maybe_contract_reexpand_batch(
+        self, graph: IdeaDag, node_ids: List[str], step_index: int
+    ) -> None:
+        """F33: drive bounded re-expansion off CONTRACT SATISFACTION, not the judge score.
+
+        No-op unless ``got.contract_reexpand_enabled`` is set (JSON default False), so
+        flag-off behavior is byte-identical. A completed retrieval leaf whose deterministic
+        contract check reports a missing payload / required datum / subject re-expands: the
+        step did not deliver what the task required, which is a signal about task PROGRESS
+        rather than about how confident a judge feels. Unlike the confidence loop this needs
+        no ``GoTOperations`` and no judge LLM call — it is free — so it fires on every
+        completed leaf, including runs with the step-confidence judge off entirely. Applied
+        SEQUENTIALLY (never inside a gather): each ``_apply_reexpand`` re-reads the
+        ``max_total_nodes`` ceiling before growing the graph.
+        """
+        if not self._cfg.got.contract_reexpand_enabled:
+            return
+        for node_id in node_ids:
+            verdict = self._contract_verdict(graph, node_id)
+            if verdict is None or verdict.satisfied:
+                continue
+            if not self._reexpand_guards_ok(graph, node_id):
+                continue
+            await self._apply_reexpand(graph, node_id, step_index, {
+                "needs_followup": True,
+                "reason": f"step contract unsatisfied: {verdict.reason}",
+            })
 
     def _handle_action_result(self, graph: IdeaDag, node_id: str, step_index: int) -> str:
         node = graph.get_node(node_id)

@@ -13,6 +13,7 @@ from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import DetailKey
 from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+from agent.app.idea_policies.shape_classifier import classify_answer_shape
 from agent.app.prompt_builder import FinalPromptBuilder
 from agent.app.idea_memory import MemoryManager
 
@@ -196,6 +197,93 @@ def _unverified_citations(text: str, sources: List[Dict[str, str]], cap: int = 2
         if len(out) >= cap:
             break
     return out
+
+
+# ---------------------------------------------------------------------------
+# Hard grounding gate (opt-in; kills Mode-2 pure-parametric hallucination)
+# ---------------------------------------------------------------------------
+#
+# The census found runs that opened ZERO pages and still emitted a confident answer —
+# some fabricating their own provenance ("accessed via memory retrieval") — at ~35% of
+# deepseek-baseline and ~13% of nano-baseline runs. Nothing downstream distinguishes such
+# an answer from a researched one. This gate does: on a grounded-research mandate with no
+# successfully-opened page, the answer is banner-flagged, its unverifiable URLs are
+# stripped, and success/goal_achieved are forced False. It is a validity gate, not a
+# quality lever — it deliberately does NOT re-run the model or spend a token.
+
+_UNGROUNDED_BANNER = (
+    "**Insufficient grounded evidence.** No source page was successfully retrieved for this "
+    "task, so nothing below is grounded in evidence this agent actually read. Any specific "
+    "value or citation in it is unverified and may be fabricated.\n\n"
+)
+_STRIPPED_URL_MARKER = "[unverified source removed]"
+
+
+def _has_grounded_evidence(graph: IdeaDag) -> bool:
+    """True when at least one node successfully opened a page and got something back.
+
+    Deliberately the SAME notion of evidence the ``sources`` provenance list uses (a
+    successful VISIT), plus a content-only fallback for a connector that returns body text
+    without echoing the URL — so the gate can never fire on a run that did read a page.
+    """
+    from agent.app.idea_policies.base import IdeaActionType
+    from agent.app.idea_policies.action_constants import ActionResultExtractor
+
+    for node in graph.iter_depth_first():
+        if node.details.get(DetailKey.ACTION.value) != IdeaActionType.VISIT.value:
+            continue
+        ar = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not isinstance(ar, dict) or not ActionResultExtractor.is_success(ar):
+            continue
+        if (ar.get("url") or "").strip() or (ar.get("content") or ar.get("content_full") or ""):
+            return True
+    return False
+
+
+def _strip_urls(text: str, urls: List[str]) -> str:
+    """Replace each unverifiable URL in ``text`` with an explicit marker."""
+    out = text
+    for url in urls:
+        if url:
+            out = out.replace(url, _STRIPPED_URL_MARKER)
+    return out
+
+
+def _apply_grounding_gate(
+    payload: Dict[str, Any], graph: IdeaDag, mandate: str, sources: List[Dict[str, str]]
+) -> None:
+    """Refuse to present an ungrounded answer as a researched one (mutates ``payload``).
+
+    No-op unless the run is a grounded-research task that opened no page. Never raises and
+    never drops the model's text (a reader can still see what it claimed) — it prefixes the
+    refusal banner, strips citations that were never opened, and marks the run unsuccessful.
+    """
+    from agent.app.idea_policies.grounding import requires_grounded_answer
+
+    try:
+        if _has_grounded_evidence(graph) or sources:
+            return
+        if not requires_grounded_answer(mandate, graph):
+            return
+    except Exception as exc:  # noqa: BLE001 — the gate must never crash finalize
+        _logger.warning(f"[GROUNDING-GATE] check failed: {exc}")
+        return
+
+    deliverable = str(payload.get("final_deliverable", "") or "")
+    unverified = _unverified_citations(deliverable, sources)
+    if unverified:
+        deliverable = _strip_urls(deliverable, unverified)
+    payload["final_deliverable"] = _UNGROUNDED_BANNER + deliverable
+    payload["success"] = False
+    payload["goal_achieved"] = False
+    payload["grounded"] = False
+    payload["grounding_gate"] = "refused-ungrounded"
+    if unverified:
+        payload["stripped_citations"] = unverified
+    _logger.warning(
+        "[GROUNDING-GATE] zero opened pages on a grounded-research mandate: "
+        f"refusing to present the answer as grounded (stripped {len(unverified)} citation(s))"
+    )
 
 
 def _looks_truncated(response: Optional[str], max_completion_tokens: int) -> bool:
@@ -462,6 +550,233 @@ async def _vote_finalize_response(
     return winner
 
 
+# ---------------------------------------------------------------------------
+# Post-synthesis reconcile chain (opt-in; attacks Mode-1 "right page, wrong value")
+# ---------------------------------------------------------------------------
+#
+# Re-expansion fixes the wrong PAGE. These passes fix the wrong VALUE extracted from
+# the RIGHT page: after the finalize draft is produced, an answer-shaped task can run
+# one or more corrective LLM passes over the SAME raw evidence, each taking the prior
+# stage's deliverable as its new draft and each failing OPEN (keep the prior draft on
+# empty/error/timeout, never regress to nothing). All default OFF -> byte-identical.
+
+_RECOMPUTE_SYSTEM = (
+    "You are a re-derivation checker in a research system. You are given a DRAFT answer and the "
+    "RAW EVIDENCE it was drawn from. Do exactly this:\n"
+    "1. List the exact source values/quantities you will use, each with a VERBATIM quote from the "
+    "evidence and its source URL.\n"
+    "2. Re-derive the answer step by step using ONLY those listed values.\n"
+    "3. If your re-derivation differs from the draft, return the CORRECTED answer; otherwise confirm "
+    "the draft.\n"
+    "Rely ONLY on the evidence below, never on prior knowledge. Return JSON "
+    "{deliverable, summary}: the deliverable is the final (corrected or confirmed) answer including "
+    "the listed values, their verbatim quotes and URLs, and the derivation."
+)
+_RECOMPUTE_USER = "MANDATE:\n{mandate}\n\nDRAFT ANSWER:\n{draft}\n\nRAW EVIDENCE:\n{evidence}"
+
+_VERIFY_SYSTEM = (
+    "You are a support checker in a research system. You are given an ANSWER and the RAW EVIDENCE. "
+    "Quote the exact passage from the evidence that SUPPORTS the answer. If NO passage in the "
+    "evidence supports it, the answer is UNSUPPORTED — return instead what the evidence ACTUALLY "
+    "says. Rely ONLY on the evidence, never on prior knowledge. Return JSON {deliverable, summary}: "
+    "the deliverable is the supported answer (with its verbatim supporting quote and URL), or the "
+    "evidence-supported correction."
+)
+_VERIFY_USER = "MANDATE:\n{mandate}\n\nANSWER TO VERIFY:\n{draft}\n\nRAW EVIDENCE:\n{evidence}"
+
+# K decorrelated framings of the core question. The point is that a systematically-biased reader
+# misreads ONE framing but not the others, so a disagreement surfaces the correct value — unlike
+# k-vote, which re-runs the identical prompt and reproduces the same misread.
+_VARIATION_ANGLES = (
+    "Rephrase the question in your own words first, then answer it directly.",
+    "Ignore any assumptions. Locate the single specific value/quantity the question asks for, "
+    "verbatim, in the evidence, and report exactly that value.",
+    "Work backward from the evidence: find the passage that DEFINITIVELY answers the question, "
+    "quote it, then state the answer it implies.",
+)
+_VARIATION_SYSTEM = (
+    "You answer a research question strictly from the RAW EVIDENCE. {angle} Quote the exact "
+    "supporting passage and its source URL. Rely ONLY on the evidence, never on prior knowledge; if "
+    "the evidence does not contain the answer, say so. Return JSON {{deliverable, summary}}: the "
+    "deliverable is the specific answer with its verbatim quote and URL."
+)
+_VARIATION_USER = "QUESTION:\n{mandate}\n\nRAW EVIDENCE:\n{evidence}"
+
+_COLLATE_SYSTEM = (
+    "You reconcile several independently-derived answers to the SAME question into the single "
+    "best-supported answer. Each candidate carries its own evidence quote. If they agree, return "
+    "that answer. If they DISAGREE, choose the one whose verbatim quote most directly supports it, "
+    "and say why. Rely ONLY on the provided candidates and their quotes. Return JSON "
+    "{deliverable, summary}."
+)
+_COLLATE_USER = "QUESTION:\n{mandate}\n\nCANDIDATE ANSWERS:\n{candidates}"
+
+
+def _split_deliverable_summary(response: str) -> tuple[str, str]:
+    """Best-effort ``(deliverable, summary)`` from a finalize-shaped response string."""
+    try:
+        data = json.loads(response)
+        return str(data.get("deliverable", "") or ""), str(data.get("summary", "") or "")
+    except Exception:  # noqa: BLE001
+        return response, ""
+
+
+def _valid_reconcile_response(response: Optional[str]) -> Optional[str]:
+    """Return ``response`` iff it parses as ``{deliverable, summary}`` with a non-empty deliverable,
+    else ``None``. Guarantees a reconcile stage never replaces a parseable draft with garbage —
+    the downstream ``json.loads`` in :func:`build_final_payload` stays valid."""
+    if not response or not response.strip():
+        return None
+    try:
+        data = json.loads(response)
+    except Exception:  # noqa: BLE001
+        return None
+    deliverable = data.get("deliverable")
+    if not (isinstance(deliverable, str) and deliverable.strip()):
+        return None
+    return response
+
+
+async def _reconcile_llm_call(
+    io: AgentIO,
+    messages: list,
+    *,
+    model_name: Optional[str],
+    json_schema: Any,
+    reasoning_effort: Optional[str],
+    text_verbosity: Optional[str],
+    max_tokens: Optional[int],
+    fallback_model: Optional[str],
+    timeout_seconds: int,
+) -> Optional[str]:
+    """One corrective/reconcile call, temp-0 for determinism. Returns a validated finalize-shaped
+    response string, or ``None`` on empty/parse-failure/exception (fail-open)."""
+    payload = io.build_llm_payload(
+        messages=messages,
+        json_mode=True,
+        model_name=model_name,
+        temperature=0.0,
+        max_tokens=max_tokens,
+        json_schema=json_schema,
+        reasoning_effort=reasoning_effort,
+        text_verbosity=text_verbosity,
+    )
+    try:
+        response = await io.query_llm_with_fallback(
+            payload, model_name=model_name, fallback_model=fallback_model,
+            timeout_seconds=timeout_seconds,
+        )
+    except Exception as exc:  # noqa: BLE001 — a reconcile pass must never crash finalize
+        _logger.warning(f"[FINALIZE] reconcile call failed: {exc}")
+        return None
+    return _valid_reconcile_response(response)
+
+
+async def _recompute_pass(
+    io: AgentIO, *, mandate: str, evidence: str, draft_response: str, **call_kwargs: Any
+) -> Optional[str]:
+    draft_deliverable, _ = _split_deliverable_summary(draft_response)
+    messages = [
+        {"role": "system", "content": _RECOMPUTE_SYSTEM},
+        {"role": "user", "content": _RECOMPUTE_USER.format(
+            mandate=mandate, draft=draft_deliverable, evidence=evidence)},
+    ]
+    return await _reconcile_llm_call(io, messages, **call_kwargs)
+
+
+async def _verify_pass(
+    io: AgentIO, *, mandate: str, evidence: str, draft_response: str, **call_kwargs: Any
+) -> Optional[str]:
+    draft_deliverable, _ = _split_deliverable_summary(draft_response)
+    messages = [
+        {"role": "system", "content": _VERIFY_SYSTEM},
+        {"role": "user", "content": _VERIFY_USER.format(
+            mandate=mandate, draft=draft_deliverable, evidence=evidence)},
+    ]
+    return await _reconcile_llm_call(io, messages, **call_kwargs)
+
+
+async def _variation_ensemble(
+    io: AgentIO, *, mandate: str, evidence: str, k: int, **call_kwargs: Any
+) -> Optional[str]:
+    """Answer K decorrelated framings independently, then run ONE collate/reconcile call.
+
+    Returns the reconciled finalize-shaped response, or ``None`` (keep the prior draft) if fewer
+    than two framings produced a valid answer or the collate call failed."""
+    k = max(1, int(k or 1))
+    angles = [_VARIATION_ANGLES[i % len(_VARIATION_ANGLES)] for i in range(k)]
+
+    async def _one(angle: str) -> Optional[str]:
+        messages = [
+            {"role": "system", "content": _VARIATION_SYSTEM.format(angle=angle)},
+            {"role": "user", "content": _VARIATION_USER.format(mandate=mandate, evidence=evidence)},
+        ]
+        return await _reconcile_llm_call(io, messages, **call_kwargs)
+
+    outcomes = await asyncio.gather(*[_one(a) for a in angles], return_exceptions=True)
+    answers = [r for r in outcomes if isinstance(r, str) and r.strip()]
+    if len(answers) < 2:
+        # Nothing to reconcile — keep the prior draft rather than swap in one un-collated framing.
+        return None
+
+    blocks = []
+    for i, ans in enumerate(answers, 1):
+        deliverable, summary = _split_deliverable_summary(ans)
+        block = f"[Candidate {i}] {deliverable}"
+        if summary:
+            block += f"\n  supporting evidence: {summary}"
+        blocks.append(block)
+    collate_messages = [
+        {"role": "system", "content": _COLLATE_SYSTEM},
+        {"role": "user", "content": _COLLATE_USER.format(
+            mandate=mandate, candidates="\n\n".join(blocks))},
+    ]
+    return await _reconcile_llm_call(io, collate_messages, **call_kwargs)
+
+
+async def _reconcile_finalize_response(
+    io: AgentIO,
+    *,
+    mandate: str,
+    evidence: str,
+    draft_response: str,
+    cfg_final: Any,
+    call_kwargs: Dict[str, Any],
+) -> str:
+    """Run the enabled reconcile passes in order (variations->collate, recompute, verify).
+
+    Each stage takes the prior stage's deliverable as its new draft and fails OPEN — a stage that
+    returns ``None`` leaves the running draft untouched, so we never regress to nothing. Only the
+    stages whose flag is set run; the shape gate is applied by the caller."""
+    response = draft_response
+
+    if cfg_final.final_variations_enabled:
+        new = await _variation_ensemble(
+            io, mandate=mandate, evidence=evidence, k=cfg_final.final_variations_k, **call_kwargs
+        )
+        if new:
+            _logger.info("[FINALIZE] variation ensemble reconciled the draft")
+            response = new
+
+    if cfg_final.final_recompute_enabled:
+        new = await _recompute_pass(
+            io, mandate=mandate, evidence=evidence, draft_response=response, **call_kwargs
+        )
+        if new:
+            _logger.info("[FINALIZE] recompute pass revised the draft")
+            response = new
+
+    if cfg_final.final_verify_enabled:
+        new = await _verify_pass(
+            io, mandate=mandate, evidence=evidence, draft_response=response, **call_kwargs
+        )
+        if new:
+            _logger.info("[FINALIZE] verify pass revised the draft")
+            response = new
+
+    return response
+
+
 async def build_final_payload(
     io: AgentIO,
     settings: Dict[str, Any],
@@ -605,24 +920,46 @@ async def build_final_payload(
     final_timeout = min(final_timeout, 600)
     _logger.info(f"[FINALIZE] timeout={final_timeout}s prompt_material={total_prompt_size}c")
 
+    # Post-synthesis reconcile chain (opt-in, default OFF). Only computed when a pass is enabled,
+    # and only for answer-shaped tasks (computation/count/argmax/disambiguation/single_value) —
+    # narrative/open-ended tasks skip it (a re-derived single value there is meaningless). This gate
+    # also decides whether the variation ensemble supersedes the k-vote path below (they overlap).
+    _reconcile_enabled = (
+        cfg.final.final_recompute_enabled
+        or cfg.final.final_verify_enabled
+        or cfg.final.final_variations_enabled
+    )
+    _answer_shape = classify_answer_shape(mandate) if _reconcile_enabled else None
+    _shape_ok = (
+        _reconcile_enabled
+        and _answer_shape is not None
+        and _answer_shape in cfg.final.final_recompute_shapes
+    )
+    _variations_will_run = cfg.final.final_variations_enabled and _shape_ok
+
     # C1b: opt-in approximator-stripped k-sample vote for the terminal answer. Default (flag off
     # or k<2) is the single call below, byte-identical. When enabled with k>=2, the voted response
     # replaces it (falling back to the single call only if every sample failed).
     response = None
     _vote_k = int(getattr(cfg.final, "native_vote_k", 1) or 1)
     if cfg.final.native_vote_k_enabled and _vote_k >= 2:
-        response = await _vote_finalize_response(
-            io,
-            final_messages=final_messages,
-            model_name=model_name,
-            max_tokens=cfg.final.max_tokens,
-            json_schema=json_schema,
-            reasoning_effort=reasoning_effort,
-            text_verbosity=text_verbosity,
-            fallback_model=cfg.generation.fallback_model,
-            timeout_seconds=final_timeout,
-            k=_vote_k,
-        )
+        if _variations_will_run:
+            # k-vote re-runs the identical prompt; the variation ensemble is its decorrelated
+            # superset. Prefer variations and skip the (overlapping, measured net-negative) k-vote.
+            _logger.info("[FINALIZE] variation ensemble enabled -> skipping k-vote (overlap)")
+        else:
+            response = await _vote_finalize_response(
+                io,
+                final_messages=final_messages,
+                model_name=model_name,
+                max_tokens=cfg.final.max_tokens,
+                json_schema=json_schema,
+                reasoning_effort=reasoning_effort,
+                text_verbosity=text_verbosity,
+                fallback_model=cfg.generation.fallback_model,
+                timeout_seconds=final_timeout,
+                k=_vote_k,
+            )
     if response is None:
         response = await io.query_llm_with_fallback(
             payload,
@@ -635,7 +972,36 @@ async def build_final_payload(
     if not response:
         _logger.warning("[FINALIZE] LLM returned empty response, constructing fallback deliverable")
         fallback = _build_fallback_deliverable(graph, merged)
-        return {"final_deliverable": fallback, "action_summary": "Fallback: LLM finalize call failed", "success": bool(fallback.strip()), "sources": sources}
+        payload = {"final_deliverable": fallback, "action_summary": "Fallback: LLM finalize call failed", "success": bool(fallback.strip()), "sources": sources}
+        if cfg.final.require_grounding:
+            _apply_grounding_gate(payload, graph, mandate, sources)
+        return payload
+
+    # Post-synthesis reconcile chain (opt-in): correct a "right page, wrong value" draft over the
+    # SAME raw evidence. Runs only for answer-shaped tasks; every stage fails open (keeps the prior
+    # draft). Bounded by the finalize timeout. Skipped entirely (byte-identical) when no pass is on.
+    if _shape_ok:
+        _logger.info(
+            f"[FINALIZE] reconcile chain (shape={_answer_shape}): "
+            f"variations={cfg.final.final_variations_enabled} "
+            f"recompute={cfg.final.final_recompute_enabled} verify={cfg.final.final_verify_enabled}"
+        )
+        response = await _reconcile_finalize_response(
+            io,
+            mandate=mandate,
+            evidence=visit_content,
+            draft_response=response,
+            cfg_final=cfg.final,
+            call_kwargs=dict(
+                model_name=model_name,
+                json_schema=json_schema,
+                reasoning_effort=reasoning_effort,
+                text_verbosity=text_verbosity,
+                max_tokens=cfg.final.max_tokens,
+                fallback_model=cfg.generation.fallback_model,
+                timeout_seconds=final_timeout,
+            ),
+        )
 
     try:
         data = json.loads(response)
@@ -687,6 +1053,10 @@ async def build_final_payload(
             payload["unverified_citations"] = unverified
         if truncated:
             payload["truncated"] = True
+        # F31: last thing before the payload leaves — an answer with zero opened pages on a
+        # grounded-research mandate is refused rather than presented as a researched result.
+        if cfg.final.require_grounding:
+            _apply_grounding_gate(payload, graph, mandate, sources)
         return payload
     except Exception as e:
         _logger.warning(f"[FINALIZE] Failed to parse response: {e}")
@@ -694,4 +1064,6 @@ async def build_final_payload(
         # A parse failure on a near-cap response is itself a strong truncation signal.
         if _looks_truncated(response, int(getattr(cfg.final, "max_tokens", 0) or 0)):
             payload["truncated"] = True
+        if cfg.final.require_grounding:
+            _apply_grounding_gate(payload, graph, mandate, sources)
         return payload

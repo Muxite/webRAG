@@ -15,7 +15,10 @@ from dataclasses import dataclass, field
 from typing import List, Set
 
 from agent.app.idea_policies.base import DetailKey, IdeaActionType
-from agent.app.idea_policies.mandate_requirements import MandateRequirements
+from agent.app.idea_policies.mandate_requirements import (
+    MandateRequirements,
+    parse_mandate_requirements,
+)
 
 
 def _norm(url: str) -> str:
@@ -49,6 +52,37 @@ def _successful_visit_urls(graph) -> Set[str]:
             if u:
                 urls.add(_norm(u))
     return urls
+
+
+def graph_planned_retrieval(graph) -> bool:
+    """True when the PLAN contains at least one search/visit node, whatever its status.
+
+    Retrieval intent in the plan is the strongest available "this is a research task"
+    signal that does not depend on the mandate using one of the magic phrases above.
+    """
+    retrieval = {IdeaActionType.SEARCH.value, IdeaActionType.VISIT.value}
+    for n in graph.iter_depth_first():
+        if (getattr(n, "details", {}) or {}).get(DetailKey.ACTION.value) in retrieval:
+            return True
+    return False
+
+
+def requires_grounded_answer(mandate: str, graph=None) -> bool:
+    """Must this task's answer come from pages the agent actually opened?
+
+    True for an explicit substantiation mandate (navigate / "do not guess"), for one that
+    names a URL or asks the agent to search/visit, and — when a graph is supplied — for any
+    run whose own plan contains a search/visit node. False for work that legitimately needs
+    no retrieval (summarize this text, transform this input), so the finalize grounding gate
+    can never refuse a non-research answer.
+    """
+    try:
+        req = parse_mandate_requirements(mandate)
+    except Exception:  # noqa: BLE001 — the gate must never crash finalize
+        return False
+    if req.needs_substantiation or req.must_visit or req.must_search or req.named_urls:
+        return True
+    return graph is not None and graph_planned_retrieval(graph)
 
 
 def evaluate_grounding(graph, requirements: MandateRequirements) -> GroundingResult:

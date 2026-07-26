@@ -7,7 +7,7 @@ import os
 
 import pytest
 
-from agent.app.idea_policies.shape_classifier import classify_shape
+from agent.app.idea_policies.shape_classifier import classify_answer_shape, classify_shape
 from agent.app.idea_policies import expansion
 
 
@@ -44,6 +44,49 @@ def test_classify_shape_empty_fails_open():
 
 def test_classify_shape_plain_prose_none():
     assert classify_shape("Find the capital of France and report it.") is None
+
+
+# ---------------------------------------------------------------------------
+# Answer-shape classifier (finalize reconcile-chain gate)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "mandate, expected",
+    [
+        # single_value: report/give-a-specific-scalar phrasings (the adaptive target tasks)
+        ("Report the maximum depth of Quesnel Lake in metres. Give the number.", "single_value"),
+        ("Report the land area of Amsterdam Island in square kilometres. Give the number.", "single_value"),
+        ("What is the capital of France?", "single_value"),
+        ("In what year was the bridge completed?", "single_value"),
+        # count
+        ("How many novels did the author publish?", "count"),
+        # computation
+        ("Compute the absolute difference between the two founding years.", "computation"),
+        ("What is the ratio of the two populations?", "computation"),
+        # argmax: superlative + a selection word
+        ("Which of these lakes is the deepest?", "argmax"),
+        # disambiguation
+        ("Which of the four rivers empties into the English Channel?", "disambiguation"),
+        # narrative / open-ended -> None (skip the passes)
+        ("Summarize the history and cultural significance of Quesnel Lake.", None),
+        ("Describe the ecosystem of the lake in detail.", None),
+        ("", None),
+    ],
+)
+def test_classify_answer_shape(mandate, expected):
+    assert classify_answer_shape(mandate) == expected
+
+
+def test_answer_shape_attribute_superlative_is_single_value_not_argmax():
+    # "maximum depth" is an attribute NAME, not an argmax over candidates -> single_value.
+    assert classify_answer_shape("Report the maximum depth of the lake.") == "single_value"
+
+
+def test_answer_shape_reuses_classify_shape_labels():
+    # A branch-eliminate task is an answer-shaped disambiguation; a chain resolves to single_value.
+    assert classify_answer_shape(_stmt("test_095_tier5_branch_eliminate_chain")) == "disambiguation"
+    assert classify_answer_shape(_stmt("test_065_tier5_leak_resistant_chain")) == "single_value"
+    assert classify_answer_shape(_stmt("test_055_tier5_multichain_arithmetic")) == "computation"
 
 
 # ---------------------------------------------------------------------------

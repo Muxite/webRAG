@@ -119,6 +119,7 @@
   "got_step_confidence_judge_model": "",
   "got_step_confidence_reexpand_enabled": false,
   "got_step_confidence_reexpand_threshold": 0.5,
+  "got_contract_reexpand_enabled": false,
   "got_reexpand_corrective_context_enabled": false,
   "got_dedup_enabled": true,
   "got_dedup_similarity_threshold": 0.85,
@@ -150,5 +151,11 @@
   "connector_retry_backoff_seconds": 0.5,
   "tool_failure_recovery_enabled": false,
   "native_vote_k_enabled": false,
-  "native_vote_k": 1
+  "native_vote_k": 1,
+  "final_require_grounding": false,
+  "final_recompute_enabled": false,
+  "final_verify_enabled": false,
+  "final_variations_enabled": false,
+  "final_variations_k": 3,
+  "final_recompute_shapes": ["computation", "count", "argmax", "disambiguation", "single_value"]
 }

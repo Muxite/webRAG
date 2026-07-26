@@ -77,6 +77,11 @@ def _json_key_for(cls, field_name: str) -> str:
 def _equivalent(default, shipped) -> bool:
     if default == shipped:
         return True
+    # Sequence sentinel: JSON has no tuple type, so a tuple dataclass default (used for
+    # an immutable, hashable frozen-view field like final_recompute_shapes) ships as a
+    # JSON array. Compare element-wise; this is not a meaningful disagreement.
+    if isinstance(default, tuple) and isinstance(shipped, list):
+        return list(default) == shipped
     # Optional-model sentinel: the JSON ships "" where the dataclass uses None to
     # mean "no model override"; both are the falsy "unset" value (and _coerce
     # passes either straight through), so this is not a meaningful disagreement.

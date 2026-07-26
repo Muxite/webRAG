@@ -193,6 +193,38 @@ def test_native_vote_k_flags_default_off():
     assert on.native_vote_k == 3
 
 
+def test_final_reconcile_chain_flags_default_off():
+    # Post-synthesis reconcile chain: default OFF from an empty load and the shipped JSON, so the
+    # finalize path stays byte-identical. The shape gate defaults to the answer-shaped label set.
+    from agent.app.idea_policies.config import FinalConfig
+    empty = FinalConfig.from_settings({})
+    assert empty.final_recompute_enabled is False
+    assert empty.final_verify_enabled is False
+    assert empty.final_variations_enabled is False
+    assert empty.final_variations_k == 3
+    assert set(empty.final_recompute_shapes) == {
+        "computation", "count", "argmax", "disambiguation", "single_value"
+    }
+    prod = FinalConfig.from_settings(load_idea_dag_settings())
+    assert prod.final_recompute_enabled is False
+    assert prod.final_verify_enabled is False
+    assert prod.final_variations_enabled is False
+    assert "single_value" in prod.final_recompute_shapes
+    # Overrides coerce; the shape list is read straight from JSON.
+    on = FinalConfig.from_settings({
+        "final_recompute_enabled": 1,
+        "final_verify_enabled": "true",
+        "final_variations_enabled": 1,
+        "final_variations_k": "5",
+        "final_recompute_shapes": ["count", "argmax"],
+    })
+    assert on.final_recompute_enabled is True
+    assert on.final_verify_enabled is True
+    assert on.final_variations_enabled is True
+    assert on.final_variations_k == 5
+    assert list(on.final_recompute_shapes) == ["count", "argmax"]
+
+
 def test_aggregate_builds_from_production_settings():
     # The shipped JSON must build cleanly and reflect its production values.
     cfg = IdeaConfig.from_settings(load_idea_dag_settings())

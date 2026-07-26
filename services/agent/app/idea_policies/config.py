@@ -27,7 +27,7 @@ Content keys — prompts (``*_system_prompt`` / ``*_user_prompt`` /
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import Any, ClassVar, Mapping, Optional
+from typing import Any, ClassVar, Mapping, Optional, Tuple
 
 
 def _coerce(raw: Any, default: Any) -> Any:
@@ -83,6 +83,13 @@ class GoTConfig:
     step_confidence_judge_model: Optional[str] = None
     step_confidence_reexpand_enabled: bool = False
     step_confidence_reexpand_threshold: float = 0.5
+    # F33 — re-base the re-expansion trigger on CONTRACT SATISFACTION instead of the
+    # anti-calibrated step-confidence judge (opt-in, default OFF -> byte-identical). When on,
+    # a completed retrieval leaf whose deterministic contract check reports a missing payload /
+    # datum / subject re-expands (no judge LLM call needed), and a leaf whose contract is
+    # demonstrably SATISFIED is protected from the judge's low-score trigger. Where the check
+    # has no verdict (``applicable=False``) the confidence trigger still applies as before.
+    contract_reexpand_enabled: bool = False
     reexpand_corrective_context_enabled: bool = False
     candidate_coverage_enabled: bool = False
     candidate_coverage_budget_extension: int = 10
@@ -246,6 +253,11 @@ class FinalConfig:
     chroma_results: int = 10
     max_prompt_chars: int = 200000  # absent from JSON; original call-site default
     allow_partial_success: bool = True
+    # F31 — hard grounding gate before finalize (opt-in, default OFF -> byte-identical). When on
+    # and the run opened ZERO pages on a grounded-research mandate, the answer is not presented as
+    # a researched result: it is banner-flagged as ungrounded, its unverifiable URLs are stripped,
+    # and success/goal_achieved are forced False rather than laundering parametric memory.
+    require_grounding: bool = False
     # C1b — approximator-stripped k-sample vote for the terminal answer (opt-in). When
     # ``native_vote_k_enabled`` and ``native_vote_k`` >= 2, the finalize answer is extracted k
     # times (anchor temp-0 + diverse temps), normalized via the approximator-stripped vote key,
@@ -253,6 +265,23 @@ class FinalConfig:
     # extraction, the current behavior -> byte-identical default.
     native_vote_k_enabled: bool = False
     native_vote_k: int = 1
+    # Post-synthesis reconcile chain (opt-in, default OFF -> byte-identical). Each pass runs ONLY
+    # for answer-shaped tasks (see ``final_recompute_shapes``) and fails open (keeps the prior
+    # draft on empty/error/timeout). ``final_recompute_enabled``: re-list the exact source values
+    # (verbatim quote + URL) and re-derive the answer, correcting an arithmetic/extraction slip.
+    # ``final_verify_enabled``: demand a verbatim passage that supports the draft, else replace it
+    # with what the evidence actually says. ``final_variations_enabled`` (with ``final_variations_k``
+    # framings): the DECORRELATED alternative to k-vote — answer K differently-framed versions of the
+    # question independently, then reconcile — surfacing the correct value where one framing misreads.
+    # Order when several are on: variations->collate, then recompute, then verify.
+    final_recompute_enabled: bool = False
+    final_verify_enabled: bool = False
+    final_variations_enabled: bool = False
+    final_variations_k: int = 3
+    # The answer-shape labels (see ``shape_classifier.classify_answer_shape``) that gate the chain.
+    final_recompute_shapes: Tuple[str, ...] = (
+        "computation", "count", "argmax", "disambiguation", "single_value",
+    )
 
     _KEYS: ClassVar[dict] = {
         "model": "final_model",
@@ -261,6 +290,7 @@ class FinalConfig:
         "chroma_results": "final_chroma_results",
         "max_prompt_chars": "final_max_prompt_chars",
         "allow_partial_success": "final_allow_partial_success",
+        "require_grounding": "final_require_grounding",
     }
 
     @classmethod

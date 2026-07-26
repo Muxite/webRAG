@@ -103,3 +103,126 @@ def classify_shape(mandate: str) -> Optional[str]:
     if _is_chain(mandate, text):
         return "chain"
     return None
+
+
+# ---------------------------------------------------------------------------
+# Answer-shape classifier (finalize reconcile-chain gate)
+# ---------------------------------------------------------------------------
+#
+# ``classify_answer_shape`` decides whether a mandate asks for a *specific,
+# extractable/derivable answer* (a computation, a count, an argmax/argmin, a
+# disambiguation survivor, or a single factual value) — the tasks where the
+# post-synthesis recompute/verify/variation passes in ``idea_finalize`` can catch a
+# "right page, wrong value" slip. It returns ``None`` (fail-open → the caller SKIPS
+# the passes) for open-ended / narrative work where re-deriving a single value is
+# meaningless and only burns tokens.
+#
+# It reuses ``classify_shape``'s labels where they already answer the question (a
+# branch-eliminate IS a disambiguation, a parallel-merge IS a computation, a chain
+# resolves to a single value), then falls back to conservative keyword heuristics.
+# Deliberately conservative on the "run" side: an unrecognised phrasing returns
+# ``None`` (skip) rather than guessing, so the passes only spend where the task is
+# clearly answer-shaped.
+
+# Disambiguation: pick the one specific item that satisfies a criterion.
+_ANSWER_DISAMBIG_MARKERS = (
+    "which of the",
+    "exactly one of",
+    "identify the specific",
+    "the specific one",
+    "disambiguate",
+)
+
+# Count: the answer is a cardinality.
+_ANSWER_COUNT_MARKERS = (
+    "how many",
+    "number of",
+    "count of",
+    "count the",
+    "count how",
+)
+
+# Computation: the answer is derived by an arithmetic operation.
+_ANSWER_COMPUTATION_MARKERS = (
+    "how much",
+    "difference between",
+    "the difference",
+    "absolute difference",
+    "sum of",
+    "product of",
+    "ratio of",
+    "ratio between",
+    "average of",
+    "combined",
+    "compute",
+    "calculate",
+    "multiply",
+    "subtract",
+    "divide",
+    "add up",
+    "percentage",
+    "percent",
+)
+
+# Argmax/argmin: select the extremum among candidates. A superlative alone is NOT
+# enough ("maximum depth" is an attribute *name*, not a selection over candidates);
+# a selection word must co-occur so plain single-value attribute lookups stay
+# ``single_value``.
+_ANSWER_SUPERLATIVES = (
+    "largest", "biggest", "highest", "deepest", "tallest", "longest", "greatest",
+    "smallest", "lowest", "shortest", "oldest", "newest", "widest", "heaviest",
+    "most", "least", "fewest", "nearest", "farthest", "furthest",
+)
+_ANSWER_SELECTION_WORDS = (
+    "which", "among", "of the following", "of these", "of all", "identify", "rank",
+)
+
+# Single value: a specific factual scalar (a value, year, date, name, measurement).
+_ANSWER_SINGLE_VALUE_MARKERS = (
+    "what is the", "what was the", "what are the", "what year", "in what year",
+    "in which year", "on what date", "report the", "give the number", "give the exact",
+    "state the", "name the", "find the", "determine the", "how deep", "how tall",
+    "how long", "how high", "how old", "how far", "how wide", "how heavy",
+    "when did", "when was", "who is", "who was", "where is", "where was",
+)
+
+
+def _has_any(text: str, markers) -> bool:
+    return any(m in text for m in markers)
+
+
+def _is_argmax(text: str) -> bool:
+    return _has_any(text, _ANSWER_SELECTION_WORDS) and _has_any(text, _ANSWER_SUPERLATIVES)
+
+
+def classify_answer_shape(mandate: str) -> Optional[str]:
+    """Classify a mandate into an *answer shape*, or ``None`` for open-ended/narrative.
+
+    Returns one of ``"computation"``, ``"count"``, ``"argmax"``, ``"disambiguation"``,
+    ``"single_value"`` when the task asks for a specific derivable answer, else ``None``.
+    Fails OPEN toward ``None`` (skip) for anything not clearly answer-shaped.
+    """
+    if not mandate:
+        return None
+    base = classify_shape(mandate)
+    if base == "branch_eliminate":
+        return "disambiguation"
+    if base == "parallel_merge":
+        return "computation"
+    if base == "chain":
+        return "single_value"
+
+    text = mandate.lower()
+    # argmax before disambiguation: "which of these ... deepest" is a selection-over-extremum, and
+    # a disambiguation marker like "which of the" is a substring of "which of these".
+    if _is_argmax(text):
+        return "argmax"
+    if _has_any(text, _ANSWER_DISAMBIG_MARKERS):
+        return "disambiguation"
+    if _has_any(text, _ANSWER_COUNT_MARKERS):
+        return "count"
+    if _has_any(text, _ANSWER_COMPUTATION_MARKERS):
+        return "computation"
+    if _has_any(text, _ANSWER_SINGLE_VALUE_MARKERS):
+        return "single_value"
+    return None

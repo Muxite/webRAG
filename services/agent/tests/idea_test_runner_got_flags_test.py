@@ -26,6 +26,7 @@ def _base():
         "got_step_confidence_judge_sample_every": 1,
         "got_step_confidence_reexpand_enabled": False,
         "got_step_confidence_reexpand_threshold": 0.5,
+        "got_contract_reexpand_enabled": False,
         "got_reexpand_corrective_context_enabled": False,
         "got_backtrack_enabled": False,
         "connector_retry_on_failure_enabled": False,
@@ -35,6 +36,22 @@ def _base():
         "expansion_expect_contract_enabled": False,
         "native_reasoning_effort_discipline_enabled": False,
         "price_tier_param_tiering_enabled": False,
+        # finalize grounding gate (a validity gate: every ARM turns it on, but the shipped
+        # JSON default — what this fixture mirrors — is OFF)
+        "final_require_grounding": False,
+        # post-synthesis reconcile chain (finalize; the `max_burn` arm turns these on)
+        "final_recompute_enabled": False,
+        "final_verify_enabled": False,
+        "final_variations_enabled": False,
+        "final_variations_k": 3,
+        # structural knobs the `max_burn` arm tunes (real settings keys; defaults here)
+        "max_steps": 50,
+        "got_candidate_coverage_enabled": False,
+        "visit_link_query_top_k": 15,
+        "max_links_per_visit": 20,
+        "got_beam_max": 5,
+        "max_branching": 5,
+        "grounding_max_replans": 2,
     }
 
 
@@ -42,6 +59,49 @@ def test_absent_flags_preserve_defaults():
     settings = _base()
     _apply_got_experiment_overrides(settings, environ={})
     assert settings == _base(), "no env flags -> loaded defaults untouched"
+
+
+def test_max_burn_arm_cranks_productive_levers_only():
+    """The `max_burn` arm turns UP re-expansion depth + supporting knobs, and keeps the
+    net-negative/inert mechanisms explicitly OFF (they must not sneak back as burn)."""
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "max_burn"})
+    # productive burn: deeper re-expansion + the room/coverage it needs to execute
+    assert settings["got_reexpand_enabled"] is True
+    assert settings["got_reexpand_max_iterations"] == 4    # the core lever, up from 2
+    assert settings["max_steps"] == 90                     # or depth-4 re-expansion starves
+    assert settings["got_candidate_coverage_enabled"] is True
+    assert settings["got_beam_max"] == 7 and settings["max_branching"] == 7
+    assert settings["grounding_max_replans"] == 3
+    # net-negative / inert / bugged mechanisms must stay OFF
+    assert settings["native_vote_k_enabled"] is False and settings["native_vote_k"] == 1
+    assert settings["got_backtrack_enabled"] is False
+    assert settings["expansion_expect_contract_enabled"] is False
+    assert settings["native_reasoning_effort_discipline_enabled"] is False
+    assert settings["price_tier_param_tiering_enabled"] is False
+
+
+def test_max_burn_carries_final_reconcile_chain_flags():
+    """max_burn is where we spend to close the SYNTHESIS gap: the finalize reconcile chain
+    (recompute + verify + variation ensemble) must be on, k-vote off (they overlap)."""
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "max_burn"})
+    assert settings["final_recompute_enabled"] is True
+    assert settings["final_verify_enabled"] is True
+    assert settings["final_variations_enabled"] is True
+    assert settings["final_variations_k"] == 3
+    # variations supersede k-vote — the overlapping k-vote path stays off.
+    assert settings["native_vote_k_enabled"] is False
+
+
+def test_max_burn_is_strictly_more_reexpansion_than_good_adaptive():
+    """max_burn must dominate good_adaptive on the productive lever, else it isn't a burn."""
+    ga = _GOT_ARM_PROFILES["good_adaptive"]
+    mb = _GOT_ARM_PROFILES["max_burn"]
+    assert mb["got_reexpand_max_iterations"] > ga.get("got_reexpand_max_iterations", 2)
+    # and it must NOT enable the mechanisms good_adaptive intentionally leaves off
+    assert mb.get("native_vote_k_enabled") is False
+    assert mb.get("got_backtrack_enabled") is False
 
 
 def test_confidence_reexpand_truthy_enables():
@@ -221,7 +281,13 @@ def test_arm_baseline_matches_shipped_defaults():
     settings["native_vote_k_enabled"] = True
     settings["native_vote_k"] = 5
     _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "baseline"})
-    assert settings == _base()
+    # Every adaptive LEVER is forced back to the shipped default. The one deliberate
+    # exception is the finalize grounding gate, a validity gate every arm carries: an
+    # answer produced with zero opened pages must not be presented as researched in the
+    # control arm either, or the comparison credits one arm's hallucinations.
+    expected = _base()
+    expected["final_require_grounding"] = True
+    assert settings == expected
 
 
 def test_arm_good_adaptive_expands_expected_flags():
@@ -233,6 +299,10 @@ def test_arm_good_adaptive_expands_expected_flags():
     assert settings["got_step_confidence_reexpand_enabled"] is True
     assert settings["got_reexpand_corrective_context_enabled"] is True
     assert settings["tool_failure_recovery_enabled"] is True
+    # F33: contract satisfaction replaces the anti-calibrated judge as the re-expansion
+    # control signal; the grounding gate rides along as a validity gate.
+    assert settings["got_contract_reexpand_enabled"] is True
+    assert settings["final_require_grounding"] is True
     # Not part of this arm.
     assert settings["native_vote_k_enabled"] is False
     assert settings["got_backtrack_enabled"] is False
