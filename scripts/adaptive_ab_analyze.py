@@ -55,22 +55,25 @@ def _node_count(d):
     return None
 
 
-def _rep_key(run_id, fname):
-    """Stable replicate identity for pairing arms per (task, rep).
+def _rep_key(run_id, fname, model=None):
+    """Stable replicate identity for pairing arms per (task, rep[, model]).
 
     The interleaved driver (native_ab_run.sh) shares a network window per (task, rep) and encodes
     the rep in BOTH the run-id suffix (``..._rep3``) and the per-file suffix (``..._r3.json``). We
     key on (run_id_rep, file_r) so a baseline run and its adjacent adaptive run land on the same
-    key regardless of which convention a given run used. Falls back to the raw filename when neither
-    is present (each file then pairs only with itself, i.e. no cross-arm pairing).
+    key regardless of which convention a given run used. The model is folded into the key so a
+    multi-model axis (two models in one arm) can't silently key-COLLIDE and overwrite one model's
+    data with the other's. Falls back to the raw filename when neither rep marker is present (each
+    file then pairs only with itself, i.e. no cross-arm pairing).
     """
-    m_run = re.search(r"rep(\d+)", run_id or "")
+    # Anchor rep(\d+) to a token boundary so run-ids containing prep/grep/step don't false-match.
+    m_run = re.search(r"(?:^|_)rep(\d+)(?:_|$)", run_id or "")
     m_file = re.search(r"_r(\d+)\.json$", fname or "")
     run_rep = int(m_run.group(1)) if m_run else None
     file_rep = int(m_file.group(1)) if m_file else None
     if run_rep is None and file_rep is None:
         return os.path.basename(fname or "")
-    return (run_rep, file_rep)
+    return (run_rep, file_rep, model)
 
 
 def load_arm(run_ids):
@@ -90,7 +93,7 @@ def load_arm(run_ids):
             by_stage = (ob.get("decisions", {}) or {}).get("by_stage", {}) or {}
             rows.append({
                 "test_id": tid, "archetype": archetype(tid),
-                "rep": _rep_key(rid, f),
+                "rep": _rep_key(rid, f, d.get("model")),
                 "score": d.get("validation", {}).get("overall_score"),
                 "nodes": _node_count(d),
                 "reexpand": int(by_stage.get("reexpand", 0)),
@@ -109,7 +112,26 @@ def _f(xs):
 
 def mean(xs):
     xs = _f(xs)
-    return sum(xs) / len(xs) if xs else 0.0
+    # NaN (not a fake 0.0) for an empty set so a HOLE — a cell with no data — prints as
+    # `nan` and is visibly a hole, instead of masquerading as a real score/cost of 0.
+    return sum(xs) / len(xs) if xs else float("nan")
+
+
+# Student-t two-sided .975 quantiles by degrees of freedom (df = n-1). For small n the
+# normal z=1.96 understates the CI by ~5-20%; this table is the scipy-free correction.
+_T975 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306,
+         9: 2.262, 10: 2.228, 11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131,
+         16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086, 21: 2.080, 22: 2.074,
+         23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042}
+
+
+def _t975(df):
+    """Two-sided 95% t-multiplier for `df` degrees of freedom (→ z=1.96 as df→∞)."""
+    if df <= 0:
+        return 0.0
+    if df in _T975:
+        return _T975[df]
+    return 2.0 if df <= 100 else 1.96
 
 
 def stdev(xs):
@@ -122,7 +144,7 @@ def stdev(xs):
 
 def ci95(xs):
     xs = _f(xs)
-    return 1.96 * stdev(xs) / math.sqrt(len(xs)) if len(xs) >= 2 else 0.0
+    return _t975(len(xs) - 1) * stdev(xs) / math.sqrt(len(xs)) if len(xs) >= 2 else 0.0
 
 
 def cohens_d(a, b):
@@ -170,18 +192,84 @@ def paired_stats(deltas):
         return 0, 0.0, 0.0, 0.0
     m = sum(xs) / n
     sd = stdev(xs)
-    ci = 1.96 * sd / math.sqrt(n) if n >= 2 else 0.0
+    ci = _t975(n - 1) * sd / math.sqrt(n) if n >= 2 else 0.0
     dz = m / sd if sd else 0.0
     return n, m, ci, dz
 
 
-def paired_deltas(A_rows, B_rows, by="rep"):
+def holm(pvals):
+    """Holm-Bonferroni step-down adjusted p-values, in the INPUT order.
+
+    Controls the family-wise error rate across a family of related tests (e.g. the 4
+    per-archetype comparisons, or a set of arm pairings) WITHOUT assuming independence —
+    scanning k tests and quoting the smallest raw p inflates the false-positive rate (~19%
+    under the null for k=4). A result is significant iff its adjusted p < 0.05. ``None``
+    p-values are treated as 1.0 (not significant).
+    """
+    m = len(pvals)
+    if m == 0:
+        return []
+    order = sorted(range(m), key=lambda i: (1.0 if pvals[i] is None else pvals[i]))
+    adj = [1.0] * m
+    running = 0.0
+    for rank, idx in enumerate(order):
+        p = 1.0 if pvals[idx] is None else pvals[idx]
+        running = max(running, min(1.0, (m - rank) * p))  # enforce monotone non-decreasing
+        adj[idx] = running
+    return adj
+
+
+def _dollars_per_solved(rows, threshold=0.75):
+    """Total USD spent / number of tasks solved (score >= threshold). NaN if none solved —
+    the honest cost-efficiency headline (a cheap arm that solves nothing is not cheap)."""
+    sc = [r for r in rows if isinstance(r.get("score"), (int, float))]
+    spend = sum(r["usd"] for r in sc if isinstance(r.get("usd"), (int, float)))
+    solved = sum(1 for r in sc if r["score"] >= threshold)
+    return (spend / solved) if solved else float("nan")
+
+
+def oaxaca_grounding_split(A_rows, B_rows):
+    """Additively decompose the raw score delta (adaptive - baseline) into three terms that
+    SUM EXACTLY to Δraw: (1) REASONING — scores better once grounded; (2) GROUNDING-RATE —
+    grounds more often; (3) ungrounded-residual. Uses the EMPIRICAL E[score|ungrounded]
+    (not the false visits==0⇒0 assumption), so the honest 'grounds more' vs 'reasons better'
+    stories can be told separately. Returns a dict of the rates and the three terms.
+    """
+    def _stats(rows):
+        sc = [r for r in rows if isinstance(r["score"], (int, float))]
+        n = len(sc)
+        grounded = [r["score"] for r in sc if (r["visits"] or 0) > 0]
+        ungrounded = [r["score"] for r in sc if (r["visits"] or 0) == 0]
+        g = len(grounded) / n if n else 0.0                          # grounding RATE
+        p = sum(grounded) / len(grounded) if grounded else 0.0       # E[score | grounded]
+        u = sum(ungrounded) / len(ungrounded) if ungrounded else 0.0  # E[score | ungrounded]
+        return g, p, u, n
+
+    gb, pb, ub, nb = _stats(B_rows)
+    ga, pa, ua, na = _stats(A_rows)
+    raw_b, raw_a = gb * pb + (1 - gb) * ub, ga * pa + (1 - ga) * ua
+    return {
+        "gb": gb, "pb": pb, "ub": ub, "nb": nb, "ga": ga, "pa": pa, "ua": ua, "na": na,
+        "delta_raw": raw_a - raw_b,
+        "reasoning": gb * (pa - pb),
+        "grounding_rate": pa * (ga - gb),
+        "ungrounded_residual": (1 - ga) * ua - (1 - gb) * ub,
+    }
+
+
+def paired_deltas(A_rows, B_rows, by="rep", missing="zero"):
     """Adaptive-minus-baseline deltas, paired within each (task[, rep]) block.
 
     by="rep": pair adaptive/baseline runs that share (task, rep) — the interleaved shared-window
     pairing (max power, exact for interleaved runs). by="task": pair the per-task *means* (n=#tasks,
     the most conservative unit — robust even when reps were not interleaved). Returns list of
     (task, delta).
+
+    missing="zero" (DEFAULT, honest): a cell scheduled in the interleaved design but MISSING in one
+    arm (timeout / crash / 402) scores 0 for that arm, over the UNION grid. Timeouts cluster on the
+    hard tasks and the high-compute arm — i.e. adaptive's worst cases — so intersection-dropping
+    them (missing="drop", the legacy behavior) inflates the delta via survivorship (~+15% on the
+    pilot). Use missing="drop" only as an explicit, logged sensitivity check.
     """
     def idx_rep(rows):
         m = {}
@@ -199,11 +287,13 @@ def paired_deltas(A_rows, B_rows, by="rep"):
 
     if by == "rep":
         ai, bi = idx_rep(A_rows), idx_rep(B_rows)
-        keys = sorted(set(ai) & set(bi), key=lambda k: (str(k[0]), str(k[1])))
-        return [(k[0], ai[k] - bi[k]) for k in keys]
+        allk = (set(ai) | set(bi)) if missing == "zero" else (set(ai) & set(bi))
+        keys = sorted(allk, key=lambda k: (str(k[0]), str(k[1])))
+        return [(k[0], ai.get(k, 0.0) - bi.get(k, 0.0)) for k in keys]
     ai, bi = idx_task_mean(A_rows), idx_task_mean(B_rows)
-    keys = sorted(set(ai) & set(bi), key=lambda t: (int(t) if str(t).isdigit() else 1e9, t))
-    return [(t, ai[t] - bi[t]) for t in keys]
+    allk = (set(ai) | set(bi)) if missing == "zero" else (set(ai) & set(bi))
+    keys = sorted(allk, key=lambda t: (int(t) if str(t).isdigit() else 1e9, t))
+    return [(t, ai.get(t, 0.0) - bi.get(t, 0.0)) for t in keys]
 
 
 def main():
@@ -279,58 +369,66 @@ def main():
     print("only as a secondary robustness figure. Per-archetype p-values are UNCORRECTED (4 tests →")
     print("apply Holm/FDR; each archetype is only ~2 tasks, so treat as exploratory, not confirmatory).")
     print("-" * 74)
-    paired_csv = ["scope,pairing,n_pairs,mean_delta,ci95,cohen_dz,p_value,significant"]
+    paired_csv = ["scope,pairing,n_pairs,mean_delta,ci95,cohen_dz,p_value,p_holm,significant"]
     for by, label in (("task", "per-task (means; conservative, n=#tasks)"),
                       ("rep", "per-(task,rep) (shared-window pairs; max power)")):
-        overall_d = [d for _, d in paired_deltas(A, B, by=by)]
+        overall_d = [d for _, d in paired_deltas(A, B, by=by, missing="zero")]
+        n_drop = len(paired_deltas(A, B, by=by, missing="drop"))
+        filled = len(overall_d) - n_drop  # cells scored 0 for a missing/timeout cell
         n, m, ci, dz = paired_stats(overall_d)
         p, _ = signflip_p(overall_d)
         sig = "n<3" if n < 3 else ("YES p<0.05" if (p is not None and p < 0.05) else "no")
         pstr = f"{p:.4f}" if p is not None else "—"
-        print(f"OVERALL  {label:<48} n={n:>2}  Δ={m:>+.3f} ±{ci:.3f}  dz={dz:>+.2f}  p={pstr}  [{sig}]")
-        paired_csv.append(f"OVERALL,{by},{n},{m:.4f},{ci:.4f},{dz:.4f},{pstr},{sig}")
-    # per-archetype paired (per-task pairing — the honest unit when reps are few)
+        cov = f"(zero-filled {filled} missing)" if filled else "(full grid)"
+        print(f"OVERALL  {label:<48} n={n:>2}  Δ={m:>+.3f} ±{ci:.3f}  dz={dz:>+.2f}  p={pstr}  [{sig}] {cov}")
+        paired_csv.append(f"OVERALL,{by},{n},{m:.4f},{ci:.4f},{dz:.4f},{pstr},—,{sig}")
+    # Power note: the task-level test's n IS the task count — reps only tighten each task mean.
+    # At the observed paired effect, ~22 tasks power dz=0.6 and ~49 power dz=0.4; the 59-task
+    # suite is adequately powered to ~dz=0.37. Per-archetype (~2-6 tasks) is UNDERPOWERED → keep
+    # it exploratory, and spend marginal budget on MORE TASKS, not more reps.
+    print("(power: n=#tasks; reps only tighten task means — add tasks, not reps, for power)")
+    # per-archetype paired (per-task pairing) with Holm correction over the 4-archetype family.
     print("-" * 74)
+    arch_rows = []
     for _, name in ARCHETYPE_RANGES:
         Aa = [r for r in A if r["archetype"] == name]
         Ba = [r for r in B if r["archetype"] == name]
-        for by in ("rep",):
-            ds = [d for _, d in paired_deltas(Aa, Ba, by=by)]
-            if not ds:
-                continue
-            n, m, ci, dz = paired_stats(ds)
-            p, _ = signflip_p(ds)
-            sig = "n<3" if n < 3 else ("YES p<0.05" if (p is not None and p < 0.05) else "no")
-            pstr = f"{p:.4f}" if p is not None else "—"
-            print(f"  {name:<12} (task,rep pairs)  n={n:>2}  Δ={m:>+.3f} ±{ci:.3f}  dz={dz:>+.2f}  p={pstr}  [{sig}]")
-            paired_csv.append(f"{name},{by},{n},{m:.4f},{ci:.4f},{dz:.4f},{pstr},{sig}")
+        # Task-level (not rep-level): each archetype is only ~2 tasks, so this honestly reads
+        # n<3 → exploratory, not a false-confident verdict off pseudoreplicated (task,rep) pairs.
+        ds = [d for _, d in paired_deltas(Aa, Ba, by="task", missing="zero")]
+        if not ds:
+            continue
+        n, m, ci, dz = paired_stats(ds)
+        p, _ = signflip_p(ds)
+        arch_rows.append((name, n, m, ci, dz, p))
+    p_holm = holm([r[5] for r in arch_rows])
+    for (name, n, m, ci, dz, p), ph in zip(arch_rows, p_holm):
+        # Significant only if the FWER-controlled p clears 0.05 AND the unit is >=3 tasks.
+        sig = "n<3" if n < 3 else ("YES p_holm<0.05" if ph < 0.05 else "no")
+        pstr = f"{p:.4f}" if p is not None else "—"
+        print(f"  {name:<12} (task pairs)  n={n:>2}  Δ={m:>+.3f} ±{ci:.3f}  dz={dz:>+.2f}  "
+              f"p={pstr} p_holm={ph:.4f}  [{sig}]")
+        paired_csv.append(f"{name},task,{n},{m:.4f},{ci:.4f},{dz:.4f},{pstr},{ph:.4f},{sig}")
     open(f"{args.out}/ab_paired.csv", "w").write("\n".join(paired_csv) + "\n")
     print("=" * 74)
 
-    # ---- GROUNDING DECOMPOSITION (honesty: is the delta "reasons better" or "looks more often"?) ----
-    # The keystone gate hard-zeros ungrounded (visit==0) runs, so a raw arm delta conflates two very
-    # different effects: (1) how OFTEN the arm grounds at all, and (2) how well it scores WHEN grounded.
-    # Report both so the headline can't overclaim "adaptive reasoning is better" when the real driver is
-    # "adaptive makes the cheap model stop guessing and go read the page."
+    # ---- GROUNDING DECOMPOSITION — additive Oaxaca split (terms SUM to Δraw) ----
+    # A raw arm delta conflates two very different effects: (1) how OFTEN the arm grounds at all
+    # (grounding rate g), and (2) how well it scores WHEN grounded (conditional p). Decompose Δraw
+    # into an exact additive identity using the EMPIRICAL ungrounded mean u (NOT the false
+    # visits==0⇒0 assumption — some ungrounded runs score >0), so the headline can't overclaim
+    # "reasons better" when the real driver is "grounds more often" (or vice-versa).
     print("\n" + "=" * 74)
-    print("GROUNDING DECOMPOSITION (the keystone gate zeros ungrounded runs)")
+    print("GROUNDING DECOMPOSITION — additive Oaxaca split")
     print("-" * 74)
-    for label, rows in (("baseline", B), ("adaptive", A)):
-        sc = [r for r in rows if isinstance(r["score"], (int, float))]
-        gz = [r for r in sc if (r["visits"] or 0) == 0]
-        gg = [r["score"] for r in sc if (r["visits"] or 0) > 0]
-        print(f"  {label:<10} n={len(sc):>2}  raw_mean={mean([r['score'] for r in sc]):.3f}  "
-              f"zero_visit={len(gz)}/{len(sc)} ({100*len(gz)//max(1,len(sc))}% hallucinated)  "
-              f"mean_WHEN_grounded={mean(gg):.3f} (n={len(gg)})")
-    bsc = [r for r in B if isinstance(r["score"], (int, float))]
-    asc = [r for r in A if isinstance(r["score"], (int, float))]
-    bgg = mean([r["score"] for r in bsc if (r["visits"] or 0) > 0])
-    agg = mean([r["score"] for r in asc if (r["visits"] or 0) > 0])
-    braw, araw = mean([r["score"] for r in bsc]), mean([r["score"] for r in asc])
-    print(f"  → RAW delta            = {araw - braw:+.3f}  (conflates grounding-rate + quality)")
-    print(f"  → CONDITIONAL-on-grounding delta = {agg - bgg:+.3f}  (pure 'reasons better once it looks')")
-    print(f"  → grounding-rate shift : baseline {100*sum(1 for r in bsc if (r['visits'] or 0)>0)//max(1,len(bsc))}%"
-          f" → adaptive {100*sum(1 for r in asc if (r['visits'] or 0)>0)//max(1,len(asc))}% of runs ground")
+    d = oaxaca_grounding_split(A, B)
+    print(f"  baseline n={d['nb']:>2}  grounds {100*d['gb']:>3.0f}%  E[score|grounded]={d['pb']:.3f}  E[score|ungrounded]={d['ub']:.3f}")
+    print(f"  adaptive n={d['na']:>2}  grounds {100*d['ga']:>3.0f}%  E[score|grounded]={d['pa']:.3f}  E[score|ungrounded]={d['ua']:.3f}")
+    resid = d["delta_raw"] - (d["reasoning"] + d["grounding_rate"] + d["ungrounded_residual"])
+    print(f"  → Δraw={d['delta_raw']:+.3f}  =  REASONING {d['reasoning']:+.3f}  +  GROUNDING-RATE {d['grounding_rate']:+.3f}"
+          f"  +  ungrounded-residual {d['ungrounded_residual']:+.3f}   (identity resid={resid:+.4f})")
+    print("  (report whichever term DOMINATES: a model that rarely grounds lifts via GROUNDING-RATE; one that")
+    print("   already grounds ~85% lifts via REASONING — do NOT merge them into one 'reasons better' headline.)")
     print("=" * 74)
 
     # ---- conditional lift: adaptive runs where reexpand fired vs not ----
@@ -340,6 +438,9 @@ def main():
           f"did NOT fire n={len(_f(notf))} mean={mean(notf):.2f}")
     print(f"Cost: baseline ${mean([r['usd'] for r in B]):.3f}/run, adaptive ${mean([r['usd'] for r in A]):.3f}/run; "
           f"context (visit.chars) base {mean([r['visit_chars'] for r in B]):.0f} vs adapt {mean([r['visit_chars'] for r in A]):.0f}")
+    # $/solved (score>=0.75): the honest cost-efficiency headline — a cheap arm that solves
+    # nothing is not cheap. NaN when an arm solved zero tasks.
+    print(f"$/solved (score>=0.75): baseline ${_dollars_per_solved(B):.4f}  adaptive ${_dollars_per_solved(A):.4f}")
 
     # ---- diagrams ----
     try:

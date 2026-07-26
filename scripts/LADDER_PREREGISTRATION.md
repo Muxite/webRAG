@@ -1,49 +1,89 @@
 # Compute-ladder A/B — pre-registered analysis plan (write-before-you-see-results)
 
-_Registered 2026-07-22, before the R=5 live matrix was analyzed. Driver: `scripts/adaptive_ladder_run.py`.
-Analysis: `scripts/adaptive_ab_analyze.py` (paired sign-flip test). This file exists so the win/lose
-call is a rule decided in advance, not a story fit to whatever the numbers happen to say._
+_Re-registered 2026-07-24, before the clean barrage is analyzed — supersedes the 2026-07-22
+version (which was written for the old 8-task, single-model `gpt-5-mini` ladder and predates the
+survivorship / multiple-comparison / grounding-decomposition fixes). Driver:
+`scripts/adaptive_ladder_run.py`. Analysis: `scripts/adaptive_ab_analyze.py`. This file exists so the
+win/lose call is a rule decided in advance, not a story fit to whatever the numbers happen to say._
 
 ## The claim under test
 
 **One cheap "bad" model can be made materially better at agentic web-research by burning more of its
-(cheap) tokens/searches** — via an adaptive agent that re-expands onto better pages, re-grounds when
-step-confidence is low, and self-consistency-votes — and it can approach a premium model's quality at
-a fraction of the premium's cost.
+(cheap) tokens + page-visits** — via an adaptive Graph-of-Thoughts agent that re-expands onto better
+pages, re-grounds when step-confidence is low, and reconciles its answer (recompute / verify / decorrelated
+variations). We do **not** claim to beat the premium reference — the claim is that the cheap model
+**approaches** it at a **fraction of the cost**. The 2–5× token premium is the STRATEGY, not a defect.
 
 ## Design (fixed before results)
 
-- **Agent model:** `openai/gpt-5-mini` (cheap), `execution_variant=graph`, in a 3-arm compute ladder:
-  `baseline` (adaptive OFF) → `good_adaptive` (re-expand + confidence re-ground + corrective context)
-  → `full` (+ k-vote×3 + backtrack + expect-contract = max searches/tokens).
-- **Reference bar (not used by the agent):** `google/gemini-3.1-pro-preview` + `sequential_react`.
-- **Tasks:** 122 125 128 130 134 138 140 144 — all four adaptive archetypes (A survivor, B conflict,
-  C chain, D re-expand), incl. the D flagship that was missing from prior data.
+- **Cheap agent models (the subjects):** `openai/gpt-4.1-nano` and `deepseek/deepseek-v4-flash` —
+  genuinely weak/cheap, so the lift is meaningful. `execution_variant=graph`.
+- **Structured arms per cheap model (the ladder):**
+  `baseline` (adaptive OFF) → `good_adaptive` (re-expand + confidence re-ground + corrective context +
+  tool-recovery — the proven winner) → `max_burn` (good_adaptive + deeper re-expansion depth + wider
+  hop/beam + the finalize reconcile chain = the productive ~5× burn). The old `full` arm (k-vote +
+  backtrack + expect-contract) was measured net-negative and is DROPPED.
+- **Naive floor (context):** an iterative `naive_rag` that keeps searching/visiting/hopping until it
+  answers or hits a bounded budget — the honest floor a cheap model reaches WITHOUT the graph, so the
+  graph arms' lift over it isolates the value of the structure, not mere persistence.
+- **Reference bar (NOT used by the agent):** `anthropic/claude-sonnet-5` + `sequential_react` — the
+  quality ceiling we approach, not beat.
+- **Tasks:** the 59-task validity suite (4 adaptive archetypes as the spine + diverse-shape coverage);
+  see `BENCHMARK_SUITE_50.md`. Power comes from the TASK count, not reps.
 - **Replication:** R=5 per cheap cell (interleaved, shared network window), R=3 for the reference.
-- **Fairness (held fixed across arms):** connector-retry ON, fixtures OFF, `parallel_action_limit=1`,
-  each cell an isolated process at internal concurrency=1.
+
+## Fairness (held fixed across arms — a fair battle)
+
+- **Search queries sanitized to Brave's limits** (≤400 chars / 50 words, count ≤20) at the connector,
+  AND the query-writing prompts tell every agent the limit — so no arm is handicapped by a 422 storm
+  (the react reference previously failed 40/40 on over-long queries; the graph arm 0/40).
+- **Connector-retry ON in every arm** (symmetric); fixtures OFF; `parallel_action_limit=1`; each cell an
+  isolated process at internal concurrency=1 with its OWN embedded chroma (no cross-cell contention).
+
+## Pre-registered ANALYSIS RULES (the methodology, fixed in advance)
+
+1. **Missing = 0 over the full grid.** A cell scheduled by the interleaved design but missing in one arm
+   (timeout / crash / 402) scores **0** for that arm, over the UNION grid. No intersection-drop
+   ("survivorship" inflated the pilot ~15%, because timeouts cluster on the hard tasks / high-compute
+   arm). `missing="drop"` is only ever an explicit, logged sensitivity check.
+2. **PRIMARY test = TASK-LEVEL.** Paired sign-flip permutation test (two-sided) on per-**task** deltas
+   (n = #tasks): **win = mean Δ > 0 with p < 0.05.** The per-(task,rep) pairing is PSEUDOREPLICATED
+   (reps within a task are not independent) and is reported ONLY as a secondary robustness figure.
+3. **Multiple-comparison correction (Holm) within families.** The per-archetype scan (4 tests) and any
+   multi-arm-pair set are Holm-corrected; a result is "significant" only if **p_holm < 0.05**. Raw p is
+   printed alongside. Per-archetype (~2–6 tasks) is UNDERPOWERED → reported as exploratory, never a
+   confirmatory verdict.
+4. **CIs use Student-t** (not z=1.96) for the small-n rows.
+5. **Grounding decomposed via the additive Oaxaca split.** Δraw = REASONING (scores better once
+   grounded) + GROUNDING-RATE (grounds more often) + ungrounded-residual, terms summing exactly to Δraw,
+   using the EMPIRICAL E[score|ungrounded]. Report **whichever term dominates** per model — a model that
+   rarely grounds lifts via grounding-rate; one that already grounds ~85% lifts via reasoning. The two
+   stories are NOT merged into one "reasons better" headline.
+6. **Cost headline = $/solved (score ≥ 0.75)**, plus the best cheap arm's mean as a % of the reference
+   mean **on the shared task support, with a CI** — never the disjoint-support number, never the
+   rep-level p.
 
 ## Pre-registered success criteria
 
-1. **PRIMARY — adaptivity lifts the cheap model.** Paired sign-flip permutation test (two-sided) on
-   per-(task,rep) deltas, `good_adaptive − baseline` AND `full − baseline`: **win = mean Δ > 0 with
-   p < 0.05.** Report the conservative per-task pairing (n = #tasks) alongside as a robustness check;
-   a claim is "strong" only if both pairings agree in sign.
-2. **SECONDARY — compute scales monotonically.** Overall mean score ordering `full ≥ good_adaptive ≥
-   baseline`. A non-monotonic result (e.g. full < good_adaptive) is reported as a real finding
-   (over-spending hurts), not hidden.
-3. **SECONDARY — the cheap model is made "decent" vs the premium bar.** Report the best cheap arm's
-   mean score as a % of the reference mean, and its $/run as a fraction of the reference $/run.
-   Pre-registered headline threshold for "decent": **≥ 85% of reference quality at ≤ 1/3 of reference
-   cost.** (Actuals reported regardless of threshold.)
-4. **HONESTY.** Per-archetype deltas reported in full, **including regressions** (C-chain is the known
-   soft spot). Full score vectors, $/run, and $/solved (score ≥ 0.75) reported. No task dropped
-   post-hoc; asymmetric-n cells flagged.
+- **PRIMARY:** `good_adaptive − baseline` (and, exploratory, `max_burn − baseline`) task-level Δ > 0,
+  p < 0.05, on the full-grid (missing=0) pairing, direction agreeing at rep-level.
+- **Compute monotonicity is a FINDING, not an assumption:** if `max_burn ≤ good_adaptive`, that is
+  reported (over-spending can hurt), not hidden.
+- **"Approaches the reference cheaply":** report the best cheap arm's % of reference quality on shared
+  support (with CI) and its $/solved vs the reference's. Threshold framing (reported regardless):
+  meaningfully closes the gap at **≤ 1/4 of reference $/solved**. We do not claim to reach 100%.
 
 ## Known risks logged in advance
 
-- C-chain may regress or stay flat (blocked/redirected multi-hop fetches, not reasoning) — expected;
-  it is a diagnosis target, not a reason to drop the archetype.
-- `full` may cost 2–4× baseline. Per the thesis that is acceptable **iff** it buys accuracy and stays
-  well under the premium's cost; $/solved is the honest efficiency metric.
-- gpt-5-mini is cheap but not the cheapest; nano (truly "bad") is a logged follow-up, not in this run.
+- **The synthesis gap caps the ceiling.** "Right page, wrong value" (Mode-1) is the dominant residual
+  and is NOT closed by any burn knob — only by the finalize recompute/verify/variations chain (shipped,
+  default-off, on in `max_burn`). If it does not validate, the honest claim is narrower: **burn closes
+  the GROUNDING gap, not the SYNTHESIS gap.** "Near-reference" phrasing is gated on the reconcile chain
+  actually lifting score in the smoke.
+- **The effect is modest** (pilot ~+0.11) and was inflated from both ends — survivorship (fixed: rule 1)
+  and a handicapped reference (fixed: Brave-422 fairness). Post-fix the gap shrinks but a defensible
+  modest win survives; an overclaim does not.
+- **deepseek** must have its reasoning-class / price-tier config bugs fixed or its ladder is noise
+  (logged follow-up).
+- **C-chain** may stay flat (blocked/redirected multi-hop fetches, not reasoning) — a diagnosis target,
+  not a reason to drop the archetype.
