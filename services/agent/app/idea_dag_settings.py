@@ -9,6 +9,31 @@ from agent.app.prompts.loader import apply_default_prompts
 from agent.app.idea_dag_schemas import apply_default_schemas
 
 
+# Hard ceiling on the finalize/merge completion RESERVATION. OpenRouter (and the OpenAI API)
+# hold ``max_completion_tokens x output_price`` against the remaining credit BEFORE running a
+# call, so the historical 100k/120k budgets reserved 15-500x the largest deliverable ever
+# observed (~4.1k tokens) and were the dominant 402 ("requires more credits, or fewer
+# max_tokens") trigger once a daily cap drained — and a 402 on finalize/merge degrades the stage
+# silently, corrupting a benchmark arm mid-run. Clamped here (not only in the shipped JSON) so an
+# alternate settings file or an ``IDEA_DAG_*_MAX_TOKENS`` env override cannot reintroduce it.
+_MAX_TOKENS_RESERVATION_CAP = 32768
+_RESERVATION_CAPPED_KEYS = ("final_max_tokens", "merge_max_tokens")
+
+
+def _clamp_reservations(settings: Dict[str, Any]) -> None:
+    """Clamp the finalize/merge token reservations to ``_MAX_TOKENS_RESERVATION_CAP`` in place."""
+    for key in _RESERVATION_CAPPED_KEYS:
+        value = settings.get(key)
+        if value is None:
+            continue
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            continue
+        if value > _MAX_TOKENS_RESERVATION_CAP:
+            settings[key] = _MAX_TOKENS_RESERVATION_CAP
+
+
 def load_idea_dag_settings(path: Optional[Path] = None) -> Dict[str, Any]:
     if path is None:
         path = Path(__file__).resolve().parent / "idea_dag_settings.json"
@@ -41,5 +66,7 @@ def load_idea_dag_settings(path: Optional[Path] = None) -> Dict[str, Any]:
                         settings[key] = int(env_value)
                 except (ValueError, TypeError):
                     pass
+
+    _clamp_reservations(settings)
 
     return settings

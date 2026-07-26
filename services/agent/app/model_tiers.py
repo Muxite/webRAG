@@ -33,30 +33,46 @@ def price_tier(model_name: Optional[str]) -> str:
 
 def is_reasoning_model(model_name: Optional[str]) -> bool:
     """True for models that spend a HIDDEN reasoning budget out of the same completion allowance —
-    the gpt-5 family and the OpenAI o-series (o1/o3/o4). These starve a small ``max_completion_tokens``
-    on reasoning before writing visible content (``content=None`` / ``finish_reason=length``).
+    the gpt-5 family, the OpenAI o-series (o1/o3/o4) and the deepseek reasoners. These starve a small
+    ``max_completion_tokens`` on reasoning before writing visible content (``content=None`` /
+    ``finish_reason=length``).
 
     This is the "does it starve?" predicate — distinct from ``llm_backends.accepts_reasoning_effort``
     (the "does the wire accept the ``reasoning_effort`` param?" predicate). The anti-starvation TOKEN
-    FLOOR keys on THIS (every starving model needs headroom, incl. o-series which the wire allowlist
-    omits); the ``reasoning_effort="minimal"`` HINT needs BOTH this AND wire-acceptance. Mirrors the
-    frozen ``execution_compiled._is_reasoning_model`` set so native and compiled agree on coverage."""
+    FLOOR keys on THIS (every starving model needs headroom, incl. o-series and deepseek, which the
+    wire allowlist omits); the ``reasoning_effort="minimal"`` HINT needs BOTH this AND wire-acceptance.
+
+    ``deepseek`` was added from live barrage telemetry: OpenRouter bills its reasoning INSIDE
+    ``completion_tokens`` (no separate ``reasoning_tokens``), and ~1% of deepseek calls hit >=95% of a
+    tight stage ceiling -> a truncated-but-nonempty JSON that fails ``json.loads`` and degrades the node
+    silently. It is deliberately NOT mirrored into the frozen ``execution_compiled._is_reasoning_model``
+    (that compiled reference stays byte-frozen); native coverage is a superset of it."""
     if not model_name:
         return False
     bare = model_name.split("/", 1)[-1] if "/" in model_name else model_name
-    return any(s.lower().startswith(("gpt-5", "o1", "o3", "o4")) for s in (model_name, bare))
+    return any(
+        s.lower().startswith(("gpt-5", "o1", "o3", "o4", "deepseek")) for s in (model_name, bare)
+    )
 
 
 # Token-budget multipliers by price tier for native executor micro-prompts. Mirrors the compiled
 # react tiering intent (cheap stays tight so its proven cost/behavior is untouched; mid/premium
 # get headroom so a verbose/reasoning model can begin its answer without starving the budget).
-_TIER_TOKEN_MULTIPLIER = {"cheap": 1.0, "mid": 2.0, "premium": 4.0, "unknown": 2.0}
+#
+# ``unknown`` is 1.0, NOT mid's 2.0: "unknown" means only that the model is missing from the local
+# pricing table, which in practice is the common case for a NEW CHEAP slug (both cheap models in the
+# barrage were unpriced). Giving them mid's 2.0x silently DOUBLED every executor micro-prompt budget
+# under the tiering flag — the exact opposite of "cheap stays tight", and it made the adaptive arm's
+# budget depend on pricing-table coverage rather than on the model. Starvation protection is the
+# anti-starvation FLOOR keyed on ``is_reasoning_model`` (the real "does it starve?" predicate), so
+# an unpriced reasoner is still protected without inflating unpriced cheap models.
+_TIER_TOKEN_MULTIPLIER = {"cheap": 1.0, "mid": 2.0, "premium": 4.0, "unknown": 1.0}
 
 
 def tier_token_multiplier(model_name: Optional[str]) -> float:
     """Price-tier token-budget multiplier (``>= 1.0``) for native executor micro-prompts.
 
-    Cheap ``== 1.0`` keeps the cheap path's budget unchanged; unknown mirrors mid (safe room —
-    the dangerous failure mode is a starved premium/reasoning model, not an over-budgeted cheap one).
+    Cheap ``== 1.0`` keeps the cheap path's budget unchanged; an unpriced/unknown model also stays at
+    ``1.0`` so a missing pricing entry can never inflate a budget (see ``_TIER_TOKEN_MULTIPLIER``).
     """
     return _TIER_TOKEN_MULTIPLIER.get(price_tier(model_name), 1.0)

@@ -239,7 +239,10 @@ class EvaluationConfig:
 class FinalConfig:
     model: Optional[str] = None
     temperature: float = 0.3
-    max_tokens: Optional[int] = 120000
+    # Capped at the provider RESERVATION ceiling (see
+    # ``idea_dag_settings._MAX_TOKENS_RESERVATION_CAP``): the old 120000 reserved ~30x the largest
+    # deliverable ever observed and 402'd once a daily credit cap drained.
+    max_tokens: Optional[int] = 32768
     chroma_results: int = 10
     max_prompt_chars: int = 200000  # absent from JSON; original call-site default
     allow_partial_success: bool = True
@@ -269,7 +272,9 @@ class FinalConfig:
 class MergeConfig:
     model: Optional[str] = None
     temperature: float = 0.3
-    max_tokens: Optional[int] = 100000
+    # Same reservation cap as ``FinalConfig.max_tokens`` (merge output is bounded by the same
+    # deliverable); see ``idea_dag_settings._MAX_TOKENS_RESERVATION_CAP``.
+    max_tokens: Optional[int] = 32768
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",

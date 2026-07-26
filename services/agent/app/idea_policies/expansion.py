@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -23,6 +24,146 @@ def _safe_serialize_details(details: Dict[str, Any]) -> str:
         return json.dumps(details, ensure_ascii=True, default=str)
     except Exception as e:
         return json.dumps({"error": f"Serialization failed: {str(e)}"}, ensure_ascii=True)
+
+
+# --- malformed-expansion-JSON repair ---------------------------------------------------------
+# A cheap executor model that emits prose-wrapped, fence-wrapped or TRUNCATED JSON used to fall
+# through a single non-nesting regex (``\{[^{}]*"candidates"[^{}]*\}``) that cannot match once the
+# candidates array contains objects — i.e. always. The plan silently became EMPTY (no children ->
+# a tool-free run). These helpers salvage the object instead: brace-balanced extraction first,
+# then a bounded "close the open brackets at the last complete element" repair for truncation.
+# Every path fails safe (``None`` -> the caller returns an empty plan), never raises.
+_JSON_REPAIR_MAX_STARTS = 32     # candidate '{' offsets tried for a complete object
+_JSON_REPAIR_MAX_CUTS = 64       # truncation cut points tried, longest first
+_TRAILING_COMMA_RE = re.compile(r",(\s*[}\]])")
+
+
+def _loads_lenient(text: str) -> Optional[Any]:
+    """``json.loads`` with the two forgiving retries an LLM payload usually needs.
+
+    ``strict=False`` tolerates raw control characters inside strings (a model pasting a page
+    excerpt with literal newlines); the trailing-comma strip covers the other common slip.
+    """
+    for attempt in (text, _TRAILING_COMMA_RE.sub(r"\1", text)):
+        try:
+            return json.loads(attempt, strict=False)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            continue
+    return None
+
+
+def _scan_json(text: str, start: int) -> tuple[Optional[int], List[str], List[int]]:
+    """String-aware bracket scan of the JSON value beginning at ``text[start]``.
+
+    :returns: ``(end, stack, cuts)`` where ``end`` is the index AFTER the matching closing
+        bracket (``None`` if the value never closes, i.e. truncated), ``stack`` is the still-open
+        bracket list at the end of the text, and ``cuts`` are offsets just past a COMPLETE nested
+        value — the only places a truncated fragment may safely be cut before auto-closing.
+    """
+    stack: List[str] = []
+    cuts: List[int] = []
+    in_string = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+                if stack:
+                    cuts.append(i + 1)
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]":
+            if not stack or stack[-1] != ch:
+                return None, stack, cuts  # unbalanced -> not a value we can trust
+            stack.pop()
+            if not stack:
+                return i + 1, stack, cuts
+            cuts.append(i + 1)
+        elif ch in "0123456789truefalsn." and stack:
+            # End of a bare literal (number / true / false / null) is a safe cut too.
+            nxt = text[i + 1] if i + 1 < len(text) else ""
+            if nxt in ("", ",", " ", "\t", "\r", "\n", "}", "]"):
+                cuts.append(i + 1)
+    return None, stack, cuts
+
+
+def _autoclose(fragment: str) -> Optional[str]:
+    """Close the brackets left open by a truncated ``fragment`` (``None`` if it can't be closed)."""
+    end, stack, _ = _scan_json(fragment, 0)
+    if end is not None or not stack:
+        return None
+    return fragment + "".join(reversed(stack))
+
+
+def _repair_json_object(content: str, required_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Best-effort recovery of a JSON object from a malformed LLM response.
+
+    Order: (1) every ``{`` offset is tried as the start of a brace-balanced object — this is what
+    handles fences/prose around an otherwise VALID object with nested structures; (2) if nothing
+    complete parses the payload is treated as TRUNCATED and repaired by cutting back to the last
+    complete nested value and closing the open brackets; (3) a bare top-level array is accepted as
+    the ``required_key`` list (a frequent cheap-model shape slip). Returns ``None`` when the text is
+    genuinely unrepairable — the caller degrades to an empty plan rather than raising.
+    """
+    if not content:
+        return None
+    text = content.strip()
+    if text.startswith("```"):  # drop a markdown fence so a bare array still starts at offset 0
+        text = text.split("\n", 1)[-1] if "\n" in text else text[3:]
+        if text.rstrip().endswith("```"):
+            text = text.rstrip()[:-3]
+        text = text.strip()
+    starts = [i for i, ch in enumerate(text) if ch == "{"][:_JSON_REPAIR_MAX_STARTS]
+
+    # An object that parses but lacks ``required_key`` is only a fallback, and only from the
+    # OUTERMOST offset — a later ``{`` is an inner element (e.g. one candidate), never the plan.
+    best: Optional[Dict[str, Any]] = None
+    for start in starts:
+        end, _stack, _cuts = _scan_json(text, start)
+        if end is None:
+            continue
+        data = _loads_lenient(text[start:end])
+        if not isinstance(data, dict):
+            continue
+        if required_key is None or required_key in data:
+            return data
+        if best is None and start == starts[0]:
+            best = data
+
+    for start in starts:
+        end, _stack, cuts = _scan_json(text, start)
+        if end is not None:
+            continue  # already tried as a complete object above
+        for cut in reversed(cuts[-_JSON_REPAIR_MAX_CUTS:]):
+            closed = _autoclose(text[start:cut])
+            if closed is None:
+                continue
+            data = _loads_lenient(closed)
+            if isinstance(data, dict) and (required_key is None or required_key in data):
+                return data
+
+    # A bare top-level array of candidates ("[{...}, {...}]" with no wrapper object). Only when the
+    # payload actually STARTS with the array — an inner array under some other key is that key's
+    # data, not the plan, and re-labelling it would invent candidates.
+    bracket = text.find("[")
+    if required_key and bracket == 0:
+        end, _stack, cuts = _scan_json(text, bracket)
+        slices = [text[bracket:end]] if end is not None else [
+            _autoclose(text[bracket:cut]) for cut in reversed(cuts[-_JSON_REPAIR_MAX_CUTS:])
+        ]
+        for candidate in slices:
+            data = _loads_lenient(candidate) if candidate else None
+            if isinstance(data, list) and data:
+                return {required_key: data}
+    return best
 
 
 # Opt-in expansion addendum (``expansion_expect_contract_enabled``): borrows the compiled
@@ -818,25 +959,28 @@ class LlmExpansionPolicy(ExpansionPolicy):
         except json.JSONDecodeError as e:
             self._logger.error(f"[EXPANSION] JSON PARSE ERROR: {e}")
             self._logger.error(f"[EXPANSION] Content preview (first 500 chars): {content[:500] if content else 'None'}")
-            if content:
-                import re
-                json_match = re.search(r'\{[^{}]*"candidates"[^{}]*\}', content, re.DOTALL)
-                if json_match:
-                    try:
-                        data = json.loads(json_match.group())
-                        self._logger.info(f"[EXPANSION] Extracted JSON from embedded text")
-                    except:
-                        pass
-            if 'data' not in locals():
+            # Salvage a fence-wrapped / prose-wrapped / TRUNCATED plan instead of silently
+            # planning nothing (see ``_repair_json_object``); still fails safe when unrepairable.
+            data = _repair_json_object(content, required_key="candidates")
+            if data is None:
+                self._logger.error("[EXPANSION] JSON repair failed - degrading to an empty plan")
                 return [], {}
+            self._logger.info(
+                f"[EXPANSION] Repaired malformed JSON (recovered {len(data.get('candidates') or [])} candidates)"
+            )
         except Exception as e:
             self._logger.error(f"[EXPANSION] PARSE EXCEPTION: {e}", exc_info=True)
             self._logger.error(f"[EXPANSION] Content preview (first 500 chars): {content[:500] if content else 'None'}")
             return [], {}
-        
-        if 'data' not in locals():
-            return [], {}
-            
+
+        if not isinstance(data, dict):
+            # A bare top-level array is the one non-object shape worth accepting as the plan.
+            if isinstance(data, list):
+                data = {"candidates": data}
+            else:
+                self._logger.error(f"[EXPANSION] Response is not a JSON object ({type(data).__name__})")
+                return [], {}
+
         candidates = data.get("candidates", [])
         if not candidates:
             self._logger.error(f"[EXPANSION] NO CANDIDATES IN RESPONSE!")

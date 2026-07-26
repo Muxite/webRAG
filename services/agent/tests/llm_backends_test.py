@@ -94,15 +94,22 @@ def test_max_completion_tokens_recognizes_slug(monkeypatch):
     assert b._get_max_completion_tokens_limit("openai/gpt-5-mini") == 128000
     assert b._get_max_completion_tokens_limit("gpt-5-mini") == 128000
     assert b._get_max_completion_tokens_limit("anthropic/claude-opus-4.7") == 64000
+    # deepseek was uncapped (None) and put the raw 100k-120k finalize/merge budget on the wire,
+    # which OpenRouter reserves against the daily credit -> a 402 cliff mid-run.
+    assert b._get_max_completion_tokens_limit("deepseek/deepseek-v4-flash") == 32768
 
 
 # --- Bug #1: reasoning_effort must survive simplify_payload for accepting models ----------
 def test_accepts_reasoning_effort_predicate():
     from agent.app.llm_backends import accepts_reasoning_effort
 
-    for accepting in ("gpt-5-mini", "openai/gpt-5-mini", "gpt-5", "gpt-4.1", "gpt-4.1-nano"):
+    for accepting in ("gpt-5-mini", "openai/gpt-5-mini", "gpt-5"):
         assert accepts_reasoning_effort(accepting) is True, accepting
-    for rejecting in ("gpt-4o", "anthropic/claude-opus-4.7", "gemini-3.1-pro-preview", "", None):
+    # gpt-4.1 was in the allowlist but is NOT a reasoning model: the param is ignored at best and
+    # a provider 400 at worst, so it must not reach the wire.
+    for rejecting in ("gpt-4.1", "gpt-4.1-nano", "openai/gpt-4.1-nano", "gpt-4o",
+                      "deepseek/deepseek-v4-flash", "anthropic/claude-opus-4.7",
+                      "gemini-3.1-pro-preview", "", None):
         assert accepts_reasoning_effort(rejecting) is False, rejecting
 
 

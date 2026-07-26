@@ -49,19 +49,23 @@ class LLMContentError(RuntimeError):
 def accepts_reasoning_effort(model_name: Optional[str]) -> bool:
     """True for models whose endpoint accepts the OpenAI-style ``reasoning_effort`` param.
 
-    Only the gpt-5 / gpt-4.1 family (bare or ``provider/`` prefixed, e.g. ``openai/gpt-5-mini``
-    via OpenRouter) understands ``reasoning_effort``; other OpenAI-compatible servers 400 on
+    Only the gpt-5 family (bare or ``provider/`` prefixed, e.g. ``openai/gpt-5-mini`` via
+    OpenRouter) understands ``reasoning_effort``; other OpenAI-compatible servers 400 on
     it, so it must be stripped for them. This is the SINGLE shared predicate: ``ConnectorLLM``
     only ADDS ``reasoning_effort`` (and ``text`` verbosity) for these models, and
     ``OpenAICompatibleBackend.simplify_payload`` strips it for everyone else — the two must
     agree, or a value added by the connector gets stripped before the wire (the gpt-5-mini
     ``content=None`` starvation bug).
+
+    gpt-4.1 used to be in this allowlist and is NOT: it is not a reasoning model, so the param is
+    at best ignored (OpenRouter drops it silently) and at worst a provider 400. Dropping it keeps
+    the predicate factually "does the wire take the param?" instead of "is it an OpenAI slug?".
     """
     name = (model_name or "").strip()
     if not name:
         return False
     bare = name.split("/", 1)[-1] if "/" in name else name
-    return name.startswith(("gpt-5", "gpt-4.1")) or bare.startswith(("gpt-5", "gpt-4.1"))
+    return name.startswith("gpt-5") or bare.startswith("gpt-5")
 
 
 class LLMBackend(ABC):
@@ -215,6 +219,11 @@ class OpenAICompatibleBackend(LLMBackend):
             "gpt-4o": 16384,
             "anthropic/claude": 64000,
             "google/gemini": 65536,
+            # deepseek had no entry -> None -> the stage's raw budget (up to 120000) went on the
+            # wire, and OpenRouter reserves ``max_completion_tokens x output_price`` against the
+            # remaining daily credit before running the call -> a 402 cliff mid-run. Its largest
+            # observed single completion is ~8.2k tokens, so 32768 is ~4x headroom.
+            "deepseek": 32768,
             "meta-llama/llama": 32768,
         }
         bare_name = model_name.split("/", 1)[-1] if "/" in model_name else model_name
@@ -292,8 +301,8 @@ class OpenAICompatibleBackend(LLMBackend):
         :returns: Payload for chat.completions.create.
         """
         safe_payload = dict(payload)
-        # Preserve ``reasoning_effort`` for the models whose endpoint accepts it (gpt-5 /
-        # gpt-4.1 family); strip it only for servers that would 400 on it. Stripping it
+        # Preserve ``reasoning_effort`` for the models whose endpoint accepts it (the gpt-5
+        # family); strip it only for servers that would 400 on it. Stripping it
         # unconditionally defeated the Phase-6 ``reasoning_effort="minimal"`` hint on
         # gpt-5-mini, which then spent its whole completion budget on hidden reasoning and
         # returned ``content=None``. Uses the SAME predicate ConnectorLLM used to ADD it.

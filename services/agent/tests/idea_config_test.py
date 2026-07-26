@@ -241,6 +241,42 @@ def test_evaluation_weight_for_is_case_insensitive_and_none_safe():
     assert e.weight_for("") == e.weight_default
 
 
+def test_finalize_merge_reservations_are_capped(tmp_path, monkeypatch):
+    """The finalize/merge completion RESERVATION must stay <= the provider cap.
+
+    OpenRouter holds ``max_completion_tokens x output_price`` against the remaining daily credit
+    before running a call, so the old 120000/100000 budgets 402'd (and silently degraded the stage)
+    once a cap drained. The cap is enforced at LOAD time so neither an alternate settings file nor
+    an ``IDEA_DAG_*_MAX_TOKENS`` env override can reintroduce it.
+    """
+    import json
+
+    from agent.app.idea_dag_settings import _MAX_TOKENS_RESERVATION_CAP
+    from agent.app.idea_policies.config import FinalConfig, MergeConfig
+
+    cap = _MAX_TOKENS_RESERVATION_CAP
+    shipped = load_idea_dag_settings()
+    assert shipped["final_max_tokens"] <= cap
+    assert shipped["merge_max_tokens"] <= cap
+    # Typed defaults agree with the shipped JSON (config_drift_test guards this globally).
+    assert FinalConfig.from_settings({}).max_tokens <= cap
+    assert MergeConfig.from_settings({}).max_tokens <= cap
+
+    # An alternate settings file carrying the old values is clamped on load...
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"final_max_tokens": 120000, "merge_max_tokens": 100000}), encoding="utf-8")
+    clamped = load_idea_dag_settings(path)
+    assert clamped["final_max_tokens"] == cap
+    assert clamped["merge_max_tokens"] == cap
+
+    # ...and so is an env override, while a SMALLER value is left untouched.
+    monkeypatch.setenv("IDEA_DAG_FINAL_MAX_TOKENS", "120000")
+    monkeypatch.setenv("IDEA_DAG_MERGE_MAX_TOKENS", "4096")
+    env_loaded = load_idea_dag_settings(path)
+    assert env_loaded["final_max_tokens"] == cap
+    assert env_loaded["merge_max_tokens"] == 4096
+
+
 def test_validate_settings_rejects_bad_type():
     # A non-numeric value for an int knob must fail loudly at validation time.
     with pytest.raises(ValueError):

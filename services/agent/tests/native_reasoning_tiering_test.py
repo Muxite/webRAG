@@ -37,9 +37,23 @@ def test_price_tier_unknown_on_lookup_error(monkeypatch):
 
 
 def test_tier_token_multiplier(monkeypatch):
-    for price, mult in [(0.5, 1.0), (2.0, 2.0), (10.0, 4.0), (0.0, 2.0)]:
+    # 0.0 == unpriced == "unknown" -> 1.0, NOT mid's 2.0: a model missing from the pricing table
+    # is usually a NEW CHEAP slug, and 2.0 silently doubled its micro-prompt budget under the
+    # tiering flag (the opposite of "cheap stays tight", and a budget that depended on pricing
+    # coverage rather than on the model). Starvation is handled by the is_reasoning_model FLOOR.
+    for price, mult in [(0.5, 1.0), (2.0, 2.0), (10.0, 4.0), (0.0, 1.0)]:
         _patch_price(monkeypatch, price)
         assert model_tiers.tier_token_multiplier("m") == mult, (price, mult)
+
+
+def test_unknown_tier_never_inflates_the_budget(monkeypatch):
+    """An UNPRICED model must get exactly the cheap budget under A5 (regression: it got 2x)."""
+    a = _action(price_tier_param_tiering_enabled=True)
+    _patch_price(monkeypatch, 0.0)  # unpriced -> "unknown"
+    assert model_tiers.price_tier("brand-new/cheap-slug") == "unknown"
+    assert a._executor_max_tokens("brand-new/cheap-slug", 700) == 700
+    _patch_price(monkeypatch, 0.5)  # a priced cheap model gets the SAME budget
+    assert a._executor_max_tokens("cheap-slug", 700) == 700
 
 
 # ---------------------------------------------------------------------------
@@ -67,11 +81,12 @@ def test_a3b_minimal_effort_needs_reasoning_model_AND_wire_acceptance():
     a = _action(native_reasoning_effort_discipline_enabled=True)
     # gpt-5-mini: reasoning model AND wire accepts reasoning_effort -> minimal.
     assert a._micro_prompt_reasoning_effort("gpt-5-mini") == "minimal"
-    # gpt-4.1-nano: the wire accepts the param but it is NOT a reasoning model -> no hint (default).
+    # gpt-4.1-nano: neither a reasoning model nor (any longer) on the wire allowlist -> no hint.
     assert a._micro_prompt_reasoning_effort("openai/gpt-4.1-nano") is None
-    # o-series: a reasoning model, but the wire allowlist omits it -> no hint (the token FLOOR,
-    # not the effort hint, is what protects o-series from starvation; see the floor test below).
+    # o-series / deepseek: reasoning models, but the wire allowlist omits them -> no hint (the token
+    # FLOOR, not the effort hint, is what protects them from starvation; see the floor test below).
     assert a._micro_prompt_reasoning_effort("o3-mini") is None
+    assert a._micro_prompt_reasoning_effort("deepseek/deepseek-v4-flash") is None
     # A plain non-reasoning model is untouched (falls back to the caller default).
     assert a._micro_prompt_reasoning_effort("gemini-3.1-pro-preview", default="high") == "high"
     assert a._micro_prompt_reasoning_effort("anthropic/claude-opus-4.7") is None
@@ -85,6 +100,9 @@ def test_a3b_floors_every_reasoning_model_incl_o_series():
     # this is the coverage gap the shared is_reasoning_model predicate fixes)...
     assert a._executor_max_tokens("o3-mini", 500) == 2048
     assert a._executor_max_tokens("openai/o1", 500) == 2048
+    # ...and deepseek, whose reasoning is billed inside the completion allowance (it truncated
+    # mid-JSON on tight stages while it was misclassified as non-reasoning).
+    assert a._executor_max_tokens("deepseek/deepseek-v4-flash", 500) == 2048
     # ...but a budget already above the floor is unchanged.
     assert a._executor_max_tokens("gpt-5-mini", 8192) == 8192
     # gpt-4.1 accepts the wire param but is NOT a reasoning model -> NOT floored (no needless bump).
@@ -129,10 +147,11 @@ def test_a3b_and_a5_compose(monkeypatch):
 
 def test_is_reasoning_model_predicate():
     from agent.app.model_tiers import is_reasoning_model
-    # gpt-5 family + o-series (bare and provider-prefixed) starve on hidden reasoning.
-    for m in ("gpt-5", "gpt-5-mini", "openai/gpt-5-nano", "o1", "openai/o1", "o3-mini", "o4-mini"):
+    # gpt-5 family + o-series + deepseek (bare and provider-prefixed) starve on hidden reasoning.
+    for m in ("gpt-5", "gpt-5-mini", "openai/gpt-5-nano", "o1", "openai/o1", "o3-mini", "o4-mini",
+              "deepseek/deepseek-v4-flash", "deepseek-v4-flash"):
         assert is_reasoning_model(m), m
-    # gpt-4.1 accepts the wire param but is NOT a reasoning model; other families are not either.
+    # gpt-4.1 is NOT a reasoning model (and no longer takes the wire param); nor are these families.
     for m in ("openai/gpt-4.1-nano", "gpt-4.1", "gemini-3.1-pro-preview",
               "anthropic/claude-opus-4.7", "", None):
         assert not is_reasoning_model(m), m

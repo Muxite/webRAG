@@ -228,7 +228,7 @@ There is also a **mandate addendum** (`mandate_addendum.py`) injected into LLM p
 | `create_merge_node()` | adds a merge child and copies `MERGED_RESULTS` |
 | `merge()` | populates `MERGED_RESULTS` + `MERGE_SUMMARY` on the parent |
 
-The actual merge **LLM call** lives in `MergeLeafAction.execute()` (`actions.py:1613–1777`), which reads `MERGED_RESULTS`, fills `merge_system_prompt`/`merge_user_prompt` templates, and parses a JSON envelope. Token cap is `merge_max_tokens=100000` (settings line ~140), temperature 0.3.
+The actual merge **LLM call** lives in `MergeLeafAction.execute()` (`actions.py:1613–1777`), which reads `MERGED_RESULTS`, fills `merge_system_prompt`/`merge_user_prompt` templates, and parses a JSON envelope. Token cap is `merge_max_tokens=32768` (settings line ~140; capped at `idea_dag_settings._MAX_TOKENS_RESERVATION_CAP` so the provider's credit reservation can't 402), temperature 0.3.
 
 The engine wires this together in `_handle_merge_creation()` (`idea_engine.py:740–784`). If the merge LLM responds with `goal_achieved=False`, the merge can be marked `SKIPPED` via the `merge_should_skip` flag (line 760) — i.e., the engine acknowledges the branch didn't accomplish its sub-goal rather than pretending it did.
 
@@ -281,7 +281,7 @@ When the loop exits, `build_final_payload()` (`idea_finalize.py:301–496`) prod
 5. **Event log** — ancestor decision trail from `idea_dag.build_event_log_table()` (`idea_dag.py:396–512`).
 6. **Mandate** — the original user query.
 
-The final prompt is built either from a custom template (`idea_finalize.py:373–405`) or from `FinalPromptBuilder`. A *Runtime capability* clause (lines 376–381) tells the LLM what tools the agent had access to. Token budget is `final_max_tokens=120000` (settings line ~205), and the timeout adapts to the prompt size: base 180s + 1s per 60 chars, capped at 600s (lines 435–440).
+The final prompt is built either from a custom template (`idea_finalize.py:373–405`) or from `FinalPromptBuilder`. A *Runtime capability* clause (lines 376–381) tells the LLM what tools the agent had access to. Token budget is `final_max_tokens=32768` (settings line ~205; capped at `idea_dag_settings._MAX_TOKENS_RESERVATION_CAP`), and the timeout adapts to the prompt size: base 180s + 1s per 60 chars, capped at 600s (lines 435–440).
 
 Success criteria (lines 460–485):
 
