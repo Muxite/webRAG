@@ -55,7 +55,7 @@ export OPENROUTER_API_KEY="$(keyval OPENROUTER_API_KEY)"
 export SEARCH_API_KEY="$(keyval SEARCH_API_KEY)"
 
 export LLM_PROVIDER=openrouter MODEL_API_URL=https://openrouter.ai/api/v1 CHROMA_URL=http://localhost:8001
-export DEFAULT_TIMEOUT=45 DEFAULT_DELAY=2 JITTER_SECONDS=0.5
+export DEFAULT_TIMEOUT=20 DEFAULT_DELAY=2 JITTER_SECONDS=0.5  # F19: 45 was a dead knob (outer 20s action budget always bound first)
 export IDEA_TEST_CONCURRENCY=1 IDEA_TEST_PARALLEL_ACTION_LIMIT=1
 export IDEA_TEST_FIXTURES=replay
 export IDEA_TEST_RENDER_DAG=1

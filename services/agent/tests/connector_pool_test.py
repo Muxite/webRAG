@@ -29,7 +29,8 @@ def _patched_pool(pool_size: int):
     with patch.object(runner, "ConnectorLLM", _FakeConnector), \
          patch.object(runner, "ConnectorSearch", _FakeConnector), \
          patch.object(runner, "ConnectorHttp", _FakeConnector), \
-         patch.object(runner, "ConnectorChroma", _FakeConnector):
+         patch.object(runner, "ConnectorChroma", _FakeConnector), \
+         patch.object(runner, "ConnectorBrowser", _FakeConnector):
         config = object()
         return runner._build_connector_pool(config, pool_size), config
 
@@ -38,7 +39,9 @@ def test_pool_size_matches_concurrency():
     pool, _ = _patched_pool(3)
     assert len(pool) == 3
     for cset in pool:
-        assert set(cset.keys()) == {"llm", "search", "http", "chroma"}
+        # F18: every slot also gets its own browser-fallback connector now (cheap —
+        # Playwright launches lazily on first use, gated at the call site instead).
+        assert set(cset.keys()) == {"llm", "search", "http", "chroma", "browser"}
 
 
 def test_concurrency_one_degenerates_to_single_set():
@@ -58,13 +61,13 @@ def test_each_set_has_independent_connector_instances():
     pool, config = _patched_pool(3)
     seen_ids = set()
     for cset in pool:
-        for key in ("llm", "search", "http", "chroma"):
+        for key in ("llm", "search", "http", "chroma", "browser"):
             conn = cset[key]
             assert conn.config is config, "all connectors share the read-only config"
             assert conn.instance_id not in seen_ids, "connector instances must not be reused"
             seen_ids.add(conn.instance_id)
-    # 3 slots * 4 connectors == 12 distinct instances.
-    assert len(seen_ids) == 12
+    # 3 slots * 5 connectors == 15 distinct instances.
+    assert len(seen_ids) == 15
 
 
 def test_slots_do_not_share_llm_instance():

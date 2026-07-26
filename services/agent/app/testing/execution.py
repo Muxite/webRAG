@@ -40,6 +40,7 @@ async def run_baseline_execution(
     connector_chroma: ConnectorChroma,
     run_stamp: str,
     summarize_observability_func=summarize_observability,
+    connector_browser=None,
 ) -> Dict[str, Any]:
     """
     Run a no-graph baseline: ``parametric`` (single completion, no tools),
@@ -58,6 +59,9 @@ async def run_baseline_execution(
     :param connector_chroma: ChromaDB connector (unused; kept for signature parity).
     :param run_stamp: Run timestamp.
     :param summarize_observability_func: Observability summarizer.
+    :param connector_browser: Optional headless-Chrome fallback connector (F18 — wired
+        uniformly across every execution variant so no arm is handicapped by bot-blocks
+        relative to another; None disables it for this run).
     :return: Execution result with observability.
     """
     connector_llm.set_model(model_name)
@@ -85,6 +89,7 @@ async def run_baseline_execution(
         connector_search=connector_search,
         connector_http=connector_http,
         connector_chroma=connector_chroma,
+        connector_browser=connector_browser,
         telemetry=telemetry,
         collection_name=f"idea_test_{test_id}_{run_stamp}",
     )
@@ -254,6 +259,7 @@ async def run_test_execution(
     idea_settings: Dict[str, Any],
     run_stamp: str,
     summarize_observability_func=summarize_observability,
+    connector_browser=None,
 ) -> Dict[str, Any]:
     """
     Execute agent for a test.
@@ -266,6 +272,8 @@ async def run_test_execution(
     :param idea_settings: DAG settings.
     :param run_stamp: Run timestamp.
     :param summarize_observability_func: Function to summarize observability.
+    :param connector_browser: Optional headless-Chrome fallback connector (F18 — wired
+        uniformly across every execution variant; None disables it for this run).
     :return: Execution result with observability.
     """
     connector_llm.set_model(model_name)
@@ -296,10 +304,11 @@ async def run_test_execution(
         connector_search=connector_search,
         connector_http=connector_http,
         connector_chroma=connector_chroma,
+        connector_browser=connector_browser,
         telemetry=telemetry,
         collection_name=f"idea_test_{test_id}_{run_stamp}",
     )
-    
+
     engine = IdeaDagEngine(
         io=agent_io,
         settings=idea_settings,

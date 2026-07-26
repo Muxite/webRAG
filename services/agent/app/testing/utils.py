@@ -4,7 +4,7 @@ Testing utilities.
 
 import json
 from collections import Counter
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from agent.app.idea_test_utils import count_words, count_chars
 from agent.app.model_costs import estimate_cost, format_cost
@@ -12,6 +12,70 @@ from agent.app.model_costs import estimate_cost, format_cost
 # Rough chars-per-token used only when the provider omits a usage block so we can
 # still place a (flagged) cost estimate on the chart instead of $0.
 _CHARS_PER_TOKEN = 4.0
+
+# F17 (infra-failure quarantine): HTTP/provider status codes that represent a payment/quota/
+# rate-limit/provider-capacity problem rather than a genuine model or task failure — 402
+# (payment required), 422 (Brave semantic rejection / malformed request), 429 (rate limit), and
+# 5xx (provider-side failure). A cell whose ONLY web/LLM failures are these should not silently
+# count as a real 0 in an A/B mean (measured: web-error runs scored 0.473 vs 0.720 clean).
+_INFRA_STATUS_CODES = frozenset({402, 422, 429, 500, 502, 503, 504})
+# Timing names whose payload reliably carries a ``status`` key AND whose status reflects the
+# FINAL outcome for that op (connector_http.py's "http_request", connector_search.py's
+# "search_query", agent_io.py's "visit" — the last already folds in a browser-fallback attempt).
+# ``status is None`` here means every attempt (HTTP, and browser if it ran) exhausted with no
+# definitive server response at all (DNS/connect/timeout) — itself an infra symptom, not a
+# content/model judgement — so it's treated as infra too. Deliberately excludes the nested
+# "browser_fetch" timing: a browser failure can legitimately be "page rendered but had no
+# content", which is a content outcome, not infra — the enclosing "visit" entry already reflects
+# whichever of the two paths actually determined the result.
+_INFRA_TIMING_NAMES = frozenset({"http_request", "search_query", "visit"})
+
+
+def _is_infra_timing(timing: Dict[str, Any]) -> bool:
+    """Classify one failed telemetry timing entry as an infra failure (F17).
+
+    Two independent signals are honored:
+      1. An explicit ``payload["infra_failed"] is True`` — set by the connector itself when it
+         has better information than a bare status code (e.g. ``connector_llm.query_llm``
+         classifies timeouts/transport errors that never got a status code at all).
+      2. A ``status`` in ``_INFRA_STATUS_CODES``, or ``status is None`` for an op that normally
+         carries one (a transport-level failure), for the connector/io ops in
+         ``_INFRA_TIMING_NAMES``.
+
+    A timing that already succeeded is never infra-classified, and a status like 401/403/404/405
+    (bot-block / not-found) is deliberately NOT infra — that's the F18 browser-fallback problem,
+    a different failure mode with a different fix.
+
+    :param timing: One entry from ``telemetry.timings``.
+    :returns: True if this failure looks like infra rather than a genuine task/model failure.
+    """
+    if timing.get("success"):
+        return False
+    payload = timing.get("payload") or {}
+    if payload.get("infra_failed") is True:
+        return True
+    name = timing.get("name")
+    status = payload.get("status")
+    if status is None:
+        return name in _INFRA_TIMING_NAMES
+    try:
+        return int(status) in _INFRA_STATUS_CODES
+    except (TypeError, ValueError):
+        return False
+
+
+def _summarize_infra(timings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Roll up infra-classified failures across a run's timings for the result JSON.
+
+    :param timings: ``telemetry.timings`` list.
+    :returns: ``{"failed": bool, "failure_count": int, "ops": [name, ...]}``.
+    """
+    infra_timings = [t for t in timings if _is_infra_timing(t)]
+    return {
+        "failed": bool(infra_timings),
+        "failure_count": len(infra_timings),
+        "ops": sorted({t.get("name", "unknown") for t in infra_timings}),
+    }
 
 
 def summarize_observability(result: Dict[str, Any], telemetry, model_name: str = "") -> Dict[str, Any]:
@@ -288,6 +352,7 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
         },
         "timings": timings_summary,
         "timings_per_call": timings_per_call,
+        "infra": _summarize_infra(telemetry.timings),
         "step_confidence": step_confidence,
         "events_count": len(telemetry.events),
     }

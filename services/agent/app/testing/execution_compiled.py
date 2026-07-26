@@ -834,6 +834,7 @@ async def _resolve_plan(
     connector_http: ConnectorHttp,
     connector_chroma: ConnectorChroma,
     summarize_observability_func,
+    connector_browser=None,
 ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     """Select the compiled plan for this run and return ``(plan, plan_meta)``.
 
@@ -879,6 +880,7 @@ async def _resolve_plan(
     compile_io = AgentIO(
         connector_llm=connector_llm, connector_search=connector_search,
         connector_http=connector_http, connector_chroma=connector_chroma,
+        connector_browser=connector_browser,
         telemetry=compile_telemetry, collection_name="scaffold_compiler",
     )
     try:
@@ -915,8 +917,13 @@ async def run_compiled_execution(
     connector_chroma: ConnectorChroma,
     run_stamp: str,
     summarize_observability_func=summarize_observability,
+    connector_browser=None,
 ) -> Dict[str, Any]:
-    """Run the compiled-graph agent; same return shape as ``run_sequential_execution``."""
+    """Run the compiled-graph agent; same return shape as ``run_sequential_execution``.
+
+    :param connector_browser: Optional headless-Chrome fallback connector (F18), wired
+        uniformly with the other execution variants; None disables it for this run.
+    """
     connector_llm.set_model(model_name)
     test_id = test_module.metadata.get("test_id", "unknown")
     correlation_id = f"idea_test_{test_id}_{model_name}_graph_compiled_{run_stamp}"
@@ -938,12 +945,14 @@ async def run_compiled_execution(
         test_module, mandate, correlation_id,
         connector_llm, connector_search, connector_http, connector_chroma,
         summarize_observability_func,
+        connector_browser=connector_browser,
     )
 
     telemetry = TelemetrySession(enabled=True, mandate=mandate, correlation_id=correlation_id, trace_path=trace_path)
     agent_io = AgentIO(
         connector_llm=connector_llm, connector_search=connector_search,
         connector_http=connector_http, connector_chroma=connector_chroma,
+        connector_browser=connector_browser,
         telemetry=telemetry, collection_name=f"idea_test_{test_id}_{run_stamp}",
     )
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -157,3 +157,98 @@ async def test_query_llm_returns_none_on_unrecoverable_error():
     mock_backend.complete.side_effect = RuntimeError("boom")
     out = await connector.query_llm({"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"})
     assert out is None
+
+
+# --- F17: infra-failure quarantine (402/408/429/5xx retried, not silently scored as a real 0) ---
+
+class _FakeStatusError(Exception):
+    """Stand-in for openai.APIStatusError — should_retry only inspects .status_code."""
+
+    def __init__(self, status_code: int):
+        super().__init__(f"status {status_code}")
+        self.status_code = status_code
+
+
+def test_is_infra_llm_failure_classifies_payment_and_rate_limit_status_codes():
+    from agent.app.connector_llm import is_infra_llm_failure
+
+    assert is_infra_llm_failure(_FakeStatusError(402)) is True   # OpenRouter payment-required
+    assert is_infra_llm_failure(_FakeStatusError(408)) is True   # request timeout
+    assert is_infra_llm_failure(_FakeStatusError(429)) is True   # rate limit
+    assert is_infra_llm_failure(_FakeStatusError(503)) is True   # provider unavailable
+
+
+def test_is_infra_llm_failure_false_for_content_and_client_errors():
+    from agent.app.connector_llm import is_infra_llm_failure
+    from agent.app.llm_backends import LLMContentError
+
+    # A 400 (bad request / malformed payload) is a genuine client-side defect, not infra.
+    assert is_infra_llm_failure(_FakeStatusError(400)) is False
+    assert is_infra_llm_failure(LLMContentError("truncated")) is False
+    assert is_infra_llm_failure(RuntimeError("some other bug")) is False
+
+
+def test_is_infra_llm_failure_classifies_timeouts_and_transport_errors():
+    import asyncio as _asyncio
+    from agent.app.connector_llm import is_infra_llm_failure
+
+    assert is_infra_llm_failure(_asyncio.TimeoutError()) is True
+
+    class FakeAPIConnectionError(Exception):
+        pass
+
+    assert is_infra_llm_failure(FakeAPIConnectionError("connection reset")) is True
+
+
+@pytest.mark.asyncio
+async def test_query_llm_retries_402_then_succeeds():
+    """A 402 (OpenRouter daily-cap style) must be retried, not treated as an immediate fatal —
+    the pre-fix behavior returned None on the very first 402, which a downstream grader scores
+    as a genuine 0 indistinguishable from a bad model answer."""
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.side_effect = [
+        _FakeStatusError(402),
+        ("recovered after retry", SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2)),
+    ]
+    out = await connector.query_llm({"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"})
+    assert out == "recovered after retry"
+    assert mock_backend.complete.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_query_llm_tags_infra_failed_in_telemetry_on_terminal_402():
+    """When every retry attempt still 402s, query_llm returns None (unchanged) but must tag the
+    failure as infra so the result-JSON layer can quarantine the cell instead of scoring a real 0."""
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.side_effect = _FakeStatusError(402)
+    telemetry = MagicMock()
+    telemetry.record_llm_usage = MagicMock()
+    connector.set_telemetry(telemetry)
+
+    out = await connector.query_llm({"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"})
+
+    assert out is None
+    # _record_timing ultimately calls telemetry.record_timing; assert the infra flag reached it.
+    assert telemetry.record_timing.called
+    _, kwargs = telemetry.record_timing.call_args
+    assert kwargs["payload"]["infra_failed"] is True
+    # record_llm_usage (the per-call usage/error trace) is also tagged.
+    usage_call_kwargs = telemetry.record_llm_usage.call_args.args[0]
+    assert usage_call_kwargs["infra_failed"] is True
+
+
+@pytest.mark.asyncio
+async def test_query_llm_does_not_tag_infra_failed_for_genuine_content_error():
+    """A non-infra terminal failure (e.g. a plain bug) must NOT be tagged infra_failed — only
+    real payment/rate-limit/timeout/transport signals should be quarantined."""
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.side_effect = RuntimeError("some other bug")
+    telemetry = MagicMock()
+    telemetry.record_llm_usage = MagicMock()
+    connector.set_telemetry(telemetry)
+
+    out = await connector.query_llm({"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"})
+
+    assert out is None
+    _, kwargs = telemetry.record_timing.call_args
+    assert kwargs["payload"]["infra_failed"] is False

@@ -10,6 +10,9 @@ Environment Variables:
 - IDEA_TEST_MODELS: Comma-separated execution models (default: MODEL_NAME or gpt-5-mini)
 - IDEA_TEST_EXECUTION_VARIANTS: Execution styles to run ("graph", "sequential", or comma-separated list)
 - IDEA_TEST_LOG_LEVEL: Logging level (default: INFO)
+- IDEA_TEST_BROWSER_FALLBACK: "1" (default) gives every execution variant a headless-Chrome
+  fallback for bot-blocked visits (401/403/429/503, or a transport-level failure); "0"/"false"/
+  "off"/"no" disables it uniformly across all arms (F18 — previously silently None everywhere).
 
 Legacy aliases still supported:
 - IDEA_TEST_PRIORITY -> IDEA_TEST_TOP_N
@@ -36,6 +39,7 @@ from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
+from agent.app.connector_browser import ConnectorBrowser
 from shared.connector_config import ConnectorConfig
 from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.testing.test_module import IdeaTestModule
@@ -54,20 +58,43 @@ from agent.app.idea_graph_analyzer import add_graph_visualization
 from agent.app.testing.report import TestReportGenerator, Verbosity
 
 
+def _browser_fallback_enabled() -> bool:
+    """Whether the harness should give execution variants a real browser-fallback connector.
+
+    Default ON, matching production (``interface_agent.py`` always wires a ``ConnectorBrowser``
+    for every arm). The F18 web-connector audit found the benchmark harness previously
+    constructed every ``AgentIO(...)`` with ``connector_browser=None``, so a 401/403 bot-block
+    was an unrecoverable hard failure everywhere — a confound that arbitrarily penalizes
+    whichever arm/task happens to hit a bot-blocked site (measured: it specifically handicapped
+    the ``sonnet sequential_react`` reference). Set ``IDEA_TEST_BROWSER_FALLBACK=0`` to disable
+    it uniformly (e.g. for a deliberate pure-HTTP-only run) instead of leaving it silently
+    inconsistent across variants.
+    :returns: True unless explicitly disabled via env.
+    """
+    raw = os.environ.get("IDEA_TEST_BROWSER_FALLBACK", "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
 def _make_connector_set(config: ConnectorConfig) -> Dict[str, Any]:
     """
-    Build one independent set of the four connectors used by a single concurrent
+    Build one independent set of the connectors used by a single concurrent
     test-run slot. Each set owns its own ConnectorLLM (whose ``set_model`` mutates
     mutable per-instance state), so isolating one set per slot lets us run test-runs
     for DIFFERENT models concurrently without racing on model attribution.
+
+    The browser connector is always constructed (cheap — Playwright/Chromium only
+    launches lazily on the first ``fetch_page()`` call, same as production), but whether
+    it is actually threaded into a run's ``AgentIO`` is gated by
+    :func:`_browser_fallback_enabled` at the call site.
     :param config: Shared connector configuration (read-only, safe to share).
-    :return: Dict with keys ``llm``, ``search``, ``http``, ``chroma``.
+    :return: Dict with keys ``llm``, ``search``, ``http``, ``chroma``, ``browser``.
     """
     return {
         "llm": ConnectorLLM(config),
         "search": ConnectorSearch(config),
         "http": ConnectorHttp(config),
         "chroma": ConnectorChroma(config),
+        "browser": ConnectorBrowser(config),
     }
 
 
@@ -944,9 +971,13 @@ async def run_single_test(
     repeat_index: int = 1,
     total_repeats: int = 1,
     effort_tier: int = 0,
+    connector_browser: Optional[ConnectorBrowser] = None,
 ) -> Dict[str, Any]:
     """
     Run a single test for a single model.
+    :param connector_browser: Optional headless-Chrome fallback connector, threaded into
+        every execution variant's ``AgentIO`` uniformly (F18 — None disables it uniformly
+        instead of leaving it silently inconsistent across variants).
     :return: Test result dict or None if failed.
     """
     test_id = extract_test_id(test_file)
@@ -966,6 +997,7 @@ async def run_single_test(
             connector_search=connector_search,
             connector_http=connector_http,
             connector_chroma=connector_chroma,
+            connector_browser=connector_browser,
             idea_settings=variant_specific_settings,
             run_stamp=run_id,
             summarize_observability_func=summarize_observability,
@@ -1334,6 +1366,12 @@ async def main() -> None:
     connector_http = primary["http"]
     connector_chroma = primary["chroma"]
 
+    browser_fallback_enabled = _browser_fallback_enabled()
+    logging.info(
+        f"Browser fallback (401/403/429/503 bot-block recovery): "
+        f"{'ENABLED for every arm' if browser_fallback_enabled else 'DISABLED (IDEA_TEST_BROWSER_FALLBACK=0)'}"
+    )
+
     async with AsyncExitStack() as stack:
         for cset in connector_pool:
             await stack.enter_async_context(cset["search"])
@@ -1341,6 +1379,9 @@ async def main() -> None:
             await stack.enter_async_context(cset["llm"])
             await cset["search"].init_search_api()
             await cset["chroma"].init_chroma()
+            # Registered unconditionally (safe no-op if the browser never launched) so toggling
+            # IDEA_TEST_BROWSER_FALLBACK never needs a teardown-logic change too.
+            stack.push_async_callback(cset["browser"].close)
 
         execution_models_requested = _unique_models(models)
         preflight_models = list(execution_models_requested)
@@ -1427,6 +1468,7 @@ async def main() -> None:
                         connector_search=cset["search"],
                         connector_http=cset["http"],
                         connector_chroma=cset["chroma"],
+                        connector_browser=cset["browser"] if browser_fallback_enabled else None,
                         idea_settings=idea_settings,
                         run_id=run_id,
                         results_dir=results_dir,

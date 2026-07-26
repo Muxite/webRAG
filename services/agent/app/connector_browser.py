@@ -7,7 +7,13 @@ from shared.connector_config import ConnectorConfig
 from shared.request_result import RequestResult
 from agent.app.connector_base import ConnectorBase
 
-BROWSER_FALLBACK_STATUSES = {401, 403}
+# 401/403 = classic bot-block (auth wall / WAF challenge). 429/503 added per the F18 web-connector
+# audit: some bot-defense layers (Cloudflare et al.) disguise a block as "rate limited"/"unavailable"
+# rather than a clean 403, and a headless-Chromium render is exactly the recovery path for those too.
+# A transport-level failure (RequestResult.status is None — DNS/connect/timeout after retries
+# exhausted) is handled separately in AgentIO (a different code path can legitimately succeed where
+# aiohttp's cannot), not via this set.
+BROWSER_FALLBACK_STATUSES = {401, 403, 429, 503}
 
 # Resource types we never use — aborting them massively cuts page-load time.
 # The downstream cleaner extracts text only, so images/media/fonts/CSS are dead weight.

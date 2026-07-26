@@ -34,7 +34,9 @@ _logger = logging.getLogger(__name__)
 _SYSTEM = (
     "You are a web-research agent solving a TASK with tools. Work ONE step at a time: "
     "think, then call exactly one tool. Tools:\n"
-    "- search(query): web search; returns titles+URLs+snippets.\n"
+    "- search(query): web search; returns titles+URLs+snippets. Keep the query SHORT — a few "
+    "focused keywords (max ~400 characters / 50 words). Do NOT put whole sentences, your reasoning, "
+    "or the full task text into the query; over-long queries are rejected by the search API.\n"
     "- visit(url): read a page's full text. Use EXACT URLs from search results.\n"
     "- verify(claim): cross-check a claim against the pages you have already read.\n"
     "- finish(answer): output the final answer. Cite the source URLs you used.\n"
@@ -167,8 +169,16 @@ async def run_sequential_execution(
     connector_chroma: ConnectorChroma,
     run_stamp: str,
     summarize_observability_func=summarize_observability,
+    connector_browser=None,
 ) -> Dict[str, Any]:
-    """Run the sequential ReAct agent; same return shape as ``run_baseline_execution``."""
+    """Run the sequential ReAct agent; same return shape as ``run_baseline_execution``.
+
+    :param connector_browser: Optional headless-Chrome fallback connector (F18). This is the
+        strong comparator arm the web-connector audit found most penalized by an unwired
+        browser fallback (its free-form queries/URLs hit bot-blocked sites more often), so
+        wiring it here uniformly with the other variants removes an infra-driven handicap
+        from the arm comparison rather than adding one.
+    """
     connector_llm.set_model(model_name)
     test_id = test_module.metadata.get("test_id", "unknown")
     correlation_id = f"idea_test_{test_id}_{model_name}_sequential_react_{run_stamp}"
@@ -187,6 +197,7 @@ async def run_sequential_execution(
     agent_io = AgentIO(
         connector_llm=connector_llm, connector_search=connector_search,
         connector_http=connector_http, connector_chroma=connector_chroma,
+        connector_browser=connector_browser,
         telemetry=telemetry, collection_name=f"idea_test_{test_id}_{run_stamp}",
     )
 

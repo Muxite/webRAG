@@ -54,6 +54,37 @@ def _inflight_semaphore() -> asyncio.Semaphore:
     return _INFLIGHT_STATE["sem"]
 
 
+# Status codes that represent a provider infra/capacity/quota problem rather than a genuine
+# model or content defect: 402 (payment-required — e.g. OpenRouter's daily-cap cliff), 408
+# (request timeout), 429 (rate limit), and 5xx (provider-side failure). 402/408 are added here
+# (F17 web-connector audit): they were previously NOT in the retryable set below, so a transient
+# provider cap/timeout permanently failed the call on the first attempt, and the resulting
+# `None` looked identical to a model that just produced nothing — silently scoring a real 0 for
+# what was actually infra flakiness.
+INFRA_RETRYABLE_STATUS_CODES = (402, 408, 429, 500, 502, 503, 504)
+
+
+def is_infra_llm_failure(exc: BaseException) -> bool:
+    """Classify a terminal ``query_llm`` failure as infra (quota/rate-limit/timeout/provider
+    5xx) rather than a genuine model/content defect, so callers can quarantine the cell from
+    scoring instead of silently counting a ``None`` return as a real 0 (F17).
+
+    :param exc: The exception ``query_llm`` is about to swallow into a ``None`` return.
+    :returns: True if this looks like an infra/provider failure rather than a model defect.
+    """
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int) and status in INFRA_RETRYABLE_STATUS_CODES:
+        return True
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
+        return True
+    # Transport-level exceptions differ per backend (openai.APIConnectionError,
+    # httpx.ConnectError/ConnectTimeout, anthropic.APIConnectionError, ...); name-matching is
+    # cheaper and more robust here than importing every SDK's exception hierarchy just to
+    # isinstance-check it.
+    name = type(exc).__name__
+    return "Connect" in name or "Timeout" in name
+
+
 class ConnectorLLM(ConnectorBase):
     """
     LLM connector: delegates wire protocol to a provider backend (OpenAI-compatible or Anthropic).
@@ -257,7 +288,7 @@ class ConnectorLLM(ConnectorBase):
                 return False
             status = getattr(exc, "status_code", None)
             if isinstance(status, int):
-                return status in (429, 500, 502, 503, 504)
+                return status in INFRA_RETRYABLE_STATUS_CODES
             if isinstance(exc, APIStatusError):
                 return False
             if isinstance(exc, retry_types):
@@ -307,24 +338,31 @@ class ConnectorLLM(ConnectorBase):
         except Exception as e:
             if isinstance(e, retry_types):
                 self._reset_client()
+            # F17: tag whether this terminal failure looks like infra (quota/rate-limit/
+            # timeout/provider 5xx) vs a genuine model/content defect. Surfaced through
+            # telemetry.timings -> testing.utils.summarize_observability -> the result JSON's
+            # top-level `infra_failed`, so a 402-poisoned cell can be quarantined from scoring
+            # instead of silently counting this `None` as a real 0.
+            infra_failed = is_infra_llm_failure(e)
             if self._telemetry:
                 self._telemetry.record_llm_usage({
                     "model": model_name,
                     "error": str(e),
+                    "infra_failed": infra_failed,
                     "duration": max(0.0, asyncio.get_event_loop().time() - started_at),
                 })
             self._record_timing(
                 name="llm_call",
                 started_at=perf_started,
                 success=False,
-                payload={"model": model_name},
+                payload={"model": model_name, "infra_failed": infra_failed},
                 error=str(e),
             )
             self.logger.error(f"LLM query failed (model={model_name}): {e}")
             self._record_io(
                 direction="out",
                 operation="llm_query",
-                payload={"model": model_name},
+                payload={"model": model_name, "infra_failed": infra_failed},
                 error=str(e),
             )
             return None

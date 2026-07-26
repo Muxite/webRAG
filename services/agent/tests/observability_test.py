@@ -2,7 +2,7 @@ import pytest
 
 from agent.app.connector_base import ConnectorBase
 from agent.app.connector_search import ConnectorSearch
-from agent.app.testing.utils import summarize_observability
+from agent.app.testing.utils import _is_infra_timing, summarize_observability
 from shared.connector_config import ConnectorConfig
 from shared.request_result import RequestResult
 
@@ -102,6 +102,75 @@ class SearchConnectorStub(ConnectorSearch):
         """
         data = {"web": {"results": [{"title": "A", "url": "https://a.example", "description": "a"}]}}
         return RequestResult(status=200, data=data, error=False)
+
+
+# --- F17: infra-failure quarantine classification (testing.utils._is_infra_timing / "infra" block) ---
+
+def _timing(name, success, status=None, infra_failed=None, error=None):
+    payload = {}
+    if status is not None or name in ("http_request", "search_query", "visit"):
+        payload["status"] = status
+    if infra_failed is not None:
+        payload["infra_failed"] = infra_failed
+    entry = {"name": name, "duration": 0.1, "success": success, "payload": payload}
+    if error:
+        entry["error"] = error
+    return entry
+
+
+def test_is_infra_timing_false_for_success():
+    assert _is_infra_timing(_timing("http_request", success=True, status=200)) is False
+
+
+def test_is_infra_timing_true_for_402_429_5xx():
+    assert _is_infra_timing(_timing("http_request", success=False, status=402)) is True
+    assert _is_infra_timing(_timing("search_query", success=False, status=422)) is True
+    assert _is_infra_timing(_timing("search_query", success=False, status=429)) is True
+    assert _is_infra_timing(_timing("http_request", success=False, status=503)) is True
+
+
+def test_is_infra_timing_false_for_bot_block_status():
+    """401/403/404 are the F18 bot-block problem, not infra — must stay a genuine failure so
+    quarantine logic never masks a real 403-everywhere task."""
+    assert _is_infra_timing(_timing("visit", success=False, status=403)) is False
+    assert _is_infra_timing(_timing("http_request", success=False, status=404)) is False
+
+
+def test_is_infra_timing_true_for_transport_failure_with_no_status():
+    """status=None on an op that normally reports one means every attempt exhausted with no
+    server response at all (DNS/connect/timeout) — a transport/infra symptom."""
+    assert _is_infra_timing(_timing("visit", success=False, status=None)) is True
+    assert _is_infra_timing(_timing("http_request", success=False, status=None)) is True
+
+
+def test_is_infra_timing_honors_explicit_infra_flag_from_connector_llm():
+    """llm_call timings carry no status code; connector_llm sets payload.infra_failed directly."""
+    assert _is_infra_timing(_timing("llm_call", success=False, infra_failed=True)) is True
+    assert _is_infra_timing(_timing("llm_call", success=False, infra_failed=False)) is False
+
+
+class _TelemetryWithTimings(_EmptyTelemetry):
+    def __init__(self, timings):
+        self.timings = timings
+
+
+def test_summarize_observability_reports_no_infra_failure_when_clean():
+    telemetry = _TelemetryWithTimings([_timing("http_request", success=True, status=200)])
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["infra"] == {"failed": False, "failure_count": 0, "ops": []}
+
+
+def test_summarize_observability_flags_infra_failure_and_counts_ops():
+    telemetry = _TelemetryWithTimings([
+        _timing("http_request", success=True, status=200),
+        _timing("search_query", success=False, status=422, error="Search API query failed: status=422"),
+        _timing("llm_call", success=False, infra_failed=True, error="status 402"),
+        _timing("visit", success=False, status=403, error="HTTP visit failed"),  # NOT infra
+    ])
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["infra"]["failed"] is True
+    assert obs["infra"]["failure_count"] == 2
+    assert obs["infra"]["ops"] == ["llm_call", "search_query"]
 
 
 @pytest.mark.asyncio

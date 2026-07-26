@@ -7,7 +7,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 import logging
 
@@ -15,6 +15,7 @@ from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
+from agent.app.connector_browser import ConnectorBrowser
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.execution import run_test_execution, run_baseline_execution
 from agent.app.testing.execution_sequential import run_sequential_execution
@@ -57,6 +58,7 @@ async def run_complete_test(
     summarize_observability_func,
     validation_model: str = VALIDATION_MODEL,
     execution_variant: str = "graph",
+    connector_browser: Optional[ConnectorBrowser] = None,
 ) -> Dict[str, Any]:
     """
     Run complete test: execution + validation.
@@ -72,6 +74,9 @@ async def run_complete_test(
     :param validation_model: Model name for validation.
     :param execution_variant: graph / sequential_react / graph_compiled (agents) or
         parametric / naive_rag / minimal (baseline).
+    :param connector_browser: Optional headless-Chrome fallback connector. Passed to EVERY
+        execution variant uniformly (F18) so no arm is structurally handicapped relative to
+        another just because it happened to hit a bot-blocked site.
     :return: Complete test result.
     """
     if execution_variant in LINEAR_AGENT_VARIANTS:
@@ -82,6 +87,7 @@ async def run_complete_test(
             connector_search=connector_search,
             connector_http=connector_http,
             connector_chroma=connector_chroma,
+            connector_browser=connector_browser,
             run_stamp=run_stamp,
             summarize_observability_func=summarize_observability_func,
         )
@@ -93,6 +99,7 @@ async def run_complete_test(
             connector_search=connector_search,
             connector_http=connector_http,
             connector_chroma=connector_chroma,
+            connector_browser=connector_browser,
             run_stamp=run_stamp,
             summarize_observability_func=summarize_observability_func,
         )
@@ -105,6 +112,7 @@ async def run_complete_test(
             connector_search=connector_search,
             connector_http=connector_http,
             connector_chroma=connector_chroma,
+            connector_browser=connector_browser,
             run_stamp=run_stamp,
             summarize_observability_func=summarize_observability_func,
         )
@@ -116,31 +124,40 @@ async def run_complete_test(
             connector_search=connector_search,
             connector_http=connector_http,
             connector_chroma=connector_chroma,
+            connector_browser=connector_browser,
             idea_settings=idea_settings,
             run_stamp=run_stamp,
             summarize_observability_func=summarize_observability_func,
         )
-    
+
     validation_runner = test_module.validation_runner
     validation_runner.validation_model = validation_model
-    
+
     result = {
         "output": execution_result.get("output", {}),
         "graph": execution_result.get("graph", {}),
     }
     observability = execution_result.get("observability", {})
-    
+
     validation_result = await validation_runner.run(
         result=result,
         observability=observability,
         connector_llm=connector_llm,
     )
-    
+
+    # F17: surface an infra-failure quarantine flag at the top of the result so downstream
+    # scoring/analysis can exclude a cell poisoned by a 402/422/429/5xx/transport failure
+    # instead of silently counting it as a genuine 0 (see testing/utils.summarize_observability
+    # for the classification). The score itself is left untouched — this only tags it.
+    infra_block = observability.get("infra") if isinstance(observability, dict) else None
+    infra_failed = bool(infra_block.get("failed")) if isinstance(infra_block, dict) else False
+
     return {
         "test_metadata": test_module.metadata,
         "model": model_name,
         "validation_model": validation_model,
         "execution": execution_result,
         "validation": validation_result,
+        "infra_failed": infra_failed,
         "timestamp": datetime.utcnow().isoformat(),
     }

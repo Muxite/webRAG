@@ -22,8 +22,9 @@ class AgentIO:
     All methods are async. Telemetry is recorded automatically when a session
     is attached. Timeouts are configurable per call.
 
-    ``visit`` and ``fetch_url`` try aiohttp (HTTPS/HTTP) first; on 401/403 or when
-    the HTTP request raises they fall back to the headless Chrome connector (if provided).
+    ``visit`` and ``fetch_url`` try aiohttp (HTTPS/HTTP) first; on 401/403/429/503
+    (``BROWSER_FALLBACK_STATUSES``) or any transport-level failure (status is None /
+    the HTTP request raised) they fall back to the headless Chrome connector (if provided).
 
     :param connector_llm: LLM connector.
     :param connector_search: Search API connector.
@@ -220,8 +221,10 @@ class AgentIO:
         """
         Fetch a URL, clean the HTML, return extracted text.
 
-        Tries aiohttp (HTTPS/HTTP) first. Falls back to headless Chrome only on
-        401/403 (bot blocking) or when the HTTP request raises.
+        Tries aiohttp (HTTPS/HTTP) first. Falls back to headless Chrome on
+        401/403/429/503 (``BROWSER_FALLBACK_STATUSES`` — bot blocking / WAF challenge)
+        or on any transport-level failure (status is None: timeout, DNS/connect error,
+        or the HTTP request raised) — cases a differently-routed headless render can recover.
 
         :param url: Target URL.
         :param timeout_seconds: Optional per-call timeout.
@@ -244,7 +247,9 @@ class AgentIO:
         if http_result and not http_result.error:
             result = http_result
         if (result is None or result.error) and self.connector_browser and (
-            http_result is None or (http_result.error and http_result.status in BROWSER_FALLBACK_STATUSES)
+            http_result is None
+            or http_result.status is None
+            or (http_result.error and http_result.status in BROWSER_FALLBACK_STATUSES)
         ):
             _logger.info(f"Falling back to headless Chrome for {url}")
             browser_result = await self._with_timeout(
@@ -315,8 +320,10 @@ class AgentIO:
         """
         Fetch raw content from a URL (no HTML cleaning).
 
-        Tries aiohttp (HTTPS/HTTP) first. Falls back to headless Chrome only on
-        401/403 (bot blocking) or when the HTTP request raises.
+        Tries aiohttp (HTTPS/HTTP) first. Falls back to headless Chrome on
+        401/403/429/503 (``BROWSER_FALLBACK_STATUSES`` — bot blocking / WAF challenge)
+        or on any transport-level failure (status is None: timeout, DNS/connect error,
+        or the HTTP request raised) — cases a differently-routed headless render can recover.
 
         :param url: Target URL.
         :param retries: Number of aiohttp retries.
@@ -338,7 +345,9 @@ class AgentIO:
         if http_result and not http_result.error:
             result = http_result
         if (result is None or result.error) and self.connector_browser and (
-            http_result is None or (http_result.error and http_result.status in BROWSER_FALLBACK_STATUSES)
+            http_result is None
+            or http_result.status is None
+            or (http_result.error and http_result.status in BROWSER_FALLBACK_STATUSES)
         ):
             _logger.info(f"Falling back to headless Chrome for {url}")
             browser_result = await self._with_timeout(

@@ -31,7 +31,9 @@ def test_imports_all_critical_modules():
     assert IdeaDagEngine is not None
     assert AgentIO is not None
     assert ConnectorBrowser is not None
-    assert BROWSER_FALLBACK_STATUSES == {401, 403}
+    # F18: widened beyond bot-block-only 401/403 to include 429/503 (bot-defense layers that
+    # disguise a block as rate-limited/unavailable) — see connector_browser.py for rationale.
+    assert BROWSER_FALLBACK_STATUSES == {401, 403, 429, 503}
     assert ConnectorHttp is not None
 
 

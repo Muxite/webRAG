@@ -11,6 +11,14 @@ def _real_enabled() -> bool:
     return os.environ.get("CONNECTOR_SMOKE_TESTS", "").lower() in ("1", "true", "yes", "on")
 
 
+def test_browser_fallback_statuses_widened_beyond_bot_block_only():
+    """F18: 401/403 (bot-block) widened to also include 429/503 (bot-defense layers that
+    disguise a block as rate-limited/unavailable) — see connector_browser.py for rationale."""
+    from agent.app.connector_browser import BROWSER_FALLBACK_STATUSES
+
+    assert BROWSER_FALLBACK_STATUSES == {401, 403, 429, 503}
+
+
 class TestConnectorBrowserUnit:
     """Unit tests for ConnectorBrowser using mocks (no real Chrome needed)."""
 
@@ -200,6 +208,71 @@ class TestAgentIOBrowserFallback:
         io, mock_http, _ = self._make_io(http_500)
         with pytest.raises(RuntimeError, match="500"):
             await io.visit("https://broken-server.com")
+
+    # --- F18: widened trigger — 429/503 (bot-defense disguised as rate-limit/unavailable) and a
+    # bare transport failure (status=None, e.g. retries-exhausted DNS/connect error) now also
+    # fall back to the headless browser, not just 401/403. ---
+
+    @pytest.mark.asyncio
+    async def test_visit_429_falls_back_to_browser(self):
+        http_429 = RequestResult(status=429, data="Too Many Requests", error=True)
+        browser_ok = RequestResult(status=200, data="<html><body>Got it</body></html>", error=False)
+        io, mock_http, mock_browser = self._make_io(http_429, browser_ok)
+        text = await io.visit("https://rate-limited.example.com")
+        mock_http.request.assert_awaited_once()
+        mock_browser.fetch_page.assert_awaited_once()
+        assert text
+
+    @pytest.mark.asyncio
+    async def test_visit_503_falls_back_to_browser(self):
+        http_503 = RequestResult(status=503, data="Service Unavailable", error=True)
+        browser_ok = RequestResult(status=200, data="<html><body>Got it</body></html>", error=False)
+        io, mock_http, mock_browser = self._make_io(http_503, browser_ok)
+        text = await io.visit("https://unavailable.example.com")
+        mock_http.request.assert_awaited_once()
+        mock_browser.fetch_page.assert_awaited_once()
+        assert text
+
+    @pytest.mark.asyncio
+    async def test_visit_transport_failure_status_none_falls_back_to_browser(self):
+        """A retries-exhausted transport failure (no HTTP response at all) is exactly the case a
+        differently-routed headless render can recover — previously only 401/403 fell back."""
+        http_none = RequestResult(status=None, data="Request failed after 2 attempts: connection reset", error=True)
+        browser_ok = RequestResult(status=200, data="<html><body>Got it</body></html>", error=False)
+        io, mock_http, mock_browser = self._make_io(http_none, browser_ok)
+        text = await io.visit("https://flaky-dns.example.com")
+        mock_http.request.assert_awaited_once()
+        mock_browser.fetch_page.assert_awaited_once()
+        assert text
+
+    @pytest.mark.asyncio
+    async def test_fetch_url_429_falls_back_to_browser(self):
+        from agent.app.agent_io import AgentIO
+
+        http_429 = RequestResult(status=429, data="Too Many Requests", error=True)
+        browser_ok = RequestResult(status=200, data="raw html", error=False)
+        mock_llm = MagicMock()
+        mock_llm.set_telemetry = MagicMock()
+        mock_search = MagicMock()
+        mock_search.set_telemetry = MagicMock()
+        mock_chroma = MagicMock()
+        mock_chroma.set_telemetry = MagicMock()
+        mock_http = MagicMock()
+        mock_http.set_telemetry = MagicMock()
+        mock_http.request = AsyncMock(return_value=http_429)
+        mock_browser = MagicMock()
+        mock_browser.set_telemetry = MagicMock()
+        mock_browser.fetch_page = AsyncMock(return_value=browser_ok)
+
+        io = AgentIO(
+            connector_llm=mock_llm, connector_search=mock_search,
+            connector_http=mock_http, connector_chroma=mock_chroma,
+            connector_browser=mock_browser,
+        )
+        text = await io.fetch_url("https://rate-limited.example.com")
+        mock_http.request.assert_awaited_once()
+        mock_browser.fetch_page.assert_awaited_once()
+        assert text == "raw html"
 
 
 @pytest.mark.asyncio

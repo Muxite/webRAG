@@ -3,6 +3,41 @@ from agent.app.connector_http import ConnectorHttp
 from shared.connector_config import ConnectorConfig
 from typing import Optional, Dict, List
 
+# Brave Web Search hard limits: the `q` param is capped at 400 chars / 50 words and count at 20.
+# Exceeding them returns HTTP 422 (Unprocessable Entity), which is a NON-retried permanent error
+# (connector_http.PERMANENT_ERROR_CODES) — so an over-long query hard-fails the search. Agents that
+# stuff a whole reasoning string into the query (the react reference did this 40/40 while the graph
+# arm, which emits concise queries, hit 0/40) then get scored on empty evidence — an unfair handicap.
+# Sanitizing every outgoing query makes the search robust to query SHAPE, symmetrically across arms.
+BRAVE_MAX_QUERY_CHARS = 400
+BRAVE_MAX_QUERY_WORDS = 50
+BRAVE_MAX_COUNT = 20
+
+
+def _sanitize_brave_query(query: str) -> str:
+    """Clip a query to Brave's limits so it can never 422 on shape.
+
+    Collapses all whitespace (newlines/tabs → single spaces), drops control characters, and
+    truncates to Brave's word/char caps on a word boundary. A well-formed short query is
+    returned unchanged.
+
+    :param query: Raw query string.
+    :returns: A Brave-safe query.
+    """
+    if not query:
+        return ""
+    # Collapse whitespace and drop control chars (str.split() also strips leading/trailing).
+    q = " ".join(str(query).split())
+    q = "".join(ch for ch in q if ch >= " ")
+    words = q.split(" ")
+    if len(words) > BRAVE_MAX_QUERY_WORDS:
+        q = " ".join(words[:BRAVE_MAX_QUERY_WORDS])
+    if len(q) > BRAVE_MAX_QUERY_CHARS:
+        clipped = q[:BRAVE_MAX_QUERY_CHARS]
+        # prefer a word boundary, but don't collapse to empty on a single very long token
+        q = clipped.rsplit(" ", 1)[0] if " " in clipped else clipped
+    return q.strip()
+
 
 class ConnectorSearch(ConnectorHttp):
     """Manage an searching api session for a connector."""
@@ -62,15 +97,23 @@ class ConnectorSearch(ConnectorHttp):
             "Accept-Encoding": "gzip",
             "X-Subscription-Token": self.search_api_key
         }
+        # Guard against Brave's 422 (non-retryable) on over-long queries / count>20.
+        safe_query = _sanitize_brave_query(query)
+        safe_count = max(1, min(int(count), BRAVE_MAX_COUNT))
+        if query and safe_query != query:
+            self.logger.debug(
+                "Sanitized search query for Brave limits (%d->%d chars)",
+                len(query), len(safe_query),
+            )
         params = {
-            "q": query,
-            "count": count
+            "q": safe_query,
+            "count": safe_count
         }
 
         self._record_io(
             direction="in",
             operation="search_query",
-            payload={"query": query, "count": count, "url": url},
+            payload={"query": safe_query, "count": safe_count, "url": url},
         )
         search_started = time.perf_counter()
         result = await self.request("GET", url, retries=3, headers=headers, params=params)
