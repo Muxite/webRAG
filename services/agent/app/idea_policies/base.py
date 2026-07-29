@@ -85,6 +85,13 @@ class IdeaActionType(str, Enum):
     SAVE = "save"
     MERGE = "merge"
     VERIFY = "verify"
+    # On-demand plan-library retrieval (opt-in, gated by ``plan_library_enabled`` +
+    # ``plan_library_action_enabled``): ask the pre-authored template corpus for a
+    # composition strategy for this node. Read-only — the action ranks, fills and reports;
+    # ``IdeaDagEngine._maybe_plan_library_reexpand`` is what turns an adopted template into
+    # real children. Reachable only when the engine patches it into ``allowed_actions``, so
+    # the default action menu is unchanged.
+    PLAN_LIBRARY_SEARCH = "plan_library_search"
 
 
 class DetailKey(str, Enum):

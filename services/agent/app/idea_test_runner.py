@@ -628,6 +628,35 @@ def _apply_got_experiment_overrides(
     _expectcontract_override = env.get("IDEA_TEST_EXPECT_CONTRACT", "").strip()
     if _expectcontract_override:
         idea_settings["expansion_expect_contract_enabled"] = _is_enabled(_expectcontract_override)
+    # IDEA_TEST_GOT_DEDUP: the memory-based duplicate-candidate filter (got_dedup_enabled,
+    # default True — NOT one of the opt-in A1-A5 adaptive levers, it is baseline engine
+    # behavior). Exists so a benchmark can isolate cross-rep memory-persistence effects: the
+    # per-mandate memory namespace (services/agent/app/idea_engine.py's
+    # ``idea_dag:{sha256(mandate)[:10]}``) is keyed on mandate TEXT only, not run_id or rep
+    # number, so it is NOT cleared between R>1 reps of the same task. A candidate set that is
+    # reproducible rep-to-rep (e.g. a plan-library template's deterministic fill) can score
+    # >=dedup_threshold_min against its OWN prior rep's stored memory and collapse to
+    # ``filter_duplicate_candidates``'s all-filtered fallback (a single surviving candidate) —
+    # found during the 2026-07-28/29 plan-library dogfooding run. Toggle here to control for it.
+    _gotdedup_override = env.get("IDEA_TEST_GOT_DEDUP", "").strip()
+    if _gotdedup_override:
+        idea_settings["got_dedup_enabled"] = _is_enabled(_gotdedup_override)
+    # IDEA_TEST_PLAN_LIBRARY / _AUTO / _ACTION: retrieval-augmented planning — the master
+    # switch (plan_library_enabled), the automatic pre-expansion short-circuit
+    # (plan_library_auto_enabled) and the on-demand `plan_library_search` leaf action
+    # (plan_library_action_enabled). The master switch plus at least one sub-switch must be on
+    # for a template to reach the graph; no threshold override exists on purpose (retrieval.py
+    # owns the calibrated decision constants, and a second engine-level gate would silently
+    # disagree with them).
+    _planlib_override = env.get("IDEA_TEST_PLAN_LIBRARY", "").strip()
+    if _planlib_override:
+        idea_settings["plan_library_enabled"] = _is_enabled(_planlib_override)
+    _planlib_auto_override = env.get("IDEA_TEST_PLAN_LIBRARY_AUTO", "").strip()
+    if _planlib_auto_override:
+        idea_settings["plan_library_auto_enabled"] = _is_enabled(_planlib_auto_override)
+    _planlib_action_override = env.get("IDEA_TEST_PLAN_LIBRARY_ACTION", "").strip()
+    if _planlib_action_override:
+        idea_settings["plan_library_action_enabled"] = _is_enabled(_planlib_action_override)
     # IDEA_TEST_NATIVE_REASONING_DISCIPLINE: native reasoning-effort discipline
     # (native_reasoning_effort_discipline_enabled).
     _reasondisc_override = env.get("IDEA_TEST_NATIVE_REASONING_DISCIPLINE", "").strip()

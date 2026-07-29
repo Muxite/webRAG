@@ -1,0 +1,61 @@
+{
+  "template_id": "entity_chain_resolution",
+  "schema_version": 1,
+  "archetype": "chain",
+  "title": "N-hop entity chain: each hop's target is revealed only by the previous hop's page",
+  "description": "A dependency chain of 2-5 sequential hops. The first hop starts from the entity the mandate names; every later hop can only be executed once the previous hop has resolved its entity, so each hop leaf depends on the one before it and the engine runs them strictly in order. Later hops reference the previous step in PROSE rather than as a runtime {placeholder}: in the native engine the upstream result is threaded in through the dependency mechanism, so an unresolved brace would only be noise. Generalizes test_051 (novel -> author -> university -> founding year) and test_065 (collection -> poet -> birth town -> elevation).",
+  "embedding_text": "Follow a research chain / dependency chain in which each step's answer is required to find the next page. You are given NO URLs - search to find the pages you need, then READ them (do not guess from memory). Each step can only be answered by reading the previous entity's page: identify the AUTHOR of this novel; then read that author's page and identify the UNIVERSITY they attended; then read that university's page and identify the YEAR it was founded. Identify the POET who wrote this collection, open that poet's page and read their BIRTHPLACE, then open that town's page and read its ELEVATION in metres from the infobox. Watch for same-named places - use the country from the previous step to open the correct page. Report the final value and the full chain from the starting work through every intermediate entity, citing the exact URL of every page you visited.",
+  "provenance": {
+    "source": "hand_authored",
+    "based_on_tasks": ["051", "065"],
+    "mined_from_trace_ids": []
+  },
+  "min_candidates": 2,
+  "max_candidates": 5,
+  "slots": [
+    {
+      "name": "seed",
+      "kind": "entity",
+      "description": "The starting entity the mandate names in full (e.g. \"the 1924 collection 'Twenty Love Poems and a Song of Despair'\"). This is the ONLY entity known before the chain runs.",
+      "extraction": "llm"
+    },
+    {
+      "name": "seed_field",
+      "kind": "field",
+      "description": "What the FIRST hop must identify from the seed's page (e.g. 'the poet who wrote it -- their full name').",
+      "extraction": "llm"
+    },
+    {
+      "name": "hops",
+      "kind": "hop_list",
+      "description": "The remaining hops in order, one element per hop: {label, field}, where 'label' names the entity that hop opens (e.g. 'the poet's birth town, with its country') and 'field' is what to read on that entity's page (e.g. 'its ELEVATION above sea level in metres, from the infobox'). Both keys are required on every element.",
+      "extraction": "llm",
+      "min_arity": 1,
+      "max_arity": 4
+    },
+    {
+      "name": "source_type",
+      "kind": "source_type",
+      "description": "Which page to open at each hop.",
+      "required": false,
+      "extraction": "default",
+      "default": "the authoritative Wikipedia page"
+    }
+  ],
+  "leaves": [
+    {
+      "id_pattern": "chain_start",
+      "instruction": "Start of a dependency chain. Search for and open <<source_type>> for <<seed>>, and identify from that page <<seed_field>>. Report ONLY that single answer, stated in FULL and unambiguously -- include any disambiguating detail the next step will need (country, dates, field of work) -- together with the exact source URL. Do not guess from memory, and do NOT attempt any later step of the chain.",
+      "expect": "<<seed_field>>, identified from the page of <<seed>> and stated in full with any disambiguating detail -- source URL",
+      "depends_on": []
+    },
+    {
+      "id_pattern": "<<item.key>>_hop",
+      "for_each": "hops",
+      "instruction": "Continue the dependency chain. The PREVIOUS step of this chain identified <<item.name>>; take that exact entity from the previous step's result (do NOT re-derive it and do NOT guess it from memory), search for and open <<source_type>> for it, and read <<item.field>> directly from that page. Other pages may share that entity's name, so use the disambiguating detail carried over from the previous step (country, dates, field of work) to open the CORRECT page. Report ONLY that value, ALWAYS naming which entity's page you opened alongside it, plus the exact source URL.",
+      "expect": "<<item.field>>, read from the page of <<item.name>> -- with that entity named and its source URL",
+      "depends_on": ["chain_start", "<<item.key>>_hop"]
+    }
+  ],
+  "aggregation": "You now have every link of the chain that starts at <<seed>>. FIRST write the chain out explicitly, one link per line, in the form '<step>: <entity> -> <value read from its page>', starting with <<seed_field>> and ending with the final hop -- use ONLY values that were actually read from a page, and if a link is missing say WHICH link is missing rather than inventing it or skipping ahead. THEN report (a) the FINAL hop's value as the keystone answer, and (b) the full chain from <<seed>> through every intermediate entity to that final value, citing the exact source URL of every page. Do not answer from memory: a chain answer that was not derived link by link from the pages is not acceptable."
+}

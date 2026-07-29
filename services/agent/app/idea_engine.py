@@ -5,7 +5,7 @@ import asyncio
 import hashlib
 import logging
 
-from agent.app.idea_dag import IdeaDag
+from agent.app.idea_dag import IdeaDag, IdeaNode
 from agent.app.idea_policies.base import IdeaNodeStatus
 from agent.app.agent_io import AgentIO
 from agent.app.idea_dag_settings import load_idea_dag_settings
@@ -36,6 +36,10 @@ from agent.app.idea_policies.post_expansion_hooks import (
 from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
 from agent.app.idea_policies.grounding import evaluate_grounding
 from agent.app.idea_policies.candidate_coverage import evaluate_candidate_coverage
+from agent.app.idea_policies import plan_library as _plan_library
+from agent.app.idea_policies import plan_library_search as _plan_search
+from agent.app.plan_library import retrieval as _plan_retrieval
+from agent.app.testing import contract_log as _contract_log
 from agent.app import idea_chunking
 from agent.app import idea_visit_dedup
 from agent.app import idea_sequencing
@@ -63,6 +67,14 @@ class IdeaDagEngine:
         # which already merge). The typed config view is the canonical reader.
         self.settings = {**load_idea_dag_settings(), **(settings or {})}
         self._cfg = IdeaConfig.from_settings(self.settings)
+        # On-demand plan library (opt-in, default OFF -> byte-identical): the ONE place the
+        # action becomes reachable. Both readers of `allowed_actions` — this class's
+        # `_execute_action` dispatch gate and `LlmExpansionPolicy`'s prompt action menu — read
+        # a settings dict derived from THIS one, so patching here covers both. It must happen
+        # BEFORE the policies are constructed below: `LlmExpansionPolicy.__init__` merges its
+        # settings into a NEW dict, so it takes a snapshot rather than a live reference.
+        # A fresh list (never an in-place append): the value may be the caller's own list.
+        self._patch_allowed_actions()
         self.io = io
         self.model_name = model_name
         self.expansion = expansion or LlmExpansionPolicy(io=io, settings=self.settings, model_name=model_name)
@@ -80,7 +92,25 @@ class IdeaDagEngine:
         self._leaf_completion_count = 0
         self._memory_manager: Optional[MemoryManager] = None
         self._got: Optional[GoTOperations] = None
+        # Built lazily on the first plan-library retrieval (see `_plan_library_corpus`), so a
+        # flag-off run never reads the template corpus off disk.
+        self._plan_library_corpus_cache: Optional[Any] = None
         self._checkpointer: Optional[Checkpointer] = create_checkpointer_from_env()
+
+    def _patch_allowed_actions(self) -> None:
+        """Add ``plan_library_search`` to the action menu — only when both flags are armed.
+
+        No-op otherwise, so ``allowed_actions`` (and therefore both the dispatch gate and the
+        expansion prompt's menu) is byte-identical on every unarmed run, including one whose
+        settings never mention the plan library at all.
+        """
+        cfg = self._cfg.plan_library
+        if not (cfg.enabled and cfg.action_enabled):
+            return
+        name = IdeaActionType.PLAN_LIBRARY_SEARCH.value
+        allowed = list(self.settings.get("allowed_actions") or [a.value for a in IdeaActionType])
+        if name not in [str(item) for item in allowed]:
+            self.settings["allowed_actions"] = allowed + [name]
 
     async def prepare(self, mandate: str, run_id: Optional[str] = None) -> tuple:
         """Canonical engine/graph setup shared by `run()` and the interactive debugger.
@@ -793,71 +823,181 @@ class IdeaDagEngine:
             return True
         return contract.is_ready(source_result, source_node)
     
+    def _plan_library_corpus(self):
+        """The plan-library corpus for this engine instance, loaded once, lazily.
+
+        ``PlanLibrary.__init__`` parses and validates every ``templates/*.json`` off disk and
+        runs the manifest drift check, so it is neither free nor cheap to repeat: building one
+        per expansion step would re-read the whole corpus at every node of every run. One per
+        engine instance is the right grain — a worker handles one mandate at a time (RabbitMQ
+        prefetch=1) and the corpus cannot change mid-run — and building it lazily keeps a
+        flag-off run from touching the disk at all.
+        """
+        if self._plan_library_corpus_cache is None:
+            self._plan_library_corpus_cache = _plan_retrieval.PlanLibrary()
+        return self._plan_library_corpus_cache
+
+    async def _plan_library_resolve(
+        self,
+        graph: IdeaDag,
+        node: IdeaNode,
+        step_index: int,
+        *,
+        call_site: str,
+        origin: str,
+    ) -> "_plan_search.SearchResolution":
+        """One plan-library retrieval attempt for ``node`` — the engine's side of it.
+
+        The pipeline itself (query -> rank -> fill -> both logs) lives in
+        ``idea_policies.plan_library_search`` because the on-demand leaf action runs exactly
+        the same one and a ``LeafAction`` has no engine handle to borrow it from; keeping one
+        implementation is what stops the two call sites drifting into different logged fields
+        or different fail-toward-silence rules. What belongs HERE is the wiring of the engine's
+        collaborators — the per-instance corpus, this run's IO and contracts, the model/timeout
+        knobs — plus the outer net: any exception at all (a broken corpus, a connector blowing
+        up) becomes an empty resolution, never a degraded run.
+
+        ``RetrievalResult.decision`` IS the confidence gate. The thresholds behind it
+        (``retrieval.AUTO_APPLY_THRESHOLD``/``SUGGEST_THRESHOLD``/``MIN_MARGIN``) are
+        calibrated against a labelled eval set, so the engine flags govern whether the
+        mechanism runs at all, not a second opinion on how confident is confident enough.
+        """
+        try:
+            return await _plan_search.resolve(
+                self._plan_library_corpus(),
+                graph,
+                node,
+                io=self.io,
+                call_site=call_site,
+                origin=origin,
+                contracts=self.contracts,
+                model_name=self.model_name or self._cfg.expansion.model or None,
+                fallback_model=self._cfg.generation.fallback_model,
+                timeout_seconds=self._cfg.timeouts.expansion or self._cfg.timeouts.llm,
+            )
+        except Exception as exc:  # noqa: BLE001 — the library never breaks a run
+            self._logger.warning(f"[STEP {step_index}] PLAN LIBRARY: retrieval failed: {exc}")
+            return _plan_search.EMPTY
+
+    async def _plan_library_auto_shortcircuit(
+        self, graph: IdeaDag, node: IdeaNode, step_index: int
+    ) -> Tuple[Optional[List[Dict[str, Any]]], Optional[Dict[str, Any]]]:
+        """Try to answer this expansion from the plan library instead of the LLM.
+
+        Returns ``(candidates, parent_details)`` when a pre-authored template matched
+        confidently and filled — the caller then skips both the memory enrichment and the
+        expansion policy entirely — and ``(None, None)`` for every other outcome: no match, a
+        suggest-only score, a slot-fill failure, or any exception at all. Fails toward silence
+        exactly like ``contract_satisfaction.py`` and like retrieval's own downgrades: a
+        library problem may never degrade a run that would otherwise have planned organically.
+        """
+        resolution = await self._plan_library_resolve(
+            graph, node, step_index,
+            call_site=_plan_retrieval.CALL_SITE_AUTO,
+            origin=_plan_library.ORIGIN_AUTO,
+        )
+        expansion = resolution.expansion
+        if expansion is None or not expansion.candidates:
+            result = resolution.retrieval
+            self._logger.info(
+                f"[STEP {step_index}] PLAN LIBRARY: no template applied "
+                f"({getattr(result, 'decision', 'error')}: {getattr(result, 'reason', '')}) "
+                f"— expanding organically"
+            )
+            return None, None
+        self._logger.info(
+            f"[STEP {step_index}] PLAN LIBRARY: applied template '{expansion.template_id}' "
+            f"-> {len(expansion.candidates)} candidates, skipping LLM expansion"
+        )
+        return list(expansion.candidates), dict(expansion.parent_details)
+
     async def _handle_expansion_node(self, graph: IdeaDag, node_id: str, step_index: int, branch_pair: Optional[BranchPair]) -> Optional[str]:
         node = graph.get_node(node_id)
         if not node:
             return None
-        
-        memories = []
-        if self._memory_manager:
-            justification = NodeDetailsExtractor.get_justification(node.details)
-            parent_goal = node.details.get(DetailKey.PARENT_GOAL.value) or ""
-            
-            query_parts = [node.title]
-            if justification:
-                query_parts.append(justification[:100])
-            if parent_goal:
-                query_parts.append(parent_goal[:100])
-            if hasattr(self, '_current_mandate') and self._current_mandate:
-                query_parts.append(self._current_mandate[:100])
-            
-            query = " ".join(query_parts)
-            
-            n_internal = self._cfg.memory.expansion_chroma_internal
-            n_observations = self._cfg.memory.expansion_chroma_observations
-            split_memories = await self._memory_manager.retrieve_memories_split(
-                query=query,
-                node_context={
-                    "title": node.title,
-                    "action": node.details.get(DetailKey.ACTION.value),
-                    "error": node.details.get(DetailKey.ACTION_ERROR.value),
-                    "justification": justification,
-                },
-                n_internal=n_internal,
-                n_observations=n_observations,
-            )
-            memories = split_memories["internal_thoughts"] + split_memories["observations"]
 
-            if self._got:
-                hybrid_extras = await self._got.hybrid_retrieve(
-                    graph, node_id, query, n_results=3,
-                )
-                seen_ids = {m.get("id") for m in memories if m.get("id")}
-                for extra in hybrid_extras:
-                    if extra.get("id") not in seen_ids:
-                        memories.append(extra)
-                        seen_ids.add(extra.get("id"))
-            self._logger.info(
-                f"[STEP {step_index}] EXPANSION: Retrieved {len(split_memories['internal_thoughts'])} internal thoughts, "
-                f"{len(split_memories['observations'])} observations from vector DB"
+        # Plan library (opt-in, default OFF -> byte-identical): a confidently-matched
+        # pre-authored template's filled leaves ARE this node's expansion, so the LLM never
+        # invents one. Placed BEFORE the memory/hybrid-retrieve enrichment below so a hit also
+        # skips that now-pointless vector-DB work. `candidates is None` on every other path,
+        # which is what keeps the flag-off behaviour identical to before.
+        candidates = None
+        parent_detail_updates = None
+        # ON-DEMAND path: `_maybe_plan_library_reexpand` already resolved a template (the leaf
+        # action matched, filled and logged it) and left the finished expansion here for us, so
+        # both call sites converge on this single expansion entry point rather than each
+        # growing children their own way. Single-use — popped on read; only ever present when
+        # both plan-library flags are armed.
+        pending = node.details.pop(_plan_library.PLAN_LIBRARY_PENDING, None)
+        if isinstance(pending, dict):
+            candidates = pending.get("candidates") or None
+            parent_detail_updates = pending.get("parent_details") or None
+        if candidates is None and self._cfg.plan_library.enabled and self._cfg.plan_library.auto_enabled:
+            candidates, parent_detail_updates = await self._plan_library_auto_shortcircuit(
+                graph, node, step_index
             )
-            if split_memories["observations"]:
-                obs_preview = "\n".join([str(obs.get("content", "") if isinstance(obs, dict) else obs)[:200] for obs in split_memories["observations"][:3]])
-                self._logger.info(f"[STEP {step_index}] Observations preview:\n{obs_preview}")
-        
-        self._logger.info(f"[STEP {step_index}] EXPANSION: Calling expansion policy for node '{node.title[:60]}...'")
-        try:
-            candidates = await self.expansion.expand(graph, node_id, memories=memories)
-            self._logger.info(f"[STEP {step_index}] EXPANSION: Policy returned {len(candidates) if candidates else 0} candidates")
-            if not candidates:
-                self._logger.error(f"[STEP {step_index}] EXPANSION FAILED: Expansion policy returned no candidates!")
-                self._logger.error(f"[STEP {step_index}] Node details: {list(node.details.keys())}")
-                self._logger.error(f"[STEP {step_index}] Node title: {node.title}")
+
+        if candidates is None:
+            memories = []
+            if self._memory_manager:
+                justification = NodeDetailsExtractor.get_justification(node.details)
+                parent_goal = node.details.get(DetailKey.PARENT_GOAL.value) or ""
+
+                query_parts = [node.title]
+                if justification:
+                    query_parts.append(justification[:100])
+                if parent_goal:
+                    query_parts.append(parent_goal[:100])
+                if hasattr(self, '_current_mandate') and self._current_mandate:
+                    query_parts.append(self._current_mandate[:100])
+
+                query = " ".join(query_parts)
+
+                n_internal = self._cfg.memory.expansion_chroma_internal
+                n_observations = self._cfg.memory.expansion_chroma_observations
+                split_memories = await self._memory_manager.retrieve_memories_split(
+                    query=query,
+                    node_context={
+                        "title": node.title,
+                        "action": node.details.get(DetailKey.ACTION.value),
+                        "error": node.details.get(DetailKey.ACTION_ERROR.value),
+                        "justification": justification,
+                    },
+                    n_internal=n_internal,
+                    n_observations=n_observations,
+                )
+                memories = split_memories["internal_thoughts"] + split_memories["observations"]
+
+                if self._got:
+                    hybrid_extras = await self._got.hybrid_retrieve(
+                        graph, node_id, query, n_results=3,
+                    )
+                    seen_ids = {m.get("id") for m in memories if m.get("id")}
+                    for extra in hybrid_extras:
+                        if extra.get("id") not in seen_ids:
+                            memories.append(extra)
+                            seen_ids.add(extra.get("id"))
+                self._logger.info(
+                    f"[STEP {step_index}] EXPANSION: Retrieved {len(split_memories['internal_thoughts'])} internal thoughts, "
+                    f"{len(split_memories['observations'])} observations from vector DB"
+                )
+                if split_memories["observations"]:
+                    obs_preview = "\n".join([str(obs.get("content", "") if isinstance(obs, dict) else obs)[:200] for obs in split_memories["observations"][:3]])
+                    self._logger.info(f"[STEP {step_index}] Observations preview:\n{obs_preview}")
+
+            self._logger.info(f"[STEP {step_index}] EXPANSION: Calling expansion policy for node '{node.title[:60]}...'")
+            try:
+                candidates = await self.expansion.expand(graph, node_id, memories=memories)
+                self._logger.info(f"[STEP {step_index}] EXPANSION: Policy returned {len(candidates) if candidates else 0} candidates")
+                if not candidates:
+                    self._logger.error(f"[STEP {step_index}] EXPANSION FAILED: Expansion policy returned no candidates!")
+                    self._logger.error(f"[STEP {step_index}] Node details: {list(node.details.keys())}")
+                    self._logger.error(f"[STEP {step_index}] Node title: {node.title}")
+                    return None
+            except Exception as exc:
+                self._logger.error(f"[STEP {step_index}] EXPANSION EXCEPTION: {exc}", exc_info=True)
                 return None
-        except Exception as exc:
-            self._logger.error(f"[STEP {step_index}] EXPANSION EXCEPTION: {exc}", exc_info=True)
-            return None
-        
+
         filtered = [
             c for c in candidates
             if c.get("details", {}).get(DetailKey.ACTION.value) != IdeaActionType.MERGE.value
@@ -879,8 +1019,24 @@ class IdeaDagEngine:
             max_branching = self._cfg.engine.max_branching
         hard_cap = self._cfg.engine.max_branching
         max_branching = min(max_branching, hard_cap)
-        graph.expand(node_id, candidates[:max_branching])
-        
+        created_children = graph.expand(node_id, candidates[:max_branching])
+
+        # Plan-library post-expand wiring, only for a library-sourced expansion (the flag rides
+        # in from the short-circuit; organic candidates never carry these markers, so an
+        # unconditional call would merely no-op — see `plan_library_auto_shortcircuit_test`):
+        #   * the template's aggregation guidance lands on the PARENT as `details.intent`,
+        #     which is the channel `MergeLeafAction` reads as `parent_intent`;
+        #   * blueprint-level `depends_on` becomes a real `requires_data` node reference, which
+        #     can only be written now that `graph.expand()` has minted the child ids.
+        if parent_detail_updates:
+            node.details.update(parent_detail_updates)
+            linked = _plan_library.link_dependencies(created_children)
+            if linked:
+                self._logger.info(
+                    f"[STEP {step_index}] PLAN LIBRARY: linked {linked} dependent child(ren) "
+                    f"onto their producer siblings (sequential execution)"
+                )
+
         parent_goal = node.details.get(DetailKey.GOAL.value) or node.title
         if not node.details.get(DetailKey.GOAL.value):
             node.details[DetailKey.GOAL.value] = parent_goal
@@ -915,7 +1071,28 @@ class IdeaDagEngine:
             
             if NodeDetailsExtractor.get_action(child.details) and not NodeDetailsExtractor.is_merge_action(child.details):
                 child.details[DetailKey.IS_LEAF.value] = True
-        
+
+            # Contract log (env-gated, no-op unless IDEA_TEST_CONTRACT_LOG): record the
+            # contract this leaf was created WITH — here rather than in the expansion
+            # policy, because only now is the candidate a real graph node with an id and a
+            # lineage to join its later `contract_resolved` verdict to. The whole block
+            # (including the ancestor walk) is skipped when the flag is off. `origin` /
+            # `template_id` are read off the child itself, which is what attributes a
+            # library-sourced leaf's outcome back to the template that authored it (an
+            # LLM-invented leaf carries neither marker and stays "organic").
+            if (
+                _contract_log.enabled()
+                and child.details.get(DetailKey.IS_LEAF.value)
+                and child.is_leaf()
+            ):
+                expect = child.details.get(DetailKey.EXPECT.value)
+                if isinstance(expect, str) and expect.strip():
+                    _contract_log.record_made(
+                        graph, child,
+                        origin=child.details.get(_plan_library.PLAN_LIBRARY_ORIGIN) or "organic",
+                        template_id=child.details.get(_plan_library.PLAN_LIBRARY_TEMPLATE_ID),
+                    )
+
         self._logger.info(f"[STEP {step_index}] EXPANSION: {len(candidates)} candidates -> {min(len(candidates), max_branching)} children (total nodes: {graph.node_count()})")
         self._record_decision(
             "expansion", node_id=node_id,
@@ -1299,6 +1476,12 @@ class IdeaDagEngine:
             # the same coverage requirement the re-expansion check has). No-op when the flag
             # is off; per-sibling judge calls run concurrently inside the batch helper.
             if done_children:
+                # On-demand plan library for the batch-completed siblings: this path bypasses
+                # `_apply_action_result`, so without this an adopted template retrieved by a
+                # parallel sibling would never become children. Sequential (never inside a
+                # gather): each expansion re-reads the shared `max_total_nodes` ceiling.
+                for cid in done_children:
+                    await self._maybe_plan_library_reexpand(graph, cid, step_index)
                 confidences = await self._maybe_judge_step_confidence_batch(graph, done_children, step_index)
                 # F33 contract->action loop for the batch-completed siblings (no-op unless
                 # got.contract_reexpand_enabled). Free and deterministic, so it runs for every
@@ -1613,6 +1796,22 @@ class IdeaDagEngine:
         status = self._handle_action_result(graph, node_id, step_index)
         node = graph.get_node(node_id)
         if node and node.status == IdeaNodeStatus.DONE:
+            # Contract log (env-gated, no-op unless IDEA_TEST_CONTRACT_LOG): what the
+            # deterministic contract check made of this completed leaf. Calls
+            # `_evaluate_contract` rather than `_contract_verdict` on purpose — the log
+            # audits the contract MECHANISM, so it must observe every completion, including
+            # on runs where the re-expansion lever it feeds is switched off.
+            if _contract_log.enabled():
+                _contract_log.record_resolved(
+                    graph, node, self._evaluate_contract(graph, node_id),
+                    step_index=step_index,
+                )
+            # On-demand plan library: an ADOPTED template search becomes real children here
+            # (no-op unless both plan-library flags are armed and this node IS such a search).
+            # Runs FIRST among the re-expansion triggers: a node it expands then has children,
+            # which gates it out of all three below — the retrieved plan wins over an invented
+            # follow-up, which is the whole point of having asked for one.
+            await self._maybe_plan_library_reexpand(graph, node_id, step_index)
             confidences = await self._maybe_judge_step_confidence(graph, node_id, step_index)
             # F33 contract->action loop: a leaf that did not deliver its contract's required
             # payload/datum/subject re-expands (no-op unless got.contract_reexpand_enabled).
@@ -1736,9 +1935,23 @@ class IdeaDagEngine:
         retrieved nothing checkable, or its contract text yields neither a measurable datum
         nor an identity token) — callers then fall back to the previous signal. Never raises
         and never mutates; costs no LLM call.
+
+        The lever gate is HERE and the computation is in ``_evaluate_contract`` so the
+        contract LOG can observe the verdict independently of whether the re-expansion
+        mechanism is switched on. Every caller of this method sees identical behavior.
         """
         if not self._cfg.got.contract_reexpand_enabled:
             return None
+        return self._evaluate_contract(graph, node_id)
+
+    def _evaluate_contract(self, graph: IdeaDag, node_id: str):
+        """The contract-satisfaction computation itself, ungated by any lever.
+
+        Same contract as ``_contract_verdict`` minus the ``got.contract_reexpand_enabled``
+        check: ``None`` for a missing node, a failed check, or NO verdict; otherwise the
+        applicable ``ContractSatisfaction``. Callers that drive BEHAVIOR must go through
+        ``_contract_verdict``; only pure observers call this directly.
+        """
         node = graph.get_node(node_id)
         if not node:
             return None
@@ -1843,6 +2056,99 @@ class IdeaDagEngine:
                 "needs_followup": True,
                 "reason": f"step contract unsatisfied: {verdict.reason}",
             })
+
+    async def _maybe_plan_library_reexpand(
+        self, graph: IdeaDag, node_id: str, step_index: int
+    ) -> bool:
+        """Turn a completed, ADOPTED on-demand plan-library search into real children.
+
+        No-op unless ``plan_library.enabled`` and ``plan_library.action_enabled`` are both set
+        (JSON default False -> byte-identical), the completed node's action is
+        ``plan_library_search``, and its result reports ``adopted=True``. The leaf action is
+        read-only by design — it ranks, fills and reports — so this is where the graph actually
+        grows, alongside every other re-expansion trigger and under the SAME
+        ``_reexpand_guards_ok`` termination bounds.
+
+        The plan is rebuilt from the result's own ``slot_values`` rather than re-retrieved:
+        ``candidates_from_template`` is pure, so the rebuild is deterministic and free, whereas
+        re-running extraction would spend a second LLM call AND could return values that
+        disagree with the ``adopted`` verdict already recorded on the node. Chroma is not
+        touched at all.
+
+        Growing the children rides ``_apply_reexpand`` -> ``_handle_expansion_node`` (the
+        expansion is handed over as a single-use stash on the node) so the ``_got_reexpanded``
+        marker step() routes on, the lineage ``_got_reexpand_count`` budget, the
+        ``max_total_nodes`` re-check, the duplicate filter and beam width, the children-metadata
+        threading, the ``contract_made`` rows and the post-expansion hooks all stay exactly
+        where the automatic path already put them, with nothing re-implemented here.
+
+        Returns True when children were created.
+        """
+        cfg = self._cfg.plan_library
+        if not (cfg.enabled and cfg.action_enabled):
+            return False
+        node = graph.get_node(node_id)
+        if not node:
+            return False
+        if (
+            NodeDetailsExtractor.get_action(node.details)
+            != IdeaActionType.PLAN_LIBRARY_SEARCH.value
+        ):
+            return False
+        result = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not isinstance(result, dict) or not result.get("adopted"):
+            return False
+        if not self._reexpand_guards_ok(graph, node_id):
+            return False
+
+        template_id = result.get("adopted_template_id")
+        slot_values = result.get("slot_values")
+        try:
+            template = self._plan_library_corpus().get(template_id)
+            if template is None or not isinstance(slot_values, dict):
+                self._logger.warning(
+                    f"[STEP {step_index}] PLAN LIBRARY: node {node_id[:8]} adopted "
+                    f"'{template_id}' but it cannot be rebuilt (template known: "
+                    f"{template is not None}, slot values: {isinstance(slot_values, dict)})"
+                )
+                return False
+            expansion = _plan_library.candidates_from_template(
+                template,
+                slot_values,
+                origin=_plan_library.ORIGIN_ACTION,
+                contracts=self.contracts,
+            )
+        except Exception as exc:  # noqa: BLE001 — a rebuild failure is silence, not a crash
+            self._logger.warning(
+                f"[STEP {step_index}] PLAN LIBRARY: rebuilding '{template_id}' failed: {exc}"
+            )
+            return False
+        if not expansion:
+            return False
+
+        node.details[_plan_library.PLAN_LIBRARY_PENDING] = {
+            "candidates": list(expansion.candidates),
+            "parent_details": dict(expansion.parent_details),
+        }
+        try:
+            applied = await self._apply_reexpand(graph, node_id, step_index, {
+                "needs_followup": True,
+                "reason": (
+                    f"plan library template '{expansion.template_id}' adopted on demand "
+                    f"({len(expansion.candidates)} sub-problems)"
+                ),
+            })
+        finally:
+            # Never leave the stash behind: `_handle_expansion_node` pops it on the happy
+            # path, but a node that failed to expand must not carry a plan into its next one.
+            node.details.pop(_plan_library.PLAN_LIBRARY_PENDING, None)
+        if applied:
+            self._logger.info(
+                f"[STEP {step_index}] PLAN LIBRARY: on-demand template "
+                f"'{expansion.template_id}' -> {len(node.children)} children under "
+                f"{node_id[:8]}"
+            )
+        return applied
 
     def _handle_action_result(self, graph: IdeaDag, node_id: str, step_index: int) -> str:
         node = graph.get_node(node_id)

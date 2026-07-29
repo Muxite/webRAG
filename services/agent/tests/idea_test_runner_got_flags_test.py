@@ -34,6 +34,9 @@ def _base():
         "native_vote_k_enabled": False,
         "native_vote_k": 1,
         "expansion_expect_contract_enabled": False,
+        "plan_library_enabled": False,
+        "plan_library_auto_enabled": False,
+        "plan_library_action_enabled": False,
         "native_reasoning_effort_discipline_enabled": False,
         "price_tier_param_tiering_enabled": False,
         # finalize grounding gate (a validity gate: every ARM turns it on, but the shipped
@@ -229,6 +232,35 @@ def test_expect_contract_bool_override():
     assert settings["expansion_expect_contract_enabled"] is True
 
 
+def test_plan_library_bool_overrides_are_independent():
+    """Three switches, not one: an operator can arm the subsystem without arming either
+    consumer, and can run the automatic short-circuit and the on-demand action separately."""
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_PLAN_LIBRARY": "1"})
+    assert settings["plan_library_enabled"] is True
+    assert settings["plan_library_auto_enabled"] is False
+    assert settings["plan_library_action_enabled"] is False
+
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_PLAN_LIBRARY_AUTO": "1"})
+    assert settings["plan_library_auto_enabled"] is True
+    assert settings["plan_library_action_enabled"] is False
+
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_PLAN_LIBRARY_ACTION": "1"})
+    assert settings["plan_library_action_enabled"] is True
+
+    _apply_got_experiment_overrides(
+        settings,
+        environ={
+            "IDEA_TEST_PLAN_LIBRARY": "0",
+            "IDEA_TEST_PLAN_LIBRARY_AUTO": "false",
+            "IDEA_TEST_PLAN_LIBRARY_ACTION": "0",
+        },
+    )
+    assert settings["plan_library_enabled"] is False
+    assert settings["plan_library_auto_enabled"] is False
+    assert settings["plan_library_action_enabled"] is False
+
+
 def test_native_reasoning_discipline_bool_override():
     settings = _base()
     _apply_got_experiment_overrides(
@@ -258,6 +290,9 @@ def test_all_new_flags_blank_are_noop():
             "IDEA_TEST_TOOL_FAILURE_RECOVERY": "",
             "IDEA_TEST_NATIVE_VOTE_K": "",
             "IDEA_TEST_EXPECT_CONTRACT": "",
+            "IDEA_TEST_PLAN_LIBRARY": "",
+            "IDEA_TEST_PLAN_LIBRARY_AUTO": "  ",
+            "IDEA_TEST_PLAN_LIBRARY_ACTION": "",
             "IDEA_TEST_NATIVE_REASONING_DISCIPLINE": "",
             "IDEA_TEST_PRICE_TIER_TIERING": "",
         },

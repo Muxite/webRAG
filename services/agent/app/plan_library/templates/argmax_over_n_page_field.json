@@ -1,0 +1,65 @@
+{
+  "template_id": "argmax_over_n_page_field",
+  "schema_version": 1,
+  "archetype": "argmax",
+  "title": "Argmax/argmin over one page-only field, read once per named candidate",
+  "description": "N candidates are named up front and one page-only quantity must be read for each, then compared to pick the single extreme. One independent leaf per candidate (no dependencies), all comparison deferred to the aggregation. Generalizes test_062 (topographic prominence argmax over six peaks) and test_077 (page-only argmax).",
+  "embedding_text": "Which of these named candidates has the HIGHEST value? You are given NO URLs - search to find the pages you need, then READ them (do not guess from memory). For EACH of the following six mountains / five lakes / seven islands, open that entity's own Wikipedia page and read ONE figure directly from the infobox: its topographic prominence in metres, its maximum depth in metres, its elevation, its surface area, its length. Then COMPARE those figures across all of the listed entities and determine which SINGLE one has the HIGHEST value - an argmax - or the LOWEST. IMPORTANT: the winner is NOT necessarily the tallest by elevation, the largest, nor the most famous; you must read each entity's figure from its own page rather than reasoning from how big or well-known it is. Report (a) which single entity has the highest figure (a single name - the keystone), (b) that winning entity's figure, (c) every entity's figure, and (d) the exact source URL of every page you read.",
+  "provenance": {
+    "source": "hand_authored",
+    "based_on_tasks": ["062", "077"],
+    "mined_from_trace_ids": []
+  },
+  "min_candidates": 2,
+  "max_candidates": 12,
+  "slots": [
+    {
+      "name": "candidates",
+      "kind": "entity_list",
+      "description": "The named candidates being compared, exactly as the mandate lists them: [{name, qualifier?}, ...]. The qualifier (country, region, disambiguating parenthetical) is used to build each leaf's search query.",
+      "extraction": "regex_candidate_list",
+      "min_arity": 2,
+      "max_arity": 12
+    },
+    {
+      "name": "field",
+      "kind": "field",
+      "description": "The single page-only quantity to read for each candidate, phrased as the mandate phrases it, WITH its unit (e.g. 'TOPOGRAPHIC PROMINENCE in metres'). Keep it under about ten words: it is also concatenated with each candidate's name to build that leaf's web-search query. Put any long caveat in the instruction, not here.",
+      "extraction": "llm"
+    },
+    {
+      "name": "entity_noun",
+      "kind": "field",
+      "description": "What one candidate is called in prose (e.g. 'mountain', 'lake', 'island'). Only makes the generated text read naturally.",
+      "required": false,
+      "extraction": "llm",
+      "default": "candidate"
+    },
+    {
+      "name": "superlative",
+      "kind": "aggregation_op",
+      "description": "The extremum being selected, as a word the aggregation can use directly: HIGHEST, LOWEST, LARGEST, SMALLEST, DEEPEST, LONGEST.",
+      "required": false,
+      "extraction": "llm",
+      "default": "HIGHEST"
+    },
+    {
+      "name": "source_type",
+      "kind": "source_type",
+      "description": "Which page to open for a candidate.",
+      "required": false,
+      "extraction": "default",
+      "default": "the authoritative Wikipedia page"
+    }
+  ],
+  "leaves": [
+    {
+      "id_pattern": "<<item.key>>_field",
+      "for_each": "candidates",
+      "instruction": "Open <<source_type>> for <<item.name>> and read, directly from that page (infobox or lead sentence), its <<field>>. Report ONLY that single value for <<item.name>>, and ALWAYS repeat the name '<<item.name>>' alongside the value so the fact stays self-contained even if it is read out of context. Give the exact source URL. Do not guess from memory, and do not compare <<item.name>> with any other <<entity_noun>> at this step.",
+      "expect": "<<item.name>>: its <<field>> as a single value with its unit -- source URL",
+      "depends_on": []
+    }
+  ],
+  "aggregation": "You now have, for each <<entity_noun>>, its <<field>> together with a source URL. FIRST write out every <<entity_noun>>'s value explicitly, one per line, in the form '<name> -> <value>', for ALL of them, BEFORE drawing any conclusion. THEN compare those values and state which SINGLE <<entity_noun>> has the <<superlative>> <<field>> -- that name is the keystone answer. IMPORTANT: the winner is NOT necessarily the biggest, tallest or most famous <<entity_noun>>; compare the values you actually read from the pages, not fame or general size. If a value is missing for any <<entity_noun>>, say which one is missing rather than guessing it. Report (a) the winning <<entity_noun>> and its <<field>>, stating explicitly that it is the <<superlative>>, (b) the full list '<name> -> <<field>>' for every <<entity_noun>>, and (c) cite each source URL."
+}

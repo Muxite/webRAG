@@ -1,0 +1,73 @@
+{
+  "template_id": "bounded_subset_sum",
+  "schema_version": 1,
+  "archetype": "subset_sum",
+  "title": "Sum one number per item over a pre-defined bounded subset",
+  "description": "A fixed, already-named subset of items (nothing to discover or filter) each contribute one integer, and the answer is their sum. Each leaf reads ONE item's own page, which structurally routes around the salient pre-computed grand total on the parent/summary page; the addition is written out term by term in the aggregation. Generalizes test_070 (episode counts of Chuck seasons 1-4, where the series page prints an all-five-seasons total).",
+  "embedding_text": "Add up the figures and report the combined total. You are given NO URLs - search to find the pages you need, then READ them (do not guess from memory). For EACH of the listed seasons / years / albums / districts, open THAT item's own Wikipedia article and read one number from the infobox: the number of episodes in that season alone, the population of that district, the number of tracks. Then ADD UP those numbers and report the SUM - the combined total across only these items. IMPORTANT: the main summary page prints a single figure that counts ALL of them, including ones outside this subset; that whole-series / grand total is NOT the answer, because it is larger than the figure you need. Do not report it - you must add up only the listed items yourself. Write the addition out term by term. Report the sum, the individual per-item figures you looked up, and the exact source URL of every page you read.",
+  "provenance": {
+    "source": "hand_authored",
+    "based_on_tasks": ["070"],
+    "mined_from_trace_ids": []
+  },
+  "min_candidates": 2,
+  "max_candidates": 12,
+  "slots": [
+    {
+      "name": "items",
+      "kind": "entity_list",
+      "description": "The pre-defined bounded subset to add up, exactly as the mandate lists it: [{name, qualifier?}, ...]. NOT a set to be discovered or filtered -- if the mandate asks which items qualify, this is the wrong template.",
+      "extraction": "regex_candidate_list",
+      "min_arity": 2,
+      "max_arity": 12
+    },
+    {
+      "name": "field",
+      "kind": "field",
+      "description": "The single number to read per item, phrased as the mandate phrases it (e.g. \"the infobox 'No. of episodes' figure for that season alone\"). Keep it under about ten words: it is also concatenated with each item's name to build that leaf's web-search query.",
+      "extraction": "llm"
+    },
+    {
+      "name": "total_name",
+      "kind": "field",
+      "description": "What the sum is called in the answer (e.g. 'the combined number of episodes across the first four seasons').",
+      "required": false,
+      "extraction": "llm",
+      "default": "combined total"
+    },
+    {
+      "name": "entity_noun",
+      "kind": "field",
+      "description": "What one item is called in prose (e.g. 'season').",
+      "required": false,
+      "extraction": "llm",
+      "default": "item"
+    },
+    {
+      "name": "distractor",
+      "kind": "criterion",
+      "description": "The salient aggregate that must NOT be reported (e.g. \"the whole-series 'No. of episodes' total on the main series page, which also counts the fifth season\").",
+      "required": false,
+      "extraction": "llm",
+      "default": "any pre-computed grand total printed on a summary or overview page, which also counts items outside this subset"
+    },
+    {
+      "name": "source_type",
+      "kind": "source_type",
+      "description": "Which page to open for an item.",
+      "required": false,
+      "extraction": "default",
+      "default": "the authoritative Wikipedia article"
+    }
+  ],
+  "leaves": [
+    {
+      "id_pattern": "<<item.key>>_value",
+      "for_each": "items",
+      "instruction": "Open <<source_type>> for <<item.name>> -- that <<entity_noun>>'s OWN page, NOT a summary or overview page covering several of them -- and read <<field>> for <<item.name>> ALONE. Report ONLY that single number, and ALWAYS repeat the name '<<item.name>>' alongside it so the figure stays self-contained even if it is read out of context. Give the exact source URL. Do NOT report <<distractor>>, do not add anything up, and do not guess from memory.",
+      "expect": "<<item.name>>: <<field>> for <<item.name>> alone (a single number) -- source URL",
+      "depends_on": []
+    }
+  ],
+  "aggregation": "You now have exactly one number per <<entity_noun>>: its <<field>>. Write out the addition EXPLICITLY on one line, in the form '<name1> (<value1>) + <name2> (<value2>) + ... = TOTAL', substituting the numbers you gathered term by term, and compute the sum -- do this BEFORE drawing any conclusion. Check that the number of terms equals the number of <<entity_noun>>s you were asked about; if one is missing, say WHICH one is missing rather than guessing its value or dropping it silently. Report that sum as the keystone answer: <<total_name>>, a partial total covering ONLY the listed <<entity_noun>>s. Do NOT report <<distractor>> -- report only the sum of exactly these items. Also list every per-<<entity_noun>> number you used, and cite each source URL."
+}

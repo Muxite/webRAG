@@ -1,0 +1,47 @@
+# Dedicated ollama for the bad-model lab. Isolated from the yappers project's
+# ollama (which owns host :11434). GPU config mirrors yappers-ollama (all GPUs).
+#
+#   docker compose -f badmodel-lab/docker-compose.yml up -d
+#   ./badmodel-lab/pull_roster.sh          # pull the subject models
+#
+# Reachable two ways:
+#   - from the host-run benchmark runner:  http://localhost:11435/v1
+#   - from inside the euglena network:     http://badmodel-ollama:11434/v1
+services:
+  badmodel-ollama:
+    image: ollama/ollama:latest
+    container_name: badmodel-ollama
+    ports:
+      - "127.0.0.1:11435:11434"      # host :11435 -> container :11434 (11434 is taken by yappers-ollama)
+    volumes:
+      - badmodel_ollama:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: "10m"        # keep a model resident between cells; swaps on demand
+      OLLAMA_MAX_LOADED_MODELS: "1"   # one subject at a time — 12 GB card, run serially
+      # CRITICAL for the native (graph) engine: ollama's runtime default is 4096 tokens
+      # regardless of a model's trained max (qwen2.5:7b supports 32768) — server logs showed
+      # `n_ctx_slot = 4096` + active `context shift` (silent mid-prompt truncation, discarding
+      # ~2045 tokens) on every merge/finalize call, since the native engine's merge step can
+      # produce 100k-char (~25-30k token) prompts. Found during the 2026-07-28 overnight
+      # baseline: this was silently corrupting every result before any model-capability
+      # conclusion was valid. 16384 (not the model's full 32768) is sized to fit qwen2.5:14b's
+      # KV cache too on this 12GB card (OLLAMA_MAX_LOADED_MODELS=1 means only one model's KV
+      # cache is ever resident, but the setting is server-wide, not per-model).
+      OLLAMA_CONTEXT_LENGTH: "16384"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - euglena_enet
+    restart: unless-stopped
+
+volumes:
+  badmodel_ollama:
+
+networks:
+  euglena_enet:
+    external: true

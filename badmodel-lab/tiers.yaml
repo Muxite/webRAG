@@ -1,0 +1,29 @@
+# Task tiers for the bad-model lab. Mirrors the case-statement in run_cell.sh
+# (kept in sync by hand; run_cell.sh is the source of truth for what actually runs).
+#
+# The point of tiers: the existing suite is calibrated to discriminate a cheap-
+# but-capable model (nano) from parametric recall, so a 0.5B model FLOORS at ~0
+# across all of it — no gradient. The micro/reachable tiers give bad models a
+# signal; the hard tier is only for anchors + the merged recovery curve.
+
+tiers:
+  sanity:                 # can the model run search->visit->report at all? (parametric OK here)
+    ids: ["048"]          # Eiffel Tower 1889 — pure pipeline sanity
+
+  micro:                  # atomic single-page keystones, anti-parametric, authored for the lab
+    ids: ["m01", "m02", "m03"]   # test_m01/m02/m03 — each ground truth live-verified before use
+
+  reachable:              # single COUNT / ARGMAX / single-ENTITY — "cheap-executor-reliable" (memory)
+    ids: ["062", "064", "069", "070", "072", "076", "078"]
+
+  format:                 # micro fact (solved) demanded as a multi-field TYPED JSON object —
+    ids: ["f01", "f02", "f03"]   # isolates the JSON-format wall (see FORMAT_STRESS_TIER.md).
+                          # Ladder via profiles fs0 (unenforced) / fs1 (strict schema) / fs2 (thin-assemble).
+
+  hard:                   # exact subset / k-th ordinal / closest-to / strict format — floors even nano
+    ids: ["063", "071", "073", "075", "077"]
+
+# "Run the simplers on the better places and merge": also run micro + reachable on
+# the anchors (qwen2.5:7b, gpt-4.1-nano) to set the CEILING, then merge micro ->
+# reachable -> hard x bad -> good into one recovery curve via
+# scripts/level_ladder.py + scripts/recovery_curve.py.

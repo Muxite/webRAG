@@ -1,0 +1,85 @@
+{
+  "template_id": "computed_ratio_argmax",
+  "schema_version": 1,
+  "archetype": "computed_ratio_argmax",
+  "title": "Argmax over a ratio computed from two figures read per candidate",
+  "description": "N candidates are named up front; TWO figures sit on each candidate's page and no page prints the cross-candidate comparison, so the quotient must be computed. One independent leaf per candidate reads both figures and is explicitly forbidden from computing anything; every division is written out in the aggregation before any conclusion. Generalizes test_064 (volume-to-surface-area ratio argmax over five lakes).",
+  "embedding_text": "Which of these has the highest ratio? You are given NO URLs - search to find the pages you need, then READ them (do not guess from memory). For EACH of the following lakes / countries / cities, open its Wikipedia page and read TWO numbers from the infobox: its water VOLUME in cubic kilometres and its SURFACE AREA in square kilometres, its population and its area, its total and its count. Then COMPUTE, for each one, the ratio of the first figure to the second (volume divided by surface area is the mean depth) - no page prints this cross-entity comparison, so you must divide the two figures yourself. COMPARE the computed ratios and determine which single entity has the HIGHEST ratio, per capita value, density or average. The answer is the largest RATIO, which is NOT necessarily the entity with the largest numerator nor the one with the largest denominator. Write out every division explicitly before concluding. Report the winning entity, its computed ratio, all the figures you looked up, and the exact source URL of every page you read.",
+  "provenance": {
+    "source": "hand_authored",
+    "based_on_tasks": ["064"],
+    "mined_from_trace_ids": []
+  },
+  "min_candidates": 2,
+  "max_candidates": 10,
+  "slots": [
+    {
+      "name": "candidates",
+      "kind": "entity_list",
+      "description": "The named candidates being compared, exactly as the mandate lists them: [{name, qualifier?}, ...].",
+      "extraction": "regex_candidate_list",
+      "min_arity": 2,
+      "max_arity": 10
+    },
+    {
+      "name": "fields",
+      "kind": "field",
+      "description": "Both figures to read from one candidate's page, phrased as the mandate phrases them, WITH units (e.g. 'the water VOLUME in cubic kilometres (km^3) and the SURFACE AREA in square kilometres (km^2)'). Also drives each leaf's search query, so keep it short enough to be searchable.",
+      "extraction": "llm"
+    },
+    {
+      "name": "numerator_field",
+      "kind": "field",
+      "description": "The figure on TOP of the ratio, named as it will be labelled (e.g. 'water volume (km^3)').",
+      "extraction": "llm"
+    },
+    {
+      "name": "denominator_field",
+      "kind": "field",
+      "description": "The figure on the BOTTOM of the ratio (e.g. 'surface area (km^2)').",
+      "extraction": "llm"
+    },
+    {
+      "name": "ratio_name",
+      "kind": "field",
+      "description": "What the quotient means, with the unit it should be reported in (e.g. 'mean depth, in metres').",
+      "required": false,
+      "extraction": "llm",
+      "default": "ratio"
+    },
+    {
+      "name": "entity_noun",
+      "kind": "field",
+      "description": "What one candidate is called in prose (e.g. 'lake').",
+      "required": false,
+      "extraction": "llm",
+      "default": "candidate"
+    },
+    {
+      "name": "superlative",
+      "kind": "aggregation_op",
+      "description": "The extremum being selected over the computed ratios: HIGHEST or LOWEST.",
+      "required": false,
+      "extraction": "llm",
+      "default": "HIGHEST"
+    },
+    {
+      "name": "source_type",
+      "kind": "source_type",
+      "description": "Which page to open for a candidate.",
+      "required": false,
+      "extraction": "default",
+      "default": "the authoritative Wikipedia page"
+    }
+  ],
+  "leaves": [
+    {
+      "id_pattern": "<<item.key>>_fields",
+      "for_each": "candidates",
+      "instruction": "Open <<source_type>> for <<item.name>> and read, directly from that page's infobox, <<fields>>. Report ONLY those two numbers, each clearly labelled as which is which, and ALWAYS repeat the name '<<item.name>>' alongside them so the pair stays self-contained even if it is read out of context. Give the exact source URL. Do NOT guess from memory, and do NOT divide, compute, compare or rank anything at this step -- this leaf only READS the two figures.",
+      "expect": "<<item.name>>: its <<numerator_field>> and its <<denominator_field>>, both labelled with units -- source URL",
+      "depends_on": []
+    }
+  ],
+  "aggregation": "You now have, for each <<entity_noun>>, two figures: its <<numerator_field>> and its <<denominator_field>>. For EACH <<entity_noun>> IN TURN, write out the division EXPLICITLY on its own line in the form '<name>: <<numerator_field>> / <<denominator_field>> = <ratio>', substituting the two numbers you gathered -- compute EVERY one of those divisions BEFORE drawing any conclusion. THEN, comparing ONLY those computed ratios, state which SINGLE <<entity_noun>> has the <<superlative>> ratio (its <<ratio_name>>) -- that name is the keystone answer. Show every division before concluding; do not skip to a conclusion from the raw figures. The winner need NOT be the <<entity_noun>> with the largest <<numerator_field>>, nor the one with the largest <<denominator_field>>. Report (a) that <<entity_noun>> and its computed <<ratio_name>>, (b) every <<entity_noun>>'s <<numerator_field>> and <<denominator_field>> as you read them, and (c) cite each source URL."
+}

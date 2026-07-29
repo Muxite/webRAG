@@ -225,6 +225,37 @@ def test_final_reconcile_chain_flags_default_off():
     assert list(on.final_recompute_shapes) == ["count", "argmax"]
 
 
+def test_plan_library_flags_default_off_and_carry_no_threshold():
+    # Retrieval-augmented planning: both switches OFF from an empty load and from the shipped
+    # JSON, so the expansion path stays byte-identical until an operator arms them.
+    from agent.app.idea_policies.config import PlanLibraryConfig
+    import dataclasses
+
+    empty = PlanLibraryConfig.from_settings({})
+    assert (empty.enabled, empty.auto_enabled, empty.action_enabled) == (False, False, False)
+    prod = PlanLibraryConfig.from_settings(load_idea_dag_settings())
+    assert (prod.enabled, prod.auto_enabled, prod.action_enabled) == (False, False, False)
+    on = PlanLibraryConfig.from_settings(
+        {
+            "plan_library_enabled": 1,
+            "plan_library_auto_enabled": "true",
+            "plan_library_action_enabled": 1,
+        }
+    )
+    assert (on.enabled, on.auto_enabled, on.action_enabled) == (True, True, True)
+    # The two sub-flags are independent: auto-only and on-demand-only are both valid runs.
+    auto_only = PlanLibraryConfig.from_settings(
+        {"plan_library_enabled": True, "plan_library_auto_enabled": True}
+    )
+    assert auto_only.auto_enabled is True and auto_only.action_enabled is False
+    # The calibrated decision constants live in plan_library/retrieval.py and are trusted as
+    # the verdict; a second engine-level similarity gate would silently disagree with them.
+    assert not any(
+        "threshold" in f.name or "similarity" in f.name
+        for f in dataclasses.fields(PlanLibraryConfig)
+    )
+
+
 def test_aggregate_builds_from_production_settings():
     # The shipped JSON must build cleanly and reflect its production values.
     cfg = IdeaConfig.from_settings(load_idea_dag_settings())

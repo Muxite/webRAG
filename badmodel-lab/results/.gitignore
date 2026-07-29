@@ -1,0 +1,5 @@
+# Run logs are transient. Only a few of the latest are kept, tracked as examples.
+*.log
+!agent_suite.log
+!format.log
+!topup.log

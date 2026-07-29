@@ -157,5 +157,8 @@
   "final_verify_enabled": false,
   "final_variations_enabled": false,
   "final_variations_k": 3,
-  "final_recompute_shapes": ["computation", "count", "argmax", "disambiguation", "single_value"]
+  "final_recompute_shapes": ["computation", "count", "argmax", "disambiguation", "single_value"],
+  "plan_library_enabled": false,
+  "plan_library_auto_enabled": false,
+  "plan_library_action_enabled": false
 }

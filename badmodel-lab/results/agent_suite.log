@@ -1,0 +1,82 @@
+models=['gemma2:2b', 'qwen2.5:1.5b', 'llama3.2:3b', 'qwen2.5:7b'] tasks=['file_count', 'file_write', 'file_find', 'memory_roundtrip', 'cross_cutting'] reps=4 -> badmodel-lab/results/agent_traces.jsonl
+  [ok ] gemma2:2b      file_count       r1 steps=5 6.415s ans='7'
+  [ok ] gemma2:2b      file_count       r2 steps=5 5.449s ans='7'
+  [ok ] gemma2:2b      file_count       r3 steps=5 6.3s ans='7'
+  [ok ] gemma2:2b      file_count       r4 steps=5 6.447s ans='7'
+  [MISS] gemma2:2b      file_write       r1 steps=7 16.935s ans='(stuck repeating the same action)'
+  [MISS] gemma2:2b      file_write       r2 steps=7 17.026s ans='(stuck repeating the same action)'
+  [MISS] gemma2:2b      file_write       r3 steps=7 17.102s ans='(stuck repeating the same action)'
+  [MISS] gemma2:2b      file_write       r4 steps=7 17.285s ans='(stuck repeating the same action)'
+  [MISS] gemma2:2b      file_find        r1 steps=3 5.865s ans="Let's break down this error and how to fix it."
+  [MISS] gemma2:2b      file_find        r2 steps=3 5.631s ans="Let's break down this error and how to fix it."
+  [MISS] gemma2:2b      file_find        r3 steps=3 5.66s ans="Let's break down this error and how to fix it."
+  [MISS] gemma2:2b      file_find        r4 steps=3 5.701s ans="Let's break down this error and how to fix it."
+  [ok ] gemma2:2b      memory_roundtrip r1 steps=4 11.772s ans='ZEBRA'
+  [ok ] gemma2:2b      memory_roundtrip r2 steps=4 11.732s ans='ZEBRA'
+  [ok ] gemma2:2b      memory_roundtrip r3 steps=4 12.005s ans='ZEBRA'
+  [ok ] gemma2:2b      memory_roundtrip r4 steps=4 11.6s ans='ZEBRA'
+  [MISS] gemma2:2b      cross_cutting    r1 steps=8 18.655s ans='(could not fill a valid action)'
+  [MISS] gemma2:2b      cross_cutting    r2 steps=8 18.485s ans='(could not fill a valid action)'
+  [MISS] gemma2:2b      cross_cutting    r3 steps=8 18.403s ans='(could not fill a valid action)'
+  [MISS] gemma2:2b      cross_cutting    r4 steps=8 17.636s ans='(could not fill a valid action)'
+  [MISS] qwen2.5:1.5b   file_count       r1 steps=4 12.413s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   file_count       r2 steps=4 7.552s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   file_count       r3 steps=4 7.277s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   file_count       r4 steps=4 7.113s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   file_write       r1 steps=4 9.424s ans='(could not fill a valid action)'
+  [MISS] qwen2.5:1.5b   file_write       r2 steps=4 9.714s ans='(could not fill a valid action)'
+  [MISS] qwen2.5:1.5b   file_write       r3 steps=4 9.64s ans='(could not fill a valid action)'
+  [MISS] qwen2.5:1.5b   file_write       r4 steps=4 9.696s ans='(could not fill a valid action)'
+  [MISS] qwen2.5:1.5b   file_find        r1 steps=1 2.612s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   file_find        r2 steps=1 2.669s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   file_find        r3 steps=1 2.79s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   file_find        r4 steps=1 2.771s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   memory_roundtrip r1 steps=4 10.423s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   memory_roundtrip r2 steps=4 10.403s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   memory_roundtrip r3 steps=4 10.433s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   memory_roundtrip r4 steps=4 10.425s ans="The error message you're encountering indicates that the act"
+  [MISS] qwen2.5:1.5b   cross_cutting    r1 steps=5 11.064s ans='(could not fill a valid action)'
+  [MISS] qwen2.5:1.5b   cross_cutting    r2 steps=5 11.145s ans='(could not fill a valid action)'
+  [MISS] qwen2.5:1.5b   cross_cutting    r3 steps=5 10.964s ans='(could not fill a valid action)'
+  [MISS] qwen2.5:1.5b   cross_cutting    r4 steps=5 10.895s ans='(could not fill a valid action)'
+  [ok ] llama3.2:3b    file_count       r1 steps=7 12.897s ans='7'
+  [ok ] llama3.2:3b    file_count       r2 steps=7 8.14s ans='7'
+  [ok ] llama3.2:3b    file_count       r3 steps=6 7.608s ans='7'
+  [ok ] llama3.2:3b    file_count       r4 steps=7 8.061s ans='7'
+  [ok ] llama3.2:3b    file_write       r1 steps=10 8.079s ans='BANANA'
+  [ok ] llama3.2:3b    file_write       r2 steps=10 7.829s ans='BANANA'
+  [ok ] llama3.2:3b    file_write       r3 steps=10 7.809s ans='BANANA'
+  [ok ] llama3.2:3b    file_write       r4 steps=10 7.494s ans='BANANA'
+  [ok ] llama3.2:3b    file_find        r1 steps=4 2.36s ans='The file needle.txt exists.'
+  [ok ] llama3.2:3b    file_find        r2 steps=4 2.159s ans='The file needle.txt exists.'
+  [ok ] llama3.2:3b    file_find        r3 steps=4 2.196s ans='The file needle.txt exists.'
+  [ok ] llama3.2:3b    file_find        r4 steps=4 2.215s ans='The file needle.txt exists.'
+  [ok ] llama3.2:3b    memory_roundtrip r1 steps=9 10.062s ans='ZEBRA'
+  [ok ] llama3.2:3b    memory_roundtrip r2 steps=9 10.044s ans='ZEBRA'
+  [ok ] llama3.2:3b    memory_roundtrip r3 steps=9 9.43s ans='ZEBRA'
+  [ok ] llama3.2:3b    memory_roundtrip r4 steps=9 9.495s ans='ZEBRA'
+  [MISS] llama3.2:3b    cross_cutting    r1 steps=5 14.277s ans='(could not fill a valid action)'
+  [MISS] llama3.2:3b    cross_cutting    r2 steps=5 14.104s ans='(could not fill a valid action)'
+  [MISS] llama3.2:3b    cross_cutting    r3 steps=5 13.748s ans='(could not fill a valid action)'
+  [MISS] llama3.2:3b    cross_cutting    r4 steps=5 13.946s ans='(could not fill a valid action)'
+  [MISS] qwen2.5:7b     file_count       r1 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_count       r2 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_count       r3 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_count       r4 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_write       r1 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_write       r2 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_write       r3 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_write       r4 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_find        r1 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_find        r2 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_find        r3 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     file_find        r4 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     memory_roundtrip r1 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     memory_roundtrip r2 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     memory_roundtrip r3 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     memory_roundtrip r4 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     cross_cutting    r1 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     cross_cutting    r2 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     cross_cutting    r3 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+  [MISS] qwen2.5:7b     cross_cutting    r4 steps=0 Nones ans="Client error '404 Not Found' for url 'http://localhost:11435"
+done.

@@ -1817,6 +1817,89 @@ class SaveLeafAction(LeafAction):
             return self._failure(action=IdeaActionType.SAVE, node_id=node_id, error=exc)
 
 
+class PlanLibrarySearchLeafAction(LeafAction):
+    """Ask the plan library for a pre-authored strategy for this node — READ-ONLY.
+
+    The model invokes this when it would rather retrieve a proven composition strategy than
+    invent one. The action ranks the template corpus, and on a confident hit spends the
+    pipeline's one slot-extraction call to bind the winner to this mandate's entities; it then
+    REPORTS what it found and stops. It never expands the graph: re-expansion bookkeeping (the
+    ``_got_reexpanded`` marker, the lineage ``_got_reexpand_count`` budget, the
+    ``max_total_nodes`` ceiling) lives on ``IdeaDagEngine`` and stays single-sourced there —
+    ``IdeaDagEngine._maybe_plan_library_reexpand`` turns an ``adopted`` result into children.
+
+    The result carries the bound ``slot_values`` alongside ``adopted_template_id`` precisely so
+    that hook can rebuild the expansion deterministically (``candidates_from_template`` is
+    pure) without a second Chroma query or a second extraction call — re-running extraction
+    would not only cost that call but could produce values that disagree with the verdict
+    already recorded here.
+
+    Unreachable unless the engine patches ``plan_library_search`` into ``allowed_actions``
+    (only when ``plan_library_enabled`` + ``plan_library_action_enabled``), so the default
+    action menu — and every run that never arms the flags — is unchanged.
+    """
+
+    name = "plan_library_search"
+
+    async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
+        try:
+            node = graph.get_node(node_id)
+            if not node:
+                raise ValueError(f"Unknown node_id: {node_id}")
+            # Imported here, not at module scope: the retrieval stack reaches into Chroma and
+            # the LLM slot-filler, and nothing else in this module needs it — an unarmed run
+            # must not pay for (or risk) importing it at all.
+            from agent.app.idea_policies import plan_library_search as _plan_search
+            from agent.app.idea_policies.plan_library import ORIGIN_ACTION
+            from agent.app.plan_library import retrieval as _plan_retrieval
+
+            # A fresh corpus per execution: a LeafAction is constructed per action, so there is
+            # no instance to cache on (the engine caches its own on ``_plan_library_corpus``),
+            # and an on-demand search is rare — at most a handful of nodes per run.
+            library = _plan_retrieval.PlanLibrary()
+            resolution = await _plan_search.resolve(
+                library,
+                graph,
+                node,
+                io=io,
+                call_site=_plan_retrieval.CALL_SITE_ON_DEMAND,
+                origin=ORIGIN_ACTION,
+                model_name=self._effective_model(io, None) or self._cfg.expansion.model,
+                fallback_model=self._cfg.generation.fallback_model,
+                timeout_seconds=self._timeout_seconds("expansion_timeout_seconds"),
+            )
+            retrieval = resolution.retrieval
+            adopted = resolution.adopted
+            self._log_structured(
+                "info",
+                "[PLAN_LIBRARY_SEARCH] retrieval complete",
+                node_id=node_id,
+                decision=getattr(retrieval, "decision", None),
+                adopted=adopted,
+                template_id=resolution.template_id,
+            )
+            return ActionResultBuilder.success(
+                action=IdeaActionType.PLAN_LIBRARY_SEARCH.value,
+                node_id=node_id,
+                query=getattr(retrieval, "query_text", ""),
+                decision=getattr(retrieval, "decision", None),
+                reason=getattr(retrieval, "reason", ""),
+                matches=[m.as_dict() for m in getattr(retrieval, "candidates", None) or []],
+                adopted=adopted,
+                adopted_template_id=resolution.template_id,
+                # What the template was bound with — the engine's rebuild input, and (once
+                # sanitized onto the node) a readable record of the plan that was adopted.
+                slot_values=(getattr(resolution.fill, "slot_values", None) if adopted else None),
+                leaf_count=(len(resolution.expansion.candidates) if adopted else 0),
+                # The uuid4 join key into both retrieval logs.
+                retrieval_id=getattr(retrieval, "retrieval_id", None),
+            )
+        except Exception as exc:
+            return self._failure(
+                action=IdeaActionType.PLAN_LIBRARY_SEARCH, node_id=node_id, error=exc
+            )
+
+
 class MergeLeafAction(LeafAction):
     name = "merge"
 
@@ -2204,6 +2287,7 @@ class LeafActionRegistry:
             IdeaActionType.THINK.value: ThinkLeafAction,
             IdeaActionType.MERGE.value: MergeLeafAction,
             IdeaActionType.VERIFY.value: VerifyLeafAction,
+            IdeaActionType.PLAN_LIBRARY_SEARCH.value: PlanLibrarySearchLeafAction,
         }
         # Kept for legacy code paths that introspect `._registry` directly.
         self._registry: Dict[IdeaActionType, type] = {
@@ -2213,6 +2297,7 @@ class LeafActionRegistry:
             IdeaActionType.THINK: ThinkLeafAction,
             IdeaActionType.MERGE: MergeLeafAction,
             IdeaActionType.VERIFY: VerifyLeafAction,
+            IdeaActionType.PLAN_LIBRARY_SEARCH: PlanLibrarySearchLeafAction,
         }
 
     @staticmethod

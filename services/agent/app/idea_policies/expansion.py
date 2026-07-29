@@ -17,6 +17,7 @@ from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.shape_classifier import classify_shape
 from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.llm_backends import json_instruction_from_response_format
+from agent.app.testing import json_telemetry as _json_telemetry
 
 
 def _safe_serialize_details(details: Dict[str, Any]) -> str:
@@ -409,6 +410,18 @@ class LlmExpansionPolicy(ExpansionPolicy):
             )
             output_preview = content[:2000] + "... [truncated]" if isinstance(content, str) and len(content) > 2000 else content
             self._logger.debug(f"[EXPANSION] LLM Output preview: {output_preview}")
+            # Bad-model lab (env-gated, no-op by default): classify WHY a weak model's plan
+            # JSON failed. ``parsed_ok`` is the raw completion's JSON-syntax validity BEFORE
+            # ``_parse_candidates``' repair fallback — same measure as the react leaf call
+            # sites — so the whole block (including the throwaway parse) is skipped when the
+            # flag is off.
+            if _json_telemetry.enabled():
+                try:
+                    json.loads(content or "")
+                    _parsed_ok = True
+                except Exception:
+                    _parsed_ok = False
+                _json_telemetry.record(model_name, content, True, _parsed_ok, phase="native_expansion")
             candidates, meta = self._parse_candidates(content, graph=graph, parent_node_id=node_id)
             self._logger.info(f"[EXPANSION] Parsed {len(candidates)} candidates from LLM response, meta={meta}")
             if not candidates:

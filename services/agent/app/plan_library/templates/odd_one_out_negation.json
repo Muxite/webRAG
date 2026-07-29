@@ -1,0 +1,63 @@
+{
+  "template_id": "odd_one_out_negation",
+  "schema_version": 1,
+  "archetype": "odd_one_out",
+  "title": "Odd one out: the single candidate that does NOT share a stated property",
+  "description": "N candidates appear to share one binary property; exactly one does not. Each leaf makes an identical, NEUTRAL yes/no determination for one candidate (the negation is never pushed down into a leaf, where a weak model flips it), and the aggregation writes out every status before naming the exception. Each leaf is forced to repeat the candidate's own name, because an out-of-context 'no' gets misattributed. Generalizes test_069 (four landlocked countries plus one with a coastline).",
+  "embedding_text": "Which one is the odd one out? Below are several countries / cities / people / films that all APPEAR to share a single binary property - being landlocked, being a member of the union, having won the award, sharing a birthplace - but in fact exactly one of them does NOT. You are given NO URLs - search to find each page and READ it (do not guess from memory). For EACH of the listed candidates, open its Wikipedia page and determine from the lead sentence or the infobox whether it satisfies the property or not. Then identify the SINGLE one that does NOT share the property - the exception. Be careful with the wording: you are asked for the one that does NOT satisfy the property, NOT one of the ones that do, and do not pick the most typical-looking candidate - pick the one that actually fails the test. Report which one is the odd one out, WHY it is the exception, each candidate's status, and the exact source URL of every page you read.",
+  "provenance": {
+    "source": "hand_authored",
+    "based_on_tasks": ["069"],
+    "mined_from_trace_ids": []
+  },
+  "min_candidates": 3,
+  "max_candidates": 10,
+  "slots": [
+    {
+      "name": "candidates",
+      "kind": "entity_list",
+      "description": "The candidates being tested, exactly as the mandate lists them: [{name, qualifier?}, ...].",
+      "extraction": "regex_candidate_list",
+      "min_arity": 3,
+      "max_arity": 10
+    },
+    {
+      "name": "field",
+      "kind": "field",
+      "description": "The page attribute that decides the property, phrased for a web search (e.g. 'landlocked status / sea coastline'). Drives each leaf's search query.",
+      "extraction": "llm"
+    },
+    {
+      "name": "property",
+      "kind": "criterion",
+      "description": "The shared property, phrased POSITIVELY and completely, as the mandate phrases it (e.g. 'is a LANDLOCKED country -- it has NO sea coastline'). Never phrase it as a negation here: the negation belongs only in the aggregation.",
+      "extraction": "llm"
+    },
+    {
+      "name": "entity_noun",
+      "kind": "field",
+      "description": "What one candidate is called in prose (e.g. 'country').",
+      "required": false,
+      "extraction": "llm",
+      "default": "candidate"
+    },
+    {
+      "name": "source_type",
+      "kind": "source_type",
+      "description": "Which page to open for a candidate.",
+      "required": false,
+      "extraction": "default",
+      "default": "the authoritative Wikipedia page"
+    }
+  ],
+  "leaves": [
+    {
+      "id_pattern": "<<item.key>>_status",
+      "for_each": "candidates",
+      "instruction": "Open <<source_type>> for <<item.name>> and determine, from the lead sentence and the infobox, whether <<item.name>> DOES or does NOT satisfy this property: <<property>>. Answer strictly in the form '<<item.name>>: YES -- <one line of evidence read from the page>' or '<<item.name>>: NO -- <one line of evidence read from the page>'. ALWAYS repeat the name '<<item.name>>' at the start of your answer so the determination stays self-contained even if it is read out of context. Give the exact source URL. Do not guess from memory, and do not compare <<item.name>> with any other <<entity_noun>> -- judge this one on its own page only.",
+      "expect": "'<<item.name>>: YES' or '<<item.name>>: NO' for the property <<property>>, with one line of page evidence -- source URL",
+      "depends_on": []
+    }
+  ],
+  "aggregation": "You now have, for each <<entity_noun>>, a YES/NO determination of the property: <<property>>. FIRST write out every <<entity_noun>>'s status explicitly, one per line, in the form '<name>: YES/NO -- <evidence>'. Determine ALL of them BEFORE drawing any conclusion. THEN identify the SINGLE <<entity_noun>> that does NOT satisfy the property -- the odd one out -- and name it: that name is the keystone answer. Be careful with the NEGATION: the answer is the one that does NOT satisfy '<<property>>', it is not one of the ones that DO, and you must NOT describe the answer as satisfying the property. If more than one, or none, came back NO, say so and re-check those pages rather than guessing. Report (a) the odd one out, (b) WHY it is the exception (the page evidence that makes it fail the property), (c) every <<entity_noun>>'s status, and (d) cite each source URL."
+}

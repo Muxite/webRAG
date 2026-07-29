@@ -232,10 +232,16 @@ class ConnectorChroma(ConnectorBase):
             return True
         return await self.init_chroma()
 
-    async def get_or_create_collection(self, collection: str) -> Any:
+    async def get_or_create_collection(
+        self, collection: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> Any:
         """
         Get or create a named collection. Uses default embedding (all-MiniLM-L6-v2).
         :param collection: Collection name.
+        :param metadata: Optional creation-time collection metadata (e.g.
+            ``{"hnsw:space": "cosine"}`` so a query distance IS the cosine distance).
+            Applied only when the collection is CREATED — an existing collection keeps
+            its own configuration, and passing a different value never raises.
         :returns: ChromaDB collection object, or None on failure.
         """
         cached = self._collections.get(collection)
@@ -246,6 +252,8 @@ class ConnectorChroma(ConnectorBase):
             return None
         try:
             create_kwargs: Dict[str, Any] = {"name": collection}
+            if metadata:
+                create_kwargs["metadata"] = dict(metadata)
             embed_fn = self._embedding_function_or_none()
             if embed_fn is not None:
                 create_kwargs["embedding_function"] = embed_fn
@@ -398,6 +406,69 @@ class ConnectorChroma(ConnectorBase):
                 f"add_to_chroma_parallel: {failures}/{n_batches} batch(es) failed"
             )
         return failures == 0
+
+    async def delete_from_chroma(self, collection: str, ids: List[str]) -> bool:
+        """
+        Delete documents from a collection by id.
+
+        Chroma's ``add`` silently KEEPS the existing row when an id already exists, so
+        re-indexing an edited document means delete-then-add; this is the delete half
+        (also used to drop entries whose source document is gone).
+
+        :param collection: Target collection name.
+        :param ids: Document ids to remove.
+        :returns: True on success (an empty id list is a no-op success).
+        """
+        if not ids:
+            return True
+        if not await self._ensure_ready():
+            return False
+        try:
+            coll = await self.get_or_create_collection(collection)
+            if coll is None:
+                return False
+            await self._op(coll.delete, ids=list(ids))
+            self._on_op_success()
+            return True
+        except Exception as e:
+            self._on_op_failure()
+            self.logger.error(f"Failed to delete from collection '{collection}': {e}")
+            return False
+
+    async def get_from_chroma(
+        self, collection: str, ids: List[str], include: Optional[List[str]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Fetch documents from a collection BY ID — an exact lookup, not a similarity search.
+
+        Chroma returns only the ids it actually holds, so this is also the cheap way to ask
+        "which of these are indexed?": an absent id is simply missing from the result. The
+        default ``include=[]`` skips documents/metadatas/embeddings, making that membership
+        check the smallest possible round-trip.
+
+        :param collection: Target collection name.
+        :param ids: Document ids to fetch (an empty list is a no-op).
+        :param include: Fields to return; ``None`` means ids only.
+        :returns: ChromaDB result dict, or None on failure — distinct from an empty result,
+            which means "the collection is reachable and holds none of these ids".
+        """
+        if not ids:
+            return {"ids": []}
+        if not await self._ensure_ready():
+            return None
+        try:
+            coll = await self.get_or_create_collection(collection)
+            if coll is None:
+                return None
+            result = await self._op(
+                coll.get, ids=list(ids), include=list(include) if include else []
+            )
+            self._on_op_success()
+            return result
+        except Exception as e:
+            self._on_op_failure()
+            self.logger.error(f"Failed to get from collection '{collection}': {e}")
+            return None
 
     async def query_chroma(
         self,

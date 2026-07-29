@@ -224,6 +224,12 @@ async def test_embedded_mode_end_to_end(tmp_path):
     res = await c.query_chroma("mem_e", ["What is the capital of France?"], n_results=1)
     assert res is not None
     assert res["documents"][0][0].startswith("The capital of France")
+    # get-by-id is an exact membership check, not a similarity search: chroma returns ONLY
+    # the ids it actually holds, which is how the plan-library sync tells "already indexed
+    # here" from "the manifest says so". An absent id is simply missing from the reply.
+    got = await c.get_from_chroma("mem_e", ["2", "never_added"])
+    assert got is not None and got["ids"] == ["2"]
+    assert (await c.get_from_chroma("mem_e", []))["ids"] == []  # no ids, no round-trip
 
 
 @pytest.mark.asyncio

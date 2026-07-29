@@ -335,6 +335,42 @@ class VerifyConfig:
 
 
 @dataclass(frozen=True)
+class PlanLibraryConfig:
+    """Retrieval-augmented planning — the ``plan_library_*`` keys.
+
+    A new subsystem rather than a GoT-optimisation knob, so it gets its own group and does
+    NOT use ``GoTConfig``'s ``got_`` auto-prefix. ``enabled`` is the master switch;
+    ``auto_enabled`` governs the automatic pre-expansion short-circuit (a confident template
+    match replaces the LLM's invented decomposition) and ``action_enabled`` the on-demand
+    ``plan_library_search`` leaf action (the model asks for a strategy itself, and an adopted
+    one grows children through ``_maybe_plan_library_reexpand``). The two sub-flags are
+    independent — auto-only, on-demand-only or both — mirroring the
+    ``got_step_confidence_judge_enabled``/``got_step_confidence_reexpand_enabled``
+    relationship. All default OFF -> byte-identical.
+
+    Deliberately carries NO similarity threshold: the decision constants live in
+    ``plan_library/retrieval.py`` (``AUTO_APPLY_THRESHOLD``/``SUGGEST_THRESHOLD``/
+    ``MIN_MARGIN``), calibrated against a labelled eval set, and the engine trusts
+    ``RetrievalResult.decision`` as that calibrated verdict. A second, uncalibrated gate here
+    would either be redundant or silently reject matches the calibration proved correct.
+    """
+
+    enabled: bool = False
+    auto_enabled: bool = False
+    action_enabled: bool = False
+
+    _KEYS: ClassVar[dict] = {
+        "enabled": "plan_library_enabled",
+        "auto_enabled": "plan_library_auto_enabled",
+        "action_enabled": "plan_library_action_enabled",
+    }
+
+    @classmethod
+    def from_settings(cls, settings: Mapping[str, Any]) -> "PlanLibraryConfig":
+        return _build(cls, settings)
+
+
+@dataclass(frozen=True)
 class ActionConfig:
     max_retries: int = 2
     retry_backoff_steps: int = 1
@@ -452,6 +488,7 @@ class IdeaConfig:
     final: FinalConfig
     merge: MergeConfig
     verify: VerifyConfig
+    plan_library: PlanLibraryConfig
     action: ActionConfig
     memory: MemoryConfig
     engine: EngineConfig
@@ -468,6 +505,7 @@ class IdeaConfig:
             final=FinalConfig.from_settings(settings),
             merge=MergeConfig.from_settings(settings),
             verify=VerifyConfig.from_settings(settings),
+            plan_library=PlanLibraryConfig.from_settings(settings),
             action=ActionConfig.from_settings(settings),
             memory=MemoryConfig.from_settings(settings),
             engine=EngineConfig.from_settings(settings),

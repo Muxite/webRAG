@@ -1,0 +1,2932 @@
+### TOPUP START 17:49:28 ###
+--- gemma2:2b / m1_thin / micro R=5 (17:49:28) ---
+>> search key sourced from euglena-agent-1
+>> cell  model=gemma2:2b  profile=m1_thin  tier=micro  ids=m01,m02,m03  runs=5  run_id=bml__gemma2-2b__m1_thin__micro  place=local
+2026-07-23 17:49:29,089 INFO root: Filtering to specific test IDs: ['m01', 'm02', 'm03']
+2026-07-23 17:49:29,090 INFO root: Specific test mode: Running 3 specified tests: ['m01', 'm02', 'm03']
+2026-07-23 17:49:29,090 INFO root: Running 3 test(s) (total available: 148)
+2026-07-23 17:49:29,090 INFO root: Mode: default
+2026-07-23 17:49:29,090 INFO root: Models: gemma2:2b
+2026-07-23 17:49:29,090 INFO root: Validation model: gemma2:2b
+2026-07-23 17:49:29,090 INFO root: Execution variants: graph_compiled (1 variant(s))
+2026-07-23 17:49:29,090 INFO root: Effort tiers (node budgets, 0=default): [0]
+2026-07-23 17:49:29,090 INFO root: Test ID filter active: ['m01', 'm02', 'm03']
+2026-07-23 17:49:29,090 INFO root: Top N tests: 0 (0 means all)
+2026-07-23 17:49:29,090 INFO root: Max parallel: 1
+2026-07-23 17:49:29,090 INFO root: Repeats: 5
+2026-07-23 17:49:29,090 INFO root: Spend ceiling: $5.0000 (matrix aborts when cumulative cost crosses it)
+2026-07-23 17:49:29,090 WARNING ConnectorConfig: No Redis URL set
+2026-07-23 17:49:29,090 WARNING ConnectorConfig: No RabbitMQ URL set
+2026-07-23 17:49:29,091 INFO root: Idea DAG settings source: (default idea_dag_settings.json) | arm=(none) | got_reexpand_enabled=False | got_step_confidence_judge_enabled=False | got_step_confidence_reexpand_enabled=False | enabled_adaptive_flags=[]
+2026-07-23 17:49:29,120 INFO ConnectorSearch: HTTP Session created.
+2026-07-23 17:49:29,120 INFO ConnectorHttp: HTTP Session created.
+2026-07-23 17:49:29,120 INFO ConnectorSearch: Probing Search API...
+2026-07-23 17:49:29,393 INFO ConnectorSearch: Search API OPERATIONAL
+2026-07-23 17:49:29,438 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/auth/identity "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,440 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,441 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database?tenant=default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,442 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2 "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,442 INFO ConnectorChroma: ChromaDB OPERATIONAL (async)
+2026-07-23 17:49:29,442 INFO root: Pre-flight target models: gemma2:2b
+2026-07-23 17:49:29,442 INFO root: Warming up ChromaDB to pre-install embedding models...
+2026-07-23 17:49:29,693 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,696 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,916 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/pre-flight-checks "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,920 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections/c15e3715-858a-4791-9dc2-0c52c2d49d00/add "HTTP/1.1 500 Internal Server Error"
+2026-07-23 17:49:29,920 ERROR ConnectorChroma: Failed to add to collection 'warmup_test': Query error: Database error: error returned from database: (code: 14) unable to open database file
+2026-07-23 17:49:29,923 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/auth/identity "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,924 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,925 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database?tenant=default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,926 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2 "HTTP/1.1 200 OK"
+2026-07-23 17:49:29,926 INFO ConnectorChroma: ChromaDB OPERATIONAL (async)
+2026-07-23 17:49:29,927 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:49:30,094 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections/c15e3715-858a-4791-9dc2-0c52c2d49d00/query "HTTP/1.1 200 OK"
+2026-07-23 17:49:30,094 INFO root: ChromaDB warmup completed - embedding models ready
+2026-07-23 17:49:34,736 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:34,740 INFO root: [PASSED] Pre-flight check for gemma2:2b (finish_reason=stop, content_len=2, payload={'max_completion_tokens': 256, 'temperature': 1})
+2026-07-23 17:49:34,740 INFO root: Valid models: gemma2:2b
+2026-07-23 17:49:34,741 INFO root: Total test tasks: 15
+2026-07-23 17:49:34,741 INFO root: Starting parallel test execution...
+2026-07-23 17:49:34,741 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:35,493 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:37,023 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:37,100 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:37,177 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:37,179 INFO root: [m01] gemma2:2b [graph_compiled] [run 1/5]: PASSED (score: 1.00, 2.4s)
+2026-07-23 17:49:37,179 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:37,773 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:38,902 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:38,981 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:39,060 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:39,061 INFO root: [m01] gemma2:2b [graph_compiled] [run 2/5]: PASSED (score: 1.00, 1.9s)
+2026-07-23 17:49:39,062 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:39,689 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:40,877 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:40,958 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:41,038 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:41,040 INFO root: [m01] gemma2:2b [graph_compiled] [run 3/5]: PASSED (score: 1.00, 2.0s)
+2026-07-23 17:49:41,040 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:41,541 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:42,819 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:42,896 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:42,974 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3672
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.362s  min=0.210s  max=0.515s  count=2  total=0.72s
+          llm_call: avg=0.755s  min=0.677s  max=0.834s  count=8  total=6.04s
+            search: avg=0.515s  min=0.515s  max=0.515s  count=1  total=0.52s
+      search_query: avg=0.515s  min=0.515s  max=0.515s  count=1  total=0.51s
+             visit: avg=0.335s  min=0.335s  max=0.335s  count=1  total=0.34s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███████████████████░░░░░░░░░░░░░░░░░░░░░| 0.362s (n=2)
+      llm_call |████████████████████████████████████████| 0.755s (n=8)
+        search |███████████████████████████░░░░░░░░░░░░░| 0.515s (n=1)
+  search_query |███████████████████████████░░░░░░░░░░░░░| 0.515s (n=1)
+         visit |█████████████████░░░░░░░░░░░░░░░░░░░░░░░| 0.335s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3672
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.256s  min=0.092s  max=0.421s  count=2  total=0.51s
+          llm_call: avg=0.578s  min=0.492s  max=0.652s  count=8  total=4.62s
+            search: avg=0.421s  min=0.421s  max=0.421s  count=1  total=0.42s
+      search_query: avg=0.421s  min=0.421s  max=0.421s  count=1  total=0.42s
+             visit: avg=0.213s  min=0.213s  max=0.213s  count=1  total=0.21s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████████████░░░░░░░░░░░░░░░░░░░░░░░| 0.256s (n=2)
+      llm_call |████████████████████████████████████████| 0.578s (n=8)
+        search |█████████████████████████████░░░░░░░░░░░| 0.421s (n=1)
+  search_query |█████████████████████████████░░░░░░░░░░░| 0.421s (n=1)
+         visit |██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.213s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3672
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.249s  min=0.089s  max=0.409s  count=2  total=0.50s
+          llm_call: avg=0.607s  min=0.520s  max=0.681s  count=8  total=4.85s
+            search: avg=0.409s  min=0.409s  max=0.409s  count=1  total=0.41s
+      search_query: avg=0.409s  min=0.409s  max=0.409s  count=1  total=0.41s
+             visit: avg=0.259s  min=0.259s  max=0.259s  count=1  total=0.26s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████████████░░░░░░░░░░░░░░░░░░░░░░░░| 0.249s (n=2)
+      llm_call |████████████████████████████████████████| 0.607s (n=8)
+        search |██████████████████████████░░░░░░░░░░░░░░| 0.409s (n=1)
+  search_query |██████████████████████████░░░░░░░░░░░░░░| 0.409s (n=1)
+         visit |█████████████████░░░░░░░░░░░░░░░░░░░░░░░| 0.259s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3671
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.317s  min=0.090s  max=0.544s  count=2  total=0.63s
+          llm_call: avg=0.593s  min=0.502s  max=0.701s  count=8  total=4.74s
+            search: avg=0.545s  min=0.545s  max=0.545s  count=1  total=0.55s
+      search_query: avg=0.545s  min=0.545s  max=0.545s  count=1  total=0.54s
+             visit: avg=0.186s  min=0.186s  max=0.186s  count=1  total=0.19s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████████████████░░░░░░░░░░░░░░░░░░░| 0.317s (n=2)
+      llm_call |████████████████████████████████████████| 0.593s (n=8)
+        search |████████████████████████████████████░░░░| 0.545s (n=1)
+  search_query |████████████████████████████████████░░░░| 0.545s (n=1)
+         visit |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.186s (n=1)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:49:42,976 INFO root: [m01] gemma2:2b [graph_compiled] [run 4/5]: PASSED (score: 1.00, 1.9s)
+2026-07-23 17:49:42,976 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:43,613 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:44,490 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:44,568 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:44,647 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:44,650 INFO root: [m01] gemma2:2b [graph_compiled] [run 5/5]: PASSED (score: 1.00, 1.7s)
+2026-07-23 17:49:44,650 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:45,285 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:47,408 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:47,508 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:47,606 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:47,609 INFO root: [m02] gemma2:2b [graph_compiled] [run 1/5]: FAILED (score: 0.50, 3.0s)
+2026-07-23 17:49:47,609 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:48,265 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:49,995 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:50,079 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:50,179 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:50,181 INFO root: [m02] gemma2:2b [graph_compiled] [run 2/5]: FAILED (score: 0.50, 2.6s)
+2026-07-23 17:49:50,181 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:50,857 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:52,515 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:52,620 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:52,724 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3672
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.136s  min=0.087s  max=0.184s  count=2  total=0.27s
+          llm_call: avg=0.580s  min=0.481s  max=0.640s  count=8  total=4.64s
+            search: avg=0.184s  min=0.184s  max=0.184s  count=1  total=0.18s
+      search_query: avg=0.184s  min=0.184s  max=0.184s  count=1  total=0.18s
+             visit: avg=0.210s  min=0.210s  max=0.210s  count=1  total=0.21s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.136s (n=2)
+      llm_call |████████████████████████████████████████| 0.580s (n=8)
+        search |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.184s (n=1)
+  search_query |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.184s (n=1)
+         visit |██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.210s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 5434
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.473s  min=0.333s  max=0.613s  count=2  total=0.95s
+          llm_call: avg=0.862s  min=0.635s  max=1.036s  count=8  total=6.89s
+            search: avg=0.613s  min=0.613s  max=0.613s  count=1  total=0.61s
+      search_query: avg=0.613s  min=0.613s  max=0.613s  count=1  total=0.61s
+             visit: avg=0.671s  min=0.671s  max=0.671s  count=1  total=0.67s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████████████████░░░░░░░░░░░░░░░░░░░| 0.473s (n=2)
+      llm_call |████████████████████████████████████████| 0.862s (n=8)
+        search |████████████████████████████░░░░░░░░░░░░| 0.613s (n=1)
+  search_query |████████████████████████████░░░░░░░░░░░░| 0.613s (n=1)
+         visit |███████████████████████████████░░░░░░░░░| 0.671s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 5433
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.450s  min=0.258s  max=0.641s  count=2  total=0.90s
+          llm_call: avg=0.625s  min=0.526s  max=0.709s  count=8  total=5.00s
+            search: avg=0.642s  min=0.642s  max=0.642s  count=1  total=0.64s
+      search_query: avg=0.641s  min=0.641s  max=0.641s  count=1  total=0.64s
+             visit: avg=0.562s  min=0.562s  max=0.562s  count=1  total=0.56s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████████████████████████░░░░░░░░░░░░| 0.450s (n=2)
+      llm_call |██████████████████████████████████████░░| 0.625s (n=8)
+        search |████████████████████████████████████████| 0.642s (n=1)
+  search_query |███████████████████████████████████████░| 0.641s (n=1)
+         visit |███████████████████████████████████░░░░░| 0.562s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.00)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [x] keystone_area: 0.0  Area 56.6 missing/incorrect
+  [x] grounding: 0.0  Keystone absent -> grounding not credited
+
+Observability:
+  LLM calls: 8, tokens: 5433
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.416s  min=0.228s  max=0.604s  count=2  total=0.83s
+          llm_call: avg=0.611s  min=0.484s  max=0.692s  count=8  total=4.89s
+            search: avg=0.604s  min=0.604s  max=0.604s  count=1  total=0.60s
+      search_query: avg=0.604s  min=0.604s  max=0.604s  count=1  total=0.60s
+             visit: avg=0.568s  min=0.568s  max=0.568s  count=1  total=0.57s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███████████████████████████░░░░░░░░░░░░░| 0.416s (n=2)
+      llm_call |████████████████████████████████████████| 0.611s (n=8)
+        search |███████████████████████████████████████░| 0.604s (n=1)
+  search_query |███████████████████████████████████████░| 0.604s (n=1)
+         visit |█████████████████████████████████████░░░| 0.568s (n=1)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:49:52,726 INFO root: [m02] gemma2:2b [graph_compiled] [run 3/5]: FAILED (score: 0.00, 2.5s)
+2026-07-23 17:49:52,727 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:53,372 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:54,667 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:54,769 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:54,870 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:54,872 INFO root: [m02] gemma2:2b [graph_compiled] [run 4/5]: FAILED (score: 0.50, 2.1s)
+2026-07-23 17:49:54,873 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:55,523 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:56,775 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:56,878 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:56,979 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:56,981 INFO root: [m02] gemma2:2b [graph_compiled] [run 5/5]: FAILED (score: 0.50, 2.1s)
+2026-07-23 17:49:56,982 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:49:57,702 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:59,210 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:59,288 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:59,365 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:49:59,367 INFO root: [m03] gemma2:2b [graph_compiled] [run 1/5]: PASSED (score: 1.00, 2.4s)
+2026-07-23 17:49:59,367 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:00,022 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:00,857 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:00,933 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:01,009 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 5433
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.199s  min=0.159s  max=0.239s  count=2  total=0.40s
+          llm_call: avg=0.613s  min=0.501s  max=0.703s  count=8  total=4.91s
+            search: avg=0.160s  min=0.160s  max=0.160s  count=1  total=0.16s
+      search_query: avg=0.159s  min=0.159s  max=0.159s  count=1  total=0.16s
+             visit: avg=0.633s  min=0.633s  max=0.633s  count=1  total=0.63s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.199s (n=2)
+      llm_call |██████████████████████████████████████░░| 0.613s (n=8)
+        search |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.160s (n=1)
+  search_query |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.159s (n=1)
+         visit |████████████████████████████████████████| 0.633s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 5433
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.171s  min=0.158s  max=0.184s  count=2  total=0.34s
+          llm_call: avg=0.672s  min=0.576s  max=0.781s  count=8  total=5.38s
+            search: avg=0.158s  min=0.158s  max=0.158s  count=1  total=0.16s
+      search_query: avg=0.158s  min=0.158s  max=0.158s  count=1  total=0.16s
+             visit: avg=0.516s  min=0.516s  max=0.516s  count=1  total=0.52s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.171s (n=2)
+      llm_call |████████████████████████████████████████| 0.672s (n=8)
+        search |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.158s (n=1)
+  search_query |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.158s (n=1)
+         visit |██████████████████████████████░░░░░░░░░░| 0.516s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3836
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.317s  min=0.093s  max=0.541s  count=2  total=0.63s
+          llm_call: avg=0.777s  min=0.718s  max=0.872s  count=8  total=6.21s
+            search: avg=0.542s  min=0.542s  max=0.542s  count=1  total=0.54s
+      search_query: avg=0.541s  min=0.541s  max=0.541s  count=1  total=0.54s
+             visit: avg=0.247s  min=0.247s  max=0.247s  count=1  total=0.25s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████████████░░░░░░░░░░░░░░░░░░░░░░░░| 0.317s (n=2)
+      llm_call |████████████████████████████████████████| 0.777s (n=8)
+        search |███████████████████████████░░░░░░░░░░░░░| 0.542s (n=1)
+  search_query |███████████████████████████░░░░░░░░░░░░░| 0.541s (n=1)
+         visit |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.247s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3836
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.083s  min=0.080s  max=0.086s  count=2  total=0.17s
+          llm_call: avg=0.602s  min=0.509s  max=0.660s  count=8  total=4.82s
+            search: avg=0.081s  min=0.081s  max=0.081s  count=1  total=0.08s
+      search_query: avg=0.080s  min=0.080s  max=0.080s  count=1  total=0.08s
+             visit: avg=0.244s  min=0.244s  max=0.244s  count=1  total=0.24s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.083s (n=2)
+      llm_call |████████████████████████████████████████| 0.602s (n=8)
+        search |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.081s (n=1)
+  search_query |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.080s (n=1)
+         visit |████████████████░░░░░░░░░░░░░░░░░░░░░░░░| 0.244s (n=1)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:50:01,011 INFO root: [m03] gemma2:2b [graph_compiled] [run 2/5]: PASSED (score: 1.00, 1.6s)
+2026-07-23 17:50:01,011 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:01,684 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:02,837 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:02,914 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:02,992 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:02,993 INFO root: [m03] gemma2:2b [graph_compiled] [run 3/5]: PASSED (score: 1.00, 2.0s)
+2026-07-23 17:50:02,994 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:03,648 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:04,385 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:04,462 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:04,538 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:04,539 INFO root: [m03] gemma2:2b [graph_compiled] [run 4/5]: PASSED (score: 1.00, 1.6s)
+2026-07-23 17:50:04,540 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:05,138 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:06,005 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:06,082 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:06,159 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:06,160 INFO root: [m03] gemma2:2b [graph_compiled] [run 5/5]: PASSED (score: 1.00, 1.6s)
+/home/muk/projects/webRAG/services/agent/app/idea_test_runner.py:1472: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp": datetime.utcnow().isoformat(),
+2026-07-23 17:50:06,164 INFO root: 
+================================================================================
+2026-07-23 17:50:06,164 INFO root:   RUN SUMMARY: bml__gemma2-2b__m1_thin__micro
+2026-07-23 17:50:06,164 INFO root: ================================================================================
+2026-07-23 17:50:06,164 INFO root:     Test           Model     Variant   Pass   Score  Visits   Nodes     Time
+2026-07-23 17:50:06,164 INFO root:   ------  --------------  ----------  -----  ------  ------  ------  -------
+2026-07-23 17:50:06,164 INFO root:      m01       gemma2:2b  graph_compiled     OK    1.00       1       0     2.4s
+2026-07-23 17:50:06,164 INFO root:      m01       gemma2:2b  graph_compiled     OK    1.00       1       0     1.9s
+2026-07-23 17:50:06,164 INFO root:      m01       gemma2:2b  graph_compiled     OK    1.00       1       0     2.0s
+2026-07-23 17:50:06,164 INFO root:      m01       gemma2:2b  graph_compiled     OK    1.00       1       0     1.9s
+2026-07-23 17:50:06,164 INFO root:      m01       gemma2:2b  graph_compiled     OK    1.00       1       0     1.7s
+2026-07-23 17:50:06,164 INFO root:      m02       gemma2:2b  graph_compiled   FAIL    0.50       1       0     3.0s
+2026-07-23 17:50:06,164 INFO root:      m02       gemma2:2b  graph_compiled   FAIL    0.50       1       0     2.6s
+2026-07-23 17:50:06,164 INFO root:      m02       gemma2:2b  graph_compiled   FAIL    0.00       1       0     2.5s
+2026-07-23 17:50:06,164 INFO root:      m02       gemma2:2b  graph_compiled   FAIL    0.50       1       0     2.1s
+2026-07-23 17:50:06,164 INFO root:      m02       gemma2:2b  graph_compiled   FAIL    0.50       1       0     2.1s
+2026-07-23 17:50:06,164 INFO root:      m03       gemma2:2b  graph_compiled     OK    1.00       1       0     2.4s
+2026-07-23 17:50:06,164 INFO root:      m03       gemma2:2b  graph_compiled     OK    1.00       1       0     1.6s
+2026-07-23 17:50:06,164 INFO root:      m03       gemma2:2b  graph_compiled     OK    1.00       1       0     2.0s
+2026-07-23 17:50:06,164 INFO root:      m03       gemma2:2b  graph_compiled     OK    1.00       1       0     1.6s
+2026-07-23 17:50:06,164 INFO root:      m03       gemma2:2b  graph_compiled     OK    1.00       1       0     1.6s
+2026-07-23 17:50:06,164 INFO root: ================================================================================
+2026-07-23 17:50:06,164 INFO root:   Passed: 10/15  Avg Score: 0.80
+2026-07-23 17:50:06,164 INFO root:   Priority mode: 0 tests (0 = all)
+2026-07-23 17:50:06,164 INFO root: 
+2026-07-23 17:50:06,164 INFO root:   Per Model+Variant Breakdown:
+2026-07-23 17:50:06,164 INFO root:                           System  Runs   Pass%     Avg     Med     Min     Max
+2026-07-23 17:50:06,164 INFO root:   ------------------------------  ----   -----   -----   -----   -----   -----
+2026-07-23 17:50:06,169 INFO root:       gemma2:2b [graph_compiled]    15  66.7%   0.800   1.000   0.000   1.000
+2026-07-23 17:50:06,169 INFO root: 
+2026-07-23 17:50:06,169 INFO root:   Aggregate Connector Timings Across All Tests:
+2026-07-23 17:50:06,170 INFO root:         http_request: avg=0.255s  min=0.061s  max=0.641s  count=30  total=7.65s
+2026-07-23 17:50:06,170 INFO root:             llm_call: avg=0.642s  min=0.437s  max=1.036s  count=120  total=77.02s
+2026-07-23 17:50:06,170 INFO root:               search: avg=0.362s  min=0.074s  max=0.642s  count=15  total=5.43s
+2026-07-23 17:50:06,170 INFO root:         search_query: avg=0.362s  min=0.073s  max=0.641s  count=15  total=5.42s
+2026-07-23 17:50:06,170 INFO root:                visit: avg=0.358s  min=0.186s  max=0.671s  count=15  total=5.38s
+2026-07-23 17:50:06,170 INFO root: 
+2026-07-23 17:50:06,170 INFO root:   Avg Duration (all tests)
+2026-07-23 17:50:06,170 INFO root:   ────────────────────────────────────────────────────────────────────────
+2026-07-23 17:50:06,170 INFO root:   http_request |███████████████░░░░░░░░░░░░░░░░░░░░░░░░░| 0.255s (n=30)
+2026-07-23 17:50:06,170 INFO root:       llm_call |████████████████████████████████████████| 0.642s (n=120)
+2026-07-23 17:50:06,170 INFO root:         search |██████████████████████░░░░░░░░░░░░░░░░░░| 0.362s (n=15)
+2026-07-23 17:50:06,170 INFO root:   search_query |██████████████████████░░░░░░░░░░░░░░░░░░| 0.362s (n=15)
+2026-07-23 17:50:06,170 INFO root:          visit |██████████████████████░░░░░░░░░░░░░░░░░░| 0.358s (n=15)
+2026-07-23 17:50:06,170 INFO root:   ────────────────────────────────────────────────────────────────────────
+2026-07-23 17:50:06,170 INFO root: ================================================================================
+2026-07-23 17:50:06,170 INFO ConnectorHttp: HTTP Session closed.
+2026-07-23 17:50:06,171 INFO ConnectorSearch: HTTP Session closed.
+
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3836
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.243s  min=0.088s  max=0.399s  count=2  total=0.49s
+          llm_call: avg=0.572s  min=0.461s  max=0.673s  count=8  total=4.58s
+            search: avg=0.399s  min=0.399s  max=0.399s  count=1  total=0.40s
+      search_query: avg=0.399s  min=0.399s  max=0.399s  count=1  total=0.40s
+             visit: avg=0.292s  min=0.292s  max=0.292s  count=1  total=0.29s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████████████░░░░░░░░░░░░░░░░░░░░░░░| 0.243s (n=2)
+      llm_call |████████████████████████████████████████| 0.572s (n=8)
+        search |███████████████████████████░░░░░░░░░░░░░| 0.399s (n=1)
+  search_query |███████████████████████████░░░░░░░░░░░░░| 0.399s (n=1)
+         visit |████████████████████░░░░░░░░░░░░░░░░░░░░| 0.292s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3836
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.080s  min=0.073s  max=0.086s  count=2  total=0.16s
+          llm_call: avg=0.549s  min=0.437s  max=0.655s  count=8  total=4.40s
+            search: avg=0.074s  min=0.074s  max=0.074s  count=1  total=0.07s
+      search_query: avg=0.073s  min=0.073s  max=0.073s  count=1  total=0.07s
+             visit: avg=0.224s  min=0.224s  max=0.224s  count=1  total=0.22s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.080s (n=2)
+      llm_call |████████████████████████████████████████| 0.549s (n=8)
+        search |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.074s (n=1)
+  search_query |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.073s (n=1)
+         visit |████████████████░░░░░░░░░░░░░░░░░░░░░░░░| 0.224s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3836
+  Cost: N/A  [gemma2:2b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.071s  min=0.061s  max=0.082s  count=2  total=0.14s
+          llm_call: avg=0.633s  min=0.567s  max=0.720s  count=8  total=5.06s
+            search: avg=0.082s  min=0.082s  max=0.082s  count=1  total=0.08s
+      search_query: avg=0.082s  min=0.082s  max=0.082s  count=1  total=0.08s
+             visit: avg=0.217s  min=0.217s  max=0.217s  count=1  total=0.22s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.071s (n=2)
+      llm_call |████████████████████████████████████████| 0.633s (n=8)
+        search |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.082s (n=1)
+  search_query |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.082s (n=1)
+         visit |█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.217s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+>> gate_report:
+
+=== gemma2:2b ===
+SCORE (mean +/- stdev, n)
+test       compiled:hand
+m01        1.00±0.00(n5)
+m02        0.40±0.22(n5)
+m03        1.00±0.00(n5)
+RUNTIME USD (mean)
+test       compiled:hand
+m01                   na
+m02                   na
+m03                   na
+--- llama3.2:3b / m0_baseline / micro R=5 (17:50:06) ---
+>> search key sourced from euglena-agent-1
+>> cell  model=llama3.2:3b  profile=m0_baseline  tier=micro  ids=m01,m02,m03  runs=5  run_id=bml__llama3.2-3b__m0_baseline__micro  place=local
+2026-07-23 17:50:07,526 INFO root: Filtering to specific test IDs: ['m01', 'm02', 'm03']
+2026-07-23 17:50:07,528 INFO root: Specific test mode: Running 3 specified tests: ['m01', 'm02', 'm03']
+2026-07-23 17:50:07,528 INFO root: Running 3 test(s) (total available: 148)
+2026-07-23 17:50:07,528 INFO root: Mode: default
+2026-07-23 17:50:07,528 INFO root: Models: llama3.2:3b
+2026-07-23 17:50:07,528 INFO root: Validation model: llama3.2:3b
+2026-07-23 17:50:07,528 INFO root: Execution variants: graph_compiled (1 variant(s))
+2026-07-23 17:50:07,528 INFO root: Effort tiers (node budgets, 0=default): [0]
+2026-07-23 17:50:07,528 INFO root: Test ID filter active: ['m01', 'm02', 'm03']
+2026-07-23 17:50:07,528 INFO root: Top N tests: 0 (0 means all)
+2026-07-23 17:50:07,528 INFO root: Max parallel: 1
+2026-07-23 17:50:07,528 INFO root: Repeats: 5
+2026-07-23 17:50:07,528 INFO root: Spend ceiling: $5.0000 (matrix aborts when cumulative cost crosses it)
+2026-07-23 17:50:07,528 WARNING ConnectorConfig: No Redis URL set
+2026-07-23 17:50:07,528 WARNING ConnectorConfig: No RabbitMQ URL set
+2026-07-23 17:50:07,528 INFO root: Idea DAG settings source: (default idea_dag_settings.json) | arm=(none) | got_reexpand_enabled=False | got_step_confidence_judge_enabled=False | got_step_confidence_reexpand_enabled=False | enabled_adaptive_flags=[]
+2026-07-23 17:50:07,557 INFO ConnectorSearch: HTTP Session created.
+2026-07-23 17:50:07,557 INFO ConnectorHttp: HTTP Session created.
+2026-07-23 17:50:07,557 INFO ConnectorSearch: Probing Search API...
+2026-07-23 17:50:07,783 INFO ConnectorSearch: Search API OPERATIONAL
+2026-07-23 17:50:08,420 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/auth/identity "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,421 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,422 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database?tenant=default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,423 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2 "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,423 INFO ConnectorChroma: ChromaDB OPERATIONAL (async)
+2026-07-23 17:50:08,423 INFO root: Pre-flight target models: llama3.2:3b
+2026-07-23 17:50:08,423 INFO root: Warming up ChromaDB to pre-install embedding models...
+2026-07-23 17:50:08,678 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,680 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,919 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/pre-flight-checks "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,921 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections/c15e3715-858a-4791-9dc2-0c52c2d49d00/add "HTTP/1.1 500 Internal Server Error"
+2026-07-23 17:50:08,921 ERROR ConnectorChroma: Failed to add to collection 'warmup_test': Query error: Database error: error returned from database: (code: 14) unable to open database file
+2026-07-23 17:50:08,924 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/auth/identity "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,925 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,926 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database?tenant=default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,927 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2 "HTTP/1.1 200 OK"
+2026-07-23 17:50:08,927 INFO ConnectorChroma: ChromaDB OPERATIONAL (async)
+2026-07-23 17:50:08,928 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:50:09,114 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections/c15e3715-858a-4791-9dc2-0c52c2d49d00/query "HTTP/1.1 200 OK"
+2026-07-23 17:50:09,115 INFO root: ChromaDB warmup completed - embedding models ready
+2026-07-23 17:50:14,122 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:14,127 INFO root: [PASSED] Pre-flight check for llama3.2:3b (finish_reason=stop, content_len=2, payload={'max_completion_tokens': 256, 'temperature': 1})
+2026-07-23 17:50:14,127 INFO root: Valid models: llama3.2:3b
+2026-07-23 17:50:14,127 INFO root: Total test tasks: 15
+2026-07-23 17:50:14,127 INFO root: Starting parallel test execution...
+2026-07-23 17:50:14,128 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:15,158 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:15,989 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:17,660 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:18,915 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:19,675 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:19,677 INFO root: [m01] llama3.2:3b [graph_compiled] [run 1/5]: FAILED (score: 0.50, 5.5s)
+2026-07-23 17:50:19,677 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:20,515 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:21,623 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:21,624 INFO root: [m01] llama3.2:3b [graph_compiled] [run 2/5]: FAILED (score: 0.50, 1.9s)
+2026-07-23 17:50:21,625 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:22,499 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:23,701 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:23,702 INFO root: [m01] llama3.2:3b [graph_compiled] [run 3/5]: FAILED (score: 0.50, 2.1s)
+2026-07-23 17:50:23,703 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:24,468 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:25,922 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:27,009 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:28,047 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:28,050 INFO root: [m01] llama3.2:3b [graph_compiled] [run 4/5]: FAILED (score: 0.50, 4.3s)
+2026-07-23 17:50:28,050 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:28,938 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:30,224 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:31,208 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+===========================================================================
+[FAIL] Test m01: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 3596
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.271s  min=0.030s  max=0.596s  count=3  total=0.81s
+          llm_call: avg=0.925s  min=0.759s  max=1.075s  count=10  total=9.25s
+            search: avg=0.313s  min=0.030s  max=0.596s  count=2  total=0.63s
+      search_query: avg=0.313s  min=0.030s  max=0.596s  count=2  total=0.63s
+             visit: avg=0.294s  min=0.294s  max=0.294s  count=1  total=0.29s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.271s (n=3)
+      llm_call |████████████████████████████████████████| 0.925s (n=10)
+        search |█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.313s (n=2)
+  search_query |█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.313s (n=2)
+         visit |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.294s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m01: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 4, tokens: 1009
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.077s  min=0.077s  max=0.077s  count=1  total=0.08s
+          llm_call: avg=0.873s  min=0.838s  max=0.907s  count=4  total=3.49s
+             visit: avg=0.201s  min=0.201s  max=0.201s  count=1  total=0.20s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.077s (n=1)
+      llm_call |████████████████████████████████████████| 0.873s (n=4)
+         visit |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.201s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m01: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 4, tokens: 1035
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.076s  min=0.076s  max=0.076s  count=1  total=0.08s
+          llm_call: avg=0.913s  min=0.875s  max=0.951s  count=4  total=3.65s
+             visit: avg=0.251s  min=0.251s  max=0.251s  count=1  total=0.25s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.076s (n=1)
+      llm_call |████████████████████████████████████████| 0.913s (n=4)
+         visit |███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.251s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m01: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 3574
+  Cost: N/A  [llama3.2:3b]
+  Visits: 2
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.222s  min=0.052s  max=0.536s  count=3  total=0.66s
+          llm_call: avg=0.859s  min=0.766s  max=0.917s  count=8  total=6.88s
+            search: avg=0.536s  min=0.536s  max=0.536s  count=1  total=0.54s
+      search_query: avg=0.536s  min=0.536s  max=0.536s  count=1  total=0.54s
+             visit: avg=0.185s  min=0.174s  max=0.196s  count=2  total=0.37s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.222s (n=3)
+      llm_call |████████████████████████████████████████| 0.859s (n=8)
+        search |████████████████████████░░░░░░░░░░░░░░░░| 0.536s (n=1)
+  search_query |████████████████████████░░░░░░░░░░░░░░░░| 0.536s (n=1)
+         visit |████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.185s (n=2)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m01: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 6, tokens: 2026
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.127s  min=0.076s  max=0.178s  count=2  total=0.25s
+          llm_call: avg=0.936s  min=0.812s  max=1.107s  count=6  total=5.62s
+            search: avg=0.178s  min=0.178s  max=0.178s  count=1  total=0.18s
+      search_query: avg=0.178s  min=0.178s  max=0.178s  count=1  total=0.18s
+             visit: avg=0.172s  min=0.172s  max=0.172s  count=1  total=0.17s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.127s (n=2)
+      llm_call |████████████████████████████████████████| 0.936s (n=6)
+        search |███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.178s (n=1)
+  search_query |███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.178s (n=1)
+         visit |███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.172s (n=1)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:50:31,209 INFO root: [m01] llama3.2:3b [graph_compiled] [run 5/5]: FAILED (score: 0.50, 3.2s)
+2026-07-23 17:50:31,210 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:32,095 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:33,820 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:35,460 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:36,807 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:37,744 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:37,747 INFO root: [m02] llama3.2:3b [graph_compiled] [run 1/5]: FAILED (score: 0.50, 6.5s)
+2026-07-23 17:50:37,748 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:38,647 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:40,220 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:41,612 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:43,132 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:43,689 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:43,693 INFO root: [m02] llama3.2:3b [graph_compiled] [run 2/5]: FAILED (score: 0.50, 5.9s)
+2026-07-23 17:50:43,694 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:44,642 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:46,322 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:47,989 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:49,515 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:50,085 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:50,089 INFO root: [m02] llama3.2:3b [graph_compiled] [run 3/5]: FAILED (score: 0.00, 6.4s)
+2026-07-23 17:50:50,090 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:51,140 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:52,698 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:53,838 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:55,343 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:56,108 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 4982
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 12
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.506s  min=0.392s  max=0.589s  count=3  total=1.52s
+          llm_call: avg=0.937s  min=0.858s  max=1.051s  count=10  total=9.37s
+            search: avg=0.491s  min=0.393s  max=0.589s  count=2  total=0.98s
+      search_query: avg=0.490s  min=0.392s  max=0.589s  count=2  total=0.98s
+             visit: avg=0.866s  min=0.866s  max=0.866s  count=1  total=0.87s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████████████████░░░░░░░░░░░░░░░░░░░| 0.506s (n=3)
+      llm_call |████████████████████████████████████████| 0.937s (n=10)
+        search |████████████████████░░░░░░░░░░░░░░░░░░░░| 0.491s (n=2)
+  search_query |████████████████████░░░░░░░░░░░░░░░░░░░░| 0.490s (n=2)
+         visit |████████████████████████████████████░░░░| 0.866s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 4910
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 12
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.407s  min=0.255s  max=0.493s  count=3  total=1.22s
+          llm_call: avg=0.876s  min=0.557s  max=1.026s  count=10  total=8.76s
+            search: avg=0.483s  min=0.472s  max=0.494s  count=2  total=0.97s
+      search_query: avg=0.483s  min=0.471s  max=0.494s  count=2  total=0.97s
+             visit: avg=0.597s  min=0.597s  max=0.597s  count=1  total=0.60s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████████████░░░░░░░░░░░░░░░░░░░░░░| 0.407s (n=3)
+      llm_call |████████████████████████████████████████| 0.876s (n=10)
+        search |██████████████████████░░░░░░░░░░░░░░░░░░| 0.483s (n=2)
+  search_query |██████████████████████░░░░░░░░░░░░░░░░░░| 0.483s (n=2)
+         visit |███████████████████████████░░░░░░░░░░░░░| 0.597s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.00)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [x] keystone_area: 0.0  Area 56.6 missing/incorrect
+  [x] grounding: 0.0  Keystone absent -> grounding not credited
+
+Observability:
+  LLM calls: 10, tokens: 5016
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 12
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.445s  min=0.239s  max=0.560s  count=3  total=1.33s
+          llm_call: avg=0.933s  min=0.570s  max=1.132s  count=10  total=9.33s
+            search: avg=0.548s  min=0.535s  max=0.561s  count=2  total=1.10s
+      search_query: avg=0.548s  min=0.535s  max=0.561s  count=2  total=1.10s
+             visit: avg=0.629s  min=0.629s  max=0.629s  count=1  total=0.63s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███████████████████░░░░░░░░░░░░░░░░░░░░░| 0.445s (n=3)
+      llm_call |████████████████████████████████████████| 0.933s (n=10)
+        search |███████████████████████░░░░░░░░░░░░░░░░░| 0.548s (n=2)
+  search_query |███████████████████████░░░░░░░░░░░░░░░░░| 0.548s (n=2)
+         visit |██████████████████████████░░░░░░░░░░░░░░| 0.629s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[PASS] Test m02: Micro: obscure island land area (single-page)  (score: 1.00)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 10, tokens: 4514
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.359s  min=0.233s  max=0.566s  count=3  total=1.08s
+          llm_call: avg=0.922s  min=0.765s  max=1.050s  count=10  total=9.22s
+            search: avg=0.566s  min=0.566s  max=0.566s  count=1  total=0.57s
+      search_query: avg=0.566s  min=0.566s  max=0.566s  count=1  total=0.57s
+             visit: avg=0.421s  min=0.278s  max=0.564s  count=2  total=0.84s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███████████████░░░░░░░░░░░░░░░░░░░░░░░░░| 0.359s (n=3)
+      llm_call |████████████████████████████████████████| 0.922s (n=10)
+        search |████████████████████████░░░░░░░░░░░░░░░░| 0.566s (n=1)
+  search_query |████████████████████████░░░░░░░░░░░░░░░░| 0.566s (n=1)
+         visit |██████████████████░░░░░░░░░░░░░░░░░░░░░░| 0.421s (n=2)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:50:56,112 INFO root: [m02] llama3.2:3b [graph_compiled] [run 4/5]: PASSED (score: 1.00, 6.0s)
+2026-07-23 17:50:56,112 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:50:57,078 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:50:58,634 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:00,058 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:01,487 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:02,209 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:02,211 INFO root: [m02] llama3.2:3b [graph_compiled] [run 5/5]: PASSED (score: 1.00, 6.1s)
+2026-07-23 17:51:02,211 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:03,151 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:04,399 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:05,686 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:06,806 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:06,808 INFO root: [m03] llama3.2:3b [graph_compiled] [run 1/5]: FAILED (score: 0.50, 4.6s)
+2026-07-23 17:51:06,808 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:07,715 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:08,865 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:10,085 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:10,087 INFO root: [m03] llama3.2:3b [graph_compiled] [run 2/5]: PASSED (score: 1.00, 3.3s)
+2026-07-23 17:51:10,087 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:11,045 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:12,505 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:14,296 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:15,687 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:16,209 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+
+=============================================================================
+[PASS] Test m02: Micro: obscure island land area (single-page)  (score: 1.00)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 10, tokens: 4965
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 12
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.483s  min=0.299s  max=0.576s  count=3  total=1.45s
+          llm_call: avg=0.863s  min=0.721s  max=0.967s  count=10  total=8.63s
+            search: avg=0.576s  min=0.575s  max=0.577s  count=2  total=1.15s
+      search_query: avg=0.576s  min=0.575s  max=0.576s  count=2  total=1.15s
+             visit: avg=0.628s  min=0.628s  max=0.628s  count=1  total=0.63s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████████████████░░░░░░░░░░░░░░░░░░| 0.483s (n=3)
+      llm_call |████████████████████████████████████████| 0.863s (n=10)
+        search |██████████████████████████░░░░░░░░░░░░░░| 0.576s (n=2)
+  search_query |██████████████████████████░░░░░░░░░░░░░░| 0.576s (n=2)
+         visit |█████████████████████████████░░░░░░░░░░░| 0.628s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m03: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 3820
+  Cost: N/A  [llama3.2:3b]
+  Visits: 2
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.241s  min=0.105s  max=0.502s  count=3  total=0.72s
+          llm_call: avg=0.890s  min=0.784s  max=0.988s  count=8  total=7.12s
+            search: avg=0.502s  min=0.502s  max=0.502s  count=1  total=0.50s
+      search_query: avg=0.502s  min=0.502s  max=0.502s  count=1  total=0.50s
+             visit: avg=0.266s  min=0.260s  max=0.272s  count=2  total=0.53s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.241s (n=3)
+      llm_call |████████████████████████████████████████| 0.890s (n=8)
+        search |██████████████████████░░░░░░░░░░░░░░░░░░| 0.502s (n=1)
+  search_query |██████████████████████░░░░░░░░░░░░░░░░░░| 0.502s (n=1)
+         visit |███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.266s (n=2)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 6, tokens: 2227
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.109s  min=0.109s  max=0.109s  count=1  total=0.11s
+          llm_call: avg=0.983s  min=0.821s  max=1.220s  count=6  total=5.90s
+             visit: avg=0.329s  min=0.329s  max=0.329s  count=1  total=0.33s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.109s (n=1)
+      llm_call |████████████████████████████████████████| 0.983s (n=6)
+         visit |█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.329s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m03: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 5136
+  Cost: N/A  [llama3.2:3b]
+  Visits: 2
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.243s  min=0.100s  max=0.521s  count=3  total=0.73s
+          llm_call: avg=1.015s  min=0.522s  max=1.270s  count=10  total=10.15s
+            search: avg=0.521s  min=0.521s  max=0.521s  count=1  total=0.52s
+      search_query: avg=0.521s  min=0.521s  max=0.521s  count=1  total=0.52s
+             visit: avg=0.262s  min=0.257s  max=0.267s  count=2  total=0.52s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.243s (n=3)
+      llm_call |████████████████████████████████████████| 1.015s (n=10)
+        search |████████████████████░░░░░░░░░░░░░░░░░░░░| 0.521s (n=1)
+  search_query |████████████████████░░░░░░░░░░░░░░░░░░░░| 0.521s (n=1)
+         visit |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.262s (n=2)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:51:16,211 INFO root: [m03] llama3.2:3b [graph_compiled] [run 3/5]: FAILED (score: 0.50, 6.1s)
+2026-07-23 17:51:16,211 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:17,113 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:18,224 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:18,855 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:18,856 INFO root: [m03] llama3.2:3b [graph_compiled] [run 4/5]: PASSED (score: 1.00, 2.6s)
+2026-07-23 17:51:18,857 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:19,732 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:20,636 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:20,637 INFO root: [m03] llama3.2:3b [graph_compiled] [run 5/5]: FAILED (score: 0.50, 1.8s)
+/home/muk/projects/webRAG/services/agent/app/idea_test_runner.py:1472: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp": datetime.utcnow().isoformat(),
+2026-07-23 17:51:20,640 INFO root: 
+================================================================================
+2026-07-23 17:51:20,641 INFO root:   RUN SUMMARY: bml__llama3.2-3b__m0_baseline__micro
+2026-07-23 17:51:20,641 INFO root: ================================================================================
+2026-07-23 17:51:20,641 INFO root:     Test           Model     Variant   Pass   Score  Visits   Nodes     Time
+2026-07-23 17:51:20,641 INFO root:   ------  --------------  ----------  -----  ------  ------  ------  -------
+2026-07-23 17:51:20,641 INFO root:      m01     llama3.2:3b  graph_compiled   FAIL    0.50       1       0     5.5s
+2026-07-23 17:51:20,641 INFO root:      m01     llama3.2:3b  graph_compiled   FAIL    0.50       1       0     1.9s
+2026-07-23 17:51:20,641 INFO root:      m01     llama3.2:3b  graph_compiled   FAIL    0.50       1       0     2.1s
+2026-07-23 17:51:20,641 INFO root:      m01     llama3.2:3b  graph_compiled   FAIL    0.50       2       0     4.3s
+2026-07-23 17:51:20,641 INFO root:      m01     llama3.2:3b  graph_compiled   FAIL    0.50       1       0     3.2s
+2026-07-23 17:51:20,641 INFO root:      m02     llama3.2:3b  graph_compiled   FAIL    0.50       1       0     6.5s
+2026-07-23 17:51:20,641 INFO root:      m02     llama3.2:3b  graph_compiled   FAIL    0.50       1       0     5.9s
+2026-07-23 17:51:20,641 INFO root:      m02     llama3.2:3b  graph_compiled   FAIL    0.00       1       0     6.4s
+2026-07-23 17:51:20,641 INFO root:      m02     llama3.2:3b  graph_compiled     OK    1.00       1       0     6.0s
+2026-07-23 17:51:20,641 INFO root:      m02     llama3.2:3b  graph_compiled     OK    1.00       1       0     6.1s
+2026-07-23 17:51:20,641 INFO root:      m03     llama3.2:3b  graph_compiled   FAIL    0.50       2       0     4.6s
+2026-07-23 17:51:20,641 INFO root:      m03     llama3.2:3b  graph_compiled     OK    1.00       1       0     3.3s
+2026-07-23 17:51:20,641 INFO root:      m03     llama3.2:3b  graph_compiled   FAIL    0.50       2       0     6.1s
+2026-07-23 17:51:20,641 INFO root:      m03     llama3.2:3b  graph_compiled     OK    1.00       1       0     2.6s
+2026-07-23 17:51:20,641 INFO root:      m03     llama3.2:3b  graph_compiled   FAIL    0.50       0       0     1.8s
+2026-07-23 17:51:20,641 INFO root: ================================================================================
+2026-07-23 17:51:20,641 INFO root:   Passed: 4/15  Avg Score: 0.60
+2026-07-23 17:51:20,641 INFO root:   Priority mode: 0 tests (0 = all)
+2026-07-23 17:51:20,641 INFO root: 
+2026-07-23 17:51:20,641 INFO root:   Per Model+Variant Breakdown:
+2026-07-23 17:51:20,641 INFO root:                           System  Runs   Pass%     Avg     Med     Min     Max
+2026-07-23 17:51:20,641 INFO root:   ------------------------------  ----   -----   -----   -----   -----   -----
+2026-07-23 17:51:20,646 INFO root:     llama3.2:3b [graph_compiled]    15  26.7%   0.600   0.500   0.000   1.000
+2026-07-23 17:51:20,646 INFO root: 
+2026-07-23 17:51:20,646 INFO root:   Aggregate Connector Timings Across All Tests:
+2026-07-23 17:51:20,646 INFO root:         http_request: avg=0.301s  min=0.030s  max=0.596s  count=34  total=10.23s
+2026-07-23 17:51:20,646 INFO root:             llm_call: avg=0.910s  min=0.522s  max=1.270s  count=116  total=105.51s
+2026-07-23 17:51:20,646 INFO root:               search: avg=0.451s  min=0.030s  max=0.596s  count=16  total=7.21s
+2026-07-23 17:51:20,646 INFO root:         search_query: avg=0.451s  min=0.030s  max=0.596s  count=16  total=7.21s
+2026-07-23 17:51:20,646 INFO root:                visit: avg=0.361s  min=0.172s  max=0.866s  count=18  total=6.49s
+2026-07-23 17:51:20,646 INFO root: 
+2026-07-23 17:51:20,646 INFO root:   Avg Duration (all tests)
+2026-07-23 17:51:20,646 INFO root:   ────────────────────────────────────────────────────────────────────────
+2026-07-23 17:51:20,647 INFO root:   http_request |█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.301s (n=34)
+2026-07-23 17:51:20,647 INFO root:       llm_call |████████████████████████████████████████| 0.910s (n=116)
+2026-07-23 17:51:20,647 INFO root:         search |███████████████████░░░░░░░░░░░░░░░░░░░░░| 0.451s (n=16)
+2026-07-23 17:51:20,647 INFO root:   search_query |███████████████████░░░░░░░░░░░░░░░░░░░░░| 0.451s (n=16)
+2026-07-23 17:51:20,647 INFO root:          visit |███████████████░░░░░░░░░░░░░░░░░░░░░░░░░| 0.361s (n=18)
+2026-07-23 17:51:20,647 INFO root:   ────────────────────────────────────────────────────────────────────────
+2026-07-23 17:51:20,647 INFO root: ================================================================================
+2026-07-23 17:51:20,647 INFO ConnectorHttp: HTTP Session closed.
+2026-07-23 17:51:20,647 INFO ConnectorSearch: HTTP Session closed.
+
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 6, tokens: 2201
+  Cost: N/A  [llama3.2:3b]
+  Visits: 1
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.100s  min=0.100s  max=0.100s  count=1  total=0.10s
+          llm_call: avg=0.795s  min=0.630s  max=0.902s  count=6  total=4.77s
+             visit: avg=0.258s  min=0.258s  max=0.258s  count=1  total=0.26s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.100s (n=1)
+      llm_call |████████████████████████████████████████| 0.795s (n=6)
+         visit |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.258s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m03: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 4, tokens: 894
+  Cost: N/A  [llama3.2:3b]
+  Visits: 0
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.089s  min=0.089s  max=0.089s  count=1  total=0.09s
+          llm_call: avg=0.845s  min=0.814s  max=0.876s  count=4  total=3.38s
+            search: avg=0.089s  min=0.089s  max=0.089s  count=1  total=0.09s
+      search_query: avg=0.089s  min=0.089s  max=0.089s  count=1  total=0.09s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.089s (n=1)
+      llm_call |████████████████████████████████████████| 0.845s (n=4)
+        search |████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.089s (n=1)
+  search_query |████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.089s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+>> gate_report:
+
+=== llama3.2:3b ===
+SCORE (mean +/- stdev, n)
+test       compiled:hand
+m01        0.50±0.00(n5)
+m02        0.60±0.42(n5)
+m03        0.70±0.27(n5)
+RUNTIME USD (mean)
+test       compiled:hand
+m01                   na
+m02                   na
+m03                   na
+--- qwen2.5:1.5b / m0_baseline / micro R=5 (17:51:20) ---
+>> search key sourced from euglena-agent-1
+>> cell  model=qwen2.5:1.5b  profile=m0_baseline  tier=micro  ids=m01,m02,m03  runs=5  run_id=bml__qwen2.5-1.5b__m0_baseline__micro  place=local
+2026-07-23 17:51:21,966 INFO root: Filtering to specific test IDs: ['m01', 'm02', 'm03']
+2026-07-23 17:51:21,967 INFO root: Specific test mode: Running 3 specified tests: ['m01', 'm02', 'm03']
+2026-07-23 17:51:21,967 INFO root: Running 3 test(s) (total available: 148)
+2026-07-23 17:51:21,967 INFO root: Mode: default
+2026-07-23 17:51:21,967 INFO root: Models: qwen2.5:1.5b
+2026-07-23 17:51:21,967 INFO root: Validation model: qwen2.5:1.5b
+2026-07-23 17:51:21,967 INFO root: Execution variants: graph_compiled (1 variant(s))
+2026-07-23 17:51:21,967 INFO root: Effort tiers (node budgets, 0=default): [0]
+2026-07-23 17:51:21,967 INFO root: Test ID filter active: ['m01', 'm02', 'm03']
+2026-07-23 17:51:21,967 INFO root: Top N tests: 0 (0 means all)
+2026-07-23 17:51:21,967 INFO root: Max parallel: 1
+2026-07-23 17:51:21,967 INFO root: Repeats: 5
+2026-07-23 17:51:21,967 INFO root: Spend ceiling: $5.0000 (matrix aborts when cumulative cost crosses it)
+2026-07-23 17:51:21,967 WARNING ConnectorConfig: No Redis URL set
+2026-07-23 17:51:21,967 WARNING ConnectorConfig: No RabbitMQ URL set
+2026-07-23 17:51:21,968 INFO root: Idea DAG settings source: (default idea_dag_settings.json) | arm=(none) | got_reexpand_enabled=False | got_step_confidence_judge_enabled=False | got_step_confidence_reexpand_enabled=False | enabled_adaptive_flags=[]
+2026-07-23 17:51:21,996 INFO ConnectorSearch: HTTP Session created.
+2026-07-23 17:51:21,996 INFO ConnectorHttp: HTTP Session created.
+2026-07-23 17:51:21,996 INFO ConnectorSearch: Probing Search API...
+2026-07-23 17:51:22,219 INFO ConnectorSearch: Search API OPERATIONAL
+2026-07-23 17:51:24,501 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/auth/identity "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,502 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,503 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database?tenant=default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,504 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2 "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,504 INFO ConnectorChroma: ChromaDB OPERATIONAL (async)
+2026-07-23 17:51:24,504 INFO root: Pre-flight target models: qwen2.5:1.5b
+2026-07-23 17:51:24,504 INFO root: Warming up ChromaDB to pre-install embedding models...
+2026-07-23 17:51:24,757 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,759 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,978 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/pre-flight-checks "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,980 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections/c15e3715-858a-4791-9dc2-0c52c2d49d00/add "HTTP/1.1 500 Internal Server Error"
+2026-07-23 17:51:24,980 ERROR ConnectorChroma: Failed to add to collection 'warmup_test': Query error: Database error: error returned from database: (code: 14) unable to open database file
+2026-07-23 17:51:24,984 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/auth/identity "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,985 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,986 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database?tenant=default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,987 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2 "HTTP/1.1 200 OK"
+2026-07-23 17:51:24,987 INFO ConnectorChroma: ChromaDB OPERATIONAL (async)
+2026-07-23 17:51:24,988 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:51:25,157 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections/c15e3715-858a-4791-9dc2-0c52c2d49d00/query "HTTP/1.1 200 OK"
+2026-07-23 17:51:25,158 INFO root: ChromaDB warmup completed - embedding models ready
+2026-07-23 17:51:30,525 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:30,530 INFO root: [PASSED] Pre-flight check for qwen2.5:1.5b (finish_reason=stop, content_len=2, payload={'max_completion_tokens': 256, 'temperature': 1})
+2026-07-23 17:51:30,530 INFO root: Valid models: qwen2.5:1.5b
+2026-07-23 17:51:30,530 INFO root: Total test tasks: 15
+2026-07-23 17:51:30,530 INFO root: Starting parallel test execution...
+2026-07-23 17:51:30,531 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:31,476 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:32,429 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:33,357 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:34,381 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:34,383 INFO root: [m01] qwen2.5:1.5b [graph_compiled] [run 1/5]: FAILED (score: 0.50, 3.9s)
+2026-07-23 17:51:34,383 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:35,052 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:35,852 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:36,529 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:37,011 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:37,676 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:37,678 INFO root: [m01] qwen2.5:1.5b [graph_compiled] [run 2/5]: PASSED (score: 1.00, 3.3s)
+2026-07-23 17:51:37,679 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:38,322 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:39,792 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:40,607 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:41,662 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:42,187 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:42,189 INFO root: [m01] qwen2.5:1.5b [graph_compiled] [run 3/5]: FAILED (score: 0.50, 4.5s)
+2026-07-23 17:51:42,190 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:42,817 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:43,746 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:44,883 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:45,800 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:45,801 INFO root: [m01] qwen2.5:1.5b [graph_compiled] [run 4/5]: FAILED (score: 0.50, 3.6s)
+2026-07-23 17:51:45,801 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:46,476 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:47,684 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:48,534 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:49,500 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:50,222 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+===========================================================================
+[FAIL] Test m01: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 3644
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 2
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.119s  min=0.059s  max=0.179s  count=2  total=0.24s
+          llm_call: avg=0.842s  min=0.650s  max=1.024s  count=8  total=6.73s
+             visit: avg=0.242s  min=0.181s  max=0.303s  count=2  total=0.48s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.119s (n=2)
+      llm_call |████████████████████████████████████████| 0.842s (n=8)
+         visit |███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.242s (n=2)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 10, tokens: 3892
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 1
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.062s  min=0.042s  max=0.083s  count=2  total=0.12s
+          llm_call: avg=0.598s  min=0.482s  max=0.669s  count=10  total=5.98s
+            search: avg=0.042s  min=0.042s  max=0.042s  count=1  total=0.04s
+      search_query: avg=0.042s  min=0.042s  max=0.042s  count=1  total=0.04s
+             visit: avg=0.261s  min=0.261s  max=0.261s  count=1  total=0.26s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.062s (n=2)
+      llm_call |████████████████████████████████████████| 0.598s (n=10)
+        search |██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.042s (n=1)
+  search_query |██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.042s (n=1)
+         visit |█████████████████░░░░░░░░░░░░░░░░░░░░░░░| 0.261s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m01: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 3615
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.345s  min=0.088s  max=0.769s  count=3  total=1.04s
+          llm_call: avg=0.670s  min=0.524s  max=0.849s  count=10  total=6.70s
+            search: avg=0.180s  min=0.180s  max=0.180s  count=1  total=0.18s
+      search_query: avg=0.180s  min=0.180s  max=0.180s  count=1  total=0.18s
+             visit: avg=0.487s  min=0.206s  max=0.769s  count=2  total=0.97s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████████████████░░░░░░░░░░░░░░░░░░░░| 0.345s (n=3)
+      llm_call |████████████████████████████████████████| 0.670s (n=10)
+        search |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.180s (n=1)
+  search_query |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.180s (n=1)
+         visit |█████████████████████████████░░░░░░░░░░░| 0.487s (n=2)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m01: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 3652
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 2
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.071s  min=0.054s  max=0.088s  count=2  total=0.14s
+          llm_call: avg=0.808s  min=0.627s  max=0.963s  count=8  total=6.46s
+             visit: avg=0.189s  min=0.173s  max=0.206s  count=2  total=0.38s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.071s (n=2)
+      llm_call |████████████████████████████████████████| 0.808s (n=8)
+         visit |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.189s (n=2)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m01: Micro: obscure lake max depth (single-page)  (score: 0.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [x] keystone_depth: 0.0  Max depth 511 missing/incorrect
+  [x] grounding: 0.0  Keystone absent -> grounding not credited
+
+Observability:
+  LLM calls: 10, tokens: 3663
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.286s  min=0.087s  max=0.620s  count=3  total=0.86s
+          llm_call: avg=0.688s  min=0.588s  max=0.756s  count=10  total=6.87s
+            search: avg=0.154s  min=0.154s  max=0.154s  count=1  total=0.15s
+      search_query: avg=0.153s  min=0.153s  max=0.153s  count=1  total=0.15s
+             visit: avg=0.414s  min=0.209s  max=0.620s  count=2  total=0.83s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████████████░░░░░░░░░░░░░░░░░░░░░░░░| 0.286s (n=3)
+      llm_call |████████████████████████████████████████| 0.688s (n=10)
+        search |████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.154s (n=1)
+  search_query |████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.153s (n=1)
+         visit |████████████████████████░░░░░░░░░░░░░░░░| 0.414s (n=2)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:51:50,224 INFO root: [m01] qwen2.5:1.5b [graph_compiled] [run 5/5]: FAILED (score: 0.00, 4.4s)
+2026-07-23 17:51:50,224 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:50,850 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:52,301 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:53,613 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:54,706 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:55,375 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:55,378 INFO root: [m02] qwen2.5:1.5b [graph_compiled] [run 1/5]: FAILED (score: 0.50, 5.2s)
+2026-07-23 17:51:55,378 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:51:55,972 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:57,291 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:58,659 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:51:59,827 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:00,542 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:00,544 INFO root: [m02] qwen2.5:1.5b [graph_compiled] [run 2/5]: FAILED (score: 0.50, 5.2s)
+2026-07-23 17:52:00,545 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:01,209 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:02,502 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:03,677 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:04,933 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:05,491 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:05,495 INFO root: [m02] qwen2.5:1.5b [graph_compiled] [run 3/5]: FAILED (score: 0.50, 5.0s)
+2026-07-23 17:52:05,495 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:06,183 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:07,215 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:08,158 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:08,160 INFO root: [m02] qwen2.5:1.5b [graph_compiled] [run 4/5]: PASSED (score: 1.00, 2.7s)
+2026-07-23 17:52:08,160 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:08,729 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:09,906 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:10,745 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:11,961 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:12,740 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 5129
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 2
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.420s  min=0.227s  max=0.751s  count=3  total=1.26s
+          llm_call: avg=0.655s  min=0.570s  max=0.712s  count=10  total=6.55s
+            search: avg=0.751s  min=0.751s  max=0.751s  count=1  total=0.75s
+      search_query: avg=0.751s  min=0.751s  max=0.751s  count=1  total=0.75s
+             visit: avg=0.561s  min=0.522s  max=0.600s  count=2  total=1.12s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████████████████░░░░░░░░░░░░░░░░░░| 0.420s (n=3)
+      llm_call |██████████████████████████████████░░░░░░| 0.655s (n=10)
+        search |████████████████████████████████████████| 0.751s (n=1)
+  search_query |███████████████████████████████████████░| 0.751s (n=1)
+         visit |█████████████████████████████░░░░░░░░░░░| 0.561s (n=2)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 5429
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 3
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.201s  min=0.179s  max=0.226s  count=3  total=0.60s
+          llm_call: avg=0.708s  min=0.595s  max=0.829s  count=10  total=7.08s
+             visit: avg=0.542s  min=0.471s  max=0.615s  count=3  total=1.63s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.201s (n=3)
+      llm_call |████████████████████████████████████████| 0.708s (n=10)
+         visit |██████████████████████████████░░░░░░░░░░| 0.542s (n=3)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 5344
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 2
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.265s  min=0.166s  max=0.448s  count=3  total=0.79s
+          llm_call: avg=0.693s  min=0.558s  max=0.827s  count=10  total=6.93s
+            search: avg=0.449s  min=0.449s  max=0.449s  count=1  total=0.45s
+      search_query: avg=0.449s  min=0.449s  max=0.449s  count=1  total=0.45s
+             visit: avg=0.515s  min=0.466s  max=0.565s  count=2  total=1.03s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███████████████░░░░░░░░░░░░░░░░░░░░░░░░░| 0.265s (n=3)
+      llm_call |████████████████████████████████████████| 0.693s (n=10)
+        search |█████████████████████████░░░░░░░░░░░░░░░| 0.449s (n=1)
+  search_query |█████████████████████████░░░░░░░░░░░░░░░| 0.449s (n=1)
+         visit |█████████████████████████████░░░░░░░░░░░| 0.515s (n=2)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[PASS] Test m02: Micro: obscure island land area (single-page)  (score: 1.00)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 6, tokens: 2771
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 1
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.164s  min=0.164s  max=0.164s  count=1  total=0.16s
+          llm_call: avg=0.725s  min=0.545s  max=0.943s  count=6  total=4.35s
+             visit: avg=0.487s  min=0.487s  max=0.487s  count=1  total=0.49s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.164s (n=1)
+      llm_call |████████████████████████████████████████| 0.725s (n=6)
+         visit |██████████████████████████░░░░░░░░░░░░░░| 0.487s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 5222
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 2
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.167s  min=0.157s  max=0.185s  count=3  total=0.50s
+          llm_call: avg=0.690s  min=0.570s  max=0.779s  count=10  total=6.90s
+            search: avg=0.185s  min=0.185s  max=0.185s  count=1  total=0.19s
+      search_query: avg=0.185s  min=0.185s  max=0.185s  count=1  total=0.19s
+             visit: avg=0.471s  min=0.466s  max=0.476s  count=2  total=0.94s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.167s (n=3)
+      llm_call |████████████████████████████████████████| 0.690s (n=10)
+        search |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.185s (n=1)
+  search_query |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.185s (n=1)
+         visit |███████████████████████████░░░░░░░░░░░░░| 0.471s (n=2)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:52:12,742 INFO root: [m02] qwen2.5:1.5b [graph_compiled] [run 5/5]: FAILED (score: 0.50, 4.6s)
+2026-07-23 17:52:12,743 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:13,375 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:14,352 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:15,557 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:16,830 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:17,489 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:17,492 INFO root: [m03] qwen2.5:1.5b [graph_compiled] [run 1/5]: FAILED (score: 0.50, 4.8s)
+2026-07-23 17:52:17,493 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:18,183 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:20,081 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:21,106 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:22,082 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:22,807 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:22,809 INFO root: [m03] qwen2.5:1.5b [graph_compiled] [run 2/5]: FAILED (score: 0.50, 5.3s)
+2026-07-23 17:52:22,810 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:23,368 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:24,613 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:24,985 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:24,987 INFO root: [m03] qwen2.5:1.5b [graph_compiled] [run 3/5]: FAILED (score: 0.00, 2.2s)
+2026-07-23 17:52:24,987 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:25,593 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:26,501 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:27,645 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:28,902 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:29,318 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+
+===========================================================================
+[FAIL] Test m03: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 5164
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 1
+  Searches: 12
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.377s  min=0.091s  max=0.526s  count=3  total=1.13s
+          llm_call: avg=0.683s  min=0.633s  max=0.746s  count=10  total=6.83s
+            search: avg=0.521s  min=0.515s  max=0.526s  count=2  total=1.04s
+      search_query: avg=0.520s  min=0.515s  max=0.526s  count=2  total=1.04s
+             visit: avg=0.289s  min=0.289s  max=0.289s  count=1  total=0.29s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████████████████░░░░░░░░░░░░░░░░░░| 0.377s (n=3)
+      llm_call |████████████████████████████████████████| 0.683s (n=10)
+        search |██████████████████████████████░░░░░░░░░░| 0.521s (n=2)
+  search_query |██████████████████████████████░░░░░░░░░░| 0.520s (n=2)
+         visit |████████████████░░░░░░░░░░░░░░░░░░░░░░░░| 0.289s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m03: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 5724
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 3
+  Searches: 0
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.396s  min=0.059s  max=1.069s  count=3  total=1.19s
+          llm_call: avg=0.731s  min=0.671s  max=0.809s  count=10  total=7.31s
+             visit: avg=0.553s  min=0.215s  max=1.226s  count=3  total=1.66s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████████████████░░░░░░░░░░░░░░░░░░░| 0.396s (n=3)
+      llm_call |████████████████████████████████████████| 0.731s (n=10)
+         visit |██████████████████████████████░░░░░░░░░░| 0.553s (n=3)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m03: Micro: obscure lake max depth (single-page)  (score: 0.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [x] keystone_depth: 0.0  Max depth 514 missing/incorrect
+  [x] grounding: 0.0  Keystone absent -> grounding not credited
+
+Observability:
+  LLM calls: 6, tokens: 997
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 0
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.486s  min=0.486s  max=0.486s  count=1  total=0.49s
+          llm_call: avg=0.563s  min=0.372s  max=0.758s  count=6  total=3.38s
+            search: avg=0.487s  min=0.487s  max=0.487s  count=1  total=0.49s
+      search_query: avg=0.487s  min=0.487s  max=0.487s  count=1  total=0.49s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████████████████████████████░░░░░░| 0.486s (n=1)
+      llm_call |████████████████████████████████████████| 0.563s (n=6)
+        search |██████████████████████████████████░░░░░░| 0.487s (n=1)
+  search_query |██████████████████████████████████░░░░░░| 0.487s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[FAIL] Test m03: Micro: obscure lake max depth (single-page)  (score: 0.50)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 10, tokens: 5196
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 1
+  Searches: 12
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.362s  min=0.088s  max=0.509s  count=3  total=1.09s
+          llm_call: avg=0.619s  min=0.416s  max=0.746s  count=10  total=6.19s
+            search: avg=0.499s  min=0.488s  max=0.510s  count=2  total=1.00s
+      search_query: avg=0.499s  min=0.488s  max=0.510s  count=2  total=1.00s
+             visit: avg=0.240s  min=0.240s  max=0.240s  count=1  total=0.24s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███████████████████████░░░░░░░░░░░░░░░░░| 0.362s (n=3)
+      llm_call |████████████████████████████████████████| 0.619s (n=10)
+        search |████████████████████████████████░░░░░░░░| 0.499s (n=2)
+  search_query |████████████████████████████████░░░░░░░░| 0.499s (n=2)
+         visit |███████████████░░░░░░░░░░░░░░░░░░░░░░░░░| 0.240s (n=1)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:52:29,321 INFO root: [m03] qwen2.5:1.5b [graph_compiled] [run 4/5]: FAILED (score: 0.50, 4.3s)
+2026-07-23 17:52:29,322 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:29,959 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:31,144 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:32,222 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:32,875 INFO httpx: HTTP Request: POST http://localhost:11435/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:32,877 INFO root: [m03] qwen2.5:1.5b [graph_compiled] [run 5/5]: PASSED (score: 1.00, 3.6s)
+/home/muk/projects/webRAG/services/agent/app/idea_test_runner.py:1472: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp": datetime.utcnow().isoformat(),
+2026-07-23 17:52:32,881 INFO root: 
+================================================================================
+2026-07-23 17:52:32,881 INFO root:   RUN SUMMARY: bml__qwen2.5-1.5b__m0_baseline__micro
+2026-07-23 17:52:32,881 INFO root: ================================================================================
+2026-07-23 17:52:32,881 INFO root:     Test           Model     Variant   Pass   Score  Visits   Nodes     Time
+2026-07-23 17:52:32,881 INFO root:   ------  --------------  ----------  -----  ------  ------  ------  -------
+2026-07-23 17:52:32,881 INFO root:      m01    qwen2.5:1.5b  graph_compiled   FAIL    0.50       2       0     3.9s
+2026-07-23 17:52:32,881 INFO root:      m01    qwen2.5:1.5b  graph_compiled     OK    1.00       1       0     3.3s
+2026-07-23 17:52:32,881 INFO root:      m01    qwen2.5:1.5b  graph_compiled   FAIL    0.50       1       0     4.5s
+2026-07-23 17:52:32,881 INFO root:      m01    qwen2.5:1.5b  graph_compiled   FAIL    0.50       2       0     3.6s
+2026-07-23 17:52:32,881 INFO root:      m01    qwen2.5:1.5b  graph_compiled   FAIL    0.00       1       0     4.4s
+2026-07-23 17:52:32,881 INFO root:      m02    qwen2.5:1.5b  graph_compiled   FAIL    0.50       2       0     5.2s
+2026-07-23 17:52:32,881 INFO root:      m02    qwen2.5:1.5b  graph_compiled   FAIL    0.50       3       0     5.2s
+2026-07-23 17:52:32,881 INFO root:      m02    qwen2.5:1.5b  graph_compiled   FAIL    0.50       2       0     5.0s
+2026-07-23 17:52:32,881 INFO root:      m02    qwen2.5:1.5b  graph_compiled     OK    1.00       1       0     2.7s
+2026-07-23 17:52:32,881 INFO root:      m02    qwen2.5:1.5b  graph_compiled   FAIL    0.50       2       0     4.6s
+2026-07-23 17:52:32,881 INFO root:      m03    qwen2.5:1.5b  graph_compiled   FAIL    0.50       1       0     4.8s
+2026-07-23 17:52:32,881 INFO root:      m03    qwen2.5:1.5b  graph_compiled   FAIL    0.50       3       0     5.3s
+2026-07-23 17:52:32,881 INFO root:      m03    qwen2.5:1.5b  graph_compiled   FAIL    0.00       0       0     2.2s
+2026-07-23 17:52:32,881 INFO root:      m03    qwen2.5:1.5b  graph_compiled   FAIL    0.50       1       0     4.3s
+2026-07-23 17:52:32,881 INFO root:      m03    qwen2.5:1.5b  graph_compiled     OK    1.00       1       0     3.6s
+2026-07-23 17:52:32,881 INFO root: ================================================================================
+2026-07-23 17:52:32,881 INFO root:   Passed: 3/15  Avg Score: 0.53
+2026-07-23 17:52:32,881 INFO root:   Priority mode: 0 tests (0 = all)
+2026-07-23 17:52:32,881 INFO root: 
+2026-07-23 17:52:32,881 INFO root:   Per Model+Variant Breakdown:
+2026-07-23 17:52:32,881 INFO root:                           System  Runs   Pass%     Avg     Med     Min     Max
+2026-07-23 17:52:32,881 INFO root:   ------------------------------  ----   -----   -----   -----   -----   -----
+2026-07-23 17:52:32,887 INFO root:    qwen2.5:1.5b [graph_compiled]    15  20.0%   0.533   0.500   0.000   1.000
+2026-07-23 17:52:32,887 INFO root: 
+2026-07-23 17:52:32,887 INFO root:   Aggregate Connector Timings Across All Tests:
+2026-07-23 17:52:32,887 INFO root:         http_request: avg=0.276s  min=0.042s  max=1.069s  count=37  total=10.20s
+2026-07-23 17:52:32,887 INFO root:             llm_call: avg=0.690s  min=0.372s  max=1.024s  count=136  total=93.90s
+2026-07-23 17:52:32,887 INFO root:               search: avg=0.398s  min=0.042s  max=0.751s  count=12  total=4.78s
+2026-07-23 17:52:32,887 INFO root:         search_query: avg=0.398s  min=0.042s  max=0.751s  count=12  total=4.78s
+2026-07-23 17:52:32,887 INFO root:                visit: avg=0.423s  min=0.173s  max=1.226s  count=25  total=10.57s
+2026-07-23 17:52:32,887 INFO root: 
+2026-07-23 17:52:32,887 INFO root:   Avg Duration (all tests)
+2026-07-23 17:52:32,887 INFO root:   ────────────────────────────────────────────────────────────────────────
+2026-07-23 17:52:32,887 INFO root:   http_request |███████████████░░░░░░░░░░░░░░░░░░░░░░░░░| 0.276s (n=37)
+2026-07-23 17:52:32,887 INFO root:       llm_call |████████████████████████████████████████| 0.690s (n=136)
+2026-07-23 17:52:32,887 INFO root:         search |███████████████████████░░░░░░░░░░░░░░░░░| 0.398s (n=12)
+2026-07-23 17:52:32,887 INFO root:   search_query |███████████████████████░░░░░░░░░░░░░░░░░| 0.398s (n=12)
+2026-07-23 17:52:32,887 INFO root:          visit |████████████████████████░░░░░░░░░░░░░░░░| 0.423s (n=25)
+2026-07-23 17:52:32,887 INFO root:   ────────────────────────────────────────────────────────────────────────
+2026-07-23 17:52:32,887 INFO root: ================================================================================
+2026-07-23 17:52:32,888 INFO ConnectorHttp: HTTP Session closed.
+2026-07-23 17:52:32,888 INFO ConnectorSearch: HTTP Session closed.
+
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3410
+  Cost: N/A  [qwen2.5:1.5b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.290s  min=0.087s  max=0.494s  count=2  total=0.58s
+          llm_call: avg=0.703s  min=0.638s  max=0.832s  count=8  total=5.63s
+            search: avg=0.495s  min=0.495s  max=0.495s  count=1  total=0.49s
+      search_query: avg=0.494s  min=0.494s  max=0.494s  count=1  total=0.49s
+             visit: avg=0.246s  min=0.246s  max=0.246s  count=1  total=0.25s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████████████░░░░░░░░░░░░░░░░░░░░░░░░| 0.290s (n=2)
+      llm_call |████████████████████████████████████████| 0.703s (n=8)
+        search |████████████████████████████░░░░░░░░░░░░| 0.495s (n=1)
+  search_query |████████████████████████████░░░░░░░░░░░░| 0.494s (n=1)
+         visit |█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.246s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+>> gate_report:
+
+=== qwen2.5:1.5b ===
+SCORE (mean +/- stdev, n)
+test       compiled:hand
+m01        0.50±0.35(n5)
+m02        0.60±0.22(n5)
+m03        0.50±0.35(n5)
+RUNTIME USD (mean)
+test       compiled:hand
+m01                   na
+m02                   na
+m03                   na
+--- qwen2.5:7b / m1_thin / micro R=5 (17:52:33) ---
+>> search key sourced from euglena-agent-1
+>> cell  model=qwen2.5:7b  profile=m1_thin  tier=micro  ids=m01,m02,m03  runs=5  run_id=bml__qwen2.5-7b__m1_thin__micro  place=local
+2026-07-23 17:52:34,232 INFO root: Filtering to specific test IDs: ['m01', 'm02', 'm03']
+2026-07-23 17:52:34,233 INFO root: Specific test mode: Running 3 specified tests: ['m01', 'm02', 'm03']
+2026-07-23 17:52:34,233 INFO root: Running 3 test(s) (total available: 148)
+2026-07-23 17:52:34,233 INFO root: Mode: default
+2026-07-23 17:52:34,233 INFO root: Models: qwen2.5:7b
+2026-07-23 17:52:34,233 INFO root: Validation model: qwen2.5:7b
+2026-07-23 17:52:34,233 INFO root: Execution variants: graph_compiled (1 variant(s))
+2026-07-23 17:52:34,233 INFO root: Effort tiers (node budgets, 0=default): [0]
+2026-07-23 17:52:34,233 INFO root: Test ID filter active: ['m01', 'm02', 'm03']
+2026-07-23 17:52:34,233 INFO root: Top N tests: 0 (0 means all)
+2026-07-23 17:52:34,233 INFO root: Max parallel: 1
+2026-07-23 17:52:34,233 INFO root: Repeats: 5
+2026-07-23 17:52:34,233 INFO root: Spend ceiling: $5.0000 (matrix aborts when cumulative cost crosses it)
+2026-07-23 17:52:34,233 WARNING ConnectorConfig: No Redis URL set
+2026-07-23 17:52:34,233 WARNING ConnectorConfig: No RabbitMQ URL set
+2026-07-23 17:52:34,234 INFO root: Idea DAG settings source: (default idea_dag_settings.json) | arm=(none) | got_reexpand_enabled=False | got_step_confidence_judge_enabled=False | got_step_confidence_reexpand_enabled=False | enabled_adaptive_flags=[]
+2026-07-23 17:52:34,263 INFO ConnectorSearch: HTTP Session created.
+2026-07-23 17:52:34,263 INFO ConnectorHttp: HTTP Session created.
+2026-07-23 17:52:34,263 INFO ConnectorSearch: Probing Search API...
+2026-07-23 17:52:34,481 INFO ConnectorSearch: Search API OPERATIONAL
+2026-07-23 17:52:36,577 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/auth/identity "HTTP/1.1 200 OK"
+2026-07-23 17:52:36,578 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:52:36,579 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database?tenant=default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:52:36,580 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2 "HTTP/1.1 200 OK"
+2026-07-23 17:52:36,580 INFO ConnectorChroma: ChromaDB OPERATIONAL (async)
+2026-07-23 17:52:36,580 INFO root: Pre-flight target models: qwen2.5:7b
+2026-07-23 17:52:36,580 INFO root: Warming up ChromaDB to pre-install embedding models...
+2026-07-23 17:52:36,834 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:52:36,836 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:52:37,055 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/pre-flight-checks "HTTP/1.1 200 OK"
+2026-07-23 17:52:37,057 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections/c15e3715-858a-4791-9dc2-0c52c2d49d00/add "HTTP/1.1 500 Internal Server Error"
+2026-07-23 17:52:37,057 ERROR ConnectorChroma: Failed to add to collection 'warmup_test': Query error: Database error: error returned from database: (code: 14) unable to open database file
+2026-07-23 17:52:37,060 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/auth/identity "HTTP/1.1 200 OK"
+2026-07-23 17:52:37,061 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:52:37,062 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database?tenant=default_tenant "HTTP/1.1 200 OK"
+2026-07-23 17:52:37,063 INFO httpx: HTTP Request: GET http://localhost:8001/api/v2 "HTTP/1.1 200 OK"
+2026-07-23 17:52:37,063 INFO ConnectorChroma: ChromaDB OPERATIONAL (async)
+2026-07-23 17:52:37,064 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-07-23 17:52:37,236 INFO httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections/c15e3715-858a-4791-9dc2-0c52c2d49d00/query "HTTP/1.1 200 OK"
+2026-07-23 17:52:37,236 INFO root: ChromaDB warmup completed - embedding models ready
+2026-07-23 17:52:41,363 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:41,367 INFO root: [PASSED] Pre-flight check for qwen2.5:7b (finish_reason=stop, content_len=2, payload={'max_completion_tokens': 256, 'temperature': 1})
+2026-07-23 17:52:41,367 INFO root: Valid models: qwen2.5:7b
+2026-07-23 17:52:41,368 INFO root: Total test tasks: 15
+2026-07-23 17:52:41,368 INFO root: Starting parallel test execution...
+2026-07-23 17:52:41,368 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:42,133 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:43,540 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:43,609 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:43,677 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:43,680 INFO root: [m01] qwen2.5:7b [graph_compiled] [run 1/5]: PASSED (score: 1.00, 2.3s)
+2026-07-23 17:52:43,680 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:44,175 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:45,023 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:45,092 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:45,160 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:45,161 INFO root: [m01] qwen2.5:7b [graph_compiled] [run 2/5]: PASSED (score: 1.00, 1.5s)
+2026-07-23 17:52:45,162 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:45,606 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:46,409 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:46,477 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:46,545 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:46,547 INFO root: [m01] qwen2.5:7b [graph_compiled] [run 3/5]: PASSED (score: 1.00, 1.4s)
+2026-07-23 17:52:46,548 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:47,077 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:47,887 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:47,956 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:48,025 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3619
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.189s  min=0.186s  max=0.192s  count=2  total=0.38s
+          llm_call: avg=0.922s  min=0.765s  max=1.041s  count=8  total=7.37s
+            search: avg=0.187s  min=0.187s  max=0.187s  count=1  total=0.19s
+      search_query: avg=0.187s  min=0.187s  max=0.187s  count=1  total=0.19s
+             visit: avg=0.314s  min=0.314s  max=0.314s  count=1  total=0.31s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.189s (n=2)
+      llm_call |████████████████████████████████████████| 0.922s (n=8)
+        search |████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.187s (n=1)
+  search_query |████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.187s (n=1)
+         visit |█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.314s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3619
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.121s  min=0.082s  max=0.159s  count=2  total=0.24s
+          llm_call: avg=0.541s  min=0.488s  max=0.624s  count=8  total=4.33s
+            search: avg=0.160s  min=0.160s  max=0.160s  count=1  total=0.16s
+      search_query: avg=0.159s  min=0.159s  max=0.159s  count=1  total=0.16s
+             visit: avg=0.199s  min=0.199s  max=0.199s  count=1  total=0.20s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.121s (n=2)
+      llm_call |████████████████████████████████████████| 0.541s (n=8)
+        search |███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.160s (n=1)
+  search_query |███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.159s (n=1)
+         visit |██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.199s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3619
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.107s  min=0.052s  max=0.163s  count=2  total=0.21s
+          llm_call: avg=0.475s  min=0.419s  max=0.554s  count=8  total=3.80s
+            search: avg=0.163s  min=0.163s  max=0.163s  count=1  total=0.16s
+      search_query: avg=0.163s  min=0.163s  max=0.163s  count=1  total=0.16s
+             visit: avg=0.221s  min=0.221s  max=0.221s  count=1  total=0.22s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.107s (n=2)
+      llm_call |████████████████████████████████████████| 0.475s (n=8)
+        search |█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.163s (n=1)
+  search_query |█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.163s (n=1)
+         visit |██████████████████░░░░░░░░░░░░░░░░░░░░░░| 0.221s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3619
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.118s  min=0.081s  max=0.155s  count=2  total=0.24s
+          llm_call: avg=0.526s  min=0.455s  max=0.593s  count=8  total=4.21s
+            search: avg=0.155s  min=0.155s  max=0.155s  count=1  total=0.16s
+      search_query: avg=0.155s  min=0.155s  max=0.155s  count=1  total=0.15s
+             visit: avg=0.198s  min=0.198s  max=0.198s  count=1  total=0.20s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.118s (n=2)
+      llm_call |████████████████████████████████████████| 0.526s (n=8)
+        search |███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.155s (n=1)
+  search_query |███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.155s (n=1)
+         visit |███████████████░░░░░░░░░░░░░░░░░░░░░░░░░| 0.198s (n=1)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:52:48,026 INFO root: [m01] qwen2.5:7b [graph_compiled] [run 4/5]: PASSED (score: 1.00, 1.5s)
+2026-07-23 17:52:48,027 INFO agent.app.testing.execution_compiled: [m01] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:48,524 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:49,634 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:49,703 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:49,772 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:49,774 INFO root: [m01] qwen2.5:7b [graph_compiled] [run 5/5]: PASSED (score: 1.00, 1.8s)
+2026-07-23 17:52:49,774 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:50,172 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:52,070 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:52,166 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:52,265 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:52,267 INFO root: [m02] qwen2.5:7b [graph_compiled] [run 1/5]: FAILED (score: 0.50, 2.5s)
+2026-07-23 17:52:52,268 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:52,796 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:53,826 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:53,925 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:54,025 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:54,027 INFO root: [m02] qwen2.5:7b [graph_compiled] [run 2/5]: FAILED (score: 0.50, 1.8s)
+2026-07-23 17:52:54,027 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:54,536 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:55,567 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:55,661 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:55,759 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+
+===========================================================================
+[PASS] Test m01: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 511 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3618
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.256s  min=0.053s  max=0.458s  count=2  total=0.51s
+          llm_call: avg=0.536s  min=0.481s  max=0.617s  count=8  total=4.29s
+            search: avg=0.459s  min=0.459s  max=0.459s  count=1  total=0.46s
+      search_query: avg=0.458s  min=0.458s  max=0.458s  count=1  total=0.46s
+             visit: avg=0.170s  min=0.170s  max=0.170s  count=1  total=0.17s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |███████████████████░░░░░░░░░░░░░░░░░░░░░| 0.256s (n=2)
+      llm_call |████████████████████████████████████████| 0.536s (n=8)
+        search |██████████████████████████████████░░░░░░| 0.459s (n=1)
+  search_query |██████████████████████████████████░░░░░░| 0.458s (n=1)
+         visit |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.170s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 5465
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.172s  min=0.130s  max=0.214s  count=2  total=0.34s
+          llm_call: avg=1.096s  min=0.398s  max=1.427s  count=8  total=8.77s
+            search: avg=0.214s  min=0.214s  max=0.214s  count=1  total=0.21s
+      search_query: avg=0.214s  min=0.214s  max=0.214s  count=1  total=0.21s
+             visit: avg=0.451s  min=0.451s  max=0.451s  count=1  total=0.45s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.172s (n=2)
+      llm_call |████████████████████████████████████████| 1.096s (n=8)
+        search |███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.214s (n=1)
+  search_query |███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.214s (n=1)
+         visit |████████████████░░░░░░░░░░░░░░░░░░░░░░░░| 0.451s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 5465
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.129s  min=0.088s  max=0.170s  count=2  total=0.26s
+          llm_call: avg=0.548s  min=0.456s  max=0.654s  count=8  total=4.38s
+            search: avg=0.171s  min=0.171s  max=0.171s  count=1  total=0.17s
+      search_query: avg=0.170s  min=0.170s  max=0.170s  count=1  total=0.17s
+             visit: avg=0.403s  min=0.403s  max=0.403s  count=1  total=0.40s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.129s (n=2)
+      llm_call |████████████████████████████████████████| 0.548s (n=8)
+        search |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.171s (n=1)
+  search_query |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.170s (n=1)
+         visit |█████████████████████████████░░░░░░░░░░░| 0.403s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 5465
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.127s  min=0.086s  max=0.168s  count=2  total=0.25s
+          llm_call: avg=0.544s  min=0.460s  max=0.652s  count=8  total=4.35s
+            search: avg=0.168s  min=0.168s  max=0.168s  count=1  total=0.17s
+      search_query: avg=0.168s  min=0.168s  max=0.168s  count=1  total=0.17s
+             visit: avg=0.401s  min=0.401s  max=0.401s  count=1  total=0.40s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.127s (n=2)
+      llm_call |████████████████████████████████████████| 0.544s (n=8)
+        search |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.168s (n=1)
+  search_query |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.168s (n=1)
+         visit |█████████████████████████████░░░░░░░░░░░| 0.401s (n=1)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:52:55,762 INFO root: [m02] qwen2.5:7b [graph_compiled] [run 3/5]: FAILED (score: 0.50, 1.7s)
+2026-07-23 17:52:55,762 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:56,269 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:57,409 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:57,508 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:57,605 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:57,607 INFO root: [m02] qwen2.5:7b [graph_compiled] [run 4/5]: FAILED (score: 0.50, 1.8s)
+2026-07-23 17:52:57,608 INFO agent.app.testing.execution_compiled: [m02] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['land_area']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:52:58,155 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:59,543 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:59,638 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:59,736 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:52:59,738 INFO root: [m02] qwen2.5:7b [graph_compiled] [run 5/5]: FAILED (score: 0.50, 2.1s)
+2026-07-23 17:52:59,739 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:53:00,306 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:01,554 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:01,623 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:01,691 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:01,693 INFO root: [m03] qwen2.5:7b [graph_compiled] [run 1/5]: PASSED (score: 1.00, 1.9s)
+2026-07-23 17:53:01,693 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:53:02,247 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:03,038 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:03,105 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:03,173 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 5465
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.145s  min=0.087s  max=0.203s  count=2  total=0.29s
+          llm_call: avg=0.556s  min=0.475s  max=0.670s  count=8  total=4.45s
+            search: avg=0.203s  min=0.203s  max=0.203s  count=1  total=0.20s
+      search_query: avg=0.203s  min=0.203s  max=0.203s  count=1  total=0.20s
+             visit: avg=0.461s  min=0.461s  max=0.461s  count=1  total=0.46s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.145s (n=2)
+      llm_call |████████████████████████████████████████| 0.556s (n=8)
+        search |██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.203s (n=1)
+  search_query |██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.203s (n=1)
+         visit |█████████████████████████████████░░░░░░░| 0.461s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+=============================================================================
+[FAIL] Test m02: Micro: obscure island land area (single-page)  (score: 0.50)
+=============================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_area: 1.0  Reported 56.6 km2
+  [x] grounding: 0.0  source cited=False
+
+Observability:
+  LLM calls: 8, tokens: 5467
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.312s  min=0.084s  max=0.539s  count=2  total=0.62s
+          llm_call: avg=0.543s  min=0.445s  max=0.637s  count=8  total=4.34s
+            search: avg=0.539s  min=0.539s  max=0.539s  count=1  total=0.54s
+      search_query: avg=0.539s  min=0.539s  max=0.539s  count=1  total=0.54s
+             visit: avg=0.402s  min=0.402s  max=0.402s  count=1  total=0.40s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████████████████████░░░░░░░░░░░░░░░░░░| 0.312s (n=2)
+      llm_call |████████████████████████████████████████| 0.543s (n=8)
+        search |███████████████████████████████████████░| 0.539s (n=1)
+  search_query |███████████████████████████████████████░| 0.539s (n=1)
+         visit |█████████████████████████████░░░░░░░░░░░| 0.402s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3770
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.096s  min=0.082s  max=0.111s  count=2  total=0.19s
+          llm_call: avg=0.876s  min=0.568s  max=1.047s  count=8  total=7.01s
+            search: avg=0.111s  min=0.111s  max=0.111s  count=1  total=0.11s
+      search_query: avg=0.111s  min=0.111s  max=0.111s  count=1  total=0.11s
+             visit: avg=0.226s  min=0.226s  max=0.226s  count=1  total=0.23s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.096s (n=2)
+      llm_call |████████████████████████████████████████| 0.876s (n=8)
+        search |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.111s (n=1)
+  search_query |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.111s (n=1)
+         visit |██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.226s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3770
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.086s  min=0.075s  max=0.098s  count=2  total=0.17s
+          llm_call: avg=0.536s  min=0.464s  max=0.598s  count=8  total=4.29s
+            search: avg=0.075s  min=0.075s  max=0.075s  count=1  total=0.08s
+      search_query: avg=0.075s  min=0.075s  max=0.075s  count=1  total=0.07s
+             visit: avg=0.252s  min=0.252s  max=0.252s  count=1  total=0.25s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.086s (n=2)
+      llm_call |████████████████████████████████████████| 0.536s (n=8)
+        search |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.075s (n=1)
+  search_query |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.075s (n=1)
+         visit |██████████████████░░░░░░░░░░░░░░░░░░░░░░| 0.252s (n=1)
+  ────────────────────────────────────────────────────────────────────────2026-07-23 17:53:03,174 INFO root: [m03] qwen2.5:7b [graph_compiled] [run 2/5]: PASSED (score: 1.00, 1.5s)
+2026-07-23 17:53:03,175 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:53:03,689 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:04,518 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:04,587 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:04,655 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:04,657 INFO root: [m03] qwen2.5:7b [graph_compiled] [run 3/5]: PASSED (score: 1.00, 1.5s)
+2026-07-23 17:53:04,657 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:53:05,207 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:06,017 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:06,086 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:06,154 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:06,157 INFO root: [m03] qwen2.5:7b [graph_compiled] [run 4/5]: PASSED (score: 1.00, 1.5s)
+2026-07-23 17:53:06,157 INFO agent.app.testing.execution_compiled: [m03] graph_compiled plan_source=hand structure={'leaf_count': 1, 'edge_count': 0, 'waves': [['max_depth']], 'wave_widths': [1], 'edges': [], 'is_dag_chain': False, 'is_pure_fanout': True}
+2026-07-23 17:53:06,677 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:07,449 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:07,517 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:07,585 INFO httpx: HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-23 17:53:07,586 INFO root: [m03] qwen2.5:7b [graph_compiled] [run 5/5]: PASSED (score: 1.00, 1.4s)
+/home/muk/projects/webRAG/services/agent/app/idea_test_runner.py:1472: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp": datetime.utcnow().isoformat(),
+2026-07-23 17:53:07,590 INFO root: 
+================================================================================
+2026-07-23 17:53:07,590 INFO root:   RUN SUMMARY: bml__qwen2.5-7b__m1_thin__micro
+2026-07-23 17:53:07,590 INFO root: ================================================================================
+2026-07-23 17:53:07,590 INFO root:     Test           Model     Variant   Pass   Score  Visits   Nodes     Time
+2026-07-23 17:53:07,590 INFO root:   ------  --------------  ----------  -----  ------  ------  ------  -------
+2026-07-23 17:53:07,590 INFO root:      m01      qwen2.5:7b  graph_compiled     OK    1.00       1       0     2.3s
+2026-07-23 17:53:07,590 INFO root:      m01      qwen2.5:7b  graph_compiled     OK    1.00       1       0     1.5s
+2026-07-23 17:53:07,590 INFO root:      m01      qwen2.5:7b  graph_compiled     OK    1.00       1       0     1.4s
+2026-07-23 17:53:07,590 INFO root:      m01      qwen2.5:7b  graph_compiled     OK    1.00       1       0     1.5s
+2026-07-23 17:53:07,590 INFO root:      m01      qwen2.5:7b  graph_compiled     OK    1.00       1       0     1.8s
+2026-07-23 17:53:07,590 INFO root:      m02      qwen2.5:7b  graph_compiled   FAIL    0.50       1       0     2.5s
+2026-07-23 17:53:07,590 INFO root:      m02      qwen2.5:7b  graph_compiled   FAIL    0.50       1       0     1.8s
+2026-07-23 17:53:07,590 INFO root:      m02      qwen2.5:7b  graph_compiled   FAIL    0.50       1       0     1.7s
+2026-07-23 17:53:07,590 INFO root:      m02      qwen2.5:7b  graph_compiled   FAIL    0.50       1       0     1.8s
+2026-07-23 17:53:07,590 INFO root:      m02      qwen2.5:7b  graph_compiled   FAIL    0.50       1       0     2.1s
+2026-07-23 17:53:07,590 INFO root:      m03      qwen2.5:7b  graph_compiled     OK    1.00       1       0     1.9s
+2026-07-23 17:53:07,590 INFO root:      m03      qwen2.5:7b  graph_compiled     OK    1.00       1       0     1.5s
+2026-07-23 17:53:07,590 INFO root:      m03      qwen2.5:7b  graph_compiled     OK    1.00       1       0     1.5s
+2026-07-23 17:53:07,590 INFO root:      m03      qwen2.5:7b  graph_compiled     OK    1.00       1       0     1.5s
+2026-07-23 17:53:07,590 INFO root:      m03      qwen2.5:7b  graph_compiled     OK    1.00       1       0     1.4s
+2026-07-23 17:53:07,590 INFO root: ================================================================================
+2026-07-23 17:53:07,590 INFO root:   Passed: 10/15  Avg Score: 0.83
+2026-07-23 17:53:07,590 INFO root:   Priority mode: 0 tests (0 = all)
+2026-07-23 17:53:07,590 INFO root: 
+2026-07-23 17:53:07,590 INFO root:   Per Model+Variant Breakdown:
+2026-07-23 17:53:07,590 INFO root:                           System  Runs   Pass%     Avg     Med     Min     Max
+2026-07-23 17:53:07,590 INFO root:   ------------------------------  ----   -----   -----   -----   -----   -----
+2026-07-23 17:53:07,595 INFO root:      qwen2.5:7b [graph_compiled]    15  66.7%   0.833   1.000   0.500   1.000
+2026-07-23 17:53:07,596 INFO root: 
+2026-07-23 17:53:07,596 INFO root:   Aggregate Connector Timings Across All Tests:
+2026-07-23 17:53:07,596 INFO root:         http_request: avg=0.138s  min=0.049s  max=0.539s  count=30  total=4.14s
+2026-07-23 17:53:07,596 INFO root:             llm_call: avg=0.623s  min=0.398s  max=1.427s  count=120  total=74.72s
+2026-07-23 17:53:07,596 INFO root:               search: avg=0.190s  min=0.075s  max=0.539s  count=15  total=2.85s
+2026-07-23 17:53:07,596 INFO root:         search_query: avg=0.190s  min=0.075s  max=0.539s  count=15  total=2.85s
+2026-07-23 17:53:07,596 INFO root:                visit: avg=0.293s  min=0.170s  max=0.461s  count=15  total=4.40s
+2026-07-23 17:53:07,596 INFO root: 
+2026-07-23 17:53:07,596 INFO root:   Avg Duration (all tests)
+2026-07-23 17:53:07,596 INFO root:   ────────────────────────────────────────────────────────────────────────
+2026-07-23 17:53:07,596 INFO root:   http_request |████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.138s (n=30)
+2026-07-23 17:53:07,596 INFO root:       llm_call |████████████████████████████████████████| 0.623s (n=120)
+2026-07-23 17:53:07,596 INFO root:         search |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.190s (n=15)
+2026-07-23 17:53:07,596 INFO root:   search_query |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.190s (n=15)
+2026-07-23 17:53:07,596 INFO root:          visit |██████████████████░░░░░░░░░░░░░░░░░░░░░░| 0.293s (n=15)
+2026-07-23 17:53:07,596 INFO root:   ────────────────────────────────────────────────────────────────────────
+2026-07-23 17:53:07,596 INFO root: ================================================================================
+2026-07-23 17:53:07,596 INFO ConnectorHttp: HTTP Session closed.
+2026-07-23 17:53:07,597 INFO ConnectorSearch: HTTP Session closed.
+
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3770
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.064s  min=0.050s  max=0.078s  count=2  total=0.13s
+          llm_call: avg=0.539s  min=0.479s  max=0.615s  count=8  total=4.31s
+            search: avg=0.079s  min=0.079s  max=0.079s  count=1  total=0.08s
+      search_query: avg=0.078s  min=0.078s  max=0.078s  count=1  total=0.08s
+             visit: avg=0.271s  min=0.271s  max=0.271s  count=1  total=0.27s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.064s (n=2)
+      llm_call |████████████████████████████████████████| 0.539s (n=8)
+        search |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.079s (n=1)
+  search_query |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.078s (n=1)
+         visit |████████████████████░░░░░░░░░░░░░░░░░░░░| 0.271s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3770
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.083s  min=0.080s  max=0.087s  count=2  total=0.17s
+          llm_call: avg=0.557s  min=0.492s  max=0.629s  count=8  total=4.46s
+            search: avg=0.087s  min=0.087s  max=0.087s  count=1  total=0.09s
+      search_query: avg=0.087s  min=0.087s  max=0.087s  count=1  total=0.09s
+             visit: avg=0.231s  min=0.231s  max=0.231s  count=1  total=0.23s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.083s (n=2)
+      llm_call |████████████████████████████████████████| 0.557s (n=8)
+        search |██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.087s (n=1)
+  search_query |██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.087s (n=1)
+         visit |████████████████░░░░░░░░░░░░░░░░░░░░░░░░| 0.231s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+===========================================================================
+[PASS] Test m03: Micro: obscure lake max depth (single-page)  (score: 1.00)
+===========================================================================
+  Nodes: 0
+
+Node Table:
+        ID    Action    Status   Score  Title
+  --------  --------  --------  ------  -----
+
+Validation Checks:
+  [+] keystone_depth: 1.0  Reported 514 m
+  [+] grounding: 1.0  source cited=True
+
+Observability:
+  LLM calls: 8, tokens: 3770
+  Cost: N/A  [qwen2.5:7b]
+  Visits: 1
+  Searches: 6
+  Chroma stores: 0
+  Chroma retrieves: 0
+
+Connector Timings (avg / min / max / count):
+      http_request: avg=0.066s  min=0.049s  max=0.084s  count=2  total=0.13s
+          llm_call: avg=0.544s  min=0.484s  max=0.619s  count=8  total=4.35s
+            search: avg=0.084s  min=0.084s  max=0.084s  count=1  total=0.08s
+      search_query: avg=0.084s  min=0.084s  max=0.084s  count=1  total=0.08s
+             visit: avg=0.203s  min=0.203s  max=0.203s  count=1  total=0.20s
+
+  Avg Connector/Tool Duration
+  ────────────────────────────────────────────────────────────────────────
+  http_request |████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.066s (n=2)
+      llm_call |████████████████████████████████████████| 0.544s (n=8)
+        search |██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.084s (n=1)
+  search_query |██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.084s (n=1)
+         visit |██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░| 0.203s (n=1)
+  ────────────────────────────────────────────────────────────────────────
+>> gate_report:
+
+=== qwen2.5:7b ===
+SCORE (mean +/- stdev, n)
+test       compiled:hand
+m01        1.00±0.00(n5)
+m02        0.50±0.00(n5)
+m03        1.00±0.00(n5)
+RUNTIME USD (mean)
+test       compiled:hand
+m01                   na
+m02                   na
+m03                   na
+### TOPUP DONE 17:53:07 ###

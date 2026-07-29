@@ -1,0 +1,71 @@
+{
+  "template_id": "filtered_count_or_predicate",
+  "schema_version": 1,
+  "archetype": "filtered_count",
+  "title": "Count (or select) the candidates whose page value satisfies a stated condition",
+  "description": "Structurally identical to argmax_over_n_page_field -- one independent page-read leaf per named candidate -- but the aggregation applies a THRESHOLD or predicate per candidate and then counts (or names the single one that qualifies) instead of picking an extreme. Every value is restated before the test is applied, so the condition is evaluated entity by entity rather than guessed globally. Generalizes test_072 / test_078 (count how many exceed a threshold) and test_076 (the single candidate satisfying two constraints at once).",
+  "embedding_text": "COUNT how many of these satisfy the condition. You are given NO URLs - search to find the pages you need, then READ them (do not guess from memory). For EACH of the following lakes / islands / countries, open its Wikipedia page and read ONE figure directly from the infobox: its maximum depth in metres, its area in square kilometres, its population, its year of construction. Then COUNT how many of them have a value STRICTLY GREATER THAN the given threshold - or, when exactly one candidate is wanted, determine the SINGLE one that satisfies BOTH constraints simultaneously (area over 5000 km2 AND maximum depth under 20 m), since several satisfy each constraint on its own and dropping either one gives a different answer set. Report the count as a single integer (or the single qualifying entity), which ones pass and which do not as two named lists, every candidate's value as read from its infobox, and the exact source URL of every page you read.",
+  "provenance": {
+    "source": "hand_authored",
+    "based_on_tasks": ["072", "076", "078"],
+    "mined_from_trace_ids": []
+  },
+  "min_candidates": 2,
+  "max_candidates": 12,
+  "slots": [
+    {
+      "name": "candidates",
+      "kind": "entity_list",
+      "description": "The candidates being tested, exactly as the mandate lists them: [{name, qualifier?}, ...].",
+      "extraction": "regex_candidate_list",
+      "min_arity": 2,
+      "max_arity": 12
+    },
+    {
+      "name": "field",
+      "kind": "field",
+      "description": "The figure(s) to read per candidate, phrased as the mandate phrases them WITH units (e.g. \"its MAXIMUM DEPTH in metres, the 'Max. depth' infobox field\"). When two constraints are tested, name both figures here. Keep it under about ten words: it is also concatenated with each candidate's name to build that leaf's web-search query.",
+      "extraction": "llm"
+    },
+    {
+      "name": "criterion",
+      "kind": "criterion",
+      "description": "The test applied to one candidate's value(s), stated exactly (e.g. 'a maximum depth STRICTLY GREATER THAN 480 metres', or 'a surface area OVER 5,000 km^2 AND a maximum depth UNDER 20 m').",
+      "extraction": "llm"
+    },
+    {
+      "name": "answer_form",
+      "kind": "aggregation_op",
+      "description": "What the mandate asks for: 'the COUNT of candidates that satisfy the condition (a single integer)' or 'the SINGLE candidate that satisfies the condition'.",
+      "required": false,
+      "extraction": "llm",
+      "default": "the COUNT of candidates that satisfy the condition (a single integer)"
+    },
+    {
+      "name": "entity_noun",
+      "kind": "field",
+      "description": "What one candidate is called in prose (e.g. 'lake', 'island').",
+      "required": false,
+      "extraction": "llm",
+      "default": "candidate"
+    },
+    {
+      "name": "source_type",
+      "kind": "source_type",
+      "description": "Which page to open for a candidate.",
+      "required": false,
+      "extraction": "default",
+      "default": "the authoritative Wikipedia page"
+    }
+  ],
+  "leaves": [
+    {
+      "id_pattern": "<<item.key>>_value",
+      "for_each": "candidates",
+      "instruction": "Open <<source_type>> for <<item.name>> and read, directly from that page's infobox, <<field>>. Report ONLY that value (or those values) for <<item.name>>, and ALWAYS repeat the name '<<item.name>>' alongside it so the figure stays self-contained even if it is read out of context. Give the exact source URL. Do NOT apply any threshold, filter, comparison or count at this step -- this leaf only READS. Do not guess from memory.",
+      "expect": "<<item.name>>: <<field>> as read from the page, with units -- source URL",
+      "depends_on": []
+    }
+  ],
+  "aggregation": "You now have, for each <<entity_noun>>, <<field>> together with a source URL. FIRST restate every <<entity_noun>>'s value explicitly, one per line, in the form '<name> -> <value>', for ALL of them, BEFORE applying any test. THEN, for EACH <<entity_noun>> IN TURN, state whether it satisfies the condition: <<criterion>> -- write 'yes' or 'no' per <<entity_noun>>, one per line, and apply the condition exactly as stated (mind strict versus non-strict comparisons, and when two constraints are given both must hold simultaneously). FINALLY report <<answer_form>> -- that is the keystone answer, and it must be consistent with the per-<<entity_noun>> yes/no lines you just wrote. Report (a) that answer, (b) which <<entity_noun>>s satisfy the condition and which do not, as two named lists, (c) every value as restated above, and (d) cite each source URL."
+}
