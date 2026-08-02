@@ -282,6 +282,31 @@ class IdeaDagEngine:
                     )
                     current_id = target
 
+            # A6: calibrated high-confidence early exit — the THIRD outcome at this decision
+            # point, alongside "keep going" and "backtrack". Gated by
+            # `native_confidence_early_exit_enabled` (default False); when on AND the shipped
+            # calibration artifact certifies a rule that the run's accumulated step-confidence
+            # history clears, stop expanding entirely and go straight to finalize. Placed after
+            # backtrack (a dead-end chain must be abandoned before it can be called "done") and
+            # before `on_step` so the checkpoint records the state we actually finalize from.
+            if (
+                self._got
+                and self._cfg.got.confidence_early_exit_enabled
+                and self._got.should_exit_early(graph, self._step_confidences)
+            ):
+                self._record_decision(
+                    "early_exit", node_id=current_id or graph.root_id(), chosen="finalize",
+                    rationale="calibrated high-confidence early exit",
+                    metadata={"judged_steps": len(self._step_confidences), "step": steps},
+                )
+                self._logger.info(
+                    f"[RUN] STEP {steps}: calibrated early exit — finalizing after "
+                    f"{len(self._step_confidences)} judged step(s)"
+                )
+                if on_step is not None:
+                    await on_step(graph, current_id, steps)
+                break
+
             if on_step is not None:
                 await on_step(graph, current_id, steps)
 
@@ -400,6 +425,9 @@ class IdeaDagEngine:
                 "nodes_pruned": pruned_count,
                 "parallel_leaves_total": getattr(self, "_parallel_leaves_total", 0),
             }
+            # A6 counter, attached ONLY when armed so the flag-off payload keeps its exact shape.
+            if self._cfg.got.confidence_early_exit_enabled:
+                final_payload["got_stats"]["early_exits"] = self._got.early_exit_count
 
         # Opt-in decorrelated per-step confidence trace (empty/absent when the flag is off),
         # surfaced so the E-valuator pilot can consume it as a real verifier-score sequence.

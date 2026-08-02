@@ -65,12 +65,14 @@ def _json_key_for(cls, field_name: str) -> str:
     """Resolve a field to its JSON key using the group's own mapping logic.
 
     Mirrors the two code paths in config.py: ``_build`` reads ``cls._KEYS``
-    (falling back to the bare field name), while ``GoTConfig.from_settings`` --
-    the only group without a ``_KEYS`` ClassVar -- hard-codes the ``got_`` prefix.
+    (falling back to the bare field name), while ``GoTConfig`` -- the only group
+    without a ``_KEYS`` ClassVar -- resolves through its own ``json_key`` (the
+    ``got_`` prefix, or a ``_NATIVE_KEYS`` override for the ``native_``-prefixed
+    A-series flags that live in the GoT group).
     """
     key_map = getattr(cls, "_KEYS", None)
     if key_map is None:
-        return f"got_{field_name}"
+        return cls.json_key(field_name)
     return key_map.get(field_name, field_name)
 
 

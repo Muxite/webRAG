@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 from agent.app.idea_policies.base import DetailKey, IdeaNodeStatus
 from agent.app.idea_policies.config import IdeaConfig
+from agent.app.idea_policies.confidence_early_exit import load_rule as load_early_exit_rule
 
 _logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class GoTOperations:
         self.io = io
         self.memory_manager = memory_manager
         self._dead_end_count = 0
+        self._early_exit_count = 0
 
     async def embed_thought(
         self,
@@ -559,6 +561,50 @@ class GoTOperations:
 
         return False
 
+    def should_exit_early(
+        self, graph: IdeaDag, step_confidences: Optional[List[Dict[str, Any]]] = None
+    ) -> bool:
+        """A6: has the run earned a calibrated high-confidence early exit?
+
+        The third outcome at the loop's decide-the-next-move point, alongside "keep going"
+        and ``should_backtrack``: stop expanding new nodes and finalize with what we have.
+        Mirrors ``should_backtrack``'s shape — flag-gated, pure, no LLM call, no mutation —
+        but reads the run's accumulated step-confidence history rather than node scores.
+
+        The bar is NOT hand-picked. ``confidence_early_exit.load_rule`` reads the versioned
+        calibration artifact (thresholds derived from held-out ``(confidence-sequence,
+        eventual-label)`` pairs under a certified false-stop rate; see
+        ``idea_policies/confidence_early_exit.py``). An absent, unparseable or
+        nothing-certified artifact yields no rule, and no rule means never stop — the same
+        fail-safe direction as E-valuator's ``c_α = ∞``.
+
+        ``got.confidence_early_exit_margin`` is added on top of the calibrated threshold
+        (extra conservatism), and ``got.confidence_early_exit_min_judged_steps`` is a hard
+        floor on how few judged steps may justify stopping at all.
+        """
+        if not self._cfg.got.confidence_early_exit_enabled:
+            return False
+        confidences = [
+            float(entry["confidence"])
+            for entry in (step_confidences or [])
+            if isinstance(entry, dict) and isinstance(entry.get("confidence"), (int, float))
+        ]
+        if len(confidences) < max(1, int(self._cfg.got.confidence_early_exit_min_judged_steps)):
+            return False
+        rule = load_early_exit_rule()
+        if rule is None:
+            return False
+        decision = rule.decide(confidences, margin=self._cfg.got.confidence_early_exit_margin)
+        if decision.stop:
+            _logger.info(
+                f"[GoT:EARLY-EXIT] Calibrated high-confidence stop after "
+                f"{decision.timestep} judged step(s) ({graph.node_count()} nodes): {decision.reason}"
+            )
+            self._early_exit_count += 1
+            return True
+        _logger.debug(f"[GoT:EARLY-EXIT] not stopping: {decision.reason}")
+        return False
+
     def find_backtrack_target(self, graph: IdeaDag, current_id: str) -> Optional[str]:
         low_score = self._cfg.got.backtrack_low_score_threshold
         path = graph.path_to_root(current_id)
@@ -666,3 +712,8 @@ class GoTOperations:
     @dead_end_count.setter
     def dead_end_count(self, value: int) -> None:
         self._dead_end_count = int(value)
+
+    @property
+    def early_exit_count(self) -> int:
+        """How many times ``should_exit_early`` fired this run (0 unless A6 is armed)."""
+        return self._early_exit_count

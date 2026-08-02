@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "generated_utc": "2026-08-02",
+  "method": "per-timestep threshold on a scalar confidence-prefix statistic, certified by an exact one-sided Clopper-Pearson lower bound (Bonferroni-corrected across timesteps) on the stop-set's eventual-pass rate; fitted sequential-consistently on a deterministic 70% split, measured on the untouched 30% holdout. Simplified from E-valuator (arXiv 2512.03109) for a 354-trajectory corpus - see idea_policies/confidence_early_exit.py.",
+  "label_rule": "validation.overall_score >= 0.75",
+  "model_roster": [
+    "gpt-4.1-nano",
+    "gpt-5-mini",
+    "deepseek",
+    "sonnet",
+    "gemini"
+  ],
+  "excluded_markers": [
+    "bmladapt",
+    "qwen",
+    "localagent",
+    "ollama"
+  ],
+  "certification_delta": 0.05,
+  "min_stop_coverage": 0.05,
+  "max_step_stop_fraction": 0.5,
+  "min_timestep": 2,
+  "max_timestep": 8,
+  "calibration_split": 0.7,
+  "preferred_target_stop_precision": 0.9,
+  "n_trajectories": 354,
+  "n_fit": 260,
+  "n_holdout": 94,
+  "base_rate": 0.5112994350282486,
+  "signal_ceiling": {
+    "best_certified_precision_any": 0.5531,
+    "per_statistic": {
+      "running_min": {
+        "2": {
+          "n_reaching": 188,
+          "base_rate": 0.6276595744680851,
+          "best_certified_precision": 0.5181,
+          "at_threshold": 0.75
+        },
+        "3": {
+          "n_reaching": 166,
+          "base_rate": 0.6506024096385542,
+          "best_certified_precision": 0.4142,
+          "at_threshold": 0.4
+        },
+        "4": {
+          "n_reaching": 132,
+          "base_rate": 0.6590909090909091,
+          "best_certified_precision": 0.3418,
+          "at_threshold": 0.05
+        },
+        "5": {
+          "n_reaching": 107,
+          "base_rate": 0.6728971962616822,
+          "best_certified_precision": 0.269,
+          "at_threshold": 0.05
+        },
+        "6": {
+          "n_reaching": 78,
+          "base_rate": 0.6666666666666666,
+          "best_certified_precision": 0.1705,
+          "at_threshold": 0.05
+        },
+        "7": {
+          "n_reaching": 53,
+          "base_rate": 0.6226415094339622,
+          "best_certified_precision": 0.0582,
+          "at_threshold": 0.05
+        },
+        "8": {
+          "n_reaching": 44,
+          "base_rate": 0.6590909090909091,
+          "best_certified_precision": 0.0024,
+          "at_threshold": 0.05
+        }
+      },
+      "running_mean": {
+        "2": {
+          "n_reaching": 188,
+          "base_rate": 0.6276595744680851,
+          "best_certified_precision": 0.5348,
+          "at_threshold": 0.675
+        },
+        "3": {
+          "n_reaching": 166,
+          "base_rate": 0.6506024096385542,
+          "best_certified_precision": 0.5531,
+          "at_threshold": 0.46666666666666673
+        },
+        "4": {
+          "n_reaching": 132,
+          "base_rate": 0.6590909090909091,
+          "best_certified_precision": 0.5437,
+          "at_threshold": 0.5075
+        },
+        "5": {
+          "n_reaching": 107,
+          "base_rate": 0.6728971962616822,
+          "best_certified_precision": 0.4736,
+          "at_threshold": 0.52
+        },
+        "6": {
+          "n_reaching": 78,
+          "base_rate": 0.6666666666666666,
+          "best_certified_precision": 0.4079,
+          "at_threshold": 0.4366666666666667
+        },
+        "7": {
+          "n_reaching": 53,
+          "base_rate": 0.6226415094339622,
+          "best_certified_precision": 0.2914,
+          "at_threshold": 0.4428571428571429
+        },
+        "8": {
+          "n_reaching": 44,
+          "base_rate": 0.6590909090909091,
+          "best_certified_precision": 0.277,
+          "at_threshold": 0.425
+        }
+      },
+      "last": {
+        "2": {
+          "n_reaching": 188,
+          "base_rate": 0.6276595744680851,
+          "best_certified_precision": 0.5109,
+          "at_threshold": 0.82
+        },
+        "3": {
+          "n_reaching": 166,
+          "base_rate": 0.6506024096385542,
+          "best_certified_precision": 0.4893,
+          "at_threshold": 0.25
+        },
+        "4": {
+          "n_reaching": 132,
+          "base_rate": 0.6590909090909091,
+          "best_certified_precision": 0.5348,
+          "at_threshold": 0.65
+        },
+        "5": {
+          "n_reaching": 107,
+          "base_rate": 0.6728971962616822,
+          "best_certified_precision": 0.4178,
+          "at_threshold": 0.3
+        },
+        "6": {
+          "n_reaching": 78,
+          "base_rate": 0.6666666666666666,
+          "best_certified_precision": 0.3355,
+          "at_threshold": 0.08
+        },
+        "7": {
+          "n_reaching": 53,
+          "base_rate": 0.6226415094339622,
+          "best_certified_precision": 0.3059,
+          "at_threshold": 0.7
+        },
+        "8": {
+          "n_reaching": 44,
+          "base_rate": 0.6590909090909091,
+          "best_certified_precision": 0.4255,
+          "at_threshold": 0.1
+        }
+      }
+    }
+  },
+  "ladder": [
+    {
+      "target_stop_precision": 0.95,
+      "certified": false
+    },
+    {
+      "target_stop_precision": 0.9,
+      "certified": false
+    },
+    {
+      "target_stop_precision": 0.85,
+      "certified": false
+    },
+    {
+      "target_stop_precision": 0.8,
+      "certified": false
+    },
+    {
+      "target_stop_precision": 0.75,
+      "certified": false
+    },
+    {
+      "target_stop_precision": 0.7,
+      "certified": false
+    },
+    {
+      "target_stop_precision": 0.65,
+      "certified": false
+    }
+  ],
+  "statistic": null,
+  "thresholds": {},
+  "target_stop_precision": null,
+  "preferred_target_met": false,
+  "note": "No ladder rung certified a non-vacuous rule on this corpus: the step-confidence judge is not predictive enough of eventual success. The highest stop precision any admissible threshold could certify is signal_ceiling.best_certified_precision_any (vs. a 0.511 base rate). The engine therefore never exits early even with native_confidence_early_exit_enabled on. Re-run this script when the corpus grows or the confidence judge improves; no code change is needed for a certified rule to go live."
+}

@@ -604,6 +604,19 @@ def _apply_got_experiment_overrides(
     _backtrack_override = env.get("IDEA_TEST_GOT_BACKTRACK", "").strip()
     if _backtrack_override:
         idea_settings["got_backtrack_enabled"] = _is_enabled(_backtrack_override)
+    # IDEA_TEST_NATIVE_EARLY_EXIT: A6 calibrated high-confidence early exit
+    # (native_confidence_early_exit_enabled) — the symmetric counterpart of the
+    # confidence->re-expansion loop, stopping an easy run instead of extending a shaky one.
+    # Requires the step-confidence judge to be on (no judged steps -> no rule input), and it
+    # only ever fires if the shipped calibration artifact certifies a rule. No threshold
+    # override exists on purpose: confidence_early_exit_calibration.json owns the derived
+    # thresholds, and a hand-set engine-level bar is exactly what the calibration replaces.
+    _earlyexit_override = env.get("IDEA_TEST_NATIVE_EARLY_EXIT", "").strip()
+    if _earlyexit_override:
+        idea_settings["native_confidence_early_exit_enabled"] = _is_enabled(_earlyexit_override)
+    _earlyexit_margin = env.get("IDEA_TEST_NATIVE_EARLY_EXIT_MARGIN", "").strip()
+    if _earlyexit_margin:
+        idea_settings["native_confidence_early_exit_margin"] = float(_earlyexit_margin)
     # IDEA_TEST_CONNECTOR_RETRY: whether a failed connector call is retried
     # (connector_retry_on_failure_enabled).
     _connretry_override = env.get("IDEA_TEST_CONNECTOR_RETRY", "").strip()

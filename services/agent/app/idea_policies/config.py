@@ -112,18 +112,47 @@ class GoTConfig:
     backtrack_enabled: bool = False
     backtrack_dead_end_threshold: int = 5
     backtrack_low_score_threshold: float = 0.3
+    # A6 — the SYMMETRIC counterpart of the step-confidence trigger above. A1 only ever adds
+    # compute (a distrusted step re-expands); this stops the loop and finalizes when the
+    # accumulated confidence prefix clears a CALIBRATED bar, so an easy mandate does not pay
+    # for steps it does not need. The bar is not hand-picked: it is derived from held-out
+    # (confidence-sequence, eventual-label) pairs with a certified false-stop rate and shipped
+    # in ``confidence_early_exit_calibration.json`` (see ``idea_policies/confidence_early_exit.py``).
+    # Opt-in, default OFF -> byte-identical; ``margin`` is an extra conservatism knob on top of
+    # the calibrated threshold and ``min_judged_steps`` a floor below which no rule may fire.
+    confidence_early_exit_enabled: bool = False
+    confidence_early_exit_margin: float = 0.05
+    confidence_early_exit_min_judged_steps: int = 2
     telemetry_routing_enabled: bool = False
     telemetry_routing_score_model: Optional[str] = None
     telemetry_routing_generate_model: Optional[str] = None
 
+    #: Fields whose JSON key is NOT the ``got_``-prefixed field name. The A6 early-exit knobs
+    #: belong to this group (they are GoT control-loop decisions, siblings of
+    #: ``backtrack_enabled``/``step_confidence_*``) but are named with the ``native_`` prefix
+    #: the rest of the native-engine A-series uses (``native_vote_k_enabled``,
+    #: ``native_reasoning_effort_discipline_enabled``). Deliberately NOT called ``_KEYS``:
+    #: that ClassVar means "override the *bare field name*" in every ``_build`` group, and
+    #: reusing the name here with a ``got_``-prefixed fallback would give it two meanings.
+    _NATIVE_KEYS: ClassVar[dict] = {
+        "confidence_early_exit_enabled": "native_confidence_early_exit_enabled",
+        "confidence_early_exit_margin": "native_confidence_early_exit_margin",
+        "confidence_early_exit_min_judged_steps": "native_confidence_early_exit_min_judged_steps",
+    }
+
+    @classmethod
+    def json_key(cls, field_name: str) -> str:
+        """The JSON key a field reads: the ``got_`` prefix, or a ``_NATIVE_KEYS`` override."""
+        return cls._NATIVE_KEYS.get(field_name, f"got_{field_name}")
+
     @classmethod
     def from_settings(cls, settings: Mapping[str, Any]) -> "GoTConfig":
-        # Every key is the field name prefixed with ``got_``.
+        # Every key is the field name prefixed with ``got_``, except ``_NATIVE_KEYS``.
         defaults = cls()
         values: dict[str, Any] = {}
         for f in fields(cls):
             current = getattr(defaults, f.name)
-            values[f.name] = _coerce(settings.get(f"got_{f.name}", current), current)
+            values[f.name] = _coerce(settings.get(cls.json_key(f.name), current), current)
         return cls(**values)
 
 

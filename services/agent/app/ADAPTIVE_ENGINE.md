@@ -40,7 +40,12 @@ The native engine is a Graph-of-Thoughts loop in `idea_engine.py`. One turn:
    - **confidence trigger** (`_confidence_triggers_reexpand`): "was this step untrustworthy
      (confidence < threshold)?"
    Either can grow real child leaves on the same lineage. A separate **backtrack** mechanism
-   (`_run_loop` + `got_operations.should_backtrack`) can abandon a low-scoring dead-end chain.
+   (`_run_loop` + `got_operations.should_backtrack`) can abandon a low-scoring dead-end chain,
+   and a third outcome — **calibrated early exit** (`_run_loop` +
+   `got_operations.should_exit_early`, A6) — stops expanding entirely and goes straight to
+   finalize when the run's confidence history clears a threshold *derived* from labelled
+   trajectories. Backtrack is checked first (a dead end must be abandoned before the run can
+   be called done), then early exit, then the step hook.
 5. **Merge / finalize** (`MergeLeafAction`, `idea_finalize.py`): synthesize a provenance-preserving
    answer.
 
@@ -68,6 +73,11 @@ research agenda and measured.
 | `native_reasoning_effort_discipline_enabled` | `false` | Reasoning-model micro-prompts get `effort=minimal` + token floor (A3b) | this session |
 | `native_reasoning_min_tokens_floor` | `2048` | The anti-starvation token floor | this session |
 | `price_tier_param_tiering_enabled` | `false` | Executor token budgets scale by model price tier (A5) | this session |
+| `native_vote_k_enabled` | `false` | k-vote finalize: k independent extractions, majority vote (A3c) | C1b |
+| `native_vote_k` | `1` | Vote count when the flag above is on (`good_adaptive` uses 3) | C1b |
+| `native_confidence_early_exit_enabled` | `false` | **Calibrated high-confidence early exit (A6)** — stop expanding and finalize when the accumulated step-confidence prefix clears a *derived* threshold | A6 |
+| `native_confidence_early_exit_margin` | `0.05` | Extra conservatism added on top of the calibrated threshold | A6 |
+| `native_confidence_early_exit_min_judged_steps` | `2` | Hard floor: no rule may stop a run on fewer judged steps than this | A6 |
 
 **The "good adaptive agent" configuration** (the thing the research agenda tests) = native `graph`
 variant with `got_reexpand_enabled` + `got_step_confidence_judge_enabled` +
@@ -121,6 +131,53 @@ plus the foresight nudge. Toggle per-run with `IDEA_TEST_GOT_REEXPAND=1`,
 | `1408f99` | **A3b+A5** — native reasoning-effort discipline + price-tier param tiering |
 | `e48736b`, `3153884` | honest retest_055 grounding verdicts (pre-fix FAIL, post-fix PARTIAL PASS) |
 
+### 5.1 A6 — calibrated high-confidence early exit (2026-08-02)
+
+**The gap.** Every confidence mechanism above only ever *adds* compute: a distrusted step
+re-expands (A1). Nothing short-circuits an easy, high-confidence mandate — which is where most
+of the compute-optimal literature's actual efficiency gain lives. A6 is the symmetric half.
+
+**What shipped.**
+- `idea_policies/confidence_early_exit.py` — the shared, pure statistics: prefix statistics
+  (`running_min` / `running_mean` / `last`), an exact one-sided **Clopper–Pearson** lower bound
+  on stop-set precision, per-timestep threshold certification with a **selectivity guard**, a
+  **sequential-consistent** fit (a trajectory stopped at *t* is removed before *t+1* is
+  certified) with **Bonferroni** correction across timesteps, rule replay, and a fail-closed
+  artifact loader.
+- `scripts/calibrate_confidence_early_exit.py` — the driver: scans
+  `idea_test_results/*.json`, filters to the regular roster (badmodel-lab runs excluded),
+  labels each run `overall_score >= 0.75`, splits deterministically 70/30 by filename hash,
+  walks a target ladder, and writes the versioned artifact.
+- `confidence_early_exit_calibration.json` — the committed artifact.
+- `got_operations.should_exit_early` + the `_run_loop` call site + the three flags in §3.
+- `IDEA_TEST_NATIVE_EARLY_EXIT` / `IDEA_TEST_NATIVE_EARLY_EXIT_MARGIN` per-run toggles.
+
+**Why a simplification of E-valuator (arXiv 2512.03109).** Its per-timestep logistic
+classifier + density ratio + PAC order-statistic threshold needs *hundreds of trajectories per
+split*; we have 354 in total. So the classifier collapses to one scalar prefix statistic chosen
+on the fit split only, and the PAC order statistic becomes an exact Clopper–Pearson bound —
+the same distribution-free finite-sample guarantee on the false-stop rate, computed the way a
+small sample allows. The "when nothing certifies, never stop" behavior is E-valuator's own
+`c_α = ∞` degenerate case, kept deliberately.
+
+**The result is a negative one, and it is the honest one.** n = **354** regular-roster
+trajectories (fit 260 / holdout 94), base pass rate **0.511**, mean 4.75 judged steps.
+**No rung of the target ladder (0.95 → 0.65) certifies a rule.** The highest stop precision
+*any* admissible threshold can certify is **0.553** — a +4.2pt lift on a 0.511 base rate,
+against a preferred target of 0.90. The shipped artifact therefore has `thresholds: {}` and
+`should_exit_early` cannot fire even with the flag on. Raw (uncertified) precision tops out
+around 0.70–0.77 at usable coverage, so this is not a bound-tightness problem: **the
+step-confidence judge simply is not predictive of eventual success** — the same anti-calibration
+that motivated F33's contract-based re-expansion, now measured (prefix-statistic AUC ≈ 0.58 at
+t=1, ≤ 0.5 by t=5).
+
+**What that buys.** The mechanism, its flags, its tests and its call site are all in place;
+re-running the calibration script is the *only* step needed for a certified rule to go live —
+no code change. Re-run it when the corpus grows (post-barrage) or when a better-calibrated
+per-step signal exists (e.g. contract satisfaction rather than the judge's number). Two tests
+pin the current "certifies nothing" state deliberately, so a future recalibration that *does*
+certify has to be acknowledged rather than slipping in silently.
+
 ---
 
 ## 6. Lessons learnt
@@ -158,6 +215,14 @@ plus the foresight nudge. Toggle per-run with `IDEA_TEST_GOT_REEXPAND=1`,
    — that is exactly what Part B of the plan (the research agenda) exists to answer, and it needs live
    $ to run.
 
+7. **A calibration that refuses to certify is a result, not a failure** (A6, §5.1). The tempting move
+   was to lower the target until *something* came back — which the data would have obliged, by
+   certifying a threshold of 0.0 that stops every run and merely inherits the base rate. The
+   selectivity guard exists specifically to make that outcome impossible, and the artifact records
+   the measured ceiling (0.553 vs. a 0.511 base rate) so the shortfall is a number rather than a
+   shrug. *Lesson: build the mechanism, let the calibration decide whether it may fire, and pin the
+   "cannot fire" state in a test so turning it on later is a decision somebody makes on purpose.*
+
 ---
 
 ## 7. The process (how this was executed)
@@ -179,8 +244,9 @@ plus the foresight nudge. Toggle per-run with `IDEA_TEST_GOT_REEXPAND=1`,
 
 ## 8. Backlog / next
 
-- **A3c** — native k-vote + `strip_approximators` answer aggregation (the highest-leverage price knob;
-  A5's broader token tiering pairs with it).
+- ~~**A3c** — native k-vote + `strip_approximators` answer aggregation~~ **DONE** (commit `1e7ee2d`,
+  "C1b"). Corrected 2026-08-02 — this section was stale; see §3's flag table and
+  `RESEARCH_LIBRARY.md`'s `answer_vote.py` entry.
 - **Compiled `_target_entity` third bug** (quoted field-name as target) — fix only if the Theme-2
   compiled baseline needs test_055 fully green; otherwise a documented compiled-path limitation.
 - **Run the research agenda** (plan Part B) — the actual validation of everything built here. Needs a

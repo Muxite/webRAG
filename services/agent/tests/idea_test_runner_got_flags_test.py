@@ -29,6 +29,8 @@ def _base():
         "got_contract_reexpand_enabled": False,
         "got_reexpand_corrective_context_enabled": False,
         "got_backtrack_enabled": False,
+        "native_confidence_early_exit_enabled": False,
+        "native_confidence_early_exit_margin": 0.05,
         "connector_retry_on_failure_enabled": False,
         "tool_failure_recovery_enabled": False,
         "native_vote_k_enabled": False,
@@ -192,6 +194,27 @@ def test_backtrack_bool_override():
     assert settings["got_backtrack_enabled"] is True
 
 
+def test_native_early_exit_bool_override():
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_NATIVE_EARLY_EXIT": "1"})
+    assert settings["native_confidence_early_exit_enabled"] is True
+
+
+def test_native_early_exit_explicit_falsey_forces_off():
+    settings = _base()
+    settings["native_confidence_early_exit_enabled"] = True
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_NATIVE_EARLY_EXIT": "0"})
+    assert settings["native_confidence_early_exit_enabled"] is False
+
+
+def test_native_early_exit_margin_float_override():
+    settings = _base()
+    _apply_got_experiment_overrides(
+        settings, environ={"IDEA_TEST_NATIVE_EARLY_EXIT_MARGIN": "0.15"}
+    )
+    assert settings["native_confidence_early_exit_margin"] == 0.15
+
+
 def test_connector_retry_bool_override():
     settings = _base()
     _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_CONNECTOR_RETRY": "yes"})
@@ -286,6 +309,8 @@ def test_all_new_flags_blank_are_noop():
             "IDEA_TEST_GOT_CORRECTIVE_CONTEXT": "  ",
             "IDEA_TEST_GOT_CONFIDENCE_THRESHOLD": "",
             "IDEA_TEST_GOT_BACKTRACK": "",
+            "IDEA_TEST_NATIVE_EARLY_EXIT": "",
+            "IDEA_TEST_NATIVE_EARLY_EXIT_MARGIN": "  ",
             "IDEA_TEST_CONNECTOR_RETRY": "",
             "IDEA_TEST_TOOL_FAILURE_RECOVERY": "",
             "IDEA_TEST_NATIVE_VOTE_K": "",
