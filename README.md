@@ -351,6 +351,7 @@ docs/             Architecture, security, benchmark plots
 - [Agent Architecture](services/agent/app/AGENT_ARCHITECTURE.md) - Graph-of-Thought engine internals
 - [Idea Engine Deep Dive](services/agent/app/IDEA_ENGINE.md) - File-and-line-cited walkthrough of the DAG controller, policies, and mechanics
 - [Adaptive Engine](services/agent/app/ADAPTIVE_ENGINE.md) - The interleaved plan-act-observe-decide loop, flag inventory, and lessons learned
+- [Research Library](services/agent/app/RESEARCH_LIBRARY.md) - Mechanism-by-mechanism map of what external research each part of the agent matches or diverges from
 - [Test Suite](services/agent/app/idea_tests/README.md) - Test structure and validation
 - [Deployment](services/agent/app/DEPLOYMENT.md) - Deployment guide
 - [Debugger](services/agent/app/AGENT_DEBUG.md) - Debugging tools and techniques

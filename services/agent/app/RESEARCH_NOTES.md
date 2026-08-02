@@ -5,6 +5,9 @@ work (see `ADAPTIVE_DISTILLATION_HANDOFF.md` and plan `a-lot-of-work-gleaming-he
 Kept here as citable background, not re-derived from this repo — update if a finding is later
 superseded or contradicted by our own live results.
 
+Scoped to that one track. For the general, mechanism-by-mechanism map of what external research
+each part of the agent matches or diverges from, see [`RESEARCH_LIBRARY.md`](RESEARCH_LIBRARY.md).
+
 ## Why narrative few-shot exemplars backfired
 
 Matches a known failure mode: models optimize for locally coherent, statistically plausible
