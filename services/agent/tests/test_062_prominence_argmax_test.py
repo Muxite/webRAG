@@ -223,6 +223,29 @@ def test_ungrounded_correct_value_gates_to_zero():
     assert sum(scores) / len(scores) < 0.75
 
 
+def test_natural_phrasing_wide_gap_between_superlative_and_winner_passes():
+    # Regression (found live, bmladapt__qwen2.5-7b__a0_native_baseline reachable_062 rep1): a
+    # natural "superlative ... is <winner>" sentence can put 59+ characters between "highest" and
+    # "Jengish Chokusu" -- this used to exceed the direction-2 proximity window (55) and wrongly
+    # fail an otherwise-correct answer. The window is now 90 (matching direction 1), symmetric.
+    text = (
+        "The highest topographically prominent peak among the six mountains is Jengish Chokusu "
+        "with a prominence of 4,148 meters."
+    )
+    assert t.validate_keystone_argmax(_r(text), _OBS)["passed"]
+
+
+def test_citation_url_for_a_rival_does_not_pollute_the_keystone_check():
+    # Defensive regression: same bug CLASS as test 069's confirmed indexmundi/slovakia false
+    # positive, where a rival's name sat inside a citation URL right next to a trigger word purely
+    # as a slug artifact. A rival's citation URL must not perturb a correct keystone assertion.
+    text = (
+        "Jengish Chokusu has the highest topographic prominence, 4,148 m. "
+        "Source for Kongur Tagh: https://en.wikipedia.org/wiki/Kongur_Tagh"
+    )
+    assert t.validate_keystone_argmax(_r(text), _OBS)["passed"]
+
+
 def test_compiled_plan_validates_and_is_six_leaf_fanout():
     plan = t.get_compiled_plan()
     cp.validate_plan(plan)  # must not raise (well-formed, acyclic, deps resolve)

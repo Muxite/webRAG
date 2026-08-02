@@ -261,6 +261,22 @@ def _children(graph, node):
     return [graph.get_node(cid) for cid in node.children]
 
 
+def _searches(graph, node):
+    """The template's own leaves, without the page-visit siblings each is followed through
+    into (``plan_library.link_page_visits``)."""
+    return [
+        c for c in _children(graph, node)
+        if c.details.get(DetailKey.ACTION.value) == IdeaActionType.SEARCH.value
+    ]
+
+
+def _visits(graph, node):
+    return [
+        c for c in _children(graph, node)
+        if c.details.get(DetailKey.ACTION.value) == IdeaActionType.VISIT.value
+    ]
+
+
 def _rows(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
@@ -515,8 +531,14 @@ async def test_an_adopted_search_grows_the_template_and_step_descends(monkeypatc
     assert node.status == IdeaNodeStatus.ACTIVE
 
     # ...whose children are the template's filled leaves, wired like any library-sourced ones
-    children = _children(graph, node)
-    assert len(children) == len(_PEAKS)
+    # (each with the page visit `link_page_visits` follows it through into — same wiring the
+    # automatic path gets, because both call sites converge on the one expansion entry point)
+    children = _searches(graph, node)
+    visits = _visits(graph, node)
+    assert len(children) == len(visits) == len(_PEAKS)
+    for visit, search in zip(visits, children):
+        assert visit.details[DetailKey.REQUIRES_DATA.value]["source_node_id"] == search.node_id
+        assert visit.details[adapter.PLAN_LIBRARY_ORIGIN] == adapter.ORIGIN_ACTION
     for child, peak in zip(children, _PEAKS):
         assert child.details[adapter.PLAN_LIBRARY_ORIGIN] == adapter.ORIGIN_ACTION
         assert child.details[adapter.PLAN_LIBRARY_TEMPLATE_ID] == "argmax_t"
@@ -535,10 +557,16 @@ async def test_an_adopted_search_grows_the_template_and_step_descends(monkeypatc
     # the rebuild cost nothing: no second ranking query, no second slot extraction
     assert len(chroma.queries) == 1
 
-    # and now the load-bearing part — the engine's OWN routing drives the new subtree
-    await engine.step(graph, node.node_id, 1)
+    # and now the load-bearing part — the engine's OWN routing drives the new subtree. Each
+    # leaf's page visit waits on that leaf's search (`requires_data`), so the engine schedules
+    # the searches itself rather than firing the whole batch off at once.
+    current = node.node_id
+    for step_index in range(1, 3 * len(children)):
+        if all(c.status is IdeaNodeStatus.DONE for c in children):
+            break
+        current = await engine.step(graph, current, step_index) or node.node_id
     assert RecordingSearchAction.executed == [c.node_id for c in children]
-    assert all(c.status == IdeaNodeStatus.DONE for c in _children(graph, node))
+    assert all(c.status == IdeaNodeStatus.DONE for c in children)
 
 
 @pytest.mark.asyncio

@@ -217,7 +217,8 @@ class AgentIO:
             )
         return results
 
-    async def visit(self, url: str, timeout_seconds: Optional[float] = None) -> str:
+    async def visit(self, url: str, timeout_seconds: Optional[float] = None,
+                    prepend_infobox: bool = False) -> str:
         """
         Fetch a URL, clean the HTML, return extracted text.
 
@@ -228,6 +229,8 @@ class AgentIO:
 
         :param url: Target URL.
         :param timeout_seconds: Optional per-call timeout.
+        :param prepend_infobox: Prefix the page's infobox as ``Label: Value`` lines (opt-in;
+            same single fetch, no extra round-trip — see :func:`observation.clean_operation`).
         :returns: Cleaned page text.
         :raises RuntimeError: On HTTP failure after all attempts.
         """
@@ -284,7 +287,7 @@ class AgentIO:
                 text_body = json.dumps(resp)
             else:
                 text_body = resp
-            cleaned = clean_operation(text_body)
+            cleaned = clean_operation(text_body, prepend_infobox=prepend_infobox)
             summary = cleaned if cleaned else "[No main content found]"
         except Exception as exc:
             error_text = str(exc)

@@ -159,9 +159,30 @@ _SUP = (r"more|larger|greater|higher|bigger|largest|greatest|highest|biggest|mos
 #   dir 2  (superlative -> subject):  "the highest ratio is Issyk-Kul"  (NOT "deeper than Issyk-Kul")
 _ISSYK_WINS = re.compile(
     _WINNER_RX + r"(?:(?!" + _OTHERS + r")[^.;]){0,90}\b(?:" + _SUP + r")\b"
-    + r"|\b(?:" + _SUP + r")\b(?:(?!\bthan\b|" + _OTHERS + r")[^.;]){0,55}" + _WINNER_RX,
+    + r"|\b(?:" + _SUP + r")\b(?:(?!\bthan\b|" + _OTHERS + r")[^.;]){0,90}" + _WINNER_RX,
     re.IGNORECASE,
 )
+
+# Strip citation URLs before any veto/assertion regex runs (see test_062's identical guard for the
+# confirmed bug this defends against: an entity's own name is often a URL path segment, and a
+# trigger word can land right next to it purely as a slug/query-string artifact).
+_URL_RX = re.compile(r"https?://\S+")
+_URL_TRAIL_PUNCT = ").,;:!?]}\"'"
+
+
+def _strip_urls(text: str) -> str:
+    def _repl(m: "re.Match") -> str:
+        # Trim trailing punctuation the greedy \S+ swallowed (e.g. the ")." after a URL in
+        # parens) back OUT of the stripped region, so sentence/clause boundaries the veto regexes
+        # rely on are preserved rather than silently deleted.
+        url = m.group(0)
+        trail = ""
+        while url and url[-1] in _URL_TRAIL_PUNCT:
+            trail = url[-1] + trail
+            url = url[:-1]
+        return " " + trail
+
+    return _URL_RX.sub(_repl, text)
 
 # Ratio-value detection: any integer/decimal up to three digits — "278", "278.4", "0.278", "0.28".
 # Accepted when it lands in the winner's mean-depth band in METRES (~278) OR in KILOMETRES (~0.278).
@@ -257,7 +278,7 @@ def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -
     n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
     if n_visits <= 0:
         return False
-    text = _primary_text(result)
+    text = _strip_urls(_primary_text(result))
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
     if not re.search(_OTHERS, text, re.IGNORECASE):

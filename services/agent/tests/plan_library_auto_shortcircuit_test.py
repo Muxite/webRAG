@@ -26,6 +26,7 @@ seed slots are deterministic, so the fill is exercised end to end without a mode
 from __future__ import annotations
 
 import json
+import logging
 
 import pytest
 
@@ -39,6 +40,11 @@ from agent.app.idea_policies.base import (
     EvaluationPolicy,
     ExpansionPolicy,
     IdeaActionType,
+    IdeaNodeStatus,
+)
+from agent.app.idea_policies.post_expansion_hooks import (
+    GroundingEvidenceEnforcementHook,
+    MandatePhraseEnforcementHook,
 )
 from agent.app.plan_library import retrieval as R
 from agent.app.plan_library import retrieval_log
@@ -292,6 +298,22 @@ def _children(graph, node):
     return [graph.get_node(cid) for cid in node.children]
 
 
+def _leaves(graph, node):
+    """The template's own leaves — i.e. the search children, without the page-visit siblings
+    ``link_page_visits`` follows each of them through into."""
+    return [
+        c for c in _children(graph, node)
+        if c.details.get(DetailKey.ACTION.value) == IdeaActionType.SEARCH.value
+    ]
+
+
+def _visits(graph, node):
+    return [
+        c for c in _children(graph, node)
+        if c.details.get(DetailKey.ACTION.value) == IdeaActionType.VISIT.value
+    ]
+
+
 def _rows(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
@@ -406,7 +428,7 @@ async def test_auto_apply_builds_the_children_from_the_template(tmp_path):
     assert result == graph.root_id()
     assert expansion.calls == 0, "the LLM invention path must not run at all"
 
-    children = _children(graph, root)
+    children = _leaves(graph, root)
     assert len(children) == len(_PEAKS)
     for child, peak in zip(children, _PEAKS):
         details = child.details
@@ -431,6 +453,97 @@ async def test_auto_apply_builds_the_children_from_the_template(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_every_library_leaf_is_followed_through_into_its_own_page_visit(tmp_path):
+    """The other half of the post-expand wiring. A template leaf is a PAGE READ, but it can
+    only be emitted as a search — so without this the whole subtree's grounding is whatever
+    the generic hook manages (one visit, first search, generic link_idea) and an N-way fan-out
+    loses N-1 entities."""
+    engine, expansion = _make_engine()
+    _wire(engine, tmp_path, [("argmax_t", 0.30, "argmax")])
+    graph = _graph()
+    root = graph.get_node(graph.root_id())
+
+    await engine._handle_expansion_node(graph, graph.root_id(), 0, None)
+
+    searches, visits = _leaves(graph, root), _visits(graph, root)
+    assert len(visits) == len(searches) == len(_PEAKS), "one page read per leaf, not one shared"
+    for search, visit, peak in zip(searches, visits, _PEAKS):
+        # each visit is fed by ITS OWN leaf's search...
+        assert visit.details[DetailKey.REQUIRES_DATA.value] == {
+            "type": "urls_from_search",
+            "source_node_id": search.node_id,
+        }
+        # ...and knows which page it is looking for among that search's results
+        assert peak in visit.details["link_idea"]
+        assert peak in visit.details[DetailKey.EXPECT.value]
+        assert visit.details[adapter.PLAN_LIBRARY_VISIT_FOR] == search.details[
+            adapter.PLAN_LIBRARY_LEAF_ID
+        ]
+        assert visit.details[DetailKey.PARENT_GOAL.value] == search.details[
+            DetailKey.PARENT_GOAL.value
+        ], "the visit inherits the parent metadata the expansion threaded onto its search"
+
+
+@pytest.mark.asyncio
+async def test_the_generic_grounding_hooks_have_nothing_left_to_inject(tmp_path):
+    """The fix is meant to make the task-blind safety net REDUNDANT here, not to fight it:
+    both mandate-driven hooks are idempotent on an existing visit child, so they add nothing
+    to a library-sourced subtree — while staying exactly as they are for organic plans."""
+    engine, _ = _make_engine()
+    _wire(engine, tmp_path, [("argmax_t", 0.30, "argmax")])
+    graph = _graph()
+
+    await engine._handle_expansion_node(graph, graph.root_id(), 0, None)
+
+    # ...and make the first search look finished, which is the state the grounding hook waits
+    # for (before this fix, that is exactly when it injected its single blind visit).
+    first_search = _leaves(graph, graph.get_node(graph.root_id()))[0]
+    first_search.status = IdeaNodeStatus.DONE
+    first_search.details[DetailKey.ACTION_RESULT.value] = {
+        "action": IdeaActionType.SEARCH.value,
+        "success": True,
+        "results": [{"title": _PEAKS[0], "url": "https://en.wikipedia.org/wiki/Kongur_Tagh"}],
+    }
+
+    before = graph.node_count()
+    for hook in (MandatePhraseEnforcementHook(), GroundingEvidenceEnforcementHook()):
+        hook.apply(graph, graph.root_id(), 1, _MANDATE, logging.getLogger("test"))
+
+    assert graph.node_count() == before
+    assert not [
+        n for n in _visits(graph, graph.get_node(graph.root_id()))
+        if adapter.PLAN_LIBRARY_VISIT_FOR not in n.details
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_dead_search_retires_its_visit_instead_of_spinning_the_budget(tmp_path):
+    """Per-leaf visits make ``requires_data`` routine rather than rare, so the routing behind
+    it has to survive a source that never delivers: ``step()`` handed control back to the
+    already-FAILED source on every step, which burned the whole step budget on one dead leaf.
+    Now the dependent is retired and the parent gets on with its healthy leaves."""
+    engine, _ = _make_engine()
+    _wire(engine, tmp_path, [("argmax_t", 0.30, "argmax")])
+    graph = _graph()
+
+    await engine._handle_expansion_node(graph, graph.root_id(), 0, None)
+    root = graph.get_node(graph.root_id())
+    searches, visits = _leaves(graph, root), _visits(graph, root)
+    searches[0].status = IdeaNodeStatus.FAILED
+    searches[0].details[DetailKey.ACTION_RESULT.value] = {
+        "action": IdeaActionType.SEARCH.value, "success": False, "error": "search API down",
+    }
+
+    next_id = await engine.step(graph, graph.root_id(), 1)
+
+    assert visits[0].status is IdeaNodeStatus.SKIPPED
+    assert "never arrived" in visits[0].details[DetailKey.ACTION_ERROR.value]
+    # the next leaf still gets scheduled — one dead entity does not stall the fan-out
+    assert next_id == searches[1].node_id
+    assert visits[1].status is IdeaNodeStatus.PENDING
+
+
+@pytest.mark.asyncio
 async def test_a_chain_templates_dependencies_become_real_node_references(tmp_path):
     """``depends_on`` is blueprint-level until ``graph.expand()`` mints ids — this is the
     post-expand pass that turns it into the engine's own sequential-execution gate."""
@@ -442,7 +555,9 @@ async def test_a_chain_templates_dependencies_become_real_node_references(tmp_pa
     await engine._handle_expansion_node(graph, graph.root_id(), 0, None)
 
     assert expansion.calls == 0
-    start, *hops = _children(graph, root)
+    # the chain's own leaves; each also gets a page-visit sibling, which never joins the chain
+    # (a hop waits on the SEARCH that produces its URLs, exactly as `link_dependencies` wrote it)
+    start, *hops = _leaves(graph, root)
     assert start.details[adapter.PLAN_LIBRARY_LEAF_ID] == "chain_start"
     assert DetailKey.REQUIRES_DATA.value not in start.details, "the first hop waits on nobody"
 
@@ -683,4 +798,4 @@ async def test_slot_fill_receives_the_raw_mandate_not_the_collapsed_query(tmp_pa
     assert "\n" not in seen["query_text"], "...which the collapsed query text no longer has"
     # and the proof it mattered: the fill succeeded, off the deterministic extractor alone
     assert expansion.calls == 0
-    assert len(graph.get_node(graph.root_id()).children) == len(_PEAKS)
+    assert len(_leaves(graph, graph.get_node(graph.root_id()))) == len(_PEAKS)

@@ -807,6 +807,196 @@ async def test_visit_with_search_results_but_wrong_action_type():
     
     action = VisitLeafAction()
     urls = action._extract_urls_from_parent_search_results(graph, visit_node)
-    
+
     # Should not extract from think node
     assert len(urls) == 0
+
+
+def _graph_with_required_search(results):
+    """A visit whose ``requires_data`` names ONE search node (the shape both the plan-library
+    follow-through and the enforcement hooks build)."""
+    graph = IdeaDag(root_title="root")
+    search_node = graph.add_child(
+        graph.root_id(),
+        "search",
+        details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value},
+    )
+    search_node.status = IdeaNodeStatus.DONE
+    search_node.details[DetailKey.ACTION_RESULT.value] = {
+        "action": IdeaActionType.SEARCH.value,
+        "success": True,
+        "results": results,
+    }
+    visit_node = graph.add_child(
+        graph.root_id(),
+        "visit",
+        details={
+            DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+            "link_idea": "the Wikipedia page for Jengish Chokusu",
+            "link_count": 1,
+            DetailKey.REQUIRES_DATA.value: {
+                "type": "urls_from_search",
+                "source_node_id": search_node.node_id,
+            },
+        },
+    )
+    return graph, search_node, visit_node
+
+
+def test_required_source_yields_every_result_url_not_just_the_first():
+    """A visit that names its source search must get that search's WHOLE URL pool.
+
+    Returning only the first result (what the mis-indented early return used to do) means a
+    dead first hit — e.g. a mirror site that 404s — fails the visit outright, and leaves the
+    ``link_idea`` best-match pick downstream with a single take-it-or-leave-it candidate.
+    """
+    graph, _, visit_node = _graph_with_required_search([
+        {"title": "Mirror", "url": "https://mirror.example.com/page/Jengish_Chokusu"},
+        {"title": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Jengish_Chokusu"},
+        {"title": "Blog", "url": "https://blog.example.com/peaks"},
+    ])
+
+    urls = VisitLeafAction()._extract_urls_from_parent_search_results(graph, visit_node)
+
+    assert urls == [
+        "https://mirror.example.com/page/Jengish_Chokusu",
+        "https://en.wikipedia.org/wiki/Jengish_Chokusu",
+        "https://blog.example.com/peaks",
+    ]
+
+
+def test_required_source_dedupes_and_skips_invalid_urls():
+    graph, _, visit_node = _graph_with_required_search([
+        {"title": "Dupe", "url": "https://en.wikipedia.org/wiki/Jengish_Chokusu"},
+        {"title": "Not a URL", "url": "wiki/Jengish_Chokusu"},
+        {"title": "Dupe again", "link": "https://en.wikipedia.org/wiki/Jengish_Chokusu"},
+        {"title": "Other", "href": "https://example.org/peak"},
+    ])
+
+    urls = VisitLeafAction()._extract_urls_from_parent_search_results(graph, visit_node)
+
+    assert urls == ["https://en.wikipedia.org/wiki/Jengish_Chokusu", "https://example.org/peak"]
+
+
+_PAGE_READ_IDEA = (
+    "Open the authoritative Wikipedia page for Muztagh Ata and read, directly from that page "
+    "(infobox or lead sentence), its TOPOGRAPHIC PROMINENCE in metres."
+)
+
+
+def test_a_link_idea_that_names_a_page_picks_it_without_a_model():
+    """"Open X's page" is not a reasoning problem — and asking a small local model to reason
+    about it is where a fan-out of visits stalls (one concurrent selection prompt each)."""
+    picked = VisitLeafAction()._pick_link_by_name(_PAGE_READ_IDEA, [
+        "https://grokipedia.com/page/Muztagh_Tower",   # a different peak entirely
+        "https://grokipedia.com/page/Muztagh_Ata",     # right page, mirror host
+        "https://en.wikipedia.org/wiki/Muztagh_Ata",   # right page, and the named source type
+        "https://www.summitpost.org/muztagh-ata/150514",
+    ])
+
+    assert picked == "https://en.wikipedia.org/wiki/Muztagh_Ata"
+
+
+def test_a_descriptive_link_idea_is_left_to_the_model():
+    """The link-following case the LLM pick exists for: no candidate slug is named by the idea,
+    so the deterministic step declines rather than guessing."""
+    assert VisitLeafAction()._pick_link_by_name(
+        "the rocket that launched the mission",
+        ["https://en.wikipedia.org/wiki/Saturn_V", "https://en.wikipedia.org/wiki/Apollo_11"],
+    ) is None
+
+
+def test_a_named_hub_page_loses_to_the_named_entity_page():
+    """Specificity first: every token of both slugs is named, but one names more of the
+    entity — the model is not needed to see that."""
+    assert VisitLeafAction()._pick_link_by_name(
+        _PAGE_READ_IDEA,
+        ["https://en.wikipedia.org/wiki/Muztagh", "https://en.wikipedia.org/wiki/Muztagh_Ata"],
+    ) == "https://en.wikipedia.org/wiki/Muztagh_Ata"
+
+
+def test_equally_named_pages_fall_back_to_search_rank():
+    """Nothing left to discriminate on: take the higher-ranked search result rather than
+    spending a selection prompt to choose between two identical descriptions."""
+    assert VisitLeafAction()._pick_link_by_name(
+        "Muztagh Ata page",
+        ["https://a.example.com/Muztagh_Ata", "https://b.example.com/Muztagh_Ata"],
+    ) == "https://a.example.com/Muztagh_Ata"
+
+
+@pytest.mark.asyncio
+async def test_a_named_page_visit_spends_no_llm_call():
+    """End to end through ``execute``: the pool comes from the node's own source search, and the
+    page is chosen without a selection prompt."""
+    graph, _, visit_node = _graph_with_required_search([
+        {"title": "Mirror", "url": "https://grokipedia.com/page/Muztagh_Ata"},
+        {"title": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Muztagh_Ata"},
+        {"title": "Other", "url": "https://www.summitpost.org/muztagh-ata/150514"},
+    ])
+    visit_node.details["link_idea"] = _PAGE_READ_IDEA
+
+    class _CountingIO(FakeIO):
+        llm_calls = 0
+
+        async def query_llm_with_fallback(self, payload, **kwargs):
+            _CountingIO.llm_calls += 1
+            return None
+
+    io = _CountingIO()
+    payload = await VisitLeafAction().execute(graph, visit_node.node_id, io)
+
+    assert payload[ActionResultKey.SUCCESS.value] is True
+    assert payload[ActionResultKey.URL.value] == "https://en.wikipedia.org/wiki/Muztagh_Ata"
+    assert _CountingIO.llm_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_a_named_source_is_not_pre_empted_by_a_siblings_first_url():
+    """The wrong-entity hazard of a fan-out: a visit that names its own source search must not
+    be handed the first URL some SIBLING entity's search happened to produce."""
+    graph = IdeaDag(root_title="six peaks")
+    other = graph.add_child(
+        graph.root_id(), "search Jengish Chokusu",
+        details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value},
+    )
+    other.status = IdeaNodeStatus.DONE
+    other.details[DetailKey.ACTION_RESULT.value] = {
+        "action": IdeaActionType.SEARCH.value, "success": True,
+        "results": [{"title": "Jengish", "url": "https://en.wikipedia.org/wiki/Jengish_Chokusu"}],
+    }
+    mine = graph.add_child(
+        graph.root_id(), "search Muztagh Ata",
+        details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value},
+    )
+    mine.status = IdeaNodeStatus.DONE
+    mine.details[DetailKey.ACTION_RESULT.value] = {
+        "action": IdeaActionType.SEARCH.value, "success": True,
+        "results": [
+            {"title": "Mirror", "url": "https://grokipedia.com/page/Muztagh_Ata"},
+            {"title": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Muztagh_Ata"},
+        ],
+    }
+    visit_node = graph.add_child(
+        graph.root_id(), "open the Muztagh Ata page",
+        details={
+            DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+            "link_idea": _PAGE_READ_IDEA,
+            "link_count": 1,
+            DetailKey.REQUIRES_DATA.value: {
+                "type": "urls_from_search", "source_node_id": mine.node_id,
+            },
+        },
+    )
+
+    payload = await VisitLeafAction().execute(graph, visit_node.node_id, FakeIO())
+
+    assert payload[ActionResultKey.URL.value] == "https://en.wikipedia.org/wiki/Muztagh_Ata"
+
+
+def test_required_source_with_unusable_results_falls_back_to_the_sibling_walk():
+    """No valid URL on the named source is not an error: the generic parent/sibling scan below
+    still runs (and here finds nothing), rather than the branch raising on an unbound local."""
+    graph, search_node, visit_node = _graph_with_required_search([])
+    search_node.details[DetailKey.ACTION_RESULT.value]["results"] = {"unexpected": "shape"}
+
+    assert VisitLeafAction()._extract_urls_from_parent_search_results(graph, visit_node) == []

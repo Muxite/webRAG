@@ -23,7 +23,16 @@ The agent uses a **Graph-of-Thought (GoT)** execution model:
 
 Two execution modes: `graph` (parallel, 90.6% pass rate) and `sequential` (depth-first baseline, 46.9% pass rate).
 
-See [Agent Architecture](../services/agent/app/AGENT_ARCHITECTURE.md) for full details.
+Two research variants build on the same engine: **`graph_compiled`** executes a DAG plan an
+expensive model authored once, offline (see Benchmark Results in the root README), and the native
+`graph` mode can run with opt-in **adaptive mechanisms** (confidence-gated re-expansion, backtrack,
+reasoning-effort discipline) layered on top of the base loop above — both are default-off and
+byte-identical to the base loop when disabled.
+
+See [Agent Architecture](../services/agent/app/AGENT_ARCHITECTURE.md) for full details, or the
+deeper, line-cited [Idea Engine](../services/agent/app/IDEA_ENGINE.md) and
+[Adaptive Engine](../services/agent/app/ADAPTIVE_ENGINE.md) docs for the DAG controller and the
+adaptive loop respectively.
 
 ## Message Flow
 

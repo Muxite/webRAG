@@ -24,10 +24,15 @@ an LLM-invented one:
     ``source_node_id`` is a real graph node id, it can only be written AFTER ``graph.expand()``
     has minted the children — hence :func:`link_dependencies`, which the caller runs on the
     freshly created nodes. Until then the dependency rides along as blueprint ids in
-    ``details._plan_library_depends_on``.
+    ``details._plan_library_depends_on``;
+  * every template leaf is a PAGE READ ("Open <source_type> for <entity> and read ... directly
+    from that page"), which a ``search`` candidate can never deliver on its own — so each search
+    leaf is followed through into its OWN sibling ``visit`` by :func:`link_page_visits`, the
+    same after-``graph.expand()`` shape for the same reason (it needs real node ids).
 
-Pure module: no I/O, no LLM, no engine state. Retrieval decides *which* template; this decides
-what the engine gets to run.
+No I/O, no LLM, no engine state: the two post-expand passes only write details onto (and, for
+the visit follow-through, add) graph nodes the caller already made. Retrieval decides *which*
+template; this decides what the engine gets to run.
 """
 
 from __future__ import annotations
@@ -47,7 +52,7 @@ from agent.app.plan_library.schema import (
 from agent.app.testing import compiled_plan
 
 if TYPE_CHECKING:
-    from agent.app.idea_dag import IdeaNode
+    from agent.app.idea_dag import IdeaDag, IdeaNode
 
 #: Where a library-sourced subtree came from — mirrored into the contract log's ``origin``.
 ORIGIN_AUTO = "plan_library_auto"
@@ -68,8 +73,20 @@ PLAN_LIBRARY_DEPENDS_ON_NODES = "_plan_library_depends_on_nodes"
 #: duplicate filter, beam width, child metadata, contract-log rows and post-expansion hooks
 #: whichever call site produced it, with nothing re-implemented per call site.
 PLAN_LIBRARY_PENDING = "_plan_library_pending"
+#: Grounding follow-through markers (:func:`link_page_visits`): on a search leaf, the id of the
+#: visit node that opens its page; on that visit, the leaf id it is reading the page for.
+PLAN_LIBRARY_VISIT_NODE = "_plan_library_visit_node"
+PLAN_LIBRARY_VISIT_FOR = "_plan_library_visit_for"
+
+#: ``VisitLeafAction``'s two steering details. They are not :class:`DetailKey` members (the
+#: action reads them as bare strings), so they are spelled here exactly as the post-expansion
+#: hooks spell them: how to recognize the wanted page, and how many pages to open.
+LINK_IDEA = "link_idea"
+LINK_COUNT = "link_count"
 
 _MAX_TITLE_CHARS = 120
+#: ``link_idea`` cap — the same 200 chars ``VisitLeafAction`` clips its own auto-generated one to.
+_MAX_LINK_IDEA_CHARS = 200
 
 
 @dataclass(frozen=True)
@@ -224,6 +241,126 @@ def link_dependencies(nodes: Sequence["IdeaNode"]) -> int:
         }
         linked += 1
     return linked
+
+
+def link_page_visits(
+    graph: "IdeaDag",
+    nodes: Sequence["IdeaNode"],
+    *,
+    contracts: Optional[ContractRegistry] = None,
+) -> List["IdeaNode"]:
+    """Follow each library-sourced search leaf through into its OWN page visit.
+
+    Second post-expand pass, same two-phase shape (and same reason) as
+    :func:`link_dependencies`: it needs the node ids ``graph.expand()`` has just minted.
+
+    Every template leaf in the corpus asks for a value read off ONE named entity's own page,
+    but a leaf can only be emitted as a ``search`` candidate (the URL does not exist until the
+    search runs), and a search returns snippets — so a library-sourced subtree that stops at
+    search is ungrounded BY CONSTRUCTION. Nothing downstream repairs that per leaf:
+    ``post_expansion_hooks.GroundingEvidenceEnforcementHook`` injects at most ONE visit for the
+    whole parent, pointed at whichever search finished first and steered by a deliberately
+    generic ``link_idea`` — so on an N-way fan-out, N-1 entities are never opened. This pass
+    makes that safety net redundant for library-sourced subtrees rather than fighting it.
+
+    Each search leaf gets a SIBLING visit (a CHILD would never run: ``step()`` routes any node
+    carrying an action straight to the leaf handler, so a visit hung under a search would be
+    orphaned), carrying only details the engine and ``VisitLeafAction`` already understand:
+
+      * ``requires_data = {urls_from_search, source_node_id: <its OWN search>}`` — the engine's
+        existing gate (``_has_required_data`` blocks the visit until that one search is DONE
+        with a usable result, and ``step()`` schedules that search first), which is ALSO how
+        ``VisitLeafAction._extract_urls_from_parent_search_results`` is told to pool THAT
+        search's result URLs instead of whatever its sibling walk stumbles on first;
+      * ``link_idea`` = the leaf's own filled instruction, so the visit action's existing
+        best-match URL pick has a per-entity discriminator ("Open the Wikipedia page for
+        Kongur Tagh ...") instead of the hook's "URL from search results or mandate";
+      * the leaf's ``intent`` and ``expect``, which is what ``_effective_intent`` turns into the
+        extraction target — the visit reads the page for the same contract the search leaf was
+        created with. (It is deliberately NOT logged as a second ``contract_made``: the
+        template authored ONE contract per leaf, and this is its follow-through.)
+
+    Idempotent (an already-escalated leaf is skipped, via ``_plan_library_visit_node``) and a
+    no-op for organic children, which carry no plan-library marker.
+
+    :returns: the visit nodes created, in leaf order.
+    """
+    registry = contracts or default_contract_registry()
+    provides = registry.contract_for_action(IdeaActionType.SEARCH.value)
+    contract_name = provides.name if provides else "urls_from_search"
+
+    created: List["IdeaNode"] = []
+    for node in nodes:
+        leaf_id = node.details.get(PLAN_LIBRARY_LEAF_ID)
+        if not isinstance(leaf_id, str):
+            continue
+        if node.details.get(DetailKey.ACTION.value) != IdeaActionType.SEARCH.value:
+            continue
+        if node.details.get(PLAN_LIBRARY_VISIT_NODE):
+            continue
+        parent_id = node.parent_id
+        if not parent_id or graph.get_node(parent_id) is None:
+            continue
+
+        instruction = node.details.get(DetailKey.INTENT.value)
+        link_idea = _link_idea_for(node)
+        if not link_idea:
+            continue  # nothing to recognize the page by; leave the leaf as a plain search
+        # Title off the structured query when there is one ("Kongur Tagh topographic
+        # prominence"), so the pair reads as "search X" / "open X's page" instead of two
+        # near-identical sentences in the trace and in the merge's child listing.
+        subject = node.details.get(DetailKey.QUERY.value) or node.title
+        title = _title_for(f"Open the page for: {subject}", node.title)
+        details: Dict[str, Any] = {
+            DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+            DetailKey.IS_LEAF.value: True,
+            DetailKey.JUSTIFICATION.value: (
+                f"Plan library template '{node.details.get(PLAN_LIBRARY_TEMPLATE_ID)}' leaf "
+                f"'{leaf_id}': its value must be read off the entity's own page, so the leaf's "
+                f"search is followed through into a visit of that page."
+            ),
+            DetailKey.GOAL.value: title,
+            DetailKey.ORIGINAL_GOAL.value: title,
+            LINK_IDEA: link_idea,
+            LINK_COUNT: 1,
+            DetailKey.REQUIRES_DATA.value: {
+                "type": contract_name,
+                "source_node_id": node.node_id,
+            },
+            PLAN_LIBRARY_TEMPLATE_ID: node.details.get(PLAN_LIBRARY_TEMPLATE_ID),
+            PLAN_LIBRARY_ORIGIN: node.details.get(PLAN_LIBRARY_ORIGIN),
+            PLAN_LIBRARY_VISIT_FOR: leaf_id,
+        }
+        if isinstance(instruction, str) and instruction.strip():
+            details[DetailKey.INTENT.value] = instruction
+        for inherited in (
+            DetailKey.EXPECT.value,
+            DetailKey.PARENT_GOAL.value,
+            DetailKey.PARENT_JUSTIFICATION.value,
+        ):
+            value = node.details.get(inherited)
+            if isinstance(value, str) and value.strip():
+                details[inherited] = value
+
+        visit = graph.add_child(parent_id=parent_id, title=title, details=details)
+        node.details[PLAN_LIBRARY_VISIT_NODE] = visit.node_id
+        created.append(visit)
+    return created
+
+
+def _link_idea_for(node: "IdeaNode") -> str:
+    """How ``VisitLeafAction`` should recognize THIS leaf's page among the search results.
+
+    The filled instruction first — it names both the entity and the wanted source type ("Open
+    the authoritative Wikipedia page for Kongur Tagh ...") — then the structured query, then
+    the title, so a hand-assembled leaf missing one of them still gets something entity-specific
+    rather than falling back to the action's own generic auto-generation.
+    """
+    for key in (DetailKey.INTENT.value, DetailKey.QUERY.value):
+        value = node.details.get(key)
+        if isinstance(value, str) and value.strip():
+            return " ".join(value.split())[:_MAX_LINK_IDEA_CHARS]
+    return " ".join(str(node.title or "").split())[:_MAX_LINK_IDEA_CHARS]
 
 
 def _wave_depths(nodes: Sequence["IdeaNode"]) -> Dict[str, int]:

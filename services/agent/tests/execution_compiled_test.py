@@ -251,6 +251,66 @@ def test_vote_extract_all_unknown_returns_empty():
     assert asyncio.run(ec._vote_extract(io, "p", "q", "m", 3)) == ""
 
 
+def _vote(answers, k=None):
+    """Run the plain fixed-k vote over a canned list of per-sample extractions."""
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(side_effect=list(answers))
+    return asyncio.run(ec._vote_extract(io, "p", "q", "m", k if k is not None else len(answers)))
+
+
+def test_vote_extract_lone_survivor_among_many_unknowns_is_rejected():
+    """THE confirmed 062 bug: 4/5 samples honestly say UNKNOWN and the 5th invents a figure that
+    matches no field on the page. Filtering UNKNOWN out first made that lone hallucination the
+    entire candidate pool, so it won uncontested with zero corroboration. A lone (top_count==1)
+    survivor at k>=3 is now rejected -> '' (a propagated miss), regardless of how many samples said
+    UNKNOWN."""
+    assert _vote(["UNKNOWN", "UNKNOWN", "1,320 m", "UNKNOWN", "UNKNOWN"]) == ""
+
+
+def test_vote_extract_real_majority_over_unknowns_still_wins():
+    """3 agreeing reads beat 2 UNKNOWNs — redundancy still rescues a genuinely uncertain page."""
+    out = _vote(["1,642 m", "UNKNOWN", "1,642 m", "UNKNOWN", "1,642 m"])
+    assert "1,642" in out
+
+
+def test_vote_extract_two_sample_corroboration_is_accepted_even_with_more_unknowns():
+    """NARROWED from an earlier, stricter rule that rejected whenever UNKNOWN outnumbered the
+    leading answer: that rule also discarded genuine corroborated signal (2 independent samples
+    agreeing is real evidence, not noise) and measurably hurt live accuracy. The rule now targets
+    exactly the diagnosed bug — a LONE (top_count==1), zero-corroboration survivor — so 2-of-5
+    agreement survives even against 3 UNKNOWNs."""
+    assert "1,642" in _vote(["UNKNOWN", "1,642 m", "UNKNOWN", "1,642 m", "UNKNOWN"])
+    assert "1,642" in _vote(["UNKNOWN", "1,642 m", "UNKNOWN", "1,642 m"])
+
+
+def test_vote_extract_k_equals_two_rescue_path_preserved():
+    """k==2 keeps the pre-existing 'rescue path' (_votes_for_model's premium-floor rationale): a
+    lone real answer against a lone UNKNOWN is still accepted — the k>=3 lone-survivor rejection
+    does not apply at k==2, which never had redundancy to require in the first place."""
+    assert "1,642" in _vote(["1,642 m", "UNKNOWN"], k=2)
+    assert "1,642" in _vote(["UNKNOWN", "1,642 m"], k=2)
+
+
+def test_vote_extract_unanimous_answer_is_unchanged():
+    out = _vote(["1,642 m", "1,642 m", "1,642 m", "1,642 m", "1,642 m"])
+    assert "1,642" in out
+
+
+def test_vote_extract_tie_break_unchanged_when_no_sample_is_unknown():
+    """The quorum rule is a no-op at unknown_count == 0: two different real values still tie-break
+    to the temperature-0 anchor exactly as before."""
+    out = _vote(["1,642 m", "1,700 m", "1,700 m", "1,642 m"])
+    assert "1,642" in out                        # anchor wins the 2-2 tie
+    assert "1,700" in _vote(["1,500 m", "1,700 m", "1,700 m"])   # anchor not tied -> majority wins
+
+
+def test_vote_extract_single_sample_path_is_untouched():
+    """k <= 1 short-circuits before the vote: there is no quorum to check with one sample."""
+    assert "1,642" in _vote(["1,642 m"], k=1)
+    assert _vote(["UNKNOWN"], k=1) == ""
+
+
 def test_vote_key_groups_numeric_variants():
     assert ec._vote_key("1,642 m") == ec._vote_key("1642 metres") == "1642"
 
@@ -478,8 +538,9 @@ def test_target_entity_ignores_possessive_apostrophe():
     # ("s Wikipedia page and read the value in the "); the fix must not.
     assert "Wikipedia page" not in target
     assert not target.startswith("s ")
-    # Only the genuine matched-quote phrase survives.
-    assert target == "Established"
+    # 'Established' is the INFOBOX FIELD to read, not the page to open (it named no subject here),
+    # so no target survives and the leaf defers to the LLM query. See _is_field_reference.
+    assert target == ""
 
 
 def test_target_entity_possessive_only_no_quotes_returns_empty():
@@ -838,6 +899,256 @@ def test_target_entity_resolved_author_hop_unaffected_by_pointer_guard():
     assert ec._target_entity(instr) == "Jane Austen"
 
 
+# --- Subject-first grounding: a quoted INFOBOX FIELD is never the page to open --------------------
+# Root cause of the count-with-threshold family's wrong grounding (072/078 in bad-model-lab): the
+# leaf quotes the field it must read ("the 'Area' field"), the old target rule returned that field
+# name, and the thin leaf SEARCHED it. Live Brave results for those queries are 'Area' ->
+# area.nyc + en.wikipedia.org/wiki/Area and 'Max. depth' -> eslint.org/docs/latest/rules/max-depth
+# — all three appear as cited (i.e. actually visited) pages in the stored traces.
+
+def test_target_entity_prefers_subject_over_quoted_infobox_field():
+    """078's real leaf: the subject is the island, the quote is the infobox field."""
+    instr = ("Open the Wikipedia article for Bangka Island (Indonesia) and read, directly from the "
+             "infobox, its AREA in km² — the 'Area' field (the total land area of the island in "
+             "square kilometres). Report ONLY that single area figure (in km²) and the exact "
+             "source URL. Do not guess from memory.")
+    assert ec._target_entity(instr) == "Bangka Island"
+
+
+def test_target_entity_prefers_subject_over_quoted_field_with_dot():
+    """072's real leaf: 'Max. depth' is the infobox row, 'Lake Matano' is the article."""
+    instr = ("Open the Wikipedia article for Lake Matano (Indonesia (South Sulawesi)) and read, "
+             "directly from the infobox, its MAXIMUM DEPTH in metres — the 'Max. depth' field "
+             "(the deepest point of the lake). Report ONLY that single depth figure.")
+    assert ec._target_entity(instr) == "Lake Matano"
+
+
+def test_target_entity_field_reference_variants_are_filtered():
+    """Both field-reference shapes are recognised: '<quote> row' (incl. an 'or' pair) and a quote
+    that directly follows 'infobox'."""
+    instr_076 = ("Open the English Wikipedia page for Lake Winnipegosis and read its SURFACE AREA "
+                 "in km² directly from the infobox ('Surface area' or 'Area' row).")
+    assert ec._target_entity(instr_076) == "Lake Winnipegosis"
+    assert ec._is_field_reference(instr_076, "Surface area")
+    assert ec._is_field_reference(instr_076, "Area")
+    instr_infobox = ("Open the Wikipedia article for the season titled 'Chuck (season 1)' and read, "
+                     "from the infobox 'No. of episodes' field, the number of episodes.")
+    assert ec._is_field_reference(instr_infobox, "No. of episodes")
+    # A quoted ARTICLE TITLE inside the subject span still wins over the unquoted span text.
+    assert ec._target_entity(instr_infobox) == "Chuck (season 1)"
+
+
+def test_target_entity_strips_category_noun_and_country_gloss():
+    """'the mountain Jengish Chokusu (Kyrgyzstan / China)' -> the bare article title."""
+    instr = ("Open the Wikipedia page for the mountain Jengish Chokusu (Kyrgyzstan / China) and "
+             "read, directly from the infobox, its TOPOGRAPHIC PROMINENCE in metres.")
+    assert ec._target_entity(instr) == "Jengish Chokusu"
+    # A capitalised name-part is never mistaken for a category noun.
+    instr_lake = "Open the Wikipedia article for Lake Ohrid (North Macedonia / Albania) and read it."
+    assert ec._target_entity(instr_lake) == "Lake Ohrid"
+
+
+def test_target_entity_cuts_em_dash_gloss_and_url_hint():
+    """A '— <gloss>' appendix and a parenthetical URL hint are not part of the search target."""
+    instr = ("Open the Wikipedia page for Circuit de Monaco — the Monte Carlo street circuit "
+             "(Monaco Grand Prix). Read its LAP LENGTH in kilometres from the infobox.")
+    assert ec._target_entity(instr) == "Circuit de Monaco"
+    instr_url = ("Open the Wikipedia page for the Tisza River "
+                 "(https://en.wikipedia.org/wiki/Tisza) and read the exact LENGTH of the river.")
+    assert ec._target_entity(instr_url) == "Tisza River"
+
+
+def test_target_entity_subject_cue_does_not_override_indirect_pointer():
+    """The redirect guard still wins: an indirect-pointer leaf keeps deferring to the LLM query."""
+    instr = ("Find the author of the novel 'The Shining', then open that author's Wikipedia page "
+             "for the university they attended.")
+    assert ec._target_entity(instr) == ""
+
+
+def test_leaf_search_query_adds_the_plans_disambiguating_gloss():
+    """The pick target stays the bare article title, but the QUERY carries the country gloss:
+    live Brave results for bare 'Flores' contain no Wikipedia article at all (payroll portal, HR
+    site, two Mexican restaurants), while 'Flores Indonesia' returns en.wikipedia.org/wiki/Flores."""
+    instr = ("Open the Wikipedia article for Flores (Indonesia) and read, directly from the "
+             "infobox, its AREA in km² — the 'Area' field.")
+    assert ec._target_entity(instr) == "Flores"
+    assert ec._leaf_search_query(instr, "Flores") == "Flores Indonesia"
+    nested = ("Open the Wikipedia article for Lake Matano (Indonesia (South Sulawesi)) and read "
+              "its MAXIMUM DEPTH in metres.")
+    assert ec._leaf_search_query(nested, "Lake Matano") == "Lake Matano Indonesia South Sulawesi"
+
+
+def test_leaf_search_query_ignores_url_hints_and_instruction_noise():
+    """A parenthetical that is a URL hint or a 'search ... if needed' aside is not a gloss."""
+    url_hint = ("Open the Wikipedia page for the Tisza River "
+                "(https://en.wikipedia.org/wiki/Tisza) and read the exact LENGTH of the river.")
+    assert ec._leaf_search_query(url_hint, "Tisza River") == "Tisza River"
+    aside = ("Open the English Wikipedia article for the Icelandic political party Vidreisn "
+             "(search for its Wikipedia page if needed) and read its seat count.")
+    assert ec._leaf_search_query(aside, "Vidreisn") == "Vidreisn"
+    # No cue / no target -> unchanged.
+    assert ec._leaf_search_query("no subject cue here", "") == ""
+
+
+def test_thin_leaf_searches_the_subject_not_the_infobox_field(monkeypatch):
+    """End-to-end 078 regression: the thin leaf must search 'Bangka Island', never 'Area'."""
+    monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    io.query_llm = AsyncMock(side_effect=["11,831 km2"])  # extraction only — no query LLM call
+    io.search = AsyncMock(return_value=[
+        {"title": "Bangka Island - Wikipedia",
+         "url": "https://en.wikipedia.org/wiki/Bangka_Island", "description": ""},
+    ])
+    io.visit = AsyncMock(return_value="Bangka Island ... Area 11,831.02 km2 ...")
+    instr = ("Open the Wikipedia article for Bangka Island (Indonesia) and read, directly from the "
+             "infobox, its AREA in km² — the 'Area' field. Report ONLY that single area figure.")
+    out = asyncio.run(ec._run_leaf_thin(io, instr, "area", "m", 6000, 6))
+    assert io.search.await_args.args[0] == "Bangka Island Indonesia"  # subject + gloss, not 'Area'
+    assert io.visit.await_args.args[0] == "https://en.wikipedia.org/wiki/Bangka_Island"
+    assert "https://en.wikipedia.org/wiki/Bangka_Island" in out
+
+
+# --- Hard wiki-first page-pick (the benchmark's ground truth IS the Wikipedia infobox) ------------
+
+def test_pick_pages_wiki_beats_higher_scoring_non_wiki():
+    """LIVE-observed 'Sepik River' shape: the article title is SHORTER than the target, so the
+    truncation penalty drops en.wikipedia.org/wiki/Sepik (+0.10) below three non-wiki competitors
+    (loe.org +1.55, britannica +1.25, a blog +1.10). The Wikipedia article must still win."""
+    instr = "Open the Wikipedia article for Sepik River (Papua New Guinea) and read its LENGTH."
+    results = [
+        {"title": "Sepik - Wikipedia", "url": "https://en.wikipedia.org/wiki/Sepik", "description": ""},
+        {"title": "Traveling the Sepik River - Papua New Guinea - Uncharted Backpacker",
+         "url": "https://www.unchartedbackpacker.com/traveling-sepik-river-papua-new-guinea/", "description": ""},
+        {"title": "Living on Earth: Battle For the Sepik River",
+         "url": "https://www.loe.org/shows/segments.html?programID=22", "description": ""},
+        {"title": "Sepik River | Papua, New Guinea, Culture | Britannica",
+         "url": "https://www.britannica.com/place/Sepik-River", "description": ""},
+    ]
+    ordered = ec._pick_pages(results, instr)
+    assert ordered[0] == "https://en.wikipedia.org/wiki/Sepik"
+    # ... and the non-wiki candidates keep their score order behind it.
+    assert ordered[1] == "https://www.loe.org/shows/segments.html?programID=22"
+
+
+def test_pick_pages_title_score_still_ranks_within_the_wiki_tier():
+    """Hard wiki preference must not blunt the 'Pride' fix: among wiki candidates the exact-title
+    article still beats the truncated concept page and a disambiguation stub."""
+    instr = "Search for and open the page for the novel 'Pride and Prejudice'. Read its author."
+    results = [
+        {"title": "Pride", "url": "https://en.wikipedia.org/wiki/Pride", "description": ""},
+        {"title": "Pride and Prejudice (disambiguation)",
+         "url": "https://en.wikipedia.org/wiki/Pride_and_Prejudice_(disambiguation)", "description": ""},
+        {"title": "Pride and Prejudice",
+         "url": "https://en.wikipedia.org/wiki/Pride_and_Prejudice", "description": ""},
+    ]
+    ordered = ec._pick_pages(results, instr)
+    assert ordered[0] == "https://en.wikipedia.org/wiki/Pride_and_Prejudice"
+    assert ordered[1] == "https://en.wikipedia.org/wiki/Pride"
+
+
+def test_pick_pages_prefers_english_wikipedia_over_other_languages():
+    """Fixtures are verified against ENGLISH Wikipedia; a local-language article ranks below it."""
+    instr = "Open the Wikipedia article for Tinnsjå (Norway) and read its maximum depth."
+    results = [
+        {"title": "Tinnsjå – Wikipedia", "url": "https://no.wikipedia.org/wiki/Tinnsj%C3%A5", "description": ""},
+        {"title": "Tinnsjå – Wikipedia", "url": "https://en.wikipedia.org/wiki/Tinnsj%C3%A5", "description": ""},
+    ]
+    ordered = ec._pick_pages(results, instr)
+    assert ordered[0] == "https://en.wikipedia.org/wiki/Tinnsj%C3%A5"
+
+
+def test_pick_pages_wiki_non_article_namespace_is_not_privileged():
+    """A Category:/File: URL is not the article, so it does not get the hard preference."""
+    instr = "Open the Wikipedia article for Kodiak Island (Alaska, USA) and read its AREA."
+    results = [
+        {"title": "Category:Kodiak Island", "url": "https://en.wikipedia.org/wiki/Category:Kodiak_Island",
+         "description": ""},
+        {"title": "Kodiak Island", "url": "https://en.wikipedia.org/wiki/Kodiak_Island", "description": ""},
+    ]
+    ordered = ec._pick_pages(results, instr)
+    assert ordered[0] == "https://en.wikipedia.org/wiki/Kodiak_Island"
+
+
+# --- Citation fidelity: the REAL gathered URLs must reach the shipped text ------------------------
+
+def test_gathered_source_urls_reads_facts_in_plan_order():
+    facts = [
+        "590 m — source: https://en.wikipedia.org/wiki/Lake_Matano",
+        "UNKNOWN — https://example.com/never-read",          # unresolved: not a citation
+        "514 m — source: https://en.wikipedia.org/wiki/Hornindalsvatnet",
+        "514 m — source: https://en.wikipedia.org/wiki/Hornindalsvatnet",  # de-duped
+    ]
+    assert ec._gathered_source_urls(facts) == [
+        "https://en.wikipedia.org/wiki/Lake_Matano",
+        "https://en.wikipedia.org/wiki/Hornindalsvatnet",
+    ]
+
+
+def test_ensure_source_citations_appends_when_model_hallucinates_url():
+    """The 078 failure shape: the answer cites a URL that is not one of the gathered sources."""
+    sources = ["https://en.wikipedia.org/wiki/Bangka_Island", "https://en.wikipedia.org/wiki/Samar"]
+    answer = "The count is 4.\nSource: https://en.wikipedia.org/wiki/Area"
+    out = ec._ensure_source_citations(answer, sources, "Report the count and cite each source URL.")
+    assert out.startswith(answer)                    # the model's own text is never rewritten
+    assert "Sources actually gathered:" in out
+    for url in sources:
+        assert url in out
+
+
+def test_ensure_source_citations_noop_when_all_urls_present():
+    sources = ["https://en.wikipedia.org/wiki/Samar"]
+    answer = "Samar -> 13,429 km2 (https://en.wikipedia.org/wiki/Samar)"
+    assert ec._ensure_source_citations(answer, sources, "cite the source URL") == answer
+
+
+def test_ensure_source_citations_respects_strict_format_contracts():
+    """A byte-exact CSV/JSON contract (063/057) must never get an appended section."""
+    sources = ["https://en.wikipedia.org/wiki/Terbium"]
+    csv_answer = "element,atomic_number,melting_point_k\nterbium,65,1629"
+    strict_agg = ("Output ONLY a strict CSV with EXACTLY five lines ... Do NOT include any prose, "
+                  "explanation, markdown code fences ... The first line must be the header.")
+    assert ec._ensure_source_citations(csv_answer, sources, strict_agg) == csv_answer
+    json_agg = ("Output ONLY a strict JSON array of EXACTLY three objects ... The first character "
+                "of the output must be '[' and the last must be ']'.")
+    assert ec._ensure_source_citations("[{\"name\": \"x\"}]", sources, json_agg) == "[{\"name\": \"x\"}]"
+
+
+def test_ensure_source_citations_noop_without_sources_or_answer():
+    assert ec._ensure_source_citations("some answer", [], "cite urls") == "some answer"
+    assert ec._ensure_source_citations("", ["https://en.wikipedia.org/wiki/X"], "cite urls") == ""
+
+
+def test_execute_plan_appends_real_sources_to_hallucinated_citation(monkeypatch):
+    """End-to-end: the leaf facts carry the real URLs, the aggregation LLM cites a wrong one, and
+    the shipped deliverable still contains every URL actually read (what validators scan)."""
+    monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_MODE", "thin")
+    monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(side_effect=lambda **kw: kw)
+    io.search = AsyncMock(side_effect=lambda q, **kw: [
+        {"title": q, "url": f"https://en.wikipedia.org/wiki/{q.replace(' ', '_')}", "description": ""},
+    ])
+    io.visit = AsyncMock(return_value="infobox: Area 11,831 km2")
+    io.query_llm = AsyncMock(side_effect=[
+        "11,831 km2", "13,429 km2",
+        "The count is 2. Source: https://en.wikipedia.org/wiki/Area",  # hallucinated citation
+    ])
+    plan = {
+        "leaves": [
+            {"id": "bangka", "instruction": "Open the Wikipedia article for Bangka Island "
+                                            "(Indonesia) and read the 'Area' field.", "expect": "area"},
+            {"id": "samar", "instruction": "Open the Wikipedia article for Samar (Philippines) "
+                                           "and read the 'Area' field.", "expect": "area"},
+        ],
+        "aggregation": "Count the islands over 8,000 km2 and cite each source URL.",
+    }
+    out = asyncio.run(ec._execute_plan(io, plan, "m", 512))
+    assert "The count is 2." in out                       # the model's answer is preserved
+    assert "https://en.wikipedia.org/wiki/Bangka_Island" in out
+    assert "https://en.wikipedia.org/wiki/Samar" in out
+
+
 # --- Reasoning-model token budget + effort hint (gpt-5-mini finish_reason=length squeeze) ---------
 
 def test_is_reasoning_model_detects_gpt5_and_o_series():
@@ -928,3 +1239,496 @@ def test_vote_key_preserves_existing_numeric_behavior():
     """The original documented behavior is unchanged for the non-hedged cases."""
     assert ec._vote_key("1,642 m") == ec._vote_key("1642 metres") == "1642"
     assert ec._vote_key("Max depth: 1,642") == "1642"
+
+
+# --- Deterministic composition (agg_mode="computed"): count_threshold + and_filter ----------------
+# The composed string is scored by grep validators with NO LLM-judge safety net, so these tests pin
+# the render BYTE-EXACTLY, not just structurally. Fixture-grounded proof that the real, shipped
+# validators of 072/076/078 accept it lives in
+# execution_compiled_and_filter_count_threshold_validators_test.py.
+
+_WIKI = "https://en.wikipedia.org/wiki/"
+
+_CT_LEAVES = [{"id": "a_depth"}, {"id": "b_depth"}, {"id": "c_depth"}]
+_CT_COMPOSITION = {
+    "op": "count_threshold", "answer_noun": "lake", "value_label": "maximum depth",
+    "unit": "m", "comparator": ">", "threshold": 480,
+    "items": [
+        {"leaf": "a_depth", "label": "Lake Matano", "type": "number"},
+        {"leaf": "b_depth", "label": "Tinnsjå", "type": "number"},
+        {"leaf": "c_depth", "label": "Lake Ohrid", "type": "number"},
+    ],
+}
+_CT_RESULTS = {
+    "a_depth": f"590 m — source: {_WIKI}Lake_Matano",
+    "b_depth": f"460 m — source: {_WIKI}Tinnsja",
+    "c_depth": f"288 m — source: {_WIKI}Lake_Ohrid",
+}
+
+_AF_CONSTRAINTS = [
+    {"key": "area", "label": "surface area", "unit": "km²", "type": "number",
+     "comparator": ">", "threshold": 5_000},
+    {"key": "depth", "label": "max depth", "unit": "m", "type": "number",
+     "comparator": "<", "threshold": 20},
+]
+_AF_LAKES = [  # 076's real six: exactly one satisfies both constraints
+    ("Lake Winnipegosis", "winnipegosis", "5,370", "12"),
+    ("Nettilling Lake", "nettilling", "5,542", "132"),
+    ("Reindeer Lake", "reindeer", "6,650", "219"),
+    ("Lake Athabasca", "athabasca", "7,849", "124"),
+    ("Lake Okeechobee", "okeechobee", "1,900", "3.7"),
+    ("Lake Khanka", "khanka", "4,070", "10.6"),
+]
+_AF_COMPOSITION = {
+    "op": "and_filter", "answer_noun": "lake", "constraints": _AF_CONSTRAINTS,
+    "items": [{"label": name, "leaves": {"area": f"{key}_area", "depth": f"{key}_depth"}}
+              for name, key, _a, _d in _AF_LAKES],
+}
+_AF_LEAVES = [{"id": f"{key}_{attr}"} for _n, key, _a, _d in _AF_LAKES for attr in ("area", "depth")]
+_AF_RESULTS = {
+    f"{key}_{attr}": f"{value} {unit} — source: {_WIKI}{name.replace(' ', '_')}"
+    for name, key, area, depth in _AF_LAKES
+    for attr, value, unit in (("area", area, "km²"), ("depth", depth, "m"))
+}
+
+
+def test_compose_value_strips_grouping_comma_and_source_tail():
+    """The bug this helper exists for: _coerce_field's number regex stops at a grouping comma, so
+    '11,831.02' would type as 11. Only a DIGIT-FLANKED comma is stripped; a miss is None, never a
+    fabricated value."""
+    assert ec._compose_value(f"11,831.02 km² — source: {_WIKI}Bangka_Island", "number") == 11831.02
+    assert ec._compose_value(f"3.7 m — source: {_WIKI}Lake_Okeechobee", "number") == 3.7
+    assert ec._compose_value("5,370 km²", "number") == 5370
+    # A sentence/list comma is not a grouping comma and must not be eaten.
+    assert ec._compose_value("Matano, Ohrid", "string") == "Matano, Ohrid"
+    # Misses -> None (never 0, never a truncated leading digit).
+    assert ec._compose_value("UNKNOWN", "number") is None
+    assert ec._compose_value(f"UNKNOWN — {_WIKI}Lake_Ohrid", "number") is None
+    assert ec._compose_value("deepest lake in Western Europe", "number") is None
+    assert ec._compose_value("", "number") is None
+    assert ec._compose_value(f"— source: {_WIKI}X", "number") is None
+
+
+def test_compose_count_threshold_renders_lead_rows_and_tallies():
+    out = ec._compose_count_threshold(_CT_LEAVES, _CT_RESULTS, _CT_COMPOSITION)
+    assert out == (
+        "1 of the 3 lakes have a maximum depth greater than 480 m.\n"
+        "\n"
+        f"Lake Matano: value=590 m (>480 m? yes) — source: {_WIKI}Lake_Matano\n"
+        f"Tinnsjå: value=460 m (>480 m? no) — source: {_WIKI}Tinnsja\n"
+        f"Lake Ohrid: value=288 m (>480 m? no) — source: {_WIKI}Lake_Ohrid\n"
+        "\n"
+        "Lakes exceeding 480 m (1): Lake Matano.\n"
+        "Lakes not exceeding 480 m (2): Tinnsjå, Lake Ohrid."
+    )
+
+
+def test_compose_count_threshold_renders_island_km2_and_decimals():
+    """078's shape: a different noun/unit, thousands-grouped thresholds and unrounded decimals."""
+    leaves = [{"id": "bangka_area"}, {"id": "leyte_area"}]
+    composition = {
+        "op": "count_threshold", "answer_noun": "island", "value_label": "area",
+        "unit": "km²", "comparator": ">", "threshold": 8_000,
+        "items": [{"leaf": "bangka_area", "label": "Bangka Island", "type": "number"},
+                  {"leaf": "leyte_area", "label": "Leyte", "type": "number"}],
+    }
+    results = {"bangka_area": f"11,831.02 km² — source: {_WIKI}Bangka_Island",
+               "leyte_area": f"7,367.6 km² — source: {_WIKI}Leyte"}
+    assert ec._compose_count_threshold(leaves, results, composition) == (
+        "1 of the 2 islands have an area greater than 8,000 km².\n"
+        "\n"
+        f"Bangka Island: value=11,831.02 km² (>8,000 km²? yes) — source: {_WIKI}Bangka_Island\n"
+        f"Leyte: value=7,367.6 km² (>8,000 km²? no) — source: {_WIKI}Leyte\n"
+        "\n"
+        "Islands exceeding 8,000 km² (1): Bangka Island.\n"
+        "Islands not exceeding 8,000 km² (1): Leyte."
+    )
+
+
+def test_compose_count_threshold_missing_item_returns_none():
+    """All-or-nothing: the count is a property of the WHOLE set, so one unresolved leaf falls back
+    rather than reporting a count that is wrong by exactly the validators' decoy margin."""
+    partial = {k: v for k, v in _CT_RESULTS.items() if k != "b_depth"}
+    assert ec._compose_count_threshold(_CT_LEAVES, partial, _CT_COMPOSITION) is None
+    unknown = dict(_CT_RESULTS, b_depth=f"UNKNOWN — {_WIKI}Tinnsja")
+    assert ec._compose_count_threshold(_CT_LEAVES, unknown, _CT_COMPOSITION) is None
+
+
+def test_compose_count_threshold_non_coercing_value_returns_none():
+    noisy = dict(_CT_RESULTS, c_depth=f"the deepest lake in the Balkans — source: {_WIKI}Lake_Ohrid")
+    assert ec._compose_count_threshold(_CT_LEAVES, noisy, _CT_COMPOSITION) is None
+
+
+def test_compose_and_filter_renders_winner_first_with_per_row_checks():
+    out = ec._compose_and_filter(_AF_LEAVES, _AF_RESULTS, _AF_COMPOSITION)
+    assert out == (
+        "Lake Winnipegosis is the unique lake that satisfies every constraint: "
+        "surface area over 5,000 km² and max depth under 20 m.\n"
+        "\n"
+        "Lake Winnipegosis: surface area=5,370 km² (>5,000 km²? yes), max depth=12 m "
+        f"(<20 m? yes) — source: {_WIKI}Lake_Winnipegosis\n"
+        "Nettilling Lake: surface area=5,542 km² (>5,000 km²? yes), max depth=132 m "
+        f"(<20 m? no) — source: {_WIKI}Nettilling_Lake\n"
+        "Reindeer Lake: surface area=6,650 km² (>5,000 km²? yes), max depth=219 m "
+        f"(<20 m? no) — source: {_WIKI}Reindeer_Lake\n"
+        "Lake Athabasca: surface area=7,849 km² (>5,000 km²? yes), max depth=124 m "
+        f"(<20 m? no) — source: {_WIKI}Lake_Athabasca\n"
+        "Lake Okeechobee: surface area=1,900 km² (>5,000 km²? no), max depth=3.7 m "
+        f"(<20 m? yes) — source: {_WIKI}Lake_Okeechobee\n"
+        "Lake Khanka: surface area=4,070 km² (>5,000 km²? no), max depth=10.6 m "
+        f"(<20 m? yes) — source: {_WIKI}Lake_Khanka"
+    )
+
+
+def test_compose_and_filter_missing_one_of_twelve_leaves_returns_none():
+    partial = {k: v for k, v in _AF_RESULTS.items() if k != "khanka_depth"}
+    assert ec._compose_and_filter(_AF_LEAVES, partial, _AF_COMPOSITION) is None
+
+
+def test_compose_and_filter_zero_or_two_satisfiers_return_none():
+    """A UNIQUE-satisfier claim asserts something about every item, so fully-resolved data yielding
+    0 or 2 simultaneous satisfiers is proof of an upstream extraction error — fall back, never
+    assert a hedged winner."""
+    two = dict(_AF_RESULTS, nettilling_depth=f"15 m — source: {_WIKI}Nettilling_Lake")
+    assert ec._compose_and_filter(_AF_LEAVES, two, _AF_COMPOSITION) is None
+    zero = dict(_AF_RESULTS, winnipegosis_depth=f"120 m — source: {_WIKI}Lake_Winnipegosis")
+    assert ec._compose_and_filter(_AF_LEAVES, zero, _AF_COMPOSITION) is None
+
+
+_AM_PEAKS = [  # 062's real six, prominence in metres — the argmax winner is the SHORTEST peak
+    ("Jengish Chokusu", "jengish_chokusu", "4,148"),
+    ("Mount Gongga", "gongga", "3,642"),
+    ("Kongur Tagh", "kongur_tagh", "3,585"),
+    ("Ismoil Somoni Peak", "ismoil_somoni", "3,402"),
+    ("Muztagh Ata", "muztagh_ata", "2,698"),
+    ("Noshaq", "noshaq", "2,024"),
+]
+_AM_COMPOSITION = {
+    "op": "argmax", "answer_noun": "peak", "value_label": "topographic prominence", "unit": "m",
+    "items": [{"leaf": key, "label": name, "type": "number"} for name, key, _p in _AM_PEAKS],
+}
+_AM_LEAVES = [{"id": key} for _n, key, _p in _AM_PEAKS]
+_AM_RESULTS = {key: f"{prom} m — source: {_WIKI}{name.replace(' ', '_')}"
+               for name, key, prom in _AM_PEAKS}
+
+
+def test_compose_argmax_renders_winner_lead_and_every_row():
+    out = ec._compose_argmax(_AM_LEAVES, _AM_RESULTS, _AM_COMPOSITION)
+    assert out == (
+        "Jengish Chokusu has the highest topographic prominence of the 6 peaks compared, "
+        "at 4,148 m.\n"
+        "\n"
+        f"Jengish Chokusu: topographic prominence=4,148 m — source: {_WIKI}Jengish_Chokusu\n"
+        f"Mount Gongga: topographic prominence=3,642 m — source: {_WIKI}Mount_Gongga\n"
+        f"Kongur Tagh: topographic prominence=3,585 m — source: {_WIKI}Kongur_Tagh\n"
+        f"Ismoil Somoni Peak: topographic prominence=3,402 m — source: {_WIKI}Ismoil_Somoni_Peak\n"
+        f"Muztagh Ata: topographic prominence=2,698 m — source: {_WIKI}Muztagh_Ata\n"
+        f"Noshaq: topographic prominence=2,024 m — source: {_WIKI}Noshaq"
+    )
+
+
+def test_compose_argmax_degrades_gracefully_over_an_unresolved_leaf():
+    """Unlike a count/AND-filter, a 'largest' claim survives a missing item: the max over what DID
+    resolve is still honest. The dropped peak is disclosed as UNKNOWN, never silently omitted."""
+    partial = dict(_AM_RESULTS, noshaq=f"UNKNOWN — {_WIKI}Noshaq")
+    out = ec._compose_argmax(_AM_LEAVES, partial, _AM_COMPOSITION)
+    assert out.startswith("Jengish Chokusu has the highest topographic prominence of the 5 peaks "
+                          "compared, at 4,148 m.")
+    assert out.endswith("Noshaq: topographic prominence=UNKNOWN")
+    # A non-coercing (prose) fact is treated the same way, and a missing key too.
+    noisy = dict(_AM_RESULTS, muztagh_ata=f"the ice mountain father — source: {_WIKI}Muztagh_Ata")
+    assert "Muztagh Ata: topographic prominence=UNKNOWN" in ec._compose_argmax(
+        _AM_LEAVES, noisy, _AM_COMPOSITION)
+    dropped = {k: v for k, v in _AM_RESULTS.items() if k != "gongga"}
+    assert "Mount Gongga: topographic prominence=UNKNOWN" in ec._compose_argmax(
+        _AM_LEAVES, dropped, _AM_COMPOSITION)
+
+
+def test_compose_argmax_needs_two_resolved_items():
+    """A 'highest of them all' claim over ONE value is vacuous — fall back rather than crown the
+    only survivor (the same uncorroborated-outlier failure the vote quorum removes upstream)."""
+    one = {"jengish_chokusu": _AM_RESULTS["jengish_chokusu"]}
+    assert ec._compose_argmax(_AM_LEAVES, one, _AM_COMPOSITION) is None
+    assert ec._compose_argmax(_AM_LEAVES, {}, _AM_COMPOSITION) is None
+    two = {k: _AM_RESULTS[k] for k in ("jengish_chokusu", "gongga")}
+    assert ec._compose_argmax(_AM_LEAVES, two, _AM_COMPOSITION).startswith(
+        "Jengish Chokusu has the highest topographic prominence of the 2 peaks compared")
+
+
+def test_compose_argmax_tie_names_every_tied_item():
+    """A tie is a symptom of a misread, so both names are stated — picking one arbitrarily would be
+    the fabrication this path exists to remove."""
+    tied = dict(_AM_RESULTS, gongga=f"4,148 m — source: {_WIKI}Mount_Gongga")
+    out = ec._compose_argmax(_AM_LEAVES, tied, _AM_COMPOSITION)
+    assert out.startswith("Jengish Chokusu and Mount Gongga tie for the highest topographic "
+                          "prominence of the 6 peaks compared, at 4,148 m each.")
+
+
+def test_compose_argmax_malformed_composition_returns_none():
+    assert ec._compose_argmax(_AM_LEAVES, _AM_RESULTS, {"op": "argmax"}) is None
+    # An item pointing at a leaf the plan does not declare is an authoring bug, not a data miss.
+    stray = dict(_AM_COMPOSITION,
+                 items=_AM_COMPOSITION["items"] + [{"leaf": "everest", "label": "Everest"}])
+    assert ec._compose_argmax(_AM_LEAVES, _AM_RESULTS, stray) is None
+
+
+_SS_SEASONS = [  # 070's real four — a genuine slip (78 -> 75) was seen live, motivating this op
+    ("Season 1", "s1_episodes", 13),
+    ("Season 2", "s2_episodes", 22),
+    ("Season 3", "s3_episodes", 19),
+    ("Season 4", "s4_episodes", 24),
+]
+_SS_COMPOSITION = {
+    "op": "subset_sum", "answer_noun": "season", "unit": "episodes",
+    "items": [{"leaf": key, "label": name, "type": "number", "unit": "episodes"}
+              for name, key, _e in _SS_SEASONS],
+}
+_SS_LEAVES = [{"id": key} for _n, key, _e in _SS_SEASONS]
+_SS_RESULTS = {key: f"{eps} — source: {_WIKI}Chuck_({name.lower().replace(' ', '_')})"
+               for name, key, eps in _SS_SEASONS}
+
+
+def test_compose_subset_sum_renders_addition_and_every_row():
+    out = ec._compose_subset_sum(_SS_LEAVES, _SS_RESULTS, _SS_COMPOSITION)
+    assert out == (
+        "Season 1 + Season 2 + Season 3 + Season 4 = 13 + 22 + 19 + 24 = 78\n"
+        "\n"
+        f"Season 1: 13 episodes — source: {_WIKI}Chuck_(season_1)\n"
+        f"Season 2: 22 episodes — source: {_WIKI}Chuck_(season_2)\n"
+        f"Season 3: 19 episodes — source: {_WIKI}Chuck_(season_3)\n"
+        f"Season 4: 24 episodes — source: {_WIKI}Chuck_(season_4)"
+    )
+
+
+def test_compose_subset_sum_requires_every_item_to_resolve():
+    """ALL-OR-NOTHING: unlike argmax's plain comparison, a sum over fewer than all declared items
+    is not an honest partial answer — dropping any one season moves the total outside the
+    validator's tight [77,79] band, so a missing or non-coercing item falls back entirely."""
+    missing = dict(_SS_RESULTS, s3_episodes=f"UNKNOWN — {_WIKI}Chuck_(season_3)")
+    assert ec._compose_subset_sum(_SS_LEAVES, missing, _SS_COMPOSITION) is None
+    noisy = dict(_SS_RESULTS, s2_episodes=f"twenty-two — source: {_WIKI}Chuck_(season_2)")
+    assert ec._compose_subset_sum(_SS_LEAVES, noisy, _SS_COMPOSITION) is None
+    dropped = {k: v for k, v in _SS_RESULTS.items() if k != "s4_episodes"}
+    assert ec._compose_subset_sum(_SS_LEAVES, dropped, _SS_COMPOSITION) is None
+    assert ec._compose_subset_sum(_SS_LEAVES, {}, _SS_COMPOSITION) is None
+
+
+def test_compose_subset_sum_malformed_composition_returns_none():
+    assert ec._compose_subset_sum(_SS_LEAVES, _SS_RESULTS, {"op": "subset_sum"}) is None
+    # An item pointing at a leaf the plan does not declare is an authoring bug, not a data miss.
+    stray = dict(_SS_COMPOSITION,
+                 items=_SS_COMPOSITION["items"] + [{"leaf": "s5_episodes", "label": "Season 5"}])
+    assert ec._compose_subset_sum(_SS_LEAVES, _SS_RESULTS, stray) is None
+
+
+def test_compose_subset_sum_comma_grouped_and_decimal_values():
+    """Reuses the shared _compose_value comma-grouping fix — a subset_sum item can be large enough
+    to carry a thousands separator, or fractional."""
+    comp = dict(_SS_COMPOSITION, items=[
+        {"leaf": "a", "label": "A", "type": "number"}, {"leaf": "b", "label": "B", "type": "number"},
+    ])
+    leaves = [{"id": "a"}, {"id": "b"}]
+    results = {"a": f"1,200 — source: {_WIKI}A", "b": f"3.5 — source: {_WIKI}B"}
+    out = ec._compose_subset_sum(leaves, results, comp)
+    assert out.startswith("A + B = 1,200 + 3.5 = 1,203.5")
+
+
+def _gathered_source_urls_case(fact):
+    return ec._gathered_source_urls([fact])
+
+
+def test_gathered_source_urls_preserves_a_legitimate_trailing_paren():
+    """Regression: the trailing-punctuation stripper used to eat a closing ')' that is actually
+    part of the URL itself (Wikipedia's own parenthesized titles, e.g. 'Chuck_(season_1)'),
+    silently costing every citation check on task 070 in both the free-text and composed paths."""
+    urls = _gathered_source_urls_case(f"13 — source: {_WIKI}Chuck_(season_1)")
+    assert urls == [f"{_WIKI}Chuck_(season_1)"]
+
+
+def test_gathered_source_urls_strips_an_excess_sentence_trailing_paren():
+    """A URL wrapped in a sentence-level parenthetical (no matching '(' inside the captured URL
+    itself) still has its excess trailing ')' removed."""
+    urls = _gathered_source_urls_case(f"13 — source: {_WIKI}Lake_Matano)")
+    assert urls == [f"{_WIKI}Lake_Matano"]
+    # Multiple trailing punctuation marks, still no legitimate paren inside the URL.
+    urls2 = _gathered_source_urls_case(f"13 — source: {_WIKI}Lake_Matano).")
+    assert urls2 == [f"{_WIKI}Lake_Matano"]
+
+
+def test_execute_plan_computed_runs_070s_real_subset_sum_plan_with_zero_llm_calls(monkeypatch):
+    """End-to-end on the ACTUAL get_compiled_plan() of 070: canned correct per-season counts in, a
+    composed deliverable out, ZERO aggregation LLM calls, and every real validator at 1.0 — the
+    exact arithmetic slip a live trace showed (75 instead of 78) is structurally impossible here."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    _patch_pricing(monkeypatch, {"cheap-slug": {"output_per_million": 0.40}})
+    from agent.app.idea_tests import test_070_tier5_subset_sum_distractor as t070
+
+    def resolve(instruction):
+        s = next(s for s in t070.SEASONS if s["label"].lower() in instruction.lower())
+        return f"{s['eps']} — source: {_WIKI}Chuck_({s['label'].lower().replace(' ', '_')})"
+
+    _stub_both_leaves(monkeypatch, resolve)
+    io = _agg_io("LLM AGGREGATION — MUST NOT RUN")
+    out = asyncio.run(ec._execute_plan(io, t070.get_compiled_plan(), "cheap-slug", 512))
+    assert io.query_llm.await_count == 0
+    assert out.startswith("Season 1 + Season 2 + Season 3 + Season 4 = 13 + 22 + 19 + 24 = 78")
+    result = {"output": {"final_deliverable": out}}
+    observability = {"visit": {"count": len(t070.SEASONS)}}
+    for check in t070.get_validation_functions():
+        assert check(result, observability)["score"] == 1.0, check.__name__
+
+
+def test_subset_sum_composition_ignored_when_agg_mode_unset(monkeypatch):
+    """ADDITIVE ONLY: a plan carrying a subset_sum composition but no agg_mode never reaches the
+    composer — the default free-text path is byte-identical to today."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    _stub_leaf(monkeypatch, lambda ins: f"13 — source: {_WIKI}Chuck_(season_1)")
+    monkeypatch.setitem(ec._COMPOSERS, "subset_sum",
+                        lambda *a, **kw: pytest.fail("_compose_subset_sum must not run"))
+    plan = {"leaves": [{"id": "s1_episodes", "instruction": "episodes of Chuck season 1"}],
+            "aggregation": "sum the seasons", "composition": _SS_COMPOSITION}
+    io = _agg_io("LLM ANSWER")
+    out = asyncio.run(ec._execute_plan(io, plan, "m", 256))
+    assert out.startswith("LLM ANSWER") and io.query_llm.await_count == 1
+
+
+def test_compose_dispatch_wires_all_four_ops_and_never_propagates():
+    """Every op is dispatched; an unknown op, a missing/malformed composition, or an exception
+    inside a composer is a logged None (fallback), never a crash."""
+    assert ec._compose(_CT_LEAVES, _CT_RESULTS, _CT_COMPOSITION).startswith("1 of the 3 lakes")
+    assert ec._compose(_AF_LEAVES, _AF_RESULTS, _AF_COMPOSITION).startswith("Lake Winnipegosis is")
+    assert ec._compose(_AM_LEAVES, _AM_RESULTS, _AM_COMPOSITION).startswith("Jengish Chokusu has")
+    assert ec._compose(_SS_LEAVES, _SS_RESULTS, _SS_COMPOSITION).startswith("Season 1 + Season 2")
+    # Still-unimplemented ops (the forward-compat guard) fall back instead of crashing.
+    assert ec._compose(_CT_LEAVES, _CT_RESULTS, dict(_CT_COMPOSITION, op="odd_one_out")) is None
+    assert ec._compose(_CT_LEAVES, _CT_RESULTS, {}) is None
+    assert ec._compose(_CT_LEAVES, _CT_RESULTS, None) is None
+    assert ec._compose(_CT_LEAVES, _CT_RESULTS, "count_threshold") is None
+    # items shaped wrong -> the composer raises internally and _compose absorbs it.
+    assert ec._compose(_CT_LEAVES, _CT_RESULTS, dict(_CT_COMPOSITION, items=["a_depth"])) is None
+
+
+def test_composition_ignored_when_agg_mode_unset(monkeypatch):
+    """ADDITIVE ONLY: a plan carrying a composition but no agg_mode is byte-identical to today —
+    _compose is never even consulted."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    _stub_leaf(monkeypatch, lambda ins: f"590 m — source: {_WIKI}Lake_Matano")
+    monkeypatch.setattr(ec, "_compose", lambda *a, **kw: pytest.fail("_compose must not run"))
+    plan = {"leaves": [{"id": "a_depth", "instruction": "depth of Lake Matano"}],
+            "aggregation": "count them", "composition": _CT_COMPOSITION}
+    io = _agg_io("LLM ANSWER")
+    out = asyncio.run(ec._execute_plan(io, plan, "m", 256))
+    assert out.startswith("LLM ANSWER") and io.query_llm.await_count == 1
+
+
+def test_execute_plan_computed_falls_back_to_single_when_incomplete(monkeypatch):
+    """One UNKNOWN leaf -> the composer declines and the unchanged free-text single path runs."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    _stub_leaf(monkeypatch, lambda ins: ("UNKNOWN" if "Tinnsjå" in ins
+                                         else f"590 m — source: {_WIKI}Lake_Matano"))
+    plan = {
+        "leaves": [{"id": "a_depth", "instruction": "depth of Lake Matano"},
+                   {"id": "b_depth", "instruction": "depth of Tinnsjå"},
+                   {"id": "c_depth", "instruction": "depth of Lake Ohrid"}],
+        "aggregation": "count the lakes over 480 m", "agg_mode": "computed",
+        "composition": _CT_COMPOSITION,
+    }
+    io = _agg_io("FREE TEXT FALLBACK")
+    out = asyncio.run(ec._execute_plan(io, plan, "m", 256))
+    assert out.startswith("FREE TEXT FALLBACK")     # _aggregate_single ran, unchanged
+    assert io.query_llm.await_count == 1
+
+
+def _stub_both_leaves(monkeypatch, resolver):
+    """Stub BOTH leaf executors so the routing tier can never reach a connector."""
+    async def fake(agent_io, instruction, *a, **kw):
+        return resolver(instruction)
+    monkeypatch.setattr(ec, "_run_leaf", fake)
+    monkeypatch.setattr(ec, "_run_leaf_thin", fake)
+
+
+def _entity_in(entities, instruction):
+    """The ENTITIES row a compiled leaf instruction is about (longest name wins, so a name that is
+    a substring of another can never mis-resolve)."""
+    hits = [e for e in entities if e["name"] in instruction]
+    return max(hits, key=lambda e: len(e["name"])) if hits else None
+
+
+def test_execute_plan_computed_runs_the_three_real_plans_with_zero_llm_calls(monkeypatch):
+    """End-to-end on the ACTUAL get_compiled_plan()s of 072/076/078: canned correct leaf facts in,
+    a composed deliverable out, ZERO aggregation LLM calls, and every real validator at 1.0."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    _patch_pricing(monkeypatch, {"cheap-slug": {"output_per_million": 0.40}})
+    from agent.app.idea_tests import test_072_tier5_count_with_condition as t072
+    from agent.app.idea_tests import test_076_tier5_numeric_and_filter as t076
+    from agent.app.idea_tests import test_078_tier5_count_with_condition_b as t078
+
+    def _url(name):
+        return f"{_WIKI}{name.replace(' ', '_')}"
+
+    def _num(value):
+        return f"{int(value)}" if float(value).is_integer() else f"{value}"
+
+    def resolve_072(instruction):
+        e = _entity_in(t072.ENTITIES, instruction)
+        return f"{e['depth']} m — source: {_url(e['name'])}"
+
+    def resolve_076(instruction):
+        e = _entity_in(t076.ENTITIES, instruction)
+        if "SURFACE AREA" in instruction:
+            return f"{e['area']:,} km² — source: {_url(e['name'])}"
+        return f"{_num(e['depth'])} m — source: {_url(e['name'])}"
+
+    def resolve_078(instruction):
+        e = _entity_in(t078.ENTITIES, instruction)
+        return f"{e['area']:,} km² — source: {_url(e['name'])}"
+
+    for module, resolve in ((t072, resolve_072), (t076, resolve_076), (t078, resolve_078)):
+        _stub_both_leaves(monkeypatch, resolve)
+        io = _agg_io("LLM AGGREGATION — MUST NOT RUN")
+        out = asyncio.run(ec._execute_plan(io, module.get_compiled_plan(), "cheap-slug", 512))
+        assert io.query_llm.await_count == 0, module.__name__      # composition is free
+        result = {"output": {"final_deliverable": out}}
+        observability = {"visit": {"count": len(module.ENTITIES)}}
+        for check in module.get_validation_functions():
+            verdict = check(result, observability)
+            assert verdict["score"] == 1.0, (module.__name__, verdict)
+
+
+def test_execute_plan_computed_runs_062s_real_argmax_plan_with_zero_llm_calls(monkeypatch):
+    """End-to-end on the ACTUAL get_compiled_plan() of 062: canned correct prominence figures in, a
+    composed deliverable out, ZERO aggregation LLM calls, and every real validator at 1.0 — the
+    comparison a stored trace shows a weak model getting wrong off its own correct list."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    _patch_pricing(monkeypatch, {"cheap-slug": {"output_per_million": 0.40}})
+    from agent.app.idea_tests import test_062_tier5_prominence_argmax as t062
+
+    def resolve(instruction):
+        e = _entity_in(t062.ENTITIES, instruction)
+        return f"{e['prominence']:,} m — source: {_WIKI}{e['name'].replace(' ', '_')}"
+
+    _stub_both_leaves(monkeypatch, resolve)
+    io = _agg_io("LLM AGGREGATION — MUST NOT RUN")
+    out = asyncio.run(ec._execute_plan(io, t062.get_compiled_plan(), "cheap-slug", 512))
+    assert io.query_llm.await_count == 0
+    assert out.startswith("Jengish Chokusu has the highest topographic prominence")
+    result = {"output": {"final_deliverable": out}}
+    observability = {"visit": {"count": len(t062.ENTITIES)}}
+    for check in t062.get_validation_functions():
+        assert check(result, observability)["score"] == 1.0, check.__name__
+
+
+def test_argmax_composition_ignored_when_agg_mode_unset(monkeypatch):
+    """ADDITIVE ONLY: a plan carrying an argmax composition but no agg_mode never reaches the
+    composer — the default free-text path is byte-identical to today."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    _stub_leaf(monkeypatch, lambda ins: f"4,148 m — source: {_WIKI}Jengish_Chokusu")
+    # Patch the REGISTRY entry (the live dispatch path), not just the module attribute _COMPOSERS
+    # already holds a reference to.
+    monkeypatch.setitem(ec._COMPOSERS, "argmax",
+                        lambda *a, **kw: pytest.fail("_compose_argmax must not run"))
+    plan = {"leaves": [{"id": "jengish_chokusu", "instruction": "prominence of Jengish Chokusu"}],
+            "aggregation": "which peak is most prominent?", "composition": _AM_COMPOSITION}
+    io = _agg_io("LLM ANSWER")
+    out = asyncio.run(ec._execute_plan(io, plan, "m", 256))
+    assert out.startswith("LLM ANSWER") and io.query_llm.await_count == 1

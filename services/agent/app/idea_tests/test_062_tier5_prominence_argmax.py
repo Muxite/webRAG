@@ -120,9 +120,32 @@ _SUP = (r"more|larger|greater|higher|bigger|largest|greatest|highest|biggest|mos
 #   dir 2  (superlative -> subject):  "the most prominent peak is Jengish Chokusu"  (NOT "than Jengish")
 _JENGISH_WINS = re.compile(
     r"(?:" + _WINNER_RX + r")(?:(?!" + _OTHERS + r")[^.;]){0,90}\b(?:" + _SUP + r")\b"
-    + r"|\b(?:" + _SUP + r")\b(?:(?!\bthan\b|" + _OTHERS + r")[^.;]){0,55}(?:" + _WINNER_RX + r")",
+    + r"|\b(?:" + _SUP + r")\b(?:(?!\bthan\b|" + _OTHERS + r")[^.;]){0,90}(?:" + _WINNER_RX + r")",
     re.IGNORECASE,
 )
+
+# Strip citation URLs before any veto/assertion regex runs: an entity's own name is often a URL
+# path segment (e.g. ".../wiki/Kongur_Tagh"), and a trigger word can land right next to it purely
+# as an artifact of the slug/query-string text, not because the model asserted anything about that
+# entity. Confirmed live (test 069's Slovakia/"coastline.html" false positive) as the same bug
+# class; applied here defensively since the machinery is shared.
+_URL_RX = re.compile(r"https?://\S+")
+_URL_TRAIL_PUNCT = ").,;:!?]}\"'"
+
+
+def _strip_urls(text: str) -> str:
+    def _repl(m: "re.Match") -> str:
+        # Trim trailing punctuation the greedy \S+ swallowed (e.g. the ")." after a URL in
+        # parens) back OUT of the stripped region, so sentence/clause boundaries the veto regexes
+        # rely on are preserved rather than silently deleted.
+        url = m.group(0)
+        trail = ""
+        while url and url[-1] in _URL_TRAIL_PUNCT:
+            trail = url[-1] + trail
+            url = url[:-1]
+        return " " + trail
+
+    return _URL_RX.sub(_repl, text)
 
 # Prominence-value detection: a 4-digit figure with an optional thousands comma ("4,148" / "4148").
 # Candidates are filtered against the WINNER_PROM +/- PROM_TOL band.
@@ -216,7 +239,7 @@ def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -
     n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
     if n_visits <= 0:
         return False
-    text = _primary_text(result)
+    text = _strip_urls(_primary_text(result))
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
     if not re.search(_OTHERS, text, re.IGNORECASE):
@@ -336,6 +359,21 @@ def get_compiled_plan() -> Dict[str, Any]:
         })
     return {
         "leaves": leaves,
+        # Deterministic composition: the executor compares the six gathered prominence figures in
+        # Python and renders the winner plus the full per-peak breakdown itself (zero extra LLM
+        # calls) — a stored trace shows a weak model printing "Jengish Chokusu: 4,147 m" as the
+        # largest number in its own list and then naming a SMALLER entry as the winner. Encodes the
+        # six GIVEN peaks only; no prominence figure and no winner are leaked (the values come from
+        # the leaves at runtime). If fewer than two leaves resolve, the composer declines and the
+        # recipe below runs unchanged.
+        "agg_mode": "computed",
+        "composition": {
+            "op": "argmax",
+            "answer_noun": "peak",
+            "value_label": "topographic prominence",
+            "unit": "m",
+            "items": [{"leaf": e["key"], "label": e["name"], "type": "number"} for e in ENTITIES],
+        },
         "aggregation": (
             "You now have, for each of the six peaks, its topographic prominence in metres (with a "
             "source URL). COMPARE the six prominence figures and determine which SINGLE peak has the "

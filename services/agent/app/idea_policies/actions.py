@@ -495,18 +495,23 @@ class VisitLeafAction(LeafAction):
                             action_type = result.get(ActionResultKey.ACTION.value) or result.get("action")
                             if action_type == IdeaActionType.SEARCH.value:
                                 search_results = result.get(ActionResultKey.RESULTS.value) or result.get("results", [])
+                                # Pool EVERY result URL of the named source (mis-indentation
+                                # here used to return inside the loop, i.e. the first hit only —
+                                # which handed the caller a single take-it-or-leave-it URL, so a
+                                # dead first result failed the whole visit and the `link_idea`
+                                # best-match pick below never had anything to choose between).
                                 if isinstance(search_results, list) and search_results:
                                     urls_from_source = []
-                                for item in search_results:
-                                    if isinstance(item, dict):
-                                        candidate_url = (
-                                            item.get("url") or item.get("link") or item.get("href")
-                                            or item.get("source") or item.get("page_url")
-                                        )
-                                        if candidate_url:
-                                            candidate_url = str(candidate_url).strip()
-                                            if self._is_valid_url(candidate_url):
-                                                urls_from_source.append(candidate_url)
+                                    for item in search_results:
+                                        if isinstance(item, dict):
+                                            candidate_url = (
+                                                item.get("url") or item.get("link") or item.get("href")
+                                                or item.get("source") or item.get("page_url")
+                                            )
+                                            if candidate_url:
+                                                candidate_url = str(candidate_url).strip()
+                                                if self._is_valid_url(candidate_url) and candidate_url not in urls_from_source:
+                                                    urls_from_source.append(candidate_url)
                                     if urls_from_source:
                                         self._log_structured(
                                             "info",
@@ -983,6 +988,61 @@ class VisitLeafAction(LeafAction):
             self._logger.warning(f"[VISIT] Failed to query links from Chroma: {exc}")
             return []
     
+    #: Host/path noise that says nothing about WHICH page a URL is.
+    _URL_NOISE_TOKENS = frozenset({
+        "www", "com", "org", "net", "edu", "gov", "int", "html", "htm", "php", "asp",
+        "wiki", "page", "pages", "index", "article", "articles",
+    })
+    _URL_WORD_RE = re.compile(r"[a-z0-9]+")
+
+    def _pick_link_by_name(self, link_idea: str, candidate_urls: List[str]) -> Optional[str]:
+        """The ONE candidate URL whose page the ``link_idea`` literally names — or None.
+
+        A deterministic pre-step for :meth:`_select_links_with_llm`, for the common case where
+        the visit is not "follow the link that means X" but "open THIS entity's page" (every
+        plan-library leaf, and planner leaves like "Visit the Axolotl Wikipedia page"). There
+        the model call is pure overhead — and worse on a small/local executor, where a fan-out
+        of visits fires one concurrent selection prompt each: measured on a 7B model, four of
+        five hit the 20s action watchdog and the one that answered picked the wrong page
+        (``/Muztagh_Tower`` for a "Muztagh Ata" leaf).
+
+        Deliberately narrow — it answers ONLY about candidates whose whole slug is named in the
+        ``link_idea``; a descriptive idea ("the rocket that launched the mission") names no
+        slug at all, so that case still reaches the model, which is what it is for. Among
+        named candidates it prefers, in order: the most specific match (so "Muztagh Ata"
+        outranks a bare "Muztagh" hub page), then a host the idea also names (so "the Wikipedia
+        page" beats a content mirror carrying the identical slug), then search rank.
+        """
+        from agent.app.idea_visit_dedup import url_slug_tokens
+
+        haystack = set(self._URL_WORD_RE.findall((link_idea or "").lower()))
+        if not haystack:
+            return None
+
+        named: List[Tuple[int, float, int, str]] = []
+        for index, url in enumerate(candidate_urls):
+            slug = [t for t in url_slug_tokens(url) if t not in self._URL_NOISE_TOKENS]
+            if not slug:
+                continue
+            matched = [t for t in slug if t in haystack]
+            if len(matched) < len(slug):
+                continue  # part of this page's identity is NOT what the idea asked for
+            host = [
+                t for t in self._URL_WORD_RE.findall((urlparse(url).netloc or "").lower())
+                if len(t) >= 3 and t not in self._URL_NOISE_TOKENS
+            ]
+            host_hit = 1.0 if any(t in haystack for t in host) else 0.0
+            named.append((len(matched), host_hit, index, url))
+
+        if not named:
+            return None
+        best = max(named, key=lambda entry: (entry[0], entry[1], -entry[2]))
+        self._logger.info(
+            f"[VISIT] Link idea names one page outright; picked {best[3][:80]} "
+            f"deterministically (no selection prompt)"
+        )
+        return best[3]
+
     async def _select_links_with_llm(
         self,
         link_idea: str,
@@ -1291,6 +1351,13 @@ class VisitLeafAction(LeafAction):
                     self._logger.warning(f"[VISIT] Clearing placeholder URL: {optional_url[:80]}")
                     optional_url = None
             
+            # Does this node NAME the search whose URLs it is meant to open? If so that source
+            # is authoritative and the opportunistic scavenging below must not pre-empt it:
+            # `_extract_url_from_parents` / `_extract_url_from_sibling_results` return the first
+            # URL any relative produced, which under a fan-out of per-entity page reads is
+            # routinely a SIBLING ENTITY's search hit — visited immediately (link_count == 1
+            # short-circuits) and never reconciled against this leaf's own `link_idea`.
+            has_named_url_source = False
             required_data = node.details.get(DetailKey.REQUIRES_DATA.value)
             if required_data and isinstance(required_data, dict):
                 source_node_id = required_data.get("source_node_id")
@@ -1310,12 +1377,13 @@ class VisitLeafAction(LeafAction):
                                 issue="dependency_not_ready"
                             )
                         else:
+                            has_named_url_source = True
                             self._logger.info(
                                 f"[VISIT] Node {node_id[:8]}... depends on search node {source_node_id[:8]}... "
                                 f"(status: {source_node.status.value})"
                             )
-            
-            if not optional_url or not self._is_valid_url(optional_url):
+
+            if not has_named_url_source and (not optional_url or not self._is_valid_url(optional_url)):
                 think_url = self._extract_url_from_think_node(graph, node)
                 if think_url:
                     optional_url = think_url
@@ -1410,8 +1478,15 @@ class VisitLeafAction(LeafAction):
                     if link_count > len(urls_to_visit):
                         needed = link_count - len(urls_to_visit)
                         if len(candidate_urls) > needed:
-                            selected = await self._select_links_with_llm(link_idea or node.title, candidate_urls, needed, io)
-                            urls_to_visit.extend(selected)
+                            named = (
+                                self._pick_link_by_name(link_idea or node.title, candidate_urls)
+                                if needed == 1 else None
+                            )
+                            if named:
+                                urls_to_visit.append(named)
+                            else:
+                                selected = await self._select_links_with_llm(link_idea or node.title, candidate_urls, needed, io)
+                                urls_to_visit.extend(selected)
                         else:
                             urls_to_visit.extend(candidate_urls[:needed])
                 else:

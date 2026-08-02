@@ -28,6 +28,7 @@ from agent.app.trace_recorder import TraceRecorder
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.testing.execution import _empty_graph
+from agent.app.testing import json_telemetry as _json_telemetry
 
 _logger = logging.getLogger(__name__)
 
@@ -89,8 +90,11 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
         raw = await agent_io.query_llm(payload, model_name=model_name)
         try:
             decision = json.loads(raw or "{}")
+            _parsed_ok = True
         except (json.JSONDecodeError, TypeError):
             decision = {}
+            _parsed_ok = False
+        _json_telemetry.record(model_name, raw, True, _parsed_ok, phase="sequential_react")
         # Models sometimes wrap the step in a list (e.g. ``[{...}]`` or a list of
         # actions) instead of a bare object; take the first dict and never let a
         # non-dict reach ``.get`` (would crash the whole react run).

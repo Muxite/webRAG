@@ -465,6 +465,23 @@ def get_compiled_plan() -> Dict[str, Any]:
         })
     return {
         "leaves": leaves,
+        # Deterministic composition: the executor applies the threshold and counts in Python over
+        # the seven gathered areas, rendering each island's check and both named lists itself (zero
+        # extra LLM calls) — free-text counting/enumeration is the confirmed failure mode here even
+        # when every area is correct. Encodes the GIVEN threshold only; no area value and no count.
+        # If any leaf fails to resolve, the composer returns nothing and the recipe below runs
+        # unchanged.
+        "agg_mode": "computed",
+        "composition": {
+            "op": "count_threshold",
+            "answer_noun": "island",
+            "value_label": "area",
+            "unit": "km²",
+            "comparator": ">",
+            "threshold": THRESHOLD,
+            "items": [{"leaf": f"{e['key']}_area", "label": e["name"], "type": "number"}
+                      for e in ENTITIES],
+        },
         "aggregation": (
             "You now have, for each of the seven islands, its area in km² and a source URL. "
             "Before applying any threshold or counting, RESTATE each island's area explicitly "

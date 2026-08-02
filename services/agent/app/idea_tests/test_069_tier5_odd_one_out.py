@@ -163,6 +163,30 @@ _RIVAL_ODD = re.compile(
     re.IGNORECASE,
 )
 
+# Strip citation URLs before ANY veto/assertion regex runs. Confirmed live bug: a citation like
+# "https://www.indexmundi.com/slovakia/coastline.html" contains the substring "slovakia" (an
+# _OTHERS name) directly adjacent to "coastline" (an _RIVAL_MARK trigger) purely as a URL path
+# artifact -- tripping _RIVAL_ODD and zeroing an otherwise-correct answer that merely cited that
+# URL. A bare citation was never meant to count as a prose assertion about the entity anyway, so
+# stripping URLs before the keystone-gate regexes run is strictly more correct, not just a patch.
+_URL_RX = re.compile(r"https?://\S+")
+_URL_TRAIL_PUNCT = ").,;:!?]}\"'"
+
+
+def _strip_urls(text: str) -> str:
+    def _repl(m: "re.Match") -> str:
+        # Trim trailing punctuation the greedy \S+ swallowed (e.g. the ");" after a URL in
+        # parens) back OUT of the stripped region, so sentence/clause boundaries the veto regexes
+        # rely on are preserved rather than silently deleted.
+        url = m.group(0)
+        trail = ""
+        while url and url[-1] in _URL_TRAIL_PUNCT:
+            trail = url[-1] + trail
+            url = url[:-1]
+        return " " + trail
+
+    return _URL_RX.sub(_repl, text)
+
 # WHY (gated secondary): the property value that differs -- Bosnia has a sea coastline / is not
 # landlocked (Adriatic / Neum / 20 km).
 _WHY = re.compile(
@@ -282,7 +306,7 @@ def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -
     n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
     if n_visits <= 0:
         return False
-    text = _primary_text(result)
+    text = _strip_urls(_primary_text(result))
     if not re.search(_BOSNIA, text, re.IGNORECASE):
         return False
     if _BOS_LL.search(text):                        # asserts Bosnia IS landlocked -> negation flip

@@ -312,4 +312,20 @@ def get_compiled_plan() -> Dict[str, Any]:
             "spans all five seasons — report only the sum of these four. Also list the four "
             "per-season counts you used, and cite each season article's source URL."
         ),
+        # Deterministic PAL-style composition (opt-in): when every season's episode count resolves
+        # to a real number, add them in Python instead of trusting a free-text sum — offline testing
+        # showed identical gathered facts produced a correct 78 in some reps and a slipped 75 in
+        # others. Falls back to the free-text `aggregation` above (unchanged) whenever any season's
+        # figure doesn't resolve cleanly.
+        "agg_mode": "computed",
+        "composition": {
+            "op": "subset_sum",
+            "answer_noun": "season",
+            "unit": "episodes",
+            "items": [
+                {"leaf": f"{s['key']}_episodes", "label": s["label"], "type": "number",
+                 "unit": "episodes"}
+                for s in SEASONS
+            ],
+        },
     }

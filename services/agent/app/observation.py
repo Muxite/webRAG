@@ -3,7 +3,56 @@ import re
 from bs4 import BeautifulSoup
 
 
-def clean_operation(html: str) -> str:
+def _is_infobox_class(value) -> bool:
+    """True for a ``class`` attribute that marks an infobox table ("infobox", "infobox vcard",
+    "infobox_v2", ...). BeautifulSoup hands multi-valued classes over as a list."""
+    if not value:
+        return False
+    joined = " ".join(value) if isinstance(value, list) else str(value)
+    return "infobox" in joined.lower()
+
+
+def extract_infobox_block(html: str) -> str:
+    """Best-effort "Label: Value" rendering of the page's FIRST infobox table.
+
+    ``clean_operation`` extracts the page with a single page-wide ``get_text(separator="\\n")``,
+    which drops every infobox cell onto its own line with no delimiter — a label and its value end
+    up indistinguishable from the neighbouring field's ("Elevation / 7,439 / m / Prominence /
+    4,148 / m"), and a weak model asked an under-specified question confidently reads off the
+    neighbour. This renders each row as ``Label: Value`` using the CELL's own
+    ``get_text(" ", strip=True)``, so a cell's internal ``<br>`` fragments collapse onto one line.
+
+    Returns ``""`` when the page has no infobox table (every non-Wikipedia page, mostly) — callers
+    treat that as "nothing to prepend".
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find("table", class_=_is_infobox_class)
+    if table is None:
+        return ""
+    lines = []
+    caption = table.find("caption")
+    if caption is not None:
+        caption_text = caption.get_text(" ", strip=True)
+        if caption_text:
+            lines.append(caption_text)          # the infobox title ("Sarez Lake")
+    for row in table.find_all("tr"):
+        header, value = row.find("th"), row.find("td")
+        if header is not None and value is not None:
+            label_text = header.get_text(" ", strip=True)
+            value_text = value.get_text(" ", strip=True)
+            if label_text and value_text:
+                lines.append(f"{label_text}: {value_text}")
+                continue
+            cell_text = label_text or value_text
+        else:
+            cell = header if header is not None else value
+            cell_text = cell.get_text(" ", strip=True) if cell is not None else ""
+        if cell_text:                      # title / section-heading / caption row
+            lines.append(cell_text)
+    return "\n".join(lines)
+
+
+def clean_operation(html: str, prepend_infobox: bool = False) -> str:
     """
     Extract simplified main text content from the provided HTML.
 
@@ -13,7 +62,13 @@ def clean_operation(html: str) -> str:
     Aggressively removes Wikipedia-specific UI elements (skip links, sidebar
     toggles, table of contents, edit sections, reference lists) and generic
     site chrome (cookie banners, headers, footers).
+
+    ``prepend_infobox`` (default ``False`` = byte-identical to the historical output) prefixes the
+    page's infobox rendered as ``Label: Value`` lines (:func:`extract_infobox_block`) ahead of the
+    cleaned text, from the SAME already-fetched HTML — no extra round-trip. Opt-in because the
+    flattened body text is left untouched underneath it, so the block is purely additive context.
     """
+    infobox_block = extract_infobox_block(html) if prepend_infobox else ""
     soup = BeautifulSoup(html, "html.parser")
 
     # ── Phase 1: remove non-content tags ──────────────────────────────
@@ -162,4 +217,7 @@ def clean_operation(html: str) -> str:
 
     # Collapse any blank lines created by removals
     main_text = re.sub(r"\n{3,}", "\n\n", main_text)
-    return main_text.strip()
+    main_text = main_text.strip()
+    if infobox_block:
+        return f"{infobox_block}\n\n{main_text}" if main_text else infobox_block
+    return main_text

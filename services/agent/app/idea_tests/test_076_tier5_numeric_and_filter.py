@@ -186,7 +186,7 @@ _SAT = (
 #   dir 2 (assertion → subject): "the only lake meeting both constraints is Winnipegosis"
 _WINNIPEGOSIS_WINS = re.compile(
     _WINNER_RX + r"(?:(?!" + _OTHERS + r")[^.;]){0,90}\b(?:" + _SAT + r")\b"
-    + r"|\b(?:" + _SAT + r")\b(?:(?!" + _OTHERS + r")[^.;]){0,55}" + _WINNER_RX,
+    + r"|\b(?:" + _SAT + r")\b(?:(?!" + _OTHERS + r")[^.;]){0,90}" + _WINNER_RX,
     re.IGNORECASE,
 )
 
@@ -194,9 +194,29 @@ _WINNIPEGOSIS_WINS = re.compile(
 # Used by _keystone_enumeration_ok and _keystone_ok to veto a wrong explicit assertion.
 _OTHER_WINS = re.compile(
     r"(?:" + _OTHERS + r")(?:(?!" + _WINNER_RX + r")[^.;]){0,90}\b(?:" + _SAT + r")\b"
-    + r"|\b(?:" + _SAT + r")\b(?:(?!" + _WINNER_RX + r")[^.;]){0,55}(?:" + _OTHERS + r")",
+    + r"|\b(?:" + _SAT + r")\b(?:(?!" + _WINNER_RX + r")[^.;]){0,90}(?:" + _OTHERS + r")",
     re.IGNORECASE,
 )
+
+# Strip citation URLs before any veto/assertion regex runs (see test_062/test_069's identical
+# guard for the confirmed bug class this defends against).
+_URL_RX = re.compile(r"https?://\S+")
+_URL_TRAIL_PUNCT = ").,;:!?]}\"'"
+
+
+def _strip_urls(text: str) -> str:
+    def _repl(m: "re.Match") -> str:
+        # Trim trailing punctuation the greedy \S+ swallowed (e.g. the ")." after a URL in
+        # parens) back OUT of the stripped region, so sentence/clause boundaries the veto regexes
+        # rely on are preserved rather than silently deleted.
+        url = m.group(0)
+        trail = ""
+        while url and url[-1] in _URL_TRAIL_PUNCT:
+            trail = url[-1] + trail
+            url = url[:-1]
+        return " " + trail
+
+    return _URL_RX.sub(_repl, text)
 
 
 def _keystone_enumeration_ok(text: str) -> bool:
@@ -338,7 +358,7 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] names Lake Winnipegosis as the unique both-constraint
     satisfier.
 
@@ -352,8 +372,16 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
 
     Rejected outright if Winnipegosis is absent, or if another lake is explicitly asserted as the
     answer, or if the enumeration table is hallucinated (a decoy also shows both-positive).
+
+    Also requires GROUNDING: the value string alone is insufficient — the agent must have
+    actually visited at least one page (visit.count > 0), else an ungrounded parametric-memory
+    guess would earn credit. (Every sibling reachable-tier task gates on this; this task had been
+    missing the check entirely.)
     """
-    text = _primary_text(result)
+    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
+    if n_visits <= 0:
+        return False
+    text = _strip_urls(_primary_text(result))
     if not re.search(_WINNER_RX, text, re.IGNORECASE):
         return False
     if not re.search(_OTHERS, text, re.IGNORECASE):
@@ -377,7 +405,7 @@ def validate_keystone_filter(result: Dict[str, Any], observability: Dict[str, An
     Winnipegosis. Models that drop a constraint mis-pick: chasing a large lake lands on Athabasca
     (7,849 km² but 124 m deep); chasing a shallow lake lands on Okeechobee (3.7 m deep but only
     1,900 km²) or Khanka (10.6 m but only 4,070 km²); Nettilling and Reindeer are large but deep."""
-    passed = _keystone_ok(result)
+    passed = _keystone_ok(result, observability)
     return {
         "check": "keystone_filter", "passed": passed, "score": 1.0 if passed else 0.0,
         "reason": ("Lake Winnipegosis named as the unique both-constraint satisfier" if passed
@@ -414,7 +442,7 @@ def validate_winner_attributes(result: Dict[str, Any], observability: Dict[str, 
     """GATED secondary: the winner's area (~5,370 km²) and max depth (~12 m) are both stated.
     Short-circuits to 0 when the keystone is absent, so a wrong or guessed winner cannot bank the
     attribute-value credit."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "winner_attributes", "passed": False, "score": 0.0,
             "reason": "Keystone absent -> attribute values not credited",
@@ -437,7 +465,7 @@ def validate_winner_attributes(result: Dict[str, Any], observability: Dict[str, 
 def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """GATED secondary: cites at least 3 of the 6 lake Wikipedia pages. Short-circuits to 0
     when the keystone is absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {
             "check": "citation", "passed": False, "score": 0.0,
             "reason": "Keystone absent -> source URLs not credited",
@@ -501,6 +529,28 @@ def get_compiled_plan() -> Dict[str, Any]:
         })
     return {
         "leaves": leaves,
+        # Deterministic composition: the executor applies BOTH constraints in Python over the twelve
+        # gathered figures and renders the winner + every lake's two-way check itself (zero extra LLM
+        # calls). Free-text conjunction logic is exactly what a weak model gets wrong here even when
+        # all twelve values are correct. Encodes the two GIVEN thresholds only — no attribute value
+        # and no winner. If any leaf fails to resolve, the composer returns nothing and the
+        # ``aggregation`` recipe below runs unchanged.
+        "agg_mode": "computed",
+        "composition": {
+            "op": "and_filter",
+            "answer_noun": "lake",
+            "constraints": [
+                {"key": "area", "label": "surface area", "unit": "km²", "type": "number",
+                 "comparator": ">", "threshold": AREA_THRESHOLD},
+                {"key": "depth", "label": "max depth", "unit": "m", "type": "number",
+                 "comparator": "<", "threshold": DEPTH_THRESHOLD},
+            ],
+            "items": [
+                {"label": e["name"],
+                 "leaves": {"area": f"{e['key']}_area", "depth": f"{e['key']}_depth"}}
+                for e in ENTITIES
+            ],
+        },
         "aggregation": (
             "You now have, for each of the six lakes, two attributes: its surface area in km² and "
             "its maximum depth in metres. For EACH of the six lakes, write out its check "

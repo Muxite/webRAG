@@ -231,6 +231,29 @@ def test_wide_margin_double_decoy_invariants():
     assert margin > 4.0, margin                           # actually ~4.95 (495%) -- wide-margin fix
 
 
+def test_natural_phrasing_wide_gap_between_superlative_and_winner_passes():
+    # Regression (same bug CLASS confirmed live on test_062's identical regex machinery): a
+    # natural "superlative ... is <winner>" sentence can put more than 55 characters between the
+    # superlative word and the winner's name -- this used to exceed the direction-2 proximity
+    # window and wrongly fail an otherwise-correct answer. The window is now 90 (matching
+    # direction 1), symmetric with test_062/test_076.
+    text = (
+        "The lake with the highest computed volume-to-surface-area ratio among these five obscure "
+        "lakes is Issyk-Kul, at about 278 m."
+    )
+    assert t.validate_keystone_argmax(_r(text), _OBS)["passed"]
+
+
+def test_citation_url_for_a_rival_does_not_pollute_the_keystone_check():
+    # Defensive regression: same bug class as test_069's confirmed indexmundi/slovakia false
+    # positive -- a rival's citation URL must not perturb a correct keystone assertion.
+    text = (
+        "Issyk-Kul has the highest volume-to-surface-area ratio, about 278 m. "
+        "Source for Lake Victoria: https://en.wikipedia.org/wiki/Lake_Victoria"
+    )
+    assert t.validate_keystone_argmax(_r(text), _OBS)["passed"]
+
+
 def test_compiled_plan_validates_and_is_five_leaf_fanout():
     plan = t.get_compiled_plan()
     cp.validate_plan(plan)  # must not raise (well-formed, acyclic, deps resolve)

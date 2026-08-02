@@ -2,13 +2,17 @@
 Test execution engine.
 """
 
+import asyncio
+import json
 import logging
 import os
 import re
 import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
+from urllib.parse import urljoin, urlparse
 
+from agent.app.observation import clean_operation
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
@@ -201,52 +205,284 @@ async def _run_search_only(agent_io: AgentIO, mandate: str, model_name: str, max
 
 
 async def _run_naive_rag(agent_io: AgentIO, mandate: str, model_name: str, max_tokens: int) -> str:
-    """One fixed round of retrieval (no graph): search + visit -> single synthesis call."""
+    """Iterative naive RAG (no graph) with a HARD, predictable budget.
+
+    Keeps going — visit, hop links, occasionally search — until it can answer or the
+    budget is spent, then forces a final synthesis that either answers or explicitly
+    declares the evidence INSUFFICIENT (never guesses, never hangs). This is the honest
+    "cheap model that keeps trying" floor for the ladder: it can recover from a bad first
+    page, unlike a one-shot RAG, but it has none of the graph engine's structured
+    re-expansion — so the graph arm's lift over it isolates the value of the token-burner,
+    not mere persistence.
+
+    Cost is bounded and predictable — the worst case is a closed formula:
+      * <= (MAX_ROUNDS + 1) LLM calls: one decision per round + one final synthesis,
+        each with <= TOTAL_CHARS of evidence in and <= max_tokens out;
+      * <= MAX_SEARCHES web searches (the expensive tool — kept scarce on purpose);
+      * <= MAX_VISITS page fetches (the cheap "burn"; link-hopping lets it keep going
+        WITHOUT spending searches, matching the search-is-pricier-than-tokens economics).
+    Every knob is an ``IDEA_TEST_NAIVE_RAG_*`` env var so a run's price ceiling is set
+    up front. Model-proposed URLs are accepted ONLY if they are known candidate links or
+    unvisited search results, so a hallucinated URL can never inflate the visit budget.
+    """
+    max_rounds = int(os.environ.get("IDEA_TEST_NAIVE_RAG_MAX_ROUNDS", "4"))
+    max_searches = int(os.environ.get("IDEA_TEST_NAIVE_RAG_MAX_SEARCHES", "2"))
+    max_visits = int(os.environ.get("IDEA_TEST_NAIVE_RAG_MAX_VISITS", "8"))
+    visits_per_round = int(os.environ.get("IDEA_TEST_NAIVE_RAG_VISITS_PER_ROUND", "3"))
     search_k = int(os.environ.get("IDEA_TEST_NAIVE_RAG_SEARCH_K", "5"))
-    visit_n = int(os.environ.get("IDEA_TEST_NAIVE_RAG_VISIT_N", "3"))
     per_page_chars = int(os.environ.get("IDEA_TEST_NAIVE_RAG_PAGE_CHARS", "8000"))
     total_chars = int(os.environ.get("IDEA_TEST_NAIVE_RAG_TOTAL_CHARS", "30000"))
+    links_per_page = int(os.environ.get("IDEA_TEST_NAIVE_RAG_LINKS_PER_PAGE", "20"))
 
-    # URLs explicitly named in the mandate take priority (mirrors engine mandate enforcement).
-    urls: List[str] = []
+    state = {"searches": 0, "visits": 0, "evidence_chars": 0}
+    visited: set = set()
+    evidence: List[str] = []              # "SOURCE URL: <url>\n<cleaned content>"
+    hop_candidates: Dict[str, str] = {}   # unvisited absolute url -> anchor text
+    search_pool: List[Dict[str, str]] = []  # unvisited {url,title,desc} from searches
+    queue: List[str] = []                 # urls scheduled to visit next
+
+    # Mandate-named URLs take priority (mirrors the engine's mandate enforcement).
     for u in _URL_RE.findall(mandate):
-        cleaned = u.rstrip('.,);]')
-        if cleaned not in urls:
-            urls.append(cleaned)
+        cu = u.rstrip('.,);]')
+        if cu not in queue:
+            queue.append(cu)
 
-    if len(urls) < visit_n:
+    async def do_search(query: str) -> None:
+        if state["searches"] >= max_searches or not query.strip():
+            return
+        state["searches"] += 1
         try:
-            results = await agent_io.search(mandate, count=search_k, timeout_seconds=20) or []
-            for item in results:
-                u = (item.get("url") or "").strip()
-                if u and u not in urls:
-                    urls.append(u)
-                if len(urls) >= max(visit_n, search_k):
-                    break
+            results = await agent_io.search(query, count=search_k, timeout_seconds=20) or []
         except Exception as exc:
             _logger.warning(f"naive_rag search failed: {exc}")
+            return
+        pool_urls = {s["url"] for s in search_pool}
+        for item in results:
+            u = (item.get("url") or "").strip()
+            if u and u not in visited and u not in queue and u not in pool_urls:
+                search_pool.append({"url": u, "title": item.get("title", ""),
+                                    "desc": (item.get("description") or "")[:200]})
+                pool_urls.add(u)
 
-    sources: List[str] = []
-    budget = total_chars
-    for u in urls[:visit_n]:
-        if budget <= 0:
+    def drain_pool(n: int) -> None:
+        while search_pool and n > 0:
+            item = search_pool.pop(0)
+            if item["url"] not in visited and item["url"] not in queue:
+                queue.append(item["url"])
+                n -= 1
+
+    async def visit(url: str) -> bool:
+        if state["visits"] >= max_visits or url in visited or state["evidence_chars"] >= total_chars:
+            return False
+        visited.add(url)
+        state["visits"] += 1
+        content, links = await _naive_fetch_page(agent_io, url, per_page_chars, links_per_page)
+        if content:
+            room = total_chars - state["evidence_chars"]
+            snippet = content[:max(0, room)]
+            if snippet:
+                evidence.append(f"SOURCE URL: {url}\n{snippet}")
+                state["evidence_chars"] += len(snippet)
+        for lu, lt in links:
+            if lu not in visited and lu not in hop_candidates:
+                hop_candidates[lu] = lt
+        return True
+
+    # Seed: if the mandate named no URLs, spend one search to get started.
+    if not queue:
+        await do_search(mandate)
+        drain_pool(visits_per_round)
+
+    answer = None
+    for round_i in range(1, max_rounds + 1):
+        visited_any = False
+        picked = 0
+        while queue and picked < visits_per_round and state["visits"] < max_visits:
+            if await visit(queue.pop(0)):
+                visited_any = True
+            picked += 1
+
+        budget = {
+            "rounds_left": max_rounds - round_i,
+            "searches_left": max_searches - state["searches"],
+            "visits_left": max_visits - state["visits"],
+        }
+        decision = await _naive_decide(
+            agent_io, mandate, model_name, max_tokens, evidence, hop_candidates, search_pool, budget
+        )
+        if decision.get("can_answer") and (decision.get("answer") or "").strip():
+            answer = decision["answer"].strip()
             break
-        try:
-            content = await agent_io.visit(u, timeout_seconds=25)
-        except Exception as exc:
-            _logger.warning(f"naive_rag visit failed for {u}: {exc}")
-            continue
-        snippet = (content or "")[:min(per_page_chars, budget)]
-        budget -= len(snippet)
-        sources.append(f"SOURCE URL: {u}\n{snippet}")
 
-    context = "\n\n---\n\n".join(sources) if sources else "(no sources retrieved)"
+        # Enqueue only KNOWN urls the model chose (anti-hallucination cost guard).
+        known = set(hop_candidates) | {s["url"] for s in search_pool}
+        for u in (decision.get("visit_urls") or []):
+            u = (u or "").strip()
+            if u in known and u not in visited and u not in queue:
+                queue.append(u)
+
+        if not queue:
+            drain_pool(visits_per_round)
+        if not queue and state["searches"] < max_searches:
+            await do_search((decision.get("search_query") or "").strip())
+            drain_pool(visits_per_round)
+
+        # Nothing visited this round and nothing left to do -> stop early (still bounded).
+        if not visited_any and not queue:
+            break
+
+    if answer:
+        return answer
+    return await _naive_final_synthesis(agent_io, mandate, model_name, max_tokens, evidence)
+
+
+def _parse_page(raw: str, base_url: str, per_page_chars: int, links_per_page: int) -> Tuple[str, List[Tuple[str, str]]]:
+    """Pure CPU-bound HTML -> (cleaned text, [(absolute_url, anchor_text)]).
+
+    Run in a thread by ``_naive_fetch_page`` — bs4 parsing blocks the event loop.
+    """
+    try:
+        content = clean_operation(raw)[:per_page_chars]
+    except Exception:
+        content = (raw or "")[:per_page_chars]
+    links: List[Tuple[str, str]] = []
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(raw, "html.parser")
+        seen: set = set()
+        for a in soup.find_all("a", href=True):
+            href = (a.get("href") or "").strip()
+            if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+                continue
+            absolute = urljoin(base_url, href)
+            if urlparse(absolute).scheme not in ("http", "https") or absolute in seen:
+                continue
+            seen.add(absolute)
+            text = " ".join((a.get_text(" ", strip=True) or "").split())[:80]
+            links.append((absolute, text))
+            if len(links) >= links_per_page:
+                break
+    except Exception:
+        pass
+    return content, links
+
+
+async def _naive_fetch_page(
+    agent_io: AgentIO, url: str, per_page_chars: int, links_per_page: int
+) -> Tuple[str, List[Tuple[str, str]]]:
+    """Fetch a page ONCE and derive both cleaned content and hop-candidate links.
+
+    Uses ``fetch_url`` (raw HTML) rather than ``visit`` because ``visit`` returns cleaned
+    text with the hrefs stripped — we need the raw markup to extract links to hop to. The
+    HTTP cost is tracked by the connector either way; we re-record the visit for
+    observability parity. Parsing is offloaded to a thread (loop-blocking bs4).
+    """
+    try:
+        raw = await agent_io.fetch_url(url, timeout_seconds=25)
+    except Exception as exc:
+        _logger.warning(f"naive_rag fetch failed for {url}: {exc}")
+        return "", []
+    if not raw:
+        return "", []
+    loop = asyncio.get_running_loop()
+    content, links = await loop.run_in_executor(
+        None, _parse_page, raw, url, per_page_chars, links_per_page
+    )
+    telemetry = getattr(agent_io, "telemetry", None)
+    if telemetry is not None and content:
+        try:
+            telemetry.record_document_seen(source="visit", document={"url": url, "content": content})
+        except Exception:
+            pass
+    return content, links
+
+
+def _parse_decision(raw: str) -> Dict[str, Any]:
+    """Parse the decision LLM's JSON, tolerating fences/prose around the object."""
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except Exception:
+        pass
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except Exception:
+            return {}
+    return {}
+
+
+async def _naive_decide(
+    agent_io: AgentIO,
+    mandate: str,
+    model_name: str,
+    max_tokens: int,
+    evidence: List[str],
+    hop_candidates: Dict[str, str],
+    search_pool: List[Dict[str, str]],
+    budget: Dict[str, int],
+) -> Dict[str, Any]:
+    """One bounded decision step: answer now, or request more evidence (prefer hops)."""
+    evidence_text = "\n\n---\n\n".join(evidence) if evidence else "(no evidence gathered yet)"
+    cand_lines = [f"- {u}  ({t})" for u, t in list(hop_candidates.items())[:40]]
+    pool_lines = [f"- {s['url']}  ({s.get('title', '')})" for s in search_pool[:15]]
+    system = (
+        "You are an iterative research agent working under a strict, limited budget. Using ONLY "
+        "the evidence gathered so far, decide whether you can now answer the task confidently and "
+        "with citations. If yes, answer. If not, request MORE evidence — STRONGLY prefer visiting "
+        "specific pages by following the candidate links (cheap) over a new web search (expensive "
+        "and scarce). Never guess. Respond with JSON ONLY:\n"
+        '{"can_answer": boolean, "answer": string, "visit_urls": [string], "search_query": string}\n'
+        "Fill \"answer\" (with the cited source URLs) only when can_answer is true. Choose "
+        "visit_urls from the candidate links or unvisited search results below. Use search_query "
+        "only when no listed link is likely to help — and keep it to a few focused keywords "
+        "(max ~400 chars / 50 words), never a full sentence, or the search API will reject it."
+    )
+    user = (
+        f"TASK:\n{mandate}\n\n"
+        f"BUDGET LEFT — rounds:{budget['rounds_left']} searches:{budget['searches_left']} "
+        f"visits:{budget['visits_left']}\n\n"
+        f"EVIDENCE GATHERED:\n{evidence_text}\n\n"
+        f"CANDIDATE LINKS (hop targets):\n{chr(10).join(cand_lines) if cand_lines else '(none)'}\n\n"
+        f"UNVISITED SEARCH RESULTS:\n{chr(10).join(pool_lines) if pool_lines else '(none)'}"
+    )
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    payload = agent_io.build_llm_payload(
+        messages=messages, json_mode=True, model_name=model_name, temperature=0.2, max_tokens=max_tokens
+    )
+    try:
+        raw = await agent_io.query_llm(payload, model_name=model_name)
+    except Exception as exc:
+        _logger.warning(f"naive_rag decision failed: {exc}")
+        return {}
+    return _parse_decision(raw or "")
+
+
+async def _naive_final_synthesis(
+    agent_io: AgentIO, mandate: str, model_name: str, max_tokens: int, evidence: List[str]
+) -> str:
+    """Forced final answer: synthesize from evidence, or explicitly say it's insufficient."""
+    context = "\n\n---\n\n".join(evidence) if evidence else "(no sources retrieved)"
     messages = [
-        {"role": "system", "content": "You are a research assistant. Answer the task using ONLY the provided sources. Cite the source URLs you used. If the sources are insufficient, say so explicitly rather than guessing."},
+        {"role": "system", "content": (
+            "You are a research assistant. Answer the task using ONLY the provided sources, and "
+            "cite the source URLs you used. If the sources do not contain enough to answer, respond "
+            "with a message that STARTS with 'INSUFFICIENT EVIDENCE:' and briefly states what is "
+            "missing. Do NOT guess or invent facts or URLs."
+        )},
         {"role": "user", "content": f"TASK:\n{mandate}\n\nSOURCES:\n{context}"},
     ]
-    payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.3, max_tokens=max_tokens)
-    return (await agent_io.query_llm(payload, model_name=model_name)) or ""
+    payload = agent_io.build_llm_payload(
+        messages=messages, json_mode=False, model_name=model_name, temperature=0.3, max_tokens=max_tokens
+    )
+    try:
+        out = await agent_io.query_llm(payload, model_name=model_name)
+    except Exception as exc:
+        _logger.warning(f"naive_rag final synthesis failed: {exc}")
+        out = ""
+    return (out or "").strip() or "INSUFFICIENT EVIDENCE: retrieval did not gather usable sources."
 
 
 async def run_test_execution(

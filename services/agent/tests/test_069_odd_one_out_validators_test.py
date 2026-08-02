@@ -138,6 +138,34 @@ def test_ungrounded_correct_value_gates_to_zero():
     assert sum(scores) / len(scores) < 0.75
 
 
+def test_rival_citation_url_substring_does_not_falsely_trip_the_rival_veto():
+    # Regression (found live, bml__qwen2.5-7b__m1_thin_069 compiled rep3): a citation URL like
+    # "https://www.indexmundi.com/slovakia/coastline.html" contains the literal substring
+    # "slovakia" (an _OTHERS name) directly adjacent to "coastline" (an _RIVAL_MARK trigger) as a
+    # pure URL-path artifact -- this used to trip _RIVAL_ODD and wrongly zero an otherwise-correct
+    # answer that never actually asserted anything about Slovakia's coastline in prose.
+    text = (
+        "The country that is NOT landlocked and has a coastline on the Adriatic Sea is Bosnia and "
+        "Herzegovina. The statuses of the five countries are as follows:\n"
+        "- Austria: landlocked\n"
+        "- Bosnia and Herzegovina: NOT landlocked -- coastline on Adriatic Sea\n"
+        "- North Macedonia: landlocked\n"
+        "- Serbia: landlocked\n"
+        "- Slovakia: landlocked\n\n"
+        "Sources for landlocked statuses:\n"
+        "- https://en.wikipedia.org/wiki/Geography_of_Bosnia_and_Herzegovina\n"
+        "- https://www.indexmundi.com/slovakia/coastline.html"
+    )
+    assert t.validate_keystone_odd_one_out(_r(text), _OBS)["passed"]
+    # ...while a genuine prose claim that Slovakia has a coastline (not just a URL artifact) must
+    # still be vetoed -- the fix strips URLs, it does not disable the rival-veto check itself.
+    still_vetoed = (
+        "Bosnia and Herzegovina is NOT landlocked. Slovakia also has a coastline, so Slovakia is "
+        "the odd one out too."
+    )
+    assert not t.validate_keystone_odd_one_out(_r(still_vetoed), _OBS)["passed"]
+
+
 def test_compiled_plan_validates_and_is_five_leaf_fanout():
     plan = t.get_compiled_plan()
     cp.validate_plan(plan)

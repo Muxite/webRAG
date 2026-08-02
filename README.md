@@ -13,24 +13,75 @@ the documented default anymore.
 
 **LLM provider (2026-05):** Default provider is OpenRouter — set `LLM_PROVIDER=openrouter`, `OPENROUTER_API_KEY=...` in `services/keys.env`, and use OR slugs like `openai/gpt-5-mini` or `anthropic/claude-opus-4.7` as `MODEL_NAME`. To bypass OR and call OpenAI directly, set `LLM_PROVIDER=openai_compatible` and revert `MODEL_API_URL` to `https://api.openai.com/v1`.
 
+## How It Works
+
+Every request becomes a **mandate** — a free-form research question — handed to a controller
+(`IdeaDagEngine`) that owns a directed acyclic graph (DAG) of "thought" nodes and a ChromaDB
+memory. It decomposes, acts, and merges until it has an answer:
+
+```mermaid
+flowchart TD
+    A[Mandate] --> B[Root Node]
+    B --> C{"Expand<br/>LLM proposes 2-5 candidates"}
+    C --> D1[search]
+    C --> D2[visit]
+    C --> D3[think]
+    C --> D4[save]
+    D1 --> E["Score + Select<br/>(best-first)"]
+    D2 --> E
+    D3 --> E
+    D4 --> E
+    E --> F[Execute leaf action]
+    F --> G{"Branch children<br/>all terminal?"}
+    G -- no --> C
+    G -- yes --> H["Merge upward<br/>(LLM synthesis)"]
+    H --> I{Root reached?}
+    I -- no --> C
+    I -- yes --> J[Final Synthesis LLM]
+    J --> K[Deliverable]
+```
+
+Everything expensive is an LLM call the graph disciplines: **expand** (plan candidates),
+**evaluate** (score them), **merge** (synthesize a branch), **finalize** (write the deliverable).
+Everything else — dependency edges, dedup, dynamic beam width, pruning, retries, checkpointing —
+is deterministic Python keeping those calls grounded. Full internals:
+[Idea Engine Deep Dive](services/agent/app/IDEA_ENGINE.md).
+
 ## Two things live in this repo
 
 1. **Euglena, the product** — a hosted GoT web-research agent (frontend, gateway, quotas,
    auth). Winding down; kept running on the local backend, low-maintenance mode.
-2. **The compiled-scaffold benchmark/research line** — an active, actively-developed research
-   platform (built on top of the same agent engine) proving a cheap model executing an
-   expensive-model-authored plan can match premium-model quality at a fraction of the cost. This
-   is where current development effort goes; see `HANDOFF.md` for the latest session-by-session
-   state. The **Benchmark Results** section immediately below belongs to this research line, not
-   the product.
+2. **The adaptive-engine research line** — an active, actively-developed research platform (built
+   on top of the same agent engine). It started with the compiled scaffold below — the project's
+   first big benchmark result — then pivoted to porting those lessons into the live DAG loop
+   itself as opt-in adaptive mechanisms (see Notes further down). This is where current
+   development effort goes; see `HANDOFF.md` for the latest committed session-by-session state.
+   The **Benchmark Results** section right below documents the closed-out compiled-scaffold
+   proof — not the product, and not the still-running adaptive-engine A/B.
 
-## Benchmark Results (active research line)
+## Benchmark Results — Compiled Scaffold (closed-out proof, 2026-06/07)
 
 **The compiled scaffold thesis:** instead of letting a cheap model improvise its own research
 plan step-by-step, split the job in two — an expensive model authors an execution plan (a DAG:
 which sub-facts to gather, in what order, what depends on what) **once, offline**; a cheap model
 executes that fixed plan **live, on every request**. The plan is the expensive part, paid for
 once and reused forever; the part that runs on every request is cheap.
+
+```mermaid
+flowchart LR
+    subgraph Offline["Offline — once, cached by mandate hash"]
+        X[Expensive model] -->|authors| P[DAG Plan]
+    end
+    subgraph Runtime["Runtime — every request"]
+        P --> W1["Cheap model<br/>executes leaf 1"]
+        P --> W2["Cheap model<br/>executes leaf 2"]
+        P --> W3["Cheap model<br/>executes leaf N"]
+        W1 --> AG[Aggregate]
+        W2 --> AG
+        W3 --> AG
+        AG --> ANS[Answer]
+    end
+```
 
 1,026 live runs (`barrage24b`, ≈$38 real OpenRouter spend) across 38 hand-designed discriminating
 tasks x 3 models x 3 repeats, comparing the compiled scaffold (`graph_compiled`) against a native
@@ -66,6 +117,35 @@ from-scratch ReAct loop on the harder tasks.
 Full package (9 charts, raw + aggregated CSVs, significance tables, honest caveats) lives in
 [`linkedin_package_38tests_2026-07-08/`](linkedin_package_38tests_2026-07-08/README_LINKEDIN.md).
 
+## Notes: The Adaptive Engine (newer, in progress)
+
+The compiled scaffold above proved *what* a good plan buys you, but it authors that plan once,
+offline, and executes it blind — it can't react to what a step actually reveals. The current line
+of work ports those lessons into the **native (non-compiled) engine** so it reasons adaptively
+mid-run: plan → act → **observe the step** → decide the next move (re-expand, backtrack, or stop).
+
+```mermaid
+flowchart LR
+    P["Plan / Expand"] --> Ac["Act: execute leaf"]
+    Ac --> Ob["Observe:<br/>confidence judge + follow-up detector"]
+    Ob -->|"low confidence, or<br/>new lead found"| Re["Re-expand or Backtrack"]
+    Re --> P
+    Ob -->|"confident & satisfied"| Mg["Merge / Finalize"]
+```
+
+Every mechanism ships **opt-in and default-off, byte-identical to prior behavior when disabled**:
+confidence-gated re-expansion, a follow-up detector, backtrack on dead-end chains, reasoning-effort
+discipline for reasoning models, and price-tier-aware token budgets. Architecture, flag inventory,
+and lessons learned: [`services/agent/app/ADAPTIVE_ENGINE.md`](services/agent/app/ADAPTIVE_ENGINE.md).
+
+**Status:** nothing adaptive is proven yet — that's what the current "ladder benchmark" is for: a
+paired A/B (`baseline` → `good_adaptive`) testing whether a cheap model (`gpt-5-mini`) burning more
+of its own tokens via the adaptive loop closes part of the accuracy gap to a strong reference model.
+A first full run was stopped after surfacing a ChromaDB concurrency hang plus several fairness and
+statistical-validity bugs; the fix set (32 items across driver safety, model reliability, infra
+fairness, validator correctness, and the grounding/re-expansion gate) is landed and offline-tested
+(1,951 passed / 18 skipped / 0 failed), and a clean relaunch is queued next.
+
 ## Features
 
 - **Graph-of-Thought reasoning**: Tasks decompose into parallel subproblems (search, visit, think, save), then merge results upward through the DAG into structured deliverables
@@ -76,7 +156,7 @@ Full package (9 charts, raw + aggregated CSVs, significance tables, honest cavea
 - **Deduplication and pruning**: Candidate thoughts are deduplicated by embedding similarity. Low-scoring nodes are pruned to save budget
 - **Elastic worker fleet**: ECS autoscaling matches demand via CloudWatch queue-depth metrics, winds down when idle (legacy/secondary deploy path — see Quick Start; current production scales via `docker compose ... --scale agent=N` on the local backend)
 - **User-scoped quotas**: Supabase enforces per-user daily usage limits with JWT authentication
-- **Comprehensive test suite**: 97 priority-ordered task modules (`services/agent/app/idea_tests/`) with programmatic and LLM-based validation, plus an 849-passed/18-skipped/0-failed offline `pytest` suite (`services/agent/tests/`); 38 of the 97 tasks are the curated, live-verified discriminators used in the benchmark campaign above
+- **Comprehensive test suite**: 151 priority-ordered task modules (`services/agent/app/idea_tests/`) with programmatic and LLM-based validation, plus a 1,951-passed/18-skipped/0-failed offline `pytest` suite (`services/agent/tests/`); 38 of the tasks are the curated, live-verified discriminators used in the compiled-scaffold benchmark above, and a further 24 ("adaptive-targeted", `test_122`–`test_145`) discriminate the adaptive engine across four decision archetypes
 
 ## Observability
 
@@ -269,7 +349,17 @@ docs/             Architecture, security, benchmark plots
 - [Configuration](docs/CONFIGURATION.md) - Environment variable registry (required / optional / benchmark-only)
 - [System Architecture](docs/ARCHITECTURE.md) - Overall system design and message flow
 - [Agent Architecture](services/agent/app/AGENT_ARCHITECTURE.md) - Graph-of-Thought engine internals
+- [Idea Engine Deep Dive](services/agent/app/IDEA_ENGINE.md) - File-and-line-cited walkthrough of the DAG controller, policies, and mechanics
+- [Adaptive Engine](services/agent/app/ADAPTIVE_ENGINE.md) - The interleaved plan-act-observe-decide loop, flag inventory, and lessons learned
 - [Test Suite](services/agent/app/idea_tests/README.md) - Test structure and validation
 - [Deployment](services/agent/app/DEPLOYMENT.md) - Deployment guide
 - [Debugger](services/agent/app/AGENT_DEBUG.md) - Debugging tools and techniques
 - [Scripts](scripts/README.md) - Deployment and diagnostic scripts
+
+## Timeline
+
+- **2025-10 → 2026-01:** Started as a single-shot LLM `Connector` + CLI; grew a FastAPI gateway, then reached MVP.
+- **2026-02 → 2026-03:** Rewritten around a **Graph-of-Thought DAG engine** — decompose into subproblems, execute `search`/`visit`/`think`/`save` leaves, merge upward (see How It Works above). AWS ECS wound down in favor of the local backend (Ops note near the top).
+- **2026-05:** Default LLM provider migrated to OpenRouter (note near the top).
+- **2026-06:** **Compiled-scaffold pivot** — an expensive model authors a DAG plan once, offline; a cheap model executes it live, recovering premium-model accuracy at a fraction of cost (see Benchmark Results above). Alongside it: a duplicate `shared/` module tree and a stale forked engine copy were deleted, and the 1,600+-line engine controller was broken into focused modules.
+- **2026-07:** **Native adaptive engine** — the compiled scaffold's lessons (structured planning, reasoning-effort discipline) ported into the live, non-compiled DAG loop as opt-in, default-off mechanisms: confidence-gated re-expansion, backtrack, price-tier token budgets (see Notes above and [`ADAPTIVE_ENGINE.md`](services/agent/app/ADAPTIVE_ENGINE.md)). Currently mid-relaunch of a live cost/accuracy A/B (the "ladder benchmark") testing whether the adaptive loop closes the gap between cheap and premium models.

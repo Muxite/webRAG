@@ -21,6 +21,7 @@ from agent.app.testing.execution import run_test_execution, run_baseline_executi
 from agent.app.testing.execution_sequential import run_sequential_execution
 from agent.app.testing.execution_compiled import run_compiled_execution
 from agent.app.testing.validation import ValidationRunner
+from agent.app.testing import json_telemetry as _json_telemetry
 
 BASELINE_VARIANTS = ("parametric", "naive_rag", "minimal")
 # Single-pass agent comparators that have their own runner (not the GoT engine).
@@ -79,6 +80,7 @@ async def run_complete_test(
         another just because it happened to hit a bot-blocked site.
     :return: Complete test result.
     """
+    _json_telemetry.set_task(test_module.metadata.get("test_id"))
     if execution_variant in LINEAR_AGENT_VARIANTS:
         execution_result = await run_sequential_execution(
             test_module=test_module,

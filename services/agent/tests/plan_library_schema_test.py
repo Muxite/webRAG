@@ -483,3 +483,125 @@ def test_link_dependencies_ignores_untagged_nodes():
     )
     assert adapter.link_dependencies(created) == 0
     assert DetailKey.REQUIRES_DATA.value not in created[0].details
+
+
+# --------------------------------------------------------------------------------------
+# every leaf gets its OWN page visit (the grounding follow-through)
+# --------------------------------------------------------------------------------------
+
+
+def _expand_argmax_into_graph():
+    """The N-way fan-out — the shape where a single shared visit loses N-1 entities."""
+    expansion = adapter.candidates_from_template(_argmax_template(), _SLOT_VALUES)
+    graph = IdeaDag(root_title="Which lake is deeper?")
+    created = graph.expand(graph.root_id(), expansion.candidates)
+    return graph, created
+
+
+def test_every_search_leaf_gets_its_own_visit_sibling():
+    """One visit per leaf — not zero (search-only, ungrounded) and not one shared."""
+    graph, created = _expand_argmax_into_graph()
+
+    visits = adapter.link_page_visits(graph, created)
+
+    assert len(visits) == len(created) == 2
+    root = graph.get_node(graph.root_id())
+    # siblings, not children: `step()` routes any node with an action to the leaf handler, so a
+    # visit hung UNDER a search would never be reached.
+    assert [v.parent_id for v in visits] == [root.node_id] * 2
+    assert root.children == [c.node_id for c in created] + [v.node_id for v in visits]
+    for visit in visits:
+        assert visit.details[DetailKey.ACTION.value] == IdeaActionType.VISIT.value
+        assert visit.details[DetailKey.IS_LEAF.value] is True
+        assert visit.details["link_count"] == 1
+
+
+def test_each_visit_requires_data_from_its_own_search_not_an_arbitrary_one():
+    """The entity affinity: leaf i's page read is fed by leaf i's search, not by whichever
+    sibling happened to finish first (which is all the generic grounding hook can manage)."""
+    graph, created = _expand_argmax_into_graph()
+    baikal, tanganyika = created
+
+    visits = adapter.link_page_visits(graph, created)
+
+    assert [v.details[DetailKey.REQUIRES_DATA.value]["source_node_id"] for v in visits] == [
+        baikal.node_id, tanganyika.node_id
+    ]
+    assert {v.details[DetailKey.REQUIRES_DATA.value]["type"] for v in visits} == {"urls_from_search"}
+    # the pairing is walkable from either end, for telemetry and for idempotence
+    assert baikal.details[adapter.PLAN_LIBRARY_VISIT_NODE] == visits[0].node_id
+    assert visits[0].details[adapter.PLAN_LIBRARY_VISIT_FOR] == "lake_baikal_field"
+    assert visits[1].details[adapter.PLAN_LIBRARY_VISIT_FOR] == "lake_tanganyika_field"
+
+
+def test_each_visits_link_idea_names_its_own_entity():
+    """``link_idea`` is what steers ``VisitLeafAction``'s URL pick. The generic hook's
+    "URL from search results or mandate" cannot discriminate between six peaks' pages; a
+    leaf's own filled instruction can."""
+    graph, created = _expand_argmax_into_graph()
+
+    baikal_visit, tanganyika_visit = adapter.link_page_visits(graph, created)
+
+    baikal_idea = baikal_visit.details["link_idea"]
+    tanganyika_idea = tanganyika_visit.details["link_idea"]
+    assert "Lake Baikal" in baikal_idea and "Lake Tanganyika" not in baikal_idea
+    assert "Lake Tanganyika" in tanganyika_idea and "Lake Baikal" not in tanganyika_idea
+    # ...and it says what KIND of page, which is how a wiki page beats a mirror/aggregator
+    assert "Wikipedia" in baikal_idea
+    assert baikal_idea != "URL from search results or mandate"
+    assert len(baikal_idea) <= 200  # same clip VisitLeafAction applies to its own fallback
+
+
+def test_the_visit_carries_the_leafs_extraction_contract():
+    """``_effective_intent`` builds the extraction target out of intent + expect, so the page
+    read aims at the same contract the template authored for that leaf."""
+    graph, created = _expand_argmax_into_graph()
+    baikal = created[0]
+
+    visit = adapter.link_page_visits(graph, created)[0]
+
+    assert visit.details[DetailKey.INTENT.value] == baikal.details[DetailKey.INTENT.value]
+    assert visit.details[DetailKey.EXPECT.value] == baikal.details[DetailKey.EXPECT.value]
+    assert visit.details[adapter.PLAN_LIBRARY_TEMPLATE_ID] == "argmax_over_n_page_field"
+    assert visit.details[adapter.PLAN_LIBRARY_ORIGIN] == adapter.ORIGIN_AUTO
+
+
+def test_a_visit_waits_on_its_own_search_only():
+    """The claim in engine terms: a sibling's completed search does not unblock this visit —
+    only its own does. Same gate ``link_dependencies`` rides, no new engine code."""
+    graph, created = _expand_argmax_into_graph()
+    baikal, tanganyika = created
+    baikal_visit, tanganyika_visit = adapter.link_page_visits(graph, created)
+    engine = IdeaDagEngine(io=_StubIO(), settings={})
+
+    baikal.status = IdeaNodeStatus.DONE
+    baikal.details[DetailKey.ACTION_RESULT.value] = ActionResultBuilder.success(
+        action=IdeaActionType.SEARCH.value,
+        results=[{"url": "https://en.wikipedia.org/wiki/Lake_Baikal", "title": "Lake Baikal"}],
+    )
+
+    assert engine._has_required_data(graph, baikal_visit) is True
+    assert engine._has_required_data(graph, tanganyika_visit) is False
+
+
+def test_link_page_visits_is_idempotent():
+    """Re-running the pass (a re-expansion of the same parent) must not double the visits."""
+    graph, created = _expand_argmax_into_graph()
+
+    first = adapter.link_page_visits(graph, created)
+    second = adapter.link_page_visits(graph, created)
+
+    assert len(first) == 2 and second == []
+    assert len(graph.get_node(graph.root_id()).children) == 4
+
+
+def test_link_page_visits_ignores_organic_children():
+    """Same safety as ``link_dependencies``: LLM-invented children carry no marker, so an
+    unconditional call is a no-op and the generic hooks keep owning the organic path."""
+    graph = IdeaDag(root_title="root")
+    created = graph.expand(
+        graph.root_id(),
+        [{"title": "organic", "details": {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}, "score": None}],
+    )
+    assert adapter.link_page_visits(graph, created) == []
+    assert len(graph.get_node(graph.root_id()).children) == 1

@@ -460,6 +460,22 @@ def get_compiled_plan() -> Dict[str, Any]:
         })
     return {
         "leaves": leaves,
+        # Deterministic composition: the executor applies the threshold and counts in Python over
+        # the seven gathered depths, rendering each lake's check and both named lists itself (zero
+        # extra LLM calls) — free-text counting is the confirmed failure mode here even when every
+        # depth is correct. Encodes the GIVEN threshold only; no depth value and no count. If any
+        # leaf fails to resolve, the composer returns nothing and the recipe below runs unchanged.
+        "agg_mode": "computed",
+        "composition": {
+            "op": "count_threshold",
+            "answer_noun": "lake",
+            "value_label": "maximum depth",
+            "unit": "m",
+            "comparator": ">",
+            "threshold": THRESHOLD,
+            "items": [{"leaf": f"{e['key']}_depth", "label": e["name"], "type": "number"}
+                      for e in ENTITIES],
+        },
         "aggregation": (
             "You now have, for each of the seven lakes, its maximum depth in metres and a "
             "source URL. Before applying any threshold or counting, RESTATE each lake's depth "

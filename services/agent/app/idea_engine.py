@@ -568,16 +568,38 @@ class IdeaDagEngine:
             child = graph.get_node(child_id)
             if not child:
                 continue
+            if child.status in (IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED):
+                continue
             if not self._has_required_data(graph, child):
                 required_data = child.details.get(DetailKey.REQUIRES_DATA.value)
                 if required_data and isinstance(required_data, dict):
                     source_node_id = required_data.get("source_node_id")
                     if source_node_id:
                         source_node = graph.get_node(source_node_id)
-                        if source_node and source_node.status != IdeaNodeStatus.DONE:
+                        # A source that has already RUN (or vanished) and still owes data will
+                        # never deliver it — returning to it just spins the step budget away on
+                        # a node the engine has given up on, and letting the dependent run would
+                        # silently read some other sibling's results. Retire the dependent
+                        # instead so the parent can still merge what did work. (BLOCKED is a
+                        # scheduled retry, not a terminal state, so it keeps waiting.)
+                        source_spent = source_node is None or source_node.status in (
+                            IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED,
+                        )
+                        if source_spent:
+                            child.status = IdeaNodeStatus.SKIPPED
+                            child.details[DetailKey.ACTION_ERROR.value] = (
+                                f"required data never arrived from source {source_node_id} "
+                                f"({source_node.status.value if source_node else 'missing'})"
+                            )
+                            self._logger.warning(
+                                f"[STEP {step_index}] Child {child_id} skipped: source "
+                                f"{source_node_id} cannot provide its required data"
+                            )
+                            continue
+                        if source_node.status != IdeaNodeStatus.DONE:
                             self._logger.info(f"[STEP {step_index}] Child {child_id} waiting for data from {source_node_id} - executing source first")
                             return source_node_id
-        
+
         return await self._handle_intermediate_node(graph, current_id, step_index, None)
     
     async def _handle_merge_node(self, graph: IdeaDag, node_id: str, step_index: int, branch_pair: Optional[BranchPair]) -> Optional[str]:
@@ -1092,6 +1114,21 @@ class IdeaDagEngine:
                         origin=child.details.get(_plan_library.PLAN_LIBRARY_ORIGIN) or "organic",
                         template_id=child.details.get(_plan_library.PLAN_LIBRARY_TEMPLATE_ID),
                     )
+
+        # Second half of the plan-library post-expand wiring: every template leaf reads a value
+        # off ONE entity's page, so each library-sourced search leaf is followed through into
+        # its OWN visit sibling, aimed at its OWN search results. Runs AFTER the loop above so
+        # the `node.children[-max_branching:]` slice still sees exactly the expanded leaves (and
+        # so each visit can inherit the parent metadata that loop just threaded onto its
+        # search). Without it the subtree's only page read is the single, task-blind one
+        # `GroundingEvidenceEnforcementHook` injects for the whole parent.
+        if parent_detail_updates:
+            visits = _plan_library.link_page_visits(graph, created_children)
+            if visits:
+                self._logger.info(
+                    f"[STEP {step_index}] PLAN LIBRARY: followed {len(visits)} search leaf/leaves "
+                    f"through into their own page visit (grounding follow-through)"
+                )
 
         self._logger.info(f"[STEP {step_index}] EXPANSION: {len(candidates)} candidates -> {min(len(candidates), max_branching)} children (total nodes: {graph.node_count()})")
         self._record_decision(

@@ -18,6 +18,7 @@ same result shape as ``run_sequential_execution``.
 import asyncio
 import json
 import logging
+import operator
 import os
 import re
 import time
@@ -39,6 +40,7 @@ from agent.app.testing.utils import summarize_observability
 from agent.app.testing.execution import _empty_graph
 from agent.app.testing.execution_sequential import _fmt_search
 from agent.app.testing import consol_pilot
+from agent.app.testing import json_telemetry as _json_telemetry
 from agent.app.testing.compiled_plan import (
     plan_structure,
     substitute_deps,
@@ -150,8 +152,11 @@ async def _run_leaf(agent_io: AgentIO, instruction: str, expect: str, model_name
         raw = await agent_io.query_llm(payload, model_name=model_name)
         try:
             decision = json.loads(raw or "{}")
+            _parsed_ok = True
         except (json.JSONDecodeError, TypeError):
             decision = {}
+            _parsed_ok = False
+        _json_telemetry.record(model_name, raw, True, _parsed_ok, phase="compiled_leaf")
         action = str(decision.get("action", "")).strip().lower()
         args = decision.get("args") or {}
 
@@ -204,6 +209,116 @@ _THIN_EXTRACT_SYS = (
     "nothing else (no sentence, no units unless asked, no source). If the PAGE does not contain it, "
     "output exactly: UNKNOWN."
 )
+# Second-pass prompt for a quorum-inconclusive page (opt-in, IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY).
+# The flattened infobox (see clean_operation) puts a field's LABEL and VALUE on separate lines with
+# no delimiter, so a weak model reads the value of the NEIGHBOURING field ('Average depth' instead
+# of 'Max. depth'). This prompt makes the locate-then-quote step explicit instead of implicit.
+_THIN_EXTRACT_SYS_RETRY = (
+    "The PAGE contains a Wikipedia infobox flattened to plain text: each field's LABEL and VALUE "
+    "sit on their own line with no punctuation between them, and an unrelated field may sit right "
+    "next to the one you need (e.g. 'Average depth' beside 'Max. depth'). First find the line "
+    "that names the QUESTION's field, then read the value on the line(s) immediately after that "
+    "label — not a neighbouring field's value. Answer with ONLY that value, nothing else. If no "
+    "matching field exists on the PAGE, output exactly: UNKNOWN."
+)
+
+# --- The plan-authored "and the exact source URL" ask, removed from the EXTRACTION question -----
+# ``_THIN_EXTRACT_SYS`` says "no source" while ~2/3 of the hand-authored leaf instructions in
+# ``idea_tests/`` end with "...and the exact source URL" — and that instruction is reused VERBATIM
+# as the extraction QUESTION. Live ablation (qwen2.5:7b on the real Sarez Lake max-depth leaf,
+# task 072, 30+ calls) showed the model resolves that contradiction by abstaining: 10/10 UNKNOWN
+# with the clause present, correct on every sample with it removed — and a system-prompt addendum
+# telling the model to ignore the URL-ask did NOT help (the clause must be textually absent).
+# ``_run_leaf_thin`` appends the real URL itself, so the model was never responsible for it.
+#
+# The three shapes present in the real corpus (see the table-driven test):
+#   * inline ...........  "Report the length and the source URL."
+#                         "..., and the exact source URL.", "..., and cite each lake's source URL."
+#   * enumerated item ..  "Report: (a) the atomic number, ..., (c) the source URL."
+#   * standalone sentence "Cite the exact authoritative source URL you read the figures from."
+# Each pattern swallows the connective that introduced the ask (a leading comma/semicolon/em-dash
+# and/or "and"), so nothing dangles behind after the removal.
+_SOURCE_ASK_HEAD = (
+    r"(?:cite\s+)?"
+    r"(?:the|its|their|each\s+[a-z' ]{1,30}?'s|each|every)?\s*"
+    r"(?:exact\s+|authoritative\s+|full\s+|complete\s+)*"
+)
+_INLINE_SOURCE_CLAUSE = re.compile(
+    r"(?:[ \t]*[,;—–])?[ \t]*and\s+" + _SOURCE_ASK_HEAD + r"source URLs?\b[^.\n]*(?=[.\n]|$)",
+    re.I,
+)
+_ENUM_SOURCE_ITEM = re.compile(
+    r"(?:[ \t]*[,;])?\s*(?:and\s+)?\(\s*(?:[a-z]|[ivx]{1,4}|\d{1,2})\s*\)[ \t]*"
+    + _SOURCE_ASK_HEAD + r"source URLs?\b[^.\n]*(?=[.\n]|$)",
+    re.I,
+)
+_CITE_SENTENCE = re.compile(
+    r"(?<![^\s])Cite\b[^.\n]*\bsource URLs?\b[^.\n]*\.[ \t]*", re.I,
+)
+# Punctuation left stranded immediately before a full stop by a removal ("Report:." -> "Report.").
+_DANGLING_PUNCT = re.compile(r"[ \t]*[,;:—–][ \t]*(?=\.)")
+
+
+def _strip_source_ask(instruction: str) -> str:
+    """Drop the plan-authored 'and the exact source URL' / '(c) the source URL' / standalone
+    'Cite ... source URL.' ask from a leaf instruction before it is used as the THIN EXTRACTION
+    question. ``_run_leaf_thin`` already appends the real URL deterministically after a value is
+    chosen — the model was never responsible for producing it — but ``_THIN_EXTRACT_SYS`` says
+    'no source' while the plan-authored instruction (reused verbatim as the QUESTION) says 'and the
+    exact source URL': live evidence (Sarez Lake max-depth leaf, task 072) shows qwen2.5:7b resolves
+    that contradiction by abstaining (10/10 UNKNOWN) even when told via the system prompt to ignore
+    the URL-ask; only removing the clause from the QUESTION text fixed it.
+
+    Applied to a NEW derived string — never mutates the raw ``instruction`` used for
+    ``_target_entity``/``_leaf_search_query`` earlier in ``_run_leaf_thin`` (those must keep seeing
+    the full original text). An instruction with no source-ask is returned BYTE-IDENTICAL, and a
+    (degenerate) instruction that would be emptied entirely falls back to the original — an empty
+    QUESTION extracts nothing.
+    """
+    out = _INLINE_SOURCE_CLAUSE.sub("", instruction)
+    out = _ENUM_SOURCE_ITEM.sub("", out)
+    out = _CITE_SENTENCE.sub("", out)
+    if out == instruction:
+        return instruction
+    out = _DANGLING_PUNCT.sub("", out)
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"[ \t]+([.,;])", r"\1", out).strip()
+    return out if re.search(r"[A-Za-z0-9]", out) else instruction
+
+
+def _strip_source_ask_enabled() -> bool:
+    """``IDEA_TEST_COMPILED_STRIP_SOURCE_ASK`` — default ON (a deliberate deviation from this
+    module's default-off convention). It is a pure deterministic text transform with zero added
+    cost that removes a demonstrated prompt self-contradiction, so it has to actually run; ``0``
+    is kept as a rollback escape hatch."""
+    return os.environ.get(
+        "IDEA_TEST_COMPILED_STRIP_SOURCE_ASK", "1"
+    ).strip().lower() not in ("0", "false", "no", "off")
+
+
+def _infobox_block_enabled() -> bool:
+    """``IDEA_TEST_COMPILED_INFOBOX_BLOCK`` — default OFF. Asks ``visit`` to prepend the page's
+    infobox as 'Label: Value' lines (``observation.extract_infobox_block``), which fixes a narrower
+    failure (an under-specified question grabbing a NEIGHBOURING field's value) but was not shown to
+    add anything beyond the source-ask strip on the real, field-quoting leaf phrasing. Needs a live
+    calibration run before any nonzero default."""
+    return os.environ.get(
+        "IDEA_TEST_COMPILED_INFOBOX_BLOCK", "0"
+    ).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _leaf_extract_retry_budget() -> int:
+    """``IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY`` — default ``0`` (off). Any value > 0 enables
+    exactly ONE extra ``_vote_extract`` pass per candidate page, with the directive
+    ``_THIN_EXTRACT_SYS_RETRY`` prompt, and only when the first pass was quorum-inconclusive.
+    Hard-bounded at one retry per page regardless of the value: worst case (both candidate pages
+    inconclusive) this adds 2k calls on a leaf that was already failing, and nothing at all on a
+    leaf that resolved on pass 1."""
+    raw = os.environ.get("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", "0").strip()
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 0
 
 
 def _votes_for_model(model_name: str) -> int:
@@ -448,6 +563,126 @@ def _quoted_phrases(instruction: str) -> List[str]:
     return [p.strip() for p in phrases if p.strip()]
 
 
+# --- Subject-first grounding: the leaf's SUBJECT, never the quoted INFOBOX FIELD NAME ------------
+# A compiled leaf quotes the field it must read ("read, directly from the infobox, its AREA in km²
+# — the 'Area' field"). The old quoted-phrase rule took that field name as the target, so the thin
+# leaf SEARCHED the field name and grounded the page-pick on it. Live Brave results for those
+# queries: "Area" -> area.nyc + en.wikipedia.org/wiki/Area (exact title, +5.6 — it WINS), "Max.
+# depth" -> eslint.org/docs/latest/rules/max-depth. Both are in the stored bad-model-lab traces as
+# the actually-visited pages (078 cited /wiki/Area seven times; 072 cited the ESLint rule page), so
+# every leaf of those tasks read its number off a page about the CONCEPT, not the entity. The fix
+# reads the subject out of the plan's own idiom ("Open the [English] Wikipedia article/page for
+# <SUBJECT> and read ...") and only falls back to quotes — with field references filtered out.
+_SUBJECT_CUE = re.compile(r"\bwikipedia\s+(?:article|page|entry)\s+(?:for|on|about)\s+", re.I)
+
+# End of the subject span: the instruction's verb ("... and read"), an em-dash gloss ("Circuit de
+# Monaco — the Monte Carlo street circuit"), a clause/sentence break. The lookbehinds keep an
+# initial/abbreviation period ("St. Lawrence River") from ending the span.
+_SUBJECT_HEAD_STOP = re.compile(
+    r"\s+and\s|\s[—–]\s|\n|;|:\s"
+    r"|(?<![A-Z])(?<!\bDr)(?<!\bMr)(?<!\bMrs)(?<!\bMs)(?<!\bSt)(?<!\bMt)(?<!\bProf)\.(?=\s|$)"
+)
+
+# Generic category nouns a plan puts BEFORE the real name ("the mountain Jengish Chokusu", "the
+# chemical element 'Terbium'"). Stripped only when lowercase, so a capitalised name-part ("Lake
+# Matano", "Mount Everest") is never touched.
+_GENERIC_SUBJECT_HEADS = frozenset({
+    "novel", "book", "film", "movie", "lake", "river", "mountain", "peak", "island", "dam",
+    "bridge", "tunnel", "city", "town", "country", "chemical", "element", "species", "band",
+    "album", "song", "tv", "series", "season", "building", "tower", "museum", "university",
+    "company", "fjord", "glacier", "volcano", "canal", "stadium", "airport", "spacecraft",
+    "aircraft", "ship", "reservoir", "waterfall", "cave", "railway", "station", "hotel",
+})
+_LEADING_DETERMINER = re.compile(r"^(?:the|a|an)\s+", re.I)
+
+
+def _is_field_reference(instruction: str, phrase: str) -> bool:
+    """True when a quoted phrase names an INFOBOX FIELD, not the leaf's subject.
+
+    Two deterministic shapes cover every compiled plan: the quote is followed by a field word
+    ("the 'Area' field", "('Surface area' or 'Area' row)") or it directly follows 'infobox'
+    ("from the infobox 'No. of episodes' field"). Such a phrase must never become the search query
+    or the page-pick target — it is what to READ, not what to OPEN.
+    """
+    for m in re.finditer(re.escape(phrase), instruction):
+        pre = instruction[max(0, m.start() - 40):m.start()]
+        post = instruction[m.end():m.end() + 60]
+        if re.search(r"\binfobox\b[\s(\-—,]*['‘“\"]?\s*$", pre, re.I):
+            return True
+        if re.search(r"^['’”\"]?\s*(?:or\s+['‘“\"][^'‘’\"”]*['’”\"]\s*)?"
+                     r"(?:field|row|line|entry|parameter|column|cell)\b", post, re.I):
+            return True
+    return False
+
+
+def _strip_generic_head(text: str) -> str:
+    """Drop a leading determiner plus lowercase category nouns ('the mountain Jengish Chokusu' ->
+    'Jengish Chokusu'), keeping every capitalised token (so 'Lake Matano' survives intact)."""
+    t = _LEADING_DETERMINER.sub("", text.strip(" .,'\"—-")).strip()
+    tokens = t.split()
+    i = 0
+    while i < len(tokens) - 1 and tokens[i].islower() and tokens[i].strip(".,") in _GENERIC_SUBJECT_HEADS:
+        i += 1
+    return " ".join(tokens[i:]).strip(" .,'\"") or t
+
+
+def _subject_head(instruction: str) -> str:
+    """The raw span the plan's 'Wikipedia article/page for <SUBJECT>' idiom names, or ''."""
+    m = _SUBJECT_CUE.search(instruction)
+    if not m:
+        return ""
+    rest = instruction[m.end():]
+    stop = _SUBJECT_HEAD_STOP.search(rest)
+    return rest[:stop.start()] if stop else rest
+
+
+def _subject_from_cue(instruction: str) -> str:
+    """The entity named by the plan's own 'Wikipedia article/page for <SUBJECT>' idiom, or ''.
+
+    A quoted phrase INSIDE the subject span still wins (the plan quotes the exact article title:
+    "for the chemical element 'Terbium'", "for the season ... titled 'Chuck (season 1)'"); an
+    unquoted span is cut at the first parenthetical/comma (the country gloss or the URL hint) and
+    stripped of its category noun.
+    """
+    head = _subject_head(instruction)
+    if not head:
+        return ""
+    quoted = [q for q in _quoted_phrases(head) if not _is_field_reference(instruction, q)]
+    if quoted:
+        return max(quoted, key=len).strip()
+    return _strip_generic_head(re.split(r"\s*[(,;]", head, maxsplit=1)[0])
+
+
+# A gloss that is instruction noise ("(search for its Wikipedia page if needed)", "(e.g., ...)") or
+# a URL hint must never be pasted into the query; a real gloss is a short place/context phrase.
+_GLOSS_NOISE = re.compile(r"https?://|\b(?:search|if needed|e\.?g\.?|optional|see)\b", re.I)
+
+
+def _leaf_search_query(instruction: str, target: str) -> str:
+    """The query a thin leaf searches: the grounding target PLUS the plan's disambiguating
+    parenthetical gloss.
+
+    The gloss is dropped from the page-pick target on purpose (title scoring wants the bare article
+    title), but a bare COMMON name is a bad query: live Brave results for 'Flores' are a payroll
+    portal, an HR site and two Mexican restaurants — no Wikipedia article at all — while 'Flores
+    Indonesia' returns en.wikipedia.org/wiki/Flores, the exact page 078's fixture was read from.
+    Only a short, noise-free gloss is used, so a URL hint or 'search ... if needed' is ignored.
+    """
+    if not target:
+        return target
+    head = _subject_head(instruction)
+    m = re.search(r"\(([^()]*(?:\([^()]*\)[^()]*)*)\)", head)
+    if not m:
+        return target
+    if _GLOSS_NOISE.search(m.group(1)):  # checked RAW: cleaning would break the 'https://' match
+        return target
+    gloss = re.sub(r"[()/,]", " ", m.group(1))
+    words = [w for w in gloss.split() if w.lower() not in _norm_tokens(target)]
+    if not words or len(words) > 4:
+        return target
+    return f"{target} {' '.join(words)}"
+
+
 def _target_entity(instruction: str) -> str:
     """The entity whose page holds the answer — what the leaf is really about.
 
@@ -455,8 +690,12 @@ def _target_entity(instruction: str) -> str:
     ('Pride and Prejudice', 'Lake Baikal'), or the resolved name after 'for the author ' on a
     dependent birth-year hop. On that hop the substituted value is the upstream leaf's full fact
     string ('... for the author Jane Austen — source: https://en.wikipedia.org/...'), so capture up
-    to the em-dash/newline/period and strip any '— source: <url>' tail before returning. Prefer the
-    author form when present (the page we must actually land on), else the quoted phrase, else ''.
+    to the em-dash/newline/period and strip any '— source: <url>' tail before returning.
+
+    Precedence: the resolved author form (the page we must actually land on), then the plan's
+    'Wikipedia article/page for <SUBJECT>' idiom (see ``_subject_from_cue`` — this outranks quotes
+    so a quoted INFOBOX FIELD can never be mistaken for the subject), then a quoted phrase that is
+    not a field reference, else ''.
     """
     # Stop at the em-dash 'source:' separator, a newline, or a SENTENCE-ending period — but NOT a
     # period that is part of an initial ('F. Scott Fitzgerald', 'J. R. R. Tolkien'): a period right
@@ -472,12 +711,15 @@ def _target_entity(instruction: str) -> str:
     )
     if m and _strip_source_tail(m.group(1)):
         return _strip_source_tail(m.group(1))
-    quoted = _quoted_phrases(instruction)
+    # An indirect-pointer leaf ("author of '<quoted>' ... then open THAT AUTHOR's page") reads its
+    # answer off a redirected page, not the named subject's — defer to the LLM query.
+    if _INDIRECT_TARGET_CUE.search(instruction):
+        return ""
+    subject = _subject_from_cue(instruction)
+    if subject:
+        return subject
+    quoted = [q for q in _quoted_phrases(instruction) if not _is_field_reference(instruction, q)]
     if quoted:
-        # An indirect-pointer leaf ("author of '<quoted>' ... then open THAT AUTHOR's page") reads
-        # its answer off a redirected page, not the quoted subject's — defer to the LLM query.
-        if _INDIRECT_TARGET_CUE.search(instruction):
-            return ""
         return max(quoted, key=len).strip()
     return ""
 
@@ -514,23 +756,56 @@ def _title_score(title: str, url: str, target_tokens: List[str], target_norm: st
     return score
 
 
+_WIKI_ARTICLE = re.compile(r"//(?P<lang>[a-z-]+)\.(?:m\.)?wikipedia\.org/wiki/", re.I)
+# Wikipedia namespaces that are never the article we want.
+_WIKI_NON_ARTICLE = re.compile(
+    r"/wiki/(?:Category|File|Talk|Template|Help|Portal|Special|Wikipedia|User|Draft|Module):", re.I
+)
+
+
+def _wiki_tier(title: str, url: str) -> int:
+    """Source tier for the page-pick: 0 = English Wikipedia article, 1 = other-language Wikipedia
+    article, 2 = everything else (including a Wikipedia disambiguation stub or a non-article
+    namespace, which are ranked on title score with the rest).
+
+    Every fixture in this benchmark is an *English Wikipedia infobox* value (each task docstring
+    says so), so a Wikipedia article present in the result set is by construction the page the
+    ground truth was read from — a weighted bonus is the wrong shape for that. Live check that
+    proves it: the query 'Sepik River' returns en.wikipedia.org/wiki/Sepik (score +0.10 — the
+    truncation penalty fires because the article title is shorter than the target) BELOW
+    loe.org (+1.55), britannica.com (+1.25) and a backpacker blog (+1.10), so the weighted sort
+    picked a radio-show page over the article holding the fixture. Title score still decides
+    WITHIN a tier (so /wiki/Pride_and_Prejudice keeps beating /wiki/Pride).
+    """
+    u = url or ""
+    m = _WIKI_ARTICLE.search(u)
+    if not m or _WIKI_NON_ARTICLE.search(u):
+        return 2
+    if any(bad in (title or "").lower() for bad in _DISAMBIG_BAD):
+        return 2
+    return 0 if m.group("lang").lower() == "en" else 1
+
+
 def _pick_pages(results: List[Dict[str, str]], instruction: str) -> List[str]:
-    """Order candidate URLs best-first by title match to the leaf's target entity (then wiki, then
-    original rank). De-dupes URLs preserving the chosen order. Replaces the old URL-only wiki sort."""
+    """Order candidate URLs best-first: Wikipedia articles (English first) ahead of every other
+    source, then by title match to the leaf's target entity, then original rank. De-dupes URLs
+    preserving the chosen order."""
     target = _target_entity(instruction)
     target_tokens = _norm_tokens(target)
     target_norm = " ".join(target_tokens)
-    scored: List[Tuple[float, int, str]] = []
+    scored: List[Tuple[int, float, int, str]] = []
     for rank, r in enumerate(results or []):
         url = str(r.get("url", "")).strip()
         if not url:
             continue
-        s = _title_score(str(r.get("title", "")), url, target_tokens, target_norm)
-        scored.append((s, rank, url))
-    scored.sort(key=lambda t: (-t[0], t[1]))  # higher score first, stable on original rank
+        title = str(r.get("title", ""))
+        s = _title_score(title, url, target_tokens, target_norm)
+        scored.append((_wiki_tier(title, url), s, rank, url))
+    # wiki tier first, then higher score, then stable on original rank
+    scored.sort(key=lambda t: (t[0], -t[1], t[2]))
     ordered: List[str] = []
     seen = set()
-    for _, _, url in scored:
+    for _, _, _, url in scored:
         if url not in seen:
             seen.add(url)
             ordered.append(url)
@@ -554,9 +829,9 @@ async def _thin_micro_query(agent_io: AgentIO, payload: Any, model_name: str) ->
 
 
 async def _thin_extract_once(agent_io: AgentIO, page: str, instruction: str, model_name: str,
-                             temperature: float) -> str:
+                             temperature: float, sys_prompt: str = _THIN_EXTRACT_SYS) -> str:
     ep = agent_io.build_llm_payload(
-        messages=[{"role": "system", "content": _THIN_EXTRACT_SYS},
+        messages=[{"role": "system", "content": sys_prompt},
                   {"role": "user", "content": f"PAGE:\n{page}\n\nQUESTION: {instruction}"}],
         json_mode=False, model_name=model_name, temperature=temperature,
         max_tokens=_thin_max_tokens_for_model(model_name),
@@ -565,7 +840,8 @@ async def _thin_extract_once(agent_io: AgentIO, page: str, instruction: str, mod
     return await _thin_micro_query(agent_io, ep, model_name)
 
 
-async def _vote_extract(agent_io: AgentIO, page: str, instruction: str, model_name: str, k: int) -> str:
+async def _vote_extract(agent_io: AgentIO, page: str, instruction: str, model_name: str, k: int,
+                        sys_prompt: str = _THIN_EXTRACT_SYS) -> str:
     """Run k INDEPENDENT extractions (neutral prompt — no leading answer) and return the majority
     value; '' if every sample is UNKNOWN. The cheap 'make candidate nodes -> prune' step.
 
@@ -573,26 +849,47 @@ async def _vote_extract(agent_io: AgentIO, page: str, instruction: str, model_na
     k-1 add mild diversity (temp 0.3) only to surface alternatives. Ties break toward the anchor.
     This keeps clean single-read facts (e.g. an infobox year) stable while still letting redundancy
     rescue genuinely uncertain extractions (e.g. a chain hop) — voting that helps, never hurts.
+
+    A LONE, ZERO-CORROBORATION SURVIVOR IS REJECTED (k>=3 only). Confirmed live on task 062 (a
+    dense, sparsely labelled infobox): the model answers UNKNOWN on 20/20 direct reproductions, yet
+    one stray sample in a 5-way vote invents a figure that matches no field on the page, and as the
+    only candidate it won uncontested. Requiring >=2 independent samples to agree before accepting
+    a value kills that lone-hallucination bug without discarding genuine corroborated signal (e.g.
+    2-of-5 samples independently agreeing while the rest say UNKNOWN is real evidence, not noise —
+    an earlier, stricter version of this rule that rejected whenever UNKNOWN outnumbered the leading
+    answer also discarded those corroborated-minority cases and measurably hurt live accuracy; this
+    narrower rule targets exactly the diagnosed bug instead). k==2 keeps the existing "rescue path"
+    (a lone real answer beats a lone UNKNOWN) per _votes_for_model's premium-floor rationale.
+
+    ``sys_prompt`` swaps the extraction system prompt (the opt-in retry pass uses the directive
+    ``_THIN_EXTRACT_SYS_RETRY``); every quorum/anchor/tie-break rule above is unaffected by it, and
+    it is threaded through the ConSol sampler too so the pilot path can never silently drop it.
     """
     if k <= 1:
-        a = await _thin_extract_once(agent_io, page, instruction, model_name, 0.0)
+        a = await _thin_extract_once(agent_io, page, instruction, model_name, 0.0, sys_prompt)
         return a if a and not a.upper().startswith("UNKNOWN") else ""
     # Opt-in ConSol SPRT early-stop pilot (IDEA_TEST_USE_CONSOL=1). Returns None -> keep fixed-k.
     if consol_pilot.consol_enabled():
         async def _sample(temp: float) -> str:
-            return await _thin_extract_once(agent_io, page, instruction, model_name, temp)
+            return await _thin_extract_once(agent_io, page, instruction, model_name, temp, sys_prompt)
         result = await consol_pilot.consol_vote(_sample, k=k, key_fn=_vote_key)
         if result is not None:
             return result.answer
     temps = [0.0] + [0.3] * (k - 1)
     answers = await asyncio.gather(*[
-        _thin_extract_once(agent_io, page, instruction, model_name, t) for t in temps
+        _thin_extract_once(agent_io, page, instruction, model_name, t, sys_prompt) for t in temps
     ])
     cands = [a for a in answers if a and not a.upper().startswith("UNKNOWN")]
     if not cands:
         return ""
     counts = Counter(_vote_key(a) for a in cands)
     top_count = counts.most_common(1)[0][1]
+    if k >= 3 and top_count < 2:
+        # A lone, uncorroborated survivor among >=3 samples -> not a quorum, don't trust it.
+        unknown_count = len(answers) - len(cands)
+        _logger.info(f"vote-extract inconclusive: leading value backed by only {top_count} of "
+                     f"{len(answers)} samples ({unknown_count} said UNKNOWN)")
+        return ""
     tied = {key for key, c in counts.items() if c == top_count}
     anchor = answers[0] if (answers[0] and not answers[0].upper().startswith("UNKNOWN")) else ""
     chosen_key = _vote_key(anchor) if anchor and _vote_key(anchor) in tied else counts.most_common(1)[0][0]
@@ -616,7 +913,7 @@ async def _run_leaf_thin(agent_io: AgentIO, instruction: str, expect: str, model
     # a model call. Fall back to a thin LLM query only when the leaf names no explicit entity.
     target = _target_entity(instruction)
     if target:
-        query = target
+        query = _leaf_search_query(instruction, target)
     else:
         qp = agent_io.build_llm_payload(
             messages=[{"role": "system", "content": _THIN_QUERY_SYS}, {"role": "user", "content": instruction}],
@@ -643,15 +940,26 @@ async def _run_leaf_thin(agent_io: AgentIO, instruction: str, expect: str, model
     if not urls:
         return "UNKNOWN"
 
-    # 4/5) try up to 2 candidate pages; vote-extract on each (repeat cycle if no consensus)
+    # 4/5) try up to 2 candidate pages; vote-extract on each (repeat cycle if no consensus).
+    # The extraction QUESTION drops the plan's redundant "and the exact source URL" ask (the
+    # harness appends the real URL below) — see _strip_source_ask. The RAW instruction above still
+    # drives the search query and the page pick; only this derived question is trimmed.
     k = _votes_for_model(model_name)
+    extract_question = _strip_source_ask(instruction) if _strip_source_ask_enabled() else instruction
+    retry_budget = _leaf_extract_retry_budget()
+    visit_kwargs = {"prepend_infobox": True} if _infobox_block_enabled() else {}
     for url in urls[:2]:
         try:
-            page = (await agent_io.visit(url, timeout_seconds=30) or "")[:page_chars]
+            page = (await agent_io.visit(url, timeout_seconds=30, **visit_kwargs) or "")[:page_chars]
         except Exception as exc:  # noqa: BLE001
             _logger.warning(f"thin leaf visit failed for {url}: {exc}")
             continue
-        ans = await _vote_extract(agent_io, page, instruction, model_name, k)
+        ans = await _vote_extract(agent_io, page, extract_question, model_name, k)
+        if not ans and retry_budget > 0:
+            # Quorum-inconclusive on a page we already paid to fetch: ONE more vote with the
+            # directive locate-then-quote prompt before moving on to the next candidate page.
+            ans = await _vote_extract(agent_io, page, extract_question, model_name, k,
+                                      sys_prompt=_THIN_EXTRACT_SYS_RETRY)
         if ans:
             return f"{ans} — source: {url}"
     return f"UNKNOWN — {urls[0]}"
@@ -686,6 +994,70 @@ _AGG_SELECT_SYSTEM = (
 )
 
 _AGG_DIVERSE_TEMPS = [0.0, 0.5, 0.7, 0.9, 1.0, 0.6, 0.8, 0.4]
+
+# --- Citation fidelity: the gathered URLs must survive the free-text synthesis -------------------
+# Every leaf returns "<value> — source: <url>" and those strings are threaded verbatim into the
+# aggregation prompt, which already instructs the model to cite only those URLs. A weak model still
+# drops or mangles them (bad-model-lab traces: 072/qwen2.5-7b cited ONE worldatlas URL for seven
+# facts, qwen2.5-1.5b cited none at all after 13 visits — every citation check scored 0/7 despite
+# the real URLs being right there in the prompt). We already hold those URLs in Python, so this is
+# a deterministic repair, not a prompting problem: append the real ones when any is missing from
+# the answer. Additive only — the model's own reasoning and citations are left untouched.
+_FACT_SOURCE_RX = re.compile(r"source:\s*(https?://\S+)", re.I)
+
+# A plan whose aggregation demands a byte-exact artifact (057 strict JSON, 063 strict CSV) must
+# never get an extra section: the appended block would push a non-header line into the output and
+# fail the format keystone. Those tasks are scored on the artifact, not on citations.
+_STRICT_FORMAT_CUE = re.compile(
+    r"\boutput only\b|\bonly a strict\b|\bdo not include any (?:prose|explanation)\b|\bno prose\b|"
+    r"\bfirst (?:character|line)[^.]{0,40}must be\b",
+    re.I,
+)
+
+
+def _strip_url_trail(url: str) -> str:
+    """Strip trailing sentence punctuation from a captured URL, without eating a closing paren
+    that's actually part of the URL itself (e.g. Wikipedia's 'Chuck_(season_1)') — only an
+    EXCESS trailing ')' (more closes than opens in the captured string, i.e. one that belongs to
+    the enclosing sentence, as in '(see https://.../page)') gets removed."""
+    url = url.rstrip(".,;]\"'")
+    while url.endswith(")") and url.count("(") < url.count(")"):
+        url = url[:-1]
+    return url
+
+
+def _gathered_source_urls(facts: List[str]) -> List[str]:
+    """The real 'source: <url>' URLs carried by the leaf facts, in plan order, de-duped.
+
+    Only a fact that actually RESOLVED carries the ``source:`` marker; an UNKNOWN leaf's
+    ``"UNKNOWN — <url>"`` fallback is deliberately excluded (that page yielded nothing, so citing
+    it would assert grounding we do not have).
+    """
+    urls: List[str] = []
+    for fact in facts:
+        for url in _FACT_SOURCE_RX.findall(fact or ""):
+            clean = _strip_url_trail(url)
+            if clean and clean not in urls:
+                urls.append(clean)
+    return urls
+
+
+def _ensure_source_citations(answer: str, sources: List[str], aggregation: str) -> str:
+    """Guarantee the gathered source URLs appear in the text that ships.
+
+    No-op when nothing was gathered, when the answer already carries every URL, or when the
+    aggregation demands a strict output format. Otherwise appends a plain, verbatim list so the
+    validators' slug regexes (which scan the whole final deliverable) see the pages actually read.
+    """
+    if not sources or not (answer or "").strip():
+        return answer
+    if _STRICT_FORMAT_CUE.search(aggregation or ""):
+        return answer
+    lowered = answer.lower()
+    if all(url.lower() in lowered for url in sources):
+        return answer
+    block = "\n".join(f"- {url}" for url in sources)
+    return f"{answer.rstrip()}\n\nSources actually gathered:\n{block}"
 
 
 def _agg_candidate_count(model_name: str) -> int:
@@ -742,6 +1114,478 @@ async def _aggregate_diverse_ground(agent_io: AgentIO, aggregation: str, facts_b
     payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name,
                                          temperature=0.0, max_tokens=max_tokens)
     return (await agent_io.query_llm(payload, model_name=model_name)) or candidates[0]
+
+
+# --- Format-stress tier: structured multi-field JSON aggregation --------------
+# The micro/reachable leaf only ever demands a 3-key envelope with one free-text
+# value, and valid_json only checks parseability (json_telemetry §0) — so the
+# "can't emit JSON" wall never appears. These aggregation modes (opt-in via
+# IDEA_TEST_COMPILED_AGG_MODE) demand a multi-field, hetero-typed object so the
+# wall becomes testable, and record a schema-aware validity flag. value(number)
+# and is_estimate(boolean) are the first non-string types demanded on this path.
+_STRUCTURED_DEFAULT_FIELDS = {
+    "entity": "string", "value": "number", "unit": "string",
+    "source_url": "string", "is_estimate": "boolean",
+}
+
+_AGG_STRUCTURED_SYSTEM = (
+    "You output ONE JSON object and nothing else — no prose, no markdown fences, no extra keys. "
+    "Use ONLY the gathered facts. The object MUST have exactly these keys with these types:\n"
+    "{fields}\n"
+    "'value' must be a bare JSON number (e.g. 511 or 56.6) — NOT a string, NOT with a unit inside it. "
+    "'is_estimate' must be a JSON boolean (true/false). 'source_url' is the http(s) URL the value was "
+    "read from. Output only the JSON object."
+)
+
+_STRUCTURED_FIELD_QUESTION = {
+    "entity": "the name of the subject entity, a few words only",
+    "value": "the numeric value only — digits, e.g. 511 or 56.6, no unit, no words",
+    "unit": "the unit of measurement only, e.g. m or km2",
+    "source_url": "the full http(s) source URL",
+    "is_estimate": "answer yes if the value is an estimate/approximate/about, otherwise no",
+}
+
+
+def _structured_json_schema(fields: Dict[str, str]) -> Dict[str, Any]:
+    """OpenAI-style strict json_schema wrapper from a {field: json_type} map."""
+    return {
+        "name": "structured_fact",
+        "schema": {
+            "type": "object",
+            "properties": {k: {"type": t} for k, t in fields.items()},
+            "required": list(fields),
+            "additionalProperties": False,
+        },
+    }
+
+
+def _coerce_field(text: str, tname: str):
+    """Harness-owned typing for the thin-assemble path: turn a plain-text answer into
+    the required JSON type. If a number can't be found, leave the string as-is so the
+    schema check honestly marks it mistyped (don't fabricate a type)."""
+    t = (text or "").strip()
+    if tname in ("number", "integer"):
+        m = re.search(r"-?\d+(?:\.\d+)?", t)
+        if not m:
+            return t
+        num = float(m.group())
+        return int(num) if (tname == "integer" or num.is_integer()) else num
+    if tname == "boolean":
+        return t.lower().startswith(("y", "true", "1"))
+    return t
+
+
+async def _aggregate_structured_json(agent_io: AgentIO, aggregation: str, facts_block: str,
+                                     model_name: str, max_tokens: int,
+                                     fields: Dict[str, str], strict: bool) -> str:
+    """One-shot structured aggregation: the model must emit the whole typed object itself.
+    strict=True passes a real json_schema (grammar-constrained decoding, if the backend
+    enforces it); strict=False is the unenforced json_object + text-hint control."""
+    system = _AGG_STRUCTURED_SYSTEM.format(fields="\n".join(f"  {k}: {t}" for k, t in fields.items()))
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": f"AGGREGATION INSTRUCTION:\n{aggregation}\n\nGATHERED FACTS:\n{facts_block}"},
+    ]
+    schema = _structured_json_schema(fields) if strict else None
+    payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name,
+                                         temperature=0.1, max_tokens=max_tokens, json_schema=schema)
+    raw = (await agent_io.query_llm(payload, model_name=model_name)) or ""
+    chk = _json_telemetry.schema_check(raw, fields)
+    _json_telemetry.record(model_name, raw, True, chk["parsed_ok"],
+                           phase="compiled_agg_structured", schema_ok=chk["schema_ok"])
+    return raw
+
+
+async def _aggregate_structured_thin(agent_io: AgentIO, aggregation: str, facts_block: str,
+                                     model_name: str, max_tokens: int, fields: Dict[str, str]) -> str:
+    """Harness-assembled object: ask each field as a plain-text micro-question and BUILD the
+    JSON ourselves — the model never emits JSON. The thin-leaf lever applied to format; typing
+    is the harness's job (see _coerce_field), so schema_ok isolates format from extraction."""
+    obj: Dict[str, Any] = {}
+    for key, tname in fields.items():
+        want = _STRUCTURED_FIELD_QUESTION.get(key, f"the {key}")
+        messages = [
+            {"role": "system", "content": "Answer with ONLY the value, no other words and no punctuation."},
+            {"role": "user", "content": f"From these facts, give {want}.\n\nFACTS:\n{facts_block}"},
+        ]
+        payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name,
+                                             temperature=0.0, max_tokens=120)
+        ans = ((await agent_io.query_llm(payload, model_name=model_name)) or "").strip()
+        obj[key] = _coerce_field(ans, tname)
+    raw = json.dumps(obj)
+    chk = _json_telemetry.schema_check(raw, fields)
+    _json_telemetry.record(model_name, raw, True, chk["parsed_ok"],
+                           phase="compiled_agg_structured_thin", schema_ok=chk["schema_ok"])
+    return raw
+
+
+# --- Deterministic composition: compute the final answer in Python, not in free text -------------
+# A weak model DECOMPOSES fine but COMPUTES unreliably in prose (the Program-Aided Language Models
+# failure mode): stored traces show the conjunction/count coming out wrong even when every gathered
+# fact is right. A plan may therefore declare a ``composition`` dict plus ``agg_mode: "computed"``;
+# ``_execute_plan`` then renders the final answer HERE, in real Python over the leaves' typed facts
+# — zero extra LLM calls — and returns ``None`` (falling back to the unchanged free-text ``single``
+# path) whenever the gathered data is not clean enough to compute honestly. A plan that declares no
+# composition, or leaves ``agg_mode`` unset, is byte-identical to before.
+#
+# Two invariants every composer holds:
+#   * NEVER FABRICATE — an item that does not resolve to a real typed value aborts the whole
+#     composition; a partial count/conjunction is a wrong answer, not an approximation.
+#   * SELF-CITE — the composed string returns BEFORE ``_ensure_source_citations`` runs, so each
+#     rendered row carries the real ``source:`` URL(s) of the leaf/leaves it was read off.
+_COMPARATORS = {">": operator.gt, "<": operator.lt, ">=": operator.ge,
+                "<=": operator.le, "==": operator.eq, "!=": operator.ne}
+
+# Comparator phrasings for the rendered prose: a count lead ("greater than 480 m"), an AND-filter
+# lead ("over 5,000 km²"), and the closing tallies ("Lakes exceeding 480 m (4): ..."). The per-row
+# checks use the bare symbol instead ("(>480 m? yes)"), mirroring the plans' own row shape.
+_CMP_PHRASE = {">": "greater than", "<": "less than", ">=": "at least", "<=": "at most",
+               "==": "equal to", "!=": "not equal to"}
+_CMP_WORD = {">": "over", "<": "under", ">=": "at least", "<=": "at most",
+             "==": "exactly", "!=": "other than"}
+_CMP_TALLY = {">": "exceeding", "<": "under", ">=": "at or above", "<=": "at or below",
+              "==": "equal to", "!=": "differing from"}
+
+# A THOUSANDS-GROUPING comma ONLY — a digit on BOTH sides. ``_coerce_field``'s number regex
+# (``-?\d+(?:\.\d+)?``) stops at a comma, so "5,370 km²" types as 5 and every area/depth/prominence
+# figure in this tier would silently truncate to its leading digit. A sentence or list comma
+# ("Matano, Ohrid") is never touched.
+_GROUPING_COMMA = re.compile(r"(?<=\d),(?=\d)")
+
+
+def _fmt_num(value: Any) -> str:
+    """Render a composed number the way the fixtures write it: thousands-grouped integers
+    (5370 -> '5,370') and trimmed decimals (12.0 -> '12', 3.7 -> '3.7')."""
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, int):
+        return f"{value:,}"
+    if isinstance(value, float):
+        return f"{int(value):,}" if value.is_integer() else f"{value:,}"
+    return str(value)
+
+
+def _plural(noun: str) -> str:
+    """Naive plural for the hand-authored ``answer_noun`` ('lake' -> 'lakes')."""
+    return noun if noun.endswith("s") else f"{noun}s"
+
+
+def _lead_capital(text: str) -> str:
+    """Capitalize the first character only (``str.capitalize`` would lowercase the rest)."""
+    return text[:1].upper() + text[1:]
+
+
+def _compose_value(raw: str, tname: str) -> Optional[Any]:
+    """Type ONE leaf's fact for composition, or ``None`` on any miss.
+
+    Handles the shapes a leaf really returns — ``"<value> — source: <url>"``, ``"UNKNOWN"`` and
+    ``"UNKNOWN — <url>"`` — by stripping the source tail and any thousands-grouping comma, then
+    delegating the actual typing to ``_coerce_field`` (whose existing callers are untouched).
+    Never raises and never fabricates: an empty/UNKNOWN/unparseable fact is ``None`` so the caller
+    can abort honestly instead of computing over a truncated value.
+    """
+    text = _strip_source_tail(str(raw or "")).strip()
+    if not text or text.upper().startswith("UNKNOWN"):
+        return None
+    value = _coerce_field(_GROUPING_COMMA.sub("", text), tname)
+    if tname in ("number", "integer") and not isinstance(value, (int, float)):
+        return None                       # _coerce_field returns the raw string when it finds none
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
+def _row_citation(facts: List[str]) -> str:
+    """The ``' — source: <url>'`` tail for one rendered row, from the leaf fact(s) it was read off
+    (de-duped, so two leaves that landed the same page cite it once). Empty when nothing resolved
+    — a composer never invents a citation."""
+    urls = _gathered_source_urls(list(facts))
+    return f" — source: {', '.join(urls)}" if urls else ""
+
+
+def _compose_count_threshold(leaves: List[Dict[str, Any]], results: Dict[str, str],
+                             composition: Dict[str, Any]) -> Optional[str]:
+    """COUNT-WITH-CONDITION: how many declared items satisfy ``<comparator> <threshold>``.
+
+    Renders a lead sentence carrying the count, one cited row per item (value + its check), and the
+    two named tallies. ALL-OR-NOTHING: any item whose fact does not resolve to a number returns
+    ``None`` (-> the unchanged free-text fallback). The keystone is a property of the WHOLE item
+    set — dropping one item moves the count by exactly the off-by-one margin the validators' own
+    decoys test for — so there is no honest partial answer.
+    """
+    items = list(composition.get("items") or [])
+    comparator = str(composition.get("comparator") or ">")
+    compare = _COMPARATORS.get(comparator)
+    threshold = composition.get("threshold")
+    if (not items or compare is None or isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))):
+        return None
+
+    known = {leaf.get("id") for leaf in (leaves or []) if isinstance(leaf, dict)}
+    rows: List[Tuple[str, Any, bool, str]] = []
+    for item in items:
+        leaf_id = str(item.get("leaf") or "")
+        if known and leaf_id not in known:
+            return None
+        fact = results.get(leaf_id, "")
+        value = _compose_value(fact, str(item.get("type") or "number"))
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        rows.append((str(item.get("label") or leaf_id), value,
+                     bool(compare(value, threshold)), _row_citation([fact])))
+
+    noun = _plural(str(composition.get("answer_noun") or "item").strip())
+    label = str(composition.get("value_label") or "value").strip()
+    unit = str(composition.get("unit") or "").strip()
+    unit_s = f" {unit}" if unit else ""
+    thr = _fmt_num(threshold)
+    passing = [name for name, _v, ok, _c in rows if ok]
+    failing = [name for name, _v, ok, _c in rows if not ok]
+
+    lead = (f"{len(passing)} of the {len(rows)} {noun} have "
+            f"{'an' if label[:1].lower() in 'aeiou' else 'a'} {label} "
+            f"{_CMP_PHRASE.get(comparator, comparator)} {thr}{unit_s}.")
+    body = [f"{name}: value={_fmt_num(value)}{unit_s} "
+            f"({comparator}{thr}{unit_s}? {'yes' if ok else 'no'}){cite}"
+            for name, value, ok, cite in rows]
+    tally = _CMP_TALLY.get(comparator, comparator)
+    tallies = [
+        f"{_lead_capital(noun)} {tally} {thr}{unit_s} ({len(passing)}): "
+        f"{', '.join(passing) or 'none'}.",
+        f"{_lead_capital(noun)} not {tally} {thr}{unit_s} ({len(failing)}): "
+        f"{', '.join(failing) or 'none'}.",
+    ]
+    return "\n".join([lead, "", *body, "", *tallies])
+
+
+def _compose_and_filter(leaves: List[Dict[str, Any]], results: Dict[str, str],
+                        composition: Dict[str, Any]) -> Optional[str]:
+    """AND-FILTER: name the UNIQUE item satisfying EVERY declared constraint.
+
+    Each item names one leaf per constraint (``{"leaves": {"area": "...", "depth": "..."}}``), and
+    the constraints are declared once and applied to every item — the composer is written over
+    ``len(constraints)``, not hardcoded to two. Renders a lead sentence naming the winner plus a
+    per-item, per-constraint breakdown, each row cited from the leaves it was read off.
+
+    ALL-OR-NOTHING, twice over: every item's every constraint must resolve, AND the computed
+    satisfier count must be exactly 1. "X is the unique <noun> satisfying every constraint" asserts
+    something about EVERY item (that all the others fail at least one), which a partial read cannot
+    support; and 0 or >=2 satisfiers over fully-resolved data is proof of an upstream extraction
+    error (the fixtures' margins make a genuine tie impossible), not a reason to assert a hedged
+    winner. Either case returns ``None`` -> the unchanged free-text fallback.
+    """
+    constraints = list(composition.get("constraints") or [])
+    items = list(composition.get("items") or [])
+    if not constraints or not items:
+        return None
+
+    specs: List[Dict[str, Any]] = []
+    for constraint in constraints:
+        comparator = str(constraint.get("comparator") or "")
+        compare = _COMPARATORS.get(comparator)
+        threshold = constraint.get("threshold")
+        if (compare is None or isinstance(threshold, bool)
+                or not isinstance(threshold, (int, float))):
+            return None
+        specs.append({
+            "key": str(constraint.get("key") or ""),
+            "label": str(constraint.get("label") or constraint.get("key") or ""),
+            "unit": str(constraint.get("unit") or "").strip(),
+            "type": str(constraint.get("type") or "number"),
+            "comparator": comparator, "compare": compare, "threshold": threshold,
+        })
+
+    known = {leaf.get("id") for leaf in (leaves or []) if isinstance(leaf, dict)}
+    rows: List[Dict[str, Any]] = []
+    for item in items:
+        item_leaves = item.get("leaves") or {}
+        checks: List[Tuple[Dict[str, Any], Any, bool]] = []
+        facts: List[str] = []
+        for spec in specs:
+            leaf_id = str(item_leaves.get(spec["key"]) or "")
+            if known and leaf_id not in known:
+                return None
+            fact = results.get(leaf_id, "")
+            value = _compose_value(fact, spec["type"])
+            if value is None or isinstance(value, str):
+                return None
+            facts.append(fact)
+            checks.append((spec, value, bool(spec["compare"](value, spec["threshold"]))))
+        rows.append({
+            "label": str(item.get("label") or ""), "checks": checks,
+            "cite": _row_citation(facts), "ok": all(ok for _s, _v, ok in checks),
+        })
+
+    winners = [row for row in rows if row["ok"]]
+    if len(winners) != 1:
+        return None
+    winner = winners[0]
+
+    def _threshold_phrase(spec: Dict[str, Any]) -> str:
+        unit_s = f" {spec['unit']}" if spec["unit"] else ""
+        word = _CMP_WORD.get(spec["comparator"], spec["comparator"])
+        return f"{spec['label']} {word} {_fmt_num(spec['threshold'])}{unit_s}"
+
+    phrases = [_threshold_phrase(spec) for spec in specs]
+    joined = phrases[0] if len(phrases) == 1 else f"{', '.join(phrases[:-1])} and {phrases[-1]}"
+    noun = str(composition.get("answer_noun") or "item").strip()
+    lead = f"{winner['label']} is the unique {noun} that satisfies every constraint: {joined}."
+
+    def _render(row: Dict[str, Any]) -> str:
+        cells = []
+        for spec, value, ok in row["checks"]:
+            unit_s = f" {spec['unit']}" if spec["unit"] else ""
+            cells.append(f"{spec['label']}={_fmt_num(value)}{unit_s} "
+                         f"({spec['comparator']}{_fmt_num(spec['threshold'])}{unit_s}? "
+                         f"{'yes' if ok else 'no'})")
+        return f"{row['label']}: {', '.join(cells)}{row['cite']}"
+
+    # Winner first, then the remaining items in declared order: the keystone's enumeration path
+    # walks a short continuation window from the FIRST mention of the winner, so its own row must
+    # sit directly under the lead sentence that names it.
+    body = [_render(winner)] + [_render(row) for row in rows if row is not winner]
+    return "\n".join([lead, "", *body])
+
+
+def _compose_argmax(leaves: List[Dict[str, Any]], results: Dict[str, str],
+                    composition: Dict[str, Any]) -> Optional[str]:
+    """ARGMAX: name the declared item with the LARGEST numeric value.
+
+    Renders a lead sentence naming the winner and its figure, then one cited row per item. Unlike
+    the count/filter composers this one DEGRADES GRACEFULLY: an argmax is a plain comparison, so a
+    leaf that never resolved only costs its own row — the maximum over the rest is still an honest
+    answer as long as at least two items resolved (a "largest" claim over a single value is
+    vacuous). Skipped items are disclosed as ``UNKNOWN`` in the breakdown rather than quietly
+    dropped, so the reader can see the comparison was partial. Fewer than two resolved items
+    returns ``None`` -> the unchanged free-text fallback.
+
+    A TIE names every tied item explicitly instead of picking one arbitrarily: the fixtures' margins
+    make a real tie a symptom of a misread, and inventing a winner out of it would be exactly the
+    fabrication this path exists to remove.
+    """
+    items = list(composition.get("items") or [])
+    if not items:
+        return None
+
+    known = {leaf.get("id") for leaf in (leaves or []) if isinstance(leaf, dict)}
+    default_unit = str(composition.get("unit") or "").strip()
+    rows: List[Dict[str, Any]] = []
+    for item in items:
+        leaf_id = str(item.get("leaf") or "")
+        if known and leaf_id not in known:
+            return None                   # a plan-authoring error, not a data miss
+        fact = results.get(leaf_id, "")
+        value = _compose_value(fact, str(item.get("type") or "number"))
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            value = None                  # unresolved -> disclosed as UNKNOWN, not fatal
+        rows.append({
+            "label": str(item.get("label") or leaf_id), "value": value,
+            "unit": str(item.get("unit") or default_unit).strip(),
+            "cite": _row_citation([fact]) if value is not None else "",
+        })
+
+    resolved = [row for row in rows if row["value"] is not None]
+    if len(resolved) < 2:
+        return None
+
+    best = max(row["value"] for row in resolved)
+    winners = [row["label"] for row in resolved if row["value"] == best]
+    noun = _plural(str(composition.get("answer_noun") or "item").strip())
+    label = str(composition.get("value_label") or "value").strip()
+    unit_s = f" {default_unit}" if default_unit else ""
+    figure = f"{_fmt_num(best)}{unit_s}"
+    scope = f"of the {len(resolved)} {noun} compared"
+    if len(winners) == 1:
+        lead = f"{winners[0]} has the highest {label} {scope}, at {figure}."
+    else:
+        joined = f"{', '.join(winners[:-1])} and {winners[-1]}"
+        lead = f"{joined} tie for the highest {label} {scope}, at {figure} each."
+
+    body = []
+    for row in rows:
+        row_unit = f" {row['unit']}" if row["unit"] else ""
+        shown = f"{_fmt_num(row['value'])}{row_unit}" if row["value"] is not None else "UNKNOWN"
+        body.append(f"{row['label']}: {label}={shown}{row['cite']}")
+    return "\n".join([lead, "", *body])
+
+
+def _compose_subset_sum(leaves: List[Dict[str, Any]], results: Dict[str, str],
+                        composition: Dict[str, Any]) -> Optional[str]:
+    """SUBSET-SUM: add up every declared item's numeric value and report the total.
+
+    Renders the addition WRITTEN OUT explicitly — labels, then figures, then the total, on one lead
+    line — followed by one cited row per item. ALL-OR-NOTHING: any item whose fact does not resolve
+    to a number returns ``None`` (-> the unchanged free-text fallback). Unlike argmax's plain
+    comparison, a subset sum has no honest partial answer: per the task's own validator design,
+    dropping any one item moves the total by at least that item's own value, far outside the
+    correctness band, so a sum over fewer than all declared items is not an approximation — it is a
+    different, wrong question.
+    """
+    items = list(composition.get("items") or [])
+    if not items:
+        return None
+
+    known = {leaf.get("id") for leaf in (leaves or []) if isinstance(leaf, dict)}
+    default_unit = str(composition.get("unit") or "").strip()
+    rows: List[Dict[str, Any]] = []
+    for item in items:
+        leaf_id = str(item.get("leaf") or "")
+        if known and leaf_id not in known:
+            return None                   # a plan-authoring error, not a data miss
+        fact = results.get(leaf_id, "")
+        value = _compose_value(fact, str(item.get("type") or "number"))
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None                   # any single unresolved item -> no honest partial sum
+        rows.append({
+            "label": str(item.get("label") or leaf_id), "value": value,
+            "unit": str(item.get("unit") or default_unit).strip(),
+            "cite": _row_citation([fact]),
+        })
+
+    total = sum(row["value"] for row in rows)
+    labels = " + ".join(row["label"] for row in rows)
+    figures = " + ".join(_fmt_num(row["value"]) for row in rows)
+    lead = f"{labels} = {figures} = {_fmt_num(total)}"
+
+    body = []
+    for row in rows:
+        unit_s = f" {row['unit']}" if row["unit"] else ""
+        body.append(f"{row['label']}: {_fmt_num(row['value'])}{unit_s}{row['cite']}")
+    return "\n".join([lead, "", *body])
+
+
+# Composer registry — a new op (odd_one_out / ...) plugs in here without touching
+# ``_execute_plan``'s wiring or the plan schema.
+_COMPOSERS = {
+    "and_filter": _compose_and_filter,
+    "argmax": _compose_argmax,
+    "count_threshold": _compose_count_threshold,
+    "subset_sum": _compose_subset_sum,
+}
+
+
+def _compose(leaves: List[Dict[str, Any]], results: Dict[str, str],
+             composition: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Dispatch a plan's ``composition`` to its composer and return the rendered final answer, or
+    ``None`` when it cannot be computed honestly — a missing/malformed composition, an unrecognized
+    op, an unresolved item, or ANY exception raised by a composer. A composition failure is always
+    a logged fallback to the proven free-text path, never a crash."""
+    if not isinstance(composition, dict):
+        return None
+    op = str(composition.get("op") or "").strip().lower()
+    composer = _COMPOSERS.get(op)
+    if composer is None:
+        _logger.info(f"composition op {op!r} is not implemented; falling back to free-text aggregation")
+        return None
+    try:
+        composed = composer(leaves, results, composition)
+    except Exception as exc:  # noqa: BLE001 — a composer must never sink the run
+        _logger.warning(f"composition op '{op}' failed: {exc}")
+        return None
+    if not composed:
+        _logger.info(f"composition op '{op}' could not resolve every declared item; falling back")
+        return None
+    return composed
 
 
 async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str, max_tokens: int) -> str:
@@ -801,6 +1645,16 @@ async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str
         for lid, fact in gathered:
             results[lid] = fact
 
+    # Single-leaf passthrough (opt-in). For a one-leaf plan the "aggregation" is just that leaf's
+    # fact, which the thin leaf already returns as "<value> — source: <url>". Running a second
+    # aggregation LLM call adds nothing but a chance for a weak model to DROP the source URL (seen
+    # on bad-model-lab micro tasks: keystone right, grounding lost). Skipping it preserves the URL
+    # and saves a call. Opt-in so the existing suite's LLM-composed finals stay byte-identical.
+    if len(leaves) == 1 and os.environ.get(
+        "IDEA_TEST_COMPILED_SINGLE_LEAF_PASSTHROUGH", ""
+    ) not in ("", "0", "false", "False"):
+        return results.get(leaves[0]["id"], "UNKNOWN")
+
     # Aggregate over every leaf, in declared plan order (stable for the judge/validators).
     # Facts are NUMBERED, not tagged with the leaf id: weak models copy a leading "[leaf_id]" tag
     # verbatim as if it were a citation instead of citing the source URL inside the fact.
@@ -820,9 +1674,31 @@ async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str
     plan_override = plan.get("agg_mode") if isinstance(plan, dict) else None
     if plan_override:
         agg_mode = str(plan_override).strip().lower()
+    # Deterministic composition (opt-in per plan): compute the answer in Python over the gathered
+    # facts instead of asking a weak model to do the arithmetic/conjunction in free text. Falls
+    # back to the unchanged "single" path whenever the data can't be composed honestly.
+    if agg_mode in ("computed", "compose"):
+        composition = plan.get("composition") if isinstance(plan, dict) else None
+        composed = _compose(leaves, results, composition)
+        if composed is not None:
+            return composed
+        _logger.info("agg_mode='computed': composition unavailable/incomplete; falling back to single")
+        agg_mode = "single"
+    if agg_mode in ("structured_json", "structured"):
+        fields = (plan.get("structured_fields") if isinstance(plan, dict) else None) or _STRUCTURED_DEFAULT_FIELDS
+        strict = os.environ.get("IDEA_TEST_COMPILED_STRUCTURED_STRICT", "").strip().lower() in ("1", "true", "yes", "on")
+        return await _aggregate_structured_json(agent_io, aggregation, facts_block, model_name, max_tokens, fields, strict)
+    if agg_mode in ("structured_thin", "structured_assemble"):
+        fields = (plan.get("structured_fields") if isinstance(plan, dict) else None) or _STRUCTURED_DEFAULT_FIELDS
+        return await _aggregate_structured_thin(agent_io, aggregation, facts_block, model_name, max_tokens, fields)
+    # Free-text paths only: the structured modes above return a JSON artifact that must stay
+    # parseable, so the citation repair never touches them.
+    sources = _gathered_source_urls([results.get(leaf["id"], "") for leaf in leaves])
     if agg_mode in ("diverse_ground", "diverse", "scatter"):
-        return await _aggregate_diverse_ground(agent_io, aggregation, facts_block, model_name, max_tokens)
-    return await _aggregate_single(agent_io, aggregation, facts_block, model_name, max_tokens)
+        answer = await _aggregate_diverse_ground(agent_io, aggregation, facts_block, model_name, max_tokens)
+    else:
+        answer = await _aggregate_single(agent_io, aggregation, facts_block, model_name, max_tokens)
+    return _ensure_source_citations(answer, sources, aggregation)
 
 
 async def _resolve_plan(
