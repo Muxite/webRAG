@@ -32,7 +32,9 @@ The native engine is a Graph-of-Thoughts loop in `idea_engine.py`. One turn:
 3. **Observe the step** — every completed leaf funnels through `_apply_action_result`, which runs, in
    order: `_maybe_judge_step_confidence` (a decorrelated LLM judge scoring the step 0–1, sees only the
    task + resolved content, never validators/ground-truth), then `_maybe_confidence_reexpand_batch`,
-   then `_maybe_reexpand_leaf`.
+   then `_maybe_reexpand_leaf`. Caveat before building on that score: only `visit`/`search` results
+   populate the fields the judge reads, so 43% of judged steps are scored on an empty payload —
+   measured, with the per-kind numbers, in `CONFIDENCE_JUDGE_MISCALIBRATION.md`.
 4. **Decide the next move** — two independent triggers feed the single, trigger-agnostic
    `_apply_reexpand` mutation:
    - **follow-up detector** (`got_operations.check_needs_followup`): "did this result reveal a
@@ -222,6 +224,17 @@ certify has to be acknowledged rather than slipping in silently.
    the measured ceiling (0.553 vs. a 0.511 base rate) so the shortfall is a number rather than a
    shrug. *Lesson: build the mechanism, let the calibration decide whether it may fire, and pin the
    "cannot fire" state in a test so turning it on later is a decision somebody makes on purpose.*
+
+8. **Check what the judge was actually shown before blaming its judgement** (2026-08-02,
+   `CONFIDENCE_JUDGE_MISCALIBRATION.md`). A6's "the confidence signal decays to chance" was read as a
+   prompt-design problem. Measuring the *inputs* instead found that `merge`/`think`/`verify`/`save`
+   results never populate the three fields `judge_step_confidence` reads (0.000 judge-visible across
+   696 recorded results), so 43.4% of judged steps are scored on an empty payload — and one such step
+   pins `running_min` at 0 for the rest of the trajectory, which is the decay. Two LLM-free graph
+   statistics (judged-step count, 0.655 AUC; content-step fraction, 0.634) outrank every confidence
+   statistic (best 0.571). *Lesson: for any evaluator, measure the payload it received before
+   theorising about the score it returned — and always report the free baseline the evaluator has to
+   beat.*
 
 ---
 

@@ -44,7 +44,9 @@ principle.
 ### `got_operations.py` — beam width, pruning, backtrack, step-confidence judge
 `compute_dynamic_beam_width`, `identify_prune_candidates`/`prune_nodes` (score-threshold pruning),
 `should_backtrack`/`find_backtrack_target`, and `judge_step_confidence` (a decorrelated per-step LLM
-judge — `ADAPTIVE_ENGINE.md` §3 names this explicitly as "E-valuator substrate"). **Research
+judge — `ADAPTIVE_ENGINE.md` §3 names this explicitly as "E-valuator substrate"; why that judge
+predicts so little is quantified in `CONFIDENCE_JUDGE_MISCALIBRATION.md` — blind on 43% of judged
+steps, +0.004 lift on `search`). **Research
 grounding:** this is the PRM+MCTS/A*-guided-search cluster's closest analog — dense step scoring
 driving pruning/backtrack decisions — but it's single-pass forward beam/DFS with confidence-triggered
 branching, not literal tree search with rollout simulation and value backup. Two confirmed,
