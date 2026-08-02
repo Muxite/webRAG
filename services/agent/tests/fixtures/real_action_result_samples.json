@@ -1,0 +1,392 @@
+{
+  "_meta": {
+    "purpose": "Frozen, verbatim sample of REAL recorded action_result dicts, used to cross-check the confidence-judge blindness fix (got_operations.judge_step_confidence declining to judge steps whose payload it cannot read) against historical data instead of hand-built shapes.",
+    "extracted": "2026-08-02",
+    "extracted_from": "services/agent/idea_test_results/**/*.json (787 result JSONs) — that directory is gitignored, so this sample is frozen here rather than read at test time.",
+    "selection": "Walked execution.graph.nodes[*].details.action_result for every successful result, grouped by result['action'], and took the SHORTEST examples from distinct source runs. Every action_result below is byte-for-byte as recorded; nothing was edited or trimmed.",
+    "roster_filter": "confidence_early_exit.is_regular_roster (MODEL_ROSTER gpt-4.1-nano/gpt-5-mini/deepseek/sonnet/gemini, EXCLUDED_MARKERS bmladapt/qwen/localagent/ollama), applied to the '<run_dir>-<file>' flattened name. The 'verify' samples are the one exception: the local corpus records verify results ONLY in off-roster badmodel-lab runs (25 of them, 0 on-roster), so they are marked on_roster=false. Their key shape is what the fix reads, and that is set by VerifyLeafAction, not by the model.",
+    "census_all_successful_results": {
+      "note": "n and the fraction carrying anything in content/content_full/results.",
+      "visit": {
+        "n": 809,
+        "judge_visible_fraction": 1.0
+      },
+      "search": {
+        "n": 576,
+        "judge_visible_fraction": 1.0
+      },
+      "merge": {
+        "n": 281,
+        "judge_visible_fraction": 0.0
+      },
+      "think": {
+        "n": 55,
+        "judge_visible_fraction": 0.0
+      },
+      "verify": {
+        "n": 25,
+        "judge_visible_fraction": 0.0
+      },
+      "save": {
+        "n": 21,
+        "judge_visible_fraction": 0.0
+      },
+      "contradictions": "0 — no merge/think/verify/save result in the whole corpus carries content, content_full or results."
+    },
+    "blind_kinds": [
+      "merge",
+      "think",
+      "verify",
+      "save"
+    ],
+    "visible_kinds": [
+      "visit",
+      "search"
+    ]
+  },
+  "samples": {
+    "merge": [
+      {
+        "source": "20260526_204444_033_google-gemini-2.5-flash_graph_r1.json",
+        "node_id": "9f1aaaa0-914a-4b6d-b9b5-059d4e448024",
+        "on_roster": true,
+        "action_result": {
+          "action": "merge",
+          "success": true,
+          "synthesized": {
+            "summary": "{\n  \"summary\":",
+            "goal_achieved": false,
+            "goal_evaluation": "Failed to parse LLM response",
+            "missing_requirements": []
+          },
+          "child_count": 5,
+          "raw_response": "{\n  \"summary\":",
+          "goal_achieved": false,
+          "goal_evaluation": "Failed to parse LLM response",
+          "missing_requirements": []
+        }
+      },
+      {
+        "source": "20260526_204444_035_google-gemini-2.5-flash_sequential_r1.json",
+        "node_id": "e11f00a6-57a7-4c89-a21f-02d896e2ee71",
+        "on_roster": true,
+        "action_result": {
+          "action": "merge",
+          "success": true,
+          "synthesized": {
+            "summary": "{\n  \"summary\": \"This aggregation compiles information for three distinct topics: Cordyceps fungi, Admiralty law, and Mathematics of paper folding. Each topic has specific facts to be extracted, which are outlined in the key findings.\",\n  \"key_findings\": [\n    \"The node for 'Cordyceps fungi' (8776af7b-4faa-4186-98fd-5c815824c31a) successfully visited the Wikipedia page and extracted information. However",
+            "goal_achieved": false,
+            "goal_evaluation": "Failed to parse LLM response",
+            "missing_requirements": []
+          },
+          "child_count": 6,
+          "raw_response": "{\n  \"summary\": \"This aggregation compiles information for three distinct topics: Cordyceps fungi, Admiralty law, and Mathematics of paper folding. Each topic has specific facts to be extracted, which are outlined in the key findings.\",\n  \"key_findings\": [\n    \"The node for 'Cordyceps fungi' (8776af7b-4faa-4186-98fd-5c815824c31a) successfully visited the Wikipedia page and extracted information. However",
+          "goal_achieved": false,
+          "goal_evaluation": "Failed to parse LLM response",
+          "missing_requirements": []
+        }
+      },
+      {
+        "source": "20260526_003141_019_google-gemini-2.5-flash_graph_r1.json",
+        "node_id": "2b73e114-6850-4249-8677-f3391f2f8a07",
+        "on_roster": true,
+        "action_result": {
+          "action": "merge",
+          "success": true,
+          "synthesized": {
+            "summary": "Python, a high-level, general-purpose programming language, was first released in 1991. It was conceived in the late 1980s by Guido van Rossum.",
+            "key_findings": [
+              "Python's first release was in 1991 (node_id: cd20c2ca-9b8c-4d50-a060-52a3b9eecc44).",
+              "The creator of Python is Guido van Rossum (node_id: cd20c2ca-9b8c-4d50-a060-52a3b9eecc44)."
+            ],
+            "goal_achieved": true,
+            "goal_evaluation": "All required information (release year and creator) was successfully extracted from the specified Wikipedia page.",
+            "missing_requirements": []
+          },
+          "child_count": 2,
+          "raw_response": "{\n  \"summary\": \"Python, a high-level, general-purpose programming language, was first released in 1991. It was conceived in the late 1980s by Guido van Rossum.\",\n  \"key_findings\": [\n    \"Python's first release was in 1991 (node_id: cd20c2ca-9b8c-4d50-a060-52a3b9eecc44).\",\n    \"The creator of Python is Guido van Rossum (node_id: cd20c2ca-9b8c-4d50-a060-52a3b9eecc44).\"\n  ],\n  \"goal_achieved\": true,\n  \"goal_evaluation\": \"All required information (release year and creator) was successfully extracted from the specified Wikipedia page.\",\n  \"missing_requirements\": []\n}",
+          "goal_achieved": true,
+          "goal_evaluation": "All required information (release year and creator) was successfully extracted from the specified Wikipedia page.",
+          "missing_requirements": []
+        }
+      }
+    ],
+    "think": [
+      {
+        "source": "20260526_030414_002_anthropic-claude-sonnet-4.6_graph_r1.json",
+        "node_id": "24d83e3e-48f0-49e5-840b-d2cfd2ba2e06",
+        "on_roster": true,
+        "action_result": {
+          "action": "think",
+          "success": true,
+          "node_id": "24d83e3e-48f0-49e5-840b-d2cfd2ba2e06",
+          "title": "Think: compile final answer from memory",
+          "details": {
+            "action": "think",
+            "goal": "Think: compile final answer from memory",
+            "original_goal": "Think: compile final answer from memory",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.4
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2
+          },
+          "thinking_content": "Think: compile final answer from memory"
+        }
+      },
+      {
+        "source": "20260526_003141_002_openai-gpt-5-mini_graph_r1.json",
+        "node_id": "72231431-edf3-48b9-8e13-562cab9fa159",
+        "on_roster": true,
+        "action_result": {
+          "action": "think",
+          "success": true,
+          "node_id": "72231431-edf3-48b9-8e13-562cab9fa159",
+          "title": "Analyze and plan next steps",
+          "details": {
+            "action": "think",
+            "justification": "Fallback candidate: Generic think node",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "goal": "Analyze and plan next steps",
+            "original_goal": "Analyze and plan next steps",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.1
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2
+          },
+          "thinking_content": "Analyze and plan next steps"
+        }
+      },
+      {
+        "source": "20260526_030710_002_openai-gpt-5-mini_graph_r1.json",
+        "node_id": "49edf03c-2475-4e46-bfe5-5a1a6251c076",
+        "on_roster": true,
+        "action_result": {
+          "action": "think",
+          "success": true,
+          "node_id": "49edf03c-2475-4e46-bfe5-5a1a6251c076",
+          "title": "Analyze and plan next steps",
+          "details": {
+            "action": "think",
+            "justification": "Fallback candidate: Generic think node",
+            "parent_goal": "What is the capital city of Australia? Provide the answer and cite one authoritative source URL.",
+            "goal": "Analyze and plan next steps",
+            "original_goal": "Analyze and plan next steps",
+            "is_leaf": true,
+            "evaluation": {
+              "score": 0.1
+            },
+            "action_attempts": 1,
+            "action_max_retries": 2
+          },
+          "thinking_content": "Analyze and plan next steps"
+        }
+      }
+    ],
+    "verify": [
+      {
+        "source": "bmladapt__qwen2.5-7b__a2_native_good_adaptive__reachable_070_qwen2.5:7b_graph_r1.json",
+        "node_id": "23f99f8d-8b5f-4743-bb5c-bb5047b65dad",
+        "on_roster": false,
+        "action_result": {
+          "action": "verify",
+          "success": true,
+          "node_id": "23f99f8d-8b5f-4743-bb5c-bb5047b65dad",
+          "claim": "The combined number of episodes across the first four seasons is 52, and each season has the following episode counts: Season 1 - 13, Season 2 - 14, Season 3 - 17, Season 4 - 18.",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.0,
+          "supporting_url": "",
+          "contradicting_url": "",
+          "quote": "",
+          "reasoning": "",
+          "evidence_sources": [
+            "https://en.wikipedia.org/wiki/Chuck_(TV_series)",
+            "https://en.wikipedia.org/wiki/Chuck_season_1",
+            "https://en.wikipedia.org/wiki/Chuck_season_1"
+          ],
+          "raw_response": "{\t    \t\t\t\t}"
+        }
+      },
+      {
+        "source": "bmladapt__llama3.1-8b__a0_native_baseline__micro_m02_llama3.1:8b_graph_r2.json",
+        "node_id": "5101caa2-967b-407e-b9f5-4eac14e051cc",
+        "on_roster": false,
+        "action_result": {
+          "action": "verify",
+          "success": true,
+          "node_id": "5101caa2-967b-407e-b9f5-4eac14e051cc",
+          "claim": "The land area of Amsterdam Island is ... square kilometers, according to its infobox.",
+          "verdict": "TRUE",
+          "confidence": 1.0,
+          "supporting_url": "https://en.wikipedia.org/wiki/Amsterdam_Island",
+          "contradicting_url": "",
+          "quote": "",
+          "reasoning": "The land area of Amsterdam Island is 56.6 km² (21.9 mi²) according to Wikipedia.",
+          "evidence_sources": [
+            "https://en.wikipedia.org/wiki/Amsterdam_Island"
+          ],
+          "raw_response": "{\n  \"verdict\": \"TRUE\",\n  \"confidence\": 1.0,\n  \"supporting_url\": \"https://en.wikipedia.org/wiki/Amsterdam_Island\",\n  \"reasoning\": \"The land area of Amsterdam Island is 56.6 km² (21.9 mi²) according to Wikipedia.\"\n}"
+        }
+      },
+      {
+        "source": "bmladapt__qwen2.5-7b__a2_native_good_adaptive__micro_m02_qwen2.5:7b_graph_r2.json",
+        "node_id": "7a0e620c-36f2-404e-8347-21d3823382a8",
+        "on_roster": false,
+        "action_result": {
+          "action": "verify",
+          "success": true,
+          "node_id": "7a0e620c-36f2-404e-8347-21d3823382a8",
+          "claim": "Amsterdam Island has a land area of 56.6 km².",
+          "verdict": "TRUE",
+          "confidence": 1.0,
+          "supporting_url": "https://en.wikipedia.org/wiki/Amsterdam_Island",
+          "contradicting_url": "",
+          "quote": "Area\n56.6 \nkm² (21.9 sq mi)",
+          "reasoning": "The evidence directly states the land area of Amsterdam Island is 56.6 km².",
+          "evidence_sources": [
+            "https://en.wikipedia.org/wiki/Amsterdam_Island"
+          ],
+          "raw_response": "{\n  \"verdict\": \"TRUE\",\n  \"confidence\": 1.0,\n  \"supporting_url\": \"https://en.wikipedia.org/wiki/Amsterdam_Island\",\n  \"contradicting_url\": \"\",\n  \"quote\": \"Area\\n56.6 \\nkm\\u00b2 (21.9 sq mi)\",\n  \"reasoning\": \"The evidence directly states the land area of Amsterdam Island is 56.6 km².\"\n}"
+        }
+      }
+    ],
+    "save": [
+      {
+        "source": "20260526_030414_002_anthropic-claude-sonnet-4.6_graph_r1.json",
+        "node_id": "5ae7908d-70d7-40b4-af6d-9a2823b038c5",
+        "on_roster": true,
+        "action_result": {
+          "action": "save",
+          "success": true,
+          "count": 1
+        }
+      },
+      {
+        "source": "20260526_030414_002_google-gemini-2.5-flash_graph_r1.json",
+        "node_id": "7fdecfa9-00d7-4241-8cf9-46fb99446837",
+        "on_roster": true,
+        "action_result": {
+          "action": "save",
+          "success": true,
+          "count": 1
+        }
+      }
+    ],
+    "visit": [
+      {
+        "source": "20260526_030710_026_google-gemini-2.5-flash_graph_r1.json",
+        "node_id": "6b9d2880-e12d-4756-b91b-eff52338322f",
+        "on_roster": true,
+        "action_result": {
+          "action": "visit",
+          "success": true,
+          "url": "https://archive.org/details/nla-au-crawl",
+          "intent": null,
+          "content": "Internet Archive: Digital Library of Free & Borrowable Texts, Movies, Music & Wayback Machine",
+          "content_is_truncated": false,
+          "content_total_chars": 93,
+          "content_full": "Internet Archive: Digital Library of Free & Borrowable Texts, Movies, Music & Wayback Machine",
+          "content_with_links": "Internet Archive: Digital Library of Free & Borrowable Texts, Movies, Music & Wayback Machine",
+          "links": [],
+          "links_full": [],
+          "links_count": 0,
+          "link_contexts": {},
+          "page_title": "Internet Archive: Digital Library of Free & Borrowable Texts, Movies, Music & Wayback Machine",
+          "h1_text": null,
+          "source_url": "https://archive.org/details/nla-au-crawl"
+        }
+      },
+      {
+        "source": "20260526_204444_009_google-gemini-2.5-flash_sequential_r1.json",
+        "node_id": "3c272941-bb11-4844-9777-d3b81e3aaf9b",
+        "on_roster": true,
+        "action_result": {
+          "action": "visit",
+          "success": true,
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8167392/",
+          "intent": null,
+          "content": "Checking your browser - reCAPTCHA\nChecking your browser before accessing pmc.ncbi.nlm.nih.gov ...\nClick\nhere\nif you are not automatically redirected after 5 seconds.",
+          "content_is_truncated": false,
+          "content_total_chars": 165,
+          "content_full": "Checking your browser - reCAPTCHA\nChecking your browser before accessing pmc.ncbi.nlm.nih.gov ...\nClick\nhere\nif you are not automatically redirected after 5 seconds.",
+          "content_with_links": "Checking your browser - reCAPTCHA\nChecking your browser before accessing pmc.ncbi.nlm.nih.gov ...\nClick\nhere\nif you are not automatically redirected after 5 seconds.",
+          "links": [],
+          "links_full": [],
+          "links_count": 0,
+          "link_contexts": {},
+          "page_title": "Checking your browser - reCAPTCHA",
+          "h1_text": null,
+          "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8167392/"
+        }
+      }
+    ],
+    "search": [
+      {
+        "source": "_pre_reactmaxtokens_backup-barrage24b_073_openai-gpt-4.1-nano_graph_r2.json",
+        "node_id": "3dbf518a-588a-48c6-837a-367556957c3e",
+        "on_roster": true,
+        "action_result": {
+          "action": "search",
+          "success": true,
+          "node_id": "3dbf518a-588a-48c6-837a-367556957c3e",
+          "query": "Kosovo Museum Wikipedia",
+          "intent": "Find the official Wikipedia article for Kosovo Museum",
+          "vector_context": [],
+          "count": 3,
+          "results": [
+            {
+              "title": "Kosovo Museum - Wikipedia",
+              "url": "https://en.wikipedia.org/wiki/Kosovo_Museum",
+              "description": "The <strong>Kosovo</strong> <strong>Museum</strong> (Albanian: Muzeu i Kosovës; Serbian: Музеј Косова / Muzej Kosova) is the national <strong>museum</strong> <strong>of</strong> <strong>Kosovo</strong>, located in the city of Pristina. Established by Yugoslav authorities in 1949, this is the largest <strong>museum</strong> <strong>in</strong> <strong>Kosovo</strong>. It is situated in a 1889 Austro-Hungarian-style ..."
+            },
+            {
+              "title": "Ethnological Museum, Pristina - Wikipedia",
+              "url": "https://en.wikipedia.org/wiki/Ethnological_Museum,_Pristina",
+              "description": "The Ethnological Treasure of <strong>Kosovo</strong> is an ethnographic <strong>museum</strong> in Pristina, <strong>Kosovo</strong>. It is located in the Emin Gjiku Complex, a monument of culture from the 18th century. The house was once owned by the family of Emin Gjikolli. The name Emin Gjikolli means &quot;little man&quot;, in Turkish the spelling ..."
+            },
+            {
+              "title": "Category:Museums in Kosovo - Wikipedia",
+              "url": "https://en.wikipedia.org/wiki/Category:Museums_in_Kosovo",
+              "description": "Wikimedia Commons has media related to <strong>Museums</strong> <strong>in</strong> <strong>Kosovo</strong>. <strong>Museums</strong> <strong>in</strong> <strong>Kosovo</strong>. This category has the following 5 subcategories, out of 5 total. ... The following 5 pages are in this category, out of 5 total. This list may not reflect recent changes."
+            }
+          ]
+        }
+      },
+      {
+        "source": "_pre_reactmaxtokens_backup-barrage24b_092_openai-gpt-4.1-nano_graph_r2.json",
+        "node_id": "48be5a5a-b5ce-4342-aaf6-b8b58632a107",
+        "on_roster": true,
+        "action_result": {
+          "action": "search",
+          "success": true,
+          "node_id": "48be5a5a-b5ce-4342-aaf6-b8b58632a107",
+          "query": "Spanish conquest of the Inca Empire lead conquistador",
+          "intent": "Identify the conquistador who led the conquest, captured Atahualpa, and founded Lima",
+          "vector_context": [],
+          "count": 3,
+          "results": [
+            {
+              "title": "Spanish conquest of the Inca Empire - Wikipedia",
+              "url": "https://en.wikipedia.org/wiki/Spanish_conquest_of_the_Inca_Empire",
+              "description": "<strong>The</strong> <strong>Spanish</strong> <strong>conquistador</strong> Pizarro and his men were greatly aided in their enterprise by invading when <strong>the</strong> <strong>Inca</strong> <strong>Empire</strong> was in the midst of a war of succession between the princes Huáscar and Atahualpa. Atahualpa seems to have spent more time with Huayna Capac during the years when he was in the north with the army conquering Ecuador. Atahualpa was thus closer to and had better relations with the army and its <strong>leading</strong> ..."
+            },
+            {
+              "title": "Francisco Pizarro - Wikipedia",
+              "url": "https://en.wikipedia.org/wiki/Francisco_Pizarro",
+              "description": "The protagonist of the story is ... <strong>the</strong> <strong>Spanish</strong> <strong>conquistadors</strong> to emancipate Peru from the fetters of slavery but ultimately fails to fulfil his mission. (Source: Ghanada Samagra, volume 3, Ananda Publishers) Randall Garrett, known mainly as a science fiction writer, wrote the novelette Despoilers of the Golden <strong>Empire</strong>, whose language <strong>leads</strong> readers to believe they are reading a story about a space invasion in the far future, while in fact it describes Pizarro&#x27;s <strong>conquest</strong> <strong>of</strong> <strong>the</strong> <strong>Incas</strong>..."
+            },
+            {
+              "title": "Francisco Pizarro | Peru, Spanish Conquistadors, Latin American History, Biography, & Inca Empire | Britannica",
+              "url": "https://www.britannica.com/biography/Francisco-Pizarro",
+              "description": "<strong>Francisco Pizarro</strong> was a Spanish conquistador best known for leading the expedition that conquered the Inca empire in the early 16th century. Born in Trujillo, Spain, into a modest background, he had limited formal education and initially pursued ..."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
