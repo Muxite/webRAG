@@ -46,7 +46,10 @@ principle.
 `should_backtrack`/`find_backtrack_target`, and `judge_step_confidence` (a decorrelated per-step LLM
 judge — `ADAPTIVE_ENGINE.md` §3 names this explicitly as "E-valuator substrate"; why that judge
 predicts so little is quantified in `CONFIDENCE_JUDGE_MISCALIBRATION.md` — blind on 43% of judged
-steps, +0.004 lift on `search`). **Research
+steps, +0.004 lift on `search`). The *other* score these read, `node.score` from
+`idea_policies/evaluation.py`, is measured in `EVALUATION_SCORE_PREDICTIVE_POWER.md`: rated before
+the action runs, capped at 0.5, run-level AUC 0.444 [0.33, 0.56], and the recorded graphs are one
+level deep so `should_backtrack`'s 5-consecutive-low trigger fired on 0 of 261 runs. **Research
 grounding:** this is the PRM+MCTS/A*-guided-search cluster's closest analog — dense step scoring
 driving pruning/backtrack decisions — but it's single-pass forward beam/DFS with confidence-triggered
 branching, not literal tree search with rollout simulation and value backup. Two confirmed,
