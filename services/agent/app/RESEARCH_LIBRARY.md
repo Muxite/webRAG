@@ -124,10 +124,13 @@ archetypes, not hundreds of near-per-mandate plans — closer to defining a hous
 lookup table. Non-dependency is load-bearing, not incidental: a missing/empty/broken index, a
 below-threshold similarity, or a failed slot-fill all degrade silently to organic expansion, never to
 a wrong or partial plan (`retrieval.py`'s own docstring states this explicitly). **Status:** covered
-(design principle, documented in prose here). **Backlog:** none automated yet — a genericity
-guardrail (e.g. a template-count ceiling, an archetype-not-mandate check in `validate_template`, or a
-parity test proving engine behavior with the library disabled) is an open, unscheduled idea, not
-committed work. **Related finding (direct search, 2026-08-02):** "Lightweight Query Routing for
+(design principle, documented in prose here) — and the non-dependency half is now automated
+run-wide: ~~a parity test proving engine behavior with the library disabled~~ **BUILT 2026-08-02**
+(`tests/plan_library_run_parity_test.py`), which runs one scripted `IdeaDagEngine.run()` twice —
+armed-but-missing vs flag-off — and locks `control_loop_parity_test`'s own `PARITY_KEYS` finalize
+signals, the whole graph shape and the expansion call count to identical. **Backlog:** the
+*genericity* guardrail (e.g. a template-count ceiling, or an archetype-not-mandate check in
+`validate_template`) remains an open, unscheduled idea, not committed work. **Related finding (direct search, 2026-08-02):** "Lightweight Query Routing for
 Adaptive RAG" (arXiv 2604.03455, RAGRouter-Bench) found lexical TF-IDF classifiers **beat** dense
 embedding (MiniLM) classifiers by 3.1 macro-F1 for routing queries to a RAG strategy — a data point
 in favor of `shape_classifier.py`'s deterministic regex hint carrying real weight, not just serving
