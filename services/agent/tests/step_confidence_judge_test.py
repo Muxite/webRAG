@@ -150,6 +150,58 @@ async def test_judge_skips_unsuccessful_leaf():
     assert await ops.judge_step_confidence(g, leaf.node_id) is None
 
 
+def _graph_with_blind_leaf(action: str, extra_result: dict):
+    """A successful leaf whose result carries only kind-specific keys the judge
+    doesn't read (no content/content_full/results) — the shape merge/think/verify/save
+    actually return. See CONFIDENCE_JUDGE_MISCALIBRATION.md."""
+    g = IdeaDag(root_title="root")
+    g.get_node(g.root_id()).details["mandate"] = "Find the poet's birthplace."
+    leaf = g.add_child(
+        g.root_id(),
+        "Resolve a sub-fact",
+        details={
+            DetailKey.ACTION.value: action,
+            DetailKey.IS_LEAF.value: True,
+            DetailKey.ACTION_RESULT.value: {
+                ActionResultKey.SUCCESS.value: True,
+                **extra_result,
+            },
+        },
+    )
+    return g, leaf
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "action,extra_result",
+    [
+        (
+            IdeaActionType.MERGE.value,
+            {"synthesized": "The poet was born in Parral.", "raw_response": "{...}"},
+        ),
+        (
+            IdeaActionType.THINK.value,
+            {"thinking_content": "Reasoning about the candidates..."},
+        ),
+        (
+            IdeaActionType.VERIFY.value,
+            {"verdict": "supported", "quote": "born in Parral", "reasoning": "matches"},
+        ),
+        (
+            IdeaActionType.SAVE.value,
+            {"count": 3},
+        ),
+    ],
+    ids=["merge", "think", "verify", "save"],
+)
+async def test_judge_declines_blind_step_without_calling_the_llm(action, extra_result):
+    ops = _ops('{"confidence": 0.95, "reason": "should never be seen"}')
+    g, leaf = _graph_with_blind_leaf(action, extra_result)
+    verdict = await ops.judge_step_confidence(g, leaf.node_id)
+    assert verdict is None
+    assert ops.io.last_messages is None, "no LLM payload should be built for a blind step"
+
+
 # ---------------------------------------------------------------------------
 # IdeaDagEngine._maybe_judge_step_confidence — the loop hook
 # ---------------------------------------------------------------------------

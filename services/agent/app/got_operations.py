@@ -263,6 +263,13 @@ class GoTOperations:
         if isinstance(results_summary, list):
             results_summary = results_summary[:5]
 
+        # Some leaf kinds (merge/think/verify/save) write their real output under keys this
+        # judge doesn't read (``synthesized``, ``thinking_content``, ``verdict``, ``count``, ...).
+        # Judging "nothing visible" produced a confidently-wrong signal instead of no signal —
+        # see CONFIDENCE_JUDGE_MISCALIBRATION.md. Decline rather than guess from an empty prompt.
+        if not content and not results_summary:
+            return None
+
         root = graph.get_node(graph.root_id())
         mandate = ""
         if root and isinstance(root.details, dict):
