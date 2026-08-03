@@ -111,3 +111,75 @@ def test_plan_structure_pure_fanout_flag():
     s = cp.plan_structure({"leaves": [{"id": "a", "instruction": "a"}, {"id": "b", "instruction": "b"}]})
     assert s["is_pure_fanout"] is True
     assert s["edge_count"] == 0
+
+
+# --- agg_mode / composition promotion (byte-identical for plans that don't set them) -----------
+def test_normalize_omits_agg_mode_and_composition_when_absent():
+    plan = cp.normalize_plan({"leaves": [{"id": "a", "instruction": "a"}]})
+    assert plan["agg_mode"] is None
+    assert plan["composition"] is None
+
+
+def test_normalize_agg_mode_lowercased_and_stripped():
+    plan = cp.normalize_plan({"leaves": [{"id": "a", "instruction": "a"}], "agg_mode": "  COMPUTED  "})
+    assert plan["agg_mode"] == "computed"
+
+
+def test_normalize_blank_agg_mode_is_none():
+    plan = cp.normalize_plan({"leaves": [{"id": "a", "instruction": "a"}], "agg_mode": "   "})
+    assert plan["agg_mode"] is None
+
+
+def test_normalize_composition_round_trips_when_dict_shaped():
+    composition = {"op": "argmax", "answer_noun": "peak", "value_label": "elevation",
+                    "items": [{"leaf": "a", "label": "Peak A", "type": "number"}]}
+    plan = cp.normalize_plan({
+        "leaves": [{"id": "a", "instruction": "a"}],
+        "agg_mode": "computed",
+        "composition": composition,
+    })
+    assert plan["composition"] == composition
+
+
+def test_normalize_composition_ignored_when_not_dict_shaped():
+    plan = cp.normalize_plan({
+        "leaves": [{"id": "a", "instruction": "a"}],
+        "agg_mode": "computed",
+        "composition": "not-a-dict",
+    })
+    assert plan["composition"] is None
+
+
+def test_composition_ops_matches_execution_compiled_composers():
+    # execution_compiled.py can't import compiled_plan back (circular), so COMPOSITION_OPS is a
+    # hand-kept mirror of execution_compiled._COMPOSERS' keys — this test is the tripwire that
+    # catches drift if a composer is ever added/removed on one side without the other.
+    from agent.app.testing import execution_compiled as ec
+    assert cp.COMPOSITION_OPS == frozenset(ec._COMPOSERS.keys())
+
+
+def test_validate_plan_does_not_raise_on_malformed_composition():
+    # A plan-authoring bug (unrecognized op, missing composition) is NOT a hard validation error —
+    # it degrades exactly like execution_compiled._compose does at runtime: silent fallback, never
+    # a crash. See validate_plan's docstring.
+    cp.validate_plan({
+        "leaves": [{"id": "a", "instruction": "a"}],
+        "agg_mode": "computed",
+        "composition": {"op": "not_a_real_op"},
+    })
+    cp.validate_plan({
+        "leaves": [{"id": "a", "instruction": "a"}],
+        "agg_mode": "computed",
+        # no composition key at all
+    })
+
+
+def test_validate_plan_preserves_agg_mode_and_composition_in_normalized_output():
+    composition = {"op": "argmax", "items": [{"leaf": "a", "label": "A", "type": "number"}]}
+    norm = cp.validate_plan({
+        "leaves": [{"id": "a", "instruction": "a"}],
+        "agg_mode": "computed",
+        "composition": composition,
+    })
+    assert norm["agg_mode"] == "computed"
+    assert norm["composition"] == composition

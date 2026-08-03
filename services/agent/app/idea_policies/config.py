@@ -76,6 +76,18 @@ class GoTConfig:
     embed_on_create: bool = True
     reexpand_enabled: bool = False
     reexpand_max_iterations: int = 1
+    # Capability-tiered re-expansion budget (opt-in, layered on top of reexpand_max_iterations
+    # above — this flag alone is a no-op; ``_effective_reexpand_max_iterations`` in idea_engine.py
+    # is the single place all THREE re-expansion budget check sites read through, required because
+    # this exact knob was once silently inert at one call site for any value > 1 — see the comment
+    # there). When on, the effective budget is picked via ``model_tiers.capability_tier``: weak
+    # models get more bounded re-expansion attempts (the native-engine-appropriate analog of
+    # badmodel-lab's per-page extraction retry lever — see the capability-continuum plan), strong
+    # models taper toward the current default. Placeholders pending live calibration.
+    reexpand_max_iterations_tiered_enabled: bool = False
+    reexpand_max_iterations_weak: int = 2
+    reexpand_max_iterations_standard: int = 1
+    reexpand_max_iterations_strong: int = 1
     reexpand_temperature: float = 0.2
     step_confidence_judge_enabled: bool = False
     step_confidence_judge_temperature: float = 0.0
@@ -294,6 +306,20 @@ class FinalConfig:
     # extraction, the current behavior -> byte-identical default.
     native_vote_k_enabled: bool = False
     native_vote_k: int = 1
+    # Capability-tiered vote-k (opt-in, layered on top of native_vote_k_enabled above — this flag
+    # alone, without the master switch, is a no-op). When both are on, ``native_vote_k`` is
+    # OVERRIDDEN by a band picked via ``model_tiers.capability_tier``: weak models get more
+    # redundant finalize votes, strong models taper toward k=1 (fully off downstream). Ported
+    # PATTERN (not the numbers) from the compiled-scaffold harness's proven ``_votes_for_model``
+    # auto-tapering (cheap=5/unknown=3/mid=3/premium=2 there) — deliberately NOT copied verbatim,
+    # since those were calibrated for a cheap per-page thin-extraction vote, not a full
+    # finalize-prompt rerun, and that harness's 4-bucket unknown≠cheap split has no equivalent
+    # here (``capability_tier`` deliberately collapses unknown into weak). These are placeholders
+    # pending live calibration (see the capability-continuum plan); do not treat as tuned values.
+    native_vote_k_tiered_enabled: bool = False
+    native_vote_k_weak: int = 3
+    native_vote_k_standard: int = 2
+    native_vote_k_strong: int = 1
     # Post-synthesis reconcile chain (opt-in, default OFF -> byte-identical). Each pass runs ONLY
     # for answer-shaped tasks (see ``final_recompute_shapes``) and fails open (keeps the prior
     # draft on empty/error/timeout). ``final_recompute_enabled``: re-list the exact source values

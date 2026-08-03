@@ -120,9 +120,19 @@ def test_fill_template_returns_compiled_plan_shape():
 
 
 def test_filled_plan_passes_compiled_plan_validate_unchanged():
-    """The filled template must be a legal compiled plan with zero changes to compiled_plan.py."""
+    """The filled template must be a legal compiled plan with zero changes to compiled_plan.py.
+
+    ``validate_plan`` now also returns ``agg_mode``/``composition`` (additive schema fields, see
+    ``compiled_plan.normalize_plan``) — ``None`` for both here since no template sets them yet, so
+    the leaves/aggregation shape (what this test actually guards) stays unchanged and doesn't need
+    ``fill_template`` to know about those two keys at all.
+    """
     filled = fill_template(_argmax_template(), _SLOT_VALUES)
-    assert compiled_plan.validate_plan(filled) == filled
+    validated = compiled_plan.validate_plan(filled)
+    assert validated["leaves"] == filled["leaves"]
+    assert validated["aggregation"] == filled["aggregation"]
+    assert validated["agg_mode"] is None
+    assert validated["composition"] is None
     assert compiled_plan.plan_structure(filled)["is_pure_fanout"] is True
 
 

@@ -26,6 +26,13 @@ from typing import Any, Dict, List
 
 _DEFAULT_AGGREGATION = "Combine the gathered facts into a final answer; cite source URLs."
 
+# The deterministic-composition op names ``execution_compiled._COMPOSERS`` implements. Duplicated
+# here (not imported) because ``execution_compiled.py`` imports FROM this module — importing back
+# would be circular. Mirrors this codebase's existing "frozen reference copy" precedent (e.g.
+# ``execution_compiled._price_tier`` vs. ``model_tiers.price_tier``): keep these two sets in sync
+# by hand if a composer op is ever added or removed.
+COMPOSITION_OPS = frozenset({"and_filter", "argmax", "count_threshold", "ratio_argmax", "subset_sum"})
+
 
 class PlanValidationError(ValueError):
     """Raised when a compiled plan is structurally invalid (bad leaf, missing dep, cycle)."""
@@ -33,7 +40,17 @@ class PlanValidationError(ValueError):
 
 def normalize_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
     """Return a normalized copy of ``plan``: every leaf has ``id``/``instruction``/``expect``/
-    ``depends_on`` (deps defaulted to ``[]``), and a non-empty ``aggregation``.
+    ``depends_on`` (deps defaulted to ``[]``), a non-empty ``aggregation``, and the optional
+    deterministic-composition fields ``agg_mode``/``composition``.
+
+    ``agg_mode`` normalizes to a lowercased/stripped string or ``None`` when absent/blank.
+    ``composition`` normalizes to the raw dict when present and dict-shaped, else ``None``. A plan
+    that sets neither key normalizes BYTE-IDENTICAL to before these fields existed (both come back
+    ``None``) — this is additive, not a behavior change for the ~all-of-today's plans that don't
+    set them. ``execution_compiled._execute_plan`` continues to read ``agg_mode``/``composition``
+    off the raw plan dict directly (unchanged); this normalization exists so ``validate_plan`` can
+    catch a malformed composition early, and so a schema-shaped consumer (``plan_library``) can see
+    these fields without reaching into the raw dict itself.
 
     Does NOT validate the dependency graph — call :func:`validate_plan` for that. Normalization
     is forgiving so a slightly-shaped hand or compiler plan still runs (ids are slugged from the
@@ -65,7 +82,14 @@ def normalize_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
         })
 
     aggregation = str(plan.get("aggregation") or "").strip() or _DEFAULT_AGGREGATION
-    return {"leaves": leaves, "aggregation": aggregation}
+    agg_mode = str(plan.get("agg_mode") or "").strip().lower() or None
+    composition = plan.get("composition") if isinstance(plan.get("composition"), dict) else None
+    return {
+        "leaves": leaves,
+        "aggregation": aggregation,
+        "agg_mode": agg_mode,
+        "composition": composition,
+    }
 
 
 def validate_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
@@ -74,6 +98,13 @@ def validate_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
 
     Checks: at least one leaf; unique non-empty leaf ids; every ``depends_on`` id exists; no
     leaf depends on itself; the dependency graph is acyclic.
+
+    Deliberately does NOT raise on a malformed/unrecognized ``composition`` (e.g. an unknown
+    ``op``, or ``agg_mode="computed"`` with no ``composition`` at all) — ``COMPOSITION_OPS`` names
+    the recognized set for callers that want to lint against it, but enforcing it here as a hard
+    error would contradict ``execution_compiled._compose``'s own contract: an unrecognized op or
+    unresolved composition is always a logged, graceful fallback to free-text aggregation, never a
+    crash. A plan-shape validator shouldn't be stricter than the executor it feeds.
     """
     norm = normalize_plan(plan)
     leaves = norm["leaves"]

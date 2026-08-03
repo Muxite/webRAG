@@ -7,6 +7,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from agent.app.answer_vote import vote_key, majority_vote
+from agent.app.model_tiers import capability_tier, tier_value
 
 from agent.app.idea_dag import IdeaDag
 from agent.app.agent_io import AgentIO
@@ -942,6 +943,13 @@ async def build_final_payload(
     # replaces it (falling back to the single call only if every sample failed).
     response = None
     _vote_k = int(getattr(cfg.final, "native_vote_k", 1) or 1)
+    if cfg.final.native_vote_k_tiered_enabled:
+        _vote_k = tier_value(
+            capability_tier(model_name),
+            weak=cfg.final.native_vote_k_weak,
+            standard=cfg.final.native_vote_k_standard,
+            strong=cfg.final.native_vote_k_strong,
+        )
     if cfg.final.native_vote_k_enabled and _vote_k >= 2:
         if _variations_will_run:
             # k-vote re-runs the identical prompt; the variation ensemble is its decorrelated

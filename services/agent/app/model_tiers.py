@@ -76,3 +76,41 @@ def tier_token_multiplier(model_name: Optional[str]) -> float:
     ``1.0`` so a missing pricing entry can never inflate a budget (see ``_TIER_TOKEN_MULTIPLIER``).
     """
     return _TIER_TOKEN_MULTIPLIER.get(price_tier(model_name), 1.0)
+
+
+# Mitigation-STRENGTH tier, distinct from ``tier_token_multiplier``'s budget-scaling policy above.
+# ``unknown`` resolves to ``"weak"`` here — the opposite hedge from ``_TIER_TOKEN_MULTIPLIER``'s
+# ``1.0`` (same as cheap), and deliberately so: an unpriced model is, in practice, almost always a
+# self-hosted (badmodel-lab-style) local model or an OpenRouter ``:free``-tier slug, i.e. exactly the
+# population this axis exists to protect. Under-mitigating a genuinely weak unpriced model is a
+# correctness bug; over-mitigating a strong one that happens to be unpriced is only wasted compute.
+# Different lever, different question, different safe default — see feedback_capability_continuum_
+# philosophy in project memory for why this is a deliberate, single, centralized policy choice rather
+# than yet another ad hoc "unknown" resolution alongside the ones above.
+_CAPABILITY_TIER_BY_PRICE_TIER = {
+    "cheap": "weak",
+    "unknown": "weak",
+    "mid": "standard",
+    "premium": "strong",
+}
+
+
+def capability_tier(model_name: Optional[str]) -> str:
+    """Classify a model into a 3-band MITIGATION-STRENGTH tier: ``'weak' | 'standard' | 'strong'``.
+
+    Built on ``price_tier()`` (price is the cheapest available capability proxy this module has —
+    see the module docstring), but resolves the ``'unknown'`` bucket ONCE, here, instead of letting
+    every new tiered mitigation lever invent its own policy for it. Known, accepted limitation: a
+    large but unpriced self-hosted model (e.g. a 70B local model) also buckets as ``'weak'`` — no
+    override escape hatch exists yet; revisit only if that proves wrong in practice.
+    """
+    return _CAPABILITY_TIER_BY_PRICE_TIER.get(price_tier(model_name), "weak")
+
+
+def tier_value(tier: str, *, weak, standard, strong):
+    """Dispatch a ``capability_tier()`` band to one of three caller-supplied values.
+
+    A single small helper so each new tiered lever doesn't reinvent its own weak/standard/strong
+    if/elif chain. Unrecognized tier strings fall back to ``standard`` (the middle-ground default).
+    """
+    return {"weak": weak, "standard": standard, "strong": strong}.get(tier, standard)

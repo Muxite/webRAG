@@ -7,6 +7,7 @@ import logging
 
 from agent.app.idea_dag import IdeaDag, IdeaNode
 from agent.app.idea_policies.base import IdeaNodeStatus
+from agent.app.model_tiers import capability_tier, tier_value
 from agent.app.agent_io import AgentIO
 from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.idea_policies.config import IdeaConfig
@@ -713,6 +714,29 @@ class IdeaDagEngine:
             return False
         return await self._apply_reexpand(graph, node_id, step_index, verdict)
 
+    def _effective_reexpand_max_iterations(self) -> int:
+        """The per-lineage re-expansion budget actually in force: the static
+        ``got.reexpand_max_iterations`` (flag off, the byte-identical default), or a band picked
+        via ``model_tiers.capability_tier(self.model_name)`` when ``reexpand_max_iterations_tiered_
+        enabled`` is on — weak models get more bounded re-expansion attempts, strong models taper
+        toward the current default.
+
+        ALL THREE budget-check sites (``_reexpand_check``, ``_apply_reexpand``,
+        ``_reexpand_guards_ok``) must read through this single method, not
+        ``self._cfg.got.reexpand_max_iterations`` directly: this exact knob was previously found to
+        be silently inert at one call site for any value > 1 (see the comment in
+        ``_apply_reexpand``) — a partial port that missed one of the three sites would reintroduce
+        that failure mode for the weak tier specifically.
+        """
+        if not self._cfg.got.reexpand_max_iterations_tiered_enabled:
+            return self._cfg.got.reexpand_max_iterations
+        return tier_value(
+            capability_tier(self.model_name),
+            weak=self._cfg.got.reexpand_max_iterations_weak,
+            standard=self._cfg.got.reexpand_max_iterations_standard,
+            strong=self._cfg.got.reexpand_max_iterations_strong,
+        )
+
     async def _reexpand_check(self, graph: IdeaDag, node_id: str, step_index: int) -> Optional[Dict[str, Any]]:
         """Read-only re-expansion gate + follow-up LLM check. No graph mutation.
 
@@ -755,7 +779,7 @@ class IdeaDagEngine:
         ):
             return None
 
-        max_iters = self._cfg.got.reexpand_max_iterations
+        max_iters = self._effective_reexpand_max_iterations()
         count = int(node.details.get("_got_reexpand_count", 0))
         if count >= max_iters:
             return None
@@ -788,7 +812,7 @@ class IdeaDagEngine:
         if graph.node_count() >= self._cfg.engine.max_total_nodes:
             return False
 
-        max_iters = self._cfg.got.reexpand_max_iterations
+        max_iters = self._effective_reexpand_max_iterations()
         count = int(node.details.get("_got_reexpand_count", 0))
         if count >= max_iters:
             return False
@@ -1985,7 +2009,7 @@ class IdeaDagEngine:
             and ActionResultExtractor.is_tool_failure(result)
         ):
             return False
-        max_iters = self._cfg.got.reexpand_max_iterations
+        max_iters = self._effective_reexpand_max_iterations()
         count = int(node.details.get("_got_reexpand_count", 0))
         if count >= max_iters:
             return False
