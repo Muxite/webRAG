@@ -146,12 +146,32 @@ Named here so later stages aren't invented from scratch each time, not committed
 
 ## Experiments — validate assumptions, don't assert them
 
-- **E1 — local-good-model vs. cheap-API-model head-to-head.** No apples-to-apples data exists on
-  disk today (confirmed this session: `badmodel-lab/results/cells_long.csv` has only local-subject
-  rows, no API-anchor rows). Uses the existing "subjects vs. anchors" split already in
-  `badmodel-lab/roster.yaml` (qwen2.5:7b local vs. gpt-4.1-nano API) across the same existing
-  `idea_tests` tiers/profiles. Needs live $ authorization; run early since the rest of the tiering
-  work leans on assumptions about how local models actually compare.
+- **E1 — local-good-model vs. cheap-API-model head-to-head. DONE 2026-08-03** ($0.1245 of a $2
+  budget). `qwen2.5:7b` (local) vs. `gpt-4.1-nano` (API) on the reachable tier (7 tasks), `m1_thin`
+  profile, R=3. Mean score 0.85 vs. 0.97; honest keystone pass 18/21 vs. 21/21. **Exact parity on
+  5 of 7 tasks** (062, 070, 072, 076, 078 — argmax/subset-sum/count-with-condition shapes); a
+  moderate gap on 064 (0.85 vs 1.00, qwen under-reports coverage, doesn't miscompute); a severe gap
+  on 069 (0.33 vs 1.00) that is a genuine reasoning failure, not noise — qwen's negation/odd-one-out
+  handling is internally self-contradictory across self-consistency samples (one run labels every
+  candidate "NOT landlocked"; another emits the literally contradictory
+  `"Austria: NOT landlocked -- coastline on none (landlocked)"`), and the vote-extract composer's
+  fallback produces garbage when 2 of 3 samples come back UNKNOWN. **Verdict on the coarse
+  "every local model = one weak bucket" question**: not obviously wrong (qwen still needs the full
+  mitigation stack — without it, 069-style catastrophic failure is real), but genuinely coarse for a
+  model this size — a 7B model tying a paid API model on 5 of 7 tasks is a different animal from the
+  0.5B-3B subjects `tiers.yaml` documents as flooring at ~0 on this same suite. The one real gap is
+  task-shape-specific (negation reasoning), not a uniform capability discount — argues that IF
+  capability-tier is ever used to modulate mitigation *strength* rather than just on/off, a
+  size-aware or task-shape-aware refinement would out-perform the current flat split. Left as an
+  open call for whoever next touches `model_tiers.py`, not forced by this one run.
+  **Side finding**: this run surfaced and fixed a real, previously-latent bug in
+  `badmodel-lab/run_cell.sh` — its key-sourcing loop never stripped surrounding double-quotes from
+  `services/keys.env` values, so `OPENROUTER_API_KEY` was exported literally including the quote
+  characters and every OpenRouter call 401'd. This is almost certainly why zero `gpt-4.1-nano` (or
+  any OpenRouter-routed) rows existed anywhere in `badmodel-lab/results/` before this session — the
+  remote-anchor path had apparently never been successfully exercised through this script. Fixed by
+  applying the same dequoting step (`sed -E 's/^"(.*)"$/\1/'`) already used consistently across
+  ~15 other key-sourcing scripts in `scripts/`.
 - **E2 — tool-registry fix parity check.** Done this session: full offline suite green at parity,
   plus the new dispatch tests. A live smoke-cell byte-for-byte reproduction of a previously-recorded
   benchmark result is the remaining live-verification step before anything is layered on top of the

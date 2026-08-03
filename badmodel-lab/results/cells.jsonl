@@ -86,3 +86,8 @@
 {"run_id": "bml__qwen2.5-7b__m1_thin__reachable", "model": "qwen2.5:7b", "place": "local", "profile": "m1_thin", "tier": "reachable", "ids": "062,064,069,070,072,076,078", "runs": 3, "t": 1785642463.6835356}
 {"run_id": "bml__qwen2.5-7b__m1_thin__reachable", "model": "qwen2.5:7b", "place": "local", "profile": "m1_thin", "tier": "reachable", "ids": "062,064,069,070,072,076,078", "runs": 3, "t": 1785649809.0655053}
 {"run_id": "bml__qwen2.5-7b__m1_thin__reachable", "model": "qwen2.5:7b", "place": "local", "profile": "m1_thin", "tier": "reachable", "ids": "062,064,069,070,072,076,078", "runs": 3, "t": 1785658961.6967142}
+{"run_id": "bml__qwen2.5-7b__m1_thin__reachable", "model": "qwen2.5:7b", "place": "local", "profile": "m1_thin", "tier": "reachable", "ids": "062,064,069,070,072,076,078", "runs": 3, "t": 1785758212.053733}
+{"run_id": "bml__qwen2.5-7b__m1_thin__reachable", "model": "qwen2.5:7b", "place": "local", "profile": "m1_thin", "tier": "reachable", "ids": "062,064,069,070,072,076,078", "runs": 3, "t": 1785758236.400311}
+{"run_id": "bml__openai-gpt-4.1-nano__m1_thin__062", "model": "openai/gpt-4.1-nano", "place": "remote", "profile": "m1_thin", "tier": "062", "ids": "062", "runs": 1, "t": 1785758482.9878898}
+{"run_id": "bml__openai-gpt-4.1-nano__m1_thin__062", "model": "openai/gpt-4.1-nano", "place": "remote", "profile": "m1_thin", "tier": "062", "ids": "062", "runs": 1, "t": 1785758586.5326467}
+{"run_id": "bml__openai-gpt-4.1-nano__m1_thin__reachable", "model": "openai/gpt-4.1-nano", "place": "remote", "profile": "m1_thin", "tier": "reachable", "ids": "062,064,069,070,072,076,078", "runs": 3, "t": 1785758614.1680954}

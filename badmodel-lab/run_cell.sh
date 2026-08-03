@@ -32,8 +32,13 @@ case "$TIER" in
 esac
 
 # --- keys from services/keys.env (CRLF per HANDOFF); only the three we need ---
+# Values may be double-quoted in keys.env; strip the quotes the same way every other
+# key-sourcing script in this repo does (scripts/*.sh's `keyval()` helper), or a
+# remote-provider key ends up literally including the quote characters and every
+# OpenRouter call 401s. Found live via this exact failure (E1, 2026-08-03) --
+# openai/gpt-4.1-nano had never been successfully run through this script before.
 while IFS='=' read -r k v; do
-  case "$k" in SEARCH_API_KEY|OPENROUTER_API_KEY|OPENAI_API_KEY) export "$k=$v" ;; esac
+  case "$k" in SEARCH_API_KEY|OPENROUTER_API_KEY|OPENAI_API_KEY) export "$k=$(sed -E 's/^"(.*)"$/\1/' <<< "$v")" ;; esac
 done < <(tr -d '\r' < services/keys.env)
 
 # The Brave SEARCH_API_KEY in keys.env is stale/invalid in this environment
