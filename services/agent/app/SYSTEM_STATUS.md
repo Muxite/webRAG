@@ -119,10 +119,18 @@ what's broken, and what's merely ugly — not chronological.
    has label leakage (it computes the very outcome it's meant to predict), so the pilot couldn't
    demonstrate real value; would need a genuinely decorrelated per-step verifier signal to be worth
    revisiting.
-4. **The "local LLM" framing is simulated, not validated** — and, per an explicit 2026-07-10 user
-   decision, **this is no longer a planned gap to close**: real local-model validation
-   (Ollama/llama.cpp) was dropped from the roadmap entirely, not deferred. All testing continues to
-   use OpenRouter cheap-tier models (nano, deepseek-flash, flash-lite) as the permanent proxy.
+4. **SUPERSEDED (2026-08-03): local-model validation is back on the roadmap.** The 2026-07-10
+   decision below (struck through, kept for history) no longer holds — see
+   `AGENT_CONTINUUM.md` for the current direction and its E1 experiment (a real local-vs-cheap-API
+   head-to-head, not yet run as of this writing). ~~The "local LLM" framing is simulated, not
+   validated — and, per an explicit 2026-07-10 user decision, this is no longer a planned gap to
+   close: real local-model validation (Ollama/llama.cpp) was dropped from the roadmap entirely, not
+   deferred. All testing continues to use OpenRouter cheap-tier models (nano, deepseek-flash,
+   flash-lite) as the permanent proxy.~~ What's actually true as of 2026-08-03: local Ollama models
+   already run today through the SAME generic OpenAI-compatible provider routing every other model
+   uses (`badmodel-lab/run_cell.sh` proves this against the real `idea_tests` suite with zero code
+   changes) — the prior "simulated, not validated" framing was itself stale by the time this
+   correction was written.
 5. **The benchmark suite's shape mix is real but was previously mis-described.** A proper
    `shape_classifier.py` recount (Phase 5) found `chain`/`parallel_merge` tied at 4/95 each before
    this session's task authoring (now 6/95 `chain` after 2 new tasks), `branch_eliminate` at 5/95,

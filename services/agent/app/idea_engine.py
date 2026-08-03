@@ -1759,20 +1759,25 @@ class IdeaDagEngine:
                     node.status = IdeaNodeStatus.FAILED
                     return result
         
+        # Resolve by NAME through the registry, not by coercing into the IdeaActionType enum —
+        # LeafActionRegistry.register()/install_pack() let a caller register a custom action
+        # under a name that was never added to the enum, and this is the one place that
+        # decides whether such a name is actually reachable from the model's own selection.
+        # Coercing through IdeaActionType(str(action_type)) here would raise for any such name
+        # and silently fall back to THINK, defeating the registry's own advertised extension
+        # point (idea_policies/extra_actions/pack.py's bundled actions hit exactly this).
+        action_name = str(action_type)
+        allowed = self.settings.get("allowed_actions") or [a.value for a in IdeaActionType]
         try:
-            allowed = self.settings.get("allowed_actions") or [a.value for a in IdeaActionType]
-            if str(action_type) not in [str(item) for item in allowed]:
-                action_enum = IdeaActionType.THINK
-            else:
-                action_enum = IdeaActionType(str(action_type))
+            if action_name not in [str(item) for item in allowed]:
+                action_name = IdeaActionType.THINK.value
+            action = self.actions.get(action_name)
         except (ValueError, KeyError) as exc:
             self._logger.warning(
-                "Unknown action_type=%r, defaulting to THINK: %s",
-                action_type,
-                exc,
+                "Unknown action_type=%r, defaulting to THINK: %s", action_type, exc,
             )
-            action_enum = IdeaActionType.THINK
-        action = self.actions.get(action_enum)
+            action_name = IdeaActionType.THINK.value
+            action = self.actions.get(action_name)
         attempts = int(node.details.get(DetailKey.ACTION_ATTEMPTS.value, 0)) + 1
         max_retries = self._cfg.action.max_retries
         graph.update_details(
@@ -1791,7 +1796,7 @@ class IdeaDagEngine:
         sanitized_result = self._sanitize_action_result(result) if result else None
         graph.update_details(node_id, {DetailKey.ACTION_RESULT.value: sanitized_result})
         self._record_decision(
-            "action", node_id=node_id, chosen=action_enum.value,
+            "action", node_id=node_id, chosen=action_name,
             metadata={
                 "success": bool(result.get("success")) if isinstance(result, dict) else False,
                 "url": (result.get("url") if isinstance(result, dict) else None),

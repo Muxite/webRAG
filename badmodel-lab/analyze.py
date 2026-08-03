@@ -27,6 +27,7 @@ import glob
 import json
 import re
 import statistics
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -34,6 +35,18 @@ LAB = Path(__file__).resolve().parent
 REPO = LAB.parent
 RES = REPO / "services" / "agent" / "idea_test_results"
 CELLS = LAB / "results" / "cells.jsonl"
+
+# Reuse the main harness's canonical result-row loader for the fields that genuinely overlap
+# (score, usd, visits, model) instead of re-deriving them independently -- the two scripts read
+# the SAME raw result JSON, so this scope's `analyze.py` and the main harness's
+# `level_ladder.py`/`recovery_curve.py` stop being able to silently drift on what those fields
+# mean. Deliberately NOT a full replacement: bench_common's `tier` is a different axis entirely
+# (an `effort_tier` runtime knob) from this file's `tier` (task-difficulty curation, TIER_BY_TASK
+# below) -- see AGENT_CONTINUUM.md's "three tiering axes" section. Every column bench_common
+# doesn't compute (keystone/honest/grounding/format pass, place, profile, leaf_mode, run_idx)
+# stays derived here from the raw JSON, same as before this bridge.
+sys.path.insert(0, str(REPO / "scripts"))
+import bench_common  # noqa: E402
 
 _TELEMETRY_CLASSES = ["valid_json", "fenced_json", "malformed_json",
                       "truncated_json", "prose", "refusal", "empty"]
@@ -181,10 +194,11 @@ def load_rows(cells: dict) -> list:
         cell = cells[rid]
         val = d.get("validation", {})
         obs = d.get("execution", {}).get("observability", {})
+        canon = bench_common.load_row(Path(f)) or {}
         ks_pass, ks_score = keystone_from(val.get("grep_validations"))
         grd_pass = grounding_from(val.get("grep_validations"))
         fmt_pass = format_from(val.get("grep_validations"))
-        visits = obs.get("visit", {}).get("count")
+        visits = canon.get("visits") if canon.get("visits") is not None else obs.get("visit", {}).get("count")
         m = re.search(r"_r(\d+)\.json$", base)
         test_id = d.get("test_metadata", {}).get("test_id")
         # Honest pass = keystone AND actually visited a page (visits>0). The bare
@@ -193,20 +207,22 @@ def load_rows(cells: dict) -> list:
         honest = (1 if (ks_pass and (visits or 0) > 0) else 0) if ks_pass is not None else None
         rows.append({
             "run_id": rid,
-            "model": d.get("model") or cell.get("model"),
+            "model": canon.get("model") or d.get("model") or cell.get("model"),
             "place": cell.get("place"),
             "profile": cell.get("profile"),
             "leaf_mode": _leaf_mode(cell.get("profile", "")),
+            # NOT canon["tier"] -- bench_common's `tier` is the effort_tier runtime knob, a
+            # different axis from this task-difficulty curation tier. See the import comment.
             "tier": TIER_BY_TASK.get(test_id, cell.get("tier")),
             "test_id": test_id,
             "run_idx": int(m.group(1)) if m else None,
-            "score": val.get("overall_score"),
+            "score": canon.get("score") if canon.get("score") is not None else val.get("overall_score"),
             "keystone_pass": (1 if ks_pass else 0) if ks_pass is not None else None,
             "keystone_score": ks_score,
             "grounding_pass": (1 if grd_pass else 0) if grd_pass is not None else None,
             "format_pass": (1 if fmt_pass else 0) if fmt_pass is not None else None,
             "honest_pass": honest,
-            "usd": obs.get("cost", {}).get("usd"),
+            "usd": canon.get("usd") if canon.get("usd") is not None else obs.get("cost", {}).get("usd"),
             "completion_tokens": obs.get("cost", {}).get("completion_tokens"),
             "visits": visits,
             "latency_s": latency_of(obs),

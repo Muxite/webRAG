@@ -28,12 +28,17 @@ from agent.app.idea_policies.extra_actions.wikipedia import WikipediaSummaryActi
 class ExtraActionPack:
     """A curated set of small, useful plugin actions.
 
-    Today the engine's `LeafActionRegistry` is keyed by the `IdeaActionType`
-    enum, so these can't yet be auto-selected by the planner. Phase 1 of
-    the extraction generalizes the registry to string keys; once that lands,
-    `ExtraActionPack.install(registry)` will wire each action in by name.
+    `_execute_action`'s dispatch gate now resolves by name through
+    `LeafActionRegistry` instead of coercing into the `IdeaActionType` enum, so
+    this bundle is reachable by the model's own action selection via the
+    registry's existing `install_pack`, without needing an enum member per
+    action:
 
-    Until then, callers instantiate actions directly:
+        engine.actions.install_pack(ExtraActionPack(settings=engine.settings))
+        engine.settings["allowed_actions"] += engine.actions.names()  # opt in
+
+    Callers who just want to invoke one action directly (no engine, no
+    registry) can still do that too:
 
         from agent.app.idea_policies.extra_actions import WikipediaSummaryAction
         action = WikipediaSummaryAction()
