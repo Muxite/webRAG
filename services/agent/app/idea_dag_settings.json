@@ -171,5 +171,11 @@
   "final_recompute_shapes": ["computation", "count", "argmax", "disambiguation", "single_value"],
   "plan_library_enabled": false,
   "plan_library_auto_enabled": false,
-  "plan_library_action_enabled": false
+  "plan_library_action_enabled": false,
+  "sandbox_workdir_root": "/work",
+  "sandbox_run_pytest_timeout_seconds": 30,
+  "sandbox_run_python_timeout_seconds": 15,
+  "sandbox_max_file_bytes": 200000,
+  "sandbox_max_files_per_leaf": 10,
+  "sandbox_llm_call_timeout_seconds": 90
 }

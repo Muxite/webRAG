@@ -470,6 +470,44 @@ class ActionConfig:
 
 
 @dataclass(frozen=True)
+class SandboxActionConfig:
+    """Limits for the CODE-domain sandbox actions (the ``sandbox_*`` settings keys).
+
+    The web-research arms act on the world through ``search``/``visit``; the coding arm
+    (``graph_compiled_code`` — see ``testing/execution_compiled_code.py``) acts on a writable
+    workdir through ``connector_sandbox.SandboxConnector``. These are that connector's cost/blast
+    bounds: where the workdir lives, how long one subprocess action may run, and how much a single
+    leaf may write. They are DEFENCE IN DEPTH, not the security boundary — the container itself
+    (read-only rootfs, dropped caps, tmpfs ``/work``, outer 900s wall-clock kill) is that.
+    """
+
+    workdir_root: str = "/work"
+    run_pytest_timeout_seconds: int = 30
+    run_python_timeout_seconds: int = 15
+    max_file_bytes: int = 200000
+    max_files_per_leaf: int = 10
+    #: Wall-clock bound on ONE leaf-loop decision call. The subprocess actions above are bounded by
+    #: their own timeouts, but an LLM completion is not: a hung backend would otherwise stall a step
+    #: forever and silently eat the outer 900s container budget with zero step-budget progress.
+    #: Sized between the two: generous next to a 30s pytest run (a ``write_file`` decision carries a
+    #: whole source file), yet small enough that a leaf's full step budget still fits in the run.
+    llm_call_timeout_seconds: int = 90
+
+    _KEYS: ClassVar[dict] = {
+        "workdir_root": "sandbox_workdir_root",
+        "run_pytest_timeout_seconds": "sandbox_run_pytest_timeout_seconds",
+        "run_python_timeout_seconds": "sandbox_run_python_timeout_seconds",
+        "max_file_bytes": "sandbox_max_file_bytes",
+        "max_files_per_leaf": "sandbox_max_files_per_leaf",
+        "llm_call_timeout_seconds": "sandbox_llm_call_timeout_seconds",
+    }
+
+    @classmethod
+    def from_settings(cls, settings: Mapping[str, Any]) -> "SandboxActionConfig":
+        return _build(cls, settings)
+
+
+@dataclass(frozen=True)
 class MemoryConfig:
     document_chunk_threshold: int = 200000
     document_chunk_size: int = 4000
@@ -545,6 +583,7 @@ class IdeaConfig:
     verify: VerifyConfig
     plan_library: PlanLibraryConfig
     action: ActionConfig
+    sandbox: SandboxActionConfig
     memory: MemoryConfig
     engine: EngineConfig
     policy: PolicyConfig
@@ -562,6 +601,7 @@ class IdeaConfig:
             verify=VerifyConfig.from_settings(settings),
             plan_library=PlanLibraryConfig.from_settings(settings),
             action=ActionConfig.from_settings(settings),
+            sandbox=SandboxActionConfig.from_settings(settings),
             memory=MemoryConfig.from_settings(settings),
             engine=EngineConfig.from_settings(settings),
             policy=PolicyConfig.from_settings(settings),

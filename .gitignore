@@ -35,3 +35,7 @@ compiled_plans/
 # Live model-pricing snapshot — rewritten on every priced run; never a source artifact
 .model_pricing_cache.json
 .barrage_prep/
+# codebench: materialize_task.py's rendered task fixtures and run results — regenerable
+# from services/agent/app/idea_code_tests/*.py, never a source artifact
+badmodel-lab/codebench/tasks/
+badmodel-lab/codebench/results/

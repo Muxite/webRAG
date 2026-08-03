@@ -762,6 +762,11 @@ def _parse_execution_variants(raw: str) -> List[str]:
         "graph_compiled": "graph_compiled",
         "compiled": "graph_compiled",
         "compiled_graph": "graph_compiled",
+        # Same, in the CODE domain: the plan's leaves drive sandbox actions (write_file /
+        # run_pytest / ...) instead of web search+visit. See testing/execution_compiled_code.py.
+        "graph_compiled_code": "graph_compiled_code",
+        "compiled_code": "graph_compiled_code",
+        "code": "graph_compiled_code",
     }
     out: List[str] = []
     seen = set()
