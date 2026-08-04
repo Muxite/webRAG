@@ -181,6 +181,13 @@ Named here so later stages aren't invented from scratch each time, not committed
   confounded with `localagent`'s entirely different control flow (anti-repeat suppression,
   finish-gate, greedy budget loop) — does typed-slot parsing measurably help weak models over JSON
   once everything else is held constant? `localagent`'s own results don't answer this in isolation.
+- **E4 — broader model comparison for an approximate tier list. DONE 2026-08-04** ($0.3343 of a $3
+  budget, $0.4588 combined with E1). Extended E1's single model pair to `deepseek/deepseek-v4-flash`
+  and `google/gemini-2.5-flash-lite` across format/reachable/hard/micro tiers, plus a `qwen2.5:7b`
+  hard-tier cell and `gpt-4.1-nano`'s first format-tier run. Full results, per-model
+  strengths/weaknesses, and important caveats (deepseek's low scores are likely a token-budget
+  measurement artifact, not a clean capability read — see below):
+  `badmodel-lab/MODEL_TIER_LIST.md`.
 
 ## Known gaps (named, not silently carried forward)
 
@@ -197,3 +204,18 @@ Named here so later stages aren't invented from scratch each time, not committed
   only if E1's data shows this is costing real accuracy on a capable local model.
 - `SYSTEM_STATUS.md`'s prior "local-model validation dropped from the roadmap entirely" claim
   (2026-07-10) is superseded by this document — that decision no longer holds.
+- **`execution_compiled.py::_is_reasoning_model` (line 366) doesn't cover deepseek**, unlike the
+  native engine's `model_tiers.py::is_reasoning_model`, which explicitly does (deepseek bills
+  reasoning tokens inside `completion_tokens`, per live telemetry). Since `badmodel-lab/run_cell.sh`
+  always runs through `execution_compiled.py`, deepseek gets the same 24-token thin-extraction
+  budget as a 0.5B local model with no reasoning-token floor — found via E4, circumstantial but
+  strong evidence (more visits + lower scores than nano/flash-lite on identical tasks). Suspected
+  root cause of deepseek's poor E4 showing; not fixed here. Follow-up: mirror the native engine's
+  deepseek coverage into `execution_compiled._is_reasoning_model`, or re-test under `react` leaf
+  mode instead of `thin`, then see if the reachable-tier score recovers.
+- `idea_tests/test_m02_amsterdam_area.py`'s `grounding` check requires an exact URL match against
+  a literal string, but Wikipedia's canonical redirect target differs — two E4 models extracted the
+  correct fact from the right page but scored 0.0 on grounding anyway, capping overall score at 0.5.
+  A scoring artifact, not a model gap; not fixed here.
+- `badmodel-lab/tiers.yaml` documents the `hard` tier as "floors even nano" — E4 found nano and
+  flash-lite both score 0.99 on it, not floored. The doc comment is stale; not updated here.
