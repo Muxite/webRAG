@@ -14,6 +14,9 @@ subjects:                         # place: local (free) via badmodel-ollama :114
   - tag: gemma2:2b                # ~1.6 GB
   - tag: llama3.2:3b              # ~2.0 GB         — the "getting decent" edge
   - tag: phi3:mini               # ~2.3 GB (3.8B)  — reasoning-capable edge case
+  - tag: qwen2.5:14b              # ~9.0 GB, ~10.9/12.3 GB VRAM at ctx=16384 -- little headroom
+                                   # left on this card. Added 2026-08-04 (Round 3); already pulled
+                                   # ad hoc from the 2026-07-28 overnight session.
 
 anchors:                          # ceiling references — run on micro/reachable tiers only
   - tag: qwen2.5:7b               # local, already pulled in yappers-ollama (:11434) — free
