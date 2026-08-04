@@ -188,6 +188,19 @@ Named here so later stages aren't invented from scratch each time, not committed
   strengths/weaknesses, and important caveats (deepseek's low scores are likely a token-budget
   measurement artifact, not a clean capability read — see below):
   `badmodel-lab/MODEL_TIER_LIST.md`.
+- **E5 — fix the deepseek token-budget bug + expand local roster to 8. DONE 2026-08-04**
+  ($0.1496 of a $3 budget; $0.7084 total across E1/E4/E5). Fixed `_is_reasoning_model` (commit
+  `d17de329`) and re-tested deepseek on the reachable tier: **0.53 → 0.96, confirmed** — the fix
+  resolved the catastrophic negation-task failure (069) into a clean, coherent pass on every rep.
+  Root cause validated, not just suspected. Format/hard/micro were not re-tested; still stale.
+  Separately, added `qwen2.5:14b` to `badmodel-lab/roster.yaml` (8th local subject) and ran it
+  across the full tier set: reachable 0.97, hard 0.95 — both essentially at the paid-API ceiling,
+  zero VRAM/stability issues despite leaving only ~1.4GB headroom on the test machine's 12GB card.
+  Its most interesting result: `qwen2.5:7b`'s severe negation gap (069, 0.33) resolves cleanly at
+  2x scale (0.99), while its k-th-ordinal gap (075) only partially resolves — scale isn't a uniform
+  fix across failure modes. Gap-filled reachable-tier data for 4 more local subjects
+  (tinyllama 0.25, qwen2.5:0.5b 0.54, llama3.2:1b 0.42, phi3:mini 0.69). Full results:
+  `badmodel-lab/MODEL_TIER_LIST.md`.
 
 ## Known gaps (named, not silently carried forward)
 
@@ -204,15 +217,11 @@ Named here so later stages aren't invented from scratch each time, not committed
   only if E1's data shows this is costing real accuracy on a capable local model.
 - `SYSTEM_STATUS.md`'s prior "local-model validation dropped from the roadmap entirely" claim
   (2026-07-10) is superseded by this document — that decision no longer holds.
-- **`execution_compiled.py::_is_reasoning_model` (line 366) doesn't cover deepseek**, unlike the
-  native engine's `model_tiers.py::is_reasoning_model`, which explicitly does (deepseek bills
-  reasoning tokens inside `completion_tokens`, per live telemetry). Since `badmodel-lab/run_cell.sh`
-  always runs through `execution_compiled.py`, deepseek gets the same 24-token thin-extraction
-  budget as a 0.5B local model with no reasoning-token floor — found via E4, circumstantial but
-  strong evidence (more visits + lower scores than nano/flash-lite on identical tasks). Suspected
-  root cause of deepseek's poor E4 showing; not fixed here. Follow-up: mirror the native engine's
-  deepseek coverage into `execution_compiled._is_reasoning_model`, or re-test under `react` leaf
-  mode instead of `thin`, then see if the reachable-tier score recovers.
+- ~~`execution_compiled.py::_is_reasoning_model` (line 366) doesn't cover deepseek~~ **FIXED in E5
+  (commit `d17de329`)** — added `"deepseek"` to the `startswith` tuple, mirroring the native
+  engine's `model_tiers.py::is_reasoning_model`. Confirmed with a live re-test, not just a code
+  review: reachable-tier score recovered 0.53 → 0.96. Format/hard/micro tiers weren't re-tested and
+  their old numbers are presumed-but-unconfirmed stale — a residual gap, not the original bug.
 - `idea_tests/test_m02_amsterdam_area.py`'s `grounding` check requires an exact URL match against
   a literal string, but Wikipedia's canonical redirect target differs — two E4 models extracted the
   correct fact from the right page but scored 0.0 on grounding anyway, capping overall score at 0.5.
