@@ -6,6 +6,7 @@ NATIVE engine shares ONE implementation across its executor call sites rather th
 the buckets. Reasoning-model detection lives in ``llm_backends.accepts_reasoning_effort`` — keep
 the two concerns separate (price tier vs. accepts-reasoning-effort).
 """
+import re
 from typing import Optional
 
 from agent.app import model_costs
@@ -100,9 +101,12 @@ def capability_tier(model_name: Optional[str]) -> str:
 
     Built on ``price_tier()`` (price is the cheapest available capability proxy this module has —
     see the module docstring), but resolves the ``'unknown'`` bucket ONCE, here, instead of letting
-    every new tiered mitigation lever invent its own policy for it. Known, accepted limitation: a
-    large but unpriced self-hosted model (e.g. a 70B local model) also buckets as ``'weak'`` — no
-    override escape hatch exists yet; revisit only if that proves wrong in practice.
+    every new tiered mitigation lever invent its own policy for it.
+
+    Deliberately still 3-valued: a large but unpriced self-hosted model (e.g. a 70B local model)
+    buckets as ``'weak'`` here too. That coarseness is now REFINED, additively, by
+    ``local_model_size_band()`` below rather than by widening this contract — callers that only
+    need on/off mitigation keep pattern-matching exactly three strings.
     """
     return _CAPABILITY_TIER_BY_PRICE_TIER.get(price_tier(model_name), "weak")
 
@@ -114,3 +118,84 @@ def tier_value(tier: str, *, weak, standard, strong):
     if/elif chain. Unrecognized tier strings fall back to ``standard`` (the middle-ground default).
     """
     return {"weak": weak, "standard": standard, "strong": strong}.get(tier, standard)
+
+
+# Approximate parameter count parsed out of an Ollama-style ``family:<size>b`` tag. ONLY the segment
+# after the LAST ``:`` is inspected, which is what makes this safe: a family name routinely carries
+# digits that are NOT a parameter count (``qwen2.5``, ``llama3.2``, ``gpt-4.1-nano``), and none of
+# those can reach this pattern. The negative lookahead rejects a size glued to more alphanumerics
+# (so ``8x7b`` — a mixture-of-experts total that isn't comparable to a dense count — stays unparsed
+# rather than being read as "8").
+_SIZE_TAG_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*b(?![a-z0-9.])", re.IGNORECASE)
+
+# (exclusive upper bound in billions, band name), ascending; anything at/above the last bound is
+# ``large``. Cut points are read off badmodel-lab's reachable-tier mean scores (see
+# ``badmodel-lab/MODEL_TIER_LIST.md`` and AGENT_CONTINUUM's E1/E5 log), NOT picked round-number
+# style: qwen2.5:0.5b 0.54 / llama3.2:1b 0.42 / tinyllama 0.25 (<2B: near-floor, needs everything);
+# phi3:mini ~3.8B 0.69 (2-6B: real but clearly sub-API); qwen2.5:7b 0.85, tying gpt-4.1-nano on 5
+# of 7 tasks (6-12B); qwen2.5:14b reachable 0.97 / hard 0.95, i.e. AT the paid-API ceiling (>=12B).
+# The 6B cut separates the ~3-4B class from the 7-8B class (so llama3.1:8b groups with qwen2.5:7b);
+# the 12B cut separates 7-8B from 13-14B, which is exactly where the measured jump to parity is.
+_SIZE_BANDS = ((2.0, "tiny"), (6.0, "small"), (12.0, "medium"))
+_LARGEST_SIZE_BAND = "large"
+
+
+def local_model_params_b(model_name: Optional[str]) -> Optional[float]:
+    """Approximate parameter count in BILLIONS parsed from an Ollama-style ``name:<size>b`` tag.
+
+    Pure string parsing — no pricing lookup, no capability judgement (that is
+    ``local_model_size_band``'s job). ``None`` means "this tag encodes no parseable size", which is
+    the correct answer for named-size conventions (``phi3:mini``), size-less tags (``tinyllama``,
+    ``mistral:latest``) and any name without a tag at all (``openai/gpt-4.1-nano``). Named sizes are
+    deliberately NOT guessed at: "mini"/"small"/"medium" mean wildly different parameter counts
+    across families, so they are less comparable than no signal at all.
+    """
+    if not model_name or ":" not in model_name:
+        return None
+    match = _SIZE_TAG_RE.match(model_name.rsplit(":", 1)[1].strip())
+    if not match:
+        return None
+    try:
+        params = float(match.group(1))
+    except ValueError:  # pragma: no cover — the regex already guarantees a float literal
+        return None
+    return params if params > 0.0 else None
+
+
+def local_model_size_band(model_name: Optional[str]) -> Optional[str]:
+    """Refine the ``weak`` capability tier for LOCAL models: ``'tiny'|'small'|'medium'|'large'``.
+
+    Additive to ``capability_tier()``, never a replacement: this exists because collapsing every
+    unpriced model into one flat ``weak`` bucket is measurably too coarse (a 14B local model scores
+    at the paid-API ceiling; a 0.5B one scores 0.54 and a 1B one 0.42 on the same suite), while a
+    capable local model still needs the mitigation STACK for specific failure modes — scale is not a
+    uniform fix (qwen2.5:7b's negation gap resolves at 14B, its k-th-ordinal gap only partly does).
+    So the right lever is mitigation STRENGTH scaling with size, not reclassifying big local models
+    out of ``weak`` entirely.
+
+    ``None`` means "unknown, do not refine" and every caller MUST fall back to its flat
+    ``capability_tier`` behavior on it (see ``size_band_value``'s ``unknown=``). It is returned for
+    any PRICED model — a priced slug's size, where it even has one, is not this axis's business
+    (price is already the stronger signal there, and ``price_tier`` is what feeds
+    ``capability_tier``) — and for any local tag whose size doesn't parse.
+    """
+    if price_tier(model_name) != "unknown":
+        return None  # priced => capability_tier already had a real signal; do not second-guess it
+    params = local_model_params_b(model_name)
+    if params is None:
+        return None
+    for upper, band in _SIZE_BANDS:
+        if params < upper:
+            return band
+    return _LARGEST_SIZE_BAND
+
+
+def size_band_value(band: Optional[str], *, tiny, small, medium, large, unknown):
+    """Dispatch a ``local_model_size_band()`` band to one of four caller-supplied values.
+
+    ``tier_value``'s counterpart for the size axis, with one deliberate difference: the fallback for
+    an unrecognized/``None`` band is an EXPLICIT ``unknown=`` argument rather than a middle band,
+    because "unknown" here is not a middle-of-the-road guess — it means the caller must keep the
+    behavior it would have had without any size refinement at all.
+    """
+    return {"tiny": tiny, "small": small, "medium": medium, "large": large}.get(band, unknown)

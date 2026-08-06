@@ -191,6 +191,15 @@ def test_native_vote_k_flags_default_off():
     on = FinalConfig.from_settings({"native_vote_k_enabled": 1, "native_vote_k": "3"})
     assert on.native_vote_k_enabled is True
     assert on.native_vote_k == 3
+    # Local size-band refinement of the weak band: default OFF, tapering k with model size.
+    assert empty.native_vote_k_size_band_enabled is False
+    assert prod.native_vote_k_size_band_enabled is False
+    assert (empty.native_vote_k_local_tiny, empty.native_vote_k_local_small,
+            empty.native_vote_k_local_medium, empty.native_vote_k_local_large) == (4, 3, 2, 1)
+    banded = FinalConfig.from_settings({"native_vote_k_size_band_enabled": 1,
+                                        "native_vote_k_local_medium": "5"})
+    assert banded.native_vote_k_size_band_enabled is True
+    assert banded.native_vote_k_local_medium == 5
 
 
 def test_final_reconcile_chain_flags_default_off():

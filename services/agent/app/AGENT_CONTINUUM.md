@@ -251,9 +251,17 @@ Named here so later stages aren't invented from scratch each time, not committed
   describes — i.e. it's a genuinely working, end-to-end, interactive (not just benchmark-harness)
   instance of the continuum thesis, one this document should have cited as evidence rather than
   omitted.
-- `capability_tier()` collapses every unpriced (local) model into a single `weak` bucket regardless
-  of actual size (0.5B vs. 70B) — left as-is per an explicit YAGNI decision this session; revisit
-  only if E1's data shows this is costing real accuracy on a capable local model.
+- ~~`capability_tier()` collapses every unpriced (local) model into a single `weak` bucket
+  regardless of actual size (0.5B vs. 70B)~~ **REFINED 2026-08-06** (offline; live validation
+  pending). `capability_tier()` deliberately still returns the same 3 strings — the additive
+  `model_tiers.local_model_size_band()` splits the weak bucket by the parameter count encoded in an
+  Ollama-style `:Nb` tag (`tiny` <2B / `small` 2-6B / `medium` 6-12B / `large` >=12B), returning
+  `None` (= "don't refine") for named-size tags (`phi3:mini`, `tinyllama`), MoE tags and any priced
+  model. Wired into `native_vote_k_tiered_enabled` behind a second opt-in flag
+  (`native_vote_k_size_band_enabled`, k = 4/3/2/1 by band) — a `None` band reproduces today's flat
+  weak value exactly. Bands are cut where E1/E5's reachable-tier scores actually step (0.5b 0.54 /
+  1b 0.42 vs. 7b 0.85 vs. 14b 0.97). This scales mitigation STRENGTH by size; it does NOT
+  reclassify big local models out of `weak`, since scale is not a uniform fix across failure modes.
 - `SYSTEM_STATUS.md`'s prior "local-model validation dropped from the roadmap entirely" claim
   (2026-07-10) is superseded by this document — that decision no longer holds.
 - ~~`execution_compiled.py::_is_reasoning_model` (line 366) doesn't cover deepseek~~ **FIXED in E5

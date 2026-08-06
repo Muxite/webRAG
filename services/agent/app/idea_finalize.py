@@ -7,7 +7,12 @@ import re
 from typing import Any, Dict, List, Optional
 
 from agent.app.answer_vote import vote_key, majority_vote
-from agent.app.model_tiers import capability_tier, tier_value
+from agent.app.model_tiers import (
+    capability_tier,
+    local_model_size_band,
+    size_band_value,
+    tier_value,
+)
 
 from agent.app.idea_dag import IdeaDag
 from agent.app.agent_io import AgentIO
@@ -950,6 +955,18 @@ async def build_final_payload(
             standard=cfg.final.native_vote_k_standard,
             strong=cfg.final.native_vote_k_strong,
         )
+        # Refine the flat weak band by LOCAL model size where the tag encodes one. An unparseable
+        # tag or a priced model yields band None -> `unknown=_vote_k` -> exactly the tiered value
+        # computed above, so this layer can only ever narrow, never reinterpret, the tiering.
+        if cfg.final.native_vote_k_size_band_enabled:
+            _vote_k = size_band_value(
+                local_model_size_band(model_name),
+                tiny=cfg.final.native_vote_k_local_tiny,
+                small=cfg.final.native_vote_k_local_small,
+                medium=cfg.final.native_vote_k_local_medium,
+                large=cfg.final.native_vote_k_local_large,
+                unknown=_vote_k,
+            )
     if cfg.final.native_vote_k_enabled and _vote_k >= 2:
         if _variations_will_run:
             # k-vote re-runs the identical prompt; the variation ensemble is its decorrelated

@@ -320,6 +320,23 @@ class FinalConfig:
     native_vote_k_weak: int = 3
     native_vote_k_standard: int = 2
     native_vote_k_strong: int = 1
+    # Size-band refinement WITHIN the weak band, for LOCAL (unpriced) models only (opt-in, layered
+    # on top of native_vote_k_tiered_enabled above — this flag alone is a no-op). When on, a model
+    # whose tag encodes a parameter count (``model_tiers.local_model_size_band``) uses the matching
+    # band below instead of the flat ``native_vote_k_weak``; an unparseable tag (``phi3:mini``,
+    # ``tinyllama``) or any priced model keeps the flat tiered value exactly, so this can only ever
+    # refine, never reinterpret. Rationale for the taper (badmodel-lab reachable-tier means): <2B
+    # scores 0.25-0.54 and its failures are often a malformed/absent extraction that one more sample
+    # can rescue, while >=12B scores 0.97 — at the paid-API ceiling — where blanket finalize
+    # redundancy buys nothing and costs the most wall-clock (a big local model is the SLOWEST thing
+    # to re-run, the small ones the cheapest). Big local models still need the mitigation stack for
+    # their specific failure modes; those are targeted levers, not this blanket one. Placeholders
+    # pending live calibration, like the tier bands above.
+    native_vote_k_size_band_enabled: bool = False
+    native_vote_k_local_tiny: int = 4
+    native_vote_k_local_small: int = 3
+    native_vote_k_local_medium: int = 2
+    native_vote_k_local_large: int = 1
     # Post-synthesis reconcile chain (opt-in, default OFF -> byte-identical). Each pass runs ONLY
     # for answer-shaped tasks (see ``final_recompute_shapes``) and fails open (keeps the prior
     # draft on empty/error/timeout). ``final_recompute_enabled``: re-list the exact source values
