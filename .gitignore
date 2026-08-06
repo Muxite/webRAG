@@ -39,3 +39,12 @@ compiled_plans/
 # from services/agent/app/idea_code_tests/*.py, never a source artifact
 badmodel-lab/codebench/tasks/
 badmodel-lab/codebench/results/
+# Coverage data file — regenerated on every pytest --cov run
+.coverage
+# Benchmark analysis script output (PNGs + CSVs) — regenerable, same category as idea_test_results/
+scripts/_ab_out/
+scripts/_campaign_out/
+scripts/_ladder_out/
+scripts/_xtier_out/
+# Weekly engineering report PDFs exported to repo root (session artifact, not source)
+webRAG_weekly_report_*.pdf
