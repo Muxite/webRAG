@@ -636,6 +636,17 @@ def _apply_got_experiment_overrides(
         idea_settings["native_vote_k"] = _votek
         if _votek >= 2:
             idea_settings["native_vote_k_enabled"] = True
+    # IDEA_TEST_NATIVE_VOTE_K_TIERED: capability-tier the vote count
+    # (native_vote_k_tiered_enabled) instead of a single fixed k.
+    _votek_tiered_override = env.get("IDEA_TEST_NATIVE_VOTE_K_TIERED", "").strip()
+    if _votek_tiered_override:
+        idea_settings["native_vote_k_tiered_enabled"] = _is_enabled(_votek_tiered_override)
+    # IDEA_TEST_NATIVE_VOTE_K_SIZE_BAND: refine the tiered weak-band vote count by LOCAL
+    # model size (native_vote_k_size_band_enabled) -- a no-op unless the tiered flag above
+    # is also on.
+    _votek_sizeband_override = env.get("IDEA_TEST_NATIVE_VOTE_K_SIZE_BAND", "").strip()
+    if _votek_sizeband_override:
+        idea_settings["native_vote_k_size_band_enabled"] = _is_enabled(_votek_sizeband_override)
     # IDEA_TEST_EXPECT_CONTRACT: the expansion "expect contract" schema requirement
     # (expansion_expect_contract_enabled).
     _expectcontract_override = env.get("IDEA_TEST_EXPECT_CONTRACT", "").strip()
