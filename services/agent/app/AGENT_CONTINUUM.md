@@ -204,14 +204,23 @@ Named here so later stages aren't invented from scratch each time, not committed
 
 ## Known gaps (named, not silently carried forward)
 
-- `compiled_plan.py::COMPOSITION_OPS` lists `ratio_argmax` as a supported composition op, but
-  `execution_compiled.py::_COMPOSERS` has no handler for it (only `and_filter`, `argmax`,
-  `count_threshold`, `subset_sum` are actually implemented) — a pre-existing drift bug, found via
-  this session's baseline test run (`compiled_plan_test.py::test_composition_ops_matches_execution_compiled_composers`
-  fails on current `master`). Orthogonal to this effort; not fixed here.
+- ~~`compiled_plan.py::COMPOSITION_OPS` lists `ratio_argmax` as a supported composition op, but
+  `execution_compiled.py::_COMPOSERS` has no handler for it~~ **FIXED**, independently, by a parallel
+  leaf-extraction/composer session on `compiled-scaffold-dag` (landed in commit `f3d47666`, merged
+  into this branch afterward) — `_compose_ratio_argmax` is now registered and
+  `compiled_plan_test.py::test_composition_ops_matches_execution_compiled_composers` passes. Built
+  as a Tier-A-only, all-or-nothing composer for task 064 after adversarial review found real bugs in
+  earlier graceful-degradation designs; see that commit's history for the full story.
 - `prompt_hygiene.py` (JSON self-contradiction lint) remains imported only by the compiled test
   harness — genuinely dead code on the live engine path. Wiring it into live prompt construction is
   unscoped, not part of Stage 1.
+- **This document didn't count `badmodel-lab/playground/`** (a Docker Compose + SearXNG interactive
+  chat demo, built the day before this doc, merged in from a parallel session) as continuum evidence
+  — it should have. Per its own `MITIGATION_BRIDGE.md`, it drives `IdeaDagEngine` directly
+  (`AGENT_USE_IDEA_DAG=1`), the same engine this document's "graph-as-primary" architecture decision
+  describes — i.e. it's a genuinely working, end-to-end, interactive (not just benchmark-harness)
+  instance of the continuum thesis, one this document should have cited as evidence rather than
+  omitted.
 - `capability_tier()` collapses every unpriced (local) model into a single `weak` bucket regardless
   of actual size (0.5B vs. 70B) — left as-is per an explicit YAGNI decision this session; revisit
   only if E1's data shows this is costing real accuracy on a capable local model.

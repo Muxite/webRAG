@@ -1,5 +1,13 @@
 # webRAG / Euglena — Session Handoff (2026-07-10, Phase 5 update)
 
+> **Stale as of 2026-08-06** — kept for historical continuity, not as the current pickup doc. Since
+> this was written: the barrage relaunch's full F1-F33 validity sweep landed and is queued for a
+> live relaunch, a leaf-extraction/composer calibration pass roughly doubled reachable-tier scores,
+> a coding-benchmark harness (`codebench`) was built, and `badmodel-lab`/`services/agent/app` merged
+> into one multicapability agent architecture — see `services/agent/app/AGENT_CONTINUUM.md` for the
+> current design doc and roadmap, and `/home/muk/.claude/plans/plan-the-next-stages-stateless-quill.md`
+> for the active next-steps plan.
+
 Start here. This is the project-wide pickup doc. Deep logs live in companion docs under
 `services/agent/app/`: `COST_BENCHMARK_HANDOFF.md` (the closed-out compiled-scaffold campaign),
 `ADAPTIVE_DISTILLATION_HANDOFF.md` (the active research line, Phases 1-5), and `SYSTEM_STATUS.md`

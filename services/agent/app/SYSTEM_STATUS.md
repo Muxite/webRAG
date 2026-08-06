@@ -5,6 +5,12 @@ campaign (`COST_BENCHMARK_HANDOFF.md`), the adaptive-engine/distillation track
 (`ADAPTIVE_DISTILLATION_HANDOFF.md`), and this session's bug-hunting. Organized by what works,
 what's broken, and what's merely ugly — not chronological.
 
+> **Stale as of 2026-08-06.** Most content below predates a month of subsequent work: the barrage
+> relaunch's F1-F33 validity sweep, the leaf-extraction/composer calibration pass (0.886→0.959
+> reachable, 0.60→0.906 hard tier), the codebench coding-benchmark harness, and the multicapability
+> merge (`AGENT_CONTINUUM.md`). Item 4's local-model reconciliation below is current; treat
+> everything else as historical unless cross-checked against git log / current code.
+
 ---
 
 ## What the system can actually do today
