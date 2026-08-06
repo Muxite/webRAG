@@ -65,11 +65,14 @@ its negation gap (see below). Zero OOM/crashes/errors across 72 task-runs despit
 leaving only ~1.4GB VRAM headroom on the test machine's 12GB card — confirmed operationally stable
 at this size. One real remaining miss: k-th-ordinal reasoning (task 075, hard tier) — 1 of 3 reps
 wrong despite gathering all 6 underlying facts correctly, a ranking/computation slip rather than a
-data-gathering one. **Format-tier finding worth flagging generally**: for this model, the
-`fs1_structured_strict` (strict JSON schema) profile scored *worse* (0.70) than no enforcement at
-all (`fs0`, 0.74) — `fs2_thin_assemble` was clearly best (0.89). Strict schema enforcement is not a
-free win even for a capable model; harness-owned thin-assemble looks like the more broadly robust
-format mitigation.
+data-gathering one. **Format-tier finding, scoped to this model**: the `fs1_structured_strict`
+(strict JSON schema) profile scored *worse* (0.70) than no enforcement at all (`fs0`, 0.74) —
+`fs2_thin_assemble` was clearly best (0.89) for `qwen2.5:14b` specifically. Strict schema
+enforcement is not a free win even for a capable model. **This does NOT generalize roster-wide** —
+see `FORMAT_STRESS_TIER.md` §7 (full 8-model R=12 reconciliation, 2026-08-06): `fs2` wins for
+`qwen2.5` (both ends of the size range tested) and `gemma2:2b`, but `fs1` wins for the
+llama/phi3/tinyllama models, and `fs0` (unenforced) wins outright for `llama3.2:3b`. Pick the
+format profile per model from that table, not from this one cell.
 
 ### `qwen2.5:7b` (local, free) — Tier B
 Ties gpt-4.1-nano on 5 of 7 E1 reachable-tier tasks. Two real, reproducible gaps:

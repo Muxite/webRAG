@@ -184,3 +184,55 @@ llama3.2:3b, phi3:mini) × {fs0, fs1, fs2}, plus qwen2.5:7b as the ceiling. R≥
 4. **[one live run]** the fs0/fs1/fs2 × roster matrix at R≥12; analyze; generate the corrected Fig 3 +
    the frontier. This is the only step that touches the local model — do it after everything above is
    validated statically.
+
+---
+
+## 7. Post-hoc reconciliation — full local roster (R=12), verified 2026-08-06
+
+Step 4 above ran, but only got reconciled against the pre-registered predictions for one model
+(`qwen2.5:7b`) at the time — `MODEL_TIER_LIST.md` and this doc's own prose kept citing that
+single-model pilot's monotonic fs0<fs1<fs2 result as if it were the roster-wide answer. It isn't.
+Full R=12 means, all 8 local subjects (verified directly against `badmodel-lab/results/cells_long.csv`):
+
+| model | size | fs0 | fs1 | fs2 | winner | P3 (fs2>fs0)? |
+|---|---|---|---|---|---|---|
+| qwen2.5:0.5b | 0.5B | 0.333 | 0.361 | **0.583** | fs2 | holds |
+| llama3.2:1b | 1B | **0.361** | 0.500 | 0.333 | fs1 | **fails** |
+| tinyllama | 1.1B | 0.250 | **0.667** | 0.333 | fs1 | holds (+0.08) |
+| qwen2.5:1.5b | 1.5B | 0.694 | **0.722** | 0.583 | fs1 | fails |
+| gemma2:2b | 2B | 0.472 | 0.694 | **0.806** | fs2 | holds |
+| llama3.2:3b | 3B | **0.750** | 0.722 | 0.500 | fs0 | fails |
+| phi3:mini | 3.8B | 0.444 | **0.500** | 0.444 | fs1 (flat) | fails (tied) |
+| qwen2.5:7b | 7B | 0.778 | 0.861 | **0.889** | fs2 | holds |
+
+**Per prediction, checked against this table, not just the qwen2.5:7b pilot cell:**
+- **P1 (the wall appears):** holds broadly — fs0 never reaches the smallest models' apparent
+  ceiling, consistent with a real if partial wall.
+- **P2 (constrained decoding rescues format):** mixed, as originally found for `qwen2.5:14b` — fs1
+  beats fs0 for 5/8 models here (llama3.2:1b, tinyllama, qwen2.5:1.5b, gemma2:2b, phi3:mini) but
+  fs1 is *worse* than fs0 for llama3.2:3b. Confirmed: "Ollama's `json_schema` helps often, not
+  always" — no clean verdict, as pre-registered as an acceptable outcome.
+- **P3 (thin payoff, "fs2 yields the highest score for the weakest models"):** **the pre-registered
+  falsification criterion actually fires for `llama3.2:1b`** — one of the three weakest models in
+  the roster — where fs2 (0.333) scores *below* fs0 (0.361), not above it. Per this doc's own §4
+  kill criterion ("If fs2 does not beat fs0 for the weakest models, the thin scaffold's format
+  value is unproven — say so"): **P3 is falsified for that model, not just "not yet confirmed
+  broadly."** It holds for the other two weakest models (qwen2.5:0.5b clearly, tinyllama
+  marginally).
+- **P4 (schema_valid monotonic with size):** not re-derived here (would need the `schema_ok` vs
+  `schema_partial` telemetry breakdown, not just the deliverable score) — still open.
+
+**Corrected headline:** there is no single universal-winner format profile. The roster splits
+roughly along family/scale lines that do NOT reduce to a clean size cutoff (sorted by parameter
+count, the winner sequence is fs2, fs1, fs1, fs1, fs2, fs0, fs1, fs2 — not monotonic in either
+direction). `qwen2.5` (at both the smallest and largest sizes tested) and `gemma2:2b` favor fs2;
+the llama/phi3/tinyllama models mostly favor fs1; `llama3.2:3b` is the one model where the
+*unenforced* baseline (fs0) wins outright. **Recommended practice going forward: pick the format
+profile per model from this table, not from a single "thin-assemble always wins" default** — and
+flag any claim in `MODEL_TIER_LIST.md` phrased as a roster-wide recommendation (rather than
+scoped to the specific model it was measured on) for correction.
+
+Not re-run: `schema_ok`/`schema_valid` vs `schema_partial` telemetry breakdown (P4), which would
+show *why* each model lands where it does (genuine schema failures vs. a lower-level content
+miss) rather than just the outcome score — a real next step if this tier gets revisited, not done
+as part of this reconciliation pass.
