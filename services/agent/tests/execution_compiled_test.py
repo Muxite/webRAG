@@ -1153,7 +1153,8 @@ def test_execute_plan_appends_real_sources_to_hallucinated_citation(monkeypatch)
 # --- Reasoning-model token budget + effort hint (gpt-5-mini finish_reason=length squeeze) ---------
 
 def test_is_reasoning_model_detects_gpt5_and_o_series():
-    for slug in ("gpt-5-mini", "openai/gpt-5-mini", "gpt-5", "openai/gpt-5", "o1", "o3-mini", "o4-mini"):
+    for slug in ("gpt-5-mini", "openai/gpt-5-mini", "gpt-5", "openai/gpt-5", "o1", "o3-mini", "o4-mini",
+                 "deepseek/deepseek-v4-flash", "deepseek-v4-flash"):
         assert ec._is_reasoning_model(slug), slug
     for slug in ("gpt-4.1-nano", "google/gemini-3.1-pro-preview", "claude-3-5", "mistral-large"):
         assert not ec._is_reasoning_model(slug), slug
@@ -1173,6 +1174,23 @@ def test_react_max_tokens_floors_reasoning_model_regardless_of_price(monkeypatch
     monkeypatch.delenv("IDEA_TEST_COMPILED_REACT_MAX_TOKENS", raising=False)
     _patch_pricing(monkeypatch, {"openai/gpt-5-mini": {"output_per_million": 2.00}})
     assert ec._react_max_tokens_for_model("openai/gpt-5-mini", 700) == int(700 * 4.4)
+
+
+def test_thin_max_tokens_floors_deepseek_regardless_of_price(monkeypatch):
+    """deepseek-v4-flash prices 'cheap' ($0.28/Mtok) but bills reasoning tokens inside
+    completion_tokens too — must get the same 128-token reasoning floor as gpt-5-mini, not the
+    24-token cheap-tier thin budget that starved it before this fix (see AGENT_CONTINUUM.md)."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_THIN_MAX_TOKENS", raising=False)
+    _patch_pricing(monkeypatch, {"deepseek/deepseek-v4-flash": {"output_per_million": 0.28}})
+    assert ec._price_tier("deepseek/deepseek-v4-flash") == "cheap"       # cheap by price...
+    assert ec._thin_max_tokens_for_model("deepseek/deepseek-v4-flash") == 128  # ...but floored
+
+
+def test_react_max_tokens_floors_deepseek_regardless_of_price(monkeypatch):
+    """Same floor on the react leaf budget's 4.4x multiplier."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_REACT_MAX_TOKENS", raising=False)
+    _patch_pricing(monkeypatch, {"deepseek/deepseek-v4-flash": {"output_per_million": 0.28}})
+    assert ec._react_max_tokens_for_model("deepseek/deepseek-v4-flash", 700) == int(700 * 4.4)
 
 
 def test_thin_reasoning_effort_minimal_for_reasoning_models(monkeypatch):

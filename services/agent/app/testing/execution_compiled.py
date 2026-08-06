@@ -351,14 +351,16 @@ def _price_tier(model_name: str) -> str:
 
 def _is_reasoning_model(model_name: str) -> bool:
     """True for models that spend a HIDDEN reasoning budget out of the same completion allowance —
-    the gpt-5 family (and OpenAI o-series o1/o3/o4). These misbehave when classified by output
-    PRICE alone: gpt-5-mini is only ``mid`` ($2/Mtok) yet, being a reasoning model, drains a small
+    the gpt-5 family (and OpenAI o-series o1/o3/o4), and deepseek (OpenRouter bills its reasoning
+    tokens inside ``completion_tokens`` too). These misbehave when classified by output PRICE
+    alone: gpt-5-mini is only ``mid`` ($2/Mtok) yet, being a reasoning model, drains a small
     ``max_completion_tokens`` on reasoning before writing any visible content (``content=None`` /
-    ``finish_reason=length``). Callers floor such models to the premium token budget and hint
-    ``reasoning_effort=minimal`` on trivial perception prompts, independent of their price tier."""
+    ``finish_reason=length``); deepseek prices ``cheap`` and hits the identical starvation. Callers
+    floor such models to the premium token budget and hint ``reasoning_effort=minimal`` on trivial
+    perception prompts, independent of their price tier."""
     bare = model_name.split("/", 1)[-1] if "/" in model_name else model_name
     name, bare = model_name.lower(), bare.lower()
-    return any(s.startswith(("gpt-5", "o1", "o3", "o4-mini", "o4")) for s in (name, bare))
+    return any(s.startswith(("gpt-5", "o1", "o3", "o4-mini", "o4", "deepseek")) for s in (name, bare))
 
 
 def _thin_reasoning_effort(model_name: str) -> Optional[str]:
