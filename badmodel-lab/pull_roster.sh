@@ -10,8 +10,13 @@ docker inspect "$CTR" >/dev/null 2>&1 || {
   exit 1
 }
 
-# subject + local-anchor tags from roster.yaml (crude YAML read: 'tag:' lines without a '/')
-mapfile -t TAGS < <(grep -E '^\s*-\s*tag:' "$LAB_DIR/roster.yaml" \
+# subject tags ONLY from roster.yaml's `subjects:` block (crude YAML read: 'tag:' lines without
+# a '/'). The `anchors:` block is deliberately excluded here -- its local entry (qwen2.5:7b) is
+# served from the SEPARATE yappers-ollama container (:11434, per run_matrix.sh/run_format.sh's
+# BADMODEL_OLLAMA_URL override for anchor cells), never from badmodel-ollama (:11435) -- pulling
+# it here wastes bandwidth/disk on a multi-GB model this container will never actually serve.
+mapfile -t TAGS < <(sed -n '/^subjects:/,/^anchors:/p' "$LAB_DIR/roster.yaml" \
+  | grep -E '^\s*-\s*tag:' \
   | sed -E 's/.*tag:\s*//' | awk '{print $1}' | grep -v '/')
 
 for t in "${TAGS[@]}"; do

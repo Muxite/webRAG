@@ -13,9 +13,13 @@ parse-failure telemetry, then prints:
                           what tells Opus *why* a model failed and which
                           mitigation to try next
   4. FLOOR / CEILING    — cells that floored (all 0) or hit the ceiling (~1)
+  5. CALIBRATION        — abstention-aware secondary metric per (model, profile,
+                          tier): correct/confident_wrong/abstain rates, a
+                          fixed-confidence Brier score, and a 2-point AURC
 
 and writes results/cells_long.csv — one row per (model, profile, tier, test,
-run) — the long-format table the chart generator plots from.
+run) — the long-format table the chart generator plots from (now also carrying
+per-row abstained/bucket/brier_term columns).
 
 Usage:  ./.venv/bin/python badmodel-lab/analyze.py [--bar 0.6]
 """
@@ -126,14 +130,20 @@ def grounding_from(grep_validations) -> bool | None:
     dataset's zero-visit passes are marked grounding=True. The honest grounding
     gate is visits>0 (see honest_pass below); this column is a deliverable-
     completeness signal (did it cite the source), reported separately.
+
+    Matches either "grounding" (the check name used by micro/format-tier tests,
+    e.g. m01-m03/f01-f03) or "citation" (the name used by reachable/hard-tier tests,
+    e.g. 062-090) -- same concept, two different names in this codebase. Without the
+    "citation" alternative, grounding_pass was silently None for every reachable/hard
+    row in cells_long.csv (confirmed: those tests have no check named "grounding" at all).
     """
     if not isinstance(grep_validations, list):
         return None
     for c in grep_validations:
         if not isinstance(c, dict):
             continue
-        name = str(c.get("check") or c.get("name") or "")
-        if "grounding" in name.lower():
+        name = str(c.get("check") or c.get("name") or "").lower()
+        if "grounding" in name or "citation" in name:
             return bool(c.get("passed"))
     return None
 
@@ -151,6 +161,75 @@ def format_from(grep_validations) -> bool | None:
         if "format" in name.lower():
             return bool(c.get("passed"))
     return None
+
+
+# A trailing citation block after the real conclusion ("Sources:" / "Sources actually
+# gathered:" followed by a bulleted URL list — confirmed in the 071/077 bad-model-lab
+# traces). Mirrors the cut-at-marker precedent in execution_compiled.py's
+# _strip_source_tail/_strip_url_trail, adapted here for a multi-line trailing block
+# instead of a single inline "— source: <url>" tail.
+_CITATION_HEADING_RX = re.compile(
+    r"\n\s*(?:sources?|references?)(?:\s+actually\s+gathered)?\s*:\s*\n", re.I
+)
+
+
+def _strip_citation_tail(text: str) -> str:
+    """Drop a trailing 'Sources:'/URL-list block before abstention classification.
+
+    Composer/aggregation output routinely appends a citation block AFTER the real
+    conclusion. Citation URLs can coincidentally contain refusal-like substrings (path
+    segments, anchor text), so cut the tail before running the abstain regex over the
+    whole text, rather than risk a false match inside a URL.
+    """
+    if not text:
+        return text
+    m = _CITATION_HEADING_RX.search(text)
+    if m:
+        return text[: m.start()].rstrip()
+    return text
+
+
+# Explicit refusal / "cannot compute" phrasing. Deliberately searches the WHOLE
+# (citation-stripped) text rather than anchoring to a trailing window: an earlier
+# "last 300 chars" design failed on the 071 r1 fixture itself, because a trailing
+# "please provide the missing data" plea pushed the actual refusal phrase out of a
+# fixed window. No anchor = no window to be pushed out of.
+#
+# The negative lookbehind excludes a refusal phrase immediately preceded by a
+# possessive entity reference ("Superior's cannot be determined") so an entity-scoped
+# hedge on ONE sub-item doesn't flip a response that still commits to an answer
+# elsewhere. This is a heuristic, not a guarantee: it only excludes the possessive
+# apostrophe when it sits directly adjacent to the matched phrase (no intervening
+# word); it will not catch every entity-scoped-hedge phrasing (e.g. "the value for
+# Lake Superior cannot be determined" has no "'s" at all, and "Superior's depth
+# cannot be determined" has a noun between the possessive and the phrase). Silent
+# omission (a missing item with no explicit refusal phrase either way) is also not
+# detected — this heuristic only catches EXPLICIT refusals. Both gaps are known
+# residuals, worth a second review pass on a bigger sample before fully trusting the
+# rate, not worth blocking on for v1.
+_ABSTAIN_RX = re.compile(
+    r"(?<!'s )(?<!'s)"
+    r"(?:impossible to (?:compute|determine|identify|calculate)|"
+    r"cannot be (?:determined|computed|identified|calculated)|"
+    r"(?:insufficient|not enough) (?:data|information) to (?:compute|determine|identify|conclude)|"
+    r"unable to (?:determine|compute|identify|conclude)|"
+    r"cannot (?:conclude|compute|determine))",
+    re.I,
+)
+
+
+def _is_abstained(final_text: str) -> bool:
+    body = _strip_citation_tail(final_text or "")
+    return bool(_ABSTAIN_RX.search(body))
+
+
+def _abstain_from(execution_output) -> bool:
+    """Extract execution.output.final_deliverable and classify it via _is_abstained.
+    Mirrors keystone_from's pattern: takes the raw substructure, returns a plain bool."""
+    if not isinstance(execution_output, dict):
+        return False
+    text = execution_output.get("final_deliverable")
+    return _is_abstained(text if isinstance(text, str) else "")
 
 
 def latency_of(obs) -> float | None:
@@ -184,6 +263,15 @@ def load_rows(cells: dict) -> list:
         ks_pass, ks_score = keystone_from(val.get("grep_validations"))
         grd_pass = grounding_from(val.get("grep_validations"))
         fmt_pass = format_from(val.get("grep_validations"))
+        out = d.get("execution", {}).get("output", {})
+        abstained = _abstain_from(out)
+        if abstained:
+            bucket = "abstained"
+        elif bool(ks_pass):  # explicit bool(): None (no keystone check) must not equal True
+            bucket = "correct"
+        else:
+            bucket = "confident_wrong"
+        brier_term = _brier_term(bucket)
         visits = obs.get("visit", {}).get("count")
         m = re.search(r"_r(\d+)\.json$", base)
         test_id = d.get("test_metadata", {}).get("test_id")
@@ -206,6 +294,9 @@ def load_rows(cells: dict) -> list:
             "grounding_pass": (1 if grd_pass else 0) if grd_pass is not None else None,
             "format_pass": (1 if fmt_pass else 0) if fmt_pass is not None else None,
             "honest_pass": honest,
+            "abstained": abstained,
+            "bucket": bucket,
+            "brier_term": brier_term,
             "usd": obs.get("cost", {}).get("usd"),
             "completion_tokens": obs.get("cost", {}).get("completion_tokens"),
             "visits": visits,
@@ -264,6 +355,69 @@ def load_schema_telemetry(run_ids) -> dict:
 
 def fmt(x, nd=2, pref=""):
     return f"{pref}{x:.{nd}f}" if isinstance(x, (int, float)) else "-"
+
+
+def _brier_term(bucket: str) -> float:
+    """Fixed-confidence Brier-score contribution for one row's 3-way bucket.
+
+    Confidence p is fixed per bucket (this is a retroactive metric over data that never
+    recorded a real confidence score): p=1.0 for an attempted answer (correct or
+    confident_wrong — the model committed), p=0.5 for an abstained answer (maximum
+    uncertainty). Outcome o=1 if correct else 0. brier_term = (p - o) ** 2.
+    """
+    if bucket == "correct":
+        return 0.0
+    if bucket == "confident_wrong":
+        return 1.0
+    return 0.25  # abstained: (0.5 - 0.0) ** 2
+
+
+def _cell_calibration(rs: list) -> dict | None:
+    """Aggregate one (model, profile, tier) cell's rows (each carrying a "bucket" and
+    "brier_term" set by load_rows) into abstain/confident_wrong/correct rates, a mean
+    Brier score, and a simplified 2-point AURC (area under the risk-coverage curve).
+
+    This is NOT a full continuous risk-coverage sweep: with only two confidence levels
+    (attempted vs abstained) the "curve" is a single trapezoid between coverage=(1 -
+    abstain_rate) [selective, abstentions excluded] and coverage=1.0 [full, abstentions
+    counted as wrong]. That is a coarse 2-point approximation, not a claim of a
+    continuous sweep.
+
+    risk_full = confident_wrong_rate + abstain_rate  (== 1 - correct_rate)
+    risk_selective = confident_wrong_count / (n - abstained_count)   [undefined if n==abstained_count]
+    aurc = trapezoidal area of the step from coverage=(1-abstain_rate) to coverage=1.0
+
+    All-abstained special case: risk_selective is 0/0 (undefined). Rather than let a NaN
+    reach the CSV, risk_selective is left None and aurc collapses to risk_full (which is
+    1.0 in this case, since correct_count is necessarily 0).
+    """
+    n = len(rs)
+    if not n:
+        return None
+    abstained_n = sum(1 for r in rs if r["bucket"] == "abstained")
+    correct_n = sum(1 for r in rs if r["bucket"] == "correct")
+    wrong_n = sum(1 for r in rs if r["bucket"] == "confident_wrong")
+    abstain_rate = abstained_n / n
+    correct_rate = correct_n / n
+    confident_wrong_rate = wrong_n / n
+    risk_full = confident_wrong_rate + abstain_rate
+    brier = _mean([r["brier_term"] for r in rs])
+    if abstained_n == n:
+        risk_selective = None
+        aurc = risk_full
+    else:
+        risk_selective = wrong_n / (n - abstained_n)
+        aurc = 0.5 * (risk_selective + risk_full) * abstain_rate + risk_selective * (1 - abstain_rate)
+    return {
+        "n": n,
+        "abstain_rate": abstain_rate,
+        "confident_wrong_rate": confident_wrong_rate,
+        "correct_rate": correct_rate,
+        "risk_selective": risk_selective,
+        "risk_full": risk_full,
+        "brier": brier,
+        "aurc": aurc,
+    }
 
 
 def main() -> int:
@@ -388,6 +542,27 @@ def main() -> int:
     print(f"FLOORED (score~0): {', '.join(floors) if floors else 'none'}")
     print(f"CEILING (score~1): {', '.join(ceils) if ceils else 'none'}")
 
+    # ---- 5. CALIBRATION (abstention-aware Brier / 2-point AURC) ---------
+    print("\n" + "=" * 104)
+    print("CALIBRATION  (bucket: abstained > correct > confident_wrong; brier=fixed-confidence "
+          "Brier score; aurc=2-point risk-coverage area, see _cell_calibration docstring)")
+    # profile column width covers the longest real profile name (a3_native_expect_contract, 25
+    # chars) + a 2-char gap -- a fixed <16 let a long profile name run straight into the tier
+    # column with no separator at all (e.g. "fs1_structured_strictformat").
+    print(f"{'model':<22}{'profile':<27}{'tier':<10}{'correct%':>9}{'cwrong%':>9}{'abst%':>7}"
+          f"{'brier':>8}{'aurc':>8}{'n':>4}")
+    for key in sorted(grp):
+        place, model, tier, profile = key
+        cal = _cell_calibration(grp[key])
+        if cal is None:
+            continue
+        print(f"{(model or '-'):<22}{(profile or '-'):<27}{(tier or '-'):<10}"
+              f"{fmt(100 * cal['correct_rate'], 0):>9}"
+              f"{fmt(100 * cal['confident_wrong_rate'], 0):>9}"
+              f"{fmt(100 * cal['abstain_rate'], 0):>7}"
+              f"{fmt(cal['brier'], 3):>8}"
+              f"{fmt(cal['aurc'], 3):>8}{cal['n']:>4}")
+
     # ---- CSV export -----------------------------------------------------
     (LAB / "results").mkdir(exist_ok=True)
     csv_path = LAB / "results" / "cells_long.csv"
@@ -398,7 +573,8 @@ def main() -> int:
     cols = ["model", "place", "profile", "leaf_mode", "tier", "test_id", "run_idx",
             "score", "keystone_pass", "keystone_score", "grounding_pass", "format_pass",
             "honest_pass", "usd", "completion_tokens", "visits", "latency_s",
-            "json_valid_frac", "run_id"]
+            "json_valid_frac", "run_id",
+            "abstained", "bucket", "brier_term"]
     with open(csv_path, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols)
         w.writeheader()
