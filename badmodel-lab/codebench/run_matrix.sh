@@ -33,7 +33,14 @@ echo "### MATRIX  subjects=${SUBJECTS[*]}  agents=${AGENT_KINDS[*]}  tasks=${TAS
 for model in "${SUBJECTS[@]}"; do
   for agent in "${AGENT_KINDS[@]}"; do
     for task in "${TASK_IDS[@]}"; do
-      CELL_DIR="$OUT_ROOT/${task}__${agent}__${model//\//_}"
+      # Sanitize BOTH "/" (vendor/model ids like openai/gpt-4.1-nano) and ":" (ollama tags
+      # like qwen2.5:14b) out of the model tag before using it in a path: CELL_DIR later
+      # feeds run_agent_sandbox.sh's `-v host:/work` bind-mount spec, and a literal colon
+      # surviving into that path gets misparsed by `docker run -v` as an extra field
+      # separator (observed live: "docker: invalid mode: /work").
+      MODEL_SLUG="${model//\//_}"
+      MODEL_SLUG="${MODEL_SLUG//:/_}"
+      CELL_DIR="$OUT_ROOT/${task}__${agent}__${MODEL_SLUG}"
       echo "  --- $task / $agent / $model ($(date +%H:%M:%S)) ---"
       mkdir -p "$CELL_DIR"
 
