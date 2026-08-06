@@ -207,6 +207,7 @@ def test_thin_leaf_pipeline_extracts_and_cites(monkeypatch):
 
 def test_thin_leaf_unknown_when_value_absent(monkeypatch):
     monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
+    monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", "0")  # not under test here
     io = MagicMock()
     io.build_llm_payload = MagicMock(return_value={})
     io.query_llm = AsyncMock(side_effect=["q", "UNKNOWN"])

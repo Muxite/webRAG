@@ -8,8 +8,10 @@ verbatim as the question); live ablation on the real task-072 Sarez Lake leaf sh
 resolves the contradiction by abstaining (10/10 UNKNOWN), and that removing the clause flips it to
 the correct value. ``_run_leaf_thin`` appends the real URL itself.
 
-Fix 3 (default OFF, ``IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY``): ONE extra vote per candidate page,
+Fix 3 (default ON, ``IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY``): ONE extra vote per candidate page,
 with the directive ``_THIN_EXTRACT_SYS_RETRY`` prompt, only when the first vote was inconclusive.
+Flipped from default-OFF after a live calibration run (reachable tier, R=3) showed a real,
+reproduced lift (avg 0.941->0.959) with no regressions on any task.
 
 The load-bearing guarantees asserted here:
   * the RAW instruction (not the stripped one) still drives ``_target_entity``/``_leaf_search_query``;
@@ -66,6 +68,10 @@ STRIP_CASES = [
      "figures from. Do not answer from memory.",
      "Read the figure off the infobox. Do not answer from memory."),
     ("Cite the source URLs you used. Do not answer from memory.", "Do not answer from memory."),
+    # standalone "Give the source URL." sentence — the odd-one-out tasks' (069/080) real phrasing,
+    # a different imperative verb hitting the exact same self-contradiction as "Cite ..."
+    ("Answer with the country's landlocked status. Give the source URL. Do not guess from memory.",
+     "Answer with the country's landlocked status. Do not guess from memory."),
 ]
 
 # Instructions with nothing to strip — these must come back BYTE-IDENTICAL.
@@ -112,6 +118,25 @@ def test_strip_source_ask_on_the_real_072_leaf():
         "infobox, its MAXIMUM DEPTH in metres — the 'Max. depth' field. Report ONLY that single "
         "depth figure (a whole number in metres). Do NOT report "
         "surface elevation or average depth. Do not guess from memory.")
+
+
+def test_strip_source_ask_on_the_real_069_leaf():
+    """069/080's real odd-one-out leaf ending — 'Give the source URL.' is a standalone-sentence
+    self-contradiction, exactly like 072's 'Cite ...' shape but with a different verb; a corpus
+    grep confirmed this is the only other real instance of the standalone-sentence shape."""
+    raw = ("Open the Wikipedia page for Austria and determine, from the lead sentence and the "
+           "infobox, whether Austria is a LANDLOCKED country (it has NO sea coastline) or whether "
+           "it HAS a sea coastline. Answer strictly with 'Austria: landlocked' or 'Austria: not "
+           "landlocked (coastline on <sea>)' -- ALWAYS repeat the country name 'Austria' at the "
+           "start of your answer so the fact is self-contained even if read out of context. Give "
+           "the source URL. Do not guess from memory.")
+    assert ec._strip_source_ask(raw) == (
+        "Open the Wikipedia page for Austria and determine, from the lead sentence and the "
+        "infobox, whether Austria is a LANDLOCKED country (it has NO sea coastline) or whether "
+        "it HAS a sea coastline. Answer strictly with 'Austria: landlocked' or 'Austria: not "
+        "landlocked (coastline on <sea>)' -- ALWAYS repeat the country name 'Austria' at the "
+        "start of your answer so the fact is self-contained even if read out of context. Do not "
+        "guess from memory.")
 
 
 def test_strip_source_ask_never_returns_an_empty_question():
@@ -301,20 +326,33 @@ def test_consol_path_does_not_drop_the_sys_prompt(monkeypatch):
 
 def test_leaf_extract_retry_budget_env(monkeypatch):
     monkeypatch.delenv("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", raising=False)
-    assert ec._leaf_extract_retry_budget() == 0                      # default OFF
-    monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", "1")
-    assert ec._leaf_extract_retry_budget() == 1
+    assert ec._leaf_extract_retry_budget() == 1                      # deliberate default-ON
+    monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", "0")
+    assert ec._leaf_extract_retry_budget() == 0                      # explicit escape hatch
     monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", "-3")
     assert ec._leaf_extract_retry_budget() == 0                      # <= 0 disables
     monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", "nonsense")
     assert ec._leaf_extract_retry_budget() == 0
 
 
-def test_no_retry_by_default_call_sequence_is_unchanged(monkeypatch):
-    """Default (``0``): an inconclusive page moves straight on to the next candidate — exactly one
-    extraction per page, two pages, then UNKNOWN. Byte-identical to the pre-change behavior."""
+def test_retry_enabled_by_default_call_sequence(monkeypatch):
+    """Default (unset -> ``1``): a quorum-inconclusive page gets one retry pass with the directive
+    prompt before moving on to the next candidate."""
     monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
     monkeypatch.delenv("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", raising=False)
+    io = _thin_io(["UNKNOWN", "505"])
+    out = asyncio.run(ec._run_leaf_thin(io, _LEAF_INSTRUCTION, "depth", "m", 6000, 6))
+    assert out == "505 — source: https://en.wikipedia.org/wiki/Sarez_Lake"
+    assert io.visit.await_count == 1                                  # same page, no extra fetch
+    assert _system_prompts(io) == [ec._THIN_EXTRACT_SYS, ec._THIN_EXTRACT_SYS_RETRY]
+
+
+def test_no_retry_when_explicitly_disabled_call_sequence_is_unchanged(monkeypatch):
+    """``0`` (the escape hatch): an inconclusive page moves straight on to the next candidate —
+    exactly one extraction per page, two pages, then UNKNOWN. Byte-identical to the pre-retry
+    behavior."""
+    monkeypatch.setenv("IDEA_TEST_COMPILED_VOTES", "1")
+    monkeypatch.setenv("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", "0")
     io = _thin_io(["UNKNOWN", "UNKNOWN"])
     out = asyncio.run(ec._run_leaf_thin(io, _LEAF_INSTRUCTION, "depth", "m", 6000, 6))
     assert out == "UNKNOWN — https://en.wikipedia.org/wiki/Sarez_Lake"

@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
 from agent.app import model_costs
+from agent.app import prompt_hygiene
 
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
@@ -209,7 +210,7 @@ _THIN_EXTRACT_SYS = (
     "nothing else (no sentence, no units unless asked, no source). If the PAGE does not contain it, "
     "output exactly: UNKNOWN."
 )
-# Second-pass prompt for a quorum-inconclusive page (opt-in, IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY).
+# Second-pass prompt for a quorum-inconclusive page (default ON, IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY).
 # The flattened infobox (see clean_operation) puts a field's LABEL and VALUE on separate lines with
 # no delimiter, so a weak model reads the value of the NEIGHBOURING field ('Average depth' instead
 # of 'Max. depth'). This prompt makes the locate-then-quote step explicit instead of implicit.
@@ -236,27 +237,15 @@ _THIN_EXTRACT_SYS_RETRY = (
 #                         "..., and the exact source URL.", "..., and cite each lake's source URL."
 #   * enumerated item ..  "Report: (a) the atomic number, ..., (c) the source URL."
 #   * standalone sentence "Cite the exact authoritative source URL you read the figures from."
+#                         "Give the source URL." (069/080's odd-one-out leaves — same self-
+#                         contradiction, a different imperative verb; a corpus-wide grep found
+#                         exactly these two real instances, no others)
 # Each pattern swallows the connective that introduced the ask (a leading comma/semicolon/em-dash
 # and/or "and"), so nothing dangles behind after the removal.
-_SOURCE_ASK_HEAD = (
-    r"(?:cite\s+)?"
-    r"(?:the|its|their|each\s+[a-z' ]{1,30}?'s|each|every)?\s*"
-    r"(?:exact\s+|authoritative\s+|full\s+|complete\s+)*"
-)
-_INLINE_SOURCE_CLAUSE = re.compile(
-    r"(?:[ \t]*[,;—–])?[ \t]*and\s+" + _SOURCE_ASK_HEAD + r"source URLs?\b[^.\n]*(?=[.\n]|$)",
-    re.I,
-)
-_ENUM_SOURCE_ITEM = re.compile(
-    r"(?:[ \t]*[,;])?\s*(?:and\s+)?\(\s*(?:[a-z]|[ivx]{1,4}|\d{1,2})\s*\)[ \t]*"
-    + _SOURCE_ASK_HEAD + r"source URLs?\b[^.\n]*(?=[.\n]|$)",
-    re.I,
-)
-_CITE_SENTENCE = re.compile(
-    r"(?<![^\s])Cite\b[^.\n]*\bsource URLs?\b[^.\n]*\.[ \t]*", re.I,
-)
-# Punctuation left stranded immediately before a full stop by a removal ("Report:." -> "Report.").
-_DANGLING_PUNCT = re.compile(r"[ \t]*[,;:—–][ \t]*(?=\.)")
+#
+# The regexes + transform themselves now live in ``app.prompt_hygiene`` (engine-agnostic — a pure
+# text transform, not a benchmark heuristic, so it's portable to the native engine too). This
+# module keeps a thin same-name wrapper so existing call sites/tests are untouched.
 
 
 def _strip_source_ask(instruction: str) -> str:
@@ -271,19 +260,10 @@ def _strip_source_ask(instruction: str) -> str:
 
     Applied to a NEW derived string — never mutates the raw ``instruction`` used for
     ``_target_entity``/``_leaf_search_query`` earlier in ``_run_leaf_thin`` (those must keep seeing
-    the full original text). An instruction with no source-ask is returned BYTE-IDENTICAL, and a
-    (degenerate) instruction that would be emptied entirely falls back to the original — an empty
-    QUESTION extracts nothing.
+    the full original text). Delegates to ``prompt_hygiene.strip_source_ask`` — see that module
+    for the transform itself.
     """
-    out = _INLINE_SOURCE_CLAUSE.sub("", instruction)
-    out = _ENUM_SOURCE_ITEM.sub("", out)
-    out = _CITE_SENTENCE.sub("", out)
-    if out == instruction:
-        return instruction
-    out = _DANGLING_PUNCT.sub("", out)
-    out = re.sub(r"[ \t]{2,}", " ", out)
-    out = re.sub(r"[ \t]+([.,;])", r"\1", out).strip()
-    return out if re.search(r"[A-Za-z0-9]", out) else instruction
+    return prompt_hygiene.strip_source_ask(instruction)
 
 
 def _strip_source_ask_enabled() -> bool:
@@ -297,24 +277,30 @@ def _strip_source_ask_enabled() -> bool:
 
 
 def _infobox_block_enabled() -> bool:
-    """``IDEA_TEST_COMPILED_INFOBOX_BLOCK`` — default OFF. Asks ``visit`` to prepend the page's
-    infobox as 'Label: Value' lines (``observation.extract_infobox_block``), which fixes a narrower
-    failure (an under-specified question grabbing a NEIGHBOURING field's value) but was not shown to
-    add anything beyond the source-ask strip on the real, field-quoting leaf phrasing. Needs a live
-    calibration run before any nonzero default."""
+    """``IDEA_TEST_COMPILED_INFOBOX_BLOCK`` — default OFF, confirmed (not just unconfirmed) by a
+    live calibration run (qwen2.5:7b, reachable tier, R=3): avg regressed 0.941->0.931, driven by a
+    real drop on task 064 (0.84±0.00->0.72±0.14) with no compensating gain elsewhere (062/069's
+    small upticks were within this n's noise, both already >=0.97 at baseline). Asks ``visit`` to
+    prepend the page's infobox as 'Label: Value' lines (``observation.extract_infobox_block``),
+    which fixes a narrower failure (an under-specified question grabbing a NEIGHBOURING field's
+    value) but restructuring apparently costs more than it gives back on tasks needing TWO
+    per-page fields (e.g. 064's volume+area). Keep default OFF; escape hatch kept as ``1``."""
     return os.environ.get(
         "IDEA_TEST_COMPILED_INFOBOX_BLOCK", "0"
     ).strip().lower() in ("1", "true", "yes", "on")
 
 
 def _leaf_extract_retry_budget() -> int:
-    """``IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY`` — default ``0`` (off). Any value > 0 enables
-    exactly ONE extra ``_vote_extract`` pass per candidate page, with the directive
-    ``_THIN_EXTRACT_SYS_RETRY`` prompt, and only when the first pass was quorum-inconclusive.
-    Hard-bounded at one retry per page regardless of the value: worst case (both candidate pages
-    inconclusive) this adds 2k calls on a leaf that was already failing, and nothing at all on a
-    leaf that resolved on pass 1."""
-    raw = os.environ.get("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", "0").strip()
+    """``IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY`` — default ``1`` (on), flipped from the original
+    default-OFF after a live calibration run (qwen2.5:7b, reachable tier, R=3) showed a real,
+    reproduced lift with no regressions on any task: avg 0.941->0.959 (062 +0.02, 064 +0.07,
+    069 +0.03, 070/072/076/078 unchanged). Any value > 0 enables exactly ONE extra
+    ``_vote_extract`` pass per candidate page, with the directive ``_THIN_EXTRACT_SYS_RETRY``
+    prompt, and only when the first pass was quorum-inconclusive. Hard-bounded at one retry per
+    page regardless of the value: worst case (both candidate pages inconclusive) this adds 2k
+    calls on a leaf that was already failing, and nothing at all on a leaf that resolved on pass 1.
+    ``0`` is kept as an escape hatch (mirrors ``IDEA_TEST_COMPILED_STRIP_SOURCE_ASK``'s convention)."""
+    raw = os.environ.get("IDEA_TEST_COMPILED_LEAF_EXTRACT_RETRY", "1").strip()
     try:
         return max(0, int(raw))
     except ValueError:
@@ -1507,6 +1493,8 @@ def _compose_argmax(leaves: List[Dict[str, Any]], results: Dict[str, str],
         shown = f"{_fmt_num(row['value'])}{row_unit}" if row["value"] is not None else "UNKNOWN"
         body.append(f"{row['label']}: {label}={shown}{row['cite']}")
     return "\n".join([lead, "", *body])
+
+
 
 
 def _compose_subset_sum(leaves: List[Dict[str, Any]], results: Dict[str, str],
