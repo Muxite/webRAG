@@ -185,5 +185,6 @@
   "sandbox_shell_timeout_seconds": 10,
   "sandbox_max_file_bytes": 200000,
   "sandbox_max_files_per_leaf": 10,
-  "sandbox_llm_call_timeout_seconds": 90
+  "sandbox_llm_call_timeout_seconds": 90,
+  "sandbox_calculator_timeout_seconds": 10
 }

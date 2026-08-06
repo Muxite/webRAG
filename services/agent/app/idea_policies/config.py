@@ -523,6 +523,16 @@ class SandboxActionConfig:
     #: Sized between the two: generous next to a 30s pytest run (a ``write_file`` decision carries a
     #: whole source file), yet small enough that a leaf's full step budget still fits in the run.
     llm_call_timeout_seconds: int = 90
+    #: Wall-clock bound on the CALCULATOR ``run_python`` leaf action
+    #: (``idea_policies/extra_actions/calculator_tools.py``), deliberately tighter than the coding
+    #: arm's 15s ``run_python_timeout_seconds``. That budget covers a generated module importing
+    #: third-party packages and doing real work; the calculator only ever recomputes over facts the
+    #: run already gathered (max of six numbers, a ratio, a subset sum), which is milliseconds even
+    #: with interpreter start-up. Anything slower is a runaway loop, and inside a latency-sensitive
+    #: web-research leaf it is cheaper to hand the model a fast "timed out" observation it can retry
+    #: than to stall the step. Matches ``shell_timeout_seconds`` — same "inspect something small"
+    #: class of work.
+    calculator_timeout_seconds: int = 10
 
     _KEYS: ClassVar[dict] = {
         "workdir_root": "sandbox_workdir_root",
@@ -532,6 +542,7 @@ class SandboxActionConfig:
         "max_file_bytes": "sandbox_max_file_bytes",
         "max_files_per_leaf": "sandbox_max_files_per_leaf",
         "llm_call_timeout_seconds": "sandbox_llm_call_timeout_seconds",
+        "calculator_timeout_seconds": "sandbox_calculator_timeout_seconds",
     }
 
     @classmethod

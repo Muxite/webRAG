@@ -14,6 +14,10 @@ from your own glue code or tests.
 """
 
 from agent.app.idea_policies.extra_actions.pack import ExtraActionPack
+from agent.app.idea_policies.extra_actions.calculator_tools import (
+    CalculatorToolPack,
+    RunPythonAction,
+)
 from agent.app.idea_policies.extra_actions.sandbox_tools import (
     CountLinesAction,
     DiskUsageAction,
@@ -43,6 +47,10 @@ __all__ = [
     # this package: opt-in only (install the pack AND allow the names AND wire a sandbox onto
     # the run's AgentIO), never part of ExtraActionPack. See `sandbox_tools.py`.
     "SandboxToolPack",
+    # A one-off Python calculator, opt-in on the same three-way gate but packaged separately so a
+    # caller can grant "compute" without granting file/shell access. See `calculator_tools.py`.
+    "CalculatorToolPack",
+    "RunPythonAction",
     "ReadFileAction",
     "WriteFileAction",
     "ListDirAction",
