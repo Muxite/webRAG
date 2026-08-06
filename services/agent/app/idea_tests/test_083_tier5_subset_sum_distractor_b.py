@@ -220,12 +220,27 @@ def _int_values(text: str) -> List[int]:
     return vals
 
 
+_LIST_MARKER_RX = re.compile(r"(?m)^\s*\(?(\d{1,2})[.)]\s+")
+
+
+def _strip_list_markers(text: str) -> str:
+    """Drop a leading enumeration marker ('1. ', '2) ', '(3) ') from the start of each line
+    before counting asserted values -- but ONLY when the text actually looks like a numbered
+    list (>=2 such markers present). A single leading digit-marker on an otherwise terse answer
+    (e.g. '4.' or '4. Lakes exceed the threshold') is far more likely a genuine short answer than
+    list enumeration, and must NOT be stripped -- confirmed via adversarial review that an
+    earlier, unconditional version of this fix broke exactly that case."""
+    if len(_LIST_MARKER_RX.findall(text)) < 2:
+        return text
+    return _LIST_MARKER_RX.sub("", text)
+
+
 def _keystone_ok(result: Dict[str, Any]) -> bool:
     """KEYSTONE gate: deliverables[0] reports the four-party seat SUM inside the tight band
     [49, 51] (= 50 +/- 1). The band ACCEPTS the exact total (and a single +/-1 misread) but
     REJECTS the printed total chamber size (63, the distractor), every drop-one partial sum
     (35, 36, 39, 40 — all at least 9 below the lower band edge) and the all-six sum (63)."""
-    return any(n in KEYSTONE_BAND for n in _int_values(_primary_text(result)))
+    return any(n in KEYSTONE_BAND for n in _int_values(_strip_list_markers(_primary_text(result))))
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

@@ -298,6 +298,21 @@ def _int_values(text: str) -> List[int]:
     return vals
 
 
+_LIST_MARKER_RX = re.compile(r"(?m)^\s*\(?(\d{1,2})[.)]\s+")
+
+
+def _strip_list_markers(text: str) -> str:
+    """Drop a leading enumeration marker ('1. ', '2) ', '(3) ') from the start of each line
+    before counting asserted values -- but ONLY when the text actually looks like a numbered
+    list (>=2 such markers present). A single leading digit-marker on an otherwise terse answer
+    (e.g. '4.' or '4. Lakes exceed the threshold') is far more likely a genuine short answer than
+    list enumeration, and must NOT be stripped -- confirmed via adversarial review that an
+    earlier, unconditional version of this fix broke exactly that case."""
+    if len(_LIST_MARKER_RX.findall(text)) < 2:
+        return text
+    return _LIST_MARKER_RX.sub("", text)
+
+
 def _keystone_ok(result: Dict[str, Any]) -> bool:
     """KEYSTONE gate: deliverables[0] contains the integer KEYSTONE_COUNT (= 4).
 
@@ -305,7 +320,7 @@ def _keystone_ok(result: Dict[str, Any]) -> bool:
     the threshold. Count=7 ('all of them'), count=3 (one tunnel dropped), and count=5 (one
     failing tunnel wrongly counted) all fail — only the computed value 4 passes.
     """
-    return KEYSTONE_COUNT in _int_values(_primary_text(result))
+    return KEYSTONE_COUNT in _int_values(_strip_list_markers(_primary_text(result)))
 
 
 # ── validation functions ──────────────────────────────────────────────────────────────────────────

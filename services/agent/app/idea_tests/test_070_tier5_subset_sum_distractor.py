@@ -80,11 +80,14 @@ from agent.app.idea_test_utils import extract_final_text
 # ----- the verified fixtures (single source of truth for statement, validators and the plan) -----
 # Each item is ONE season of *Chuck*; ``eps`` is that season's infobox 'No. of episodes' figure.
 # Nothing here (no per-season figure, no total) is leaked into the task statement or the plan.
+# Parens made optional in slug_rx below: "Chuck_(season_N)" redirects to the real canonical
+# "Chuck_season_N" (no parens) on English Wikipedia -- confirmed live via the MediaWiki redirects
+# API for all four seasons. A correctly-grounded citation to the real title was losing credit.
 SEASONS: List[Dict[str, Any]] = [
-    {"key": "s1", "label": "Season 1", "num": 1, "eps": 13, "slug_rx": r"chuck_\(season_1\)"},
-    {"key": "s2", "label": "Season 2", "num": 2, "eps": 22, "slug_rx": r"chuck_\(season_2\)"},
-    {"key": "s3", "label": "Season 3", "num": 3, "eps": 19, "slug_rx": r"chuck_\(season_3\)"},
-    {"key": "s4", "label": "Season 4", "num": 4, "eps": 24, "slug_rx": r"chuck_\(season_4\)"},
+    {"key": "s1", "label": "Season 1", "num": 1, "eps": 13, "slug_rx": r"chuck_\(?season_1\)?"},
+    {"key": "s2", "label": "Season 2", "num": 2, "eps": 22, "slug_rx": r"chuck_\(?season_2\)?"},
+    {"key": "s3", "label": "Season 3", "num": 3, "eps": 19, "slug_rx": r"chuck_\(?season_3\)?"},
+    {"key": "s4", "label": "Season 4", "num": 4, "eps": 24, "slug_rx": r"chuck_\(?season_4\)?"},
 ]
 
 KEYSTONE_TOTAL = 78           # 13 + 22 + 19 + 24 — the first-four-season subset sum
@@ -186,6 +189,21 @@ def _int_values(text: str) -> List[int]:
     return vals
 
 
+_LIST_MARKER_RX = re.compile(r"(?m)^\s*\(?(\d{1,2})[.)]\s+")
+
+
+def _strip_list_markers(text: str) -> str:
+    """Drop a leading enumeration marker ('1. ', '2) ', '(3) ') from the start of each line
+    before counting asserted values -- but ONLY when the text actually looks like a numbered
+    list (>=2 such markers present). A single leading digit-marker on an otherwise terse answer
+    (e.g. '4.' or '4. Lakes exceed the threshold') is far more likely a genuine short answer than
+    list enumeration, and must NOT be stripped -- confirmed via adversarial review that an
+    earlier, unconditional version of this fix broke exactly that case."""
+    if len(_LIST_MARKER_RX.findall(text)) < 2:
+        return text
+    return _LIST_MARKER_RX.sub("", text)
+
+
 def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE gate: deliverables[0] reports the first-four-season SUM inside the tight band
     [77, 79] (= 78 +/- 1). The band ACCEPTS the exact total (and a single +/-1 misread) but REJECTS
@@ -198,7 +216,7 @@ def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -
     n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
     if n_visits <= 0:
         return False
-    return any(n in KEYSTONE_BAND for n in _int_values(_primary_text(result)))
+    return any(n in KEYSTONE_BAND for n in _int_values(_strip_list_markers(_primary_text(result))))
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
