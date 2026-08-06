@@ -80,6 +80,8 @@ research agenda and measured.
 | `native_confidence_early_exit_enabled` | `false` | **Calibrated high-confidence early exit (A6)** — stop expanding and finalize when the accumulated step-confidence prefix clears a *derived* threshold | A6 |
 | `native_confidence_early_exit_margin` | `0.05` | Extra conservatism added on top of the calibrated threshold | A6 |
 | `native_confidence_early_exit_min_judged_steps` | `2` | Hard floor: no rule may stop a run on fewer judged steps than this | A6 |
+| `expansion_input_output_framing_enabled` | `false` | Labels the expansion user prompt's context blob as read-only INPUT and restates the `{candidates: [...]}` output shape right after it (also unwraps the schema hint's copyable `{"name","schema"}` envelope) | 2026-08-06 |
+| `expansion_echo_retry_enabled` | `false` | ONE corrective retry when an expansion reply parses but is the echoed input rather than a plan | 2026-08-06 |
 
 **The "good adaptive agent" configuration** (the thing the research agenda tests) = native `graph`
 variant with `got_reexpand_enabled` + `got_step_confidence_judge_enabled` +

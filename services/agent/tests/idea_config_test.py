@@ -133,6 +133,26 @@ def test_expansion_expect_contract_defaults_off():
     ).expect_contract_enabled is True
 
 
+def test_expansion_input_output_framing_flags_default_off():
+    # Prompt-hygiene lever + its retry safety net: both OFF from an empty load and from the
+    # shipped JSON, so the expansion prompt bytes are unchanged until an operator arms them.
+    # They are SEPARATE flags on purpose (independent ablation of prompt fix vs safety net).
+    from agent.app.idea_policies.config import ExpansionConfig
+    empty = ExpansionConfig.from_settings({})
+    assert empty.input_output_framing_enabled is False
+    assert empty.echo_retry_enabled is False
+    prod = ExpansionConfig.from_settings(load_idea_dag_settings())
+    assert prod.input_output_framing_enabled is False
+    assert prod.echo_retry_enabled is False
+    # Truthy overrides coerce to bool, independently.
+    framing_only = ExpansionConfig.from_settings({"expansion_input_output_framing_enabled": 1})
+    assert framing_only.input_output_framing_enabled is True
+    assert framing_only.echo_retry_enabled is False
+    retry_only = ExpansionConfig.from_settings({"expansion_echo_retry_enabled": "true"})
+    assert retry_only.echo_retry_enabled is True
+    assert retry_only.input_output_framing_enabled is False
+
+
 def test_native_tiering_flags_default_off():
     # A3b + A5 executor-tiering flags: default OFF from an empty load and the shipped JSON,
     # so the native micro-prompt token/effort path stays byte-identical.

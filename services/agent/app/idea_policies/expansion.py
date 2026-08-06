@@ -181,6 +181,109 @@ _EXPECT_CONTRACT_ADDENDUM = (
 )
 
 
+# --- opt-in input/output framing (``expansion_input_output_framing_enabled``) -------------------
+# The shipped expansion USER prompt opens with an OUTPUT instruction immediately followed by an
+# INPUT blob:
+#     Return your response as valid JSON. {"path": [...], "parent_id": ..., "event_log": [...]}
+# Read literally, that sentence says "return this object" — and the expected output shape
+# ({candidates: [...]}) is stated exactly once, far away, on the LAST line of a long system prompt.
+#
+# Live telemetry (2026-08-06, qwen2.5:0.5b, native `graph` variant, phase=native_expansion) shows a
+# weak model doing what the text says: of 8 syntactically-valid completions, 5 echoed the "path"
+# context straight back, 1 echoed the schema hint's own {"name": "expansion_result", "schema": ...}
+# envelope complete with placeholder values, and only 2 produced a real {"candidates": [...]} plan.
+# This is NOT a malformed-JSON problem (every one parsed) — it is the WRONG SHAPE, which nothing
+# downstream can rescue: no ``candidates`` key means ``_create_fallback_candidate`` fires, and for
+# the ROOT node (whose title IS the mandate) it emits a search whose query is the mandate's first
+# 100 characters — an instruction preamble, not an entity — so the run makes zero page visits.
+#
+# The fix is pure prompt hygiene, in the spirit of the leaf-extraction source-ask removal: drop the
+# misleading lead sentence, label the blob as read-only INPUT, and restate the OUTPUT shape
+# immediately AFTER it — the recency position the model was already copying from.
+_INPUT_FRAMING_HEADER = (
+    "INPUT CONTEXT (read-only). The JSON below is this run's own history and state. It is DATA "
+    "FOR YOU TO READ — not a template to fill in, not an example of your answer, and never "
+    "something to copy back."
+)
+_INPUT_FRAMING_FOOTER = (
+    "END OF INPUT CONTEXT.\n"
+    "\n"
+    "NOW WRITE A NEW JSON OBJECT OF YOUR OWN: the plan. It has a DIFFERENT shape from everything "
+    "above, with exactly one required top-level key, \"candidates\":\n"
+    "{\"candidates\": [{\"title\": \"<subproblem>\", \"action\": \"<one allowed action>\", "
+    "\"details\": {<arguments for that action>}}], \"meta\": {\"execute_all_children\": false}}\n"
+    "- Your reply must begin with {\"candidates\": and have no other top-level key except the "
+    "optional \"meta\". A reply whose top-level key is \"path\", \"node_id\", \"name\" or "
+    "\"schema\" is the WRONG object and will be discarded.\n"
+    "- Every title, action and details value must be text YOU write for this plan, never copied "
+    "from the input context above.\n"
+    "- Output that one JSON object only: no markdown fences, no commentary."
+)
+#: The shipped user template's opening OUTPUT instruction. Removed (exact prefix match, no regex)
+#: when the framing is on, so the framed message carries no leftover "return this" cue in front of
+#: the input blob. A custom template that does not start with it is wrapped unchanged.
+_USER_PROMPT_OUTPUT_LEAD = "Return your response as valid JSON. "
+
+
+def frame_expansion_user_prompt(user: str) -> str:
+    """Wrap a rendered expansion user message in explicit INPUT/OUTPUT framing.
+
+    Wraps rather than replaces so a custom ``expansion_user_prompt`` (alternate settings files,
+    sequential mode) keeps supplying the context payload and still gains the framing.
+    """
+    body = (user or "").lstrip()
+    if body.startswith(_USER_PROMPT_OUTPUT_LEAD):
+        body = body[len(_USER_PROMPT_OUTPUT_LEAD):]
+    return f"{_INPUT_FRAMING_HEADER}\n{body}\n\n{_INPUT_FRAMING_FOOTER}"
+
+
+# --- opt-in input-echo retry (``expansion_echo_retry_enabled``) ----------------------------------
+# Safety net for whatever fraction of the failure above the prompt fix alone does not resolve, and
+# deliberately narrow: it fires ONLY on the echo shape (parsed object, no usable ``candidates``,
+# but one of the input/schema keys present), never on malformed JSON — ``_repair_json_object``
+# already owns that class. Hard-bounded at ONE extra call per expansion, mirroring the compiled
+# path's leaf-extract retry lever.
+#: Keys that only ever appear in what the model was SHOWN — the user message's context blob
+#: ("path"/"parent_id"/"parent_title"/"blocked_sites"/"errors"/"memories"/"event_log", plus the
+#: per-entry "node_id"), or the schema hint's envelope ("name"/"schema").
+_ECHO_INPUT_KEYS = (
+    "path", "parent_id", "parent_title", "blocked_sites", "errors", "memories", "event_log",
+    "node_id", "schema", "name",
+)
+_ECHO_RETRY_PROMPT = (
+    "That reply was the WRONG OBJECT: its top-level key was \"{key}\", which came from the "
+    "read-only context you were shown. That context is input; it is never the answer.\n"
+    "Reply again with ONLY a new object of your own:\n"
+    "{{\"candidates\": [{{\"title\": \"<subproblem>\", \"action\": \"<one allowed action>\", "
+    "\"details\": {{<arguments for that action>}}}}]}}\n"
+    "It must start with {{\"candidates\": and contain no \"path\", \"node_id\", \"name\" or "
+    "\"schema\" key, no copied context, and no commentary."
+)
+
+
+def detect_input_echo(content: Optional[str]) -> Optional[str]:
+    """Name the echoed key when a reply is syntactically valid JSON of the WRONG shape.
+
+    Returns the offending top-level key for a parsed object that carries no usable ``candidates``
+    but does carry one of the input/schema keys; ``None`` for anything else (unparseable, a real
+    plan, or an empty/odd object that is some other failure). The key reported is the reply's OWN
+    first offending key (JSON preserves document order), because the corrective prompt quotes it
+    back at the model. Never raises.
+    """
+    if not content:
+        return None
+    try:
+        data = json.loads(content)
+    except Exception:  # noqa: BLE001 — malformed JSON is a different failure class
+        return None
+    if not isinstance(data, dict) or data.get("candidates"):
+        return None
+    for key in data:
+        if key in _ECHO_INPUT_KEYS:
+            return key
+    return None
+
+
 # --- extra-actions menu ------------------------------------------------------------------------
 # The system prompt hand-writes ACTIONS entries for the core actions only, and its SEARCH + VISIT
 # PIPELINE section actively steers every web task toward search/visit. So an action added through
@@ -420,6 +523,15 @@ class LlmExpansionPolicy(ExpansionPolicy):
         if self._cfg.expansion.expect_contract_enabled:
             from agent.app.idea_dag_schemas import EXPANSION_JSON_SCHEMA_WITH_EXPECT
             json_schema = EXPANSION_JSON_SCHEMA_WITH_EXPECT
+        # Opt-in, same lever as the user-prompt framing: ``json_instruction_from_response_format``
+        # dumps the whole {"name": "expansion_result", "schema": {...}} envelope into the system
+        # prompt, and a weak model copies that ENVELOPE instead of producing an instance of it
+        # (one of the 8 recorded qwen2.5:0.5b completions did exactly that, placeholders and all).
+        # Passing the inner schema keeps every constraint and removes the copyable wrapper.
+        if self._cfg.expansion.input_output_framing_enabled and isinstance(json_schema, dict):
+            inner_schema = json_schema.get("schema")
+            if isinstance(inner_schema, dict):
+                json_schema = inner_schema
         schema_hint = (
             json_instruction_from_response_format({"type": "json_schema", "json_schema": json_schema})
             if json_schema
@@ -487,6 +599,55 @@ class LlmExpansionPolicy(ExpansionPolicy):
                 _json_telemetry.record(model_name, content, True, _parsed_ok, phase="native_expansion")
             candidates, meta = self._parse_candidates(content, graph=graph, parent_node_id=node_id)
             self._logger.info(f"[EXPANSION] Parsed {len(candidates)} candidates from LLM response, meta={meta}")
+            # Opt-in safety net (``expansion_echo_retry_enabled``): the reply parsed but was the
+            # INPUT echoed back, not a plan. ONE corrective retry that names the offending key,
+            # then the existing fallback path takes over exactly as before. Self-contained failure
+            # handling so a failed retry degrades to that fallback, never to an empty plan.
+            if not candidates and self._cfg.expansion.echo_retry_enabled:
+                echoed_key = detect_input_echo(content)
+                if echoed_key:
+                    self._logger.warning(
+                        f"[EXPANSION] Reply echoed the input context (top-level key "
+                        f"'{echoed_key}') instead of a plan - one corrective retry"
+                    )
+                    try:
+                        retry_messages = self._append_user_directive(
+                            messages, _ECHO_RETRY_PROMPT.format(key=echoed_key)
+                        )
+                        retry_payload = self.io.build_llm_payload(
+                            messages=retry_messages,
+                            json_mode=True,
+                            model_name=model_name,
+                            temperature=self._cfg.expansion.temperature,
+                            max_tokens=max_tokens,
+                            json_schema=None,
+                            reasoning_effort=reasoning_effort,
+                            text_verbosity=text_verbosity,
+                        )
+                        retry_content = await self.io.query_llm_with_fallback(
+                            retry_payload,
+                            model_name=model_name,
+                            fallback_model=self._cfg.generation.fallback_model,
+                            timeout_seconds=expansion_timeout,
+                        )
+                        if _json_telemetry.enabled():
+                            try:
+                                json.loads(retry_content or "")
+                                _retry_parsed_ok = True
+                            except Exception:
+                                _retry_parsed_ok = False
+                            _json_telemetry.record(
+                                model_name, retry_content, True, _retry_parsed_ok,
+                                phase="native_expansion_echo_retry",
+                            )
+                        candidates, meta = self._parse_candidates(
+                            retry_content, graph=graph, parent_node_id=node_id
+                        )
+                        self._logger.info(
+                            f"[EXPANSION] Echo retry parsed {len(candidates)} candidates"
+                        )
+                    except Exception as retry_err:  # noqa: BLE001 — a retry never sinks a run
+                        self._logger.warning(f"[EXPANSION] Echo retry failed: {retry_err}")
             if not candidates:
                 self._logger.error(f"[EXPANSION] CRITICAL: No candidates parsed from LLM response!")
                 self._logger.error(f"[EXPANSION] LLM response length: {len(content) if content else 0} chars")
@@ -505,6 +666,23 @@ class LlmExpansionPolicy(ExpansionPolicy):
         except Exception as e:
             self._logger.error(f"[EXPANSION] Exception during expansion: {e}", exc_info=True)
             return []
+
+    def _append_user_directive(self, messages: List[Dict[str, str]], directive: str) -> List[Dict[str, str]]:
+        """Append ``directive`` to the LAST user message (a copy; message count unchanged).
+
+        The corrective retry rides on the existing user turn rather than adding a second one:
+        the count stays system + user (as ``_inject_schema_hint`` also guarantees), which keeps
+        every backend happy about role alternation, and the directive lands in the last position
+        the model reads.
+        """
+        out = [dict(msg) for msg in messages]
+        for msg in reversed(out):
+            if msg.get("role") == "user":
+                existing = msg.get("content") or ""
+                msg["content"] = f"{existing}\n\n{directive}" if existing else directive
+                return out
+        out.append({"role": "user", "content": directive})
+        return out
 
     def _inject_schema_hint(self, messages: List[Dict[str, str]], hint: str) -> List[Dict[str, str]]:
         """Append the candidate-shape instruction to the system message.
@@ -815,6 +993,10 @@ class LlmExpansionPolicy(ExpansionPolicy):
             user = user_template or ""
             for k, v in format_kwargs.items():
                 user = user.replace("{" + k + "}", str(v))
+        # Opt-in: label the context blob as read-only input and restate the output shape right
+        # after it (see ``frame_expansion_user_prompt``). Default path is byte-identical.
+        if self._cfg.expansion.input_output_framing_enabled:
+            user = frame_expansion_user_prompt(user)
         from agent.app.idea_policies.action_constants import PromptBuilder
         messages = PromptBuilder.build_messages(system_content=system, user_content=user)
         

@@ -224,6 +224,13 @@ class ExpansionConfig:
     max_context_nodes: int = 5
     max_detail_chars: int = 5000
     expect_contract_enabled: bool = False
+    # Prompt hygiene for weak models: label the context blob as read-only INPUT and restate the
+    # {candidates: [...]} output shape right after it. Both default OFF so the shipped prompt
+    # bytes are unchanged; ``echo_retry_enabled`` is a separate lever on purpose so the prompt
+    # fix and the retry safety net can be ablated independently. See expansion.py's
+    # ``_INPUT_FRAMING_HEADER`` block for the telemetry that motivated them.
+    input_output_framing_enabled: bool = False
+    echo_retry_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "expansion_model",
@@ -232,6 +239,8 @@ class ExpansionConfig:
         "max_context_nodes": "expansion_max_context_nodes",
         "max_detail_chars": "expansion_max_detail_chars",
         "expect_contract_enabled": "expansion_expect_contract_enabled",
+        "input_output_framing_enabled": "expansion_input_output_framing_enabled",
+        "echo_retry_enabled": "expansion_echo_retry_enabled",
     }
 
     @classmethod

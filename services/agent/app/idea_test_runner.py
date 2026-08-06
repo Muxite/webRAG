@@ -652,6 +652,19 @@ def _apply_got_experiment_overrides(
     _expectcontract_override = env.get("IDEA_TEST_EXPECT_CONTRACT", "").strip()
     if _expectcontract_override:
         idea_settings["expansion_expect_contract_enabled"] = _is_enabled(_expectcontract_override)
+    # IDEA_TEST_EXPANSION_IO_FRAMING: label the expansion user prompt's context blob as read-only
+    # INPUT and restate the {candidates: [...]} output shape right after it
+    # (expansion_input_output_framing_enabled) — the prompt-hygiene fix for a weak model echoing
+    # the context back instead of planning.
+    _ioframing_override = env.get("IDEA_TEST_EXPANSION_IO_FRAMING", "").strip()
+    if _ioframing_override:
+        idea_settings["expansion_input_output_framing_enabled"] = _is_enabled(_ioframing_override)
+    # IDEA_TEST_EXPANSION_ECHO_RETRY: one bounded corrective retry when an expansion reply parses
+    # but is the echoed input rather than a plan (expansion_echo_retry_enabled). Independent of
+    # the framing flag above so the prompt fix and the safety net can be ablated separately.
+    _echoretry_override = env.get("IDEA_TEST_EXPANSION_ECHO_RETRY", "").strip()
+    if _echoretry_override:
+        idea_settings["expansion_echo_retry_enabled"] = _is_enabled(_echoretry_override)
     # IDEA_TEST_GOT_DEDUP: the memory-based duplicate-candidate filter (got_dedup_enabled,
     # default True — NOT one of the opt-in A1-A5 adaptive levers, it is baseline engine
     # behavior). Exists so a benchmark can isolate cross-rep memory-persistence effects: the

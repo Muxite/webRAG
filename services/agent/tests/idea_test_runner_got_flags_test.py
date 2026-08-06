@@ -300,6 +300,32 @@ def test_price_tier_tiering_bool_override():
     assert settings["price_tier_param_tiering_enabled"] is True
 
 
+def test_expansion_io_framing_and_echo_retry_are_independent_bool_overrides():
+    """Two levers, not one: the prompt fix (framing) and its safety net (retry) must be armable
+    separately so a live A/B can attribute the effect to the prompt alone."""
+    framing_only = _base()
+    _apply_got_experiment_overrides(
+        framing_only, environ={"IDEA_TEST_EXPANSION_IO_FRAMING": "1"}
+    )
+    assert framing_only["expansion_input_output_framing_enabled"] is True
+    assert "expansion_echo_retry_enabled" not in framing_only
+
+    retry_only = _base()
+    _apply_got_experiment_overrides(
+        retry_only, environ={"IDEA_TEST_EXPANSION_ECHO_RETRY": "1"}
+    )
+    assert retry_only["expansion_echo_retry_enabled"] is True
+    assert "expansion_input_output_framing_enabled" not in retry_only
+
+    both_off = _base()
+    _apply_got_experiment_overrides(
+        both_off,
+        environ={"IDEA_TEST_EXPANSION_IO_FRAMING": "0", "IDEA_TEST_EXPANSION_ECHO_RETRY": "0"},
+    )
+    assert both_off["expansion_input_output_framing_enabled"] is False
+    assert both_off["expansion_echo_retry_enabled"] is False
+
+
 def test_all_new_flags_blank_are_noop():
     settings = _base()
     _apply_got_experiment_overrides(
@@ -315,6 +341,8 @@ def test_all_new_flags_blank_are_noop():
             "IDEA_TEST_TOOL_FAILURE_RECOVERY": "",
             "IDEA_TEST_NATIVE_VOTE_K": "",
             "IDEA_TEST_EXPECT_CONTRACT": "",
+            "IDEA_TEST_EXPANSION_IO_FRAMING": "",
+            "IDEA_TEST_EXPANSION_ECHO_RETRY": "  ",
             "IDEA_TEST_PLAN_LIBRARY": "",
             "IDEA_TEST_PLAN_LIBRARY_AUTO": "  ",
             "IDEA_TEST_PLAN_LIBRARY_ACTION": "",
