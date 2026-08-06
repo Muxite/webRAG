@@ -414,4 +414,18 @@ def get_compiled_plan() -> Dict[str, Any]:
             "that lake and its ratio value (mean depth, in metres), (b) all five lakes' volume and "
             "surface area, and (c) cite each lake's source URL."
         ),
+        "agg_mode": "computed",
+        "composition": {
+            "op": "ratio_argmax",
+            "answer_noun": "lake",
+            "value_label": "volume-to-surface-area ratio",
+            "numerator_label": "volume",
+            "denominator_label": "area",
+            "numerator_unit": "km^3",
+            "denominator_unit": "km^2",
+            "ratio_unit": "m",
+            "multiplier": 1000,
+            "round_digits": 1,
+            "items": [{"leaf": e["key"], "label": e["name"]} for e in ENTITIES],
+        },
     }

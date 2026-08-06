@@ -1495,6 +1495,137 @@ def _compose_argmax(leaves: List[Dict[str, Any]], results: Dict[str, str],
     return "\n".join([lead, "", *body])
 
 
+# --- ratio_argmax: an argmax over a COMPUTED RATIO of two facts gathered by the SAME leaf ---------
+# Motivated by live evidence that a weak, different-family model (gemma2:2b) computes every item's
+# ratio correctly in its own free text and then asserts the wrong (famous/largest) winner anyway —
+# the same "compute-right/conclude-wrong" failure the other composers exist to eliminate. Unlike
+# and_filter's two-leaf-per-item shape, both quantities here sit on ONE page, so an item names ONE
+# leaf and the composer must pull TWO distinct labelled numbers out of ONE fact string.
+_NUM_TOKEN_RX = re.compile(r"-?\d(?:[\d,]*\d)?(?:\.\d+)?")
+
+
+def _field_number(text: str, label: str, other_label: str, max_window: int = 60) -> Optional[str]:
+    """The LONGEST digit-run token following `label`'s first mention, window truncated at the
+    next mention of `other_label` (never lets a neighbouring field's bigger number bleed in),
+    a hard delimiter (';'/newline), or `max_window` chars -- whichever comes first."""
+    m = re.search(rf"\b{re.escape(label)}\w*\b", text, re.I)
+    if not m:
+        return None
+    tail = text[m.end():]
+    stop = len(tail)
+    if other_label:
+        om = re.search(rf"\b{re.escape(other_label)}\w*\b", tail, re.I)
+        if om:
+            stop = min(stop, om.start())
+    dm = re.search(r"[;\n]", tail)
+    if dm:
+        stop = min(stop, dm.start())
+    stop = min(stop, max_window)
+    toks = _NUM_TOKEN_RX.findall(tail[:stop])
+    return max(toks, key=lambda t: len(t.replace(",", "").lstrip("-"))) if toks else None
+
+
+def _parse_num_token(tok: str):
+    try:
+        v = float(tok.replace(",", ""))
+    except ValueError:
+        return None
+    return int(v) if v.is_integer() else v
+
+
+def _extract_ratio_pair(raw: str, num_label: str, den_label: str) -> Optional[Tuple[Any, Any]]:
+    """Tier A ONLY: both fields must be explicitly labelled and resolve to DISTINCT tokens, or
+    this refuses entirely -- no positional/leftover-number fallback (removed after adversarial
+    review found it could accept an unrelated decoy number, e.g. a formation year or elevation
+    figure, and invert a non-winning item's ratio past the true winner)."""
+    text = _strip_source_tail(str(raw or "")).strip()      # reuse existing helper
+    if not text or text.upper().startswith("UNKNOWN"):
+        return None
+    num_tok = _field_number(text, num_label, den_label)
+    den_tok = _field_number(text, den_label, num_label)
+    if num_tok is None or den_tok is None or num_tok == den_tok:
+        return None                                        # refuse -- never guess
+
+    n, d = _parse_num_token(num_tok), _parse_num_token(den_tok)
+    if n is None or d is None or isinstance(d, bool) or d <= 0:
+        return None
+    return n, d
+
+
+def _compose_ratio_argmax(leaves: List[Dict[str, Any]], results: Dict[str, str],
+                          composition: Dict[str, Any]) -> Optional[str]:
+    """RATIO ARGMAX: name the item with the largest ratio of two labelled facts gathered by the
+    SAME leaf (e.g. volume/area). Extraction is Tier-A-only (see ``_extract_ratio_pair``) — an
+    item whose fact does not carry BOTH fields explicitly labelled and distinct is unresolved,
+    never guessed from a leftover number, because a decoy figure sharing the fact string with one
+    labelled field could otherwise invert a non-winning item's ratio past the true winner.
+
+    ALL-OR-NOTHING, unlike ``_compose_argmax``'s graceful degradation — found live, not assumed:
+    an early ">=2 resolved" version of this composer confidently named Lake Ladoga the winner
+    (0/5 -> wrong) whenever Issyk-Kul's own leaf failed to resolve but 2+ OTHER lakes did, because
+    excluding the true (deliberately obscure) winner from the comparison silently lets a lesser,
+    easier-to-extract candidate win by default. This is the SAME failure family as the
+    positional-guessing risk in ``_extract_ratio_pair`` — a confidently WRONG keystone, strictly
+    worse than a missed composer fire — but from item-selection rather than field-extraction. A
+    task whose winner is deliberately the hardest item to extract (the anti-parametric design
+    point of this whole task family) cannot safely tolerate a partial-comparison composer: every
+    item must resolve, or fall back to the unchanged free-text path.
+    """
+    items = list(composition.get("items") or [])
+    num_label = str(composition.get("numerator_label") or "").strip()
+    den_label = str(composition.get("denominator_label") or "").strip()
+    if not items or not num_label or not den_label:
+        return None
+    try:
+        multiplier = float(composition.get("multiplier") if composition.get("multiplier") is not None else 1.0)
+    except (TypeError, ValueError):
+        return None
+    rd = composition.get("round_digits")
+    round_digits = rd if isinstance(rd, int) and not isinstance(rd, bool) and rd >= 0 else 3
+
+    known = {leaf.get("id") for leaf in (leaves or []) if isinstance(leaf, dict)}
+    num_unit = str(composition.get("numerator_unit") or "").strip()
+    den_unit = str(composition.get("denominator_unit") or "").strip()
+    ratio_unit = str(composition.get("ratio_unit") or "").strip()
+
+    rows = []
+    for item in items:
+        leaf_id = str(item.get("leaf") or "")
+        if known and leaf_id not in known:
+            return None                                     # plan-authoring error, not a data miss
+        fact = results.get(leaf_id, "")
+        pair = _extract_ratio_pair(fact, num_label, den_label)
+        ratio = None
+        if pair is not None:
+            n, d = pair
+            ratio = round((n / d) * multiplier, round_digits)
+        rows.append({"label": str(item.get("label") or leaf_id), "pair": pair, "ratio": ratio,
+                     "cite": _row_citation([fact]) if pair is not None else ""})
+
+    if any(row["ratio"] is None for row in rows):
+        return None                                         # ALL-OR-NOTHING -- see docstring
+
+    best = max(row["ratio"] for row in rows)
+    winners = [row["label"] for row in rows if row["ratio"] == best]
+    noun = _plural(str(composition.get("answer_noun") or "item").strip())
+    label = str(composition.get("value_label") or "ratio").strip()
+    unit_s = f" {ratio_unit}" if ratio_unit else ""
+    figure = f"{_fmt_num(best)}{unit_s}"
+    scope = f"of the {len(rows)} {noun} compared"
+    if len(winners) == 1:
+        lead = f"{winners[0]} has the highest {label} {scope}, at {figure}."
+    else:
+        joined = f"{', '.join(winners[:-1])} and {winners[-1]}"
+        lead = f"{joined} tie for the highest {label} {scope}, at {figure} each."
+
+    body = []
+    for row in rows:
+        n, d = row["pair"]
+        n_s = f"{_fmt_num(n)}{f' {num_unit}' if num_unit else ''}"
+        d_s = f"{_fmt_num(d)}{f' {den_unit}' if den_unit else ''}"
+        r_s = f"{_fmt_num(row['ratio'])}{unit_s}"
+        body.append(f"{row['label']}: {num_label}={n_s}, {den_label}={d_s}, {label}={r_s}{row['cite']}")
+    return "\n".join([lead, "", *body])
 
 
 def _compose_subset_sum(leaves: List[Dict[str, Any]], results: Dict[str, str],
@@ -1548,6 +1679,7 @@ _COMPOSERS = {
     "and_filter": _compose_and_filter,
     "argmax": _compose_argmax,
     "count_threshold": _compose_count_threshold,
+    "ratio_argmax": _compose_ratio_argmax,
     "subset_sum": _compose_subset_sum,
 }
 

@@ -1473,6 +1473,186 @@ def test_compose_argmax_malformed_composition_returns_none():
     assert ec._compose_argmax(_AM_LEAVES, _AM_RESULTS, stray) is None
 
 
+# --- ratio_argmax: argmax over a COMPUTED RATIO of two labelled facts gathered by ONE leaf --------
+# Both quantities sit on the SAME page (064/079/088's real shape), so extraction must pull TWO
+# distinct labelled numbers out of ONE fact string — see ``_field_number``/``_extract_ratio_pair``.
+# REVISED after adversarial review: Tier B (a leftover-number fallback) was removed because it could
+# accept an unrelated decoy number (a formation year, an elevation) and invert a non-winning item's
+# ratio past the true winner. Only Tier A (both fields explicitly labelled and distinct) fires.
+
+def test_field_number_prefers_the_longer_digit_run_over_a_unit_exponent():
+    """A naive '\\bvolume\\w*\\b[^0-9]{0,30}(\\d[\\d,]*)' regex would stop at the '3' inside 'km^3';
+    the fix takes the LONGEST digit-run token in the window instead."""
+    assert ec._field_number("Volume: 1,736 km^3", "volume", "area") == "1,736"
+
+
+def test_field_number_window_stops_at_the_other_labels_next_occurrence():
+    """Cross-field bleed regression: without truncating the window at the OTHER label's next
+    occurrence, a bigger number belonging to the NEXT field would win purely on digit-run length
+    (999 has more digits than 5)."""
+    assert ec._field_number("Volume: 5, Area: 999", "volume", "area") == "5"
+    assert ec._field_number("Volume: 5, Area: 999", "area", "volume") == "999"
+
+
+def test_field_number_trailing_comma_regression():
+    """Blocker 1: the ORIGINAL '-?\\d[\\d,]*(?:\\.\\d+)?' token swallowed the comma that actually
+    SEPARATES the two fields (no digit follows it in 'Volume: 1,736, Area: ...'), so float()
+    parsing failed entirely. The fix requires the token to END in a digit."""
+    assert ec._field_number("Volume: 1,736, Area: 6,236", "volume", "area") == "1,736"
+    assert ec._field_number("Volume: 1,736, Area: 6,236", "area", "volume") == "6,236"
+
+
+def test_extract_ratio_pair_both_labelled_and_distinct():
+    assert ec._extract_ratio_pair(
+        "Volume: 1,736 km^3, Area: 6,236 km^2", "volume", "area") == (1736, 6236)
+
+
+def test_extract_ratio_pair_decoy_regression_refuses_an_unlabelled_leftover_number():
+    """Blocker 2 (the more serious one): the volume label is DROPPED entirely; a formation-year
+    decoy (10,000) is the only leftover number in the fact. The removed Tier B would have accepted
+    it as the volume (10000/25667*1000 = 389.6 m, which EXCEEDS Issyk-Kul's true 278.4 m and would
+    make the composer confidently name the wrong winner). Tier-A-only refuses instead of guessing."""
+    text = "Area: 25,667 km^2. The lake formed about 10,000 years ago after the last glaciation."
+    assert ec._extract_ratio_pair(text, "volume", "area") is None
+
+
+def test_extract_ratio_pair_identical_token_refuses():
+    assert ec._extract_ratio_pair("Volume: 100, Area: 100", "volume", "area") is None
+
+
+def test_extract_ratio_pair_zero_or_negative_denominator_refuses():
+    assert ec._extract_ratio_pair("Volume: 100, Area: 0", "volume", "area") is None
+    assert ec._extract_ratio_pair("Volume: 100, Area: -5", "volume", "area") is None
+
+
+def test_extract_ratio_pair_unknown_fact_refuses():
+    assert ec._extract_ratio_pair("UNKNOWN", "volume", "area") is None
+    assert ec._extract_ratio_pair(f"UNKNOWN — {_WIKI}Lake_X", "volume", "area") is None
+
+
+_RA_LAKES = [  # 064's real five — the ratio winner (Issyk-Kul) is NOT the largest by volume or area
+    ("Issyk-Kul", "issyk_kul", 1736, 6236, "Issyk-Kul"),
+    ("Lake Victoria", "victoria", 2424, 59947, "Lake_Victoria"),
+    ("Lake Ladoga", "ladoga", 837, 17891, "Lake_Ladoga"),
+    ("Lake Erie", "erie", 480, 25667, "Lake_Erie"),
+    ("Lake Winnipeg", "winnipeg", 294, 24514, "Lake_Winnipeg"),
+]
+_RA_COMPOSITION = {
+    "op": "ratio_argmax", "answer_noun": "lake", "value_label": "volume-to-surface-area ratio",
+    "numerator_label": "volume", "denominator_label": "area",
+    "numerator_unit": "km^3", "denominator_unit": "km^2", "ratio_unit": "m",
+    "multiplier": 1000, "round_digits": 1,
+    "items": [{"leaf": key, "label": name} for name, key, _v, _a, _slug in _RA_LAKES],
+}
+_RA_LEAVES = [{"id": key} for _n, key, _v, _a, _s in _RA_LAKES]
+
+
+def _ra_fact(volume, area, slug):
+    return f"Volume: {volume:,} km^3, Area: {area:,} km^2 — source: {_WIKI}{slug}"
+
+
+_RA_RESULTS = {key: _ra_fact(vol, area, slug) for _n, key, vol, area, slug in _RA_LAKES}
+
+
+def test_compose_ratio_argmax_renders_winner_lead_and_every_row():
+    out = ec._compose_ratio_argmax(_RA_LEAVES, _RA_RESULTS, _RA_COMPOSITION)
+    assert out == (
+        "Issyk-Kul has the highest volume-to-surface-area ratio of the 5 lakes compared, at 278.4 m.\n"
+        "\n"
+        f"Issyk-Kul: volume=1,736 km^3, area=6,236 km^2, volume-to-surface-area ratio=278.4 m"
+        f" — source: {_WIKI}Issyk-Kul\n"
+        f"Lake Victoria: volume=2,424 km^3, area=59,947 km^2, volume-to-surface-area ratio=40.4 m"
+        f" — source: {_WIKI}Lake_Victoria\n"
+        f"Lake Ladoga: volume=837 km^3, area=17,891 km^2, volume-to-surface-area ratio=46.8 m"
+        f" — source: {_WIKI}Lake_Ladoga\n"
+        f"Lake Erie: volume=480 km^3, area=25,667 km^2, volume-to-surface-area ratio=18.7 m"
+        f" — source: {_WIKI}Lake_Erie\n"
+        f"Lake Winnipeg: volume=294 km^3, area=24,514 km^2, volume-to-surface-area ratio=12 m"
+        f" — source: {_WIKI}Lake_Winnipeg"
+    )
+
+
+def test_compose_ratio_argmax_is_all_or_nothing_not_graceful():
+    """ALL-OR-NOTHING, unlike ``_compose_argmax``'s graceful degradation — changed after a LIVE
+    regression: an earlier ">=2 resolved" version confidently named Lake Ladoga the winner whenever
+    Issyk-Kul's own leaf failed to resolve but 2+ others did, because excluding the true
+    (deliberately obscure) winner from the comparison silently lets a lesser candidate win by
+    default. Any single unresolved item — even just the non-winning ones — must now refuse."""
+    partial = {
+        "issyk_kul": _RA_RESULTS["issyk_kul"],
+        "ladoga": _RA_RESULTS["ladoga"],
+        "victoria": f"UNKNOWN — {_WIKI}Lake_Victoria",
+        "erie": f"UNKNOWN — {_WIKI}Lake_Erie",
+        "winnipeg": f"UNKNOWN — {_WIKI}Lake_Winnipeg",
+    }
+    assert ec._compose_ratio_argmax(_RA_LEAVES, partial, _RA_COMPOSITION) is None
+
+
+def test_compose_ratio_argmax_true_winner_missing_does_not_crown_a_runner_up():
+    """THE regression itself, reproduced directly: Issyk-Kul (the true winner) fails to resolve,
+    Lake Victoria and Lake Ladoga both resolve cleanly. A graceful-degradation composer would name
+    Ladoga (46.8 m, the higher of the two resolved) the winner — confidently wrong, since the real
+    winner (278.4 m) was silently excluded. Must return None instead."""
+    missing_winner = {
+        "issyk_kul": f"UNKNOWN — {_WIKI}Issyk-Kul",
+        "victoria": _RA_RESULTS["victoria"],
+        "ladoga": _RA_RESULTS["ladoga"],
+        "erie": f"UNKNOWN — {_WIKI}Lake_Erie",
+        "winnipeg": f"UNKNOWN — {_WIKI}Lake_Winnipeg",
+    }
+    assert ec._compose_ratio_argmax(_RA_LEAVES, missing_winner, _RA_COMPOSITION) is None
+
+
+def test_compose_ratio_argmax_needs_all_items_resolved():
+    """Even ONE unresolved item (4/5, not just 1/5 or 0/5) now falls back — not just the
+    'fewer than two resolved' vacuous-comparison case."""
+    one = {"issyk_kul": _RA_RESULTS["issyk_kul"]}
+    assert ec._compose_ratio_argmax(_RA_LEAVES, one, _RA_COMPOSITION) is None
+    assert ec._compose_ratio_argmax(_RA_LEAVES, {}, _RA_COMPOSITION) is None
+    four_of_five = dict(_RA_RESULTS, erie=f"UNKNOWN — {_WIKI}Lake_Erie")
+    assert ec._compose_ratio_argmax(_RA_LEAVES, four_of_five, _RA_COMPOSITION) is None
+
+
+def test_compose_ratio_argmax_tie_names_every_tied_item():
+    """A fabricated tie renders without crashing and names every tied item (the tie-render branch
+    the design flags as a latent gap, structurally impossible on the real fixture but still worth a
+    defensive unit test)."""
+    tied = dict(_RA_RESULTS, ladoga=_ra_fact(1736, 6236, "Lake_Ladoga"))
+    out = ec._compose_ratio_argmax(_RA_LEAVES, tied, _RA_COMPOSITION)
+    assert out.startswith("Issyk-Kul and Lake Ladoga tie for the highest volume-to-surface-area "
+                          "ratio of the 5 lakes compared, at 278.4 m each.")
+
+
+def test_compose_dispatch_wires_ratio_argmax_and_unknown_op_stays_none():
+    out = ec._compose(_RA_LEAVES, _RA_RESULTS, _RA_COMPOSITION)
+    assert out.startswith("Issyk-Kul has the highest volume-to-surface-area ratio")
+    assert ec._compose(_RA_LEAVES, _RA_RESULTS, dict(_RA_COMPOSITION, op="odd_one_out")) is None
+
+
+def test_execute_plan_computed_runs_064s_real_ratio_argmax_plan_with_zero_llm_calls(monkeypatch):
+    """End-to-end on the ACTUAL get_compiled_plan() of 064: canned correct per-lake volume+area
+    facts in (both labelled, one leaf per lake), a composed deliverable out, ZERO aggregation LLM
+    calls, and every real validator at 1.0."""
+    monkeypatch.delenv("IDEA_TEST_COMPILED_AGG_MODE", raising=False)
+    _patch_pricing(monkeypatch, {"cheap-slug": {"output_per_million": 0.40}})
+    from agent.app.idea_tests import test_064_tier5_computed_ratio_argmax_wide as t064
+
+    def resolve(instruction):
+        e = _entity_in(t064.ENTITIES, instruction)
+        url = f"{_WIKI}{e['name'].replace(' ', '_')}"
+        return f"Volume: {e['volume']:,} km^3, Area: {e['area']:,} km^2 — source: {url}"
+
+    _stub_both_leaves(monkeypatch, resolve)
+    io = _agg_io("LLM AGGREGATION — MUST NOT RUN")
+    out = asyncio.run(ec._execute_plan(io, t064.get_compiled_plan(), "cheap-slug", 512))
+    assert io.query_llm.await_count == 0
+    assert out.startswith("Issyk-Kul has the highest volume-to-surface-area ratio")
+    result = {"output": {"final_deliverable": out}}
+    observability = {"visit": {"count": len(t064.ENTITIES)}}
+    for check in t064.get_validation_functions():
+        assert check(result, observability)["score"] == 1.0, check.__name__
+
+
 _SS_SEASONS = [  # 070's real four — a genuine slip (78 -> 75) was seen live, motivating this op
     ("Season 1", "s1_episodes", 13),
     ("Season 2", "s2_episodes", 22),

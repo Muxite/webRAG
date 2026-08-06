@@ -96,9 +96,12 @@ ENTITIES: List[Dict[str, Any]] = [
      "slug_rx": r"wiki/pont.de.normand"},
     {"key": "rion_antirion", "name": "Rion-Antirion Bridge", "country": "Greece",
      "span": 560, "winner": False,
-     "name_rx": r"antirion|trikoupis",
+     # Real canonical English Wikipedia title is "Rio-Antirrio Bridge" (en-dash, double-r, "io"
+     # not "ion") -- "Rion-Antirion_Bridge" redirects there, confirmed live. Both the name and
+     # slug patterns kept their original form as one alternative alongside the real spelling.
+     "name_rx": r"antirion|antirrio|trikoupis",
      "span_rx": r"(?<!\d)560(?!\d)",
-     "slug_rx": r"wiki/r[io]+n.antirion"},
+     "slug_rx": r"wiki/(?:rion-antirion|rio.{0,12}antirr?io)"},
     {"key": "helgeland", "name": "Helgeland Bridge", "country": "Norway",
      "span": 425, "winner": False,
      "name_rx": r"helgeland",
@@ -393,6 +396,29 @@ def get_compiled_plan() -> Dict[str, Any]:
         })
     return {
         "leaves": leaves,
+        # Deterministic composition: the executor compares the six gathered spans in Python and
+        # renders the winner plus the full per-bridge breakdown itself (zero extra LLM calls) —
+        # a live cross-model check found a weak model (llama3.2:3b) correctly extracting all six
+        # real span figures (Russky 1104m plainly visible in its own list) and then still
+        # concluding a SMALLER entry (Rio-Antirrio, 560m) was "the longest" -- the exact
+        # compute-right/conclude-wrong failure this mechanism exists to eliminate.
+        # NOTE (found via adversarial stress-testing before wiring, not assumed safe): unlike test
+        # 062's identical `argmax` wiring, this task's own `value_label` MUST NOT share a word
+        # with `_SUP` (this file's superlative-trigger vocabulary, e.g. "longest"/"highest") --
+        # the composer's breakdown row format ("<Name>: <value_label>=<value>") would otherwise
+        # trivially satisfy `_RUSSKY_WINS`'s proximity check for EVERY entity's own row
+        # (including a non-winner's), regardless of which bridge the lead sentence actually names.
+        # Reproduced live with "longest main span" (wrongly credited a runner-up with zero missing
+        # leaves); "main span" (no `_SUP` word) verified clean on both the degraded-leaf case and
+        # the full correct-render case before choosing it here.
+        "agg_mode": "computed",
+        "composition": {
+            "op": "argmax",
+            "answer_noun": "bridge",
+            "value_label": "main span",
+            "unit": "m",
+            "items": [{"leaf": e["key"], "label": e["name"], "type": "number"} for e in ENTITIES],
+        },
         "aggregation": (
             "You now have, for each of the six bridges, its longest main span in metres (with a "
             "source URL). Before drawing any conclusion, write out each bridge's span on its own "
