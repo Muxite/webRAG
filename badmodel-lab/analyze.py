@@ -275,7 +275,14 @@ def load_rows(cells: dict) -> list:
         obs = d.get("execution", {}).get("observability", {})
         canon = bench_common.load_row(Path(f)) or {}
         ks_pass, ks_score = keystone_from(val.get("grep_validations"))
-        grd_pass = grounding_from(val.get("grep_validations"))
+        # Prefer the authoritative grounding-gate flag (same precedence bench_common's
+        # `load_row()` uses) over the text-grep proxy, when the flag is actually set. In
+        # practice this is currently always None for badmodel-lab's compiled-scaffold runs
+        # (the gate is a native-adaptive-engine mechanism, not yet exercised here) so the
+        # grep fallback still does the real work today -- kept for when/if that changes,
+        # not because it currently flips any row.
+        grounding_flag = obs.get("grounding", {}).get("grounded")
+        grd_pass = grounding_flag if grounding_flag is not None else grounding_from(val.get("grep_validations"))
         fmt_pass = format_from(val.get("grep_validations"))
         out = d.get("execution", {}).get("output", {})
         abstained = _abstain_from(out)
@@ -316,7 +323,12 @@ def load_rows(cells: dict) -> list:
             "usd": canon.get("usd") if canon.get("usd") is not None else obs.get("cost", {}).get("usd"),
             "completion_tokens": obs.get("cost", {}).get("completion_tokens"),
             "visits": visits,
-            "latency_s": latency_of(obs),
+            # canon's `secs` (execution.duration_seconds) is reliably populated; this file's
+            # own `latency_of()` reads observability.timings for a "total"/"wall"-style key
+            # that real result JSONs never actually carry (confirmed empty across a live
+            # sample) -- `latency_of` was silently dead code. Kept as a fallback in case a
+            # future timings shape does carry one of those keys.
+            "latency_s": canon.get("secs") if canon.get("secs") is not None else latency_of(obs),
         })
     return rows
 
