@@ -122,10 +122,31 @@ tests, same one pre-existing unrelated failure — see "Known gaps" below).
 
 Named here so later stages aren't invented from scratch each time, not committed to a schedule:
 
-1. **Populate the tool registry** with new domains: file/shell/memory actions (ported from
-   `badmodel-lab/localagent/tools/`) and code/sandbox execution (from
-   `testing/execution_compiled_code.py`/`SandboxConnector`, the "dockerized home for code work"),
-   each as `LeafAction` subclasses registered and tier-gated the same way.
+1. **Populate the tool registry — DONE 2026-08-06 for file/shell; memory/web deliberately skipped.**
+   `localagent/tools/{files,shell}.py` ported as `SandboxToolPack`
+   (`idea_policies/extra_actions/sandbox_tools.py`), delegating to the existing
+   `SandboxConnector` (codebench's already-security-reviewed confinement) rather than
+   reimplementing it — opt-in only, gated by a run's `AgentIO.connector_sandbox` actually being
+   set, never installed by default. `move` was NOT ported (`SandboxConnector` has no move
+   primitive; adding one was out of scope). `localagent/tools/{web,memory}.py` were confirmed
+   redundant, not ported: `WebReadTool` is strictly less than the existing `search`/`visit`
+   actions, and `memory.py`'s own docstring says its P1 backend already IS
+   `idea_memory.MemoryManager` — porting either would duplicate an already-shared mechanism. One
+   real gap flagged, not fixed: `localagent` keys memory to a durable identity, while
+   `IdeaDagEngine._memo_namespace()` is per-mandate and ephemeral — a namespace-policy question,
+   not a missing tool. **A second, deeper prerequisite gap was found and fixed in the same
+   session**: a registered-and-allowed action was still practically unselectable, because the
+   expansion prompt only ever listed non-core action NAMES with zero description while its
+   `SEARCH + VISIT PIPELINE` section actively steered every task toward search/visit — dispatch
+   reachability isn't the same as prompt reachability. Fixed via `LeafAction.menu_line()` /
+   `LeafActionRegistry.menu_lines()` + a `{extra_actions_menu}` prompt placeholder (empty and
+   therefore byte-identical when no extra action is allowed) and `engine.install_action_pack()`
+   (keeps registry + dispatch gate + prompt menu in sync — a settings-snapshot staleness bug
+   would otherwise leave the prompt not describing an action the gate had just started allowing).
+   Live-verified (3 mandates, gpt-4.1-nano): the model correctly picked `datetime_now` and
+   `hacker_news_top` when they were the clear best fit, and reasonably preferred the existing
+   `visit` action over the new `wikipedia_summary` for an encyclopedia-summary mandate — the menu
+   makes an action selectable, it does not force it, which is the correct behavior.
 2. **Wire tier-gated response parsing** — JSON action objects (strong tier, current default) vs.
    typed-slot IR (`badmodel-lab/localagent/ir.py`'s router→slot-fill→validate→typed-repair pattern,
    weak tier) — as a helper inside leaf execution, gated by `capability_tier()`. Only after E3
@@ -135,8 +156,17 @@ Named here so later stages aren't invented from scratch each time, not committed
    beats it on localagent's own task suite (file/shell/memory/web-read) — not before. Its typed-slot
    IR primitives (`ir.py`, `actions.py`, `state.py`) are small and reusable regardless of whether the
    outer loop itself survives.
-4. **Unify benchmark reporting** — `badmodel-lab/analyze.py` bridged onto `scripts/bench_common.py`
-   (this session's Stage 1 also does the first slice of this — see the plan's item 4).
+4. **Unify benchmark reporting — in progress, not closed.** `badmodel-lab/analyze.py` now bridges
+   `model`/`score`/`usd`/`visits` (Stage 1) plus `grounding_pass` (prefers the authoritative
+   `obs.grounding.grounded` flag, same precedence `bench_common.load_row()` uses, before falling
+   back to its own grep-based proxy) and `latency_s` (2026-08-06: `canon.get("secs")` — a real
+   fix, not just deduplication; `analyze.py`'s own `latency_of()` reads an `observability.timings`
+   shape that live result JSONs never actually carry, confirmed empty across a 60-file sample, so
+   `latency_s` had been silently `None` in every row until this bridge). `completion_tokens`
+   deliberately stays UNbridged — it and `bench_common`'s `total_tokens` measure different things
+   (completion-only vs. prompt+completion), the same kind of false-cousin `tier` already warns
+   against. Remaining candidates, not yet done: `place`/`profile`/`leaf_mode`/`tier`/`test_id` are
+   genuinely badmodel-lab-specific (no `bench_common` equivalent) and may never bridge.
 5. **Full orthogonal ExecutionStyle × ActionVocabulary × ResponseParsingStrategy protocol system**
    — deliberately NOT built now. Two of three independent architecture proposals this session
    flagged it as premature: today, 2 of those 3 axes have exactly one real implementation each, and
