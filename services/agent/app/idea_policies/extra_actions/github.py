@@ -26,6 +26,7 @@ class GithubRepoInfoAction(LeafAction):
     """
 
     name = "github_repo_info"
+    args_hint = "details={owner, repo} or {url}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

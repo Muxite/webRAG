@@ -78,12 +78,17 @@ class IdeaDagEngine:
         self._patch_allowed_actions()
         self.io = io
         self.model_name = model_name
-        self.expansion = expansion or LlmExpansionPolicy(io=io, settings=self.settings, model_name=model_name)
+        # Built BEFORE the expansion policy: the policy takes the registry by reference purely to
+        # describe allowed non-core actions in its prompt (a name the model is never told the
+        # meaning of is dispatchable but not selectable), so it must exist first.
+        self.actions = actions or LeafActionRegistry(settings=self.settings)
+        self.expansion = expansion or LlmExpansionPolicy(
+            io=io, settings=self.settings, model_name=model_name, actions=self.actions,
+        )
         self.evaluation = evaluation or LlmBatchEvaluationPolicy(io=io, settings=self.settings, model_name=model_name)
         self.selection = selection or BestScoreSelectionPolicy(settings=self.settings)
         self.decomposition = decomposition or ScoreThresholdDecompositionPolicy(settings=self.settings)
         self.merge = merge or SimpleMergePolicy(settings=self.settings)
-        self.actions = actions or LeafActionRegistry(settings=self.settings)
         self.contracts = contracts or default_contract_registry()
         self.post_expansion_hooks: List[PostExpansionHook] = (
             list(post_expansion_hooks) if post_expansion_hooks is not None else default_post_expansion_hooks()
@@ -112,6 +117,47 @@ class IdeaDagEngine:
         allowed = list(self.settings.get("allowed_actions") or [a.value for a in IdeaActionType])
         if name not in [str(item) for item in allowed]:
             self.settings["allowed_actions"] = allowed + [name]
+
+    def install_action_pack(self, pack: Any, *, allow: bool = True) -> List[str]:
+        """Register every action in ``pack`` and (by default) permit it for this run.
+
+        The one supported way to add actions to a live engine, because three things must agree
+        for an action to be genuinely usable and they live in three places:
+          1. the REGISTRY must know the class (dispatch resolves by name through it);
+          2. ``settings["allowed_actions"]`` must contain the name (``_execute_action``'s gate);
+          3. the EXPANSION POLICY's own settings copy must contain it too — the policy snapshots
+             settings at construction, so assigning a fresh list to ``engine.settings`` after the
+             fact updates the dispatch gate while leaving the prompt's action menu stale, and the
+             model then never proposes the action it is now allowed to run.
+
+        Pass ``allow=False`` to register without permitting (the higher-stakes packs — e.g. the
+        sandbox file/shell tools — are meant to be opted into deliberately, one run at a time).
+
+        :param pack: Anything with an ``ACTION_CLASSES`` list (see ``extra_actions/pack.py``).
+        :param allow: Whether to add the installed names to ``allowed_actions``.
+        :returns: The names that were installed.
+        """
+        installed = self.actions.install_pack(pack)
+        if allow and installed:
+            self.allow_actions(installed)
+        return installed
+
+    def allow_actions(self, names: List[str]) -> List[str]:
+        """Add ``names`` to ``allowed_actions`` everywhere it is read (engine + expansion policy).
+
+        Returns the resulting allowed list. Idempotent, order-preserving, and it never mutates the
+        caller's original list in place (it may be shared).
+        """
+        allowed = [str(item) for item in (self.settings.get("allowed_actions")
+                                          or [a.value for a in IdeaActionType])]
+        for name in names:
+            if str(name) not in allowed:
+                allowed.append(str(name))
+        self.settings["allowed_actions"] = allowed
+        expansion_settings = getattr(self.expansion, "settings", None)
+        if isinstance(expansion_settings, dict):
+            expansion_settings["allowed_actions"] = list(allowed)
+        return allowed
 
     async def prepare(self, mandate: str, run_id: Optional[str] = None) -> tuple:
         """Canonical engine/graph setup shared by `run()` and the interactive debugger.

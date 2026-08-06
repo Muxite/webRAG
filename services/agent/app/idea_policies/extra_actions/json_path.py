@@ -66,6 +66,7 @@ class JsonPathAction(LeafAction):
     """
 
     name = "json_path"
+    args_hint = "details={json, path} or {json, paths}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

@@ -35,6 +35,7 @@ class ArxivSearchAction(LeafAction):
     """
 
     name = "arxiv_search"
+    args_hint = "details={query, max_results?}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

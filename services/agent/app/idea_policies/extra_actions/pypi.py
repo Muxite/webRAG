@@ -23,6 +23,7 @@ class PypiPackageInfoAction(LeafAction):
     """
 
     name = "pypi_package_info"
+    args_hint = "details={package}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

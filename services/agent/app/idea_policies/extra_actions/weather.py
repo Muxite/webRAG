@@ -24,6 +24,7 @@ class OpenMeteoWeatherAction(LeafAction):
     """
 
     name = "open_meteo_weather"
+    args_hint = "details={lat, lon, units?}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

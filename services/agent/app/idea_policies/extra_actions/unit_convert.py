@@ -74,6 +74,7 @@ class UnitConvertAction(LeafAction):
     """
 
     name = "unit_convert"
+    args_hint = "details={value, from_unit, to_unit}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

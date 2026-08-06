@@ -181,6 +181,43 @@ _EXPECT_CONTRACT_ADDENDUM = (
 )
 
 
+# --- extra-actions menu ------------------------------------------------------------------------
+# The system prompt hand-writes ACTIONS entries for the core actions only, and its SEARCH + VISIT
+# PIPELINE section actively steers every web task toward search/visit. So an action added through
+# ``LeafActionRegistry.register()``/``install_pack()`` used to reach the model as a bare NAME in the
+# ``{allowed_actions}`` sentence and nothing else: dispatchable (since the enum-coercion fix) but
+# not practically selectable, because the prompt never said what it does, what it takes, or when it
+# beats search+visit. This block closes that gap — it lists exactly the allowed NON-CORE actions,
+# each with its own one-line description + argument shape, and reconciles them with the "every
+# data-gathering task must include at least one visit" rule that would otherwise veto them.
+#
+# It is EMPTY whenever no non-core action is allowed (the default on every benchmark task and
+# fixture), and an empty menu substitutes/appends nothing, so the prompt stays byte-identical.
+_EXTRA_ACTIONS_MENU_HEADER = (
+    "EXTRA ACTIONS (registered for this run, in addition to the four above):"
+)
+_EXTRA_ACTIONS_MENU_FOOTER = (
+    "- Use one of these ONLY when it directly answers the subproblem; it is then cheaper and "
+    "more exact than search+visit, and it counts as the data-gathering step for that child (no "
+    "separate visit node is needed for it). For anything it does not cover, use search+visit "
+    "exactly as described above."
+)
+#: Placeholder a prompt template may host so the menu lands in a chosen spot. A template that
+#: does not host it gets the menu appended instead, so alternate/custom templates work too.
+EXTRA_ACTIONS_MENU_PLACEHOLDER = "{extra_actions_menu}"
+
+
+def build_extra_actions_menu(lines: List[str]) -> str:
+    """Render the prompt block for ``lines`` (already-formatted per-action menu lines).
+
+    Returns ``""`` for an empty list — the caller relies on that to keep the default prompt
+    byte-identical.
+    """
+    if not lines:
+        return ""
+    return "\n".join([_EXTRA_ACTIONS_MENU_HEADER, *lines, _EXTRA_ACTIONS_MENU_FOOTER])
+
+
 # IDEA_TEST_REASONING_EXEMPLAR: per-run toggle that injects a general reasoning
 # demonstration (a task-shape few-shot) into the expansion system prompt, so a
 # cheap executor model learns HOW to reason through a chain/mixed/parallel task
@@ -328,14 +365,40 @@ def _auto_reasoning_rules(mandate: str) -> str:
 
 
 class LlmExpansionPolicy(ExpansionPolicy):
-    def __init__(self, io: AgentIO, settings: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None):
+    """Generate operation: ask the model for this node's children.
+
+    :param actions: The engine's live ``LeafActionRegistry``. Optional and read-only — it is
+        used solely to DESCRIBE allowed non-core actions in the prompt (see
+        ``build_extra_actions_menu``). Passing the engine's own instance (rather than a copy)
+        means an action registered after construction still gets described. ``None`` (a
+        standalone policy, e.g. in a test) simply renders no menu — and since only a NON-CORE
+        action can ever produce a menu line, that is the same prompt a default registry gives.
+    """
+
+    def __init__(self, io: AgentIO, settings: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None,
+                 actions: Optional[Any] = None):
         default_settings = load_idea_dag_settings()
         merged_settings = {**default_settings, **(settings or {})}
         super().__init__(settings=merged_settings)
         self._cfg = IdeaConfig.from_settings(merged_settings)
         self.io = io
         self.model_name = model_name
+        self.actions = actions
         self._logger = logging.getLogger(self.__class__.__name__)
+
+    def _extra_actions_menu(self, allowed: List[Any]) -> str:
+        """The extra-actions prompt block for this run's ``allowed`` list (``""`` when none).
+
+        Never raises: a registry that cannot describe itself must not sink an expansion.
+        """
+        registry = self.actions
+        if registry is None:
+            return ""
+        try:
+            return build_extra_actions_menu(registry.menu_lines(allowed))
+        except Exception as exc:  # noqa: BLE001 — a menu is an enhancement, never a failure mode
+            self._logger.warning(f"[EXPANSION] Could not build the extra-actions menu: {exc}")
+            return ""
 
     async def expand(self, graph: IdeaDag, node_id: str, memories: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         node = graph.get_node(node_id)
@@ -643,14 +706,31 @@ class LlmExpansionPolicy(ExpansionPolicy):
         system_template = self.settings.get("expansion_system_prompt")
         user_template = self.settings.get("expansion_user_prompt")
         effective_range = f"exactly {max_children}" if max_children <= 1 else f"2-{max_children}"
+        # Non-core actions this run allows, described for the model. Empty (and therefore a
+        # no-op on the prompt bytes) unless a caller registered AND allowed an extra action.
+        extra_menu = self._extra_actions_menu(allowed)
+        hosts_placeholder = EXTRA_ACTIONS_MENU_PLACEHOLDER in (system_template or "")
+        # A hosted placeholder occupies the blank line where the block belongs, so the empty
+        # menu collapses back to that blank line and the filled one keeps its blank lines.
+        menu_substitution = f"\n{extra_menu}\n" if extra_menu else ""
         try:
             system = system_template.format(
                 allowed_actions=allowed_actions,
                 max_children=effective_range,
+                extra_actions_menu=menu_substitution,
             ) if system_template else ""
         except KeyError as fmt_err:
             self._logger.error(f"[EXPANSION] System prompt format error (missing key: {fmt_err}) - using raw template")
-            system = (system_template or "").replace("{allowed_actions}", str(allowed_actions)).replace("{max_children}", str(effective_range))
+            system = (
+                (system_template or "")
+                .replace("{allowed_actions}", str(allowed_actions))
+                .replace("{max_children}", str(effective_range))
+                .replace(EXTRA_ACTIONS_MENU_PLACEHOLDER, menu_substitution)
+            )
+        # Templates that do not host the placeholder (alternate settings files, custom prompts)
+        # still get the menu — appended, in the same way the planning addendum below is.
+        if extra_menu and not hosts_placeholder:
+            system = f"{system}\n\n{extra_menu}" if system else extra_menu
         planning_addendum = str(
             self.settings.get(
                 "expansion_planning_addendum",

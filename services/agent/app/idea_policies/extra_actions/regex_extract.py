@@ -22,6 +22,7 @@ class RegexExtractAction(LeafAction):
     """
 
     name = "regex_extract"
+    args_hint = "details={pattern, text, flags?, max_matches?}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

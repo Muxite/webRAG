@@ -20,6 +20,7 @@ class DatetimeNowAction(LeafAction):
     """
 
     name = "datetime_now"
+    args_hint = "details={tz_offset_hours?, add_days?, add_hours?, add_minutes?}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

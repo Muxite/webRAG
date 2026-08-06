@@ -44,5 +44,5 @@ VISIT DETAILS:
 - Semantic discovery: details={{link_idea: "<what you want>", link_count: <N>}}
 - Hybrid: details={{optional_url: "<try first>", link_idea: "<fallback>", link_count: <N>}}
 - Copy EXACT URLs from previous results. Never construct or guess URLs.
-
+{extra_actions_menu}
 Output: JSON {{candidates: [{{title, action, details}}], meta?: {{execute_all_children: boolean}}}}

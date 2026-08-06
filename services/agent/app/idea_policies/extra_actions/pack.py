@@ -32,10 +32,11 @@ class ExtraActionPack:
     `LeafActionRegistry` instead of coercing into the `IdeaActionType` enum, so
     this bundle is reachable by the model's own action selection via the
     registry's existing `install_pack`, without needing an enum member per
-    action:
+    action. Install it through the engine so all three readers agree — the
+    registry, the dispatch gate's `allowed_actions`, and the expansion prompt's
+    action menu (which is where the model learns these actions exist at all):
 
-        engine.actions.install_pack(ExtraActionPack(settings=engine.settings))
-        engine.settings["allowed_actions"] += engine.actions.names()  # opt in
+        engine.install_action_pack(ExtraActionPack(settings=engine.settings))
 
     Callers who just want to invoke one action directly (no engine, no
     registry) can still do that too:

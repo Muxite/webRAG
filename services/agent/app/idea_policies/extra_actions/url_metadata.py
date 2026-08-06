@@ -78,6 +78,7 @@ class UrlMetadataAction(LeafAction):
     """
 
     name = "url_metadata"
+    args_hint = "details={url}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

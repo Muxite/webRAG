@@ -24,6 +24,7 @@ class WikipediaSummaryAction(LeafAction):
     """
 
     name = "wikipedia_summary"
+    args_hint = "details={title, lang?}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)

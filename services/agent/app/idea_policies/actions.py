@@ -5,7 +5,7 @@ import asyncio
 import json
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Dict, Optional, List, Set, Tuple
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, List, Set, Tuple
 import uuid
 from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
 
@@ -31,10 +31,47 @@ from agent.app.idea_policies.action_constants import (
 
 
 class LeafAction(ABC):
+    #: One-line, model-facing summary of what this action does. Left ``None`` on purpose:
+    #: :meth:`menu_description` then harvests the FIRST line of the class docstring, so an
+    #: action documents itself once (in its docstring) rather than in two places that drift.
+    #: Set it explicitly only when the docstring's opening line is a poor prompt line.
+    description: ClassVar[Optional[str]] = None
+    #: One-line argument shape for the expansion prompt, in the same notation the hardcoded
+    #: ACTIONS block uses for ``visit`` (e.g. ``details={title, lang?}`` — ``?`` = optional).
+    #: ``None`` means "no args worth stating"; the menu line then carries the description only.
+    args_hint: ClassVar[Optional[str]] = None
+
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         self.settings = dict(settings or {})
         self._cfg = IdeaConfig.from_settings(self.settings)
         self._logger = logging.getLogger(self.__class__.__name__)
+
+    @classmethod
+    def menu_description(cls) -> str:
+        """The one-line description used by the expansion prompt's extra-actions menu.
+
+        Prefers the explicit :attr:`description` ClassVar, else the first line of the class
+        docstring, else an empty string. Docstring harvesting keeps the prose in ONE place.
+        """
+        explicit = getattr(cls, "description", None)
+        if isinstance(explicit, str) and explicit.strip():
+            return " ".join(explicit.split())
+        doc = (cls.__doc__ or "").strip()
+        if not doc:
+            return ""
+        return " ".join(doc.splitlines()[0].split())
+
+    @classmethod
+    def menu_line(cls) -> str:
+        """This action's full ``- name: details={...}. Description`` prompt line.
+
+        Mirrors the shape of the hardcoded ACTIONS entries so an extra action reads like a
+        first-class one to the model rather than a bolted-on afterthought.
+        """
+        name = str(getattr(cls, "name", "") or "")
+        parts = [part for part in (str(cls.args_hint or "").strip(), cls.menu_description()) if part]
+        body = ". ".join(parts)
+        return f"- {name}: {body}" if body else f"- {name}"
 
     def _log_structured(self, level: str, message: str, **kwargs) -> None:
         """
@@ -2421,6 +2458,29 @@ class LeafActionRegistry:
 
     def names(self) -> List[str]:
         return list(self._by_name.keys())
+
+    def menu_lines(self, allowed: Any) -> List[str]:
+        """Prompt lines describing the NON-CORE actions among ``allowed``, in ``allowed`` order.
+
+        "Core" means an `IdeaActionType` member: those already have hand-written entries in the
+        expansion prompt's ACTIONS block, so re-describing them would both duplicate and
+        perturb every existing run. Only registry-only extension actions (whatever
+        `register()`/`install_pack()` added) produce a line, and an allowed name nobody
+        registered a class for produces nothing — the menu never advertises a dead action.
+        """
+        core = {member.value for member in IdeaActionType}
+        lines: List[str] = []
+        seen: Set[str] = set()
+        for item in allowed or []:
+            name = str(item)
+            if name in core or name in seen:
+                continue
+            action_cls = self._by_name.get(name)
+            if action_cls is None:
+                continue
+            seen.add(name)
+            lines.append(action_cls.menu_line())
+        return lines
 
 
 def execute_leaf_action(action: LeafAction, graph: IdeaDag, node_id: str, io: AgentIO):

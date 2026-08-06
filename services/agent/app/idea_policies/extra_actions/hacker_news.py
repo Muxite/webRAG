@@ -27,6 +27,7 @@ class HackerNewsTopAction(LeafAction):
     """
 
     name = "hacker_news_top"
+    args_hint = "details={count?}"
 
     async def execute(self, graph, node_id: str, io: Any) -> Dict[str, Any]:
         node = graph.get_node(node_id)
