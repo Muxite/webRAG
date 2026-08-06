@@ -62,7 +62,12 @@ def validate_grounding(result: Dict[str, Any], observability: Dict[str, Any]) ->
         return {"check": "grounding", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> grounding not credited"}
     text = extract_final_text(result).lower()
-    cited = bool(re.search(r"wiki/amsterdam_island", text))
+    # The island's actual canonical English Wikipedia title is "Île Amsterdam" (the French
+    # name) -- "Amsterdam_Island" is a redirect. A real, correct visit can land on either URL
+    # (confirmed live: en.wikipedia.org/wiki/%C3%8Ele_Amsterdam returns HTTP 200, title "Île
+    # Amsterdam - Wikipedia", not a broken link) and both slugs contain "amsterdam", so match
+    # either rather than only the assumed-canonical one.
+    cited = bool(re.search(r"wiki/[a-z0-9%_-]*amsterdam", text))
     return {"check": "grounding", "passed": cited, "score": 1.0 if cited else 0.0,
             "reason": f"source cited={cited}"}
 

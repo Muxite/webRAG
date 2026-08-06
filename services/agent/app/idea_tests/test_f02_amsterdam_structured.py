@@ -73,7 +73,9 @@ def validate_grounding(result: Dict[str, Any], observability: Dict[str, Any]) ->
         return {"check": "grounding", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> grounding not credited"}
     text = extract_final_text(result).lower()
-    cited = bool(re.search(r"wiki/amsterdam_island", text))
+    # Same fix as test_m02_amsterdam_area.py: the island's real canonical English Wikipedia
+    # title is "Île Amsterdam" (Amsterdam_Island is a redirect) -- confirmed live via curl.
+    cited = bool(re.search(r"wiki/[a-z0-9%_-]*amsterdam", text))
     return {"check": "grounding", "passed": cited, "score": 1.0 if cited else 0.0,
             "reason": f"source cited={cited}"}
 
