@@ -83,6 +83,29 @@ research agenda and measured.
 | `expansion_input_output_framing_enabled` | `false` | Labels the expansion user prompt's context blob as read-only INPUT and restates the `{candidates: [...]}` output shape right after it (also unwraps the schema hint's copyable `{"name","schema"}` envelope) | 2026-08-06 |
 | `expansion_echo_retry_enabled` | `false` | ONE corrective retry when an expansion reply parses but is the echoed input rather than a plan | 2026-08-06 |
 
+**`expansion_input_output_framing_enabled` — live-validated 2026-08-06 (Cycle 2), the echo bug is
+confirmed real and confirmed fixed.** Root cause: the shipped expansion user prompt opens with an
+output imperative immediately followed by an input JSON blob (`Return your response as valid
+JSON. {"path": [...], ...}`), and the expected `{candidates: [...]}` output shape is stated only
+once, far away, on the last line of the system prompt. Live telemetry on `qwen2.5:0.5b` and
+`llama3.2:1b` (native `graph` engine, tasks 062/072, profiles `a0_native_baseline` vs
+`a7_native_io_framing` vs `a8_native_io_framing_retry`, R=2, `badmodel-lab/profiles/`) checked the
+**raw completions directly**, not just downstream scores: **5 of 8 root-expansion completions under
+`a0` echoed the input context or schema envelope back (syntactically valid JSON, wrong shape) — 0 of
+16 did under `a7`/`a8`.** `llama3.2:1b` went from 0/4 reps with any page visit (fallback-candidate
+fired 8/8 times) to 3/4 reps visiting (fallback 0/8) — a clean win from the free prompt fix alone.
+`qwen2.5:0.5b` had the echo itself fully eliminated (fallback 6/6→0) but still only reached 1/4 reps
+with a visit, because even a correctly-shaped `candidates` envelope from a 0.5B model is often
+filled with unusable content (placeholder values, malformed action verbs) — **a separate, genuine
+downstream problem this fix was never meant to solve, correctly not conflated with it.** The retry
+safety net (`a8`) added no measurable benefit over the free framing fix alone IN THIS SAMPLE — every
+completion in the `a8` batch either parsed to real candidates or hit a different (non-echo) failure
+shape outside the retry's designed scope, so it never got a chance to fire. **Not yet flipped
+default-on** (n=2/cell per model, two models — informative, not a statistically powered result) but
+this is now the strongest-evidenced fix to come out of the local-LLM development cycles: it
+eliminates a concretely-identified, concretely-reproduced failure mode with a free (framing-only)
+mechanism, in the same spirit as the compiled-scaffold path's proven leaf-extraction source-ask fix.
+
 **The "good adaptive agent" configuration** (the thing the research agenda tests) = native `graph`
 variant with `got_reexpand_enabled` + `got_step_confidence_judge_enabled` +
 `got_step_confidence_reexpand_enabled` on, `got_reexpand_max_iterations ≥ 2`, optionally backtrack,

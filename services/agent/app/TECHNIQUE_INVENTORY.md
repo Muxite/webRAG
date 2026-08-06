@@ -97,7 +97,15 @@ plan-library) have cracked this. This is the frontier, not the already-won groun
   confirmed working via real telemetry). Directionally supportive for medium/large local models
   (voting matters less as size increases, more sharply than expected at 14B); inconclusive for tiny
   models for a new reason — they often never trigger a page visit at all, which no amount of
-  finalize-vote tuning can fix. **This surfaced a fresh, more fundamental open question — see below.**
+  finalize-vote tuning can fix. **This surfaced a fresh, more fundamental open question, closed
+  below in Cycle 2.**
+
+**Closed out in Cycle 2 (2026-08-06) — see PART 1 §16 for full detail:**
+- The tiny-local-model visit-triggering floor Cycle 1 surfaced: root-caused to a concrete,
+  directly-verified bug (the expansion prompt inviting a weak model to echo its own input context
+  back instead of producing a plan) and PROVEN fixed — 5/8 input-echo completions under baseline
+  dropped to 0/16 under the fix, checked in the raw completions, not inferred. The single
+  strongest-evidenced result across both cycles.
 
 ---
 
@@ -258,6 +266,47 @@ model correctly picked new actions when clearly the best fit, correctly still pr
 otherwise. `SandboxToolPack` (file/shell tools, ported from badmodel-lab, delegating to the
 already-security-reviewed `SandboxConnector`) landed same day — opt-in, zero accuracy-lift data
 yet, architecturally the safest port possible (no new confinement code written).
+
+### 16. Expansion input/output framing (`expansion_input_output_framing_enabled`) — Cycle 2, PROVEN
+**The strongest-evidenced local-model fix to come out of the development cycles.** Root cause,
+found by reading raw completion telemetry (not inferred): the native engine's expansion USER
+prompt opens with an output imperative immediately followed by an input JSON blob (`Return your
+response as valid JSON. {"path": [...], ...}`) — read literally, that sentence tells the model to
+return the input. The real expected output shape (`{candidates: [...]}`) is stated once, far away,
+on the system prompt's last line. A weak model does what the text literally says: of 8 raw
+`qwen2.5:0.5b` completions checked, 5 echoed the `"path"` context (or the JSON-schema hint's own
+`{"name","schema"}` envelope, placeholders included) straight back — syntactically valid JSON, but
+the WRONG SHAPE, which starves the run of any candidates and triggers a crude fallback that (for
+the root node, whose title IS the mandate) emits a search query that's just the mandate's own first
+100 characters. This is the *direct*, previously-unexplained mechanism behind Cycle 1's finding
+that tiny local models often make zero page visits on the native engine.
+
+**Fix**: opt-in prompt reframing (label the context blob read-only, restate the output shape
+immediately after it — free, no extra LLM call) plus an independent, narrower one-shot corrective
+retry for whatever the framing alone doesn't catch (fires only when a parsed reply has no usable
+`candidates` but does carry a known input/schema key — never on generic malformed JSON, which
+`_repair_json_object` already owns).
+
+**Live-validated, PROVEN via direct evidence**: `qwen2.5:0.5b` + `llama3.2:1b`, native `graph`
+engine, tasks 062/072, R=2, comparing `a0_native_baseline`/`a7_native_io_framing`/
+`a8_native_io_framing_retry`. **5/8 root-expansion completions echoed the input under `a0` → 0/16
+did under `a7`/`a8`** (checked in the raw completions directly, not just inferred from downstream
+scores) — the diagnosis and the fix both confirmed, not assumed. `llama3.2:1b`: 0/4 reps with a
+visit → 3/4 (fallback-candidate occurrences 8→0), a clean win from the free framing fix alone.
+`qwen2.5:0.5b`: the echo itself fully eliminated (fallback 6→0) but visits only reached 1/4 reps —
+a **separate, distinct downstream problem** (a 0.5B model often fills even a correctly-shaped
+envelope with unusable content) that this fix correctly doesn't claim to solve. The retry safety
+net (`a8`) showed no measurable benefit over the framing fix alone in this sample — every completion
+either parsed cleanly or hit a different, out-of-scope failure shape, so the retry never got a
+chance to fire; not evidence it's useless, just untested-in-this-sample. **Not flipped default-on**
+(n=2/cell × 2 models, informative not statistically powered) but this is a real, mechanistically
+understood, directly-verified fix in the same tradition as the compiled-scaffold path's leaf-
+extraction source-ask fix (PART 2 §6) — pure prompt hygiene, no new mechanism, real measured lift.
+**Open**: `evaluation_user_prompt` has the identical anti-pattern (`{"path": {path_json},
+"candidate_id": ...}`, output shape stated only in the system prompt) — not yet touched, milder
+failure mode (an echoed evaluation degrades to a default score, not to zero visits), a natural
+follow-up. Also open: `qwen2.5:0.5b`'s residual content-quality problem once the envelope shape is
+fixed — a new, narrower target than the original "zero visits" framing.
 
 ---
 
@@ -533,12 +582,22 @@ resolution stays visible next to the original question).
    bundle in an accuracy A/B — is it pulling its weight on its own?
 8. **Plan-library's one negative data point** (badmodel-lab a0 vs a4): worth understanding *why* it
    regressed before writing the mechanism off entirely, or worth leaving alone — genuinely open.
-9. **NEW, surfaced by Cycle 1's live validation — the tiny-local-model visit-triggering floor.**
-   `qwen2.5:0.5b` on the native `graph` engine frequently makes **zero page visits at all** before
-   finalizing (062/072, most `a5` reps) — no finalize-time mechanism (voting, recompute, verify) can
-   rescue a run that never gathers evidence in the first place. This is a different, and possibly
-   more fundamental, bottleneck than anything else on this list: it's an *expansion-time* failure
-   (the model doesn't even propose/complete a visit action), not a *synthesis-time* one. Worth its
-   own targeted investigation — does thin-leaf-style forced structure (compiled-scaffold's proven
-   fix for a related but distinct problem) transfer to the native engine's expansion step for the
-   smallest local models? Untested.
+9. ~~**The tiny-local-model visit-triggering floor** (surfaced by Cycle 1's live validation):
+   `qwen2.5:0.5b` on the native `graph` engine frequently makes zero page visits at all before
+   finalizing — no finalize-time mechanism (voting, recompute, verify) can rescue a run that never
+   gathers evidence in the first place~~ **ROOT-CAUSED AND FIXED, Cycle 2** — PART 1 §16. The
+   expansion prompt invited a weak model to echo its own input context back instead of proposing a
+   plan; `llama3.2:1b` is now cleanly fixed by a free prompt-hygiene change, `qwen2.5:0.5b` has the
+   echo eliminated but exposed a **new, narrower open question** (10 below).
+10. **NEW, surfaced by Cycle 2 — `qwen2.5:0.5b`'s content-quality floor.** Even once the expansion
+    reply is correctly *shaped* (`{candidates: [...]}`, no echo), a 0.5B model often fills it with
+    unusable content (placeholder values, malformed action verbs) — a different, likely harder
+    problem than the shape-echo bug, since it's about semantic content quality, not prompt-structure
+    confusion. Does compiled-scaffold's thin-leaf pattern (harness-owned micro-pipeline, no
+    free-form JSON authoring at all) transfer to the native engine's expansion step as a
+    tier-gated helper for the very smallest models? Untested — a natural Cycle 3 candidate if there
+    is one.
+11. **`evaluation_user_prompt` has the identical input/output framing anti-pattern** as the
+    expansion prompt did (PART 1 §16's "Open") — not yet touched, milder failure mode (degrades to
+    a default score, not zero visits), a cheap, well-understood follow-up given the fix pattern is
+    now proven.
