@@ -80,19 +80,24 @@ plan-library) have cracked this. This is the frontier, not the already-won groun
   proven *benefit* either; these are two different measurements of the same mechanism, not a
   contradiction, and both point the same direction: unproven-to-negative so far.)
 
-**What's OPT-IN and genuinely untested — the real candidate pool for the next 2 cycles:**
+**What's OPT-IN and genuinely untested — the real candidate pool for cycle work:**
 - Adaptive re-expansion (A1) in isolation, cleanly measured (not bundled into "good_adaptive").
 - `SandboxToolPack` (file/shell tools) — architecturally sound, zero accuracy-lift data yet.
 - Typed-slot IR (badmodel-lab's `localagent/ir.py` pattern) ported as a helper *inside* the main
   engine's leaf execution — explicitly deferred (roadmap item 2/"E3"), never built.
-- Capability-tier refinement (the flat local-model "weak" bucket is confirmed too coarse for 7B+
-  models, but no size-aware split has been built).
-- Format-stress "fs2 thin-assemble is the strongest lever" — only true for qwen2.5 7B+/gemma2:2b;
-  contradicted by the full R=12 roster run for smaller models; not yet reconciled in the docs that
-  still assert it broadly. A real target for cycle work: which format lever actually wins per
-  model size, properly reconciled.
 - ConSol batched voting — consistent speedup (4/4 cells) but cost direction cell-dependent, n=5,
   explicitly "not recommended at this evidence level" for a default flip.
+
+**Closed out in Cycle 1 (2026-08-06) — see PART 3 §6 and PART 1 §11 for full detail:**
+- Format-stress reconciliation: no universal winning profile exists; the roster splits by
+  family/scale, not a clean size cutoff, and the "fs2 always wins" claim was corrected in the docs
+  that asserted it (it's outright falsified for `llama3.2:1b` per the tier's own pre-registered
+  kill criterion).
+- Capability-tier size-band refinement: built, offline-tested, and live-validated (mechanically
+  confirmed working via real telemetry). Directionally supportive for medium/large local models
+  (voting matters less as size increases, more sharply than expected at 14B); inconclusive for tiny
+  models for a new reason — they often never trigger a page visit at all, which no amount of
+  finalize-vote tuning can fix. **This surfaced a fresh, more fundamental open question — see below.**
 
 ---
 
@@ -202,8 +207,26 @@ Price-derived `weak|standard|strong`, computed once per run, never re-evaluated 
 opt-in/off. **Confirmed genuinely coarse for 7B+ local models**: E1 found qwen2.5:7b (bucketed
 `weak`) ties gpt-4.1-nano on 5/7 reachable tasks; E5 found qwen2.5:14b resolves a 7B negation gap
 cleanly at 2× scale but only *partially* resolves a k-th-ordinal gap at the same scale-up — "scale
-isn't a uniform fix across failure modes." No size-aware refinement built; left as an explicit open
-call.
+isn't a uniform fix across failure modes."
+
+**Size-band refinement — BUILT + live-validated 2026-08-06 (Cycle 1).** Additive
+`local_model_size_band()` splits the weak bucket by parsed Ollama tag size (`tiny`<2B/`small`
+2-6B/`medium`6-12B/`large`≥12B, `None`/no-op for unparseable tags or priced models), wired into
+`native_vote_k_tiered_enabled` behind a second opt-in flag (`native_vote_k_size_band_enabled`,
+k=4/3/2/1 by band). **Status: OPT-IN, mechanically confirmed working via live telemetry (not just
+offline tests), directionally informative, NOT flipped default-on (n=2/cell, first-contact check
+only).** Native `graph` engine, tasks 062/072, R=2: **medium (7b) holds** — k 3→2 didn't measurably
+hurt. **Large (14b) — sharpest, most surprising result**: k=1 (voting off) scored notably *better*
+than k=3 (0.324 vs 0.064 combined), consistent with (if anything stronger than) "large local models
+don't need blanket voting" — though a partial hedged-vs-declarative-answer confound was found in the
+raw deliverables, so treat as suggestive not proven. **Tiny (0.5b) — inconclusive for a genuinely
+new reason**: most reps made **zero page visits at all**, hard-gating score to 0 regardless of vote
+count. This is a real finding in its own right — the bottleneck for tiny local models on the native
+engine is the exploration/visit-triggering step, not finalize-time voting, and no amount of tuning
+this particular lever will fix it. `phi3:mini` control (unaffected band) confirmed the mechanism
+doesn't perturb models it shouldn't touch. **Open**: a properly-powered follow-up (larger n) before
+any default flip; separately, the tiny-model visit-triggering floor is a new, more fundamental gap
+worth its own investigation (see the updated open-questions list below).
 
 ### 12. ConSol early-stop voting (sequential + batched)
 **Status: validated with caveats, opt-in only.** Sequential: trustworthy answer agreement, ~27%
@@ -484,13 +507,16 @@ attempt-ledger.
 
 ---
 
-## Cross-cutting open questions for the next 2 development cycles
+## Cross-cutting open questions for the next development cycles
 
 Not a plan — a list of what's genuinely untested/unreconciled, worth choosing from deliberately
-rather than by default:
+rather than by default. Updated 2026-08-06 after Cycle 1 (format-stress reconciliation +
+capability-tier size-band refinement, both closed out — struck through below, not deleted, so the
+resolution stays visible next to the original question).
 
-1. **Format-stress reconciliation** (PART 3 §6): which format lever (fs0/fs1/fs2) actually wins per
-   model *size band*, not just for the 7B+ models the current headline claim covers.
+1. ~~**Format-stress reconciliation**: which format lever (fs0/fs1/fs2) actually wins per model
+   size band~~ **DONE, Cycle 1** — no universal winner; PART 3 §6 / `FORMAT_STRESS_TIER.md` §7 have
+   the full per-model table.
 2. **Native adaptive engine's composition wall** (PART 0): still far below the compiled-scaffold
    bar for local models on reachable-tier tasks — no combo tried so far has closed this gap.
 3. **`SandboxToolPack` accuracy lift**: architecturally landed, zero data on whether file/shell
@@ -498,11 +524,21 @@ rather than by default:
 4. **Typed-slot IR as an in-engine helper** (roadmap item 2/E3): never isolated from `localagent`'s
    other control-flow differences — does the parsing pattern itself help, independent of the rest
    of that loop?
-5. **Capability-tier size-awareness**: a confirmed-too-coarse flat weak bucket, no refinement built
-   — would a 7B+ vs. sub-3B split change which mitigations get applied and help?
+5. ~~**Capability-tier size-awareness**: a confirmed-too-coarse flat weak bucket, no refinement
+   built~~ **DONE, Cycle 1** — built, live-validated (PART 1 §11). Directionally supportive for
+   medium/large models; n=2/cell, not yet powered enough for a default flip.
 6. **Deepseek format/hard/micro re-test**: post token-budget-fix numbers are still stale/unverified
    on 3 of 4 tiers.
 7. **Adaptive re-expansion (A1) in isolation**: never cleanly separated from the "good_adaptive"
    bundle in an accuracy A/B — is it pulling its weight on its own?
 8. **Plan-library's one negative data point** (badmodel-lab a0 vs a4): worth understanding *why* it
    regressed before writing the mechanism off entirely, or worth leaving alone — genuinely open.
+9. **NEW, surfaced by Cycle 1's live validation — the tiny-local-model visit-triggering floor.**
+   `qwen2.5:0.5b` on the native `graph` engine frequently makes **zero page visits at all** before
+   finalizing (062/072, most `a5` reps) — no finalize-time mechanism (voting, recompute, verify) can
+   rescue a run that never gathers evidence in the first place. This is a different, and possibly
+   more fundamental, bottleneck than anything else on this list: it's an *expansion-time* failure
+   (the model doesn't even propose/complete a visit action), not a *synthesis-time* one. Worth its
+   own targeted investigation — does thin-leaf-style forced structure (compiled-scaffold's proven
+   fix for a related but distinct problem) transfer to the native engine's expansion step for the
+   smallest local models? Untested.

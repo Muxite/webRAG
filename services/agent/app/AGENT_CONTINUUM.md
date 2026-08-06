@@ -252,8 +252,8 @@ Named here so later stages aren't invented from scratch each time, not committed
   instance of the continuum thesis, one this document should have cited as evidence rather than
   omitted.
 - ~~`capability_tier()` collapses every unpriced (local) model into a single `weak` bucket
-  regardless of actual size (0.5B vs. 70B)~~ **REFINED 2026-08-06** (offline; live validation
-  pending). `capability_tier()` deliberately still returns the same 3 strings — the additive
+  regardless of actual size (0.5B vs. 70B)~~ **REFINED 2026-08-06, live-validated same day.**
+  `capability_tier()` deliberately still returns the same 3 strings — the additive
   `model_tiers.local_model_size_band()` splits the weak bucket by the parameter count encoded in an
   Ollama-style `:Nb` tag (`tiny` <2B / `small` 2-6B / `medium` 6-12B / `large` >=12B), returning
   `None` (= "don't refine") for named-size tags (`phi3:mini`, `tinyllama`), MoE tags and any priced
@@ -262,6 +262,23 @@ Named here so later stages aren't invented from scratch each time, not committed
   weak value exactly. Bands are cut where E1/E5's reachable-tier scores actually step (0.5b 0.54 /
   1b 0.42 vs. 7b 0.85 vs. 14b 0.97). This scales mitigation STRENGTH by size; it does NOT
   reclassify big local models out of `weak`, since scale is not a uniform fix across failure modes.
+  **Live validation** (native `graph` engine, tasks 062/072, qwen2.5:0.5b/7b/14b + a phi3:mini
+  control, R=2/cell — profiles `a5_native_vote_k_tiered` vs `a6_native_vote_k_sizeband`, see
+  `badmodel-lab/profiles/`): the knob is confirmed genuinely wired, not just offline-tested — raw
+  `llm.calls` telemetry moves in the predicted direction for every model (0.5b: a6>a5 calls, k=4 vs
+  3; 7b/14b: a6<a5 calls, k=2/1 vs 3). Directionally: **7b (medium) holds** — dropping k 3→2 didn't
+  measurably hurt. **14b (large) was the sharpest and most surprising result** — k=1 (voting off)
+  scored notably *better* than k=3 on both tasks (combined mean 0.324 vs 0.064), consistent with
+  (if anything stronger than) "large local models don't need blanket voting," though a partial
+  hedged-vs-declarative-answer confound was found in the raw deliverables and n=2/cell is too small
+  to fully separate a real effect from sampling noise. **0.5b (tiny) was inconclusive** for a
+  different reason: most `a5` reps made **zero page visits** at all, which hard-gates the score to 0
+  regardless of vote count — voting cannot rescue a run that never gathers evidence. This surfaces a
+  real, more fundamental bottleneck for tiny local models on the native engine: the exploration/
+  visit-triggering step, not finalize-time voting. The `phi3:mini` control (band=`None`, k=3 either
+  way) confirmed no accidental perturbation. **Not flipped default-on** — n=2/cell is a first-contact
+  directional check, not a statistically powered result; full run details in the session that landed
+  this (2026-08-06).
 - `SYSTEM_STATUS.md`'s prior "local-model validation dropped from the roadmap entirely" claim
   (2026-07-10) is superseded by this document — that decision no longer holds.
 - ~~`execution_compiled.py::_is_reasoning_model` (line 366) doesn't cover deepseek~~ **FIXED in E5
