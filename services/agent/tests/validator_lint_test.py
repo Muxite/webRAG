@@ -45,6 +45,47 @@ _AGENT4_ADDITIONS = ["052", "071", "078", "079", "081", "082", "084", "085", "09
 
 ACTIVE_SUITE_IDS = sorted(set(_TIER_A + _TIER_B_MINUS_024 + _TIER_C + _AGENT4_ADDITIONS))
 
+# The self-contained "general reasoning" category (2026-08-06): no web access, no grounding gate
+# (get_test_metadata()["grounding_required"] = False, self-declared per-task), procedurally-varied
+# puzzle parameters, reference-solver-verified ground truth. Runs through the `parametric`
+# execution variant, never the graph/graph_compiled ladder. Deliberately a SEPARATE list from
+# ACTIVE_SUITE_IDS -- the disjointness test below makes "a reasoning id can never land in the
+# grounding-gated active suite" a machine-checked invariant instead of an accident of omission,
+# mirroring how test_m01/f01 already live outside ACTIVE_SUITE_IDS with zero CI impact today.
+REASONING_SUITE_IDS = [
+    "200", "201", "202", "203", "204", "205", "206", "207",
+]
+
+
+def test_reasoning_suite_is_disjoint_from_active_suite():
+    """A 2xx reasoning id must never be folded into the grounding-gated active suite -- these
+    tasks structurally have no visit.count to gate on, so mixing them in would silently weaken
+    the active-suite's own validity bar rather than adding a genuinely new, honestly-scoped one."""
+    overlap = set(REASONING_SUITE_IDS) & set(ACTIVE_SUITE_IDS)
+    assert not overlap, f"reasoning ids must never overlap the active suite: {overlap}"
+
+
+def test_reasoning_suite_task_files_exist():
+    import glob
+    missing = [tid for tid in REASONING_SUITE_IDS
+               if not glob.glob(os.path.join(_IDEA_TESTS_DIR, f"test_{tid}_*.py"))]
+    assert not missing, f"reasoning-suite IDs with no matching task file: {missing}"
+
+
+def test_reasoning_suite_lints_clean_of_llm_judges():
+    """The exemption is from the grounding [GATE] check ONLY -- determinism is still required.
+    A [GATE] finding on a reasoning task is EXPECTED and correct (there is no visit.count to
+    gate on, by design) and must not be "fixed"; a [LLM] finding would mean a non-deterministic
+    judge snuck in, which this category holds itself to the same zero-tolerance bar as the web
+    suite for."""
+    if not REASONING_SUITE_IDS:
+        return
+    all_findings = lint.lint_directory(_IDEA_TESTS_DIR)
+    hard = lint.hard_findings(all_findings)
+    llm_findings = [(tid, fi) for tid, fi in hard
+                     if tid in REASONING_SUITE_IDS and fi.startswith("[LLM]")]
+    assert llm_findings == [], f"non-deterministic judge in the reasoning suite: {llm_findings}"
+
 
 def test_active_suite_id_count_is_59():
     """Sanity check on the manifest arithmetic itself, so a miscount fails loudly here rather
