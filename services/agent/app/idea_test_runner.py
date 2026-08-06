@@ -359,6 +359,13 @@ TEST_PRIORITY_ORDER = [
     "119",  # Tier 5: branch-eliminate then chain — great bells (Tsar Bell decoy) -> ringing Mingun Bell -> 55,555 viss (10/10) - level=graph, weight=long
     "120",  # Tier 5: branch-eliminate then chain — Cleopatra's Needles (London/Paris traps) -> NY obelisk -> 112-day transit (10/10) - level=graph, weight=long
     "121",  # Tier 5: branch-eliminate then chain — record caves (Mammoth decoy) -> deepest Krubera -> mapped length 16.058 km (10/10) - level=graph, weight=long
+    # Compound "stacked-axis" tasks (F34, 2026-08-06) — harder IN KIND than the single-axis 10/10s:
+    # each stacks two or three DISTINCT axis types inside the 6-9 visit budget. NOT part of the
+    # active 59 (a separate, later live-$ decision); registered here so they are runnable/orderable.
+    "146",  # Compound: 4 independent 2-hop chains + cross-branch argmax — hydro project -> reservoir -> surface area (Smallwood 6,527 km²) (10/10) - level=graph, weight=long
+    "147",  # Compound: two-constraint AND-filter -> survivor -> disambiguated chain terminus — Alpine lakes -> Lake Constance -> High Rhine 165 km (10/10) - level=graph, weight=long
+    "148",  # Compound: categorical survivor -> conflicting-source reconciliation -> constrained subset-sum — Kara Sea river (Ob) -> 3,700 not 5,410 -> 10,398 km (10/10) - level=graph, weight=long
+    "149",  # Compound B: 4 independent 2-hop chains + cross-branch argmax — observatory -> largest telescope -> primary mirror (VLT 8.2 m) (10/10) - level=graph, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12

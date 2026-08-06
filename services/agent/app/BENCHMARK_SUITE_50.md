@@ -122,6 +122,34 @@ findings across the active 59-task suite** (the two score-corrupting severities)
 outside the 59 (e.g. 024, the un-gated branch-eliminate overflow) are intentionally excluded from
 that hard gate — see the test file's docstring for the scoping rationale.
 
+## F34 (2026-08-06) — four NEW compound "stacked-axis" tasks (146–149), pool only, NOT in the active 59
+
+The suite's 33 tasks at 10/10 are all **single-axis-hard**: one elimination round, or one chain, or
+one AND-filter. The closest existing compound is **095** (2 elimination rounds + 1 chain terminus,
+~9–11 visits). These four are harder **in kind**, not in depth — each stacks two or three DISTINCT
+axis TYPES inside the documented **6–9 visit budget** (visit VOLUME, not hop count, was the root
+cause of the ChromaDB-contention timeout crisis; see `BARRAGE_RELAUNCH_HANDOFF.md` §1):
+
+| id | axis stack (new shape) | golden path | keystone |
+|---|---|---|---|
+| **146** | per-branch 2-hop chain × 4 **+ cross-branch argmax** (today's argmaxes are page-only; today's chains never feed a comparison) | 8 visits | Smallwood Reservoir, 6,527 km² — volume-ranking decoy (Manicouagan) + fame decoy (Lake Mead) |
+| **147** | two-constraint **AND-filter → survivor → disambiguated chain terminus** (extends the suite's thinnest shape, 2 tasks: 081/094) | 7 visits | High Rhine 165 km — rejects the whole Rhine (1,230 km) and the inflow section (93.5 km) |
+| **148** | categorical **survivor → conflicting-source reconciliation → constrained subset-sum** (095 + 128–133 + 070 in one task) | 8 visits | 10,398 km — every single-rule failure lands ≥1,579 km outside the band |
+| **149** | 146's shape replicated in an unrelated domain (observatory → largest telescope → mirror) | 7–8 visits | VLT/Paranal 8.2 m — the two 20th-century record holders are the decoys |
+
+All four follow the house discipline: grounding-gated 0/1 keystone (`visit.count > 0`), an **un-gated**
+visit-capped breadth diagnostic (148 has two, one per gathered axis), keystone-short-circuited
+secondaries → bimodal scores (full answer 1.0, wrong keystone ≤0.5, 0-visit run 0.0), leak-free
+`get_compiled_plan()` (the leak assertion caught a real statement leak in 146 during authoring), and
+live-verified fixtures with wide margins (146: 3.36×; 147: ≥13% on both thresholds; 148: ≥15% of the
+keystone; 149: +61% over the runner-up). Ground truth verified against live English Wikipedia via the
+MediaWiki API on 2026-08-06 and recorded per fact in each module's docstring.
+
+Offline validator tests: `services/agent/tests/test_14{6,7,8,9}_*_validators_test.py` (69 cases,
+green). Ids registered in `idea_test_runner.TEST_PRIORITY_ORDER`. **Deliberately NOT added to
+`ACTIVE_SUITE_IDS`/`TASK_SETS`** — promoting any of them into a live barrage is a separate, later
+$-spend decision; the `validator_lint_test` hard gate remains scoped to the active 59.
+
 ## Invalid (71) — do NOT run
 - **Substance failures (drop permanently, ~41):** 001–011, 013–020, 026, 027, 029–039, 043, 045, 048, 053, 063, 066 (single-fact / format-only / memorized-trivia / non-discriminating / leaked-URLs-in-prompt).
 - **Grounding-gate regression (~30 → ~25 after F28, ONE-LINE FIXABLE):** 051, 057, 074, 076, 080, 083, 086–089, 092, 097, 098, 100–103, 105–107, 109, 111, 112, 114, 115, 117, 119, 120 — `_keystone_ok(result)` is missing the `observability`/`visit.count>0` gate its siblings have (078, 079, 081, 082, 084, 064, 121 were fixed 2026-07-25 as part of F28; **024** was separately dropped, see F27 above, not gate-fixed). Copying the gate flips the remainder valid, BUT most are duplicate shapes (branch-eliminate / count / computation), so patch only ones that ADD a shape.
