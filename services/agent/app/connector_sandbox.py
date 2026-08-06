@@ -47,6 +47,13 @@ OUTPUT_CHAR_CAP = 4000
 # under the workdir; anything else is treated as an inline program.
 _PY_SUFFIXES = (".py",)
 
+#: Executables :meth:`SandboxConnector.run_readonly` will run. Ported from
+#: ``badmodel-lab/localagent/tools/shell.py``'s allow-list: every one of them READS — nothing here
+#: writes, deletes, or reaches the network, so no argv built from it can mutate the workdir. The
+#: allow-list is what makes the surface safe to expose as leaf actions; adding a writing command to
+#: it would silently widen every caller's blast radius, so don't.
+READONLY_COMMANDS = frozenset({"wc", "grep", "du", "find", "head"})
+
 
 def _truncate(text: str, cap: int = OUTPUT_CHAR_CAP) -> str:
     """Clip ``text`` to ``cap`` chars keeping both ends (head + tail), marking the elision.
@@ -373,6 +380,57 @@ class SandboxConnector(ConnectorBase):
             return await self._run("run_python", [sys.executable, self.rel(target)], timeout,
                                    path=self.rel(target))
         return await self._run("run_python", [sys.executable, "-c", text], timeout)
+
+    def _argv_escapes(self, argv: List[str]) -> Optional[str]:
+        """The first ``argv`` token that looks like a path OUT of the workdir, else ``None``.
+
+        Belt-and-suspenders behind the callers, which confine their own path slots before building
+        argv: refuses an absolute token that does not resolve under the workdir, and any token
+        carrying a ``..`` path segment (which ``cwd``-relative execution would otherwise honour).
+        A pattern-shaped argument that genuinely needs ``..`` or a leading ``/`` is refused too —
+        fail-closed is the right trade for a surface whose whole point is that it cannot reach
+        outside the workdir.
+        """
+        for token in argv[1:]:
+            text = str(token)
+            if any(segment == ".." for segment in text.split("/")):
+                return text
+            if text.startswith("/") and self.confine(text) is None:
+                return text
+        return None
+
+    async def run_readonly(self, op: str, argv: List[str],
+                           timeout_s: Optional[float] = None) -> Dict[str, Any]:
+        """Run ONE allow-listed READ-ONLY command (``wc``/``grep``/``du``/``find``/``head``).
+
+        The model never authors ``argv``: a caller (see
+        ``idea_policies/extra_actions/sandbox_tools.py``) picks a narrow intent and fills typed
+        slots, and code assembles the exact argument vector — no ``shell=True``, no pipes, no
+        metacharacter expansion. Two refusals guard it: :data:`READONLY_COMMANDS` (so a mutating
+        command cannot be constructed at all) and :meth:`_argv_escapes` (so no argument reaches
+        outside the workdir). Runs with ``cwd`` = the workdir under
+        ``sandbox_shell_timeout_seconds``, like every other subprocess action here.
+
+        ``grep``'s exit code 1 means "no match", which is a RESULT and not a failure, so it comes
+        back ``ok`` with ``matched: False``.
+        """
+        argv = [str(part) for part in (argv or [])]
+        if not argv:
+            return {"ok": False, "action": op, "error": "no command to run"}
+        if argv[0] not in READONLY_COMMANDS:
+            return {"ok": False, "action": op,
+                    "error": f"command {argv[0]!r} is not read-only allow-listed "
+                             f"({sorted(READONLY_COMMANDS)})"}
+        escaping = self._argv_escapes(argv)
+        if escaping is not None:
+            return self._denied(op, escaping)
+        timeout = self.limits.shell_timeout_seconds if timeout_s is None else timeout_s
+        result = await self._run(op, argv, timeout)
+        if argv[0] == "grep":
+            result["matched"] = result.get("exit_code") == 0
+            if result.get("exit_code") == 1:
+                result["ok"] = True
+        return result
 
     async def run_pytest(self, target_relpath: str = "", timeout_s: Optional[float] = None) -> Dict[str, Any]:
         """Run pytest inside the workdir on ``target_relpath`` (``""`` = the whole workdir)."""

@@ -33,6 +33,11 @@ class AgentIO:
     :param connector_browser: Optional headless Chrome connector for bot-blocked sites.
     :param telemetry: Optional telemetry session.
     :param collection_name: ChromaDB collection for memory isolation.
+    :param connector_sandbox: Optional workdir-confined ``SandboxConnector``. ``None`` on every
+        web-research run, and that is the point: the sandbox file/shell leaf actions
+        (``extra_actions/sandbox_tools.py``) resolve their sandbox from HERE, so a run that was
+        never handed one cannot touch a filesystem no matter what the model proposes. One
+        instance per run, shared by every leaf, so the whole graph sees the same workdir.
     """
     def __init__(
         self,
@@ -43,12 +48,14 @@ class AgentIO:
         connector_browser: Optional[ConnectorBrowser] = None,
         telemetry: Optional[TelemetrySession] = None,
         collection_name: str = "agent_memory",
+        connector_sandbox: Optional[Any] = None,
     ) -> None:
         self.connector_llm = connector_llm
         self.connector_search = connector_search
         self.connector_http = connector_http
         self.connector_chroma = connector_chroma
         self.connector_browser = connector_browser
+        self.connector_sandbox = connector_sandbox
         self.collection_name = collection_name
         self.telemetry = telemetry
         self._attach_telemetry()
@@ -64,6 +71,8 @@ class AgentIO:
             self.connector_chroma.set_telemetry(self.telemetry)
         if self.connector_browser:
             self.connector_browser.set_telemetry(self.telemetry)
+        if self.connector_sandbox:
+            self.connector_sandbox.set_telemetry(self.telemetry)
 
     def set_telemetry(self, telemetry: Optional[TelemetrySession]) -> None:
         self.telemetry = telemetry

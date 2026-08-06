@@ -484,6 +484,11 @@ class SandboxActionConfig:
     workdir_root: str = "/work"
     run_pytest_timeout_seconds: int = 30
     run_python_timeout_seconds: int = 15
+    #: Wall-clock bound on ONE allow-listed read-only shell command (``connector_sandbox``'s
+    #: ``run_readonly``: wc/grep/du/find/head). Small on purpose — these inspect a scratch workdir,
+    #: so anything slower than this is a pathological pattern or tree, not useful work. Matches the
+    #: 10s bound the ported ``badmodel-lab/localagent/tools/shell.py`` used.
+    shell_timeout_seconds: int = 10
     max_file_bytes: int = 200000
     max_files_per_leaf: int = 10
     #: Wall-clock bound on ONE leaf-loop decision call. The subprocess actions above are bounded by
@@ -497,6 +502,7 @@ class SandboxActionConfig:
         "workdir_root": "sandbox_workdir_root",
         "run_pytest_timeout_seconds": "sandbox_run_pytest_timeout_seconds",
         "run_python_timeout_seconds": "sandbox_run_python_timeout_seconds",
+        "shell_timeout_seconds": "sandbox_shell_timeout_seconds",
         "max_file_bytes": "sandbox_max_file_bytes",
         "max_files_per_leaf": "sandbox_max_files_per_leaf",
         "llm_call_timeout_seconds": "sandbox_llm_call_timeout_seconds",

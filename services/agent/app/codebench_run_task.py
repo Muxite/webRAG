@@ -118,17 +118,19 @@ def build_context(model: str, workdir: Path, mandate: str):
 
     telemetry = TelemetrySession(enabled=True, mandate=mandate,
                                  correlation_id=f"codebench_{model}_{workdir.name}", trace_path=None)
-    agent_io = AgentIO(
-        connector_llm=connector_llm, connector_search=connector_search,
-        connector_http=connector_http, connector_chroma=None,
-        telemetry=telemetry, collection_name="codebench",
-    )
     # Shipped limits (idea_dag_settings.json's sandbox_* keys), re-rooted at the workdir this
     # container was actually handed — the JSON default is /work, but --workdir is authoritative.
     limits = replace(sandbox_config(), workdir_root=str(workdir))
     sandbox = SandboxConnector(workdir, connector_config=config, limits=limits,
                                connector_search=connector_search)
-    sandbox.set_telemetry(telemetry)
+    # ONE sandbox for the whole run, carried on the AgentIO (which also attaches telemetry to it):
+    # every leaf — the compiled-code loop's own dispatch and any sandbox leaf action — then works
+    # in the same workdir, so a file one leaf writes is there for the next.
+    agent_io = AgentIO(
+        connector_llm=connector_llm, connector_search=connector_search,
+        connector_http=connector_http, connector_chroma=None,
+        telemetry=telemetry, collection_name="codebench", connector_sandbox=sandbox,
+    )
     return sandbox, agent_io, limits, telemetry
 
 

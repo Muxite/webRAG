@@ -14,6 +14,17 @@ from your own glue code or tests.
 """
 
 from agent.app.idea_policies.extra_actions.pack import ExtraActionPack
+from agent.app.idea_policies.extra_actions.sandbox_tools import (
+    CountLinesAction,
+    DiskUsageAction,
+    FindFilesAction,
+    HeadFileAction,
+    ListDirAction,
+    ReadFileAction,
+    SandboxToolPack,
+    WordCountAction,
+    WriteFileAction,
+)
 from agent.app.idea_policies.extra_actions.wikipedia import WikipediaSummaryAction
 from agent.app.idea_policies.extra_actions.arxiv import ArxivSearchAction
 from agent.app.idea_policies.extra_actions.github import GithubRepoInfoAction
@@ -28,6 +39,18 @@ from agent.app.idea_policies.extra_actions.datetime_now import DatetimeNowAction
 
 __all__ = [
     "ExtraActionPack",
+    # Workdir file + read-only shell tools. A higher-stakes capability class than the rest of
+    # this package: opt-in only (install the pack AND allow the names AND wire a sandbox onto
+    # the run's AgentIO), never part of ExtraActionPack. See `sandbox_tools.py`.
+    "SandboxToolPack",
+    "ReadFileAction",
+    "WriteFileAction",
+    "ListDirAction",
+    "CountLinesAction",
+    "WordCountAction",
+    "HeadFileAction",
+    "DiskUsageAction",
+    "FindFilesAction",
     "WikipediaSummaryAction",
     "ArxivSearchAction",
     "GithubRepoInfoAction",
