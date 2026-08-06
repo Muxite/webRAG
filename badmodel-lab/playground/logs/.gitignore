@@ -1,0 +1,6 @@
+# Friend play-session logs land here via a bind mount (see docker-compose.yml).
+# The directory itself is tracked (this file + .gitkeep) so a fresh clone has
+# somewhere for the container to write; the actual log contents are not.
+*
+!.gitkeep
+!.gitignore

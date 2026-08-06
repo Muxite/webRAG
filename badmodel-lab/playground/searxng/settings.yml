@@ -1,0 +1,16 @@
+# Adapted from badmodel-lab/localagent/docker/searxng/settings.yml — the existing
+# prototype in this repo for a self-hosted, keyless search backend. `search.formats`
+# must include `json` for pkg/connector_search_searxng.py's `?format=json` requests.
+#
+# secret_key is a CSRF-style token, not a credential — this instance is
+# container-network-only (no host port published in docker-compose.yml), never
+# internet-exposed, so leaving it as a static placeholder is low-stakes. Randomize it if
+# you want to be tidy; it doesn't protect anything sensitive here.
+use_default_settings: true
+server:
+  secret_key: "badmodel-playground-secret"
+  bind_address: "0.0.0.0"
+search:
+  formats:
+    - html
+    - json

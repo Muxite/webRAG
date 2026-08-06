@@ -1,0 +1,22 @@
+# Default interactive-play mitigation profile per VRAM tier.
+#
+# Only the `a0`-`a4` native-adaptive-engine profiles in badmodel-lab/profiles/ apply to
+# interactive chat — the `m0`-`m4`/`fs0`-`fs2` compiled-scaffold profiles require a
+# pre-authored DAG plan for a known benchmark task id, which doesn't exist for a friend's
+# freeform typed mandate. See MITIGATION_BRIDGE.md for the full explanation.
+#
+# No tier has a confirmed "best" profile yet — that research is separate, ongoing work
+# (another session). All four default to `a0_native_baseline` (the safe, documented
+# control: every A1-A5 mechanism at its JSON default, i.e. off) as an explicit
+# placeholder. When that research lands on a real per-tier recommendation, update the
+# value below — this is the one place to change it so every friend's next
+# `docker compose up` picks it up automatically, no image rebuild needed (this file is
+# bind-mounted, not baked into the image).
+#
+# A friend can always override per-invocation without touching this file:
+#   BADMODEL_PROFILE=a3_native_expect_contract docker compose up badmodel-8gb --build -d
+defaults:
+  4gb: a0_native_baseline
+  6gb: a0_native_baseline
+  8gb: a0_native_baseline
+  12gb: a0_native_baseline

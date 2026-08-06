@@ -1,0 +1,57 @@
+# Mirrors services/agent/.dockerfile's proven build recipe (python:3.10-slim, same pip
+# install steps, same embedding-model pre-download so CHROMA_MODE=embedded works fully
+# offline after build) but built from the REPO ROOT context (not services/), since it
+# needs to COPY from both services/ and badmodel-lab/ — a classic Dockerfile can't COPY
+# from outside its own build context. Two deltas from the source Dockerfile:
+#   - drops `playwright install --with-deps chromium`: verified safe — basic_cli.py
+#     never wires a connector_browser into Agent(...), so nothing in the playground uses
+#     it. Re-add the RUN step (and a PLAYWRIGHT_BROWSERS_PATH env) if a future change
+#     needs it.
+#   - adds the playground package (pkg/) and its CMD instead of app.main's RabbitMQ
+#     worker loop.
+#
+# MAINTENANCE NOTE: this duplicates rather than derives from services/agent/.dockerfile,
+# because Compose's single-command `docker compose up <service> --build` UX doesn't
+# cleanly support chaining two separately-built images. If
+# services/agent/requirements.txt or the embedding pre-download steps change, diff this
+# file against services/agent/.dockerfile and re-sync by hand.
+FROM python:3.10-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    SENTENCE_TRANSFORMERS_HOME=/root/.cache \
+    TRANSFORMERS_CACHE=/root/.cache/huggingface
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir --upgrade pip
+
+COPY services/agent/requirements.txt /app/agent/requirements.txt
+RUN pip install --no-cache-dir -r /app/agent/requirements.txt
+
+COPY services/shared /app/shared
+RUN pip install --no-cache-dir /app/shared
+
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" && \
+    echo "SentenceTransformers model pre-downloaded"
+
+RUN python -c "\
+from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2; \
+ef = ONNXMiniLM_L6_V2(); \
+ef(['warmup']); \
+print('ChromaDB ONNX embedding model pre-downloaded')"
+
+COPY services/agent /app/agent
+COPY badmodel-lab/playground/pkg /app/playground
+
+# WORKDIR is /app/agent (not /app), matching services/agent/.dockerfile's convention —
+# `python -m` implicitly adds the CWD to sys.path, which some agent.app.* modules rely
+# on (e.g. idea_graph_analyzer.py does `from app.idea_graph_visualizer import ...`, a
+# CWD-relative style, not `agent.app...`). PYTHONPATH=/app still resolves both
+# `agent.app.*` and `playground.*` regardless of CWD, so all three import styles used
+# across this codebase work simultaneously. Found via the live smoke test: chat_entrypoint
+# crashed with `ModuleNotFoundError: No module named 'app'` under WORKDIR=/app.
+WORKDIR /app/agent
+
+CMD ["python", "-m", "playground.boot"]

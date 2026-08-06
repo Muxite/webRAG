@@ -1,0 +1,47 @@
+# VRAM tier -> curated local model roster for the badmodel playground.
+#
+# `default` is the model auto-pulled at first boot and pre-selected when a friend opens
+# `chat.sh`. Every model listed is also pulled and available via basic_cli's `:model`
+# command mid-session — OLLAMA_MAX_LOADED_MODELS=1 (set in docker-compose.yml) means
+# switching unloads/reloads on demand (a few seconds, no VRAM contention from listing
+# several models per tier), so comparing a genuinely-broken small model against a
+# getting-decent bigger one within the same tier is free to offer.
+#
+# Sizes are Q4_K_M `ollama pull` download sizes, taken from badmodel-lab/roster.yaml and
+# badmodel-lab/OVERNIGHT_2026-07-28.md (the latter confirmed qwen2.5:7b/llama3.1:8b/
+# qwen2.5:14b sizes empirically via `/api/tags` on a live pull). These are NOT peak VRAM.
+#
+# The only real *measured* VRAM datapoint in this repo is qwen2.5:14b at
+# OLLAMA_CONTEXT_LENGTH=16384 (the context-truncation-bug fix this stack also uses,
+# see docker-compose.yml) = 10,857 / 12,288 MiB — about +1.9GB over its 8.99GB download
+# size (KV-cache + runtime overhead at 16384 ctx). Every tier below applies that same
+# +1.9GB margin as an ESTIMATE, not a measurement, and it is almost certainly
+# over-conservative for the smallest models (KV-cache size scales with a model's own
+# hidden dim/layer count, which shrinks a lot faster than this flat margin does) —
+# verify with `nvidia-smi --query-gpu=memory.used --format=csv` during a real chat
+# session before trusting a tier boundary you're close to.
+tiers:
+  4gb:
+    default: qwen2.5:0.5b   # ~0.4GB dl — "super bad; cannot reliably emit JSON" (roster.yaml)
+    models:
+      - qwen2.5:0.5b        # ~0.4GB dl -> ~2.3GB est.
+      - tinyllama            # ~0.6GB dl -> ~2.5GB est. — the floor; genuinely terrible at structure
+      - qwen2.5:1.5b        # ~1.0GB dl -> ~2.9GB est.
+      - llama3.2:1b          # ~1.3GB dl -> ~3.2GB est.
+  6gb:
+    default: llama3.2:3b    # ~2.0GB dl — "the getting-decent edge" (roster.yaml)
+    models:
+      - llama3.2:3b          # ~2.0GB dl -> ~3.9GB est.
+      - gemma2:2b            # ~1.6GB dl -> ~3.5GB est.
+      - phi3:mini            # ~2.3GB dl -> ~4.2GB est. (3.8B, reasoning-capable edge case)
+  8gb:
+    default: qwen2.5:7b     # ~4.68GB dl, confirmed via /api/tags (OVERNIGHT_2026-07-28.md)
+    models:
+      - qwen2.5:7b           # ~4.68GB dl -> ~6.6GB est.
+      - llama3.1:8b          # ~4.92GB dl -> ~6.8GB est. — closer to the edge; verify with nvidia-smi
+  12gb:
+    default: qwen2.5:14b    # ~8.99GB dl; 10,857 MiB MEASURED (not estimated) at ctx=16384 — tight,
+                              # ~1.4GB headroom on a 12GB card, don't run anything else GPU-heavy alongside it
+    models:
+      - qwen2.5:14b          # ~8.99GB dl -> 10.86GB MEASURED
+      - qwen2.5:7b           # ~4.68GB dl -> ~6.6GB est. (lighter option, same tier)

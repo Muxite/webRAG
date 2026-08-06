@@ -1,0 +1,164 @@
+# Friend-distributable badmodel playground — see README.md for the quickstart.
+#
+# Four VRAM tiers are mutually-exclusive, profile-gated services in this one file:
+#   docker compose up badmodel-8gb --build -d      # pick the tier matching your GPU
+#   ./chat.sh 8gb                                   # then chat (docker exec, see chat.sh)
+#   ./down.sh 8gb                                   # weights + memory persist (no -v)
+#
+# Verified mechanism: a bare `docker compose up` with every service profile-gated starts
+# nothing; naming a profile-gated service explicitly (`up badmodel-8gb`) pulls in its
+# depends_on regardless of THEIR profile gating — so bringing up one tier can never also
+# spin up another tier's GPU-contending ollama pull. Tested against this host's Compose.
+#
+# IMPORTANT: `down` does NOT mirror `up`'s bare-service-name convenience — a plain
+# `docker compose down` resolves an EMPTY active-service set when every service is
+# profile-gated and no profile is selected, so it silently does nothing (confirmed via a
+# live test). Use `./down.sh <tier>` (runs `docker compose --profile <tier> down`), not
+# a bare `docker compose down`.
+#
+# No RabbitMQ/Redis/separate Chroma container by design — this is intentionally the
+# minimal stack: ollama (local model), searxng (local, keyless web search), and one
+# agent container per tier talking to both directly (CHROMA_MODE=embedded, no Chroma
+# service needed). basic_cli.py's REPL never constructs Redis/RabbitMQ connectors.
+name: badmodel-playground
+
+x-agent-env: &agent-env
+  BADMODEL_PROFILE: ${BADMODEL_PROFILE:-}
+  LLM_PROVIDER: openai_compatible
+  MODEL_API_URL: http://ollama:11434/v1
+  OPENAI_API_KEY: ollama
+  OLLAMA_BASE_URL: http://ollama:11434
+  SEARXNG_URL: http://searxng:8080
+  CHROMA_MODE: embedded
+  CHROMA_EMBEDDED_PATH: /app/data/chroma
+  AGENT_USE_IDEA_DAG: "1"
+
+x-agent-service: &agent-service
+  build:
+    context: ../..
+    dockerfile: badmodel-lab/playground/Dockerfile.agent
+  depends_on:
+    - ollama
+    - searxng
+  networks:
+    - badmodel_playground_net
+  security_opt:
+    - no-new-privileges:true
+  command: ["python", "-m", "playground.boot"]
+  healthcheck:
+    test: ["CMD", "test", "-f", "/tmp/badmodel-ready"]
+    interval: 10s
+    timeout: 3s
+    retries: 60
+    start_period: 30s
+  restart: unless-stopped
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: badmodel-playground-ollama
+    ports:
+      - "127.0.0.1:11436:11434"   # distinct from badmodel-lab's :11435 — both can run at once
+    volumes:
+      - badmodel_playground_ollama:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: "10m"        # keep a model resident between mandates; swaps on demand
+      OLLAMA_MAX_LOADED_MODELS: "1"   # one model at a time — sized for one consumer GPU
+      # Same fix as badmodel-lab/docker-compose.yml: ollama's runtime default context is
+      # 4096 tokens regardless of a model's trained max, and silently truncates
+      # mid-prompt. 16384 is sized to still fit qwen2.5:14b's KV cache on a 12GB card
+      # (measured: 10,857/12,288 MiB — see tier_roster.yaml for the full note).
+      OLLAMA_CONTEXT_LENGTH: "16384"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - badmodel_playground_net
+    profiles: ["4gb", "6gb", "8gb", "12gb"]
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: badmodel-playground-searxng
+    volumes:
+      - ./searxng:/etc/searxng:ro
+    environment:
+      SEARXNG_BASE_URL: "http://searxng:8080/"
+      # Container-network-only, never internet-exposed — safe to disable the
+      # bot-detection limiter, which otherwise can 403 the agent's programmatic JSON
+      # search requests. Smoke-test at first real use (open item from the design plan).
+      SEARXNG_LIMITER: "false"
+    networks:
+      - badmodel_playground_net
+    profiles: ["4gb", "6gb", "8gb", "12gb"]
+    restart: unless-stopped
+
+  badmodel-4gb:
+    <<: *agent-service
+    container_name: badmodel-playground-4gb
+    profiles: ["4gb"]
+    environment:
+      <<: *agent-env
+      BADMODEL_TIER: "4gb"
+    volumes:
+      - badmodel_playground_chroma_4gb:/app/data
+      - ./logs:/app/playground_logs
+      - ./tier_roster.yaml:/app/playground_config/tier_roster.yaml:ro
+      - ./tier_profiles.yaml:/app/playground_config/tier_profiles.yaml:ro
+      - ../profiles:/app/playground_config/mitigation_profiles:ro
+
+  badmodel-6gb:
+    <<: *agent-service
+    container_name: badmodel-playground-6gb
+    profiles: ["6gb"]
+    environment:
+      <<: *agent-env
+      BADMODEL_TIER: "6gb"
+    volumes:
+      - badmodel_playground_chroma_6gb:/app/data
+      - ./logs:/app/playground_logs
+      - ./tier_roster.yaml:/app/playground_config/tier_roster.yaml:ro
+      - ./tier_profiles.yaml:/app/playground_config/tier_profiles.yaml:ro
+      - ../profiles:/app/playground_config/mitigation_profiles:ro
+
+  badmodel-8gb:
+    <<: *agent-service
+    container_name: badmodel-playground-8gb
+    profiles: ["8gb"]
+    environment:
+      <<: *agent-env
+      BADMODEL_TIER: "8gb"
+    volumes:
+      - badmodel_playground_chroma_8gb:/app/data
+      - ./logs:/app/playground_logs
+      - ./tier_roster.yaml:/app/playground_config/tier_roster.yaml:ro
+      - ./tier_profiles.yaml:/app/playground_config/tier_profiles.yaml:ro
+      - ../profiles:/app/playground_config/mitigation_profiles:ro
+
+  badmodel-12gb:
+    <<: *agent-service
+    container_name: badmodel-playground-12gb
+    profiles: ["12gb"]
+    environment:
+      <<: *agent-env
+      BADMODEL_TIER: "12gb"
+    volumes:
+      - badmodel_playground_chroma_12gb:/app/data
+      - ./logs:/app/playground_logs
+      - ./tier_roster.yaml:/app/playground_config/tier_roster.yaml:ro
+      - ./tier_profiles.yaml:/app/playground_config/tier_profiles.yaml:ro
+      - ../profiles:/app/playground_config/mitigation_profiles:ro
+
+volumes:
+  badmodel_playground_ollama:
+  badmodel_playground_chroma_4gb:
+  badmodel_playground_chroma_6gb:
+  badmodel_playground_chroma_8gb:
+  badmodel_playground_chroma_12gb:
+
+networks:
+  badmodel_playground_net:

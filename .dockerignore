@@ -1,0 +1,47 @@
+# Root-level build context excludes for badmodel-lab/playground/Dockerfile.agent — the
+# first Dockerfile in this repo built from repo-root context (it COPYs from both
+# services/ and badmodel-lab/). services/.dockerignore covers the services/-scoped
+# builds separately and is untouched by this file.
+
+# VCS / editor
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+.venv/
+venv/
+env/
+
+# Frontend (irrelevant to any Python image build)
+frontend/node_modules/
+frontend/dist/
+
+# Large, non-runtime result/data/output directories
+services/agent/idea_test_results/
+services/agent/tests/
+services/agent/compiled_plans/
+badmodel-lab/results/
+badmodel-lab/gallery/
+badmodel-lab/localagent/
+scripts/_ab_out/
+scripts/_campaign_out/
+scripts/_ladder_out/
+scripts/_xtier_out/
+
+# Secrets — never send these into a build context
+services/keys.env
+services/aws.env
+*.env
+!services/.env
+
+# Misc
+*.md
+*.pdf
+*.log
