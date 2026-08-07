@@ -62,7 +62,8 @@ LADDER_ARMS = ["baseline", "good_adaptive", "max_burn"]
 # embedded mode gives each cell subprocess its OWN SQLite file (no cross-subprocess
 # write-lock contention) and runs embedding off the loop via to_thread; embed_device
 # 'cuda'/'auto' pushes embedding to the GPU. Defaults chosen for the barrage relaunch.
-RUN_CFG = {"chroma_mode": "embedded", "embed_device": "auto", "embedded_root": None}
+# log_dir (2026-08-07): per-cell stdout/stderr capture dir, see run_cell().
+RUN_CFG = {"chroma_mode": "embedded", "embed_device": "auto", "embedded_root": None, "log_dir": None}
 
 
 def cell_db_path(cell):
@@ -501,13 +502,24 @@ def run_cell(cell):
     if has_complete_result(cell["run_id"], cell["task"]):
         return cell, "skip", 0.0, None, 0.0  # already have a real result → resume-safe
     t0 = time.time()
+    # 2026-08-07 finding: 24/72 cells in a live checkpoint-2 run exited rc=0 in normal time with
+    # NO result JSON at all — silently, un-diagnosable, because stdout/stderr previously went
+    # straight to DEVNULL. Capture to a per-cell log file (append mode: a resumed retry's output
+    # lands after the prior attempt's, so the full attempt history is visible in one place)
+    # instead, so the NEXT time this (or anything else) fails silently there's something to read.
+    log_path = (os.path.join(RUN_CFG["log_dir"], f"{cell_key(cell)}.log")
+                if RUN_CFG.get("log_dir") else None)
+    log_fh = open(log_path, "a") if log_path else subprocess.DEVNULL
+    if log_path:
+        log_fh.write(f"\n=== attempt started {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+        log_fh.flush()
     # 1800s (was 1200): the 'full'/'max_burn' arm's longest runs are its highest-scorers; a too-tight
     # cap dropped them and biased the heavy arms downward (survivorship). Give heavy runs room to
     # finish. start_new_session=True puts each cell in its OWN process group so a timeout or a
     # hard-abort (repeated SIGINT/SIGTERM) can kill it and any children as a unit.
     proc = subprocess.Popen(
         [f"{REPO}/.venv/bin/python", "-m", "agent.app.idea_test_runner"],
-        cwd=REPO, env=cell_env(cell), stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+        cwd=REPO, env=cell_env(cell), stdout=log_fh, stderr=subprocess.STDOUT,
         start_new_session=True,
     )
     with _CHILDREN_LOCK:
@@ -520,6 +532,8 @@ def run_cell(cell):
     finally:
         with _CHILDREN_LOCK:
             _CHILDREN.pop(proc.pid, None)
+        if log_path:
+            log_fh.close()
     dt = time.time() - t0
     usd, score = cell_usd_and_score(cell["run_id"], cell["task"])
     if usd is None:
@@ -600,6 +614,10 @@ def main():
     RUN_CFG["embedded_root"] = f"{out_dir}/_chroma"
     if RUN_CFG["chroma_mode"] == "embedded":
         os.makedirs(RUN_CFG["embedded_root"], exist_ok=True)
+    # 2026-08-07: per-cell stdout/stderr capture (see run_cell()) — was DEVNULL, making any
+    # rc=0-but-no-result cell (a real occurrence, not hypothetical) completely undiagnosable.
+    RUN_CFG["log_dir"] = f"{out_dir}/cell_logs"
+    os.makedirs(RUN_CFG["log_dir"], exist_ok=True)
 
     # Per-invocation timestamped log: a long barrage is restarted/resumed many times, and a single
     # shared driver.log across invocations (worse, across DIFFERENT axis/model configs reusing a
