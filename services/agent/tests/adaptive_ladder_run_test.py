@@ -168,3 +168,95 @@ def test_run_meta_guard_refuses_mismatched_config(tmp_path):
     ladder.check_run_meta(meta_path, {"axis": "final3", "model": ""})
     with pytest.raises(SystemExit):
         ladder.check_run_meta(meta_path, {"axis": "", "model": "openai/gpt-5-mini"})
+
+
+# ---------------------------------------------------------- 0a: local-model wiring (2026-08-07) --
+def test_build_axis_cells_threads_provider_and_local_flag():
+    # A ladder entry with a provider override (local Ollama routing) must mark its cells "local";
+    # a ladder entry without one (API model) must not — this is what the GPU-serialization lock in
+    # fill() keys off of.
+    axis = {
+        "ladders": [
+            {"model": "qwen2.5:1.5b", "tag": "q15", "reps": 1,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+            {"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 1},
+        ],
+    }
+    cells = ladder.build_axis_cells("r", axis, ["005"], arms=["baseline"])
+    by_tag = {c["run_id"].split("_")[1]: c for c in cells}
+    assert by_tag["q15"]["local"] is True
+    assert by_tag["q15"]["provider"] == "openai_compatible"
+    assert by_tag["q15"]["api_url"] == "http://localhost:11435/v1"
+    assert by_tag["nano"]["local"] is False
+    assert by_tag["nano"]["provider"] is None
+
+
+def test_build_axis_cells_reference_can_also_be_local():
+    axis = {
+        "ladders": [{"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 1}],
+        "reference": {"model": "qwen2.5:14b", "tag": "q14", "variant": "sequential_react",
+                      "reps": 1, "provider": "openai_compatible",
+                      "api_url": "http://localhost:11435/v1"},
+    }
+    cells = ladder.build_axis_cells("r", axis, ["005"], arms=["baseline"])
+    ref = next(c for c in cells if c["arm"] is None)
+    assert ref["local"] is True
+    assert ref["provider"] == "openai_compatible"
+
+
+def test_build_axis_cells_variant_override_applies_to_ladder_not_reference():
+    axis = {
+        "ladders": [{"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 1}],
+        "reference": {"model": "anthropic/claude-sonnet-5", "tag": "sonnet",
+                      "variant": "sequential_react", "reps": 1},
+    }
+    cells = ladder.build_axis_cells("r", axis, ["005"], arms=["baseline"], variant="graph_compiled")
+    ladder_cell = next(c for c in cells if c["arm"] is not None)
+    ref_cell = next(c for c in cells if c["arm"] is None)
+    assert ladder_cell["variant"] == "graph_compiled"
+    assert ref_cell["variant"] == "sequential_react"  # reference keeps its own variant regardless
+
+
+def test_build_axis_cells_telemetry_flag_from_axis():
+    axis_on = {"json_telemetry": True,
+               "ladders": [{"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 1}]}
+    axis_off = {"ladders": [{"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 1}]}
+    on = ladder.build_axis_cells("r", axis_on, ["005"], arms=["baseline"])
+    off = ladder.build_axis_cells("r", axis_off, ["005"], arms=["baseline"])
+    assert on[0]["telemetry"] is True
+    assert off[0]["telemetry"] is False
+
+
+def test_cell_env_applies_local_provider_override(tmp_path, monkeypatch):
+    monkeypatch.setitem(ladder.RUN_CFG, "embedded_root", str(tmp_path))
+    cell = {"task": "005", "model": "qwen2.5:1.5b", "variant": "graph", "run_id": "r_q15_baseline_rep1",
+            "arm": "baseline", "provider": "openai_compatible",
+            "api_url": "http://localhost:11435/v1", "local": True, "telemetry": True, "burn": None}
+    env = ladder.cell_env(cell)
+    assert env["LLM_PROVIDER"] == "openai_compatible"
+    assert env["MODEL_API_URL"] == "http://localhost:11435/v1"
+    assert env["OPENAI_API_KEY"] == "ollama"
+    assert env["IDEA_TEST_PREFLIGHT_JSON"] == "0"
+    assert env["IDEA_TEST_JSON_TELEMETRY"] == "1"
+    assert env["LLM_READ_TIMEOUT"] == "480"  # local generation is throughput-, not network-bound
+    assert env["IDEA_TEST_PREFLIGHT_TIMEOUT_SECONDS"] == "120"  # covers an Ollama cold-load swap
+    assert env["IDEA_TEST_EXPANSION_TIMEOUT"] == "480"  # expansion, not llm_timeout, gates decide-calls
+    assert env["IDEA_TEST_FINAL_TIMEOUT"] == "480"
+
+
+def test_cell_env_leaves_openrouter_routing_untouched_when_no_provider(tmp_path, monkeypatch):
+    # final3-style API cell — must NOT gain any of the local-only overrides, so the already-proven
+    # OpenRouter path stays exactly as it was before this feature was added.
+    monkeypatch.setitem(ladder.RUN_CFG, "embedded_root", str(tmp_path))
+    cell = {"task": "005", "model": "openai/gpt-4.1-nano", "variant": "graph",
+            "run_id": "r_nano_baseline_rep1", "arm": "baseline", "provider": None, "api_url": None,
+            "local": False, "telemetry": False, "burn": None}
+    env = ladder.cell_env(cell)
+    assert env["LLM_PROVIDER"] == "openrouter"
+    assert env["MODEL_API_URL"] == "https://openrouter.ai/api/v1"
+    assert "IDEA_TEST_PREFLIGHT_JSON" not in env
+    assert "IDEA_TEST_JSON_TELEMETRY" not in env
+    assert "LLM_READ_TIMEOUT" not in env  # API cells keep the proven F3 default (90s), untouched
+    assert "IDEA_TEST_PREFLIGHT_TIMEOUT_SECONDS" not in env  # keeps the 20s cloud-API default
+    assert "IDEA_TEST_EXPANSION_TIMEOUT" not in env
+    assert "IDEA_TEST_FINAL_TIMEOUT" not in env

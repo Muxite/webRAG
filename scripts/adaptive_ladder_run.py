@@ -83,6 +83,14 @@ TASK_SETS = {
         + ["068", "095", "108", "040", "054", "065", "042", "056", "061",       # Tier C (11)
            "070", "090"]
     ),
+    # 2026-08-07 diagnostic barrage (not the held barrage1 pre-registration): one exemplar of
+    # every shape in the active 59-suite + 2 cross-domain reasoning tasks (200/206, no web
+    # grounding) + 1 opportunistic stacked-axis task (146, pool-only, never run live before). See
+    # /home/muk/.claude/plans/i-think-the-next-steady-wand.md for the selection rationale.
+    "barrage20": [
+        "122", "108", "134", "040", "132", "140", "143", "070", "072", "079",
+        "094", "044", "047", "052", "071", "073", "200", "206", "146",
+    ],
 }
 TASKS = TASK_SETS["smoke8"]  # default; overridden by --task-set / --tasks
 
@@ -137,6 +145,46 @@ def cell_env(cell):
         env["IDEA_TEST_ARM"] = cell["arm"]
     else:
         env.pop("IDEA_TEST_ARM", None)
+    # 0a: local-model provider override — route this cell at an OpenAI-compatible local endpoint
+    # (Ollama) instead of OpenRouter. Mirrors badmodel-lab/run_cell.sh's established local-routing
+    # recipe exactly: openai_compatible provider, a non-empty-but-ignored API key (the SDK client
+    # requires a truthy key even though Ollama ignores it), and the JSON preflight gate OFF — a
+    # genuinely weak subject that can't emit clean JSON is exactly what this barrage exists to
+    # observe, not silently drop (default IDEA_TEST_PREFLIGHT_JSON=1 would exclude it entirely).
+    if cell.get("provider"):
+        env["LLM_PROVIDER"] = cell["provider"]
+        env["MODEL_API_URL"] = cell.get("api_url") or env["MODEL_API_URL"]
+        env["OPENAI_API_KEY"] = "ollama"
+        env["IDEA_TEST_PREFLIGHT_JSON"] = "0"
+        # Smoke-test finding (2026-08-07): the default 90s LLM_READ_TIMEOUT (tuned for cloud API
+        # latency, F3) is throughput-bound, not network-bound, for local generation — qwen2.5:14b
+        # against a 32768-token completion budget on a single consumer GPU genuinely needs more
+        # wall-clock than that, and with IDEA_TEST_CONNECTOR_RETRY=1's one retry, two consecutive
+        # 90s misses (~180s) killed EVERY q14 cell and q15's larger-prompt cells in the first live
+        # smoke run before any local model finished a single call. 480s gives real generation room
+        # to complete while staying well inside the driver's own 1800s per-cell subprocess cap.
+        env["LLM_READ_TIMEOUT"] = "480"
+        # 2nd smoke-test finding, same run: idea_test_runner.preflight_check_llm has its OWN
+        # hardcoded 20s-per-payload-candidate wait_for, independent of LLM_READ_TIMEOUT — this is
+        # what actually killed q15's task=140 cell (empty-string asyncio.TimeoutError, "No valid
+        # execution models after pre-flight checks. Aborting.", zero output). Root cause: the
+        # global local-model lock (above) only serializes CONCURRENT local cells, it does nothing
+        # about a DIFFERENT local model (e.g. q14) running in between and evicting q15 from
+        # Ollama's single-loaded-model slot (OLLAMA_MAX_LOADED_MODELS=1) — the next q15 cell then
+        # has to cold-load before it can answer even the tiny "reply OK" preflight probe, which
+        # 5 x 20s = 100s isn't reliably enough time for. 120s per candidate covers a cold load.
+        env["IDEA_TEST_PREFLIGHT_TIMEOUT_SECONDS"] = "120"
+        # 3rd smoke-test finding, same run (the real blocker for q14 + q15's larger prompts):
+        # idea_engine.py's decision/expansion call uses `timeouts.expansion or timeouts.llm`
+        # (expansion defaults to 180 and always wins over llm when set) — LLM_READ_TIMEOUT only
+        # bounds the httpx transport, not this engine-level wait_for. Every q14 call hit the SAME
+        # flat 180.1s ceiling regardless of prompt size, killing the cell with rc=0 and zero
+        # output. IDEA_TEST_EXPANSION_TIMEOUT/IDEA_TEST_FINAL_TIMEOUT are new env overrides added
+        # for this (idea_test_runner.py); give local cells real room.
+        env["IDEA_TEST_EXPANSION_TIMEOUT"] = "480"
+        env["IDEA_TEST_FINAL_TIMEOUT"] = "480"
+    if cell.get("telemetry"):
+        env["IDEA_TEST_JSON_TELEMETRY"] = "1"
     # Chroma isolation + embedding device. In embedded mode each cell gets its own
     # SQLite file (no shared-server contention) at a unique path; embedding runs on the
     # chosen device (GPU under 'cuda'/'auto').
@@ -360,6 +408,25 @@ AXES = {
         "reference": {"model": "anthropic/claude-sonnet-5", "tag": "sonnet",
                       "variant": "sequential_react", "reps": 3},
     },
+    # 2026-08-07 diagnostic barrage: local (Ollama) + API ladders side by side, so the SAME
+    # task-major interleaved/resumable/budget-tracked driver that already serves final3 also
+    # covers strong-vs-weak and local-vs-non-local in one pass. `provider`/`api_url` route a
+    # ladder entry at a local OpenAI-compatible endpoint instead of OpenRouter (see cell_env()).
+    # qwen2.5:1.5b/qwen2.5:14b are both "subjects" in badmodel-lab/roster.yaml, served from the
+    # same badmodel-ollama container (port 11435) — see badmodel-lab/run_cell.sh for precedent.
+    "barrage20": {
+        "json_telemetry": True,  # capture parse-failure classes; no-op unless read, additive only
+        "ladders": [
+            {"model": "qwen2.5:1.5b", "tag": "q15", "reps": 1, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+            {"model": "qwen2.5:14b", "tag": "q14", "reps": 1, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+            {"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 1, "burn": None},
+            {"model": "deepseek/deepseek-v4-flash", "tag": "ds", "reps": 1, "burn": None},
+        ],
+        "reference": {"model": "anthropic/claude-sonnet-5", "tag": "sonnet",
+                      "variant": "sequential_react", "reps": 1},
+    },
 }
 
 
@@ -381,25 +448,33 @@ def build_cells(run_id, reps, ref_reps, model, ref_model, ref_variant, include_r
     return cells
 
 
-def build_axis_cells(run_id, axis, tasks, arms=None):
+def build_axis_cells(run_id, axis, tasks, arms=None, variant="graph"):
     """Full multi-model axis. Ordered task-major so same-task cells are adjacent (per-task lock +
-    shared window). Any per-model `burn` override applies only to the top (most-burn) arm."""
+    shared window). Any per-model `burn` override applies only to the top (most-burn) arm.
+    `variant` lets --variant point the SAME task/model grid at graph_compiled or naive_discretion
+    under a different --run-id (Phase 2 technique-coverage reuse), without touching this axis's
+    reference cell, which always keeps its own axis-defined variant (e.g. sequential_react)."""
     arms = arms or LADDER_ARMS
     top_arm = arms[-1]
+    telemetry = bool(axis.get("json_telemetry"))
     cells = []
     for task in tasks:
         for lad in axis["ladders"]:
             for rep in range(1, lad["reps"] + 1):
                 for arm in arms:
                     cells.append({"task": task, "rep": rep, "arm": arm, "model": lad["model"],
-                                  "variant": "graph",
+                                  "variant": variant,
                                   "burn": lad.get("burn") if arm == top_arm else None,
+                                  "provider": lad.get("provider"), "api_url": lad.get("api_url"),
+                                  "local": bool(lad.get("provider")), "telemetry": telemetry,
                                   "run_id": f"{run_id}_{lad['tag']}_{arm}_rep{rep}"})
         ref = axis.get("reference")
         if ref:
             for rep in range(1, ref["reps"] + 1):
                 cells.append({"task": task, "rep": rep, "arm": None, "model": ref["model"],
                               "variant": ref["variant"], "burn": None,
+                              "provider": ref.get("provider"), "api_url": ref.get("api_url"),
+                              "local": bool(ref.get("provider")), "telemetry": telemetry,
                               "run_id": f"{run_id}_{ref['tag']}_ref_rep{rep}"})
     return cells
 
@@ -452,8 +527,16 @@ def run_cell(cell):
         # and --real-budget stay honest instead of booking $0 for a cell that really spent money.
         usd = recover_cell_usd(cell["run_id"], cell["task"])
     status = "ok" if rc == 0 else f"{rc}"
-    # Reclaim the per-cell embedded DB (fresh memory is per-run; results already scraped).
-    if RUN_CFG["chroma_mode"] == "embedded" and RUN_CFG["embedded_root"]:
+    # Resume experiment (2026-08-07): reclaim the per-cell embedded DB ONLY on a genuine complete
+    # result. A killed/timed-out attempt's partial chroma memory (already-fetched, already-embedded
+    # pages) is deliberately LEFT IN PLACE instead — a retry of the SAME cell (same run_id+task ->
+    # same cell_db_path, see cell_db_path()) starts a fresh subprocess but against that same chroma
+    # dir, so the engine's mandate-hash-keyed memory lookup can reuse whatever it already indexed
+    # instead of re-fetching/re-embedding from zero on every timeout. Orphaned dirs for cells that
+    # are finally given up on (never complete within --max-attempts) are reclaimed in fill()'s DEAD
+    # branch instead, once no further retry can use them.
+    if RUN_CFG["chroma_mode"] == "embedded" and RUN_CFG["embedded_root"] and \
+            has_complete_result(cell["run_id"], cell["task"]):
         shutil.rmtree(cell_db_path(cell), ignore_errors=True)
     return cell, status, (usd or 0.0), score, dt
 
@@ -482,6 +565,12 @@ def main():
                     help="chroma embedding device; auto = GPU if available else CPU")
     ap.add_argument("--arms", default="", help="space/comma ladder arms (IDEA_TEST_ARM profiles), "
                     "top arm gets any per-model burn; default: " + " ".join(LADDER_ARMS))
+    ap.add_argument("--variant", default="graph",
+                    help="execution_variant for subject (non-reference) cells in --axis mode, "
+                         "e.g. graph, graph_compiled, naive_discretion — lets a second invocation "
+                         "point the SAME task/model grid at a different technique under a fresh "
+                         "--run-id, reusing all resume/lock/budget machinery. Reference cells keep "
+                         "their own axis-defined variant regardless (e.g. sequential_react).")
     ap.add_argument("--max-attempts", type=int, default=3,
                     help="give up on a cell (mark it dead in the ledger) after this many non-skip "
                          "attempts with no complete result, instead of retrying it forever on "
@@ -502,7 +591,7 @@ def main():
     tasks = ([t for t in args.tasks.replace(",", " ").split()] if args.tasks
              else TASK_SETS[args.task_set])
     if args.axis:
-        cells = build_axis_cells(args.run_id, AXES[args.axis], tasks, arms=arms)
+        cells = build_axis_cells(args.run_id, AXES[args.axis], tasks, arms=arms, variant=args.variant)
     else:
         cells = build_cells(args.run_id, args.reps, args.ref_reps, args.model,
                             args.ref_model, args.ref_variant, not args.no_ref, tasks, arms=arms)
@@ -579,6 +668,7 @@ def main():
     stopped = False
     pending = list(cells)
     busy_tasks = set()
+    local_busy = False  # 0a: at most one local-provider cell in flight process-wide (see fill())
     futs = {}  # future -> cell
 
     def _drain(signum, _frame):
@@ -602,10 +692,19 @@ def main():
     signal.signal(signal.SIGTERM, _drain)
 
     def fill(ex):
+        nonlocal local_busy
         for c in list(pending):
             if len(futs) >= args.jobs:
                 break
             if c["task"] in busy_tasks:
+                continue
+            # 0a: local models share ONE GPU-resident Ollama slot (OLLAMA_MAX_LOADED_MODELS=1) —
+            # two concurrent local cells on different tasks would fight over it and thrash
+            # (constant reload), the same failure class as the chroma hang that burned the prior
+            # barrage. Serialize local cells globally; API cells are unaffected and keep
+            # parallelizing up to --jobs (this `continue` just lets the loop try the next pending
+            # cell, which may well be a non-local one for a different task).
+            if c.get("local") and local_busy:
                 continue
             if is_dead(c, ledger, args.max_attempts):
                 pending.remove(c)
@@ -613,9 +712,17 @@ def main():
                 emit(f"  DEAD   task={c['task']} {cell_key(c)} attempts={rec.get('attempts')} "
                      f"last_status={rec.get('last_status')} — giving up "
                      f"(max-attempts={args.max_attempts})")
+                # Resume experiment (2026-08-07): a live cell's partial embedded-chroma memory is
+                # now preserved across a killed/timed-out attempt so a RETRY can reuse it (see
+                # run_cell()) — but a cell that's finally given up on will never retry again, so
+                # reclaim its orphaned dir here instead of leaking it forever.
+                if RUN_CFG["chroma_mode"] == "embedded" and RUN_CFG["embedded_root"]:
+                    shutil.rmtree(cell_db_path(c), ignore_errors=True)
                 continue
             pending.remove(c)
             busy_tasks.add(c["task"])
+            if c.get("local"):
+                local_busy = True
             futs[ex.submit(run_cell, c)] = c
 
     with ThreadPoolExecutor(max_workers=args.jobs) as ex:
@@ -625,6 +732,8 @@ def main():
             for fut in finished:
                 cell = futs.pop(fut)
                 busy_tasks.discard(cell["task"])
+                if cell.get("local"):
+                    local_busy = False
                 try:
                     _, status, usd, score, dt = fut.result()
                 except Exception as exc:

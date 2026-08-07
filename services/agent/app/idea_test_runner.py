@@ -109,6 +109,23 @@ def _build_connector_pool(config: ConnectorConfig, pool_size: int) -> List[Dict[
     return [_make_connector_set(config) for _ in range(max(1, int(pool_size)))]
 
 
+def _preflight_call_timeout_seconds() -> float:
+    """Per-payload-candidate timeout for the plain pre-flight probe (below).
+
+    Default 20 preserves existing behavior for cloud API models. A local (Ollama) model can need
+    much longer on any given attempt it is NOT already resident for: 20s covers a warm response but
+    not a cold model-load (found live, 2026-08-07 — barrage20 smoke run: qwen2.5:1.5b's own repeat
+    preflight failed silently, empty-string asyncio.TimeoutError, after alternating with a different
+    local model evicted it from Ollama's single-loaded-model slot, `OLLAMA_MAX_LOADED_MODELS=1`).
+    IDEA_TEST_PREFLIGHT_TIMEOUT_SECONDS lets a caller (e.g. the ladder driver, for local-provider
+    cells only) raise this without touching the cloud-API default.
+    """
+    try:
+        return float(os.environ.get("IDEA_TEST_PREFLIGHT_TIMEOUT_SECONDS", "20"))
+    except (TypeError, ValueError):
+        return 20.0
+
+
 async def preflight_check_llm(connector_llm: ConnectorLLM, model_name: str) -> bool:
     """
     Pre-flight check to verify LLM calls work for a model.
@@ -130,6 +147,7 @@ async def preflight_check_llm(connector_llm: ConnectorLLM, model_name: str) -> b
     original_model = connector_llm.get_model()
     last_error = "unknown"
     connector_llm.set_model(model_name)
+    preflight_timeout = _preflight_call_timeout_seconds()
     try:
         working_payload = None
         for payload in payload_candidates:
@@ -140,7 +158,7 @@ async def preflight_check_llm(connector_llm: ConnectorLLM, model_name: str) -> b
                         messages=messages,
                         **payload,
                     ),
-                    timeout=20,
+                    timeout=preflight_timeout,
                 )
                 choices = getattr(response, "choices", None) or []
                 if not choices:
@@ -1504,11 +1522,23 @@ async def main() -> None:
     # Optional visit/fetch/action/LLM timeout overrides for slow or contended calls.
     # IDEA_TEST_LLM_TIMEOUT lowers the per-call LLM wire timeout for faster-fail throughput
     # runs; unset -> the shipped llm_timeout_seconds default (success path unchanged).
+    # IDEA_TEST_EXPANSION_TIMEOUT/IDEA_TEST_FINAL_TIMEOUT added 2026-08-07 (barrage20 smoke
+    # finding): idea_engine.py's decision/expansion call site uses
+    # `self._cfg.timeouts.expansion or self._cfg.timeouts.llm` — expansion (default 180) wins
+    # whenever set, so raising IDEA_TEST_LLM_TIMEOUT alone never reaches this call at all. A
+    # local (Ollama) model generating against a large completion budget on a single consumer GPU
+    # can genuinely need more than 180s; without this override every such call hit the SAME
+    # 180.1s ceiling regardless of LLM_READ_TIMEOUT, killing every local-model cell in the first
+    # live smoke run with a clean rc=0 and zero result (see also final_timeout_seconds, which
+    # already self-scales with prompt size and hard-caps at 600s — override it too for symmetry,
+    # though it was not the one observed failing).
     for _env, _key in (
         ("IDEA_TEST_VISIT_TIMEOUT", "visit_timeout_seconds"),
         ("IDEA_TEST_FETCH_TIMEOUT", "fetch_timeout_seconds"),
         ("IDEA_TEST_ACTION_TIMEOUT", "action_timeout_seconds"),
         ("IDEA_TEST_LLM_TIMEOUT", "llm_timeout_seconds"),
+        ("IDEA_TEST_EXPANSION_TIMEOUT", "expansion_timeout_seconds"),
+        ("IDEA_TEST_FINAL_TIMEOUT", "final_timeout_seconds"),
     ):
         _val = os.environ.get(_env)
         if _val:

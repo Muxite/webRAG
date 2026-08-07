@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# Drive the full matrix: roster.yaml subjects x {badmodel, aider} x TASK_IDS, one cell at
-# a time. Not -e: one bad cell must not kill the matrix (same convention as
+# Drive the full matrix: TASK_IDS x roster.yaml subjects x {badmodel, aider}, TASK-MAJOR (a task
+# that's finished has cross-model data even if the run stops partway — see the 2026-08-07 barrage
+# plan). Not -e: one bad cell must not kill the matrix (same convention as
 # badmodel-lab/run_matrix.sh). Each cell: sandbox run -> extract -> grade/judge -> record
 # a row into results/runs.jsonl (score_and_record.py owns hard/soft scoring + the row
 # schema — see codebench_results.py).
+#
+# Resume-safe: a cell already recorded for THIS run-tag (matching task_id+agent_kind+model in
+# results/runs.jsonl) is skipped instead of re-run, so restarting after a stop/kill neither
+# duplicates rows nor re-spends on completed (incl. paid-API-anchor) cells.
 set -uo pipefail
 LAB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CB_DIR="$LAB_DIR/codebench"
@@ -19,6 +24,7 @@ IFS=' ' read -r -a TASK_IDS <<< "${CODEBENCH_TASK_IDS:?set CODEBENCH_TASK_IDS, e
 
 RUN_TAG="${CODEBENCH_RUN_TAG:-cb_$(date +%Y%m%d_%H%M%S)}"
 OUT_ROOT="$CB_DIR/results/runs/$RUN_TAG"
+RESULTS_FILE="$CB_DIR/results/runs.jsonl"
 mkdir -p "$OUT_ROOT"
 
 "$CB_DIR/setup_network.sh"
@@ -29,10 +35,36 @@ for t in "${TASK_IDS[@]}"; do
     || echo "  !! materialize failed for $t"
 done
 
-echo "### MATRIX  subjects=${SUBJECTS[*]}  agents=${AGENT_KINDS[*]}  tasks=${TASK_IDS[*]} ($(date +%H:%M:%S)) ###"
-for model in "${SUBJECTS[@]}"; do
-  for agent in "${AGENT_KINDS[@]}"; do
-    for task in "${TASK_IDS[@]}"; do
+# Re-read RESULTS_FILE fresh on every call (not cached) so a row this very invocation just wrote
+# earlier in the loop is correctly seen as done, not just rows from a prior invocation.
+result_exists() {
+  python3 -c "
+import json, sys
+run_id, task_id, agent_kind, model, path = sys.argv[1:6]
+try:
+    with open(path) as f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except Exception:
+                continue
+            if (d.get('run_id'), d.get('task_id'), d.get('agent_kind'), d.get('model')) == \
+               (run_id, task_id, agent_kind, model):
+                sys.exit(0)
+except FileNotFoundError:
+    pass
+sys.exit(1)
+" "$RUN_TAG" "$1" "$2" "$3" "$RESULTS_FILE"
+}
+
+echo "### MATRIX  tasks=${TASK_IDS[*]}  subjects=${SUBJECTS[*]}  agents=${AGENT_KINDS[*]} ($(date +%H:%M:%S)) ###"
+for task in "${TASK_IDS[@]}"; do
+  for model in "${SUBJECTS[@]}"; do
+    for agent in "${AGENT_KINDS[@]}"; do
+      if result_exists "$task" "$agent" "$model"; then
+        echo "  --- $task / $agent / $model — SKIP (already recorded for run $RUN_TAG) ---"
+        continue
+      fi
       # Sanitize BOTH "/" (vendor/model ids like openai/gpt-4.1-nano) and ":" (ollama tags
       # like qwen2.5:14b) out of the model tag before using it in a path: CELL_DIR later
       # feeds run_agent_sandbox.sh's `-v host:/work` bind-mount spec, and a literal colon
@@ -64,10 +96,10 @@ for model in "${SUBJECTS[@]}"; do
       PYTHONPATH="$REPO_ROOT/services" python3 "$CB_DIR/score_and_record.py" \
         --task-id "$task" --agent-kind "$agent" --model "$model" \
         --cell-dir "$CELL_DIR" --run-id "$RUN_TAG" \
-        --results-file "$CB_DIR/results/runs.jsonl" \
+        --results-file "$RESULTS_FILE" \
         || echo "      scoring/record failed"
     done
   done
 done
 
-echo "### DONE ($(date +%H:%M:%S)) ### -> $CB_DIR/results/runs.jsonl"
+echo "### DONE ($(date +%H:%M:%S)) ### -> $RESULTS_FILE"
