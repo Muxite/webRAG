@@ -1,8 +1,8 @@
 """
 codebench task c25 — hard/hidden, concurrency (bounded blocking producer-consumer queue).
 
-Second concurrency-shaped codebench task (see test_c24_thread_safe_counter.py for the
-first). Where c24 is about a single shared mutable value, c25 is about a bounded buffer with
+Second concurrency-shaped codebench task (see test_c24_call_coalescer.py for the
+first). Where c24 is about single-flight call coalescing, c25 is about a bounded buffer with
 genuine BLOCKING semantics: put() must wait while full, get() must wait while empty, and
 neither producer nor consumer may ever observe a lost or duplicated item.
 
