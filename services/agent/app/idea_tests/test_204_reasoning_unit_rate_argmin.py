@@ -152,7 +152,7 @@ def get_test_metadata() -> Dict[str, Any]:
         "test_name": "Reasoning: unit-rate argmin over bulk purchase options (lowest cost per test)",
         "difficulty_level": "7/10",
         "category": "Self-contained reasoning: derived-quantity argmin",
-        "level": "graph",
+        "level": "reasoning",
         "weight": "short",
         # No web lookup exists for this task: every fact is in the statement. The harness must NOT
         # apply a grounding/visit gate, and the validators below deliberately have none.

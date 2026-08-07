@@ -150,7 +150,7 @@ def get_test_metadata() -> Dict[str, Any]:
                      "(most cargo per litre)",
         "difficulty_level": "8/10",
         "category": "Self-contained reasoning: derived-quantity argmax",
-        "level": "graph",
+        "level": "reasoning",
         "weight": "short",
         # Nothing to visit: every figure is in the statement. No grounding/visit gate applies.
         "grounding_required": False,

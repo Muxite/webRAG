@@ -250,7 +250,7 @@ def test_metadata_declares_the_grounding_exemption():
     md = t.get_test_metadata()
     assert md["test_id"] == "206"
     assert md["grounding_required"] is False
-    assert md["level"] == "micro"
+    assert md["level"] == "reasoning"
     assert t.get_llm_validation_function() is None
     assert not hasattr(t, "get_compiled_plan")      # parametric variant only, no DAG scaffold
 

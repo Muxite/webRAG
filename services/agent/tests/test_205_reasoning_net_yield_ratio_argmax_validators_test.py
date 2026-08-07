@@ -247,7 +247,7 @@ def test_metadata_declares_the_no_grounding_contract_and_no_llm_judge():
     md = t.get_test_metadata()
     assert md["test_id"] == "205"
     assert md["grounding_required"] is False
-    assert md["level"] in {"micro", "integration", "navigation", "graph"}
+    assert md["level"] == "reasoning"
     assert t.get_llm_validation_function() is None
 
 

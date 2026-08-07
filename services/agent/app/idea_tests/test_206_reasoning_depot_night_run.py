@@ -267,7 +267,7 @@ def get_test_metadata() -> Dict[str, Any]:
         "test_name": "Reasoning: 5-rule deductive chain (depot night run)",
         "difficulty_level": "6/10",
         "category": "Self-contained Deductive Reasoning",
-        "level": "micro",
+        "level": "reasoning",
         "weight": "short",
         # Self-declared exemption from the web suite's grounding gate: this task has no page to
         # visit, so visit.count is structurally 0 and must never be scored.
