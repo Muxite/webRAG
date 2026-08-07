@@ -1,7 +1,7 @@
 """
 codebench task c26 — hard/hidden, concurrency (deadlock avoidance via lock-ordering).
 
-Third concurrency-shaped codebench task (see test_c24_thread_safe_counter.py and
+Third concurrency-shaped codebench task (see test_c24_call_coalescer.py and
 test_c25_bounded_blocking_queue.py for the first two). Where c24/c25 are about NOT losing
 data under contention, c26 is about a different failure mode entirely: two locks acquired
 in an inconsistent order across threads, causing a genuine, permanent, circular-wait
@@ -16,14 +16,24 @@ blocking call that releases the GIL, so once thread A holds lock 1 and blocks wa
 lock 2 while thread B holds lock 2 and blocks waiting for lock 1, that condition is
 PERMANENT (barring external intervention) -- there is no scheduling luck involved once the
 circular hold-and-wait actually forms, only in HOW LIKELY it is to form at all within a
-bounded number of trials/threads. This task's offline validator confirms live (both on this
-host's python3.12 and the actual codebench sandbox's python:3.10-slim image) that a naive
-`with src.lock: with dst.lock: ...` implementation (locks acquired in caller-argument order,
-not a consistent global order) deadlocks in 100% of 6 independent trials when ~24 threads
-fire concurrent transfers in both directions across a small pool of accounts, while a
-correct implementation (locks acquired in a consistent order derived from account identity,
-e.g. sorted by account id, regardless of which account is `src` vs `dst`) never deadlocks
-across the same trials and completes in milliseconds.
+bounded number of trials/threads. On a fast, lightly-loaded host, a bare
+`with src.lock: with dst.lock: ...` (no delay between the two acquisitions) does NOT reliably
+race -- both `with` statements execute back-to-back fast enough that the interleaving window
+where thread A holds lock 1 and thread B holds lock 2 simultaneously is rarely hit (mirroring
+this project's own earlier finding, in c24/c37/c39's hardening history, that "naive unlocked
+code races" is often folklore against modern schedulers unless something actually forces a
+yield). This task's offline validator's naive reference (`_transfer_naive` in
+`idea_code_test_c26_test.py`) therefore inserts a real, disclosed `time.sleep(0.001)` between
+the two `with` statements to force the interleaving window open -- this is a legitimate,
+common technique for testing lock-ordering bugs (widen the race window rather than hope for
+luck), not a hidden thumb on the scale, but the timing is a genuine test-harness detail, not
+something a submitted implementation needs to replicate. WITH that forced yield point, the
+harness confirms live (both on this host's python3.12 and the actual codebench sandbox's
+python:3.10-slim image) that caller-argument-order locking deadlocks in 100% of 6 independent
+trials when ~24 threads fire concurrent transfers in both directions across a small pool of
+accounts, while a correct implementation (locks acquired in a consistent order derived from
+account identity, e.g. sorted by account id, regardless of which account is `src` vs `dst`)
+never deadlocks across the same trials and completes in milliseconds.
 
 The grading invariant deliberately does NOT pin down HOW the agent avoids the deadlock (any
 consistent global lock-ordering scheme works, and so would coarser-grained locking) -- it
