@@ -59,9 +59,15 @@ total 10,348, and +/-10 km of rounding slack). EVERY single-error total lands fa
     dropped the Irtysh                           ->  6,150   (-4,180)
     survivor's length alone / system alone       ->  3,700 / 5,410
   The nearest wrong total is 1,579 km from the band, i.e. ~15% of the keystone — no plausible
-  extraction slip lands in band, and no wrong subset coincides with the right total. The four
+  extraction slip lands in band, and NO SINGLE-ERROR total coincides with the right one. The four
   component lengths (1,591 / 2,450 / 2,650 / 4,248) are pairwise distinct, so the coverage
   diagnostic is collision-free.
+  Exhaustive enumeration over {3,700 | 3,650 | 5,410 | each wrong survivor's length} x all 16
+  component subsets finds exactly two spurious in-band totals, both TRIPLE errors that also drop
+  the basin's dominant tributary: 3,700 + Ishim + Tobol + Vilyuy = 10,391 and its 3,650 variant
+  10,341. Both require an agent to discard the Irtysh — the very tributary stage 2 defines the
+  decoy system-length through — while admitting BOTH rivers the membership rules exclude, so
+  neither is a reachable failure mode (an agent that drops both rules counts all four: 14,639).
 
 WHY IT DISCRIMINATES:
   * The famous, quotable figure in this domain is the SYSTEM length ("seventh-longest river system
@@ -91,7 +97,12 @@ CANDIDATES: List[Dict[str, Any]] = [
     {
         "key": "ob", "name": "Ob", "desc": "the Ob, in western Siberia, Russia",
         "name_rx": r"\bob\b", "mouth_rx": r"kara\s+sea|gulf\s+of\s+ob|ob\s+estuary",
-        "slug_rx": r"wiki/ob_\(river\)|wiki/ob_river", "survivor": True,
+        # The CANONICAL article title is plain "Ob" (verified live 2026-08-07: /wiki/Ob_(river) and
+        # /wiki/Ob_River are redirects; the REST summary reports title "Ob", desktop URL
+        # https://en.wikipedia.org/wiki/Ob). Without the bare ``wiki/ob\b`` alternative the citation
+        # validator could not credit the survivor's own page — the single most important source in
+        # the task. ``\b`` keeps it off /wiki/Obninsk and off the underscored forms (covered below).
+        "slug_rx": r"wiki/ob\b|wiki/ob_\(river\)|wiki/ob_river", "survivor": True,
     },
     {
         "key": "lena", "name": "Lena", "desc": "the Lena, in eastern Siberia, Russia",
@@ -110,6 +121,30 @@ CANDIDATES: List[Dict[str, Any]] = [
     },
 ]
 SURVIVOR = next(c for c in CANDIDATES if c["survivor"])      # the Ob
+
+
+def _bind(name_rx: str, mouth_rx: str, others_rx: str) -> "re.Pattern":
+    """A river's NAME bound to ITS OWN mouth inside one sentence, never crossing another
+    candidate's name — the canonical suite proximity form (``[^.]`` is newline-tolerant so a
+    one-row-per-line table still binds).
+
+    Un-bound whole-text matching was measurably free credit here: the task statement necessarily
+    names the Kara Sea criterion, so a run that merely paraphrases the prompt used to score a full
+    4/4 on this breadth axis without reading a single page. Binding costs a real answer nothing (it
+    states '<river> -> <mouth>' per row anyway) and makes the prompt-echo score 0."""
+    return re.compile(
+        r"(?:" + name_rx + r")(?:(?!" + others_rx + r")[^.]){0,80}(?:" + mouth_rx + r")"
+        r"|(?:" + mouth_rx + r")(?:(?!" + others_rx + r")[^.]){0,80}(?:" + name_rx + r")",
+        re.IGNORECASE,
+    )
+
+
+for _c in CANDIDATES:
+    _c["bound_rx"] = _bind(
+        _c["name_rx"], _c["mouth_rx"],
+        "|".join(o["name_rx"] for o in CANDIDATES if o["key"] != _c["key"]),
+    )
+del _c
 
 # ── STAGE 3: the component rivers (the subset-sum candidate set) ──
 # ``counted`` is DERIVED below from the two membership rules, never hand-set.
@@ -177,9 +212,9 @@ def get_task_statement() -> str:
         "STAGE 1 — eliminate to one survivor. Four great rivers:\n"
         f"{cand}\n"
         "Exactly ONE of these four empties into the KARA SEA. Open EACH river's page and read its "
-        "MOUTH from the infobox to decide which one — the other three empty into the Laptev Sea, "
-        "the East Siberian Sea, or the Strait of Tartary (the Pacific side). Determine the mouth of "
-        "all four; do not simply pick the one you have heard of.\n\n"
+        "MOUTH from the infobox to decide which one; where the infobox names a gulf, an estuary or "
+        "a delta rather than a sea, work out which sea that body of water belongs to. Determine the "
+        "mouth of all four; do not simply pick the one you have heard of.\n\n"
         "STAGE 2 — reconcile two conflicting lengths for the surviving river. Two different lengths "
         "circulate for it and BOTH appear on its own article: one is the length of the RIVER "
         "ITSELF (source confluence to mouth); the other, much larger, is the length of the combined "
@@ -300,14 +335,13 @@ def validate_keystone_total(result: Dict[str, Any], observability: Dict[str, Any
 
 def validate_branch_exploration(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """UN-gated breadth diagnostic #1 (the elimination axis): how many of the FOUR candidate rivers
-    were resolved to their mouth (name AND mouth token present). Retained even when the arithmetic
-    downstream is botched — it is the axis that separates a structured agent that checks all four
-    candidates from a linear one that guesses the famous river. Visit-capped (``min(hits,
+    were resolved to their mouth — the river's name BOUND to its own mouth inside one sentence (see
+    ``_bind``), not merely both tokens loose somewhere in the text. Retained even when the
+    arithmetic downstream is botched — it is the axis that separates a structured agent that checks
+    all four candidates from a linear one that guesses the famous river. Visit-capped (``min(hits,
     n_visits)``) because a mouth is a page-only infobox fact."""
     text = _all_text(result)
-    hits = [c["name"] for c in CANDIDATES
-            if re.search(c["name_rx"], text, re.IGNORECASE)
-            and re.search(c["mouth_rx"], text, re.IGNORECASE)]
+    hits = [c["name"] for c in CANDIDATES if c["bound_rx"].search(text)]
     n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
     credited = min(len(hits), n_visits)
     n = len(CANDIDATES)

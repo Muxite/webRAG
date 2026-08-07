@@ -110,6 +110,62 @@ def test_system_length_error_gates_to_zero_but_keeps_both_breadth_axes():
     assert t.validate_citations(r, _OBS)["score"] == 0.0
 
 
+def test_prompt_echo_earns_no_breadth_credit():
+    """Regression guard for the free-credit defect found in adversarial review (2026-08-07).
+
+    The statement used to hand over the mouth vocabulary outright ("the other three empty into the
+    Laptev Sea, the East Siberian Sea, or the Strait of Tartary (the Pacific side)"), and
+    ``branch_exploration`` matched each river's name and mouth token ANYWHERE in the answer. Feeding
+    the task statement straight back as the answer therefore scored a full 1.00 on this breadth axis
+    with zero pages actually read — the axis measured nothing. Two changes close it: the
+    enumeration is gone from the statement, and name<->mouth must now bind inside one sentence.
+
+    Note the Kara Sea criterion itself CANNOT leave the statement (it is what defines the survivor),
+    so proximity binding — not vocabulary removal alone — is what forces this to 0."""
+    echo = t.get_task_statement()
+    r = {"output": {"final_deliverable": echo}, "deliverables": [echo]}
+    assert t.validate_branch_exploration(r, _OBS)["score"] == 0.0
+    assert t.validate_component_coverage(r, _OBS)["score"] == 0.0
+    assert t.validate_keystone_total(r, _OBS)["score"] == 0.0
+    # ...and the statement no longer names any of the three eliminated rivers' seas.
+    low = echo.lower()
+    for handed_over in ("laptev", "east siberian", "tartary", "okhotsk"):
+        assert handed_over not in low, f"statement still hands over the mouth token {handed_over!r}"
+
+
+def test_branch_exploration_requires_the_mouth_bound_to_its_own_river():
+    """A mouth token loose in the text must not credit a river it is not attached to."""
+    # Correct binding, both directions and across a line break.
+    assert t.validate_branch_exploration(_r("Amur -> Strait of Tartary"), _OBS)["score"] == 0.25
+    assert t.validate_branch_exploration(_r("Laptev Sea\nis the mouth of the Lena"), _OBS)["score"] == 0.25
+    # Scattered tokens that never bind: every mouth named in one place, every river in another.
+    scattered = ("Seas encountered: Kara Sea, Laptev Sea, East Siberian Sea, Strait of Tartary. "
+                 "Rivers considered: the Ob, the Lena, the Amur, the Kolyma.")
+    assert t.validate_branch_exploration(_r(scattered), _OBS)["score"] == 0.0
+    # A window may not hop over another candidate's name to reach a mouth.
+    assert t.validate_branch_exploration(
+        _r("the Ob, then the Lena, then the Amur reaches the Strait of Tartary"), _OBS
+    )["score"] == 0.25          # only the Amur binds; Ob/Lena are blocked by the intervening names
+
+
+def test_citations_credit_the_survivors_canonical_url():
+    """The Ob's CANONICAL article URL is /wiki/Ob (verified live 2026-08-07 — /wiki/Ob_(river) and
+    /wiki/Ob_River are redirects). The slug pattern must credit all three renderings and must not
+    fire on an unrelated page that merely starts with 'Ob'."""
+    slug = t.CANDIDATES[0]["slug_rx"]
+    for url in ("https://en.wikipedia.org/wiki/ob",
+                "https://en.wikipedia.org/wiki/ob_(river)",
+                "https://en.wikipedia.org/wiki/ob_river"):
+        assert re.search(slug, url), f"survivor citation not credited for {url}"
+    for url in ("https://en.wikipedia.org/wiki/obninsk", "https://en.wikipedia.org/wiki/obelisk"):
+        assert re.search(slug, url) is None, f"survivor slug over-matches {url}"
+    # ...and end-to-end: an answer citing every page it had to read scores a full 1.0.
+    cited = _r("Total: 10,398 km. Sources: " + " ".join(
+        "https://en.wikipedia.org/wiki/" + p for p in
+        ("Ob", "Lena_River", "Amur", "Kolyma_(river)", "Irtysh", "Ishim_(river)", "Tobol", "Vilyuy")))
+    assert t.validate_citations(cited, _OBS)["score"] == 1.0
+
+
 def test_membership_rule_failures_are_rejected():
     # STAGE-3 failures: counting the too-short Tobol, counting the out-of-basin Vilyuy, or both.
     assert t.validate_keystone_total(_r("Total: 11,989 km"), _OBS)["passed"] is False   # + Tobol

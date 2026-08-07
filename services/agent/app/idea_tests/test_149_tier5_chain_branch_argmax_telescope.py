@@ -7,7 +7,7 @@ hydro-geography; this one is observational astronomy) so the pair can be used as
 replication rather than a single lucky fixture. Same stack, different facts:
 
     per branch (2 hops, both page-only)
-      HOP 1  observatory SITE  ->  the NAME of the LARGEST telescope installed there
+      HOP 1  observatory SITE  ->  the NAME of the LARGEST OPTICAL telescope installed there
       HOP 2  that telescope's article  ->  its PRIMARY MIRROR DIAMETER in metres
     then
       ARGMAX across the four branches -> which site's largest telescope has the biggest mirror.
@@ -35,6 +35,24 @@ Ground truth (verified against live English Wikipedia via the MediaWiki API, 202
   branches it is 2.05x and 3.23x. The four diameters (2.54 / 4.0 / 5.08 / 8.2) are pairwise
   distinct with >25% between neighbours, so neither the argmax nor the coverage attribution can be
   flipped by one noisy extraction.
+
+  NOTE ON THE PRINTED FIGURES (re-verified live 2026-08-07): 5.08 and 2.54 are the exact
+  inch->metre conversions, but they are NOT the strings the articles print. The pages render
+  "200-inch (5.1 m)" for the Hale and "100-inch (2.5 m)" for the Hooker (the Mount Wilson article
+  also calls it "the 2.5 meter telescope" in prose). Both renderings are therefore accepted by the
+  per-branch ``dia_rx``, so an agent that answers the task as asked — the diameter IN METRES — is
+  credited for the value the page actually shows.
+
+ADVERSARIAL CHECK ON HOP 1 (found while verifying, and mitigated): "the largest telescope at that
+site" is NOT well defined at one of the four sites. Kitt Peak's article says only that "the largest
+OPTICAL instruments at KPNO are the Mayall 4 meter telescope and the WIYN 3.5-meter", and separately
+that "the ARO 12m Radio Telescope is also at the location" — so a careful, literal reading of an
+unqualified "largest telescope" yields a 12 m radio dish, which is BIGGER than the winning branch's
+8.2 m and silently flips the argmax. Both the task statement and the compiled plan therefore ask,
+UNIFORMLY for all four branches (so the qualifier leaks nothing about which branch is affected), for
+the largest OPTICAL telescope. That is the winning instrument at every site — Paranal's VLT,
+Palomar's Hale, Kitt Peak's Mayall, Mount Wilson's Hooker — so the qualifier disambiguates without
+narrowing anything, and at Kitt Peak it matches the article's own wording verbatim.
 
 WHY IT DISCRIMINATES (the decoys are the historically famous instruments):
   * FAME DECOY 1 — the Hale Telescope at Palomar was the largest telescope in the world for 45
@@ -98,7 +116,10 @@ BRANCHES: List[Dict[str, Any]] = [
         "telescope": "Nicholas U. Mayall Telescope",
         "tel_rx": r"mayall",
         "tel_slug": r"wiki/nicholas_u\._?_?mayall_telescope|wiki/mayall",
-        "dia_rx": r"\b158[\s-]*(?:in\b|inch)|\bfour[\s-]*met|\b4(?:\.0)?\s*[-\s]*(?:m\b|met)",
+        # The metric alternative needs BOTH guards: ``\b`` alone treats the '.' in "2.4 m" as a word
+        # boundary, so a bare ``\b4\s*m`` credits the MDM 2.4 m Hiltner (printed on the Kitt Peak
+        # page) and any other "X.4 m". ``(?<![\d.])`` blocks a preceding digit or decimal point.
+        "dia_rx": r"\b158[\s-]*(?:in\b|inch)|\bfour[\s-]*met|(?<![\d.])\b4(?:\.0)?\s*[-\s]*(?:m\b|met)",
         "diameter_m": 4.0,
         "winner": False,
     },
@@ -112,7 +133,10 @@ BRANCHES: List[Dict[str, Any]] = [
         "tel_rx": r"hooker",
         # No standalone article: the Hooker is a section of the Mount Wilson Observatory page.
         "tel_slug": r"wiki/mount_wilson_observatory|wiki/hooker_telescope",
-        "dia_rx": r"\b2\.54\b|\b100[\s-]*(?:in\b|inch)",
+        # 2.54 m is the exact conversion, but the article prints "100-inch (2.5 m)" and calls it
+        # "the 2.5 meter telescope" — so the metric value an agent reads off the page is 2.5.
+        # ``\b2\.5\b`` alone cannot match "2.54" (5|4 is not a boundary), hence the optional digit.
+        "dia_rx": r"\b2\.5(?:4)?\b|\b100[\s-]*(?:in\b|inch)",
         "diameter_m": 2.54,
         "winner": False,
     },
@@ -160,14 +184,16 @@ def get_task_statement() -> str:
         "For EACH of the four sites you must follow a TWO-STEP chain — the page you need in step 2 "
         "is unknown until step 1 is resolved:\n"
         "  STEP 1 — open the observatory's own Wikipedia page and read the NAME of the LARGEST "
-        "telescope installed at that site. None of the four telescopes is named after its "
-        "observatory, so you cannot infer this — you must read it.\n"
+        "OPTICAL telescope installed at that site. Ignore radio telescopes, solar telescopes and "
+        "interferometer arrays even where one of those has a wider dish — the comparison is between "
+        "OPTICAL instruments. None of the four telescopes is named after its observatory, so you "
+        "cannot infer this — you must read it.\n"
         "  STEP 2 — open THAT TELESCOPE's own article (or its section on the observatory page, if "
         "it has no separate article) and read the diameter of its PRIMARY MIRROR in metres. If the "
         "instrument consists of several identical unit telescopes, report the diameter of ONE "
         "unit's primary mirror, not a combined or equivalent aperture.\n\n"
-        "Then COMPARE the four branches: determine which site's largest telescope has the BIGGEST "
-        "primary mirror.\n\n"
+        "Then COMPARE the four branches: determine which site's largest optical telescope has the "
+        "BIGGEST primary mirror.\n\n"
         "Careful: two of these sites held the 'largest telescope in the world' record during the "
         "twentieth century — historical fame is not the criterion here; compare the four "
         "primary-mirror diameters you actually read.\n\n"
@@ -181,7 +207,7 @@ def get_task_statement() -> str:
 def get_required_deliverables() -> List[str]:
     return [
         "The primary-mirror diameter (m) of the biggest of the four telescopes, naming it (the keystone)",
-        "All four rows: observatory -> largest telescope -> primary mirror diameter",
+        "All four rows: observatory -> largest optical telescope -> primary mirror diameter",
         "Source URL for each observatory page and each telescope page",
     ]
 
@@ -189,7 +215,8 @@ def get_required_deliverables() -> List[str]:
 def get_success_criteria() -> List[str]:
     return [
         "At least 5 pages visited (golden path 7-8: four observatory pages + the telescope pages)",
-        "Resolves hop 1 for each branch (the largest telescope at each site)",
+        "Resolves hop 1 for each branch (the largest OPTICAL telescope at each site — at Kitt Peak "
+        "the wider ARO 12m RADIO dish is not the answer)",
         "Resolves hop 2 for each branch (each telescope's primary mirror diameter)",
         "Correctly names the VLT at Paranal (8.2 m per unit telescope) as the biggest — NOT the "
         "Hale Telescope (5.08 m, world's largest 1949-1993) and NOT the Hooker (2.54 m)",
@@ -323,8 +350,10 @@ def get_compiled_plan() -> Dict[str, Any]:
 
     Two waves of FOUR — four independent 2-hop chains, then a merge (NOT a pure fan-out, NOT a
     single chain):
-      * WAVE 1 — one leaf per GIVEN observatory, reading ONLY the NAME of the largest telescope
-        there (hop 1).
+      * WAVE 1 — one leaf per GIVEN observatory, reading ONLY the NAME of the largest OPTICAL
+        telescope there (hop 1). The "optical" qualifier is applied uniformly to all four leaves —
+        it is what makes hop 1 well defined at every site (see the ARO 12m note above) and it
+        cannot hint which site needed it.
       * WAVE 2 — one leaf per branch, each depending on ITS OWN wave-1 leaf and templating that
         result ({tel_*}) to read the primary-mirror diameter (hop 2), with the multi-unit
         instruction ("one unit's primary mirror") applied uniformly to every branch so the plan
@@ -339,12 +368,14 @@ def get_compiled_plan() -> Dict[str, Any]:
             "id": f"tel_{b['key']}",
             "instruction": (
                 f"Open the English Wikipedia page for {b['site']} — {b['desc']}. Read ONLY the NAME "
-                "of the LARGEST telescope installed at that site (the instrument with the biggest "
-                f"primary mirror there). Report your finding in the form '{b['site']}: largest "
-                "telescope = <TELESCOPE NAME>' followed by the exact source URL. Do not report any "
-                "diameter or other figure, and do not guess from memory."
+                "of the LARGEST OPTICAL telescope installed at that site (the optical instrument "
+                "with the biggest primary mirror there). Ignore radio telescopes, solar telescopes "
+                "and interferometer arrays even where one of those has a wider dish. Report your "
+                f"finding in the form '{b['site']}: largest optical telescope = <TELESCOPE NAME>' "
+                "followed by the exact source URL. Do not report any diameter or other figure, and "
+                "do not guess from memory."
             ),
-            "expect": f"'{b['site']}: largest telescope = <TELESCOPE NAME>' — source URL",
+            "expect": f"'{b['site']}: largest optical telescope = <TELESCOPE NAME>' — source URL",
             "depends_on": [],
         }
         for b in BRANCHES
@@ -353,7 +384,7 @@ def get_compiled_plan() -> Dict[str, Any]:
         {
             "id": f"dia_{b['key']}",
             "instruction": (
-                "The previous step identified the largest telescope at "
+                "The previous step identified the largest optical telescope at "
                 f"{b['site']}: {{tel_{b['key']}}}. Open THAT TELESCOPE's own article (or, if it has "
                 "no separate article, its section on the observatory's page) and read the diameter "
                 "of its PRIMARY MIRROR in metres. If the instrument consists of several identical "
@@ -370,8 +401,8 @@ def get_compiled_plan() -> Dict[str, Any]:
     return {
         "leaves": hop1 + hop2,
         "aggregation": (
-            "You now have, for each of the four observatory sites, the largest telescope there and "
-            "that telescope's primary-mirror diameter. FIRST write out all four rows explicitly, "
+            "You now have, for each of the four observatory sites, the largest optical telescope "
+            "there and its primary-mirror diameter. FIRST write out all four rows explicitly, "
             "one per line, in the form '<observatory> -> <telescope> -> <primary mirror> m'. THEN "
             "compare the four diameters and identify the telescope with the BIGGEST primary mirror "
             "— compare ONE unit's mirror diameter, never a combined or equivalent aperture. Report "

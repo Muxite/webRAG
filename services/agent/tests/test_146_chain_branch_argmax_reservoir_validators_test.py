@@ -143,6 +143,25 @@ def test_partial_branch_coverage_scores_exact_fraction():
     assert t.validate_winner_chain(r, _OBS)["score"] == 0.0
 
 
+def test_branch_coverage_rejects_construction_years_as_areas():
+    """Regression guard from adversarial review (2026-08-07): the Manicouagan branch's area pattern
+    used to be ``\\b1[,.\\s]?9[45]\\d\\b``, which accepts 1,940-1,959 — i.e. eight plausible
+    20th-century years. The Daniel-Johnson dam's own page prints 1959 six times (its
+    ``construction_began`` row) plus 1945/1955/1956, so an answer that named the reservoir and any
+    of those dates banked this branch's AREA in the un-gated breadth diagnostic without ever
+    reading the figure. Only the two figures that actually circulate (1,942 reservoir page / 1,950
+    dam page) may count."""
+    manic = next(b for b in t.BRANCHES if b["reservoir"] == "Manicouagan Reservoir")["area_rx"]
+    for real in ("1,942 km²", "1942", "1,950 km²", "1950"):
+        assert re.search(real, real) and re.search(manic, real), f"real area rejected: {real!r}"
+    for year in ("construction began 1959", "opened in 1955", "commissioned 1956",
+                 "1945-1970", "1,949", "1958"):
+        assert re.search(manic, year) is None, f"area pattern matches the year in {year!r}"
+    # ...and end-to-end: naming the reservoir plus a construction year earns that branch nothing.
+    r = _r("Daniel-Johnson Dam -> Manicouagan Reservoir, construction began 1959.")
+    assert t.validate_branch_coverage(r, _OBS)["score"] == 0.0
+
+
 def test_branch_coverage_requires_visits_not_just_text():
     # Both hops are page-only, so a 0-visit narration of all four chains must bank nothing, and a
     # partially-grounded run is capped at the number of visits actually made.
@@ -206,21 +225,37 @@ def test_compiled_plan_validates_and_is_branch_then_chain():
     assert struct["wave_widths"] == [4, 4]
     assert struct["is_pure_fanout"] is False    # NOT a flat one-round fan-out
     assert struct["is_dag_chain"] is False      # NOT a single linear chain
-    assert set(struct["waves"][0]) == {"res_churchill", "res_manic", "res_williston", "res_mead"}
-    assert set(struct["waves"][1]) == {"area_churchill", "area_manic", "area_williston", "area_mead"}
+    assert set(struct["waves"][0]) == {"res_churchill", "res_danieljohnson", "res_bennett", "res_hoover"}
+    assert set(struct["waves"][1]) == {"area_churchill", "area_danieljohnson", "area_bennett", "area_hoover"}
 
 
 def test_compiled_plan_templates_its_own_branch_only():
     plan = t.get_compiled_plan()
     by_id = {leaf["id"]: leaf for leaf in plan["leaves"]}
-    for key in ("churchill", "manic", "williston", "mead"):
+    keys = ("churchill", "danieljohnson", "bennett", "hoover")
+    for key in keys:
         instr = by_id[f"area_{key}"]["instruction"]
         assert "{res_" + key + "}" in instr
         # a hop-2 leaf must not template any OTHER branch's hop-1 result (the chains are independent)
-        for other in ("churchill", "manic", "williston", "mead"):
+        for other in keys:
             if other != key:
                 assert "{res_" + other + "}" not in instr
         assert by_id[f"area_{key}"]["depends_on"] == [f"res_{key}"]
+
+
+def test_compiled_plan_leaf_ids_are_keyed_on_givens_not_answers():
+    """A leaf ``id`` may only name a GIVEN (the project), never hop 1's answer (the reservoir).
+
+    Regression guard: the ids used to be ``res_manic``/``res_williston``/``res_mead``, which spell
+    out three of the four hop-1 answers. That never reached the executing model (``substitute_deps``
+    fills ``{dep_id}`` before the prompt is built and the aggregation numbers its facts instead of
+    tagging them with ids), but it is still a leak the moment a plan is rendered raw — and the
+    word-boundary form of the leak assertion below could not see it, because ``\\bmead\\b`` does not
+    match inside ``res_mead``."""
+    plan = t.get_compiled_plan()
+    ids = " ".join(leaf["id"] for leaf in plan["leaves"]).lower()
+    for answer_token in ("smallwood", "manicouagan", "manic", "williston", "mead"):
+        assert answer_token not in ids, f"leaf id leaks the hop-1 answer {answer_token!r}"
 
 
 def test_compiled_plan_leaks_nothing():
@@ -229,6 +264,8 @@ def test_compiled_plan_leaks_nothing():
     # STRUCTURE only: the four GIVEN projects and the GIVEN comparison attribute may appear, but no
     # reservoir name (hop 1's answer), no area (hop 2's answer), no volume (the decoy axis) and no
     # hint of which branch wins.
-    for leak in ("smallwood", "manicouagan", "williston", "mead", "6,527", "6527", "6,988",
+    # SUBSTRING match (as in the 148/149 siblings), NOT \b-bounded: ``str(leaf)`` renders the leaf
+    # ``id`` too, and a \b-bounded probe cannot see a token glued to an underscore ("res_mead").
+    for leak in ("smallwood", "manicouagan", "manic", "williston", "mead", "6,527", "6527", "6,988",
                  "1,942", "1942", "1,761", "1761", "640", "247", "32.64", "137.9"):
-        assert re.search(r"\b" + re.escape(leak) + r"\b", blob) is None, f"plan leaks {leak!r}"
+        assert re.search(re.escape(leak), blob) is None, f"plan leaks {leak!r}"

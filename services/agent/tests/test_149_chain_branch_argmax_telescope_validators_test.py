@@ -167,6 +167,61 @@ def test_fixture_margins_are_wide_and_distinct():
         assert b / a > 1.25
 
 
+def test_hop1_asks_for_the_largest_OPTICAL_telescope_uniformly():
+    """Regression guard for the hop-1 ambiguity found in adversarial review (2026-08-07).
+
+    Kitt Peak's article never calls the Mayall "the largest telescope"; it says the largest OPTICAL
+    instruments are the Mayall and the WIYN, and separately that "the ARO 12m Radio Telescope is
+    also at the location". An UNQUALIFIED "largest telescope at that site" therefore has a
+    defensible answer of 12 m, which beats the winner's 8.2 m and silently flips the argmax — a
+    correct-process run scoring 0. The qualifier must be present in the statement AND in every
+    hop-1 leaf, and must be UNIFORM across the four branches so it cannot hint which site needs it
+    (all four winners are optical, so it narrows nothing)."""
+    stmt = t.get_task_statement().lower()
+    assert "largest optical telescope" in stmt
+    assert "radio telescope" in stmt, "the statement must say which instrument class to ignore"
+    hop1 = [lf for lf in t.get_compiled_plan()["leaves"] if lf["id"].startswith("tel_")]
+    assert len(hop1) == len(t.BRANCHES)
+    for leaf in hop1:
+        assert "largest optical telescope" in leaf["instruction"].lower(), leaf["id"]
+        assert "radio telescope" in leaf["instruction"].lower(), leaf["id"]
+    # UNIFORMITY: strip the branch's own givens and every hop-1 instruction must be byte-identical,
+    # so the qualifier cannot be read as a hint about one particular site.
+    skeletons = set()
+    for leaf, b in zip(hop1, t.BRANCHES):
+        # ``desc`` embeds ``site``, so it must be substituted FIRST or the longer span is mangled.
+        skeletons.add(leaf["instruction"].replace(b["desc"], "<DESC>").replace(b["site"], "<SITE>"))
+    assert len(skeletons) == 1, f"hop-1 instructions differ beyond their GIVEN site/description: {skeletons}"
+
+
+def test_page_printed_metric_values_are_credited():
+    """The pages print "100-inch (2.5 m)" and "200-inch (5.1 m)", NOT the exact conversions 2.54 /
+    5.08 (verified live 2026-08-07 — neither string occurs in the wikitext of any of the four
+    pages; Mount Wilson's prose even says "the 2.5 meter telescope"). An agent that answers the
+    question as asked — the diameter IN METRES — must be credited for the value the page shows."""
+    hooker = next(b for b in t.BRANCHES if b["key"] == "wilson")["dia_rx"]
+    kitt = next(b for b in t.BRANCHES if b["key"] == "kittpeak")["dia_rx"]
+    for shown in ("Hooker telescope: 2.5 m", "the 2.5-meter telescope", "2.54 m", "100-inch"):
+        assert re.search(hooker, shown, re.I), f"page-printed value not credited: {shown!r}"
+    for near_miss in ("1.5 m", "12.5 m", "3.5 m"):
+        assert re.search(hooker, near_miss, re.I) is None, f"over-matches {near_miss!r}"
+    # ...and the Kitt Peak metric alternative must not fire on any other "X.4 m" figure: a bare
+    # ``\b4\s*m`` treats the '.' in "2.4 m" as a word boundary and credited the MDM 2.4 m Hiltner
+    # (printed on the very same Kitt Peak page) as if it were the Mayall's mirror.
+    for good in ("Mayall 4-meter", "4.0 m", "the 4 m Mayall", "158 inches", "four-meter"):
+        assert re.search(kitt, good, re.I), good
+    for bad in ("the MDM 2.4 m Hiltner Telescope", "a 3.4 m mirror", "WIYN 3.5-meter", "24 m"):
+        assert re.search(kitt, bad, re.I) is None, f"Kitt Peak dia_rx over-matches {bad!r}"
+
+
+def test_full_answer_with_page_printed_metric_values_still_scores_all():
+    """End-to-end companion: the same answer written with the metric values the pages actually
+    print (2.5 m / 5.1 m) scores exactly as the exact-conversion fixture does."""
+    r = _r(_FULL_SINGLE.replace("2.54 m", "2.5 m").replace("5.08 m", "5.1 m"))
+    assert t.validate_keystone_argmax(r, _OBS)["score"] == 1.0
+    assert t.validate_branch_coverage(r, _OBS)["score"] == 1.0
+
+
 def test_compiled_plan_validates_and_is_branch_then_chain():
     plan = t.get_compiled_plan()
     cp.validate_plan(plan)

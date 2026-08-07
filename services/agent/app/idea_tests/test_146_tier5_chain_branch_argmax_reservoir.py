@@ -91,7 +91,9 @@ BRANCHES: List[Dict[str, Any]] = [
         "winner": True,
     },
     {
-        "key": "manic",
+        # ``key`` is keyed on the GIVEN project, never on the reservoir: it becomes the compiled
+        # plan's leaf id ("res_<key>"/"area_<key>"), which must not spell out hop 1's answer.
+        "key": "danieljohnson",
         "project": "Daniel-Johnson Dam",
         # NB: the description must not name the river this dam sits on — that river shares its name
         # with the reservoir, i.e. it would leak hop 1's answer into the task statement AND the
@@ -102,13 +104,17 @@ BRANCHES: List[Dict[str, Any]] = [
         "reservoir": "Manicouagan Reservoir",
         "res_rx": r"manicouagan\s+reservoir|lake\s+manicouagan",
         "res_slug": r"wiki/manicouagan_reservoir",
-        # 1,942 km² (reservoir page) or 1,950 km² (dam page) — one token family, no collisions.
-        "area_rx": r"\b1[,.\s]?9[45]\d\b",
+        # 1,942 km² (reservoir page) or 1,950 km² (dam page) — the two circulating figures ONLY.
+        # A ``9[45]\d`` tail would also swallow 1,940-1,959, i.e. eight plausible 20th-century
+        # years: the dam's own page prints 1959 six times (construction_began), plus 1945/1955/1956.
+        # That let "Manicouagan Reservoir ... construction began 1959" bank this branch's AREA in
+        # the un-gated breadth diagnostic without the figure ever being read.
+        "area_rx": r"\b1[,.\s]?9(?:42|50)\b",
         "area_km2": 1942,
         "winner": False,
     },
     {
-        "key": "williston",
+        "key": "bennett",
         "project": "W. A. C. Bennett Dam",
         "desc": "the W. A. C. Bennett Dam on the Peace River, British Columbia, Canada",
         "project_rx": r"bennett\s+dam|w\.?\s*a\.?\s*c\.?\s*bennett",
@@ -121,7 +127,7 @@ BRANCHES: List[Dict[str, Any]] = [
         "winner": False,
     },
     {
-        "key": "mead",
+        "key": "hoover",
         "project": "Hoover Dam",
         "desc": "the Hoover Dam on the Colorado River, on the Nevada/Arizona border, USA",
         "project_rx": r"hoover\s+dam",

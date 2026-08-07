@@ -128,6 +128,18 @@ def test_keystone_rejects_wrong_unit_and_embedded_numbers():
     assert t.validate_keystone_section_length(_r("the Rhine is 1,230 km"), _OBS)["score"] == 0.0
 
 
+def test_keystone_rejects_grouped_numbers_ending_in_the_keystone_digits():
+    """Boundary-artefact guard, mirroring 146's ``16,527`` case (added in adversarial review,
+    2026-08-07). ``\\b`` treats the thousands separator as a word boundary, so ``\\b165\\s*km``
+    used to accept "1,165 km" — the digits of a LARGER grouped number satisfying the keystone.
+    ``(?<![\\d,.])`` closes it, on both the metric and the imperial alternative."""
+    for grouped in ("1,165 km", "2,165 km", "1.165 km", "9,103 mi", "1,103 miles"):
+        assert t.validate_keystone_section_length(_r(grouped), _OBS)["score"] == 0.0, grouped
+    # ...while every legitimate rendering the High Rhine article produces still passes.
+    for real in ("165 km", "165\nkm", "165 kilometres", "(165 km)", "= 165 km", "103 mi"):
+        assert t.validate_keystone_section_length(_r(real), _OBS)["score"] == 1.0, real
+
+
 def test_partial_filter_coverage_scores_exact_fraction():
     text = (
         "Lake Constance 536 km² / 251 m; Lake Como 146 km² / 425 m; Lake Balaton 600 km² / 12.2 m. "

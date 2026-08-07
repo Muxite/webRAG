@@ -129,7 +129,10 @@ SURVIVOR = _SATISFIERS[0]      # Lake Constance
 # ── STAGE 3 keystone: the OUTFLOW section's length (High Rhine, 165 km / 103 mi) ──
 # Unit-tolerant (F26 discipline): accepts "165 km", "165 kilometres", "165\nkm" and the imperial
 # "103 mi". A bare 165 without a length unit does NOT match, so an unrelated 165 cannot satisfy it.
-KEYSTONE_RX = re.compile(r"\b165\s*(?:km|kilomet)|\b103\s*(?:mi\b|miles)", re.IGNORECASE)
+# ``(?<![\d,.])`` is the boundary guard 146 carries for 16,527: ``\b`` alone treats the separator in
+# "1,165 km" as a word boundary, so the digits of a LARGER grouped number would satisfy the keystone.
+KEYSTONE_RX = re.compile(
+    r"(?<![\d,.])\b165\s*(?:km|kilomet)|(?<![\d,.])\b103\s*(?:mi\b|miles)", re.IGNORECASE)
 SECTION_RX = re.compile(r"high\s*rhine|hochrhein", re.IGNORECASE)
 # Decoys, for reporting only (never accepted): the whole Rhine (1,230 km) and the INFLOW section
 # (Alpine Rhine, 93.5 km).
