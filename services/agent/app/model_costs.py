@@ -231,3 +231,29 @@ def format_cost(cost_usd: Optional[float]) -> str:
     if cost_usd < 0.01:
         return f"${cost_usd:.4f}"
     return f"${cost_usd:.2f}"
+
+
+def is_local_row(row: Dict[str, Any]) -> bool:
+    """
+    True if a result/row represents a local (self-hosted) model run, for cost-reporting
+    purposes: local models have no meaningful $ price and should be excluded from cost
+    axes/charts rather than shown as a misleading "$0.00" point.
+
+    Prefers the explicit ``origin`` field stamped at result-write time
+    (idea_test_runner.py::run_single_test, reading connector_llm.config.llm_provider).
+    Result files written before that field existed fall back to the same "unpriced"
+    signal the cost-reporting pipeline already relied on implicitly.
+
+    Accepts either a raw result dict (top-level "origin"/"model") or a flattened row
+    (e.g. scripts/bench_common.py::load_row's output) — both use the same key names.
+
+    :param row: A result dict or flattened row.
+    :returns: True if the run should be treated as local/free for cost reporting.
+    """
+    origin = row.get("origin")
+    if origin is not None:
+        return origin == "local"
+    model = row.get("model") or row.get("model_name")
+    if not model:
+        return False
+    return _lookup_pricing(str(model)) is None

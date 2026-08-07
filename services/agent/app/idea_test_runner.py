@@ -701,6 +701,14 @@ def _apply_got_experiment_overrides(
     _planlib_action_override = env.get("IDEA_TEST_PLAN_LIBRARY_ACTION", "").strip()
     if _planlib_action_override:
         idea_settings["plan_library_action_enabled"] = _is_enabled(_planlib_action_override)
+    # IDEA_TEST_STRATEGY_LIBRARY: the OTHER library — generalized prose advice spliced into the
+    # graph_compiled authoring/aggregation prompts (strategy_library_enabled). One switch, no
+    # threshold override: strategy_library/retrieval.py owns that constant, exactly as
+    # plan_library/retrieval.py does. This is the knob an advice-on/advice-off A/B flips (see
+    # scripts/eval_strategy_library_generalization.py).
+    _stratlib_override = env.get("IDEA_TEST_STRATEGY_LIBRARY", "").strip()
+    if _stratlib_override:
+        idea_settings["strategy_library_enabled"] = _is_enabled(_stratlib_override)
     # IDEA_TEST_NATIVE_REASONING_DISCIPLINE: native reasoning-effort discipline
     # (native_reasoning_effort_discipline_enabled).
     _reasondisc_override = env.get("IDEA_TEST_NATIVE_REASONING_DISCIPLINE", "").strip()
@@ -789,6 +797,10 @@ def _parse_execution_variants(raw: str) -> List[str]:
         "sequential_react": "sequential_react",
         "react": "sequential_react",
         "linear": "sequential_react",
+        # Honest floor: same tools and same dispatch, minimal prompt, no engineered structure.
+        "naive_discretion": "naive_discretion",
+        "discretion": "naive_discretion",
+        "floor": "naive_discretion",
         # Cheap model executing an expensive-model-authored offline plan (no runtime planning).
         "graph_compiled": "graph_compiled",
         "compiled": "graph_compiled",
@@ -1099,6 +1111,20 @@ def _result_cost_usd(result: Dict[str, Any]) -> float:
     return total
 
 
+_LOCAL_LLM_PROVIDERS = ("ollama", "local")
+
+
+def _result_origin(connector_llm: ConnectorLLM) -> str:
+    """"local" if this run's backend targets a self-hosted provider (Ollama/local), else "api".
+
+    Stamped at the source (from the actual resolved provider config) rather than inferred
+    downstream from missing pricing data, so reporting code can distinguish "no price
+    applies" from "price data is just missing" — see model_costs.is_local_row.
+    """
+    provider = (getattr(getattr(connector_llm, "config", None), "llm_provider", None) or "").strip().lower()
+    return "local" if provider in _LOCAL_LLM_PROVIDERS else "api"
+
+
 async def run_single_test(
     test_file: Path,
     model_name: str,
@@ -1151,6 +1177,7 @@ async def run_single_test(
         result["execution_variant"] = execution_variant
         result["tooling_profile"] = profile_for_variant(execution_variant)
         result["effort_tier"] = effort_tier
+        result["origin"] = _result_origin(connector_llm)
 
         result = add_graph_visualization(result)
 
@@ -1211,6 +1238,7 @@ async def run_single_test(
             "model": normalized,
             "execution_variant": execution_variant,
             "tooling_profile": profile_for_variant(execution_variant),
+            "origin": _result_origin(connector_llm),
             "error": str(exc),
             "timestamp": datetime.utcnow().isoformat(),
         }
@@ -1576,7 +1604,7 @@ async def main() -> None:
             for model_name in execution_models:
                 for execution_variant in execution_variants:
                     # Baselines + linear agents ignore effort tiers (single fixed pass); engine variants sweep.
-                    tiers = [0] if execution_variant in ("parametric", "naive_rag", "minimal", "sequential_react") else effort_tiers
+                    tiers = [0] if execution_variant in ("parametric", "naive_rag", "minimal", "sequential_react", "naive_discretion") else effort_tiers
                     for effort_tier in tiers:
                         for repeat_index in range(1, repeats + 1):
                             test_tasks.append((test_file, model_name, execution_variant, effort_tier, repeat_index))

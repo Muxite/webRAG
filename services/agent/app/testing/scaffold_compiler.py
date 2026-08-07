@@ -17,6 +17,12 @@ on breadth and dependent-chain tasks.
 The LLM call is isolated in ``_author_plan_llm`` so the parse/validate/cache logic is unit-
 testable offline with a mocked author. Cache reads (the common benchmark path) need no LLM and
 no connectors at all.
+
+``compile_plan(..., strategy_advice=...)`` is where the ``strategy_library`` package plugs in:
+a retrieved, leak-gated prose note is appended to the meta-prompt (``meta_prompt``) and folded
+into the cache key (``mandate_hash``), so an advice-on plan can never be served from an
+advice-off cache entry. Empty advice — every caller's default, and what a run with
+``strategy_library_enabled`` off always passes — is byte-identical to before that hook existed.
 """
 from __future__ import annotations
 
@@ -77,10 +83,43 @@ _META_PROMPT = (
 )
 
 
-def mandate_hash(mandate: str) -> str:
-    """Stable cache key for a mandate (sha256 of its normalized text, first 16 hex chars)."""
+#: Heading the retrieved strategy note is spliced under. A separate, labelled block rather than
+#: prose woven into the rules: the meta-prompt is the proven artifact, and an addendum that is
+#: visibly bolted on can be removed (or A/B'd) without touching it.
+STRATEGY_ADVICE_HEADER = (
+    "\n\nRETRIEVED STRATEGY NOTE — generalized advice for tasks of this shape, from a library "
+    "built on OTHER tasks. It knows nothing about this mandate's entities or answer. Fold it "
+    "into the plan you author (typically into the aggregation step); it never overrides the "
+    "rules above, and rule 6 still binds:\n"
+)
+
+
+def meta_prompt(strategy_advice: str = "") -> str:
+    """The author system prompt, plus a retrieved strategy note when one applies.
+
+    ``strategy_advice=""`` (the default, and what every caller passes unless
+    ``strategy_library_enabled`` is on) returns :data:`_META_PROMPT` unchanged — byte-identical
+    to before this hook existed.
+    """
+    advice = " ".join(str(strategy_advice or "").split())
+    return _META_PROMPT if not advice else f"{_META_PROMPT}{STRATEGY_ADVICE_HEADER}{advice}"
+
+
+def mandate_hash(mandate: str, strategy_advice: str = "") -> str:
+    """Stable cache key for a mandate (sha256 of its normalized text, first 16 hex chars).
+
+    A plan authored WITH a strategy note is a different artifact from one authored without it,
+    so the advice extends the key — otherwise the first arm of an A/B would poison the cache the
+    second arm reads, and every "advice on" measurement after the first would silently be an
+    "advice off" run. The suffix only appears when advice is present, so every existing cached
+    plan keeps its path.
+    """
     norm = re.sub(r"\s+", " ", (mandate or "").strip())
-    return hashlib.sha256(norm.encode("utf-8")).hexdigest()[:16]
+    key = hashlib.sha256(norm.encode("utf-8")).hexdigest()[:16]
+    advice = " ".join(str(strategy_advice or "").split())
+    if not advice:
+        return key
+    return f"{key}_sa{hashlib.sha256(advice.encode('utf-8')).hexdigest()[:8]}"
 
 
 def default_cache_dir() -> Path:
@@ -92,15 +131,19 @@ def default_cache_dir() -> Path:
     return Path(__file__).resolve().parent.parent.parent / "compiled_plans"
 
 
-def cached_plan_path(mandate: str, cache_dir: Optional[Path] = None) -> Path:
+def cached_plan_path(
+    mandate: str, cache_dir: Optional[Path] = None, strategy_advice: str = ""
+) -> Path:
     """Path the authored plan for ``mandate`` is (or would be) cached at."""
     base = Path(cache_dir) if cache_dir is not None else default_cache_dir()
-    return base / f"{mandate_hash(mandate)}.json"
+    return base / f"{mandate_hash(mandate, strategy_advice)}.json"
 
 
-def load_cached_plan(mandate: str, cache_dir: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+def load_cached_plan(
+    mandate: str, cache_dir: Optional[Path] = None, strategy_advice: str = ""
+) -> Optional[Dict[str, Any]]:
     """Return the cached, validated plan for ``mandate`` if present and well-formed, else None."""
-    path = cached_plan_path(mandate, cache_dir)
+    path = cached_plan_path(mandate, cache_dir, strategy_advice)
     if not path.exists():
         return None
     try:
@@ -140,10 +183,11 @@ def parse_plan(raw: str) -> Dict[str, Any]:
         raise CompileError(f"authored plan is invalid: {exc}") from exc
 
 
-async def _author_plan_llm(agent_io, mandate: str, author_model: str, max_tokens: int) -> str:
+async def _author_plan_llm(agent_io, mandate: str, author_model: str, max_tokens: int,
+                           strategy_advice: str = "") -> str:
     """Single LLM call to the strong author model; returns the raw JSON string."""
     messages = [
-        {"role": "system", "content": _META_PROMPT},
+        {"role": "system", "content": meta_prompt(strategy_advice)},
         {"role": "user", "content": f"MANDATE:\n{mandate}\n\nReturn the execution DAG as JSON."},
     ]
     payload = agent_io.build_llm_payload(
@@ -161,6 +205,7 @@ async def compile_plan(
     cache_dir: Optional[Path] = None,
     max_tokens: int = 2048,
     force: bool = False,
+    strategy_advice: str = "",
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Return ``(plan, info)`` — the authored DAG plan and a metadata block.
 
@@ -168,11 +213,14 @@ async def compile_plan(
     this is the normal benchmark path and the "already paid offline" case. On a miss (or
     ``force``) the strong ``author_model`` authors the plan via ``agent_io`` and the result is
     cached. Raises :class:`CompileError` on a miss with no ``agent_io`` or unparseable output.
+
+    :param strategy_advice: a retrieved ``strategy_library`` note, spliced into the meta-prompt
+        and folded into the cache key. Empty (the default) is byte-identical to before.
     """
-    key = mandate_hash(mandate)
-    path = cached_plan_path(mandate, cache_dir)
+    key = mandate_hash(mandate, strategy_advice)
+    path = cached_plan_path(mandate, cache_dir, strategy_advice)
     if not force:
-        cached = load_cached_plan(mandate, cache_dir)
+        cached = load_cached_plan(mandate, cache_dir, strategy_advice)
         if cached is not None:
             return cached, {"cache": "hit", "key": key, "path": str(path),
                             "structure": plan_structure(cached)}
@@ -181,9 +229,10 @@ async def compile_plan(
         raise CompileError(f"cache miss for mandate {key} and no agent_io provided to author it")
 
     _logger.info(f"compiling scaffold for mandate {key} with author model {author_model}")
-    raw = await _author_plan_llm(agent_io, mandate, author_model, max_tokens)
+    raw = await _author_plan_llm(agent_io, mandate, author_model, max_tokens, strategy_advice)
     plan = parse_plan(raw)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8")
     return plan, {"cache": "miss", "key": key, "path": str(path),
-                  "author_model": author_model, "structure": plan_structure(plan)}
+                  "author_model": author_model, "structure": plan_structure(plan),
+                  "strategy_advice": bool(" ".join(str(strategy_advice or "").split()))}

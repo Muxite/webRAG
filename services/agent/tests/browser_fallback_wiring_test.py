@@ -150,7 +150,7 @@ async def test_resolve_plan_threads_connector_browser_to_compile_io(monkeypatch)
     """The OFFLINE compiler AgentIO (~execution_compiled.py L1003) — a cold-cache miss path."""
     sentinel_browser = object()
     monkeypatch.setattr(ec, "AgentIO", _RecordingAgentIO)
-    monkeypatch.setattr(ec.scaffold_compiler, "load_cached_plan", lambda mandate: None)
+    monkeypatch.setattr(ec.scaffold_compiler, "load_cached_plan", lambda mandate, **kw: None)
     monkeypatch.setattr(
         ec.scaffold_compiler, "compile_plan",
         AsyncMock(return_value=({"leaves": []}, {"structure": "fanout"})),

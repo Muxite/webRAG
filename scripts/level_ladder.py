@@ -29,7 +29,27 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bench_common  # noqa: E402  (path insert must precede this import)
 
+# Local (self-hosted) models have no meaningful $ price. Reuse the one shared predicate
+# (agent.app.model_costs.is_local_row) rather than re-deriving "unpriced" locally, but
+# degrade gracefully so this script keeps working standalone without
+# PYTHONPATH=services:services/agent (same convention as recovery_curve.py's plot_style import).
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services" / "agent"))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services"))
+    from agent.app.model_costs import is_local_row as _is_local_row_impl
+except Exception:  # noqa: BLE001
+    _is_local_row_impl = None
+
 LEVEL_ORDER = ["micro", "integration", "navigation", "graph", "legacy"]
+
+
+def _is_local(row: Dict[str, Any]) -> bool:
+    if _is_local_row_impl is not None:
+        return _is_local_row_impl(row)
+    origin = row.get("origin")
+    if origin is not None:
+        return origin == "local"
+    return row.get("usd") is None
 
 
 def _results_dir() -> Path:
@@ -38,15 +58,26 @@ def _results_dir() -> Path:
 
 def _load_row(p: Path) -> Optional[Dict[str, Any]]:
     """Thin adapter over bench_common's canonical row (same fields, level_ladder's names)."""
-    row = bench_common.load_row(p)
-    if not row:
-        return None
-    row["usd"] = row.get("usd") or 0.0
-    return row
+    return bench_common.load_row(p)
 
 
 def _mean(xs: List[float]) -> float:
     return sum(xs) / len(xs) if xs else 0.0
+
+
+def _fmt_usd(rows: List[Dict[str, Any]]) -> str:
+    """Mean $ over priced (non-local) rows in a group.
+
+    "local" if every row in the group is a local/free model (so it isn't shown as a
+    misleading $0.00000), "n/a" if no row has a price for another reason (e.g. an
+    unrecognized paid model with a pricing-table gap).
+    """
+    priced = [x["usd"] for x in rows if x.get("usd") is not None and not _is_local(x)]
+    if priced:
+        return f"{_mean(priced):.5f}"
+    if rows and all(_is_local(x) for x in rows):
+        return "local"
+    return "n/a"
 
 
 def _ci95(xs: List[float]) -> float:
@@ -134,7 +165,7 @@ def main(argv: List[str]) -> int:
                   f"{success:>18}"
                   f"{_mean([x['visits'] for x in g]):>8.1f}"
                   f"{_mean([x['tool_calls'] for x in g]):>7.1f}"
-                  f"{_mean([x['usd'] for x in g]):>10.5f}"
+                  f"{_fmt_usd(g):>10}"
                   f"{_mean([x['secs'] for x in g]):>8.1f}"
                   f"{_mean([x['grounded'] for x in g]):>10.3f}")
         print()

@@ -321,6 +321,62 @@ def build_extra_actions_menu(lines: List[str]) -> str:
     return "\n".join([_EXTRA_ACTIONS_MENU_HEADER, *lines, _EXTRA_ACTIONS_MENU_FOOTER])
 
 
+# --- core-actions menu (shared with non-GoT loops) ---------------------------------------------
+# The CORE actions' model-facing prose is hand-written in exactly one place: the shipped
+# ``expansion_system_prompt``'s ``ACTIONS:`` block. A loop that is not the Generate operation (the
+# flat ``naive_discretion`` variant) still has to describe the same tools to the model, and a
+# hand-copied second version of that prose would drift — so it reads the block back out of the
+# settings instead. Holding the TOOL DOCUMENTATION fixed across arms is the point: an arm
+# comparison is then attributable to structure, not to one arm's tools being better explained.
+_CORE_ACTIONS_BLOCK_HEADER = "ACTIONS:"
+
+
+def core_actions_menu_lines(
+    settings: Optional[Dict[str, Any]] = None, allowed: Optional[List[Any]] = None,
+) -> List[str]:
+    """The ``ACTIONS:`` entries of the expansion system prompt, filtered to ``allowed``.
+
+    One string per bullet, with its indented continuation lines (``* optional_url: ...``) kept
+    attached, in the prompt's own order. The template's doubled braces (``details={{query}}``)
+    are unescaped, since a caller outside ``str.format`` should show the model real braces.
+
+    An allowed action the block does not document produces nothing — ``merge`` has no
+    hand-written entry because it is engine-driven rather than model-selected — mirroring
+    ``LeafActionRegistry.menu_lines``' rule that the menu never advertises what it cannot
+    describe. ``allowed=None`` returns every documented entry.
+
+    :param settings: Settings carrying ``expansion_system_prompt`` (falls back to the shipped JSON).
+    :param allowed: This run's ``allowed_actions``; ``None`` means "no filtering".
+    :returns: Prompt-ready menu lines (empty when the block is missing).
+    """
+    prompt = str((settings or {}).get("expansion_system_prompt") or "").strip()
+    if not prompt:
+        prompt = str(load_idea_dag_settings().get("expansion_system_prompt") or "")
+    lines = prompt.splitlines()
+    try:
+        start = lines.index(_CORE_ACTIONS_BLOCK_HEADER)
+    except ValueError:
+        return []
+    entries: List[List[str]] = []
+    names: List[str] = []
+    for raw in lines[start + 1:]:
+        if not raw.strip():
+            break
+        if raw.startswith("- "):
+            names.append(raw[2:].split(":", 1)[0].strip())
+            entries.append([raw])
+        elif entries:
+            entries[-1].append(raw)
+        else:
+            break
+    permitted = None if allowed is None else {str(item) for item in allowed}
+    return [
+        "\n".join(block).replace("{{", "{").replace("}}", "}")
+        for name, block in zip(names, entries)
+        if permitted is None or name in permitted
+    ]
+
+
 # IDEA_TEST_REASONING_EXEMPLAR: per-run toggle that injects a general reasoning
 # demonstration (a task-shape few-shot) into the expansion system prompt, so a
 # cheap executor model learns HOW to reason through a chain/mixed/parallel task

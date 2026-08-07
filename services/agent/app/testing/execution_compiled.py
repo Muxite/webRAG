@@ -959,6 +959,26 @@ _AGG_SINGLE_SYSTEM = (
     "output the 'Fact N' labels or any bracketed internal identifiers as if they were citations."
 )
 
+
+#: Heading a retrieved strategy note is spliced under in the aggregation system prompt. The
+#: SECOND of this path's two consumption points (the first is the offline authoring meta-prompt,
+#: ``scaffold_compiler.meta_prompt``). Both are fed by ONE retrieval per run — see
+#: ``_resolve_strategy_advice`` — rather than being two mechanisms: the authoring splice only
+#: reaches tasks whose plan is compiler-authored, and most of this suite's tasks ship a
+#: hand-authored ``get_compiled_plan()``, so authoring alone would be inert exactly where the
+#: kill-switch experiment measured its effect.
+STRATEGY_ADVICE_HEADER = (
+    "\n\nGENERALIZED STRATEGY NOTE (from a library built on OTHER tasks — it knows nothing "
+    "about this task's entities, values or answer; the AGGREGATION INSTRUCTION still wins on "
+    "any conflict):\n"
+)
+
+
+def _strategy_advice_addendum(strategy_advice: str = "") -> str:
+    """The aggregation-prompt addendum for a retrieved note (``""`` -> byte-identical)."""
+    advice = " ".join(str(strategy_advice or "").split())
+    return f"{STRATEGY_ADVICE_HEADER}{advice}" if advice else ""
+
 # "Scattered thoughts": a weak model is told to be explicit and ground every step, then sampled at
 # several temperatures so independent attempts diverge — betting one derivation is right.
 _AGG_GEN_SYSTEM = (
@@ -1058,10 +1078,12 @@ def _agg_candidate_count(model_name: str) -> int:
 
 
 async def _aggregate_single(agent_io: AgentIO, aggregation: str, facts_block: str,
-                            model_name: str, max_tokens: int) -> str:
-    """The default one-shot aggregation call (proven behavior — kept byte-identical)."""
+                            model_name: str, max_tokens: int,
+                            strategy_advice: str = "") -> str:
+    """The default one-shot aggregation call (proven behavior — byte-identical when no strategy
+    note applies, which is every run with ``strategy_library_enabled`` off)."""
     messages = [
-        {"role": "system", "content": _AGG_SINGLE_SYSTEM},
+        {"role": "system", "content": _AGG_SINGLE_SYSTEM + _strategy_advice_addendum(strategy_advice)},
         {"role": "user", "content": f"AGGREGATION INSTRUCTION:\n{aggregation}\n\nGATHERED FACTS:\n{facts_block}"},
     ]
     payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name,
@@ -1710,7 +1732,8 @@ def _compose(leaves: List[Dict[str, Any]], results: Dict[str, str],
     return composed
 
 
-async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str, max_tokens: int) -> str:
+async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str, max_tokens: int,
+                        strategy_advice: str = "") -> str:
     """Execute a compiled DAG plan topologically, then run the aggregation call.
 
     Leaves are grouped into dependency waves (``compiled_plan.topological_waves``): each wave's
@@ -1719,6 +1742,12 @@ async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str
     substituted with the resolved upstream fact. A plan with no dependencies reduces to a single
     wave — the original pure-parallel fan-out (so test 052 is unchanged). Then aggregate over all
     gathered facts in plan order.
+
+    :param strategy_advice: a retrieved ``strategy_library`` note. Reaches ONLY the free-text
+        single aggregation: ``diverse_ground`` runs its own grounding-heavy prompt, the
+        structured modes must keep their output parseable, and ``computed`` composes in Python
+        with no LLM at all — none of them is the failure mode the note addresses. Empty (the
+        default) is byte-identical to before.
     """
     norm = validate_plan(plan)  # normalizes ids/deps and rejects cycles/missing deps
     leaves: List[Dict[str, Any]] = norm["leaves"]
@@ -1819,8 +1848,52 @@ async def _execute_plan(agent_io: AgentIO, plan: Dict[str, Any], model_name: str
     if agg_mode in ("diverse_ground", "diverse", "scatter"):
         answer = await _aggregate_diverse_ground(agent_io, aggregation, facts_block, model_name, max_tokens)
     else:
-        answer = await _aggregate_single(agent_io, aggregation, facts_block, model_name, max_tokens)
+        answer = await _aggregate_single(agent_io, aggregation, facts_block, model_name, max_tokens,
+                                         strategy_advice)
     return _ensure_source_citations(answer, sources, aggregation)
+
+
+async def _resolve_strategy_advice(
+    test_module: IdeaTestModule,
+    mandate: str,
+    idea_settings: Optional[Dict[str, Any]],
+    connector_chroma: ConnectorChroma,
+) -> Tuple[str, Dict[str, Any]]:
+    """Retrieve ONE ``strategy_library`` note for this run — or nothing at all.
+
+    The single retrieval behind BOTH of this path's splice points (the offline authoring
+    meta-prompt and the aggregation prompt), so one run can never end up consulting two
+    different notes.
+
+    Off unless ``strategy_library_enabled`` is set, and every failure mode — no settings, an
+    unreachable Chroma, an unpromoted corpus, a note that trips this task's own leak ledger —
+    returns ``("", {...})`` and the run proceeds exactly as it does today. Returns
+    ``(advice, meta)`` where ``meta`` is the retrieval record for the result JSON.
+    """
+    if not idea_settings:
+        return "", {}
+    try:
+        from agent.app.idea_policies.config import StrategyLibraryConfig
+
+        if not StrategyLibraryConfig.from_settings(idea_settings).enabled:
+            return "", {}
+        # Imported lazily: with the flag off (the default) this path never loads the package,
+        # which keeps the corpus scan and the ledger machinery off every normal run.
+        from agent.app.strategy_library.retrieval import StrategyLibrary
+
+        result = await StrategyLibrary().advice_for_task(
+            connector_chroma, mandate, test_module.module
+        )
+    except Exception as exc:  # noqa: BLE001 — advice is additive; it never breaks a run
+        _logger.warning(f"strategy library retrieval failed: {exc}")
+        return "", {"decision": "error", "reason": str(exc)}
+    meta = result.as_dict()
+    if result.applied:
+        _logger.info(f"strategy library: applying note '{result.note_id}' "
+                     f"(similarity {result.similarity:.3f})")
+    else:
+        _logger.debug(f"strategy library: no advice ({result.decision}: {result.reason})")
+    return result.advice, meta
 
 
 async def _resolve_plan(
@@ -1833,6 +1906,7 @@ async def _resolve_plan(
     connector_chroma: ConnectorChroma,
     summarize_observability_func,
     connector_browser=None,
+    strategy_advice: str = "",
 ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     """Select the compiled plan for this run and return ``(plan, plan_meta)``.
 
@@ -1845,6 +1919,11 @@ async def _resolve_plan(
     The compiler is cache-first: a warm ``compiled_plans/`` cache costs no LLM call. On a cold
     miss it authors the plan with a *separate* telemetry session/AgentIO so the offline authoring
     cost never pollutes the cheap model's runtime dollars; that cost is returned in ``plan_meta``.
+
+    ``strategy_advice`` reaches only the COMPILER path — a hand-authored ``get_compiled_plan()``
+    is a fixed artifact, so there is nothing for advice to shape there. Its cache key includes
+    the advice (``scaffold_compiler.mandate_hash``), so an advice-on arm cannot be served an
+    advice-off plan.
     """
     source = os.environ.get("IDEA_TEST_COMPILED_PLAN_SOURCE", "hand").strip().lower()
     force = os.environ.get("IDEA_TEST_COMPILED_FORCE_RECOMPILE", "").strip().lower() in ("1", "true", "yes", "on")
@@ -1864,7 +1943,8 @@ async def _resolve_plan(
     # auto / compiler path — cache-first
     author_model = os.environ.get("IDEA_TEST_COMPILED_AUTHOR_MODEL", scaffold_compiler.DEFAULT_AUTHOR_MODEL).strip()
     compile_max_tokens = int(os.environ.get("IDEA_TEST_COMPILED_AUTHOR_MAX_TOKENS", "2048"))
-    cached = None if force else scaffold_compiler.load_cached_plan(mandate)
+    cached = None if force else scaffold_compiler.load_cached_plan(
+        mandate, strategy_advice=strategy_advice)
     if cached is not None:
         meta["plan_source"] = "auto"
         meta["compiler"] = {"cache": "hit", "author_model": author_model}
@@ -1884,7 +1964,7 @@ async def _resolve_plan(
     try:
         plan, info = await scaffold_compiler.compile_plan(
             mandate, author_model=author_model, agent_io=compile_io,
-            max_tokens=compile_max_tokens, force=force,
+            max_tokens=compile_max_tokens, force=force, strategy_advice=strategy_advice,
         )
     except scaffold_compiler.CompileError as exc:
         _logger.error(f"scaffold compilation failed: {exc}")
@@ -1916,11 +1996,16 @@ async def run_compiled_execution(
     run_stamp: str,
     summarize_observability_func=summarize_observability,
     connector_browser=None,
+    idea_settings: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run the compiled-graph agent; same return shape as ``run_sequential_execution``.
 
     :param connector_browser: Optional headless-Chrome fallback connector (F18), wired
         uniformly with the other execution variants; None disables it for this run.
+    :param idea_settings: The run's typed-settings dict. This path has historically needed none
+        (it is env-driven), and still needs none to behave as before: it is read for exactly one
+        flag, ``strategy_library_enabled``. ``None`` (the default) means "off", so every existing
+        caller keeps today's behavior.
     """
     connector_llm.set_model(model_name)
     test_id = test_module.metadata.get("test_id", "unknown")
@@ -1936,6 +2021,13 @@ async def run_compiled_execution(
     if mandate_suffix:
         mandate = f"{mandate}\n\n{mandate_suffix}"
 
+    # ONE strategy-library retrieval for the whole run, before anything consumes it: the
+    # authoring meta-prompt (compiler path only) and the aggregation prompt both read this same
+    # note, so the two splice points can never disagree. Empty string when the flag is off.
+    strategy_advice, strategy_meta = await _resolve_strategy_advice(
+        test_module, mandate, idea_settings, connector_chroma
+    )
+
     # Resolve the plan FIRST (hand or compiler). Any compiler authoring runs on its own isolated
     # telemetry; building the runtime AgentIO afterward re-points the shared connectors at the
     # runtime telemetry, so only execution counts toward this run's cost.
@@ -1944,6 +2036,7 @@ async def run_compiled_execution(
         connector_llm, connector_search, connector_http, connector_chroma,
         summarize_observability_func,
         connector_browser=connector_browser,
+        strategy_advice=strategy_advice,
     )
 
     telemetry = TelemetrySession(enabled=True, mandate=mandate, correlation_id=correlation_id, trace_path=trace_path)
@@ -1963,7 +2056,8 @@ async def run_compiled_execution(
         _logger.info(f"[{test_id}] graph_compiled plan_source={plan_meta.get('plan_source')} "
                      f"structure={plan_meta.get('plan_structure')}")
         try:
-            deliverable = await _execute_plan(agent_io, plan, model_name, max_tokens)
+            deliverable = await _execute_plan(agent_io, plan, model_name, max_tokens,
+                                              strategy_advice)
         except Exception as exc:
             _logger.error(f"Compiled execution failed: {exc}", exc_info=True)
 
@@ -1975,6 +2069,12 @@ async def run_compiled_execution(
         "plan_source": plan_meta.get("plan_source"),
         "plan_structure": plan_meta.get("plan_structure"),
     }
+    # Only stamped when a note actually applied — a run with the flag off keeps today's exact
+    # result shape, and the eval script can tell an advice-on arm from an advice-off one without
+    # trusting the invocation's env.
+    if strategy_advice:
+        output["strategy_note"] = strategy_meta.get("note_id")
+        output["strategy_retrieval"] = strategy_meta
     telemetry.finish(success=output["success"])
     tracer.close()
 

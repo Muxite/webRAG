@@ -45,6 +45,11 @@ INTENTIONALLY_JSON_ABSENT = {
     "semantic_dedup_require_hook_source",
     # PolicyConfig
     "require_score",
+    # ToolsConfig: the core menu's shipped source of truth is still the legacy
+    # `allowed_actions` key (which callers override per run); shipping the typed
+    # override too would let a JSON default clobber those overrides. Documented
+    # in ToolsConfig's own docstring.
+    "tools_core_actions",
 }
 
 

@@ -26,7 +26,7 @@ Content keys — prompts (``*_system_prompt`` / ``*_user_prompt`` /
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from typing import Any, ClassVar, Mapping, Optional, Tuple
 
 
@@ -452,6 +452,104 @@ class PlanLibraryConfig:
 
 
 @dataclass(frozen=True)
+class StrategyLibraryConfig:
+    """Retrieval-augmented *advice* — the ``strategy_library_*`` keys.
+
+    The sibling of :class:`PlanLibraryConfig`, modelled on it directly, for the OTHER library:
+    ``strategy_library/`` holds generalized prose notes rather than slot-parameterized DAG
+    blueprints, and is consumed on the ``graph_compiled`` path — spliced into the offline
+    authoring meta-prompt (``testing/scaffold_compiler``) and into that path's aggregation
+    prompt — rather than through the native engine's expansion.
+
+    One flag, not three: unlike the plan library there is no auto-vs-on-demand choice to make,
+    because a note is never *applied*, only appended to a prompt. Default OFF -> byte-identical.
+
+    Deliberately carries NO similarity threshold, for the same reason ``PlanLibraryConfig``
+    does not: the decision constant lives next to the retrieval that owns it
+    (``strategy_library/retrieval.APPLY_THRESHOLD``), and a second engine-level gate would
+    silently disagree with it. Nor does it carry a leak-gate switch — the gate is not optional.
+    """
+
+    enabled: bool = False
+
+    _KEYS: ClassVar[dict] = {
+        "enabled": "strategy_library_enabled",
+    }
+
+    @classmethod
+    def from_settings(cls, settings: Mapping[str, Any]) -> "StrategyLibraryConfig":
+        return _build(cls, settings)
+
+
+def _action_names(raw: Any) -> Tuple[str, ...]:
+    """Normalise an action-name sequence (JSON array / tuple) to a tuple of strings.
+
+    JSON has no tuple type, so a shipped list arrives as a list and ``_coerce`` passes it
+    straight through; the frozen views need something hashable and immutable. A bare string is
+    treated as a one-element menu rather than silently exploding into characters.
+    """
+    if raw is None:
+        return ()
+    if isinstance(raw, str):
+        return (raw,)
+    return tuple(str(item) for item in raw)
+
+
+@dataclass(frozen=True)
+class ToolsConfig:
+    """Which tools a run may use — the ``tools_*`` keys.
+
+    Tool availability used to be a bare content key (``allowed_actions``, a literal list set at
+    each entry point) plus an unused extension point: ``IdeaDagEngine.install_action_pack`` was
+    built and unit-tested but had no production call site, so "run this task with the calculator
+    but no file writes" was not expressible without editing code. This group makes it declarative,
+    modelled on :class:`PlanLibraryConfig` — master flag per pack, independent sub-flags, all
+    default OFF -> byte-identical.
+
+    ``core_actions`` is the always-available menu (today's hard-coded six, in their order).
+    ``tools_core_actions`` is deliberately ABSENT from ``idea_dag_settings.json``: the shipped
+    source of truth for that list is still the legacy ``allowed_actions`` key, which callers
+    (``idea_test_runner``, ``debug_runner``, tests) already override per run. Shipping both would
+    make a JSON default silently clobber those overrides, so ``from_settings`` reads the legacy
+    key when the new one is unset, and the new one only exists to *override* it.
+
+    ``sandbox_pack_actions`` is the subset of :class:`SandboxToolPack` that actually gets
+    permitted when the pack is on. The pack is always installed whole (the registry learns every
+    class it ships); narrowing happens at the ``allowed_actions`` gate, so "sandbox on, read_file
+    only" is a config change rather than an edit to ``SandboxToolPack.ACTION_CLASSES``.
+    """
+
+    core_actions: Tuple[str, ...] = ("search", "visit", "save", "think", "merge", "verify")
+    sandbox_pack_enabled: bool = False
+    sandbox_pack_actions: Tuple[str, ...] = (
+        "read_file", "write_file", "list_dir", "count_lines",
+        "word_count", "head_file", "disk_usage", "find_files",
+    )
+    calculator_pack_enabled: bool = False
+
+    _KEYS: ClassVar[dict] = {
+        "core_actions": "tools_core_actions",
+        "sandbox_pack_enabled": "tools_sandbox_pack_enabled",
+        "sandbox_pack_actions": "tools_sandbox_pack_actions",
+        "calculator_pack_enabled": "tools_calculator_pack_enabled",
+    }
+
+    @classmethod
+    def from_settings(cls, settings: Mapping[str, Any]) -> "ToolsConfig":
+        built = _build(cls, settings)
+        core = settings.get(cls._KEYS["core_actions"])
+        if core is None:
+            # Legacy key still wins when the typed override is unset (see the class docstring):
+            # a run that narrows `allowed_actions` keeps its narrowed menu.
+            core = settings.get("allowed_actions", built.core_actions)
+        return replace(
+            built,
+            core_actions=_action_names(core),
+            sandbox_pack_actions=_action_names(built.sandbox_pack_actions),
+        )
+
+
+@dataclass(frozen=True)
 class ActionConfig:
     max_retries: int = 2
     retry_backoff_steps: int = 1
@@ -625,6 +723,8 @@ class IdeaConfig:
     merge: MergeConfig
     verify: VerifyConfig
     plan_library: PlanLibraryConfig
+    strategy_library: StrategyLibraryConfig
+    tools: ToolsConfig
     action: ActionConfig
     sandbox: SandboxActionConfig
     memory: MemoryConfig
@@ -643,6 +743,8 @@ class IdeaConfig:
             merge=MergeConfig.from_settings(settings),
             verify=VerifyConfig.from_settings(settings),
             plan_library=PlanLibraryConfig.from_settings(settings),
+            strategy_library=StrategyLibraryConfig.from_settings(settings),
+            tools=ToolsConfig.from_settings(settings),
             action=ActionConfig.from_settings(settings),
             sandbox=SandboxActionConfig.from_settings(settings),
             memory=MemoryConfig.from_settings(settings),

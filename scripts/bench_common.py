@@ -90,6 +90,7 @@ def load_row(path: Path) -> Optional[Dict[str, Any]]:
     return {
         "path": str(path),
         "model": d.get("model"),
+        "origin": d.get("origin"),
         "variant": variant,
         "tooling": d.get("tooling_profile") or _VARIANT_TO_TOOLING.get(variant, variant),
         "tier": int(d.get("effort_tier") or 0),

@@ -68,6 +68,11 @@ class IdeaDagEngine:
         # which already merge). The typed config view is the canonical reader.
         self.settings = {**load_idea_dag_settings(), **(settings or {})}
         self._cfg = IdeaConfig.from_settings(self.settings)
+        # Tool availability is typed config (`ToolsConfig`): the action menu starts from
+        # `tools.core_actions`, which carries the run's own `allowed_actions` through unchanged
+        # unless an operator sets `tools_core_actions`. Must run BEFORE the plan-library patch
+        # below (which appends to this list) and before the policies snapshot the settings dict.
+        self._apply_tools_config()
         # On-demand plan library (opt-in, default OFF -> byte-identical): the ONE place the
         # action becomes reachable. Both readers of `allowed_actions` — this class's
         # `_execute_action` dispatch gate and `LlmExpansionPolicy`'s prompt action menu — read
@@ -89,6 +94,11 @@ class IdeaDagEngine:
         self.selection = selection or BestScoreSelectionPolicy(settings=self.settings)
         self.decomposition = decomposition or ScoreThresholdDecompositionPolicy(settings=self.settings)
         self.merge = merge or SimpleMergePolicy(settings=self.settings)
+        # The opt-in tool packs armed in `ToolsConfig` — the first production call site for
+        # `install_action_pack`. AFTER the registry and the expansion policy exist, because
+        # `allow_actions` updates the policy's own settings snapshot (the prompt's action menu)
+        # as well as the dispatch gate. Both packs default OFF -> byte-identical.
+        self._install_configured_tool_packs()
         self.contracts = contracts or default_contract_registry()
         self.post_expansion_hooks: List[PostExpansionHook] = (
             list(post_expansion_hooks) if post_expansion_hooks is not None else default_post_expansion_hooks()
@@ -102,6 +112,38 @@ class IdeaDagEngine:
         # flag-off run never reads the template corpus off disk.
         self._plan_library_corpus_cache: Optional[Any] = None
         self._checkpointer: Optional[Checkpointer] = create_checkpointer_from_env()
+
+    def _apply_tools_config(self) -> None:
+        """Seed ``allowed_actions`` from the typed tools config (see ``ToolsConfig``).
+
+        The core action menu is declarative now: ``tools_core_actions`` wins when set, otherwise
+        ``ToolsConfig`` carries the run's existing ``allowed_actions`` through verbatim. So this
+        rewrites the same list on every run that does not configure it — byte-identical, and a
+        caller's narrowed menu (``debug_runner``, tests) is still respected.
+        """
+        self.settings["allowed_actions"] = list(self._cfg.tools.core_actions)
+
+    def _install_configured_tool_packs(self) -> None:
+        """Install (and permit) the opt-in tool packs armed in ``ToolsConfig``.
+
+        Each enabled pack is installed WHOLE — the registry learns every class it ships — but only
+        the configured subset reaches ``allowed_actions``, so "sandbox on, ``read_file`` only" is a
+        config change rather than an edit to ``SandboxToolPack.ACTION_CLASSES``. Imports are local
+        so a flag-off run (the default) never imports a pack it will not use.
+        """
+        cfg = self._cfg.tools
+        if cfg.sandbox_pack_enabled:
+            from agent.app.idea_policies.extra_actions.sandbox_tools import SandboxToolPack
+            installed = self.install_action_pack(
+                SandboxToolPack(settings=self.settings), allow=False,
+            )
+            granted = set(cfg.sandbox_pack_actions)
+            permitted = [name for name in installed if name in granted]
+            if permitted:
+                self.allow_actions(permitted)
+        if cfg.calculator_pack_enabled:
+            from agent.app.idea_policies.extra_actions.calculator_tools import CalculatorToolPack
+            self.install_action_pack(CalculatorToolPack(settings=self.settings), allow=True)
 
     def _patch_allowed_actions(self) -> None:
         """Add ``plan_library_search`` to the action menu — only when both flags are armed.

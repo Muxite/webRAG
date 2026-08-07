@@ -1079,7 +1079,7 @@ def plot_cost_analysis(results: List[Dict[str, Any]], output_dir: Path):
     :param results: Test results.
     :param output_dir: Output directory.
     """
-    from agent.app.model_costs import MODEL_PRICING, estimate_cost, estimate_cost_from_total, format_cost
+    from agent.app.model_costs import MODEL_PRICING, estimate_cost, estimate_cost_from_total, format_cost, is_local_row
 
     models = sorted(set(_system_label(r) for r in results))
     model_colors = _get_system_colors(models, "tab10")
@@ -1087,6 +1087,7 @@ def plot_cost_analysis(results: List[Dict[str, Any]], output_dir: Path):
     model_costs = defaultdict(list)
     model_scores = defaultdict(list)
     model_tokens = defaultdict(list)
+    model_local_flags = defaultdict(list)
 
     for result in results:
         label = _system_label(result)
@@ -1106,19 +1107,31 @@ def plot_cost_analysis(results: List[Dict[str, Any]], output_dir: Path):
             model_costs[label].append(cost)
         model_scores[label].append(score)
         model_tokens[label].append(total_tokens)
+        model_local_flags[label].append(is_local_row(result))
 
     fig, axes = plt.subplots(1, 3, figsize=(28, 11))
     fig.suptitle("Cost Analysis by System", fontsize=14, fontweight="bold")
 
-    x = np.arange(len(models))
-    avg_costs = [np.mean(model_costs[m]) if model_costs[m] else 0.0 for m in models]
-    colors = [model_colors.get(m, (0.5, 0.5, 0.5, 1.0)) for m in models]
+    # Local (self-hosted) systems have no meaningful $ price — a model with zero priced
+    # samples would otherwise render as a misleading "$0.00" bar (reads as "confirmed free"
+    # rather than "no data"/"not applicable"). Exclude systems that are entirely local from
+    # the two cost-bearing bar charts; the "Score vs Cost" scatter (axes[1]) is unaffected
+    # since it only ever plots priced points already.
+    cost_models = [m for m in models if not (model_local_flags[m] and all(model_local_flags[m]))]
+    excluded_local = [m for m in models if m not in cost_models]
+    if excluded_local:
+        fig.text(0.5, 0.955, f"(local/free systems excluded from cost bars: {', '.join(excluded_local)})",
+                  ha="center", fontsize=10, style="italic")
+
+    x = np.arange(len(cost_models))
+    avg_costs = [np.mean(model_costs[m]) if model_costs[m] else 0.0 for m in cost_models]
+    colors = [model_colors.get(m, (0.5, 0.5, 0.5, 1.0)) for m in cost_models]
 
     bars = axes[0].bar(x, avg_costs, color=colors, alpha=0.8, edgecolor="black", linewidth=1)
-    for i, (m, c) in enumerate(zip(models, avg_costs)):
+    for i, (m, c) in enumerate(zip(cost_models, avg_costs)):
         axes[0].text(i, c + max(avg_costs) * 0.02, format_cost(c), ha="center", fontsize=14, fontweight="bold")
     axes[0].set_xticks(x)
-    axes[0].set_xticklabels(models, fontsize=14)
+    axes[0].set_xticklabels(cost_models, fontsize=14)
     axes[0].set_ylabel("Avg Cost per Test (USD)", fontsize=14)
     axes[0].set_title("Average Cost per Test", fontsize=14, fontweight="bold")
     axes[0].grid(axis="y", alpha=0.3)
@@ -1140,13 +1153,16 @@ def plot_cost_analysis(results: List[Dict[str, Any]], output_dir: Path):
     axes[1].legend(fontsize=14, loc="best")
     axes[1].grid(alpha=0.3)
 
-    avg_scores = [np.mean(model_scores[m]) if model_scores[m] else 0.0 for m in models]
+    # NB: avg_scores/efficiency are computed over cost_models (not the full models list),
+    # matching avg_costs/x above one-for-one — zipping against the full models list here
+    # would silently misalign scores with the wrong system once local systems are excluded.
+    avg_scores = [np.mean(model_scores[m]) if model_scores[m] else 0.0 for m in cost_models]
     efficiency = [s / c if c > 0 else 0.0 for s, c in zip(avg_scores, avg_costs)]
     bars2 = axes[2].bar(x, efficiency, color=colors, alpha=0.8, edgecolor="black", linewidth=1)
     for i, e in enumerate(efficiency):
         axes[2].text(i, e + max(efficiency) * 0.02 if efficiency else 0, f"{e:.1f}", ha="center", fontsize=14, fontweight="bold")
     axes[2].set_xticks(x)
-    axes[2].set_xticklabels(models, fontsize=14)
+    axes[2].set_xticklabels(cost_models, fontsize=14)
     axes[2].set_ylabel("Score / USD", fontsize=14)
     axes[2].set_title("Cost Efficiency (Score per Dollar)", fontsize=14, fontweight="bold")
     axes[2].grid(axis="y", alpha=0.3)
