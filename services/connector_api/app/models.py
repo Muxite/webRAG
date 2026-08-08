@@ -14,21 +14,26 @@ from pydantic import BaseModel, Field
 
 
 class SearchRequest(BaseModel):
-    """Parameters for a Brave Search API query, matching ``ConnectorSearch.query_search``."""
+    """Parameters for a search query, matching ``ConnectorSearch.query_search``.
+
+    Provider-agnostic (``ConnectorConfig.search_provider`` picks Brave/Serper at runtime, see
+    ``connector_search.create_search_backend``) — no provider-specific ceiling is hardcoded here.
+    """
 
     query: str = Field(
         ...,
         min_length=1,
-        description="The search query string sent verbatim to the Brave Search API.",
+        description="The search query string sent verbatim to the configured search provider.",
         examples=["site:sec.gov Apple 10-K 2023"],
     )
     count: int = Field(
         default=10,
         ge=1,
-        le=20,
+        le=100,
         description=(
-            "Maximum number of web results to request (Brave caps this at 20). "
-            "The API may return fewer than requested."
+            "Maximum number of web results to request. This is a generous sanity bound, not a "
+            "provider limit — each provider may apply its own tighter ceiling internally "
+            "(e.g. Brave caps at 20) and may return fewer than requested."
         ),
     )
 

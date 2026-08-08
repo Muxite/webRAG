@@ -1,7 +1,7 @@
 import asyncio
 from agent.app.agent import Agent
 from agent.app.connector_llm import ConnectorLLM
-from agent.app.connector_search import ConnectorSearch
+from agent.app.connector_search import create_search_backend
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from shared.connector_config import ConnectorConfig
@@ -94,7 +94,7 @@ async def main():
 
     config = ConnectorConfig()
     connector_llm = ConnectorLLM(config)
-    connector_search = ConnectorSearch(config)
+    connector_search = create_search_backend(config)
     connector_http = ConnectorHttp(config)
     connector_chroma = ConnectorChroma(config)
 

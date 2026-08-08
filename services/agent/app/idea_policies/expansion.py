@@ -1317,7 +1317,13 @@ class LlmExpansionPolicy(ExpansionPolicy):
             self._logger.error(f"[EXPANSION] NO CANDIDATES IN RESPONSE!")
             self._logger.error(f"[EXPANSION] Response data keys: {list(data.keys())}")
             self._logger.error(f"[EXPANSION] Full response data: {json.dumps(data, indent=2, ensure_ascii=True)[:1000]}")
-        meta = data.get("meta") or {}
+        meta = data.get("meta")
+        if not isinstance(meta, dict):
+            # A weak model can emit a truthy-but-wrong-shaped "meta" (seen live: `true`, and
+            # separately a flat list) — `meta or {}` only substitutes on FALSY values, so a
+            # malformed truthy meta survives to `dict(meta)` below and throws TypeError, killing
+            # the whole expansion step instead of just ignoring the bad field.
+            meta = {}
         cleaned: List[Dict[str, Any]] = []
         for candidate in candidates:
             if not isinstance(candidate, dict):

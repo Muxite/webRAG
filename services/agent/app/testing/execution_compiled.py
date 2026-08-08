@@ -1942,7 +1942,11 @@ async def _resolve_plan(
 
     # auto / compiler path — cache-first
     author_model = os.environ.get("IDEA_TEST_COMPILED_AUTHOR_MODEL", scaffold_compiler.DEFAULT_AUTHOR_MODEL).strip()
-    compile_max_tokens = int(os.environ.get("IDEA_TEST_COMPILED_AUTHOR_MAX_TOKENS", "2048"))
+    # 16384 not 2048: DEFAULT_AUTHOR_MODEL (google/gemini-3.1-pro-preview) burns a large, invisible
+    # reasoning-token budget before it ever emits visible JSON content (measured live, 2026-08-08:
+    # a 2873-char/377-word completion consumed 4543 completion_tokens) — 2048 truncates mid-JSON on
+    # this specific model, hitting "author output is not valid JSON" on any real cache miss.
+    compile_max_tokens = int(os.environ.get("IDEA_TEST_COMPILED_AUTHOR_MAX_TOKENS", "16384"))
     cached = None if force else scaffold_compiler.load_cached_plan(
         mandate, strategy_advice=strategy_advice)
     if cached is not None:

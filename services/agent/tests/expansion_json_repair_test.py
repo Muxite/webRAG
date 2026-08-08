@@ -9,6 +9,7 @@ fail-safe (empty plan, never an exception) when the text is genuinely unrepairab
 """
 from __future__ import annotations
 
+import json
 import logging
 
 from agent.app.idea_policies.expansion import LlmExpansionPolicy, _repair_json_object
@@ -115,3 +116,16 @@ def test_parse_candidates_accepts_a_bare_valid_top_level_array():
     cleaned, meta = _parse('[{"title": "a", "action": "search", "details": {"query": "x"}}]')
     assert [c["title"] for c in cleaned] == ["a"]
     assert meta == {}
+
+
+def test_parse_candidates_ignores_a_truthy_non_dict_meta():
+    # Live-observed (2026-08-08, qwen2.5:1.5b): a malformed but TRUTHY "meta" field survives
+    # `meta or {}` (only falsy values get replaced) and then `dict(meta)` throws TypeError,
+    # killing the whole expansion step instead of just ignoring the bad field.
+    for bad_meta in (True, ["a"], "oops"):
+        cleaned, meta = _parse(
+            '{"candidates": [{"title": "a", "details": {"action": "search", "query": "x"}}], '
+            f'"meta": {json.dumps(bad_meta)}}}'
+        )
+        assert [c["title"] for c in cleaned] == ["a"]
+        assert meta == {}

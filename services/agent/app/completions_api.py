@@ -78,14 +78,14 @@ class EngineRunner:
 
     async def start(self) -> None:
         from agent.app.connector_llm import ConnectorLLM
-        from agent.app.connector_search import ConnectorSearch
+        from agent.app.connector_search import create_search_backend
         from agent.app.connector_http import ConnectorHttp
         from agent.app.connector_chroma import ConnectorChroma
         from agent.app.idea_dag_settings import load_idea_dag_settings
 
         self._settings = load_idea_dag_settings()
         self._llm = ConnectorLLM(self.config)
-        self._search = ConnectorSearch(self.config)
+        self._search = create_search_backend(self.config)
         self._http = ConnectorHttp(self.config)
         self._chroma = ConnectorChroma(self.config)
 

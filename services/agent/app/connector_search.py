@@ -14,6 +14,35 @@ BRAVE_MAX_QUERY_WORDS = 50
 BRAVE_MAX_COUNT = 20
 
 
+def _collect(items: list) -> List[Dict[str, str]]:
+    """Flatten a provider's raw result items into this repo's `{title, url, description}` shape.
+
+    Field-name fallback chain is deliberately provider-agnostic (`url`/`link`/`href`,
+    `title`/`name`, `description`/`snippet`) so it works unmodified across Brave's `web.results`/
+    `mixed` shapes and Serper's `organic` shape alike — verified field-by-field against a real
+    Serper response before reuse, not assumed. Recurses into a nested `results` list (Brave's
+    `mixed` sub-buckets carry these) so a provider that nests results one level deeper still flattens.
+    """
+    collected: List[Dict[str, str]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        url_value = item.get("url") or item.get("link") or item.get("href")
+        if not url_value:
+            nested = item.get("results")
+            if isinstance(nested, list):
+                collected.extend(_collect(nested))
+            continue
+        collected.append(
+            {
+                "title": item.get("title") or item.get("name") or "",
+                "url": url_value,
+                "description": item.get("description") or item.get("snippet") or "",
+            }
+        )
+    return collected
+
+
 def _sanitize_brave_query(query: str) -> str:
     """Clip a query to Brave's limits so it can never 422 on shape.
 
@@ -141,26 +170,6 @@ class ConnectorSearch(ConnectorHttp):
         if not isinstance(data, dict):
             raise RuntimeError(f"Unexpected search response type: {type(data).__name__}")
 
-        def _collect(items: list) -> List[Dict[str, str]]:
-            collected: List[Dict[str, str]] = []
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                url_value = item.get("url") or item.get("link") or item.get("href")
-                if not url_value:
-                    nested = item.get("results")
-                    if isinstance(nested, list):
-                        collected.extend(_collect(nested))
-                    continue
-                collected.append(
-                    {
-                        "title": item.get("title") or item.get("name") or "",
-                        "url": url_value,
-                        "description": item.get("description") or item.get("snippet") or "",
-                    }
-                )
-            return collected
-
         try:
             web_results = []
             if isinstance(data.get("web"), dict):
@@ -227,3 +236,29 @@ class ConnectorSearch(ConnectorHttp):
                 error=str(exc),
             )
             raise RuntimeError(f"Search parse failed: {data} ({exc})")
+
+
+def create_search_backend(config: ConnectorConfig) -> ConnectorSearch:
+    """
+    Factory for search backends from ``ConnectorConfig.search_provider``.
+
+    Mirrors ``llm_backends.create_llm_backend``'s dispatch pattern. ``"brave"``/``"serper"`` only —
+    SearXNG stays a manual per-call-site instantiation (``ConnectorSearchXNG``, see that module's
+    own docstring: it exists specifically for codebench's network-isolated sandbox, a deliberate,
+    unrelated choice this factory doesn't touch).
+
+    :param config: Connector configuration (``search_provider``/``search_api_key`` already
+        resolved by ``ConnectorConfig.__init__``).
+    :returns: Concrete ``ConnectorSearch`` subclass.
+    """
+    provider = (config.search_provider or "serper").strip().lower()
+    if provider == "brave":
+        return ConnectorSearch(config)
+    if provider != "serper":
+        config.logger.warning("Unknown SEARCH_PROVIDER=%s; using serper", provider)
+    # Lazy import: connector_search_serper.py imports FROM this module (ConnectorSearch, _collect),
+    # so importing it back at module load time would be circular. Importing here, inside the
+    # function body, defers it until first call — both modules are already fully loaded by then.
+    from agent.app.connector_search_serper import ConnectorSearchSerper
+
+    return ConnectorSearchSerper(config)

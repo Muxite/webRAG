@@ -29,7 +29,7 @@ from shared.request_result import RequestResult
 
 from agent.app.connector_browser import ConnectorBrowser
 from agent.app.connector_http import ConnectorHttp
-from agent.app.connector_search import ConnectorSearch
+from agent.app.connector_search import ConnectorSearch, create_search_backend
 
 from app.models import (
     SearchRequest,
@@ -102,7 +102,7 @@ def create_app(
         # without a network round-trip. HTTP sessions are opened lazily on first
         # request by the connectors themselves.
         if app.state.search is None:
-            app.state.search = ConnectorSearch(cfg)
+            app.state.search = create_search_backend(cfg)
         if app.state.http is None:
             app.state.http = ConnectorHttp(cfg)
         if app.state.browser is None:

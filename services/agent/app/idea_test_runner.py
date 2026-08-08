@@ -36,7 +36,7 @@ from typing import List, Dict, Any, Tuple, Optional, Mapping
 import logging
 
 from agent.app.connector_llm import ConnectorLLM
-from agent.app.connector_search import ConnectorSearch
+from agent.app.connector_search import ConnectorSearch, create_search_backend
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.connector_browser import ConnectorBrowser
@@ -91,7 +91,7 @@ def _make_connector_set(config: ConnectorConfig) -> Dict[str, Any]:
     """
     return {
         "llm": ConnectorLLM(config),
-        "search": ConnectorSearch(config),
+        "search": create_search_backend(config),
         "http": ConnectorHttp(config),
         "chroma": ConnectorChroma(config),
         "browser": ConnectorBrowser(config),

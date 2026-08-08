@@ -113,7 +113,7 @@ class ConnectorHttp(ConnectorBase):
         fixture_mode = web_fixtures.fixture_mode()
         fixture_key = None
         if fixture_mode != "off":
-            fixture_key = web_fixtures.make_key(method, url, kwargs.get("params"))
+            fixture_key = web_fixtures.make_key(method, url, kwargs.get("params"), kwargs.get("json"))
             if fixture_mode in ("replay", "replay_strict"):
                 cached = web_fixtures.load(fixture_key)
                 if cached is not None:
@@ -213,7 +213,7 @@ class ConnectorHttp(ConnectorBase):
                 payload={"method": method, "url": url, "status": result.status, "error": result.error},
             )
             if fixture_key is not None and not result.error:
-                web_fixtures.save(fixture_key, method, url, kwargs.get("params"), result)
+                web_fixtures.save(fixture_key, method, url, kwargs.get("params"), result, kwargs.get("json"))
             return result
         except Exception as e:
             status = e.status if hasattr(e, "status") else None

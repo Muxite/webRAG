@@ -649,6 +649,13 @@ def _compact(text: str) -> str:
 
     ``connector_search._sanitize_brave_query`` is the real enforcement point; clipping here
     keeps the query readable in logs and telemetry rather than silently truncated later.
+
+    Duplicate-constant hazard (2026-08-08): the ``400`` below is a second, independent copy of
+    Brave's char limit — now that Serper is the default provider (whose real limit is unverified,
+    see ``connector_search_serper.py``'s module docstring) this clip may be tighter than the
+    active provider actually needs. Left as-is (harmless either way: it only affects log/telemetry
+    readability, not the real request), but if Serper's limit ever needs enforcing for real,
+    fix the duplication rather than adding a third copy.
     """
     out = " ".join(str(text or "").split())
     if len(out) > 400:

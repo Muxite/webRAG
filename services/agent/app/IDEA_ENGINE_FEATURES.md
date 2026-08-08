@@ -174,7 +174,7 @@ the graph + deliverable inline.
 engine = (
     IdeaEngine.builder()
         .with_llm(OpenAI(api_key=...))
-        .with_search(Brave(api_key=...))
+        .with_search(SearchBackend(api_key=...))
         .with_action_pack(WebActionPack())
         .with_max_steps(50)
         .build()

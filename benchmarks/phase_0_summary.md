@@ -118,7 +118,7 @@ and LangChain adapter work.
 ## What's still needed (smoke test the user runs)
 
 Run the engine against a small subset of the 39-test suite at the existing
-default model. Requires ChromaDB + Redis + OpenRouter + Brave API keys.
+default model. Requires ChromaDB + Redis + OpenRouter + a search provider (Serper/Brave) API key.
 The standard webRAG invocation:
 
 ```bash

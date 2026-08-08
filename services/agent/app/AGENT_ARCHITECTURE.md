@@ -97,7 +97,7 @@ Mandate → Root
 | Connector | Layer | Description |
 |---|---|---|
 | `ConnectorLLM` | Low-level | OpenAI API interaction (chat completions) |
-| `ConnectorSearch` | Low-level | Brave Search API queries |
+| `ConnectorSearch` | Low-level | Web search queries (Serper by default, Brave via `SEARCH_PROVIDER=brave`) |
 | `ConnectorHttp` | Low-level | aiohttp page fetching with retry and status handling |
 | `ConnectorBrowser` | Low-level | undetected-chromedriver fallback for bot-protected sites |
 | `ConnectorChroma` | Low-level | ChromaDB connection, add/query operations |
@@ -166,7 +166,7 @@ Telemetry is layered through base classes so action code stays clean:
 | `agent_io.py` | Unified connector interface (LLM, search, HTTP, browser, Chroma) |
 | `got_operations.py` | Embedding, dedup, beam width, pruning |
 | `connector_llm.py` | LLM API interaction |
-| `connector_search.py` | Brave Search API |
+| `connector_search.py` | Web search (Serper by default, Brave via `SEARCH_PROVIDER=brave`; factory in `create_search_backend`) |
 | `connector_http.py` | aiohttp HTTP fetching |
 | `connector_browser.py` | undetected-chromedriver fallback |
 | `connector_chroma.py` | ChromaDB connection and operations |
@@ -184,7 +184,7 @@ Telemetry is layered through base classes so action code stays clean:
 | `ConnectorChroma.query_chroma` | Low-level | Queries ChromaDB for nearest neighbors |
 | `ConnectorHttp.request` | Low-level | HTTP GET/POST with retry logic |
 | `ConnectorBrowser.fetch_page` | Low-level | Headless Chrome page fetch |
-| `ConnectorSearch.query_search` | Low-level | Sends query to Brave Search API |
+| `ConnectorSearch.query_search` | Low-level | Sends query to the configured search provider (Serper/Brave) |
 | `AgentIO.visit` | High-level | HTTP fetch with browser fallback + telemetry |
 | `AgentIO.fetch_url` | High-level | URL fetch with browser fallback + telemetry |
 | `AgentIO.search` | High-level | Wraps `query_search` + document tracking + telemetry |

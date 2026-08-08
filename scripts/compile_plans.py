@@ -37,7 +37,7 @@ for _p in (_ROOT / "services", _ROOT / "services" / "agent"):
 
 from shared.connector_config import ConnectorConfig  # noqa: E402
 from agent.app.connector_llm import ConnectorLLM  # noqa: E402
-from agent.app.connector_search import ConnectorSearch  # noqa: E402
+from agent.app.connector_search import create_search_backend  # noqa: E402
 from agent.app.connector_http import ConnectorHttp  # noqa: E402
 from agent.app.connector_chroma import ConnectorChroma  # noqa: E402
 from agent.app.agent_io import AgentIO  # noqa: E402
@@ -60,7 +60,11 @@ async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tests", default="050,051,052,053,054", help="Comma-separated test_ids")
     ap.add_argument("--author-model", default=scaffold_compiler.DEFAULT_AUTHOR_MODEL)
-    ap.add_argument("--max-tokens", type=int, default=2048)
+    # 16384 not 2048: DEFAULT_AUTHOR_MODEL (google/gemini-3.1-pro-preview) burns a large, invisible
+    # reasoning-token budget before it ever emits visible JSON content (measured live, 2026-08-08:
+    # a 2873-char/377-word completion consumed 4543 completion_tokens) — 2048 truncates mid-JSON on
+    # this specific model. Mirrors the same fix in execution_compiled.py's auto-authoring path.
+    ap.add_argument("--max-tokens", type=int, default=16384)
     ap.add_argument("--force", action="store_true", help="Re-author even if cached")
     ap.add_argument("--dry-run", action="store_true", help="Only print cached plan structure; no LLM")
     ap.add_argument("--show", action="store_true", help="Print the full authored plan JSON")
@@ -73,7 +77,7 @@ async def main() -> int:
     connectors = []
     if not args.dry_run:
         config = ConnectorConfig()
-        cl, cs, ch, cc = ConnectorLLM(config), ConnectorSearch(config), ConnectorHttp(config), ConnectorChroma(config)
+        cl, cs, ch, cc = ConnectorLLM(config), create_search_backend(config), ConnectorHttp(config), ConnectorChroma(config)
         connectors = [cl, cs, ch, cc]
 
     rc = 0

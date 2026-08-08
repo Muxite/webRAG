@@ -38,15 +38,24 @@ esac
 # OpenRouter call 401s. Found live via this exact failure (E1, 2026-08-03) --
 # openai/gpt-4.1-nano had never been successfully run through this script before.
 while IFS='=' read -r k v; do
-  case "$k" in SEARCH_API_KEY|OPENROUTER_API_KEY|OPENAI_API_KEY) export "$k=$(sed -E 's/^"(.*)"$/\1/' <<< "$v")" ;; esac
+  case "$k" in SEARCH_API_KEY|OPENROUTER_API_KEY|OPENAI_API_KEY|SERPER_KEY) export "$k=$(sed -E 's/^"(.*)"$/\1/' <<< "$v")" ;; esac
 done < <(tr -d '\r' < services/keys.env)
+
+# 2026-08-08: default search provider is now Serper (Brave's SEARCH_API_KEY ran out of quota,
+# confirmed live HTTP 402). Set SEARCH_PROVIDER=brave explicitly to opt back into the Brave path
+# below once/if its quota resets.
+export SEARCH_PROVIDER="${SEARCH_PROVIDER:-serper}"
 
 # The Brave SEARCH_API_KEY in keys.env is stale/invalid in this environment
 # (SUBSCRIPTION_TOKEN_INVALID); the running euglena agent holds the valid key.
 # Prefer the container's key so retrieval actually works; keys.env is the fallback.
-_KEY_CTR="${BADMODEL_SEARCH_KEY_FROM_CTR:-euglena-agent-1}"
-_ck="$(docker exec "$_KEY_CTR" printenv SEARCH_API_KEY 2>/dev/null || true)"
-if [ -n "$_ck" ]; then export SEARCH_API_KEY="$_ck"; echo ">> search key sourced from $_KEY_CTR" >&2; fi
+# Only relevant when SEARCH_PROVIDER=brave — left in place (not removed) so switching back needs
+# no script changes, per this repo's additive-not-destructive convention.
+if [ "$SEARCH_PROVIDER" = "brave" ]; then
+  _KEY_CTR="${BADMODEL_SEARCH_KEY_FROM_CTR:-euglena-agent-1}"
+  _ck="$(docker exec "$_KEY_CTR" printenv SEARCH_API_KEY 2>/dev/null || true)"
+  if [ -n "$_ck" ]; then export SEARCH_API_KEY="$_ck"; echo ">> search key sourced from $_KEY_CTR" >&2; fi
+fi
 
 export PYTHONPATH=services:services/agent
 export IDEA_TEST_CONCURRENCY=1                 # MANDATORY — shared connectors

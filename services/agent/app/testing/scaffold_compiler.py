@@ -203,7 +203,11 @@ async def compile_plan(
     agent_io: Any = None,
     *,
     cache_dir: Optional[Path] = None,
-    max_tokens: int = 2048,
+    # 16384 not 2048: DEFAULT_AUTHOR_MODEL (google/gemini-3.1-pro-preview) burns a large, invisible
+    # reasoning-token budget before it ever emits visible content — 2048 truncates mid-JSON on this
+    # model (measured live, 2026-08-08). Every current caller passes its own value explicitly; this
+    # is the fallback for any future direct caller.
+    max_tokens: int = 16384,
     force: bool = False,
     strategy_advice: str = "",
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:

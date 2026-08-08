@@ -22,7 +22,7 @@ from shared.worker_presence import WorkerPresence
 from shared.worker_state import WorkerState
 from agent.app.agent import Agent
 from agent.app.connector_llm import ConnectorLLM
-from agent.app.connector_search import ConnectorSearch
+from agent.app.connector_search import create_search_backend
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_browser import ConnectorBrowser
 from agent.app.connector_chroma import ConnectorChroma
@@ -51,7 +51,7 @@ class InterfaceAgent:
         self._state = WorkerState(self.config, worker_type="agent", worker_id=self._presence.worker_id)
         
         self.connector_llm = ConnectorLLM(self.config)
-        self.connector_search = ConnectorSearch(self.config)
+        self.connector_search = create_search_backend(self.config)
         self.connector_http = ConnectorHttp(self.config)
         self.connector_chroma = ConnectorChroma(self.config)
         self.connector_browser = ConnectorBrowser(self.config)

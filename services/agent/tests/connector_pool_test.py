@@ -26,8 +26,11 @@ class _FakeConnector:
 
 
 def _patched_pool(pool_size: int):
+    # search is built via create_search_backend(config) (a provider-dispatch factory function,
+    # see connector_search.py), not the ConnectorSearch class directly — patch the factory name,
+    # not the class, or the real factory runs and AttributeErrors on the bare-object() config.
     with patch.object(runner, "ConnectorLLM", _FakeConnector), \
-         patch.object(runner, "ConnectorSearch", _FakeConnector), \
+         patch.object(runner, "create_search_backend", _FakeConnector), \
          patch.object(runner, "ConnectorHttp", _FakeConnector), \
          patch.object(runner, "ConnectorChroma", _FakeConnector), \
          patch.object(runner, "ConnectorBrowser", _FakeConnector):

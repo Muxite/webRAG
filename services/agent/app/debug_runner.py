@@ -23,7 +23,7 @@ import sys
 from typing import Tuple
 
 from agent.app.connector_llm import ConnectorLLM
-from agent.app.connector_search import ConnectorSearch
+from agent.app.connector_search import create_search_backend
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.agent_io import AgentIO
@@ -88,7 +88,7 @@ def _load_test_mandate(test_id: str) -> str:
 
 async def _boot_connectors(config: ConnectorConfig) -> Tuple:
     llm = ConnectorLLM(config)
-    search = ConnectorSearch(config)
+    search = create_search_backend(config)
     http = ConnectorHttp(config)
     chroma = ConnectorChroma(config)
     await search.__aenter__()

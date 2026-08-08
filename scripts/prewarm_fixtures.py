@@ -81,7 +81,7 @@ def _mandate_urls(mandate: str) -> List[str]:
 
 
 # Hosts that are tool *endpoints*, not content pages — never prewarm these as visits.
-_ENDPOINT_HOSTS = ("api.search.brave.com", "openrouter.ai", "googleapis.com")
+_ENDPOINT_HOSTS = ("api.search.brave.com", "google.serper.dev", "openrouter.ai", "googleapis.com")
 
 
 def _is_page_url(url: str) -> bool:
@@ -171,7 +171,7 @@ async def _prewarm(tasks) -> int:
     mandate search only for ``--tests`` tasks (harvested/explicit URL sets carry no mandate)."""
     from shared.connector_config import ConnectorConfig
     from agent.app.connector_llm import ConnectorLLM
-    from agent.app.connector_search import ConnectorSearch
+    from agent.app.connector_search import create_search_backend
     from agent.app.connector_http import ConnectorHttp
     from agent.app.connector_chroma import ConnectorChroma
     from agent.app.agent_io import AgentIO
@@ -180,7 +180,7 @@ async def _prewarm(tasks) -> int:
     config = ConnectorConfig()
     agent_io = AgentIO(
         connector_llm=ConnectorLLM(config),
-        connector_search=ConnectorSearch(config),
+        connector_search=create_search_backend(config),
         connector_http=ConnectorHttp(config),
         connector_chroma=ConnectorChroma(config),
         telemetry=TelemetrySession(enabled=False, mandate="", correlation_id="prewarm", trace_path=None),

@@ -110,6 +110,8 @@ def base_env():
         "PYTHONPATH": "services:services/agent",
         "OPENROUTER_API_KEY": keyval("OPENROUTER_API_KEY"),
         "SEARCH_API_KEY": keyval("SEARCH_API_KEY"),
+        "SERPER_KEY": keyval("SERPER_KEY"),
+        "SEARCH_PROVIDER": "serper",
         "LLM_PROVIDER": "openrouter",
         "MODEL_API_URL": "https://openrouter.ai/api/v1",
         "CHROMA_URL": "http://localhost:8001",

@@ -18,7 +18,19 @@ class ConnectorConfig:
         self.llm_api_url = self._resolve_llm_api_url()
         self.openrouter_http_referer = os.environ.get("OPENROUTER_HTTP_REFERER") or "https://euglena.vercel.app"
         self.openrouter_x_title = os.environ.get("OPENROUTER_X_TITLE") or "Euglena"
-        self.search_api_key = os.environ.get("SEARCH_API_KEY")
+        # 2026-08-08: Brave's SEARCH_API_KEY ran out of quota (confirmed live, HTTP 402) and was
+        # replaced with Serper (google.serper.dev, 2500 free queries) as the default provider.
+        # search_provider picks the key AND, via create_search_backend() in connector_search.py,
+        # the connector class — "brave"/"serper" only (searxng stays a manual per-call-site
+        # instantiation, see connector_search_searxng.py's own docstring for why). Brave's own key
+        # is read unchanged from SEARCH_API_KEY so switching back (SEARCH_PROVIDER=brave) needs no
+        # key migration once its quota resets.
+        self.search_provider = (os.environ.get("SEARCH_PROVIDER") or "serper").strip().lower()
+        self.search_api_key = (
+            os.environ.get("SERPER_KEY") or os.environ.get("SEARCH_API_KEY")
+            if self.search_provider == "serper"
+            else os.environ.get("SEARCH_API_KEY")
+        )
 
         self.default_delay = int(os.environ.get("DEFAULT_DELAY", "2"))
         self.default_timeout = int(os.environ.get("DEFAULT_TIMEOUT", "5"))

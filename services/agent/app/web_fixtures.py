@@ -53,18 +53,31 @@ def _fixtures_dir() -> Path:
     return base
 
 
-def make_key(method: str, url: str, params: Optional[Dict[str, Any]]) -> str:
+def make_key(
+    method: str,
+    url: str,
+    params: Optional[Dict[str, Any]],
+    json_body: Optional[Dict[str, Any]] = None,
+) -> str:
     """
     Build a stable cache key from request identity (auth headers excluded).
+
     :param method: HTTP method.
     :param url: Request URL.
     :param params: Query params (e.g. search q/count); order-insensitive.
+    :param json_body: POST JSON body (e.g. Serper's ``{"q": ...}``), for requests that carry the
+        query in the body rather than the querystring. Without this, every such request hashes to
+        the SAME key (identical method+url, empty params) — a real determinism bug, not a
+        hypothetical one: it would make every Serper search collide to one fixture entry.
     :return: Hex digest key.
     """
     norm_params = ""
     if isinstance(params, dict) and params:
         norm_params = json.dumps({str(k): params[k] for k in sorted(params)}, sort_keys=True, default=str)
-    raw = f"{method.upper()} {url} {norm_params}"
+    norm_body = ""
+    if isinstance(json_body, dict) and json_body:
+        norm_body = json.dumps({str(k): json_body[k] for k in sorted(json_body)}, sort_keys=True, default=str)
+    raw = f"{method.upper()} {url} {norm_params} {norm_body}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
 
@@ -93,7 +106,14 @@ def load(key: str) -> Optional[RequestResult]:
     )
 
 
-def save(key: str, method: str, url: str, params: Optional[Dict[str, Any]], result: RequestResult) -> None:
+def save(
+    key: str,
+    method: str,
+    url: str,
+    params: Optional[Dict[str, Any]],
+    result: RequestResult,
+    json_body: Optional[Dict[str, Any]] = None,
+) -> None:
     """
     Persist a RequestResult to the fixture cache.
     :param key: Cache key.
@@ -101,11 +121,13 @@ def save(key: str, method: str, url: str, params: Optional[Dict[str, Any]], resu
     :param url: Request URL (stored for human readability).
     :param params: Query params (stored for human readability).
     :param result: The live RequestResult to cache.
+    :param json_body: POST JSON body (stored for human readability), see :func:`make_key`.
     """
     payload = {
         "method": method.upper(),
         "url": url,
         "params": params if isinstance(params, dict) else None,
+        "json": json_body if isinstance(json_body, dict) else None,
         "status": result.status,
         "error": bool(result.error),
         "data": result.data,

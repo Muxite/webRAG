@@ -37,12 +37,19 @@ case "$TIER" in
 esac
 
 while IFS='=' read -r k v; do
-  case "$k" in SEARCH_API_KEY|OPENROUTER_API_KEY|OPENAI_API_KEY) export "$k=$v" ;; esac
+  case "$k" in SEARCH_API_KEY|OPENROUTER_API_KEY|OPENAI_API_KEY|SERPER_KEY) export "$k=$v" ;; esac
 done < <(tr -d '\r' < services/keys.env)
 
-_KEY_CTR="${BADMODEL_SEARCH_KEY_FROM_CTR:-euglena-agent-1}"
-_ck="$(docker exec "$_KEY_CTR" printenv SEARCH_API_KEY 2>/dev/null || true)"
-if [ -n "$_ck" ]; then export SEARCH_API_KEY="$_ck"; echo ">> search key sourced from $_KEY_CTR" >&2; fi
+# 2026-08-08: default search provider is now Serper (Brave's SEARCH_API_KEY ran out of quota,
+# confirmed live HTTP 402) — mirrors run_cell.sh's identical fix. Set SEARCH_PROVIDER=brave to
+# opt back into the Brave path (and its container-key override) below.
+export SEARCH_PROVIDER="${SEARCH_PROVIDER:-serper}"
+
+if [ "$SEARCH_PROVIDER" = "brave" ]; then
+  _KEY_CTR="${BADMODEL_SEARCH_KEY_FROM_CTR:-euglena-agent-1}"
+  _ck="$(docker exec "$_KEY_CTR" printenv SEARCH_API_KEY 2>/dev/null || true)"
+  if [ -n "$_ck" ]; then export SEARCH_API_KEY="$_ck"; echo ">> search key sourced from $_KEY_CTR" >&2; fi
+fi
 
 export PYTHONPATH=services:services/agent
 export IDEA_TEST_CONCURRENCY=1

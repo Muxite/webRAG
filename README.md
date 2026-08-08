@@ -232,7 +232,7 @@ Visualizations are automatically generated after test runs and saved to `service
 |---|---|
 | Frontend | React, Vite, Supabase Auth |
 | Backend | FastAPI, RabbitMQ, Redis, ChromaDB, Supabase |
-| Agent | Graph-of-Thought engine, OpenAI LLMs, Brave Search, undetected-chromedriver |
+| Agent | Graph-of-Thought engine, OpenAI LLMs, web search (Serper/Brave), undetected-chromedriver |
 | Infra | Local Docker Compose on-host (current production path, via Tailscale Funnel); AWS ECS, ECR, CloudWatch, Lambda autoscaling remain available as a secondary/legacy path |
 
 ## Quick Start

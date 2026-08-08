@@ -51,7 +51,7 @@ All tunable parameters live in `app/idea_dag_settings.json`.
 | Connector | Purpose |
 |---|---|
 | `ConnectorLLM` | OpenAI API for expansion, evaluation, merge, finalization |
-| `ConnectorSearch` | Brave Search API for web queries |
+| `ConnectorSearch` | Web search for queries (Serper by default, Brave via `SEARCH_PROVIDER=brave`) |
 | `ConnectorHttp` | aiohttp for page fetching with retry logic |
 | `ConnectorBrowser` | undetected-chromedriver fallback for bot-protected sites (403/401) |
 | `ConnectorChroma` | ChromaDB for vector storage and retrieval |
