@@ -195,6 +195,16 @@ class TimeoutConfig:
     llm: int = 60
     final: int = 180
     expansion: int = 180
+    # 2026-08-08: merge previously had NO dedicated field here, so
+    # idea_engine.py::_action_timeout_for's `getattr(self._cfg.timeouts, "merge", None)` always
+    # returned None and silently fell back to the generic `action` timeout (20s) — while a merge
+    # call synthesizes from ALL of its children's raw page content concatenated in one LLM call
+    # (confirmed live: 150-210KB / ~19K tokens for a 4-leaf task), which routinely exceeds 20s for
+    # a local model. Found via a real barrage: every qwen2.5:14b merge node failed
+    # `"timeout after 20.0s"`, stranding an otherwise-fully-grounded run onto a cruder finalize
+    # fallback. 180 matches final/expansion's existing generous default for the same class of
+    # single-call-over-large-context action.
+    merge: int = 180
 
     _KEYS: ClassVar[dict] = {
         "action": "action_timeout_seconds",
@@ -205,6 +215,7 @@ class TimeoutConfig:
         "llm": "llm_timeout_seconds",
         "final": "final_timeout_seconds",
         "expansion": "expansion_timeout_seconds",
+        "merge": "merge_timeout_seconds",
     }
 
     @classmethod

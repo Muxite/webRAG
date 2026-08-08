@@ -299,9 +299,22 @@ def test_timeout_for_action_falls_back_to_generic():
     t = TimeoutConfig.from_settings({})
     assert t.for_action("search") == 15
     assert t.for_action("visit") == 20
-    # Actions without a dedicated timeout (save/think/merge/verify) fall back.
+    # Actions without a dedicated timeout (save/think/verify) fall back to the generic one.
     assert t.for_action("save") == t.action
     assert t.for_action("verify") == t.action
+
+
+def test_timeout_for_merge_has_a_dedicated_default(monkeypatch):
+    # 2026-08-08: merge previously had no dedicated field, so a merge action synthesizing an
+    # answer from multiple children's raw page content silently inherited the generic 20s
+    # `action` timeout instead of something sized for a large single-call synthesis (confirmed
+    # live: every qwen2.5:14b merge node in a real barrage failed "timeout after 20.0s" trying
+    # to digest ~150-210KB of concatenated page content). It must now resolve independently of
+    # `action`, matching final/expansion's existing generous default for the same call shape.
+    t = TimeoutConfig.from_settings({})
+    assert t.merge == 180
+    assert t.for_action("merge") == 180
+    assert TimeoutConfig.from_settings(load_idea_dag_settings()).merge == 180
 
 
 def test_evaluation_weight_for_falls_back_to_default():
