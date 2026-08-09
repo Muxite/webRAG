@@ -75,7 +75,7 @@ Most stages already have a tool-shaped home; the loop above is mainly what ties 
 
 ## Provenance
 
-This structure was designed and its first cycle run on 2026-08-09. Cycle 1 caught two concrete
+This structure was designed and its first cycle run on 2026-08-09. Cycle 1 caught three concrete
 lessons worth keeping in mind for future cycles:
 
 1. A handoff doc (`BARRAGE_RELAUNCH_HANDOFF.md`) turned out to be ~15% stale against `HEAD` within
@@ -87,3 +87,10 @@ lessons worth keeping in mind for future cycles:
    (`scripts/unified_bench_report.py`, reading both `idea_test_results/*.json` and codebench's
    `runs.jsonl`) — worth checking for this kind of overlap at Plan time before building two of
    something.
+3. A clean adversarial review and a green offline suite still didn't catch a real engine bug: the
+   barrage's own $3 confirmation smoke found `idea_engine.py`'s re-expansion guard can make the
+   `good_adaptive` arm self-loop to zero visits and silently exhaust its step budget on a common
+   task shape, producing a near-zero score with no error anywhere in the driver's own accounting.
+   Nothing upstream of a live run would have surfaced this — it's why "run benchmarks" stays a real
+   stage even when a change looks purely infrastructural, and why a smoke's job is to look for
+   exactly this kind of silent failure, not just confirm the driver doesn't crash.
