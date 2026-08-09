@@ -20,8 +20,8 @@ MODEL_CANDIDATES = [
 # emit json_mode output, which the engine's expansion/evaluation/merge calls require.
 BENCHMARK_ROSTER = {
     "reference": ["google/gemini-3.1-pro-preview"],
-    "reference_cached": ["openai/gpt-5", "google/gemini-2.5-pro"],
-    "cheap": ["google/gemini-2.5-flash", "openai/gpt-5-mini", "openai/gpt-4.1-nano"],
+    "reference_cached": ["openai/gpt-5", "google/gemini-2.5-pro", "openai/gpt-5.6-terra"],
+    "cheap": ["google/gemini-2.5-flash", "openai/gpt-5-mini", "openai/gpt-4.1-nano", "openai/gpt-5.6-luna"],
     "experiment": ["google/gemini-2.5-flash-lite", "openai/gpt-5-nano", "deepseek/deepseek-v4-flash"],
 }
 

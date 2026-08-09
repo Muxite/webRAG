@@ -407,6 +407,8 @@ AXES = {
             # The productive burn now lives in the `max_burn` ARM profile (uniform, deeper
             # re-expansion), not a per-model k-vote override — k-vote was net-negative.
             {"model": "deepseek/deepseek-v4-flash", "tag": "ds", "reps": 5, "burn": None},
+            {"model": "openai/gpt-5.6-luna", "tag": "luna", "reps": 5, "burn": None},
+            {"model": "openai/gpt-5.6-terra", "tag": "terra", "reps": 5, "burn": None},
         ],
         "reference": {"model": "anthropic/claude-sonnet-5", "tag": "sonnet",
                       "variant": "sequential_react", "reps": 3},
@@ -426,6 +428,8 @@ AXES = {
              "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
             {"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 1, "burn": None},
             {"model": "deepseek/deepseek-v4-flash", "tag": "ds", "reps": 1, "burn": None},
+            {"model": "openai/gpt-5.6-luna", "tag": "luna", "reps": 1, "burn": None},
+            {"model": "openai/gpt-5.6-terra", "tag": "terra", "reps": 1, "burn": None},
         ],
         "reference": {"model": "anthropic/claude-sonnet-5", "tag": "sonnet",
                       "variant": "sequential_react", "reps": 1},
