@@ -1011,7 +1011,18 @@ _AGG_DIVERSE_TEMPS = [0.0, 0.5, 0.7, 0.9, 1.0, 0.6, 0.8, 0.4]
 # the real URLs being right there in the prompt). We already hold those URLs in Python, so this is
 # a deterministic repair, not a prompting problem: append the real ones when any is missing from
 # the answer. Additive only — the model's own reasoning and citations are left untouched.
+#
+# The strict pattern only fires on ``_run_leaf_thin``'s deterministically-appended
+# "<value> — source: <url>" tail. ``_run_leaf`` (react mode — what every cheap-tier model actually
+# runs under) returns the model's own free-form ``finish`` answer verbatim with no such guarantee:
+# a react leaf that DID cite its page rarely happens to use the literal word "source:", so the
+# strict-only version starved react-mode facts of citation credit entirely (live-observed: 0/12
+# composed cells credited any citation during Part D Stage 1's kill-switch A/B, vs. noisy-but-real
+# credit on the free-text arm — traced to the free-text aggregation LLM copying a bare URL it saw
+# in the prompt, a path composed rows never had). ``_FACT_BARE_URL_RX`` is the fallback for exactly
+# that shape, used ONLY when the strict pattern finds nothing on a given fact.
 _FACT_SOURCE_RX = re.compile(r"source:\s*(https?://\S+)", re.I)
+_FACT_BARE_URL_RX = re.compile(r"(https?://\S+)")
 
 # A plan whose aggregation demands a byte-exact artifact (057 strict JSON, 063 strict CSV) must
 # never get an extra section: the appended block would push a non-header line into the output and
@@ -1035,15 +1046,25 @@ def _strip_url_trail(url: str) -> str:
 
 
 def _gathered_source_urls(facts: List[str]) -> List[str]:
-    """The real 'source: <url>' URLs carried by the leaf facts, in plan order, de-duped.
+    """The real source URLs carried by the leaf facts, in plan order, de-duped.
 
-    Only a fact that actually RESOLVED carries the ``source:`` marker; an UNKNOWN leaf's
-    ``"UNKNOWN — <url>"`` fallback is deliberately excluded (that page yielded nothing, so citing
-    it would assert grounding we do not have).
+    An UNKNOWN leaf's fact (e.g. ``"UNKNOWN — <url>"``) is deliberately excluded outright — that
+    page yielded nothing, so citing it would assert grounding we do not have — checked BEFORE any
+    pattern match so a stray URL sitting next to "UNKNOWN" can never sneak in via the bare-URL
+    fallback below.
+
+    A RESOLVED fact tries the strict ``"source: <url>"`` marker first (what ``_run_leaf_thin``
+    always appends); when that finds nothing, it falls back to any bare ``http(s)`` URL in the
+    fact text (what a react-mode leaf's own free-form answer actually contains when it cites its
+    page without using the literal word "source").
     """
     urls: List[str] = []
     for fact in facts:
-        for url in _FACT_SOURCE_RX.findall(fact or ""):
+        text = fact or ""
+        if text.strip().upper().startswith("UNKNOWN"):
+            continue
+        matches = _FACT_SOURCE_RX.findall(text) or _FACT_BARE_URL_RX.findall(text)
+        for url in matches:
             clean = _strip_url_trail(url)
             if clean and clean not in urls:
                 urls.append(clean)

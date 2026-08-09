@@ -63,6 +63,7 @@ Ground truth (verified against live English Wikipedia 2026-06-27 — each lake's
 """
 
 from typing import Dict, Any, List
+import os
 import re
 from agent.app.idea_test_utils import extract_final_text
 
@@ -343,6 +344,14 @@ def get_compiled_plan() -> Dict[str, Any]:
     reminded that depth is NOT the same as fame, so the cheap executor never shortcuts to the
     most celebrated name. Encodes STRUCTURE only: names the six lakes and their countries, but
     leaks no depth figure and never states which lake wins.
+
+    Composition kill-switch (Part D Stage 1 validation, off by default): when
+    ``IDEA_TEST_COMPILED_COMPOSITION_KILLSWITCH`` is set, the plan additionally declares
+    ``agg_mode: "computed"`` plus an ``argmax`` ``composition`` over the six depth leaves, routing
+    the final comparison through ``execution_compiled._compose_argmax`` (deterministic numeric
+    comparison) instead of the free-text aggregation prompt below. Unset (the default) reproduces
+    today's plan dict exactly — the ``aggregation`` string stays byte-identical either way, since
+    it remains the fallback whenever composition can't resolve honestly.
     """
     leaves: List[Dict[str, Any]] = []
     for e in ENTITIES:
@@ -359,7 +368,7 @@ def get_compiled_plan() -> Dict[str, Any]:
             "expect": "MAXIMUM DEPTH in metres (a single figure) -- source URL",
             "depends_on": [],
         })
-    return {
+    plan: Dict[str, Any] = {
         "leaves": leaves,
         "aggregation": (
             "You now have, for each of the six lakes, its maximum depth in metres (with a source "
@@ -372,3 +381,16 @@ def get_compiled_plan() -> Dict[str, Any]:
             "source URL."
         ),
     }
+    if os.environ.get("IDEA_TEST_COMPILED_COMPOSITION_KILLSWITCH", "") not in ("", "0", "false", "False"):
+        plan["agg_mode"] = "computed"
+        plan["composition"] = {
+            "op": "argmax",
+            "items": [
+                {"leaf": e["key"], "label": e["name"], "type": "number", "unit": "m"}
+                for e in ENTITIES
+            ],
+            "answer_noun": "lake",
+            "value_label": "maximum depth",
+            "unit": "m",
+        }
+    return plan

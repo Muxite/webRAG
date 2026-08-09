@@ -75,6 +75,7 @@ Ground truth (verified against live English Wikipedia 2026-07-07 — each dam's 
 """
 
 from typing import Dict, Any, List
+import os
 import re
 from agent.app.idea_test_utils import extract_final_text
 
@@ -436,6 +437,14 @@ def get_compiled_plan() -> Dict[str, Any]:
     Encodes STRUCTURE ONLY: names the six GIVEN dams and their regions, but leaks no height
     figure and not which dam wins. Each leaf's answer text self-describes its dam (name in the
     'expect' line) so aggregation binding survives leaf-ID stripping.
+
+    Composition kill-switch (Part D Stage 1 validation, off by default): when
+    ``IDEA_TEST_COMPILED_COMPOSITION_KILLSWITCH`` is set, the plan additionally declares
+    ``agg_mode: "computed"`` plus an ``argmax`` ``composition`` over the six height leaves, routing
+    the final comparison through ``execution_compiled._compose_argmax`` (deterministic numeric
+    comparison) instead of the free-text aggregation prompt below. Unset (the default) reproduces
+    today's plan dict exactly — the ``aggregation`` string stays byte-identical either way, since
+    it remains the fallback whenever composition can't resolve honestly.
     """
     leaves: List[Dict[str, Any]] = []
     for e in ENTITIES:
@@ -453,7 +462,7 @@ def get_compiled_plan() -> Dict[str, Any]:
             ),
             "depends_on": [],
         })
-    return {
+    plan: Dict[str, Any] = {
         "leaves": leaves,
         "aggregation": (
             "You now have, for each of the six dams, its structural height in metres. "
@@ -466,3 +475,16 @@ def get_compiled_plan() -> Dict[str, Any]:
             "(c) cite each dam's source URL."
         ),
     }
+    if os.environ.get("IDEA_TEST_COMPILED_COMPOSITION_KILLSWITCH", "") not in ("", "0", "false", "False"):
+        plan["agg_mode"] = "computed"
+        plan["composition"] = {
+            "op": "argmax",
+            "items": [
+                {"leaf": e["key"], "label": e["name"], "type": "number", "unit": "m"}
+                for e in ENTITIES
+            ],
+            "answer_noun": "dam",
+            "value_label": "height",
+            "unit": "m",
+        }
+    return plan

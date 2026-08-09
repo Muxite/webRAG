@@ -1754,6 +1754,41 @@ def test_gathered_source_urls_strips_an_excess_sentence_trailing_paren():
     assert urls2 == [f"{_WIKI}Lake_Matano"]
 
 
+def test_gathered_source_urls_falls_back_to_a_bare_url_without_the_word_source():
+    """Regression: react-mode leaves (``_run_leaf``) return the model's own free-form ``finish``
+    answer verbatim — no guaranteed "source: <url>" tail the way ``_run_leaf_thin`` always appends.
+    A fact that cites its page with a bare URL (no literal "source") must still be gathered, or
+    every composed row for a react-mode leaf loses its citation credit even though the page really
+    was read (live-observed: 0/12 composed cells credited any citation during a kill-switch A/B
+    entirely because of this gap, vs. noisy-but-real credit on the free-text arm)."""
+    urls = _gathered_source_urls_case(f"836 m ({_WIKI}O%27Higgins/San_Mart%C3%ADn_Lake)")
+    assert urls == [f"{_WIKI}O%27Higgins/San_Mart%C3%ADn_Lake"]
+
+
+def test_gathered_source_urls_bare_fallback_never_credits_an_unknown_fact():
+    """An UNKNOWN leaf must never be cited, even when a stray URL sits right next to it — checked
+    before any pattern match so the new bare-URL fallback can't undo this existing invariant."""
+    assert _gathered_source_urls_case(f"UNKNOWN — {_WIKI}never-read") == []
+    assert _gathered_source_urls_case(f"unknown, page had no matching field ({_WIKI}also-never-read)") == []
+
+
+def test_compose_argmax_cites_a_bare_url_react_style_fact():
+    """End-to-end: _compose_argmax's per-row citation now resolves for a react-mode-shaped fact
+    (a bare URL, no "source:" label) exactly as it already did for a thin-mode-shaped one."""
+    leaves = [{"id": "ohiggins"}, {"id": "crater"}]
+    results = {
+        "ohiggins": f"Lake O'Higgins is 836 m deep ({_WIKI}Ohiggins)",
+        "crater": f"594 m — source: {_WIKI}Crater_Lake",
+    }
+    comp = {"op": "argmax", "items": [
+        {"leaf": "ohiggins", "label": "Lake O'Higgins", "type": "number", "unit": "m"},
+        {"leaf": "crater", "label": "Crater Lake", "type": "number", "unit": "m"},
+    ], "answer_noun": "lake", "value_label": "maximum depth", "unit": "m"}
+    out = ec._compose_argmax(leaves, results, comp)
+    assert f"{_WIKI}Ohiggins" in out
+    assert f"{_WIKI}Crater_Lake" in out
+
+
 def test_execute_plan_computed_runs_070s_real_subset_sum_plan_with_zero_llm_calls(monkeypatch):
     """End-to-end on the ACTUAL get_compiled_plan() of 070: canned correct per-season counts in, a
     composed deliverable out, ZERO aggregation LLM calls, and every real validator at 1.0 — the
