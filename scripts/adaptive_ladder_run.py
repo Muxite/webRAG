@@ -25,7 +25,7 @@ of the same (task,rep) are enqueued adjacently so they share the same network wi
 pairs on (task,rep). A hard global BUDGET stops enqueueing, and a per-run USD ceiling guards runaways.
 
 Usage (from repo root):
-  PYTHONPATH=services:services/agent ./.venv/bin/python scripts/adaptive_ladder_run.py \
+  PYTHONPATH=.:services:agent ./.venv/bin/python scripts/adaptive_ladder_run.py \
       --run-id ladder --jobs 6 --budget 22 --reps 5 --ref-reps 3
 Resume-safe: cells with a COMPLETE, parseable result JSON are skipped; a cell that has failed
 `--max-attempts` times with no complete result is marked dead in a durable ledger and skipped too
@@ -52,7 +52,7 @@ except Exception:  # pragma: no cover - keep the driver runnable even if the imp
     _estimate_cost = None
 
 REPO = "/home/muk/projects/webRAG"
-RESULTS_DIR = f"{REPO}/services/agent/idea_test_results"
+RESULTS_DIR = f"{REPO}/agent/idea_test_results"
 # Default ladder: floor -> proven winner -> productive max-burn. `full` (k-vote + backtrack +
 # expect-contract) was measured NET-NEGATIVE for cheap models and is dropped; `max_burn` cranks the
 # ONE productive lever (re-expansion depth) instead. Override with --arms for a different shape.
@@ -70,7 +70,7 @@ def cell_db_path(cell):
     """Unique per-cell embedded-chroma dir (fresh memory per run_id+task)."""
     return os.path.join(RUN_CFG["embedded_root"], f"{cell['run_id']}_{cell['task']}")
 
-# Named task sets (see services/agent/app/BENCHMARK_SUITE_50.md). All ids are validated + deduped.
+# Named task sets (see agent/app/BENCHMARK_SUITE_50.md). All ids are validated + deduped.
 TASK_SETS = {
     # the original 8-task smoke across 4 archetypes
     "smoke8": ["122", "125", "128", "130", "134", "138", "140", "144"],
@@ -99,7 +99,7 @@ TASK_SETS = {
 # grounding-gated rebuild) PLUS AGENT4's 10 bounded parallel fan-out additions (breadth/argmax/
 # count/AND-filter/nearest thin shapes). Derived from `suite50` rather than re-typed so the two
 # can never silently diverge; pinned against the CI lint gate's own manifest
-# (services/agent/tests/validator_lint_test.ACTIVE_SUITE_IDS) by adaptive_ladder_run_test.py, so
+# (agent/tests/validator_lint_test.ACTIVE_SUITE_IDS) by adaptive_ladder_run_test.py, so
 # the barrage can never run a task the validator-integrity gate does not check.
 TASK_SETS["suite59"] = [t for t in TASK_SETS["suite50"] if t != "024"] + [
     "052", "071", "078", "079", "081", "082", "084", "085", "091", "094",
@@ -118,7 +118,7 @@ def keyval(name):
 def base_env():
     env = dict(os.environ)
     env.update({
-        "PYTHONPATH": "services:services/agent",
+        "PYTHONPATH": "services:agent",
         "OPENROUTER_API_KEY": keyval("OPENROUTER_API_KEY"),
         "SEARCH_API_KEY": keyval("SEARCH_API_KEY"),
         "SERPER_KEY": keyval("SERPER_KEY"),

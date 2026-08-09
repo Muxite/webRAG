@@ -11,12 +11,12 @@ into every body.
 ## Two phases
 
 **Phase 1 — build the system and prove the thesis.** The Graph-of-Thoughts engine
-(`services/agent/app/idea_engine.py`, `idea_policies/*`) plus the cost-recovery benchmark: a
+(`agent/app/idea_engine.py`, `idea_policies/*`) plus the cost-recovery benchmark: a
 discriminating task suite (`idea_tests/test_*.py`), execution variants (graph, sequential_react,
 parametric, naive_rag, **graph_compiled**), fixtures, cost instrumentation, and the analysis
 scripts. The thesis: a graph/compiled scaffold turns a cheap model's larger token budget into
 premium-reference quality at a fraction of the dollar cost. Status: proven live — see
-`services/agent/app/COST_BENCHMARK_HANDOFF.md` (Rounds 1–3).
+`agent/app/COST_BENCHMARK_HANDOFF.md` (Rounds 1–3).
 
 **Phase 2 — use the system to make cheap models stronger (current focus).** Treat the benchmark
 as a feedback loop and push *structured work strategy* down to the leaf so weak/cheap models

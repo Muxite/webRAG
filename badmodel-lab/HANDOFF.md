@@ -74,7 +74,7 @@
 > it. That thesis is proven and settled — see `project_compiled_scaffold_thesis` memory. It is
 > explicitly **not** the goal of webRAG; the native (non-compiled) adaptive engine
 > (`execution_variant=graph`, where the model itself plans/expands/decides each turn — see
-> `services/agent/app/ADAPTIVE_ENGINE.md`) is. Nobody had run *that* against local sub-15B models
+> `agent/app/ADAPTIVE_ENGINE.md`) is. Nobody had run *that* against local sub-15B models
 > before this session — only cloud models (gpt-5-mini). This session's mandate: make 6-12GB-class
 > local models (qwen2.5:7b, llama3.1:8b, qwen2.5:14b — one at a time on a 12GB card) viable to
 > **plan**, not just execute a plan, for the adaptive engine. Ran ~6h autonomous/overnight
@@ -233,7 +233,7 @@ recovers premium accuracy) is already proven; this pushes it to the capability f
 ## Key findings that shaped the specs (verified against code this session)
 
 - **THE critical gotcha:** `IDEA_TEST_COMPILED_LEAF_MODE` defaults to `auto`
-  (`services/agent/app/testing/execution_compiled.py::_leaf_mode_for_model`, L115–133), and `auto` gives
+  (`agent/app/testing/execution_compiled.py::_leaf_mode_for_model`, L115–133), and `auto` gives
   cheap/unknown-price models the **`react` JSON leaf** — the exact format a local 3B can't emit. The demo
   **must hard-set `thin`**. Thin-leaf (harness owns control flow, LLM only perceives/extracts) is the unlock.
 - **Local inference is already wired** — `llm_backends.py` (L144–156) accepts `LLM_PROVIDER=ollama|local` over
@@ -267,7 +267,7 @@ recovers premium accuracy) is already proven; this pushes it to the capability f
 
 1. **Decide the `reachable` tier**: reuse the curated simple-keystone task IDs vs. author explicit
    `level: "reachable"` tasks (reuse is faster/lower-risk). See `DEMO_PREP.md` §C/§H.
-2. **Audit `services/agent/compiled_plans/*.json`** for the demo tasks; run the one-time offline compile
+2. **Audit `agent/compiled_plans/*.json`** for the demo tasks; run the one-time offline compile
    (`scripts/compile_plans.py`, cloud, offline) for any missing plan.
 3. **Pull ollama models** and confirm `MODEL_API_URL`/`LLM_PROVIDER` (A2/A3 in `DEMO_PREP.md`).
 4. **Run the demo matrix** (the one live step): 3B tier × {m0 baseline, m1 thin-leaf} × {micro, reachable},
@@ -286,7 +286,7 @@ recovers premium accuracy) is already proven; this pushes it to the capability f
   on default.
 - Relevant memory notes: `webrag-benchmark-test-design` (what discriminates for a cheap model; the
   simple-keystone wall), `webrag-commit-policy`.
-- Source-of-truth harness docs: `services/agent/app/BENCHMARK_NATIVE.md`, `BENCHMARK_SUITE_50.md`,
+- Source-of-truth harness docs: `agent/app/BENCHMARK_NATIVE.md`, `BENCHMARK_SUITE_50.md`,
   `scripts/LADDER_PREREGISTRATION.md`, `scripts/adaptive_ab_analyze.py` / `cross_tier_analyze.py` /
   `bench_common.py` / `recovery_curve.py`.
 - Everything this session was design/prep; no code changed, nothing ran, no numbers were fabricated.

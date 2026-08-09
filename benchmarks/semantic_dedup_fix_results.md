@@ -7,7 +7,7 @@ Run pair:
 ## The fix
 
 `IdeaDagEngine._semantic_dedup_visits` runs after the post-expansion hooks
-(`services/agent/app/idea_engine.py:561`). For each visit child of the current
+(`agent/app/idea_engine.py:561`). For each visit child of the current
 parent: if it has neither `url`/`optional_url` nor `link_idea`, scan
 URL-bearing siblings for one whose path-slug tokens all appear in the
 URL-less node's `title + goal + parent_goal`. If matched, mark the URL-less

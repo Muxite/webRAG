@@ -1,6 +1,6 @@
 ---
 name: codebench-task-author
-description: Author and live-calibrate new codebench tasks (services/agent/app/idea_code_tests/test_c<NN>_*.py) — Docker-sandboxed coding/hybrid-retrieval-and-code tasks for the codebench harness. Use when adding programming-related benchmark tasks that must be proven, live, to actually challenge a weak local model without being unsolvable.
+description: Author and live-calibrate new codebench tasks (agent/app/idea_code_tests/test_c<NN>_*.py) — Docker-sandboxed coding/hybrid-retrieval-and-code tasks for the codebench harness. Use when adding programming-related benchmark tasks that must be proven, live, to actually challenge a weak local model without being unsolvable.
 tools: Read, Write, Edit, Bash, WebFetch, WebSearch
 model: sonnet
 ---
@@ -18,7 +18,7 @@ allowed but often not required to be complex.
 ## 0. Module contract (mirror `idea_code_tests/test_c01_nth_even_fib_sum.py`, and
 `test_c06_topo_sort_build_deps.py` if your task is genuinely multi-leaf)
 
-One Python module per task, `services/agent/app/idea_code_tests/test_c<NN>_<slug>.py`, implementing:
+One Python module per task, `agent/app/idea_code_tests/test_c<NN>_<slug>.py`, implementing:
 - `get_test_metadata() -> {"test_id": "cNN", "title": "kebab-case", "category": "hard"}` (all new
   tasks in this batch are `"hard"` — deterministic pytest grading, $0 forever, no LLM judge).
 - `get_task_statement() -> str` — becomes the agent-visible prompt.
@@ -38,7 +38,7 @@ One Python module per task, `services/agent/app/idea_code_tests/test_c<NN>_<slug
   `[UPSTREAM STEP DID NOT COMPLETE]` marker if it never finished — write downstream instructions
   to re-derive/verify rather than blindly trust that marker, mirroring c06).
 
-Companion offline validator: `services/agent/tests/idea_code_test_c<NN>_test.py` (mirror
+Companion offline validator: `agent/tests/idea_code_test_c<NN>_test.py` (mirror
 `idea_code_test_c01_test.py`). Non-negotiable: (a) **independently re-derive the ground truth** —
 a second, differently-written computation, never the module's own hand-derived values taken on
 faith; (b) assert every literal expected value embedded in the test file matches that independent
@@ -48,7 +48,7 @@ structure, JSON-serializability, and that it leaks nothing (no canonical test as
 answer values — describe the contract, never the answer, exactly like c06's plan); (f) an
 end-to-end `materialize_task.py <id> --out <tmp_path>` subprocess run asserting the on-disk output
 matches the module's own return values exactly (`badmodel-lab/codebench/materialize_task.py`,
-invoke with `PYTHONPATH=services`).
+invoke with `PYTHONPATH=.:services`).
 
 ## 1. Security constraints (binding on you as author, from this system's own adversarial review)
 
@@ -140,7 +140,7 @@ across your whole batch — other agents are waiting their turn on the same GPU/
 ## 5. Prove it before reporting done
 
 ```
-PYTHONPATH=services:services/agent ./.venv/bin/python -m pytest -q services/agent/tests/idea_code_test_c<NN>_test.py
+PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests/idea_code_test_c<NN>_test.py
 ```
 byte-compile every touched file. Do not commit — leave everything staged/uncommitted for review.
 

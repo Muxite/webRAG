@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Render one services/agent/app/idea_code_tests/test_c*.py task module to an on-disk
+"""Render one agent/app/idea_code_tests/test_c*.py task module to an on-disk
 fixture tree that run_agent_sandbox.sh / run_grade.sh can mount and consume.
 
-Task module contract (see services/agent/app/idea_code_tests/test_c01_*.py for the first
+Task module contract (see agent/app/idea_code_tests/test_c01_*.py for the first
 concrete example):
     get_test_metadata() -> {"test_id": str, "category": "hard"|"soft", ...}
     get_task_statement() -> str                       # becomes public/prompt.md
@@ -23,7 +23,7 @@ Output layout:
                                                discard before trusting the submission
     tasks/<id>/meta.json             <- category/visibility/keystone_test_ids/entrypoint
 
-Usage: PYTHONPATH=services python badmodel-lab/codebench/materialize_task.py c01 --out badmodel-lab/codebench/tasks
+Usage: PYTHONPATH=. python badmodel-lab/codebench/materialize_task.py c01 --out badmodel-lab/codebench/tasks
 """
 from __future__ import annotations
 
@@ -38,9 +38,9 @@ from pathlib import Path
 def _resolve_module_name(test_id: str) -> str:
     """Task modules are test_<id>_<slug>.py (e.g. test_c01_nth_even_fib_sum.py),
     mirroring idea_tests/'s test_NNN_<slug>.py convention — glob rather than assume
-    the suffix. Imported as agent.app.idea_code_tests.* (the PYTHONPATH=services host
+    the suffix. Imported as agent.app.idea_code_tests.* (the PYTHONPATH=. host
     convention this repo's own test invocation already uses — see project memory
-    "Tests need PYTHONPATH=services"), NOT app.idea_code_tests.*, which is a container-only
+    "Tests need PYTHONPATH=."), NOT app.idea_code_tests.*, which is a container-only
     alias that only resolves via the Docker image's WORKDIR=/app/agent CWD trick."""
     import agent.app.idea_code_tests as pkg
 

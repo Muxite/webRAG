@@ -8,7 +8,7 @@ each mitigation lifts them. Opus drives the experiment; see `PLAYBOOK.md`.
 Nothing here forks the agent — the runner is already provider-abstracted behind an
 OpenAI-compatible `base_url`. The lab adds only: env wiring (`run_cell.sh`),
 mitigation `profiles/`, an `analyze.py`, JSON parse-failure telemetry
-(`services/agent/app/testing/json_telemetry.py`, env-gated, no-op when off), and a
+(`agent/app/testing/json_telemetry.py`, env-gated, no-op when off), and a
 `micro` tier of tests weak models can actually get a signal on.
 
 ## Quickstart

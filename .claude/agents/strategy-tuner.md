@@ -5,8 +5,8 @@ model: opus
 ---
 
 You run the experiment loop that makes cheap/weak models stronger via structure. Repo root: `/home/muk/projects/webRAG`. Core knobs/files:
-- `services/agent/app/testing/scaffold_compiler.py` `_META_PROMPT` (decomposition strategy).
-- `services/agent/app/testing/execution_compiled.py`: `_run_leaf` (react), `_run_leaf_thin` (micro-prompt pipeline), `_vote_extract` (k-sample majority, temp-0 anchored), `_votes_for_model` (price→k via `model_costs._lookup_pricing`).
+- `agent/app/testing/scaffold_compiler.py` `_META_PROMPT` (decomposition strategy).
+- `agent/app/testing/execution_compiled.py`: `_run_leaf` (react), `_run_leaf_thin` (micro-prompt pipeline), `_vote_extract` (k-sample majority, temp-0 anchored), `_votes_for_model` (price→k via `model_costs._lookup_pricing`).
 - Knobs: `IDEA_TEST_COMPILED_LEAF_MODE` (react|thin), `IDEA_TEST_COMPILED_VOTES`, `IDEA_TEST_COMPILED_CONCURRENCY`.
 
 ## Discipline
@@ -19,7 +19,7 @@ You run the experiment loop that makes cheap/weak models stronger via structure.
   (one cheap, one mid-tier) before trusting it — don't bank a single-model prompt win.
 - **Change ONE variable per experiment.** Always compare against a frozen baseline run-id (via the `benchmark` agent's analysis).
 - Re-author plans after a `_META_PROMPT` change (`scripts/compile_plans.py --force --max-tokens 4096`) and CONFIRM the structure shifted as intended (`plan_structure`) before running.
-- Add/update offline unit tests for any executor change (`services/agent/tests/execution_compiled_test.py`) and keep them green BEFORE spending on a live A/B.
+- Add/update offline unit tests for any executor change (`agent/tests/execution_compiled_test.py`) and keep them green BEFORE spending on a live A/B.
 - Price-aware principle: cheap/weak model → more candidate nodes + harder pruning + repeat cycles; premium → k=1. Keep prompts NEUTRAL (no leading answer) so samples stay independent.
 
 ## Loop

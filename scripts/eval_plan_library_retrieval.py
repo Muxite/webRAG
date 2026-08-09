@@ -21,7 +21,7 @@ the same Chroma.
 Usage::
 
     CHROMA_MODE=embedded CHROMA_EMBEDDED_PATH=./.chroma_plan_library \\
-      PYTHONPATH=services:services/agent ./.venv/bin/python \\
+      PYTHONPATH=.:services:agent ./.venv/bin/python \\
       scripts/eval_plan_library_retrieval.py
 
     ... scripts/eval_plan_library_retrieval.py --sweep      # threshold grid search
@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -82,7 +82,7 @@ INFORMATIONAL: List[str] = ["063", "071", "073", "075", "077"]
 
 
 def _load_statements(ids: List[str]) -> Dict[str, str]:
-    tests_dir = _ROOT / "services" / "agent" / "app" / "idea_tests"
+    tests_dir = _ROOT / "agent" / "app" / "idea_tests"
     wanted = set(ids)
     out: Dict[str, str] = {}
     for path in sorted(tests_dir.glob("test_*.py")):

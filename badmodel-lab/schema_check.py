@@ -16,7 +16,7 @@ from pathlib import Path
 
 # Make the harness importable when run standalone (mirrors run_cell.sh's PYTHONPATH).
 _REPO = Path(__file__).resolve().parents[1]
-for p in (_REPO / "services", _REPO / "services" / "agent"):
+for p in (_REPO, _REPO / "services", _REPO / "agent"):
     sp = str(p)
     if sp not in sys.path:
         sys.path.insert(0, sp)

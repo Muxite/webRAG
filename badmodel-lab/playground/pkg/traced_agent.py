@@ -54,7 +54,7 @@ class JsonlLogHandler(logging.Handler):
     `IdeaDagEngine` and its policies (LlmExpansionPolicy, SearchLeafAction, etc.) already
     log every step via the stdlib `logging` module — the same lines a friend sees on
     their terminal. Attaching this handler to the root logger persists that exact detail
-    to the transcript file too, with zero changes to services/agent/app/*.
+    to the transcript file too, with zero changes to agent/app/*.
     """
 
     def __init__(self, recorder: SessionTraceRecorder, level: int = logging.INFO) -> None:

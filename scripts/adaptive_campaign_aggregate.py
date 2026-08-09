@@ -7,14 +7,14 @@ non-adaptive baseline arm) and emits:
   - PNG diagrams: score A/B, DAG-complexity A/B, re-expansion events, context-usage A/B.
 
 Usage:
-  PYTHONPATH=services:services/agent ./.venv/bin/python scripts/adaptive_campaign_aggregate.py \
+  PYTHONPATH=.:services:agent ./.venv/bin/python scripts/adaptive_campaign_aggregate.py \
       --adaptive-run-id adaptive_proof_g0 --baseline-run-id adaptive_baseline_g1 \
       --out scripts/_campaign_out
 """
 import argparse, glob, json, os
 from collections import defaultdict
 
-RESULTS_DIR = "services/agent/idea_test_results"
+RESULTS_DIR = "agent/idea_test_results"
 
 # ── colorblind-safe categorical palette (adaptive = blue, baseline = amber) ──
 C_ADAPT = "#1f6feb"

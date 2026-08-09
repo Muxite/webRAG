@@ -2,14 +2,14 @@
 """
 Derive the calibrated high-confidence early-exit rule (A6) from recorded benchmark runs. $0.
 
-Reads every ``services/agent/idea_test_results/*.json`` that (a) comes from the REGULAR model
+Reads every ``agent/idea_test_results/*.json`` that (a) comes from the REGULAR model
 roster, (b) carries a non-empty ``execution.observability.step_confidence.trace``, and (c) has
 a ``validation.overall_score``; turns each into one E-valuator-style calibration example
 ``(confidence-sequence, eventual-label)``; splits it deterministically into a fit set and a
 never-fitted holdout; fits per-timestep stop thresholds at each rung of
 ``TARGET_STOP_PRECISION_LADDER``; and writes the versioned artifact the engine reads:
 
-    services/agent/app/confidence_early_exit_calibration.json
+    agent/app/confidence_early_exit_calibration.json
 
 The statistics live in ``idea_policies/confidence_early_exit.py`` (shared with the engine, so
 the rule that is measured here is byte-for-byte the rule that runs); this file is only the
@@ -27,7 +27,7 @@ Selection policy (deliberately boring, all constants named in the shared module)
 
 Usage::
 
-    PYTHONPATH=services:services/agent ./.venv/bin/python \\
+    PYTHONPATH=.:services:agent ./.venv/bin/python \\
       scripts/calibrate_confidence_early_exit.py
 
     ... --dry-run            # print the report, write nothing
@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -73,7 +73,7 @@ from agent.app.idea_policies.confidence_early_exit import (  # noqa: E402
     prefix_statistic,
 )
 
-DEFAULT_RESULTS_DIR = _ROOT / "services" / "agent" / "idea_test_results"
+DEFAULT_RESULTS_DIR = _ROOT / "agent" / "idea_test_results"
 
 
 def is_regular_roster(filename: str) -> bool:

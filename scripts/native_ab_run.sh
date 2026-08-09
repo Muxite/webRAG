@@ -24,7 +24,7 @@ set -uo pipefail   # NOT -e: one failing cell must not abort the matrix.
 REPO=/home/muk/projects/webRAG
 cd "$REPO" || exit 1
 PY=./.venv/bin/python
-export PYTHONPATH=services:services/agent
+export PYTHONPATH=.:services:agent
 
 # ---- params (env-overridable) ----
 ARMS="${ARMS:-baseline good_adaptive}"
@@ -53,7 +53,7 @@ export IDEA_TEST_CONNECTOR_RETRY=1      # infra-fairness: absorb transient tool 
 export IDEA_TEST_EFFORT_TIERS=0
 export IDEA_TEST_USD_CEILING="$USD_CEILING"
 
-OUT_DIR="services/agent/idea_test_results/_${RUN_ID}"
+OUT_DIR="agent/idea_test_results/_${RUN_ID}"
 mkdir -p "$OUT_DIR"
 echo "[native_ab_run] arms=[$ARMS] tasks=[$TASKS] model=$MODEL R=$R run_id=$RUN_ID ceiling=\$$USD_CEILING"
 

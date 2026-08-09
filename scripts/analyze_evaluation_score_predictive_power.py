@@ -50,13 +50,13 @@ What it reports:
   "on the answer path vs a pruned branch".
 * **rationale availability** — whether there is any judge prose to quote at all.
 
-Findings are written up in ``services/agent/app/EVALUATION_SCORE_PREDICTIVE_POWER.md``. This
+Findings are written up in ``agent/app/EVALUATION_SCORE_PREDICTIVE_POWER.md``. This
 script is analysis only: it reads result JSON and prints; it writes no artifact the engine
 reads and changes no behaviour.
 
 Usage::
 
-    PYTHONPATH=services:services/agent ./.venv/bin/python \\
+    PYTHONPATH=.:services:agent ./.venv/bin/python \\
       scripts/analyze_evaluation_score_predictive_power.py
 
     ... --samples 8              # high-scoring nodes inside failed runs to print
@@ -75,7 +75,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent", _ROOT / "scripts"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent", _ROOT / "scripts"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 

@@ -20,14 +20,14 @@ REPO=/home/muk/projects/webRAG
 cd "$REPO" || exit 1
 
 RUN_ID=barrage24b
-RESULTS_DIR=services/agent/idea_test_results
+RESULTS_DIR=agent/idea_test_results
 DRIVER_DIR="$RESULTS_DIR/_driver_${RUN_ID}"
 AGG_DIR="$DRIVER_DIR/agg"
 LOG="$DRIVER_DIR/driver.log"
 STATUS="$DRIVER_DIR/STATUS.md"
 LOCK="$DRIVER_DIR/driver.pid"
 PY=./.venv/bin/python
-export PYTHONPATH=services:services/agent
+export PYTHONPATH=.:services:agent
 
 GLOBAL_USD_CAP=15.00      # driver stops between cells once cumulative barrage24b spend crosses this
 PER_INV_CEILING=4.00      # backstop inside a single runner invocation (runaway guard)

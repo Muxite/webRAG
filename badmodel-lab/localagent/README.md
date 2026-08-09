@@ -3,7 +3,7 @@
 A **separate layer** that treats a weak local LLM as a *noisy semantic controller* and wraps every fragile
 interface in deterministic code. It **reuses IdeaEngine primitives by import** (connectors, local MiniLM
 embeddings, HTML cleaning, `json_telemetry.schema_check`) and makes **zero changes to `idea_engine.py` or the
-production path**. Named `localagent` (not `agent`) to avoid colliding with the repo's `services/agent`
+production path**. Named `localagent` (not `agent`) to avoid colliding with the repo's `agent`
 package. Full design: `/home/muk/.claude/plans/plan-future-work-*.md`.
 
 ## The loop (doctrine)

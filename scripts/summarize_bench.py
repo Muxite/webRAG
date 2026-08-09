@@ -1,7 +1,7 @@
 """
 Quick stat aggregator for idea-test JSON result files.
 
-Each test run produces ONE JSON file in services/agent/idea_test_results/. This
+Each test run produces ONE JSON file in agent/idea_test_results/. This
 script scans all files in that dir (or a subset by timestamp prefix) and prints:
 - model x variant grid
 - test x variant grid
@@ -89,7 +89,7 @@ def _metrics(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def main(argv: List[str]) -> int:
-    results_dir = Path("services/agent/idea_test_results")
+    results_dir = Path("agent/idea_test_results")
     if not results_dir.is_dir():
         results_dir = Path("agent/idea_test_results")
     files: List[Path] = []

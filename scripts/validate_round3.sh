@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u; cd /home/muk/projects/webRAG; PY=./.venv/bin/python
-export PYTHONPATH=services:services/agent
-OUT=services/agent/idea_test_results; LOG="$OUT/_validate_round3/driver.log"; mkdir -p "$OUT/_validate_round3"
+export PYTHONPATH=.:services:agent
+OUT=agent/idea_test_results; LOG="$OUT/_validate_round3/driver.log"; mkdir -p "$OUT/_validate_round3"
 keyval(){ grep -E "^$1=" services/keys.env | cut -d= -f2- | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/'; }
 export OPENROUTER_API_KEY="$(keyval OPENROUTER_API_KEY)" SEARCH_API_KEY="$(keyval SEARCH_API_KEY)"
 export LLM_PROVIDER=openrouter MODEL_API_URL=https://openrouter.ai/api/v1 CHROMA_URL=http://localhost:8001

@@ -6,10 +6,10 @@
 |-----------|-------------|
 | `frontend/` | React UI with Supabase auth, task submission, and task history |
 | `services/gateway/` | FastAPI gateway, task intake, Supabase sync, health monitoring |
-| `services/agent/` | Graph-of-Thought reasoning agent with web crawling and RAG |
+| `agent/` | Graph-of-Thought reasoning agent with web crawling and RAG |
 | `services/shared/` | Shared connectors, models, storage helpers, message contracts |
-| `services/metrics/` | CloudWatch queue-depth publisher for autoscaling |
-| `services/lambda_autoscaling/` | Lambda-based ECS autoscaler (deployment only) |
+| `services/_legacy-aws/metrics/` | CloudWatch queue-depth publisher for autoscaling (unused in current compose stack) |
+| `services/_legacy-aws/lambda_autoscaling/` | Lambda-based ECS autoscaler (deployment only, unused in current compose stack) |
 
 ## Agent Internals
 
@@ -29,9 +29,9 @@ expensive model authored once, offline (see Benchmark Results in the root README
 reasoning-effort discipline) layered on top of the base loop above — both are default-off and
 byte-identical to the base loop when disabled.
 
-See [Agent Architecture](../services/agent/app/AGENT_ARCHITECTURE.md) for full details, or the
-deeper, line-cited [Idea Engine](../services/agent/app/IDEA_ENGINE.md) and
-[Adaptive Engine](../services/agent/app/ADAPTIVE_ENGINE.md) docs for the DAG controller and the
+See [Agent Architecture](../agent/app/AGENT_ARCHITECTURE.md) for full details, or the
+deeper, line-cited [Idea Engine](../agent/app/IDEA_ENGINE.md) and
+[Adaptive Engine](../agent/app/ADAPTIVE_ENGINE.md) docs for the DAG controller and the
 adaptive loop respectively.
 
 ## Message Flow

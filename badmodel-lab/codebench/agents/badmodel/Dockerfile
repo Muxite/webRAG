@@ -7,9 +7,9 @@
 # Build order: codebench-base -> this image. Build context MUST be the repo root, e.g.:
 #   docker build -f badmodel-lab/codebench/agents/badmodel/Dockerfile -t codebench-badmodel .
 #
-# MAINTENANCE NOTE: duplicates services/agent/.dockerfile's dependency-install steps
+# MAINTENANCE NOTE: duplicates agent/.dockerfile's dependency-install steps
 # rather than deriving from it (same tradeoff playground/Dockerfile.agent already made).
-# Re-sync by hand if services/agent/requirements.txt changes.
+# Re-sync by hand if agent/requirements.txt changes.
 FROM codebench-base:latest
 
 ENV PYTHONPATH=/app \
@@ -18,7 +18,7 @@ ENV PYTHONPATH=/app \
 
 WORKDIR /app
 
-COPY services/agent/requirements.txt /app/agent/requirements.txt
+COPY agent/requirements.txt /app/agent/requirements.txt
 RUN pip install --no-cache-dir -r /app/agent/requirements.txt
 
 COPY services/shared /app/shared
@@ -33,7 +33,7 @@ ef = ONNXMiniLM_L6_V2(); \
 ef(['warmup']); \
 print('ChromaDB ONNX embedding model pre-downloaded')"
 
-COPY services/agent /app/agent
+COPY agent /app/agent
 
 # SECURITY: idea_code_tests/ (and the QA idea_tests/) hold canonical grading content —
 # for tasks with hidden tests, that content must never be reachable from inside an agent
@@ -49,7 +49,7 @@ WORKDIR /app/agent
 RUN chown -R agent:agent /app
 USER agent
 
-# app.codebench_run_task (services/agent/app/codebench_run_task.py) loads the task's
+# app.codebench_run_task (agent/app/codebench_run_task.py) loads the task's
 # compiled plan and drives it via the graph_compiled_code execution variant against
-# /work — see services/agent/app/testing/execution_compiled_code.py.
+# /work — see agent/app/testing/execution_compiled_code.py.
 ENTRYPOINT ["python", "-m", "app.codebench_run_task"]

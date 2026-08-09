@@ -23,8 +23,8 @@ Schema v2 DAG: `leaves=[{id, instruction, expect, depends_on}]` + `aggregation`.
 WebFetch the authoritative page for EVERY fact and confirm it EXACTLY (infobox figure, spelling, slug/redirects). For argmin/argmax, confirm the keystone margin is wide enough that one noisy extraction can't flip it. Prefer **page-only, hard-to-memorize** facts (parametric-leak resistant). Annotate provenance in the docstring ("verified against live <source>, <date>").
 
 ## 4. Harden + gate
-Write `services/agent/tests/<name>_validators_test.py` with adversarial cases: full answer (single- AND multi-line layout → 1.0), wrong keystone (gate 0, coverage retained, citations gated 0), partial coverage (exact fraction), no-visits (visit gate 0), and the compiled-plan well-formed + leaks-nothing assertion. Register the id in `idea_test_runner.py TEST_PRIORITY_ORDER`.
+Write `agent/tests/<name>_validators_test.py` with adversarial cases: full answer (single- AND multi-line layout → 1.0), wrong keystone (gate 0, coverage retained, citations gated 0), partial coverage (exact fraction), no-visits (visit gate 0), and the compiled-plan well-formed + leaks-nothing assertion. Register the id in `idea_test_runner.py TEST_PRIORITY_ORDER`.
 Prove green and byte-compile:
-`PYTHONPATH=services:services/agent ./.venv/bin/python -m pytest -q services/agent/tests/<name>_validators_test.py`
+`PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests/<name>_validators_test.py`
 
 Return the new files, the verified ground-truth table with margins, and the test output.

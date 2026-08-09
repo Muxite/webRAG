@@ -24,10 +24,10 @@ REPO=/home/muk/projects/webRAG
 cd "$REPO" || exit 1
 
 PY=./.venv/bin/python
-export PYTHONPATH=services:services/agent
+export PYTHONPATH=.:services:agent
 
 RUN_ID="${IDEA_TEST_RUN_ID:-throughput_run}"
-RESULTS_DIR=services/agent/idea_test_results
+RESULTS_DIR=agent/idea_test_results
 OUT_DIR="$RESULTS_DIR/_throughput"
 LOG="$OUT_DIR/driver.log"
 mkdir -p "$OUT_DIR"

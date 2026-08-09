@@ -70,7 +70,7 @@ def _load_schema_check():
     except Exception:
         import sys
         root = Path(__file__).resolve().parents[2]     # webRAG/
-        for p in (root / "services", root / "services" / "agent"):
+        for p in (root, root / "services"):
             if str(p) not in sys.path:
                 sys.path.insert(0, str(p))
         try:

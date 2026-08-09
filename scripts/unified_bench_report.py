@@ -11,7 +11,7 @@ markdown view, and mutates nothing.
 
 **What it reads (and, importantly, what each file actually is)**
 
-* ``services/agent/idea_test_results/*.json`` — the main harness's per-cell results. This is
+* ``agent/idea_test_results/*.json`` — the main harness's per-cell results. This is
   the ONLY source of QA scores. Loaded through ``scripts/bench_common.py``
   (``discover_files`` + ``load_row``), the canonical shared loader already used by
   ``recovery_curve.py`` / ``level_ladder.py`` / ``mine_failure_taxonomy.py`` — NOT a private
@@ -81,7 +81,7 @@ from statistics import mean
 from typing import Any, Dict, List, Optional, Sequence
 
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent", _ROOT / "scripts"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent", _ROOT / "scripts"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 

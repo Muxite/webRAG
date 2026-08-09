@@ -32,13 +32,13 @@ What it reports (all from recorded runs, no LLM calls):
 * **a qualitative sample** of high-confidence steps inside failed trajectories, printed
   verbatim so the failure mode can be read rather than inferred.
 
-Findings are written up in ``services/agent/app/CONFIDENCE_JUDGE_MISCALIBRATION.md``. This
+Findings are written up in ``agent/app/CONFIDENCE_JUDGE_MISCALIBRATION.md``. This
 script is analysis only: it reads result JSON and prints; it writes no artifact the engine
 reads and changes no behaviour.
 
 Usage::
 
-    PYTHONPATH=services:services/agent ./.venv/bin/python \\
+    PYTHONPATH=.:services:agent ./.venv/bin/python \\
       scripts/analyze_confidence_judge_miscalibration.py
 
     ... --samples 10             # how many high-confidence-but-failed steps to print
@@ -59,7 +59,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent", _ROOT / "scripts"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent", _ROOT / "scripts"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 

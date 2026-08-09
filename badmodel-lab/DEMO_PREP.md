@@ -12,11 +12,11 @@ what to look at and decide **before** any live run. Nothing here is executed. Co
 
 | # | Item | Where to look | What "ready" means |
 |---|---|---|---|
-| A1 | Local inference path is wired | `services/agent/app/llm_backends.py` (L144–156) | `LLM_PROVIDER` accepts `ollama`/`local`/`openai_compatible`; OpenAI-compatible Chat Completions covers Ollama/vLLM/llama.cpp. **Already supported.** |
+| A1 | Local inference path is wired | `agent/app/llm_backends.py` (L144–156) | `LLM_PROVIDER` accepts `ollama`/`local`/`openai_compatible`; OpenAI-compatible Chat Completions covers Ollama/vLLM/llama.cpp. **Already supported.** |
 | A2 | Which local models are pulled | `ollama list` (inspect only) | Demo targets present: `llama3.2:3b`, `phi3:mini`, `gemma2:2b`. Diagnosis/contrast: `llama3.2:1b`, `qwen2.5:0.5b`, `tinyllama`. |
 | A3 | Endpoint the harness will hit | env: `MODEL_API_URL` | Points at ollama's OpenAI shim, e.g. `http://localhost:11434/v1`; `LLM_PROVIDER=ollama`. |
 | A4 | Non-local dependencies (be honest) | env: `SEARCH_API_KEY`, chroma on `:8001` | Web **search + page fetch are the environment**, not the model — they stay online. "Fully local" = the *model/inference* is local. State this plainly in the writeup. |
-| A5 | Harness run contract | `HANDOFF.md` "How to run" | `PYTHONPATH=services:services/agent`, `IDEA_TEST_CONCURRENCY=1` (mandatory, shared connectors), chroma up. |
+| A5 | Harness run contract | `HANDOFF.md` "How to run" | `PYTHONPATH=.:services:agent`, `IDEA_TEST_CONCURRENCY=1` (mandatory, shared connectors), chroma up. |
 
 ---
 
@@ -39,11 +39,11 @@ honest cells. Proposed axis to look at and lock:
 
 | Tier | Status in repo | Task IDs to look at | Note |
 |---|---|---|---|
-| **micro** | **Exists** | `test_045_micro_extract.py` (level `micro`, difficulty 2/10: visit ONE page, extract ONE value, reward stop-early) | The cleanest existence-proof task. Check for siblings: `grep -l '"level": "micro"' services/agent/app/idea_tests/*.py`. |
+| **micro** | **Exists** | `test_045_micro_extract.py` (level `micro`, difficulty 2/10: visit ONE page, extract ONE value, reward stop-early) | The cleanest existence-proof task. Check for siblings: `grep -l '"level": "micro"' agent/app/idea_tests/*.py`. |
 | **reachable** | **Not a named level yet** — curate from existing simple-keystone tasks | single-COUNT: `072`, `078` · single-ARGMAX: `062`, `064` · threshold-ENTITY: `069`, `076` · subset-sum-to-one-total: `070` | These are the keystones the memory doc marks *cheap-executor-reliable* (compiled 0.80–1.00). **Caveat: validated on nano, not on 0.5–3B local** — re-confirm each is truly simple before trusting it as "reachable." |
 | **hard** | Exists (the 38-task suite + adaptive archetypes) | `smoke8`, `suite50` (`scripts/adaptive_ladder_run.py` `TASK_SETS`) | Diagnosis/ceiling context only, not the demo. |
 
-Also look at: `services/agent/app/BENCHMARK_SUITE_50.md` and `BENCHMARK_SUITE_64.md` for the vetted task-set
+Also look at: `agent/app/BENCHMARK_SUITE_50.md` and `BENCHMARK_SUITE_64.md` for the vetted task-set
 definitions before finalizing the reachable list.
 
 **The memory-doc wall to respect when picking tasks:** cheap/local executors reliably produce a *single*
@@ -59,7 +59,7 @@ closest-to/argmin. Pick keystones from the first group only.
    — i.e. local models get the exact format they can't emit. The demo **must override to `thin`**, or it will
    fail for the wrong reason. This is the single most important prep item.
 2. **Compiled scaffold path.** `IDEA_TEST_EXECUTION_VARIANTS=graph_compiled` + a compiled plan must exist for
-   each demo task. Look at `services/agent/compiled_plans/*.json` (hashed by mandate). If a demo task has no
+   each demo task. Look at `agent/compiled_plans/*.json` (hashed by mandate). If a demo task has no
    plan, it must be authored offline via `scripts/compile_plans.py` — **this is the one cloud/offline step**
    ("compile once offline, run local forever"). Decide *when* to run it; it is prep, not the demo.
 3. **Grounding gate.** Keystone credit requires `observability.visit.count > 0` (`BENCHMARK_NATIVE.md`
@@ -80,7 +80,7 @@ closest-to/argmin. Pick keystones from the first group only.
 
 ## E. What to inspect in the results (the "items to look at" after a run)
 
-Per-run JSON lands in `services/agent/idea_test_results/<run_id>_<task>_<model>_<variant>_r*.json`. Fields to
+Per-run JSON lands in `agent/idea_test_results/<run_id>_<task>_<model>_<variant>_r*.json`. Fields to
 read (via `scripts/gate_report.py` / `bench_common.load_row`, no live calls):
 
 - `validation.overall_score` (and keystone, if emitted) — did it clear **0.75**?

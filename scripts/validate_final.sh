@@ -5,8 +5,8 @@
 set -u
 cd /home/muk/projects/webRAG
 PY=./.venv/bin/python
-export PYTHONPATH=services:services/agent
-OUT=services/agent/idea_test_results
+export PYTHONPATH=.:services:agent
+OUT=agent/idea_test_results
 LOG="$OUT/_validate_final/driver.log"
 mkdir -p "$OUT/_validate_final"
 

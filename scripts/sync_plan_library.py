@@ -26,14 +26,14 @@ Usage::
 
     # embedded mode: a private per-process SQLite store, no chroma service needed
     CHROMA_MODE=embedded CHROMA_EMBEDDED_PATH=./.chroma_plan_library \\
-      PYTHONPATH=services:services/agent ./.venv/bin/python scripts/sync_plan_library.py
+      PYTHONPATH=.:services:agent ./.venv/bin/python scripts/sync_plan_library.py
 
     # against the running chroma service
     CHROMA_URL=http://localhost:8001 \\
-      PYTHONPATH=services:services/agent ./.venv/bin/python scripts/sync_plan_library.py
+      PYTHONPATH=.:services:agent ./.venv/bin/python scripts/sync_plan_library.py
 
     # what would change: reads the collection, embeds nothing, manifest untouched
-    PYTHONPATH=services:services/agent ./.venv/bin/python scripts/sync_plan_library.py --dry-run
+    PYTHONPATH=.:services:agent ./.venv/bin/python scripts/sync_plan_library.py --dry-run
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ from typing import Any, Dict, List
 
 # Mirror the runner's import roots so this works from a plain checkout.
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 

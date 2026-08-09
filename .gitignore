@@ -37,7 +37,7 @@ compiled_plans/
 .model_pricing_cache.json
 .barrage_prep/
 # codebench: materialize_task.py's rendered task fixtures and run results — regenerable
-# from services/agent/app/idea_code_tests/*.py, never a source artifact
+# from agent/app/idea_code_tests/*.py, never a source artifact
 badmodel-lab/codebench/tasks/
 badmodel-lab/codebench/results/
 # Coverage data file — regenerated on every pytest --cov run

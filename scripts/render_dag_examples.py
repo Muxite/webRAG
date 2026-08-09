@@ -3,7 +3,7 @@
 
 Used to eyeball the visualizer's layout/sizing. Writes square >=1920px images.
 
-    PYTHONPATH=services:services/agent ./.venv/bin/python scripts/render_dag_examples.py [out_dir] [side_px]
+    PYTHONPATH=.:services:agent ./.venv/bin/python scripts/render_dag_examples.py [out_dir] [side_px]
 """
 import json
 import os
@@ -11,7 +11,7 @@ import sys
 
 from agent.app.testing.dag_visualizer import render_plan_dag, render_runtime_dag
 
-PLANS_DIR = "services/agent/compiled_plans"
+PLANS_DIR = "agent/compiled_plans"
 EXAMPLES = {
     "fanout6": ("c7b7b03a215c4fe0.json", "Pure fan-out — deepest of 6 lakes (test 053)",
                 "Which of 6 lakes is deepest by max depth?"),

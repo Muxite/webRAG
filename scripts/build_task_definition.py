@@ -841,7 +841,7 @@ def main():
     mode = DeploymentMode.from_string(args.mode)
     
     repo_root = Path(__file__).resolve().parent.parent
-    base_dir = repo_root / "services" / "task-definitions"
+    base_dir = repo_root / "services" / "_legacy-aws" / "task-definitions"
     base_dir.mkdir(parents=True, exist_ok=True)
     services_dir = repo_root / "services"
     

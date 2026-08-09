@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build all codebench images in dependency order (base first — badmodel/aider FROM it).
 # Run from the repo root or anywhere; this script cd's to the repo root itself, since
-# agents/badmodel/Dockerfile needs a repo-root build context (COPY services/agent, etc).
+# agents/badmodel/Dockerfile needs a repo-root build context (COPY agent, etc).
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"

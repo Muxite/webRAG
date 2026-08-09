@@ -4,7 +4,7 @@
 #
 # What it verifies
 # ----------------
-# Two engine fixes landed in services/agent/app/testing/execution_compiled.py:
+# Two engine fixes landed in agent/app/testing/execution_compiled.py:
 #   1. _target_entity indirect-pointer guard — a thin leaf whose instruction says
 #      "find the author of the novel 'X', then open THAT AUTHOR's page and read ..." no longer
 #      grounds its search/page-pick on the NOVEL 'X'; it defers to the LLM query (which names the
@@ -21,7 +21,7 @@
 # Runs graph_compiled with thin leaves HARD-PINNED (IDEA_TEST_COMPILED_LEAF_MODE=thin) on BOTH
 # models, so nano is tested on the exact thin path that failed (auto-routing would send cheap nano
 # to react and hide the regression). Compare against the pre-fix baselines in
-# services/agent/idea_test_results/consol_gpt5mini_*_055_*.json and
+# agent/idea_test_results/consol_gpt5mini_*_055_*.json and
 # p2_consol_pilot_*_055_openai-gpt-4.1-nano_*.json.
 #
 # Launch (survives terminal close):
@@ -32,10 +32,10 @@ REPO=/home/muk/projects/webRAG
 cd "$REPO" || exit 1
 
 PY=./.venv/bin/python
-export PYTHONPATH=services:services/agent
+export PYTHONPATH=.:services:agent
 
 RUN_ID=retest055grounding
-RESULTS_DIR=services/agent/idea_test_results
+RESULTS_DIR=agent/idea_test_results
 OUT_DIR="$RESULTS_DIR/_retest_055"
 LOG="$OUT_DIR/driver.log"
 mkdir -p "$OUT_DIR"

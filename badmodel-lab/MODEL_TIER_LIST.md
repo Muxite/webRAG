@@ -163,7 +163,7 @@ Total live spend across all three rounds: E1 $0.1245 + Round 2 $0.3343 + Round 3
    differs from the literal string the task checks for. Reproduces again in Round 3
    (`qwen2.5:14b` gets the correct fact every time but scores 0.0 on grounding, capping m02 at
    0.50 and the format-tier f02 task at 0.67 across all three profiles). Fix candidate:
-   `services/agent/app/idea_tests/test_m02_amsterdam_area.py`'s grounding check should accept the
+   `agent/app/idea_tests/test_m02_amsterdam_area.py`'s grounding check should accept the
    known redirect target. Still not fixed.
 6. **Small samples.** R=1-3 per cell. Treat single-digit-percentage differences as noise.
 
@@ -177,6 +177,6 @@ Total live spend across all three rounds: E1 $0.1245 + Round 2 $0.3343 + Round 3
 - Round 3 (2026-08-04): the deepseek `reachable`-tier re-test (post-fix, same run_id prefix as
   Round 2, later timestamps), `bml__qwen2.5-14b__*` across reachable/hard/format/micro, and
   gap-fill reachable-tier cells for `tinyllama`/`qwen2.5-0.5b`/`llama3.2-1b`/`phi3-mini`.
-- Full writeups: `services/agent/app/AGENT_CONTINUUM.md`'s E1/E4 sections. Raw result JSONs in
-  `services/agent/idea_test_results/bml__*.json` (gitignored, local to whichever environment ran
+- Full writeups: `agent/app/AGENT_CONTINUUM.md`'s E1/E4 sections. Raw result JSONs in
+  `agent/idea_test_results/bml__*.json` (gitignored, local to whichever environment ran
   them).

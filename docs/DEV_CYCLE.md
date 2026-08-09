@@ -14,7 +14,7 @@ with a repeatable loop, sized to the change instead of applied uniformly.
 | Write/adjust tests | Author the offline `pytest` tests or `idea_tests` task modules that will gate the change. | Never (tests may land alongside implementation, not after) |
 | Adjust benchmarks | Update benchmark scripts/task definitions/reporting if the change affects a live benchmark's shape. | Change doesn't touch benchmark surface |
 | Implement | Write the code. | Never |
-| Run tests | `PYTHONPATH=services:services/agent ./.venv/bin/python -m pytest -q services/agent/tests/...` green, touched files byte-compiled. Required before any live spend. | Never |
+| Run tests | `PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests/...` green, touched files byte-compiled. Required before any live spend. | Never |
 | Run benchmarks | Live-$ runs. Smoke (1×1) before a full matrix. Explicit budget authorization at execution time — never pre-authorized by a plan. | Change has no live-benchmark surface |
 | Review results | Read raw output (`gate_report.py` / `level_ladder.py` / `recovery_curve.py` / `unified_bench_report.py`) against any pre-registration. | Benchmarks were skipped |
 | Analyze | Trace failures to root cause, not just an aggregate score. Findings become the next cycle's Plan input — this is what closes the loop. | Never |
@@ -67,7 +67,7 @@ Most stages already have a tool-shaped home; the loop above is mainly what ties 
 | Plan / adversarial review | `Plan` / `general-purpose` agents (ad hoc panel, see above) |
 | Write tests / adjust benchmarks | `.claude/agents/task-author.md`, `codebench-task-author.md`, `reasoning-task-author.md` |
 | Implement | `.claude/agents/engine-dev.md` |
-| Run tests | `PYTHONPATH=services:services/agent ./.venv/bin/python -m pytest -q services/agent/tests` |
+| Run tests | `PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests` |
 | Run benchmarks | `.claude/agents/benchmark.md`, `scripts/adaptive_ladder_run.py` |
 | Review results / Analyze | `scripts/gate_report.py`, `scripts/level_ladder.py`, `scripts/recovery_curve.py`, `scripts/unified_bench_report.py` |
 | Pre-commit gate | `.claude/agents/reviewer.md` |

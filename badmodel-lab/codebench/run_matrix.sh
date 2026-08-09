@@ -31,7 +31,7 @@ mkdir -p "$OUT_ROOT"
 
 echo "### MATERIALIZE TASKS ($(date +%H:%M:%S)) ###"
 for t in "${TASK_IDS[@]}"; do
-  PYTHONPATH="$REPO_ROOT/services" python3 "$CB_DIR/materialize_task.py" "$t" --out "$CB_DIR/tasks" \
+  PYTHONPATH="$REPO_ROOT" python3 "$CB_DIR/materialize_task.py" "$t" --out "$CB_DIR/tasks" \
     || echo "  !! materialize failed for $t"
 done
 
@@ -93,7 +93,7 @@ for task in "${TASK_IDS[@]}"; do
         --out "$CELL_DIR/grade_report.json" \
         || echo "      grading crashed (score_and_record.py will treat as all-fail)"
 
-      PYTHONPATH="$REPO_ROOT/services" python3 "$CB_DIR/score_and_record.py" \
+      PYTHONPATH="$REPO_ROOT" python3 "$CB_DIR/score_and_record.py" \
         --task-id "$task" --agent-kind "$agent" --model "$model" \
         --cell-dir "$CELL_DIR" --run-id "$RUN_TAG" \
         --results-file "$RESULTS_FILE" \

@@ -3,7 +3,7 @@ classification, Brier score, 2-point AURC).
 
 analyze.py had no existing test file anywhere in the repo before this one — kept
 minimal, following the plain-pytest / sys.path-injection convention used by
-services/agent/tests/adaptive_analyzer_rigor_test.py for other standalone scripts
+agent/tests/adaptive_analyzer_rigor_test.py for other standalone scripts
 that live outside the services.* package tree.
 """
 import sys
@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import analyze  # noqa: E402
 
 # ---- 4 real, hand-labeled final_deliverable texts, pulled verbatim (via repr())
-# from services/agent/idea_test_results/bml__qwen2.5-7b__m1_thin__hard_*.json ----
+# from agent/idea_test_results/bml__qwen2.5-7b__m1_thin__hard_*.json ----
 
 HARD_071_R1 = 'The gathered facts do not include the depths of the five candidate lakes. Therefore, it is impossible to compute the absolute differences as required in the task.\n\nPlease provide the depth information for each lake from credible sources such as Wikipedia or other reliable encyclopedias and databases. Once you have that data, I can proceed with the necessary calculations and determinations.\n\nSources actually gathered:\n- https://en.wikipedia.org/wiki/Lake_Matano'
 

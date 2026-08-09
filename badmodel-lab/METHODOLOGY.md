@@ -3,7 +3,7 @@
 *Written 2026-07-23 after the first full local run (R=3, micro + reachable tiers). This is the
 critical-review companion to `README.md`/`PLAYBOOK.md`. It records what the current data can and
 cannot honestly support, the defects found, and the corrected claims. Every number here was
-recomputed read-only from `results/cells_long.csv` and the raw `services/agent/idea_test_results/
+recomputed read-only from `results/cells_long.csv` and the raw `agent/idea_test_results/
 bml__*.json`; no model was run to produce it. Code citations are `file:line` against the working tree.*
 
 **Bottom line.** The lab produced a real, honest result — *a fully-local 2–3B model reads a live web

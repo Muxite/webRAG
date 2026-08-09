@@ -2,7 +2,7 @@
 """Bad-model lab analyzer.
 
 Reads the cells produced by run_cell.sh (attributed via results/cells.jsonl),
-the scored result JSONs in services/agent/idea_test_results/, and the JSON
+the scored result JSONs in agent/idea_test_results/, and the JSON
 parse-failure telemetry, then prints:
 
   1. LEADERBOARD        — mean score / keystone pass-rate / $ / visits per
@@ -37,7 +37,7 @@ from pathlib import Path
 
 LAB = Path(__file__).resolve().parent
 REPO = LAB.parent
-RES = REPO / "services" / "agent" / "idea_test_results"
+RES = REPO / "agent" / "idea_test_results"
 CELLS = LAB / "results" / "cells.jsonl"
 
 # Reuse the main harness's canonical result-row loader for the fields that genuinely overlap

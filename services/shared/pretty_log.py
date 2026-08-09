@@ -105,7 +105,7 @@ def pretty_log_graph_print(graph, indents=0, render: str = "ascii"):
     if render == "data":
         return _build_idea_dag_data(graph)
     if render == "ascii":
-        from services.agent.app.idea_dag_log import idea_dag_to_ascii
+        from agent.app.idea_dag_log import idea_dag_to_ascii
         return idea_dag_to_ascii(graph)
 
     return pretty_log_print(payload, indents)
@@ -116,7 +116,7 @@ def _build_idea_dag_data(graph):
     :param graph: Graph instance or dict with nodes.
     :returns: Dict with nodes and edges.
     """
-    from services.agent.app.idea_dag_log import idea_dag_data
+    from agent.app.idea_dag_log import idea_dag_data
     return idea_dag_data(graph)
 
 def pretty_log_print(data, indents=0):

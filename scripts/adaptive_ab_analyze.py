@@ -7,7 +7,7 @@ CI-disjoint significance verdict + Cohen's d, conditional lift (score when re-ex
 not), DAG-growth-vs-accuracy, and $/solved — plus diagrams.
 
 Usage:
-  PYTHONPATH=services:services/agent ./.venv/bin/python scripts/adaptive_ab_analyze.py \
+  PYTHONPATH=.:services:agent ./.venv/bin/python scripts/adaptive_ab_analyze.py \
       --adaptive-run-id honest_adaptive --baseline-run-id honest_baseline --out scripts/_ab_out
 
 Both --*-run-id accept a comma-joined list (merges groups). Works at any R (n<2 => CI 0).
@@ -15,7 +15,7 @@ Both --*-run-id accept a comma-joined list (merges groups). Works at any R (n<2 
 import argparse, glob, itertools, json, math, os, random, re
 from collections import defaultdict
 
-RESULTS_DIR = "services/agent/idea_test_results"
+RESULTS_DIR = "agent/idea_test_results"
 C_ADAPT, C_BASE, C_GRID, C_INK = "#1f6feb", "#e8873a", "#e6ecf2", "#1a2733"
 
 ARCHETYPE_RANGES = [(range(122, 128), "A survivor"), (range(128, 134), "B conflict"),

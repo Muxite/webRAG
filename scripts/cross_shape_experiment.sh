@@ -53,7 +53,7 @@ export IDEA_TEST_MAX_STEPS=40
 export IDEA_TEST_REPORT_VERBOSITY=1
 export IDEA_TEST_EFFORT_TIERS=0
 export IDEA_TEST_RUN_ID="$RUN_ID"
-export PYTHONPATH=services:services/agent
+export PYTHONPATH=.:services:agent
 
 echo "===== run_id=$RUN_ID  tests=$TESTS  author=$AUTHOR_MODEL ====="
 

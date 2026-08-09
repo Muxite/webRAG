@@ -14,11 +14,11 @@ Usage::
 
     # author plans for the cross-shape suite with the reference model
     OPENROUTER_API_KEY=... LLM_PROVIDER=openrouter MODEL_API_URL=https://openrouter.ai/api/v1 \\
-      PYTHONPATH=services:services/agent ./.venv/bin/python scripts/compile_plans.py \\
+      PYTHONPATH=.:services:agent ./.venv/bin/python scripts/compile_plans.py \\
       --tests 050,051,052,053,054 --author-model google/gemini-3.1-pro-preview
 
     # show the cached plan structure without authoring (no LLM, no network)
-    PYTHONPATH=services:services/agent ./.venv/bin/python scripts/compile_plans.py \\
+    PYTHONPATH=.:services:agent ./.venv/bin/python scripts/compile_plans.py \\
       --tests 050,051,052,053,054 --dry-run
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ from pathlib import Path
 
 # Mirror the runner's import roots so this works from a plain checkout.
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -48,7 +48,7 @@ from agent.app.testing.compiled_plan import plan_structure  # noqa: E402
 
 
 def _load_modules() -> dict:
-    tests_dir = _ROOT / "services" / "agent" / "app" / "idea_tests"
+    tests_dir = _ROOT / "agent" / "app" / "idea_tests"
     by_id = {}
     for f in sorted(tests_dir.glob("test_*.py")):
         m = IdeaTestModule(f)

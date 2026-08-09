@@ -34,10 +34,10 @@ _VARIANT_TO_TOOLING = {
 
 
 def results_dir() -> Path:
-    for cand in (Path("services/agent/idea_test_results"), Path("agent/idea_test_results")):
-        if cand.is_dir():
-            return cand
-    return Path(__file__).resolve().parent.parent / "services" / "agent" / "idea_test_results"
+    cand = Path("agent/idea_test_results")
+    if cand.is_dir():
+        return cand
+    return Path(__file__).resolve().parent.parent / "agent" / "idea_test_results"
 
 
 def discover_files(run_ids: Optional[Sequence[str]] = None, *, since: str = "",

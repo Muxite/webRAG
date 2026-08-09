@@ -20,10 +20,10 @@ the Chroma write contention this codebase already had to fix once).
 Usage::
 
     CHROMA_MODE=embedded CHROMA_EMBEDDED_PATH=./.chroma_strategy_library \\
-      PYTHONPATH=services:services/agent ./.venv/bin/python scripts/sync_strategy_library.py
+      PYTHONPATH=.:services:agent ./.venv/bin/python scripts/sync_strategy_library.py
 
     CHROMA_URL=http://localhost:8001 \\
-      PYTHONPATH=services:services/agent ./.venv/bin/python scripts/sync_strategy_library.py
+      PYTHONPATH=.:services:agent ./.venv/bin/python scripts/sync_strategy_library.py
 
     ... scripts/sync_strategy_library.py --dry-run      # reads the index, writes nothing
 """
@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Dict, List
 
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 

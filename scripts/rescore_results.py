@@ -12,7 +12,7 @@ and only a live re-run can regenerate it faithfully).
 Usage:
     ./.venv/bin/python scripts/rescore_results.py --test-id 069 --run-id barrage24b [--dry-run]
 
-Requires PYTHONPATH=services:services/agent (same as the runner).
+Requires PYTHONPATH=.:services:agent (same as the runner).
 """
 from __future__ import annotations
 
@@ -28,13 +28,13 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--test-id", required=True, help="3-digit test id, e.g. 069")
     ap.add_argument("--run-id", required=True, help="run_id prefix, e.g. barrage24b")
-    ap.add_argument("--results-dir", default="services/agent/idea_test_results")
+    ap.add_argument("--results-dir", default="agent/idea_test_results")
     ap.add_argument("--dry-run", action="store_true", help="report the score delta, do not write")
     args = ap.parse_args()
 
     module_glob = f"agent.app.idea_tests.test_{args.test_id}_*"
     candidates = glob.glob(
-        os.path.join("services", "agent", "app", "idea_tests", f"test_{args.test_id}_*.py")
+        os.path.join("agent", "app", "idea_tests", f"test_{args.test_id}_*.py")
     )
     if not candidates:
         print(f"No test module found matching test_{args.test_id}_*.py", file=sys.stderr)

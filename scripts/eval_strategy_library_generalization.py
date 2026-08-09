@@ -25,12 +25,12 @@ fall back to ``overall_score`` and are labelled as such in the output.
 
 Usage::
 
-    PYTHONPATH=services:services/agent ./.venv/bin/python \\
+    PYTHONPATH=.:services:agent ./.venv/bin/python \\
       scripts/eval_strategy_library_generalization.py plan \\
       --note argmax_from_062_077 --held-out 084 091 --seed 062 \\
       --model openai/gpt-5-nano --repeats 4
 
-    PYTHONPATH=services:services/agent ./.venv/bin/python \\
+    PYTHONPATH=.:services:agent ./.venv/bin/python \\
       scripts/eval_strategy_library_generalization.py score \\
       --note argmax_from_062_077 --held-out 084 091 --seed 062 \\
       --on-run-id sl_on --off-run-id sl_off --write
@@ -45,7 +45,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -62,7 +62,7 @@ from agent.app.strategy_library.schema import (  # noqa: E402
     promotion_reason,
 )
 
-DEFAULT_RESULTS_DIR = _ROOT / "services" / "agent" / "idea_test_results"
+DEFAULT_RESULTS_DIR = _ROOT / "agent" / "idea_test_results"
 DEFAULT_VARIANT = "graph_compiled"
 
 
@@ -172,8 +172,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
             print(
                 f"IDEA_TEST_STRATEGY_LIBRARY={flag} IDEA_TEST_RUN_ID={run_id} "
                 f"{ENV_INCLUDE_UNPROMOTED}=1 "
-                f"PYTHONPATH=services:services/agent ./.venv/bin/python "
-                f"services/agent/app/idea_test_runner.py --tests {task_id} "
+                f"PYTHONPATH=.:services:agent ./.venv/bin/python "
+                f"agent/app/idea_test_runner.py --tests {task_id} "
                 f"--models {args.model} --variants {args.variant} --repeats {args.repeats} "
                 f"--concurrency 1"
             )

@@ -45,7 +45,7 @@ Everything expensive is an LLM call the graph disciplines: **expand** (plan cand
 **evaluate** (score them), **merge** (synthesize a branch), **finalize** (write the deliverable).
 Everything else — dependency edges, dedup, dynamic beam width, pruning, retries, checkpointing —
 is deterministic Python keeping those calls grounded. Full internals:
-[Idea Engine Deep Dive](services/agent/app/IDEA_ENGINE.md).
+[Idea Engine Deep Dive](agent/app/IDEA_ENGINE.md).
 
 ## Two things live in this repo
 
@@ -55,7 +55,7 @@ is deterministic Python keeping those calls grounded. Full internals:
    on top of the same agent engine). It started with the compiled scaffold below — the project's
    first big benchmark result — then pivoted to porting those lessons into the live DAG loop
    itself as opt-in adaptive mechanisms (see Notes further down). This is where current
-   development effort goes; see `HANDOFF.md` for the latest committed session-by-session state.
+   development effort goes; see `docs/handoffs/HANDOFF.md` for the latest committed session-by-session state.
    The **Benchmark Results** section right below documents the closed-out compiled-scaffold
    proof — not the product, and not the still-running adaptive-engine A/B.
 
@@ -136,7 +136,7 @@ flowchart LR
 Every mechanism ships **opt-in and default-off, byte-identical to prior behavior when disabled**:
 confidence-gated re-expansion, a follow-up detector, backtrack on dead-end chains, reasoning-effort
 discipline for reasoning models, and price-tier-aware token budgets. Architecture, flag inventory,
-and lessons learned: [`services/agent/app/ADAPTIVE_ENGINE.md`](services/agent/app/ADAPTIVE_ENGINE.md).
+and lessons learned: [`agent/app/ADAPTIVE_ENGINE.md`](agent/app/ADAPTIVE_ENGINE.md).
 
 **Status:** nothing adaptive is proven yet — that's what the current "ladder benchmark" is for: a
 paired A/B (`baseline` → `good_adaptive`) testing whether a cheap model (`gpt-5-mini`) burning more
@@ -156,7 +156,7 @@ fairness, validator correctness, and the grounding/re-expansion gate) is landed 
 - **Deduplication and pruning**: Candidate thoughts are deduplicated by embedding similarity. Low-scoring nodes are pruned to save budget
 - **Elastic worker fleet**: ECS autoscaling matches demand via CloudWatch queue-depth metrics, winds down when idle (legacy/secondary deploy path — see Quick Start; current production scales via `docker compose ... --scale agent=N` on the local backend)
 - **User-scoped quotas**: Supabase enforces per-user daily usage limits with JWT authentication
-- **Comprehensive test suite**: 151 priority-ordered task modules (`services/agent/app/idea_tests/`) with programmatic and LLM-based validation, plus a 1,951-passed/18-skipped/0-failed offline `pytest` suite (`services/agent/tests/`); 38 of the tasks are the curated, live-verified discriminators used in the compiled-scaffold benchmark above, and a further 24 ("adaptive-targeted", `test_122`–`test_145`) discriminate the adaptive engine across four decision archetypes
+- **Comprehensive test suite**: 151 priority-ordered task modules (`agent/app/idea_tests/`) with programmatic and LLM-based validation, plus a 1,951-passed/18-skipped/0-failed offline `pytest` suite (`agent/tests/`); 38 of the tasks are the curated, live-verified discriminators used in the compiled-scaffold benchmark above, and a further 24 ("adaptive-targeted", `test_122`–`test_145`) discriminate the adaptive engine across four decision archetypes
 
 ## Observability
 
@@ -182,7 +182,7 @@ idea_test_runner  >  JSON results  >  visualization_summary  >  terminal report
                                    >  visualization_plots    >  detailed plot gallery
 ```
 
-Results are written to `services/agent/idea_test_results/` as timestamped JSON (gitignored, not a repo-root directory). The visualizer can filter by run ID (`--latest`, `--run-id`) and generates executive dashboards, heatmaps, efficiency frontiers, and per-test breakdowns.
+Results are written to `agent/idea_test_results/` as timestamped JSON (gitignored, not a repo-root directory). The visualizer can filter by run ID (`--latest`, `--run-id`) and generates executive dashboards, heatmaps, efficiency frontiers, and per-test breakdowns.
 
 **Regenerating Visualizations:**
 
@@ -214,17 +214,17 @@ Benchmark Results above) has its own dedicated, $0-to-regenerate gallery pipelin
 against the on-disk result JSONs — no docker, no live model calls:
 
 ```bash
-PYTHONPATH=services:services/agent python3 scripts/render_gallery.py
+PYTHONPATH=.:services:agent python3 scripts/render_gallery.py
 ```
 
-Reads every `barrage24b_*.json` under `services/agent/idea_test_results/`, writes 9 square 4K
-(3840×3840) PNGs plus raw/aggregated CSVs to `services/agent/idea_test_results/barrage24b_gallery/`
-(`scripts/bench_common.py` is the shared, run-id-scoped data loader; `services/agent/app/testing/plot_style.py`
+Reads every `barrage24b_*.json` under `agent/idea_test_results/`, writes 9 square 4K
+(3840×3840) PNGs plus raw/aggregated CSVs to `agent/idea_test_results/barrage24b_gallery/`
+(`scripts/bench_common.py` is the shared, run-id-scoped data loader; `agent/app/testing/plot_style.py`
 is the shared Magma-family house style — titles/labels/marks are sized to stay readable when the
 4K image is viewed small, e.g. embedded in a doc or a slide). The curated, packaged copy for
 external sharing is [`linkedin_package_38tests_2026-07-08/`](linkedin_package_38tests_2026-07-08/README_LINKEDIN.md).
 
-Visualizations are automatically generated after test runs and saved to `services/agent/idea_test_results/plots_<run_id>/`.
+Visualizations are automatically generated after test runs and saved to `agent/idea_test_results/plots_<run_id>/`.
 
 ## Tech Stack
 
@@ -348,13 +348,13 @@ docs/             Architecture, security, benchmark plots
 
 - [Configuration](docs/CONFIGURATION.md) - Environment variable registry (required / optional / benchmark-only)
 - [System Architecture](docs/ARCHITECTURE.md) - Overall system design and message flow
-- [Agent Architecture](services/agent/app/AGENT_ARCHITECTURE.md) - Graph-of-Thought engine internals
-- [Idea Engine Deep Dive](services/agent/app/IDEA_ENGINE.md) - File-and-line-cited walkthrough of the DAG controller, policies, and mechanics
-- [Adaptive Engine](services/agent/app/ADAPTIVE_ENGINE.md) - The interleaved plan-act-observe-decide loop, flag inventory, and lessons learned
-- [Research Library](services/agent/app/RESEARCH_LIBRARY.md) - Mechanism-by-mechanism map of what external research each part of the agent matches or diverges from
-- [Test Suite](services/agent/app/idea_tests/README.md) - Test structure and validation
-- [Deployment](services/agent/app/DEPLOYMENT.md) - Deployment guide
-- [Debugger](services/agent/app/AGENT_DEBUG.md) - Debugging tools and techniques
+- [Agent Architecture](agent/app/AGENT_ARCHITECTURE.md) - Graph-of-Thought engine internals
+- [Idea Engine Deep Dive](agent/app/IDEA_ENGINE.md) - File-and-line-cited walkthrough of the DAG controller, policies, and mechanics
+- [Adaptive Engine](agent/app/ADAPTIVE_ENGINE.md) - The interleaved plan-act-observe-decide loop, flag inventory, and lessons learned
+- [Research Library](agent/app/RESEARCH_LIBRARY.md) - Mechanism-by-mechanism map of what external research each part of the agent matches or diverges from
+- [Test Suite](agent/app/idea_tests/README.md) - Test structure and validation
+- [Deployment](agent/app/DEPLOYMENT.md) - Deployment guide
+- [Debugger](agent/app/AGENT_DEBUG.md) - Debugging tools and techniques
 - [Scripts](scripts/README.md) - Deployment and diagnostic scripts
 
 ## Timeline
@@ -363,4 +363,4 @@ docs/             Architecture, security, benchmark plots
 - **2026-02 → 2026-03:** Rewritten around a **Graph-of-Thought DAG engine** — decompose into subproblems, execute `search`/`visit`/`think`/`save` leaves, merge upward (see How It Works above). AWS ECS wound down in favor of the local backend (Ops note near the top).
 - **2026-05:** Default LLM provider migrated to OpenRouter (note near the top).
 - **2026-06:** **Compiled-scaffold pivot** — an expensive model authors a DAG plan once, offline; a cheap model executes it live, recovering premium-model accuracy at a fraction of cost (see Benchmark Results above). Alongside it: a duplicate `shared/` module tree and a stale forked engine copy were deleted, and the 1,600+-line engine controller was broken into focused modules.
-- **2026-07:** **Native adaptive engine** — the compiled scaffold's lessons (structured planning, reasoning-effort discipline) ported into the live, non-compiled DAG loop as opt-in, default-off mechanisms: confidence-gated re-expansion, backtrack, price-tier token budgets (see Notes above and [`ADAPTIVE_ENGINE.md`](services/agent/app/ADAPTIVE_ENGINE.md)). Currently mid-relaunch of a live cost/accuracy A/B (the "ladder benchmark") testing whether the adaptive loop closes the gap between cheap and premium models.
+- **2026-07:** **Native adaptive engine** — the compiled scaffold's lessons (structured planning, reasoning-effort discipline) ported into the live, non-compiled DAG loop as opt-in, default-off mechanisms: confidence-gated re-expansion, backtrack, price-tier token budgets (see Notes above and [`ADAPTIVE_ENGINE.md`](agent/app/ADAPTIVE_ENGINE.md)). Currently mid-relaunch of a live cost/accuracy A/B (the "ladder benchmark") testing whether the adaptive loop closes the gap between cheap and premium models.

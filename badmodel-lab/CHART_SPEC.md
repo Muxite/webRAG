@@ -6,7 +6,7 @@ generator how to draw it. Every color choice below was run through the `dataviz`
 `validate_palette.js`; the validator output is quoted inline, not eyeballed.*
 
 Design authority: the `dataviz` skill (form heuristic → color-by-job → **run the validator** → mark
-specs → accessibility). House-style continuity: `services/agent/app/testing/plot_style.py` (square-4K,
+specs → accessibility). House-style continuity: `agent/app/testing/plot_style.py` (square-4K,
 resolution-independent fonts) and `linkedin_package_38tests_2026-07-08/` (the proven gallery).
 
 ---

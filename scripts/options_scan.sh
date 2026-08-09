@@ -6,9 +6,9 @@
 set -u
 cd /home/muk/projects/webRAG
 PY=./.venv/bin/python
-export PYTHONPATH=services:services/agent
+export PYTHONPATH=.:services:agent
 
-OUT=/home/muk/projects/webRAG/services/agent/idea_test_results
+OUT=/home/muk/projects/webRAG/agent/idea_test_results
 LOG="$OUT/_optscan/driver.log"
 mkdir -p "$OUT/_optscan"
 

@@ -21,15 +21,15 @@ URL sources (compose freely):
 Usage::
 
     # mandate-named URLs (URL-bearing tasks)
-    PYTHONPATH=services:services/agent SEARCH_API_KEY=... \\
+    PYTHONPATH=.:services:agent SEARCH_API_KEY=... \\
       ./.venv/bin/python scripts/prewarm_fixtures.py --tests 048,049
 
     # freeze a discovery run's discovered pages (search-driven tasks)
-    PYTHONPATH=services:services/agent SEARCH_API_KEY=... \\
+    PYTHONPATH=.:services:agent SEARCH_API_KEY=... \\
       ./.venv/bin/python scripts/prewarm_fixtures.py --from-run xshape_20260615_164736
 
     # see what it WOULD fetch, no network
-    PYTHONPATH=services:services/agent ./.venv/bin/python scripts/prewarm_fixtures.py --from-run <id> --dry-run
+    PYTHONPATH=.:services:agent ./.venv/bin/python scripts/prewarm_fixtures.py --from-run <id> --dry-run
 
 After prewarming, run the matrix with ``IDEA_TEST_FIXTURES=replay_strict`` so any
 cache miss fails loudly instead of silently going live.
@@ -46,7 +46,7 @@ from typing import List
 
 # Mirror the runner's import roots so this works from a plain checkout.
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -138,10 +138,7 @@ def _harvest_run_urls(results_dir: Path, run_id: str) -> List[str]:
 
 
 def _results_dir() -> Path:
-    for cand in (_ROOT / "services" / "agent" / "idea_test_results", _ROOT / "agent" / "idea_test_results"):
-        if cand.is_dir():
-            return cand
-    return _ROOT / "services" / "agent" / "idea_test_results"
+    return _ROOT / "agent" / "idea_test_results"
 
 
 def _load_tasks(test_ids: List[str]):

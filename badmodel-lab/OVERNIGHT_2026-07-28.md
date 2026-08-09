@@ -8,7 +8,7 @@ handoff, stop starting new experiments regardless of where results stand).**
 User's framing, verbatim intent: compiled-scaffold is NOT the important story for webRAG — it was
 a proof-of-thesis teacher, already proven (see `project_compiled_scaffold_thesis` memory). The native
 **adaptive (non-compiled) engine is THE GOAL** (confirmed independently in
-`services/agent/app/ADAPTIVE_ENGINE.md` §1 and `project_native_adaptive_engine` memory, written
+`agent/app/ADAPTIVE_ENGINE.md` §1 and `project_native_adaptive_engine` memory, written
 2026-07-11, well before this session). The ask: make **6-12GB local models** (mid-tier, above the
 existing 0.5-3B badmodel-lab roster) viable to **plan** — i.e. run the native `graph` execution
 variant, where the model itself proposes/expands GoT leaves each turn — not just execute a

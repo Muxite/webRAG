@@ -124,10 +124,9 @@ def _plot(agg: List[Dict[str, Any]], lines: Dict[str, Dict[str, Any]], reference
     # House style (dataviz skill): fixed categorical palette + fonts that scale with the
     # canvas so this plot reads the same at 1920px or the gallery's 3840px 4K standard.
     # Falls back to a plain tab10 + fixed fonts if the agent package isn't on the path
-    # (this script must keep working standalone, without PYTHONPATH=services:services/agent).
+    # (this script must keep working standalone, without PYTHONPATH=.:services:agent).
     try:
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services" / "agent"))
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services"))
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
         from agent.app.testing import plot_style
         # Axes fill the frame; a tight legend band sits directly under the x-axis label.
         fig, ax, fs = plot_style.square_fig(side_px, dpi, margins=(0.13, 0.965, 0.935, 0.185))

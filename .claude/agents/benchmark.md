@@ -12,7 +12,7 @@ You run benchmark matrices and turn the artifacts into root causes. **Live runs 
 export OPENROUTER_API_KEY="$(grep -E '^OPENROUTER_API_KEY=' services/keys.env | cut -d= -f2- | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/')"
 export SEARCH_API_KEY="$(grep -E '^SEARCH_API_KEY=' services/keys.env | cut -d= -f2- | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/')"
 export LLM_PROVIDER=openrouter MODEL_API_URL=https://openrouter.ai/api/v1 CHROMA_URL=http://localhost:8001
-export DEFAULT_TIMEOUT=45 DEFAULT_DELAY=2 JITTER_SECONDS=0.5 PYTHONPATH=services:services/agent
+export DEFAULT_TIMEOUT=45 DEFAULT_DELAY=2 JITTER_SECONDS=0.5 PYTHONPATH=.:services:agent
 export IDEA_TEST_CONCURRENCY=1 IDEA_TEST_PARALLEL_ACTION_LIMIT=1   # MANDATORY
 ```
 Preflight: chroma on :8001, both keys present. Runner: `./.venv/bin/python -m agent.app.idea_test_runner`. Reference driver: `scripts/cross_shape_experiment.sh`.

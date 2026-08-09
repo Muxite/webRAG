@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Bash
 model: opus
 ---
 
-You develop the webRAG Graph-of-Thoughts engine. Repo root: `/home/muk/projects/webRAG`; canonical engine lives in `services/agent/app` (the old `ideaengine/` fork is deleted — never touch it).
+You develop the webRAG Graph-of-Thoughts engine. Repo root: `/home/muk/projects/webRAG`; canonical engine lives in `agent/app` (the old `ideaengine/` fork is deleted — never touch it).
 
 ## Map
 - Engine: `idea_engine.py`, `got_operations.py`, `idea_finalize.py`, `idea_checkpointer.py`.
@@ -16,6 +16,6 @@ You develop the webRAG Graph-of-Thoughts engine. Repo root: `/home/muk/projects/
 
 ## Discipline
 - Match surrounding style; keep changes minimal and idiomatic.
-- Offline-test everything: `PYTHONPATH=services:services/agent ./.venv/bin/python -m pytest -q services/agent/tests/<relevant>_test.py` (e.g. `idea_dag_*`, `got_operations_test`, `engine_graph_test`, `idea_config_test`). Byte-compile touched files.
+- Offline-test everything: `PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests/<relevant>_test.py` (e.g. `idea_dag_*`, `got_operations_test`, `engine_graph_test`, `idea_config_test`). Byte-compile touched files.
 - New behavior gets a test. Don't break the benchmark wiring (`testing/runner.py`, variant parser in `idea_test_runner.py`).
 Return a summary of files changed and the test command output. Don't run live ($) benchmarks — hand that to the `benchmark` agent.

@@ -32,10 +32,9 @@ import bench_common  # noqa: E402  (path insert must precede this import)
 # Local (self-hosted) models have no meaningful $ price. Reuse the one shared predicate
 # (agent.app.model_costs.is_local_row) rather than re-deriving "unpriced" locally, but
 # degrade gracefully so this script keeps working standalone without
-# PYTHONPATH=services:services/agent (same convention as recovery_curve.py's plot_style import).
+# PYTHONPATH=.:services:agent (same convention as recovery_curve.py's plot_style import).
 try:
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services" / "agent"))
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "services"))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from agent.app.model_costs import is_local_row as _is_local_row_impl
 except Exception:  # noqa: BLE001
     _is_local_row_impl = None

@@ -2,7 +2,7 @@
 """
 Per-cell summary of cross-shape benchmark results, by run-id prefix(es).
 
-Reads ``services/agent/idea_test_results/<prefix>_*.json`` and prints, per model, a
+Reads ``agent/idea_test_results/<prefix>_*.json`` and prints, per model, a
 test x variant table of mean score (and a matching mean-USD table). ``graph_compiled`` cells
 are split into ``compiled:hand`` vs ``compiled:auto`` from each run's recorded ``plan_source``,
 so B-hand and B-auto are distinguishable even when they share the variant name.
@@ -20,7 +20,7 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-_RES = Path(__file__).resolve().parent.parent / "services" / "agent" / "idea_test_results"
+_RES = Path(__file__).resolve().parent.parent / "agent" / "idea_test_results"
 
 
 def _label(d: dict) -> str:

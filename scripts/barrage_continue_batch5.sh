@@ -19,14 +19,14 @@ REPO=/home/muk/projects/webRAG
 cd "$REPO" || exit 1
 
 RUN_ID=barrage24b                     # shared run_id -> aggregates with the existing 050-062 data
-RESULTS_DIR=services/agent/idea_test_results
+RESULTS_DIR=agent/idea_test_results
 DRIVER_DIR="$RESULTS_DIR/_driver_${RUN_ID}_batch5"
 AGG_DIR="$DRIVER_DIR/agg"
 LOG="$DRIVER_DIR/driver.log"
 STATUS="$DRIVER_DIR/STATUS.md"
 LOCK="$DRIVER_DIR/driver.pid"
 PY=./.venv/bin/python
-export PYTHONPATH=services:services/agent
+export PYTHONPATH=.:services:agent
 
 # barrage24b spent $29.47 after the 065/069 bugfixes; cap = that + ~$15 for batch 5 (3 reworked + 5 brand-new tests).
 GLOBAL_USD_CAP=45.00

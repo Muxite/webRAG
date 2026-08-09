@@ -13,7 +13,7 @@ Flags, per task file:
           with NO bare-number or spelled-unit fallback -> "300 metres" false-fails.
   [DEC]   no-tolerance decimal keystones (\\bNN\\.NN\\b) -> standard roundings false-fail.
 
-CLI usage:  python scripts/validator_lint.py [dir]   (default: services/agent/app/idea_tests)
+CLI usage:  python scripts/validator_lint.py [dir]   (default: agent/app/idea_tests)
 Exit 1 if any [GATE] or [LLM] finding (the two score-corrupting severities).
 
 Programmatic usage (e.g. from a pytest CI gate):
@@ -28,7 +28,7 @@ import sys
 from typing import List, Tuple
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_DIR = os.path.join(_REPO_ROOT, "services", "agent", "app", "idea_tests")
+DEFAULT_DIR = os.path.join(_REPO_ROOT, "agent", "app", "idea_tests")
 
 
 def _fn(tree: ast.AST, name: str):

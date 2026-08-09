@@ -6,11 +6,11 @@ from, all from the ``barrage24b`` cost-recovery benchmark (already on disk -- $0
 live model calls).
 
 Usage:
-    PYTHONPATH=services:services/agent python3 scripts/render_gallery.py
-    PYTHONPATH=services:services/agent python3 scripts/render_gallery.py --size 3840 \
+    PYTHONPATH=.:services:agent python3 scripts/render_gallery.py
+    PYTHONPATH=.:services:agent python3 scripts/render_gallery.py --size 3840 \
         --extra-run-ids 073fix_validate,080fix_validate   # once those exist
 
-Everything lands in services/agent/idea_test_results/barrage24b_gallery/.
+Everything lands in agent/idea_test_results/barrage24b_gallery/.
 """
 from __future__ import annotations
 
@@ -26,7 +26,8 @@ from typing import Any, Dict, List, Sequence, Tuple
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 sys.path.insert(0, str(_HERE.parent / "services"))
-sys.path.insert(0, str(_HERE.parent / "services" / "agent"))
+sys.path.insert(0, str(_HERE.parent / "agent"))
+sys.path.insert(0, str(_HERE.parent))
 
 import bench_common  # noqa: E402
 import recovery_curve  # noqa: E402
@@ -40,7 +41,7 @@ import numpy as np  # noqa: E402
 
 VARIANT_ORDER = ["graph_compiled", "sequential_react", "graph", "naive_rag", "parametric", "minimal"]
 LEVEL_ORDER = ["micro", "integration", "navigation", "graph", "legacy"]
-PLANS_DIR = _HERE.parent / "services" / "agent" / "compiled_plans"
+PLANS_DIR = _HERE.parent / "agent" / "compiled_plans"
 # Representative cached compiled plans (same roster render_dag_examples.py uses) --
 # a pure fan-out and a mixed dependent+independent DAG, the two shapes that best show
 # off the compiled scaffold's structure.

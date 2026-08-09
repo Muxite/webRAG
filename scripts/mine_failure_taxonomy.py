@@ -37,10 +37,10 @@ node-level ones — read by no other script today.
 
 Usage::
 
-    PYTHONPATH=services:services/agent ./.venv/bin/python scripts/mine_failure_taxonomy.py \\
+    PYTHONPATH=.:services:agent ./.venv/bin/python scripts/mine_failure_taxonomy.py \\
       --run-id barrage20_p1 --run-id barrage20_smoke
 
-    ... --files services/agent/idea_test_results/stage0_*_r1.json
+    ... --files agent/idea_test_results/stage0_*_r1.json
     ... --run-id stage0_native_coarse --csv out.csv --md out.md
 """
 from __future__ import annotations
@@ -53,7 +53,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 _ROOT = Path(__file__).resolve().parent.parent
-for _p in (_ROOT / "services", _ROOT / "services" / "agent", _ROOT / "scripts"):
+for _p in (_ROOT, _ROOT / "services", _ROOT / "agent", _ROOT / "scripts"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 

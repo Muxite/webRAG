@@ -93,7 +93,7 @@ def observation_extract_fn() -> ExtractFn:
         import sys
         from pathlib import Path as _P
         root = _P(__file__).resolve().parents[3]      # webRAG/
-        for p in (root / "services", root / "services" / "agent"):
+        for p in (root, root / "services"):
             if str(p) not in sys.path:
                 sys.path.insert(0, str(p))
         try:

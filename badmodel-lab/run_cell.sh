@@ -57,7 +57,7 @@ if [ "$SEARCH_PROVIDER" = "brave" ]; then
   if [ -n "$_ck" ]; then export SEARCH_API_KEY="$_ck"; echo ">> search key sourced from $_KEY_CTR" >&2; fi
 fi
 
-export PYTHONPATH=services:services/agent
+export PYTHONPATH=.:services:agent
 export IDEA_TEST_CONCURRENCY=1                 # MANDATORY — shared connectors
 export CHROMA_URL="${CHROMA_URL:-http://localhost:8001}"
 

@@ -75,9 +75,9 @@ variant, never `graph_compiled`.
 
 ## 4. Registration
 
-- File: `services/agent/app/idea_tests/test_2NN_reasoning_<slug>.py`, using the next free id in the
+- File: `agent/app/idea_tests/test_2NN_reasoning_<slug>.py`, using the next free id in the
   `200`-`2XX` range (check what's already used before picking a number).
-- Add your task's id to `REASONING_SUITE_IDS` in `services/agent/tests/validator_lint_test.py`
+- Add your task's id to `REASONING_SUITE_IDS` in `agent/tests/validator_lint_test.py`
   (an additive list — do not touch `ACTIVE_SUITE_IDS` or the existing
   `test_idea_tests_directory_lints_clean_on_the_active_suite` assertion, which must stay
   byte-unchanged). If `REASONING_SUITE_IDS` and its disjointness/LLM-lint tests don't exist yet in
@@ -91,13 +91,13 @@ variant, never `graph_compiled`.
 
 ## 5. Harden + verify
 
-Write `services/agent/tests/<name>_validators_test.py`: full-correct answer → 1.0; a wrong keystone
+Write `agent/tests/<name>_validators_test.py`: full-correct answer → 1.0; a wrong keystone
 → gated 0; a partially-correct multi-part answer → the exact expected partial score; confirm
 `scripts/validator_lint.py` shows **zero `[LLM]` findings** for your task (a `[GATE]` finding is
 expected and correct here — no grounding check exists by design, don't try to silence it).
 Byte-compile. Prove green:
 ```
-PYTHONPATH=services:services/agent ./.venv/bin/python -m pytest -q services/agent/tests/<name>_validators_test.py
+PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests/<name>_validators_test.py
 ```
 
 Return the new files, both reference solvers' output confirming agreement + uniqueness/margin, and

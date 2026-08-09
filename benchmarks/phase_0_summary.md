@@ -7,7 +7,7 @@ smoke test at the end") still needs to run against real infrastructure.
 
 ## What changed
 
-### 1. `DataContract` indirection — `services/agent/app/idea_policies/data_contracts.py` (new)
+### 1. `DataContract` indirection — `agent/app/idea_policies/data_contracts.py` (new)
 
 The four hardcoded `REQUIRES_DATA` string types
 (`urls_from_search`, `urls_from_visit`, `url_from_think`, `chunk_from_visit`)
@@ -20,7 +20,7 @@ shape, registered in a `ContractRegistry`. Engine becomes contract-table-driven:
 - Custom action packs (Phase 1+) register their own contracts at construction
   time and the engine adopts them with no further code changes.
 
-### 2. `LeafAction.post_execute_provides` — `services/agent/app/idea_policies/actions.py`
+### 2. `LeafAction.post_execute_provides` — `agent/app/idea_policies/actions.py`
 
 Base `LeafAction` declares the hook returning `None` by default. Overrides:
 
@@ -32,7 +32,7 @@ The engine's auto-tagging in `_handle_action_result` no longer switches on
 instance what contract its successful result satisfies. Custom actions
 declare what they provide simply by overriding the method.
 
-### 3. Prompts externalized — `services/agent/app/prompts/`
+### 3. Prompts externalized — `agent/app/prompts/`
 
 Nine prompt strings (expansion/evaluation/merge/final, system + user, plus
 expansion planning addendum) live as `.md` files under
@@ -44,7 +44,7 @@ unchanged.
 The Jinja2 migration + composition slots for plug-in actions stay deferred to
 Phase 1 (new repo) where they ride alongside `ActionPack` introduction.
 
-### 4. Mandate enforcement hooks — `services/agent/app/idea_policies/post_expansion_hooks.py` (new)
+### 4. Mandate enforcement hooks — `agent/app/idea_policies/post_expansion_hooks.py` (new)
 
 The two enforcement helpers and the `_clean_extracted_url` utility moved out
 of the engine and into a `PostExpansionHook` Protocol with two
@@ -60,7 +60,7 @@ implementations:
 defaults to the two web-research hooks above. Custom packs swap them out.
 ~180 lines deleted from `idea_engine.py`.
 
-### 5. `Solver` Protocol + `IdeaEngineSolver` — `services/agent/app/solver.py` (new)
+### 5. `Solver` Protocol + `IdeaEngineSolver` — `agent/app/solver.py` (new)
 
 Narrow contract built around `engine.run()`:
 
@@ -80,7 +80,7 @@ class IdeaEngineSolver:
 `wall_time_s`, etc. as optional. The Phase 3 comparison harness adds
 `LangGraphSolver` and `LangChainSolver` against the same contract.
 
-The test harness in `services/agent/app/testing/execution.py` is **not yet
+The test harness in `agent/app/testing/execution.py` is **not yet
 migrated** to use `Solver` — it manually drives `engine.step()` for fine
 control. Migration is part of Phase 3, scoped together with the LangGraph
 and LangChain adapter work.
@@ -89,27 +89,27 @@ and LangChain adapter work.
 
 | Module | Change |
 |---|---|
-| `services/agent/app/idea_engine.py` | Removed 180 lines (mandate enforcement helpers); wired `contracts` registry and `post_expansion_hooks` into `__init__`; `_has_required_data` registry-driven; auto-tagging uses `action.post_execute_provides` |
-| `services/agent/app/idea_policies/actions.py` | Added `post_execute_provides` hook on base `LeafAction`; overrides in `SearchLeafAction`, `VisitLeafAction` |
-| `services/agent/app/idea_policies/data_contracts.py` | **NEW** — `DataContract`, `ContractRegistry`, four built-in contracts |
-| `services/agent/app/idea_policies/post_expansion_hooks.py` | **NEW** — `PostExpansionHook` Protocol, two web hooks, `default_post_expansion_hooks()` |
-| `services/agent/app/prompts/__init__.py`, `prompts/loader.py` | **NEW** — disk-backed prompt loader |
-| `services/agent/app/prompts/defaults/*.md` | **NEW** — nine prompt files |
-| `services/agent/app/idea_dag_settings.py` | Calls `apply_default_prompts(settings)` after loading the JSON |
-| `services/agent/app/solver.py` | **NEW** — `Solver` Protocol, `SolverResult`, `IdeaEngineSolver` |
-| `services/agent/tests/data_contracts_test.py` | **NEW** — 7 unit tests |
-| `services/agent/tests/prompts_loader_test.py` | **NEW** — 4 unit tests |
-| `services/agent/tests/solver_normalize_test.py` | **NEW** — 4 unit tests |
+| `agent/app/idea_engine.py` | Removed 180 lines (mandate enforcement helpers); wired `contracts` registry and `post_expansion_hooks` into `__init__`; `_has_required_data` registry-driven; auto-tagging uses `action.post_execute_provides` |
+| `agent/app/idea_policies/actions.py` | Added `post_execute_provides` hook on base `LeafAction`; overrides in `SearchLeafAction`, `VisitLeafAction` |
+| `agent/app/idea_policies/data_contracts.py` | **NEW** — `DataContract`, `ContractRegistry`, four built-in contracts |
+| `agent/app/idea_policies/post_expansion_hooks.py` | **NEW** — `PostExpansionHook` Protocol, two web hooks, `default_post_expansion_hooks()` |
+| `agent/app/prompts/__init__.py`, `prompts/loader.py` | **NEW** — disk-backed prompt loader |
+| `agent/app/prompts/defaults/*.md` | **NEW** — nine prompt files |
+| `agent/app/idea_dag_settings.py` | Calls `apply_default_prompts(settings)` after loading the JSON |
+| `agent/app/solver.py` | **NEW** — `Solver` Protocol, `SolverResult`, `IdeaEngineSolver` |
+| `agent/tests/data_contracts_test.py` | **NEW** — 7 unit tests |
+| `agent/tests/prompts_loader_test.py` | **NEW** — 4 unit tests |
+| `agent/tests/solver_normalize_test.py` | **NEW** — 4 unit tests |
 
 ## Verification done
 
 - AST-parse passes on all modified files.
 - 15/15 new unit tests pass:
   ```bash
-  PYTHONPATH=services python3 -m pytest \
-      services/agent/tests/data_contracts_test.py \
-      services/agent/tests/prompts_loader_test.py \
-      services/agent/tests/solver_normalize_test.py -v
+  PYTHONPATH=.:services python3 -m pytest \
+      agent/tests/data_contracts_test.py \
+      agent/tests/prompts_loader_test.py \
+      agent/tests/solver_normalize_test.py -v
   ```
 - Behavioral preservation verified by line-by-line equivalence of the
   refactored predicates against the original switch-case bodies in

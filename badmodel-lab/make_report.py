@@ -25,7 +25,7 @@ from matplotlib.colors import LinearSegmentedColormap
 
 LAB = Path(__file__).resolve().parent
 REPO = LAB.parent
-RES = REPO / "services" / "agent" / "idea_test_results"
+RES = REPO / "agent" / "idea_test_results"
 GALLERY = LAB / "gallery"
 BAR = 0.75  # feasibility bar (repo overall_passed line)
 

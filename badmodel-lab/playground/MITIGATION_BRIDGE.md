@@ -9,7 +9,7 @@ picking the wrong one doesn't look like a broken feature.
 **`m0`-`m4` and `fs0`-`fs2`** (8 profiles) target the *compiled-scaffold* execution path
 (`graph_compiled`, driven by `agent.app.testing.execution_compiled`). That path executes
 a **pre-authored DAG plan for a known benchmark task id** — the plan itself is data
-committed under `services/agent/compiled_plans/`, keyed by task id. There is no such
+committed under `agent/compiled_plans/`, keyed by task id. There is no such
 thing as a compiled plan for a friend's freeform typed mandate; nothing generates one at
 chat time. Setting `BADMODEL_PROFILE` to one of these produces **no behavior change at
 all** — not a subtle degradation, a literal no-op — because the env vars these profiles
@@ -17,7 +17,7 @@ set (`IDEA_TEST_COMPILED_*`) are only ever read inside the compiled-leaf executo
 the interactive path never runs.
 
 **`a0`-`a4`** (5 profiles) target the *native adaptive engine* (`IdeaDagEngine` —
-`services/agent/app/idea_engine.py`), where the model itself proposes and expands
+`agent/app/idea_engine.py`), where the model itself proposes and expands
 Graph-of-Thoughts leaves each turn instead of executing a fixed plan. This is exactly the
 engine `Agent.run()` uses whenever `AGENT_USE_IDEA_DAG=1` (always set in this stack's
 `docker-compose.yml`) — the same engine `basic_cli.py` drives, compiled-scaffold or not.

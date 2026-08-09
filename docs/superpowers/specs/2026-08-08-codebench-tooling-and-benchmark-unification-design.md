@@ -4,7 +4,7 @@
 
 Serper (the live search provider) is down (403 Unauthorized, confirmed live) and Part D Stage 1's
 composer validation is blocked on it. Rather than wait, this work pivots to codebench — the
-Docker-sandboxed coding-task benchmark (`services/agent/app/idea_code_tests/test_c01`..`c52`.py` +
+Docker-sandboxed coding-task benchmark (`agent/app/idea_code_tests/test_c01`..`c52`.py` +
 `badmodel-lab/codebench/`) — which never touches the live web except through an internal,
 network-isolated SearXNG instance, so it's completely unaffected by the outage.
 
@@ -26,7 +26,7 @@ run:
    `badmodel-lab/results/cells.jsonl` (QA) and `badmodel-lab/codebench/results/runs.jsonl` (code)
    are explicitly documented in `score_and_record.py`'s own docstring as "a SIBLING to cells.jsonl's
    schema, not a literal extension of it" — a deliberate, acknowledged fork. There's a third format
-   too: the main harness's per-cell `services/agent/idea_test_results/*.json`.
+   too: the main harness's per-cell `agent/idea_test_results/*.json`.
 3. **No one has actually run codebench at real scale yet**, so there's no data on where the
    compiled-scaffold engine actually struggles on coding tasks — which is the actual "improve
    performance" target, and can't be scoped further until real failures exist to look at.
@@ -49,7 +49,7 @@ call. They've already diverged:
   find_files` entirely, so codebench's real Docker sandbox has no way to search/inspect files by
   pattern today, only `list_dir` one directory at a time or an indirect `run_python` workaround.
 
-**Design**: a new shared module, `services/agent/app/sandbox_dispatch.py`, exposing one async
+**Design**: a new shared module, `agent/app/sandbox_dispatch.py`, exposing one async
 function — `async def dispatch_sandbox_action(sandbox: SandboxConnector, action: str, args: dict) ->
 Dict[str, Any]` — that owns:
 - The unified path-key alias table (superset of both existing tables: `path, file, relpath,
@@ -118,7 +118,7 @@ already set with `scripts/mine_failure_taxonomy.py` — a standalone analyzer th
 result files and produces a new view, touching none of them. Three input readers:
 - `badmodel-lab/results/cells.jsonl` (QA benchmark)
 - `badmodel-lab/codebench/results/runs.jsonl` (codebench)
-- `services/agent/idea_test_results/*.json` (main harness — covers the case where a codebench task
+- `agent/idea_test_results/*.json` (main harness — covers the case where a codebench task
   is ever run through `graph_compiled_code` via the standard harness for a dev/smoke check, not just
   through the Docker pipeline)
 
@@ -161,7 +161,7 @@ pre-authorized by this spec, matching this session's established convention for 
 
 ## Verification (all phases)
 
-- `PYTHONPATH=services:services/agent ./.venv/bin/pytest -q services/agent/tests` green after each
+- `PYTHONPATH=.:services:agent ./.venv/bin/pytest -q agent/tests` green after each
   phase's code changes.
 - Phase 1: the existing `sandbox_tools_actions_test.py`/`execution_compiled_code_test.py` suites
   pass unchanged (contract preserved), plus the new crash/guard/parity tests described above.

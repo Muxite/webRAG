@@ -7,7 +7,7 @@ Reads the three arm run-ids and reports, per task / per archetype / overall:
   - the cost ratio ($/run), i.e. the "spam is cheaper" side of the story.
 
 Usage:
-  PYTHONPATH=services:services/agent ./.venv/bin/python scripts/cross_tier_analyze.py \
+  PYTHONPATH=.:services:agent ./.venv/bin/python scripts/cross_tier_analyze.py \
       --skill xtier_skill --spam-nano xtier_spamnano --spam-mini xtier_spammini --out scripts/_xtier_out
 """
 import argparse, os

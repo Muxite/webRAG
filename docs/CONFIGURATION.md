@@ -63,8 +63,8 @@ production).
 | `AGENT_START_PREFLIGHT_ENABLED` | `1` | Web/LLM/search reachability check on worker boot. |
 
 Engine behaviour (branching, timeouts, evaluation weights, prompts) is configured in
-`services/agent/app/idea_dag_settings.json` and surfaced through the typed config layer in
-`services/agent/app/idea_policies/config.py` — prefer editing those over scattering new env
+`agent/app/idea_dag_settings.json` and surfaced through the typed config layer in
+`agent/app/idea_policies/config.py` — prefer editing those over scattering new env
 knobs. A handful of `IDEA_DAG_*_MAX_TOKENS` env overrides exist; see the audit script output.
 
 ---
@@ -73,4 +73,4 @@ knobs. A handful of `IDEA_DAG_*_MAX_TOKENS` env overrides exist; see the audit s
 
 45 variables drive the offline test/benchmark harness only (`IDEA_TEST_IDS`, `IDEA_TEST_MODELS`,
 `IDEA_TEST_EXECUTION_VARIANTS`, `IDEA_TEST_COMPILED_*`, …). They have **no effect on production**.
-See the README "Running Tests" section and `services/agent/app/COST_BENCHMARK_HANDOFF.md`.
+See the README "Running Tests" section and `agent/app/COST_BENCHMARK_HANDOFF.md`.

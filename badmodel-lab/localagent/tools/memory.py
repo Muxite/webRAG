@@ -4,7 +4,7 @@ Two backends behind one interface:
 - FileMemoryStore — a durable append-only JSONL bound to a STABLE identity key (not a
   per-task prompt hash), with keyword recall. Fully local, inspectable, serialized
   single-writer. Used in tests and as a zero-dependency default.
-- VectorMemoryStore (P1) — reuse services/agent/app/idea_memory.MemoryManager + the
+- VectorMemoryStore (P1) — reuse agent/app/idea_memory.MemoryManager + the
   local MiniLM embeddings + a persistent Chroma volume, same identity-keyed namespace.
   Swaps in behind the same MemoryStore protocol; nothing else changes.
 

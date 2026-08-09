@@ -1,5 +1,5 @@
 """
-Package the autoscaling Lambda from services/lambda_autoscaling.
+Package the autoscaling Lambda from services/_legacy-aws/lambda_autoscaling.
 """
 
 import argparse
@@ -39,7 +39,7 @@ def package_lambda() -> Path:
     """
     repo_root = Path(__file__).resolve().parent.parent
     services_dir = repo_root / "services"
-    lambda_dir = services_dir / "lambda_autoscaling"
+    lambda_dir = services_dir / "_legacy-aws" / "lambda_autoscaling"
     output_dir = repo_root / "dist"
 
     if not lambda_dir.exists():

@@ -65,7 +65,7 @@ ARMS="baseline reexpand_only confidence_only good_adaptive" TASKS="140 144" R=5 
 ```
 
 Env recipe (keys.env CRLF-strip, chroma:8001, concurrency=1, parallel_action_limit=1) is baked into
-the driver. Output lands in `services/agent/idea_test_results/_<RUN_ID>/` with an `analysis/` folder
+the driver. Output lands in `agent/idea_test_results/_<RUN_ID>/` with an `analysis/` folder
 (per-archetype deltas, CI-disjoint verdict, Cohen's d, conditional lift, diagrams).
 
 ## What the analysis reports (`adaptive_ab_analyze.py`)
