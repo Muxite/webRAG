@@ -17,6 +17,7 @@ dist/
 .pytest_cache/
 .claude/*
 !.claude/agents/
+!.claude/skills/
 .cursor
 .venv
 
