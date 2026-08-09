@@ -10,13 +10,14 @@ It reuses ``AgentIO`` (search/visit/query_llm/build_llm_payload) and returns the
 result shape as ``run_baseline_execution`` so cost instrumentation, validation and the
 analysis scripts treat it identically. Wired as the ``sequential_react`` variant.
 """
+import asyncio
 import json
 import logging
 import os
 import re
 import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, NamedTuple, Optional
 
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
@@ -25,12 +26,19 @@ from agent.app.connector_chroma import ConnectorChroma
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
 from agent.app.trace_recorder import TraceRecorder
+from agent.app.idea_policies.action_constants import is_transient_tool_error
+from agent.app.idea_policies.config import ActionConfig
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.testing.execution import _empty_graph
 from agent.app.testing import json_telemetry as _json_telemetry
 
 _logger = logging.getLogger(__name__)
+
+#: Sentinel ``AgentIO.visit`` returns when a page fetched fine but yielded no extractable text.
+#: The graph arm's VISIT action flips that same outcome into a retryable tool failure, so this
+#: arm treats it as an empty payload too (see :func:`_call_tool_with_retry`).
+_EMPTY_PAGE = "[No main content found]"
 
 _SYSTEM = (
     "You are a web-research agent solving a TASK with tools. Work ONE step at a time: "
@@ -50,6 +58,62 @@ _SYSTEM = (
 )
 
 
+class ToolRetry(NamedTuple):
+    """Bounded in-place retry policy for this arm's search/visit calls (F16, arm fairness).
+
+    The graph arms already retry a TRANSIENT tool failure at the source
+    (``IdeaEngine._maybe_retry_tool_failure``, gated by ``connector_retry_on_failure_enabled``),
+    and the benchmark drivers turn that on for every arm (``IDEA_TEST_CONNECTOR_RETRY=1``). This
+    linear arm had no equivalent, so one flaky search/visit became a permanent error observation
+    for the reference model only — an infra confound in an arm comparison, not a model difference.
+    Reading the SAME three settings keys keeps the two arms symmetric; with no settings dict (any
+    non-benchmark caller) or the flag off, ``enabled`` is False and behavior is unchanged.
+    """
+
+    enabled: bool = False
+    max_attempts: int = 0
+    backoff_seconds: float = 0.0
+
+    @classmethod
+    def from_settings(cls, settings: Optional[Dict[str, Any]]) -> "ToolRetry":
+        cfg = ActionConfig.from_settings(settings or {})
+        return cls(
+            enabled=bool(cfg.connector_retry_on_failure_enabled),
+            max_attempts=max(0, int(cfg.connector_retry_max_attempts)),
+            backoff_seconds=max(0.0, float(cfg.connector_retry_backoff_seconds)),
+        )
+
+
+async def _call_tool_with_retry(call, is_empty, retry: ToolRetry):
+    """Run one tool call, retrying a TRANSIENT failure in place.
+
+    Mirrors the graph engine's retry semantics exactly: retry when the call RAISED a transient
+    error (timeout / 429 / 5xx — :func:`is_transient_tool_error`) or "succeeded" with an EMPTY
+    payload (no search results / no page text), up to ``max_attempts`` extra attempts with a
+    growing backoff. A permanent failure (401/403/404, bot-block) is never retried — re-running
+    it only burns budget.
+
+    :param call: Zero-arg coroutine factory for the tool call.
+    :param is_empty: Predicate marking a successful-but-empty payload.
+    :param retry: The arm's retry policy.
+    :returns: ``(result, error)``; ``error`` is the last exception when every attempt raised.
+    """
+    attempt = 0
+    while True:
+        try:
+            result, error = await call(), None
+        except Exception as exc:  # noqa: BLE001
+            result, error = None, exc
+        transient = is_transient_tool_error(error) if error is not None else is_empty(result)
+        if not (retry.enabled and transient and attempt < retry.max_attempts):
+            return result, error
+        attempt += 1
+        _logger.info(f"[TOOL-RETRY] sequential tool failure; retrying "
+                     f"(attempt {attempt}/{retry.max_attempts})")
+        if retry.backoff_seconds > 0:
+            await asyncio.sleep(retry.backoff_seconds * attempt)
+
+
 def _fmt_search(results: List[Dict[str, str]], k: int) -> str:
     lines = []
     for i, item in enumerate((results or [])[:k], 1):
@@ -66,7 +130,9 @@ async def _verify_claim(agent_io: AgentIO, claim: str, evidence: str, model_name
     return (await agent_io.query_llm(payload, model_name=model_name)) or "UNVERIFIABLE"
 
 
-async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps: int, max_tokens: int) -> str:
+async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps: int,
+                     max_tokens: int, retry: Optional[ToolRetry] = None) -> str:
+    retry = retry or ToolRetry()  # default: retry OFF -> unchanged behavior
     page_chars = int(os.environ.get("IDEA_TEST_SEQ_PAGE_CHARS", "6000"))
     search_k = int(os.environ.get("IDEA_TEST_SEQ_SEARCH_K", "6"))
     dedup_search = os.environ.get("IDEA_TEST_SEQ_DEDUP_SEARCH", "1") not in ("0", "false", "False")
@@ -139,19 +205,23 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
             else:
                 if norm:
                     seen_queries.add(norm)
-                try:
-                    results = await agent_io.search(query, count=search_k, timeout_seconds=20) or []
-                    obs = _fmt_search(results, search_k)
-                except Exception as exc:  # noqa: BLE001
-                    obs = f"SEARCH ERROR: {exc}"
+                results, error = await _call_tool_with_retry(
+                    lambda: agent_io.search(query, count=search_k, timeout_seconds=20),
+                    lambda r: not r, retry,
+                )
+                obs = f"SEARCH ERROR: {error}" if error is not None else _fmt_search(results or [], search_k)
         elif action == "visit":
             url = str(args.get("url", "")).strip()
-            try:
-                content = (await agent_io.visit(url, timeout_seconds=30) or "")[:page_chars]
+            content, error = await _call_tool_with_retry(
+                lambda: agent_io.visit(url, timeout_seconds=30),
+                lambda c: not (c or "").strip() or (c or "").strip() == _EMPTY_PAGE, retry,
+            )
+            if error is not None:
+                obs = f"VISIT ERROR for {url}: {error}"
+            else:
+                content = (content or "")[:page_chars]
                 evidence.append(f"SOURCE {url}\n{content}")
                 obs = f"PAGE {url}:\n{content}"
-            except Exception as exc:  # noqa: BLE001
-                obs = f"VISIT ERROR for {url}: {exc}"
         elif action == "verify":
             claim = str(args.get("claim", ""))
             verdict = await _verify_claim(agent_io, claim, "\n\n".join(evidence), model_name)
@@ -174,6 +244,7 @@ async def run_sequential_execution(
     run_stamp: str,
     summarize_observability_func=summarize_observability,
     connector_browser=None,
+    idea_settings: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run the sequential ReAct agent; same return shape as ``run_baseline_execution``.
 
@@ -182,6 +253,10 @@ async def run_sequential_execution(
         browser fallback (its free-form queries/URLs hit bot-blocked sites more often), so
         wiring it here uniformly with the other variants removes an infra-driven handicap
         from the arm comparison rather than adding one.
+    :param idea_settings: The run's typed-settings dict. This arm has no GoT engine, so it reads
+        exactly the three ``connector_retry_*`` keys (F16) — the SAME flag the graph arms use for
+        their in-place tool retry, so a benchmark can't hand one arm a retry the other never
+        gets. Omitted/None (any non-benchmark caller) keeps the retry off.
     """
     connector_llm.set_model(model_name)
     test_id = test_module.metadata.get("test_id", "unknown")
@@ -211,10 +286,12 @@ async def run_sequential_execution(
     # are graph_compiled's distinctive features, not handicaps to "fix" here).
     max_steps = int(os.environ.get("IDEA_TEST_SEQUENTIAL_MAX_STEPS", "25"))
     max_tokens = int(os.environ.get("IDEA_TEST_BASELINE_MAX_TOKENS", "8192"))
+    retry = ToolRetry.from_settings(idea_settings)
     started = time.perf_counter()
     deliverable = ""
     try:
-        deliverable = await _run_react(agent_io, mandate, model_name, max_steps, max_tokens)
+        deliverable = await _run_react(agent_io, mandate, model_name, max_steps, max_tokens,
+                                       retry=retry)
     except Exception as exc:
         _logger.error(f"Sequential ReAct failed: {exc}", exc_info=True)
 

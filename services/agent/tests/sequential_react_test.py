@@ -2,12 +2,16 @@
 Unit tests for the sequential ReAct agent loop (testing/execution_sequential.py) — free.
 
 Drive the loop with a mocked AgentIO and assert it issues the right tool calls
-(search -> visit -> finish), passes args through, and falls back to a forced synthesis
-when the model never calls finish within the step budget.
+(search -> visit -> finish), passes args through, falls back to a forced synthesis
+when the model never calls finish within the step budget, and (F16) retries a TRANSIENT
+tool failure exactly like the graph arms do when the shared
+``connector_retry_on_failure_enabled`` flag is on.
 """
 import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from agent.app.testing import execution_sequential as seq
 
@@ -120,3 +124,153 @@ def test_react_step_token_budget_default_is_reasoning_adequate(monkeypatch):
     io2 = _agent_io(decisions)
     asyncio.run(seq._run_react(io2, "task", "m", max_steps=2, max_tokens=512))
     assert io2.build_llm_payload.call_args_list[0].kwargs["max_tokens"] == 9000
+
+
+# ------------------------------------------- F16: arm-symmetric tool retry (2026-08-09) ---------
+# The graph arms retry a transient search/visit failure in place (idea_engine._maybe_retry_tool_
+# failure) whenever `connector_retry_on_failure_enabled` is set — which every benchmark driver
+# sets for EVERY arm (IDEA_TEST_CONNECTOR_RETRY=1). This arm had no retry at all, so the same
+# flaky network hit only the reference model: an infra confound, not a model difference.
+_RETRY_ON = seq.ToolRetry(enabled=True, max_attempts=2, backoff_seconds=0.0)
+
+_SEARCH_THEN_FINISH = [
+    {"thought": "look", "action": "search", "args": {"query": "q"}},
+    {"thought": "done", "action": "finish", "args": {"answer": "A"}},
+]
+_VISIT_THEN_FINISH = [
+    {"thought": "read", "action": "visit", "args": {"url": "https://en.wikipedia.org/wiki/X"}},
+    {"thought": "done", "action": "finish", "args": {"answer": "A"}},
+]
+
+
+def _observation(io, step=1):
+    """The scratchpad the loop fed back into the NEXT step's prompt."""
+    return io.build_llm_payload.call_args_list[step].kwargs["messages"][1]["content"]
+
+
+def test_tool_retry_defaults_to_disabled():
+    # No settings dict (any non-benchmark caller) -> unchanged behavior.
+    assert seq.ToolRetry.from_settings(None).enabled is False
+    assert seq.ToolRetry.from_settings({}).enabled is False
+
+
+def test_tool_retry_reads_the_same_settings_keys_as_the_graph_arm():
+    retry = seq.ToolRetry.from_settings({
+        "connector_retry_on_failure_enabled": True,
+        "connector_retry_max_attempts": 3,
+        "connector_retry_backoff_seconds": 0.25,
+    })
+    assert retry == seq.ToolRetry(enabled=True, max_attempts=3, backoff_seconds=0.25)
+
+
+def test_transient_search_failure_is_not_retried_when_flag_off():
+    io = _agent_io(_SEARCH_THEN_FINISH)
+    io.search = AsyncMock(side_effect=[asyncio.TimeoutError("search timed out")])
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512))
+    assert io.search.await_count == 1                    # default (flag off) is unchanged
+    assert "SEARCH ERROR" in _observation(io)
+
+
+def test_transient_search_failure_is_retried_when_flag_on():
+    io = _agent_io(_SEARCH_THEN_FINISH)
+    io.search = AsyncMock(side_effect=[
+        asyncio.TimeoutError("search timed out"),
+        [{"title": "T", "url": "https://en.wikipedia.org/wiki/X", "description": "d"}],
+    ])
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, retry=_RETRY_ON))
+    assert io.search.await_count == 2
+    obs = _observation(io)
+    assert "SEARCH RESULTS" in obs and "SEARCH ERROR" not in obs
+
+
+def test_empty_search_results_are_retried():
+    # Success-with-EMPTY payload is a tool failure in the graph arm too (`is_tool_failure`).
+    io = _agent_io(_SEARCH_THEN_FINISH)
+    io.search = AsyncMock(side_effect=[[], [{"title": "T", "url": "u", "description": "d"}]])
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, retry=_RETRY_ON))
+    assert io.search.await_count == 2
+
+
+def test_retry_is_bounded_by_max_attempts_and_keeps_the_error_observation():
+    io = _agent_io(_SEARCH_THEN_FINISH)
+    io.search = AsyncMock(side_effect=[asyncio.TimeoutError("boom")] * 5)
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, retry=_RETRY_ON))
+    assert io.search.await_count == 3                    # 1 initial + max_attempts(2) retries
+    assert "SEARCH ERROR" in _observation(io)
+
+
+def test_transient_visit_failure_is_retried_and_recovers_evidence():
+    io = _agent_io(_VISIT_THEN_FINISH)
+    io.visit = AsyncMock(side_effect=[
+        RuntimeError("HTTP visit failed: https://en.wikipedia.org/wiki/X status=503"),
+        "REAL PAGE TEXT",
+    ])
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, retry=_RETRY_ON))
+    assert io.visit.await_count == 2
+    assert "REAL PAGE TEXT" in _observation(io)
+
+
+def test_permanent_visit_failure_is_not_retried():
+    # 403 bot-block: re-running it only burns budget — the graph arm doesn't retry it either.
+    io = _agent_io(_VISIT_THEN_FINISH)
+    io.visit = AsyncMock(side_effect=[
+        RuntimeError("HTTP visit failed: https://en.wikipedia.org/wiki/X status=403")] * 3)
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, retry=_RETRY_ON))
+    assert io.visit.await_count == 1
+    assert "VISIT ERROR" in _observation(io)
+
+
+def test_empty_page_is_retried():
+    io = _agent_io(_VISIT_THEN_FINISH)
+    io.visit = AsyncMock(side_effect=[seq._EMPTY_PAGE, "REAL PAGE TEXT"])
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, retry=_RETRY_ON))
+    assert io.visit.await_count == 2
+    assert "REAL PAGE TEXT" in _observation(io)
+
+
+@pytest.mark.asyncio
+async def test_run_sequential_execution_threads_the_retry_flag_from_settings(monkeypatch):
+    """End-to-end wiring: the arm's settings dict (the same one the runner hands every variant)
+    must reach the react loop as a ToolRetry, or the flag would be silently inert."""
+    captured = {}
+
+    async def _fake_run_react(agent_io, mandate, model_name, max_steps, max_tokens, retry=None):
+        captured["retry"] = retry
+        return "answer"
+
+    monkeypatch.setattr(seq, "_run_react", _fake_run_react)
+    tm = MagicMock()
+    tm.metadata = {"test_id": "999"}
+    tm.get_task_statement.return_value = "Do the thing."
+    await seq.run_sequential_execution(
+        test_module=tm, model_name="m",
+        connector_llm=MagicMock(), connector_search=MagicMock(),
+        connector_http=MagicMock(), connector_chroma=MagicMock(),
+        run_stamp="r1",
+        summarize_observability_func=lambda *a, **kw: {},
+        idea_settings={"connector_retry_on_failure_enabled": True},
+    )
+    assert captured["retry"].enabled is True
+
+
+@pytest.mark.asyncio
+async def test_run_complete_test_passes_settings_to_the_sequential_runner(monkeypatch):
+    """The harness must hand THIS arm the run's settings like it does every other variant —
+    otherwise the shared retry flag never reaches it and the arms stay asymmetric."""
+    from agent.app.testing import runner as harness_runner
+
+    dispatched = AsyncMock(return_value={"output": {}, "graph": {}, "observability": {}})
+    monkeypatch.setattr(harness_runner, "run_sequential_execution", dispatched)
+    tm = MagicMock()
+    tm.metadata = {"test_id": "999"}
+    tm.validation_runner.run = AsyncMock(return_value={"overall_score": 0.0})
+    await harness_runner.run_complete_test(
+        test_module=tm, model_name="m",
+        connector_llm=MagicMock(), connector_search=MagicMock(),
+        connector_http=MagicMock(), connector_chroma=MagicMock(),
+        idea_settings={"connector_retry_on_failure_enabled": True},
+        run_stamp="r1", summarize_observability_func=lambda *a, **k: {},
+        execution_variant="sequential_react",
+    )
+    assert dispatched.await_args.kwargs["idea_settings"] == {
+        "connector_retry_on_failure_enabled": True}

@@ -1,7 +1,37 @@
 from __future__ import annotations
 
+import asyncio
+import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
+
+def is_transient_tool_error(error: BaseException) -> bool:
+    """Classify a RAISED tool error as transient (worth a bounded retry) vs. permanent.
+
+    Single source of truth for both retry paths, so an arm comparison can never be skewed by two
+    different notions of "transient": the graph engine's leaf actions
+    (:meth:`LeafAction._is_retryable`, which sets the ``retryable`` flag that
+    ``IdeaEngine._should_retry_tool_failure`` reads) and the sequential ReAct arm's in-place
+    tool retry (see ``testing/execution_sequential``).
+
+    Transient: a timeout, HTTP 429, or any 5xx. Permanent: HTTP 401/403, a bot-block/WAF
+    signature (forbidden / cloudflare / captcha / ...), and anything unrecognized — the
+    conservative default, which never spends budget on a retry that cannot help.
+
+    :param error: The exception raised by the tool call.
+    :returns: True if the failure looks transient.
+    """
+    if isinstance(error, (asyncio.TimeoutError, TimeoutError)):
+        return True
+    match = re.search(r"status=([0-9]{3})", str(error))
+    if match:
+        status = int(match.group(1))
+        if status in (401, 403):
+            return False
+        if status == 429 or status >= 500:
+            return True
+    return False
 
 
 class ErrorType(str, Enum):

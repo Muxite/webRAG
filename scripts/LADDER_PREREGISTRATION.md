@@ -43,9 +43,17 @@ variations). We do **not** claim to beat the premium reference — the claim is 
 ## Pre-registered ANALYSIS RULES (the methodology, fixed in advance)
 
 1. **Missing = 0 over the full grid.** A cell scheduled by the interleaved design but missing in one arm
-   (timeout / crash / 402) scores **0** for that arm, over the UNION grid. No intersection-drop
+   (timeout / crash) scores **0** for that arm, over the UNION grid. No intersection-drop
    ("survivorship" inflated the pilot ~15%, because timeouts cluster on the hard tasks / high-compute
    arm). `missing="drop"` is only ever an explicit, logged sensitivity check.
+   **1b. INFRA failures are QUARANTINED, not zero-filled** (amended 2026-08-09, BEFORE the barrage —
+   F17). A cell whose web/LLM calls died on 402 / 422 / 429 / 5xx / transport (flagged `infra_failed`
+   by the runner) measured the PROVIDER, not the model, so it is excluded from the primary
+   aggregation and from the paired grid — pairwise, i.e. its partner cell in the other arm goes with
+   it, so no healthy run is scored against a fabricated 0. The count is reported ("infra failures
+   excluded: N") and every excluded cell is listed in `ab_infra.csv`; a run whose exclusions are not
+   a small minority is not publishable and must be re-run. This carve-out applies ONLY to the
+   `infra_failed` classification — an ordinary timeout or crash is still a real 0 per rule 1.
 2. **PRIMARY test = TASK-LEVEL.** Paired sign-flip permutation test (two-sided) on per-**task** deltas
    (n = #tasks): **win = mean Δ > 0 with p < 0.05.** The per-(task,rep) pairing is PSEUDOREPLICATED
    (reps within a task are not independent) and is reported ONLY as a secondary robustness figure.

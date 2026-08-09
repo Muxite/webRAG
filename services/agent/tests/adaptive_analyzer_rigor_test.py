@@ -6,6 +6,7 @@ Pins the two headline-integrity fixes:
   * _rep_key anchors rep(\\d+) to a token boundary so run-ids containing prep/grep/step
     don't false-match a replicate index (which silently mis-pairs / drops data).
 """
+import json
 import os
 import sys
 from pathlib import Path
@@ -13,8 +14,11 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
+import adaptive_ab_analyze as ana  # noqa: E402
 from adaptive_ab_analyze import (  # noqa: E402
     paired_deltas,
+    quarantine_infra,
+    _infra_failed,
     _rep_key,
     holm,
     oaxaca_grounding_split,
@@ -94,6 +98,118 @@ def test_oaxaca_terms_sum_to_delta_raw_with_empirical_ungrounded():
     assert total == pytest.approx(d["delta_raw"])
     assert d["reasoning"] == pytest.approx(0.15)         # 0.5*(0.8-0.5)
     assert d["grounding_rate"] == pytest.approx(0.20)    # 0.8*(0.75-0.5)
+
+
+# ------------------------------------------------------- F17: infra-failure quarantine ----------
+def _irows(specs):
+    """rows as (task, rep, score, infra_failed)."""
+    return [{"test_id": t, "rep": (r, r), "score": s, "infra_failed": i} for t, r, s, i in specs]
+
+
+def test_infra_failed_reads_either_flag():
+    # Top-level flag (testing/runner.py) ...
+    assert _infra_failed({"infra_failed": True}, {}) is True
+    # ... or the observability roll-up it derives from (older result JSONs).
+    assert _infra_failed({}, {"infra": {"failed": True, "ops": ["search_query"]}}) is True
+    assert _infra_failed({}, {"infra": {"failed": False}}) is False
+    assert _infra_failed({}, {}) is False
+
+
+def test_quarantine_infra_splits_rows_and_excludes_the_poisoned_cell():
+    A = _irows([("1", 1, 0.8, False), ("2", 1, 0.0, True)])
+    B = _irows([("1", 1, 0.5, False), ("2", 1, 0.4, False)])
+    (Ac, Bc), (Ai, Bi), excl = quarantine_infra(A, B)
+    assert [r["test_id"] for r in Ac] == ["1"] and [r["test_id"] for r in Ai] == ["2"]
+    assert Bi == [] and len(Bc) == 2
+    assert excl["rep"] == {("2", (1, 1))}
+    assert excl["task"] == {"2"}          # adaptive lost EVERY row for task 2 -> whole task out
+
+
+def test_infra_cell_is_excluded_not_zero_filled():
+    # Without the exclusion, adaptive's 402-poisoned task-2 cell would be zero-filled and read as
+    # a -0.4 model regression; the honest result is that the pair is not measured at all.
+    A = _irows([("1", 1, 0.8, False), ("2", 1, 0.0, True)])
+    B = _irows([("1", 1, 0.5, False), ("2", 1, 0.4, False)])
+    (Ac, Bc), _, excl = quarantine_infra(A, B)
+    naive = dict(paired_deltas(Ac, Bc, by="task", missing="zero"))
+    honest = dict(paired_deltas(Ac, Bc, by="task", missing="zero", exclude=excl))
+    assert naive["2"] == pytest.approx(-0.4)   # the bug: an outage scored as a model failure
+    assert "2" not in honest                   # quarantined from BOTH arms
+    assert honest["1"] == pytest.approx(0.3)   # healthy pairs are untouched
+
+
+def test_infra_quarantine_keeps_surviving_reps_of_the_same_task():
+    # Only the poisoned (task, rep) cell drops; rep 2 of the same task still pairs, so one bad
+    # network window doesn't cost the whole task.
+    A = _irows([("1", 1, 0.0, True), ("1", 2, 0.9, False)])
+    B = _irows([("1", 1, 0.5, False), ("1", 2, 0.4, False)])
+    (Ac, Bc), _, excl = quarantine_infra(A, B)
+    assert excl["task"] == set()               # task 1 survives via rep 2
+    reps = paired_deltas(Ac, Bc, by="rep", missing="zero", exclude=excl)
+    assert [k for k, _ in reps] == ["1"]       # only the rep-2 pair remains
+    assert reps[0][1] == pytest.approx(0.5)
+    # The quarantine is PAIRWISE: baseline's healthy rep-1 partner leaves the task mean too, so
+    # the mean is not an unpaired mix (0.9 - mean(0.5, 0.4) = 0.45 would be the sloppy answer).
+    assert dict(paired_deltas(Ac, Bc, by="task", missing="zero", exclude=excl))["1"] == \
+        pytest.approx(0.5)
+
+
+def _write_result(tmp_path, run_id, task, score, infra=False):
+    body = {
+        "test_metadata": {"test_id": task},
+        "model": "openai/gpt-4.1-nano",
+        "validation": {"overall_score": score},
+        "execution": {"observability": {"visit": {"count": 1}, "cost": {"usd": 0.01},
+                                        "infra": {"failed": infra,
+                                                  "ops": ["search_query"] if infra else []}}},
+    }
+    if infra:
+        body["infra_failed"] = True
+    (tmp_path / f"{run_id}_{task}_nano_graph_r1.json").write_text(json.dumps(body))
+
+
+def test_load_arm_flags_infra_rows_from_the_result_json(tmp_path, monkeypatch):
+    monkeypatch.setattr(ana, "RESULTS_DIR", str(tmp_path))
+    _write_result(tmp_path, "run1_rep1", "140", 0.0, infra=True)
+    _write_result(tmp_path, "run1_rep1", "141", 0.9)
+    rows = {r["test_id"]: r for r in ana.load_arm("run1_rep1")}
+    assert rows["140"]["infra_failed"] is True
+    assert rows["140"]["infra_ops"] == "search_query"
+    assert rows["141"]["infra_failed"] is False
+
+
+def test_main_reports_infra_exclusions_end_to_end(tmp_path, monkeypatch, capsys):
+    # Wiring check: a 402-poisoned adaptive cell must be reported and quarantined, NOT folded
+    # into the paired grid as a 0 — and the healthy pair must still be scored.
+    results, out = tmp_path / "results", tmp_path / "out"
+    results.mkdir()
+    _write_result(results, "adapt_rep1", "140", 0.0, infra=True)
+    _write_result(results, "adapt_rep1", "141", 0.9)
+    _write_result(results, "base_rep1", "140", 0.4)
+    _write_result(results, "base_rep1", "141", 0.4)
+    monkeypatch.setattr(ana, "RESULTS_DIR", str(results))
+    monkeypatch.setattr(sys, "argv", ["adaptive_ab_analyze.py", "--adaptive-run-id", "adapt_rep1",
+                                      "--baseline-run-id", "base_rep1", "--out", str(out)])
+    ana.main()
+    printed = capsys.readouterr().out
+    assert "infra failures excluded: 1 (adaptive 1, baseline 0)" in printed
+    infra_csv = (out / "ab_infra.csv").read_text().splitlines()
+    assert infra_csv[0] == "arm,task,rep,score,ops"
+    assert infra_csv[1].startswith("adaptive,140,")
+    # n=1 pair (task 141 only): task 140 is quarantined, not scored -0.4.
+    paired = (out / "ab_paired.csv").read_text()
+    assert "OVERALL,task,1,0.5000" in paired
+
+
+def test_genuine_timeout_is_still_zero_filled():
+    # The quarantine must NOT become a survivorship loophole: a MISSING cell with no infra flag
+    # (timeout/crash on a hard task) is still a real 0 over the union grid.
+    A = _rows([("1", 0.8), ("2", 0.9)])
+    B = _rows([("1", 0.5), ("2", 0.4), ("3", 0.3)])
+    (Ac, Bc), (Ai, Bi), excl = quarantine_infra(A, B)
+    assert Ai == [] and Bi == [] and excl["rep"] == set() and excl["task"] == set()
+    assert dict(paired_deltas(Ac, Bc, by="task", missing="zero", exclude=excl))["3"] == \
+        pytest.approx(-0.3)
 
 
 def test_dollars_per_solved():

@@ -27,6 +27,7 @@ from agent.app.idea_policies.action_constants import (
     ActionResultBuilder,
     PromptBuilder,
     ContextBuilder,
+    is_transient_tool_error,
 )
 
 
@@ -194,31 +195,9 @@ class LeafAction(ABC):
             return None
 
     def _is_retryable(self, error: Exception) -> bool:
-        if isinstance(error, (asyncio.TimeoutError, TimeoutError)):
-            return True
-        message = str(error)
-        match = re.search(r"status=([0-9]{3})", message)
-        if match:
-            status = int(match.group(1))
-            if status in (401, 403):
-                return False
-            if status == 429:
-                return True
-            if status >= 500:
-                return True
-        error_lower = message.lower()
-        bot_blocking_indicators = [
-            "forbidden",
-            "access denied",
-            "cloudflare",
-            "bot detection",
-            "captcha",
-            "blocked",
-            "unauthorized",
-        ]
-        if any(indicator in error_lower for indicator in bot_blocking_indicators):
-            return False
-        return False
+        # Shared with the sequential arm's tool retry so both arms agree on what "transient"
+        # means — see action_constants.is_transient_tool_error.
+        return is_transient_tool_error(error)
 
     def _limit_text(self, text: str) -> Dict[str, Any]:
         max_chars = self._max_observation_chars()

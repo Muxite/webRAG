@@ -260,3 +260,32 @@ def test_cell_env_leaves_openrouter_routing_untouched_when_no_provider(tmp_path,
     assert "IDEA_TEST_PREFLIGHT_TIMEOUT_SECONDS" not in env  # keeps the 20s cloud-API default
     assert "IDEA_TEST_EXPANSION_TIMEOUT" not in env
     assert "IDEA_TEST_FINAL_TIMEOUT" not in env
+
+
+# ------------------------------------------------------- F27: the suite59 task set (2026-08-09) --
+def _active_suite_ids():
+    """The validator-lint CI gate's own 59-task manifest — the single source of truth for what
+    "the active suite" means (see services/agent/app/BENCHMARK_SUITE_50.md)."""
+    from agent.tests.validator_lint_test import ACTIVE_SUITE_IDS
+    return ACTIVE_SUITE_IDS
+
+
+def test_suite59_is_registered_as_a_task_set():
+    # The relaunch command documented in BARRAGE_RELAUNCH_HANDOFF.md §5 passes
+    # `--task-set suite59`; argparse `choices` comes straight from TASK_SETS, so a missing entry
+    # is a hard blocker for the launch, not a cosmetic gap.
+    assert "suite59" in ladder.TASK_SETS
+
+
+def test_suite59_matches_the_ci_lint_gate_manifest():
+    # The barrage must never run a task the [GATE]/[LLM] validator-integrity gate doesn't check.
+    assert sorted(ladder.TASK_SETS["suite59"]) == sorted(_active_suite_ids())
+
+
+def test_suite59_is_suite50_minus_024_plus_the_ten_additions():
+    suite50, suite59 = ladder.TASK_SETS["suite50"], ladder.TASK_SETS["suite59"]
+    additions = ["052", "071", "078", "079", "081", "082", "084", "085", "091", "094"]
+    assert len(suite50) == 50
+    assert len(suite59) == len(set(suite59)) == 59
+    assert "024" in suite50 and "024" not in suite59  # F27 drop (un-gated + LLM-judge-scored)
+    assert set(suite59) == (set(suite50) - {"024"}) | set(additions)

@@ -55,6 +55,20 @@ def _node_count(d):
     return None
 
 
+def _infra_failed(d, ob):
+    """Whether this cell was poisoned by an INFRA failure (402/422/429/5xx/transport) — F17.
+
+    Two equivalent sources are honored: the top-level ``infra_failed`` flag the runner writes
+    (testing/runner.py) and the ``observability.infra`` roll-up it is derived from
+    (testing/utils._summarize_infra), so a result JSON written before the top-level flag existed
+    still classifies correctly.
+    """
+    if d.get("infra_failed") is True:
+        return True
+    infra = ob.get("infra")
+    return bool(infra.get("failed")) if isinstance(infra, dict) else False
+
+
 def _rep_key(run_id, fname, model=None):
     """Stable replicate identity for pairing arms per (task, rep[, model]).
 
@@ -102,6 +116,8 @@ def load_arm(run_ids):
                 "visit_chars": (ob.get("visit", {}) or {}).get("chars"),
                 "usd": (ob.get("cost", {}) or {}).get("usd"),
                 "secs": d.get("execution", {}).get("duration_seconds"),
+                "infra_failed": _infra_failed(d, ob),
+                "infra_ops": ",".join((ob.get("infra", {}) or {}).get("ops") or []),
             })
     return rows
 
@@ -257,7 +273,37 @@ def oaxaca_grounding_split(A_rows, B_rows):
     }
 
 
-def paired_deltas(A_rows, B_rows, by="rep", missing="zero"):
+def quarantine_infra(*arms):
+    """Split each arm's rows into (clean, infra-poisoned) and list the pairing keys to DROP — F17.
+
+    Zero-fill (``missing="zero"``) is the honest convention for a MODEL failure: a timeout or a
+    crash on a hard task is a real 0, and intersection-dropping it would be survivorship. It is
+    the WRONG convention for an INFRA failure — a 402/429/5xx storm measures the PROVIDER, not the
+    model — because it both books an outage as a model defect and drags the healthy paired partner
+    of that cell down with it. Infra cells are therefore removed from the primary aggregation and
+    from the paired grid entirely (in BOTH arms of the affected pair) and reported separately.
+
+    :param arms: One row-list per arm (as returned by :func:`load_arm`).
+    :returns: ``(clean_arms, infra_arms, exclude)``; ``exclude`` is
+        ``{"rep": {(task, rep), ...}, "task": {task, ...}}``, the shape
+        :func:`paired_deltas` takes. A task is excluded WHOLESALE only when an arm lost every
+        one of its rows for that task to infra — otherwise the task keeps its surviving clean
+        reps and only the poisoned (task, rep) cells drop out.
+    """
+    clean_arms, infra_arms = [], []
+    exclude = {"rep": set(), "task": set()}
+    for rows in arms:
+        clean = [r for r in rows if not r.get("infra_failed")]
+        infra = [r for r in rows if r.get("infra_failed")]
+        clean_arms.append(clean)
+        infra_arms.append(infra)
+        survivors = {r["test_id"] for r in clean if isinstance(r.get("score"), (int, float))}
+        exclude["rep"] |= {(r["test_id"], r["rep"]) for r in infra}
+        exclude["task"] |= {r["test_id"] for r in infra} - survivors
+    return clean_arms, infra_arms, exclude
+
+
+def paired_deltas(A_rows, B_rows, by="rep", missing="zero", exclude=None):
     """Adaptive-minus-baseline deltas, paired within each (task[, rep]) block.
 
     by="rep": pair adaptive/baseline runs that share (task, rep) — the interleaved shared-window
@@ -266,11 +312,20 @@ def paired_deltas(A_rows, B_rows, by="rep", missing="zero"):
     (task, delta).
 
     missing="zero" (DEFAULT, honest): a cell scheduled in the interleaved design but MISSING in one
-    arm (timeout / crash / 402) scores 0 for that arm, over the UNION grid. Timeouts cluster on the
+    arm (timeout / crash) scores 0 for that arm, over the UNION grid. Timeouts cluster on the
     hard tasks and the high-compute arm — i.e. adaptive's worst cases — so intersection-dropping
     them (missing="drop", the legacy behavior) inflates the delta via survivorship (~+15% on the
     pilot). Use missing="drop" only as an explicit, logged sensitivity check.
+
+    exclude (F17): keys to remove from the grid ENTIRELY rather than zero-fill — the
+    infra-quarantined cells from :func:`quarantine_infra` (``{"rep": {...}, "task": {...}}``). A
+    provider outage is not a model failure, so it must be neither scored 0 nor allowed to zero out
+    its healthy partner. The quarantine is PAIRWISE: an excluded (task, rep) cell also removes its
+    partner from the other arm, so a task mean is never an unpaired mix of "A over the reps that
+    survived" vs "B over all of its reps".
     """
+    dropped_reps = set((exclude or {}).get("rep") or ())
+
     def idx_rep(rows):
         m = {}
         for r in rows:
@@ -281,17 +336,18 @@ def paired_deltas(A_rows, B_rows, by="rep", missing="zero"):
     def idx_task_mean(rows):
         g = defaultdict(list)
         for r in rows:
-            if isinstance(r["score"], (int, float)):
+            if isinstance(r["score"], (int, float)) and (r["test_id"], r["rep"]) not in dropped_reps:
                 g[r["test_id"]].append(r["score"])
         return {t: mean(v) for t, v in g.items()}
 
+    dropped = set((exclude or {}).get(by) or ())
     if by == "rep":
         ai, bi = idx_rep(A_rows), idx_rep(B_rows)
-        allk = (set(ai) | set(bi)) if missing == "zero" else (set(ai) & set(bi))
+        allk = ((set(ai) | set(bi)) if missing == "zero" else (set(ai) & set(bi))) - dropped
         keys = sorted(allk, key=lambda k: (str(k[0]), str(k[1])))
         return [(k[0], ai.get(k, 0.0) - bi.get(k, 0.0)) for k in keys]
     ai, bi = idx_task_mean(A_rows), idx_task_mean(B_rows)
-    allk = (set(ai) | set(bi)) if missing == "zero" else (set(ai) & set(bi))
+    allk = ((set(ai) | set(bi)) if missing == "zero" else (set(ai) & set(bi))) - dropped
     keys = sorted(allk, key=lambda t: (int(t) if str(t).isdigit() else 1e9, t))
     return [(t, ai.get(t, 0.0) - bi.get(t, 0.0)) for t in keys]
 
@@ -307,6 +363,26 @@ def main():
     A, B = load_arm(args.adaptive_run_id), load_arm(args.baseline_run_id)
     if not A and not B:
         print("No result files found for those run-ids."); return
+
+    # ---- F17: quarantine infra-poisoned cells BEFORE any scoring ----
+    # A cell whose web/LLM calls died on 402/422/429/5xx/transport measured the provider, not the
+    # model. Under the zero-fill convention it would otherwise be booked as a genuine 0 (measured:
+    # web-error runs 0.473 vs 0.720 clean), so an outage would read as a model regression. Exclude
+    # such cells from the primary aggregation and REPORT them separately instead.
+    (A, B), (A_infra, B_infra), infra_exclude = quarantine_infra(A, B)
+    n_infra = len(A_infra) + len(B_infra)
+    infra_csv = ["arm,task,rep,score,ops"]
+    for label, rows in (("adaptive", A_infra), ("baseline", B_infra)):
+        for r in sorted(rows, key=lambda r: (str(r["test_id"]), str(r["rep"]))):
+            infra_csv.append(f"{label},{r['test_id']},{r['rep']},{r['score']},{r['infra_ops']}")
+    open(f"{args.out}/ab_infra.csv", "w").write("\n".join(infra_csv) + "\n")
+    print(f"infra failures excluded: {n_infra} "
+          f"(adaptive {len(A_infra)}, baseline {len(B_infra)}) — 402/422/429/5xx/transport, "
+          f"NOT zero-filled; see {args.out}/ab_infra.csv")
+    if n_infra:
+        print(f"  quarantined pairs: {len(infra_exclude['rep'])} (task,rep) cells, "
+              f"{len(infra_exclude['task'])} task(s) lost entirely in an arm — all removed from "
+              f"the paired grid in BOTH arms, so no healthy partner is scored against a fake 0.")
 
     def group(rows):
         m = defaultdict(list)
@@ -372,14 +448,16 @@ def main():
     paired_csv = ["scope,pairing,n_pairs,mean_delta,ci95,cohen_dz,p_value,p_holm,significant"]
     for by, label in (("task", "per-task (means; conservative, n=#tasks)"),
                       ("rep", "per-(task,rep) (shared-window pairs; max power)")):
-        overall_d = [d for _, d in paired_deltas(A, B, by=by, missing="zero")]
-        n_drop = len(paired_deltas(A, B, by=by, missing="drop"))
+        overall_d = [d for _, d in paired_deltas(A, B, by=by, missing="zero", exclude=infra_exclude)]
+        n_drop = len(paired_deltas(A, B, by=by, missing="drop", exclude=infra_exclude))
         filled = len(overall_d) - n_drop  # cells scored 0 for a missing/timeout cell
         n, m, ci, dz = paired_stats(overall_d)
         p, _ = signflip_p(overall_d)
         sig = "n<3" if n < 3 else ("YES p<0.05" if (p is not None and p < 0.05) else "no")
         pstr = f"{p:.4f}" if p is not None else "—"
         cov = f"(zero-filled {filled} missing)" if filled else "(full grid)"
+        if n_infra:
+            cov += f" (infra-excluded {n_infra})"
         print(f"OVERALL  {label:<48} n={n:>2}  Δ={m:>+.3f} ±{ci:.3f}  dz={dz:>+.2f}  p={pstr}  [{sig}] {cov}")
         paired_csv.append(f"OVERALL,{by},{n},{m:.4f},{ci:.4f},{dz:.4f},{pstr},—,{sig}")
     # Power note: the task-level test's n IS the task count — reps only tighten each task mean.
@@ -395,7 +473,8 @@ def main():
         Ba = [r for r in B if r["archetype"] == name]
         # Task-level (not rep-level): each archetype is only ~2 tasks, so this honestly reads
         # n<3 → exploratory, not a false-confident verdict off pseudoreplicated (task,rep) pairs.
-        ds = [d for _, d in paired_deltas(Aa, Ba, by="task", missing="zero")]
+        ds = [d for _, d in paired_deltas(Aa, Ba, by="task", missing="zero",
+                                          exclude=infra_exclude)]
         if not ds:
             continue
         n, m, ci, dz = paired_stats(ds)

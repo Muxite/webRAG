@@ -93,6 +93,17 @@ TASK_SETS = {
         "094", "044", "047", "052", "071", "073", "200", "206", "146",
     ],
 }
+# F27 — the ACTIVE barrage suite (59), i.e. what `--task-set suite59` in the relaunch command
+# means: `suite50` MINUS task 024 (dropped 2026-07-25 — un-gated AND LLM-judge-scored, so a
+# 0-visit hallucination scored 0.786 and PASSED the 0.75 bar; the file is kept for a future
+# grounding-gated rebuild) PLUS AGENT4's 10 bounded parallel fan-out additions (breadth/argmax/
+# count/AND-filter/nearest thin shapes). Derived from `suite50` rather than re-typed so the two
+# can never silently diverge; pinned against the CI lint gate's own manifest
+# (services/agent/tests/validator_lint_test.ACTIVE_SUITE_IDS) by adaptive_ladder_run_test.py, so
+# the barrage can never run a task the validator-integrity gate does not check.
+TASK_SETS["suite59"] = [t for t in TASK_SETS["suite50"] if t != "024"] + [
+    "052", "071", "078", "079", "081", "082", "084", "085", "091", "094",
+]
 TASKS = TASK_SETS["smoke8"]  # default; overridden by --task-set / --tasks
 
 

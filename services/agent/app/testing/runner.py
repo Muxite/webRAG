@@ -97,6 +97,10 @@ async def run_complete_test(
             connector_http=connector_http,
             connector_chroma=connector_chroma,
             connector_browser=connector_browser,
+            # F16: this arm reads only the `connector_retry_*` keys — the same tool-retry flag
+            # the graph arms honor — so an arm comparison isn't skewed by the reference model
+            # being the only one that never gets a second chance at a flaky search/visit.
+            idea_settings=idea_settings,
             run_stamp=run_stamp,
             summarize_observability_func=summarize_observability_func,
         )
