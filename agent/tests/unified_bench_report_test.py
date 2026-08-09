@@ -353,13 +353,17 @@ def test_aggregate_mean_pass_rate_and_cost_by_model_x_benchmark_type():
     assert unscored["score"] is None and unscored["pass_rate"] is None
 
 
-def test_aggregate_counts_a_measured_cost_even_when_the_local_predicate_false_positives():
+def test_aggregate_counts_a_measured_cost_even_when_the_local_predicate_false_positives(monkeypatch):
     # Legacy result files predate the `origin` stamp, so model_costs.is_local_row falls back to
-    # a model-name lookup and calls a paid model with a pricing-table gap "local". A row that
-    # RECORDED a dollar cost is a measurement and must still be averaged in.
+    # a model-name lookup and can call a paid model "local" when its pricing entry is missing
+    # from the static table (a real gap this repo has hit before) or, on a machine where a live
+    # OpenRouter pricing cache has since filled that specific gap, simply misclassify some other
+    # unpriced model. Either way, a row that RECORDED a dollar cost is a measurement and must
+    # still be averaged in — force the false-positive precondition directly rather than relying
+    # on a real model name's pricing-cache state at test time, which varies machine to machine.
+    monkeypatch.setattr(ubr, "_is_local", lambda row: True)
     rows = [{"model": "openai/gpt-4.1-nano", "benchmark_type": "qa", "score": 0.7,
              "passed": False, "cost_usd": 0.005, "duration_s": 20.0, "origin": None}]
-    assert ubr._is_local(rows[0]) is True, "fixture must exercise the false-positive path"
     agg = ubr.aggregate(rows)
     assert agg[0]["usd"] == pytest.approx(0.005) and agg[0]["n_priced"] == 1
 
