@@ -8,6 +8,22 @@ same ``confine()`` (and has been through codebench's security review, where real
 sandbox-escape/symlink-exfiltration bugs were found and fixed). Re-implementing confinement in a
 second place is exactly how the two copies drift.
 
+The same reasoning applies one level up: the ``{action, args} -> connector method`` translation
+lives in :mod:`agent.app.sandbox_dispatch`, shared with codebench's ``graph_compiled_code`` leaf
+loop, so the two call sites cannot drift on which argument aliases they accept. Each action class
+below is therefore a NAME, a docstring (which is its prompt line) and an args hint; the work is
+the shared dispatcher's.
+
+What this pack exposes is EIGHT actions: ``read_file``, ``write_file``, ``list_dir`` and the five
+read-only shell actions. Two absences are deliberate and should not be read as oversights:
+
+* there is no ``patch_file`` — the native engine can only full-overwrite a file today. The
+  connector and the shared dispatcher both support patching (codebench uses it); adding the leaf
+  action here would be a capability ADDITION, not part of unifying the dispatcher.
+* there is no ``run_python`` / ``run_pytest`` / ``search_web``. The shared dispatcher can reach
+  them, but exposing arbitrary code execution to a general web-research engine is a materially
+  bigger decision than de-duplicating a dispatcher, and proximity is not authorization.
+
 Two properties this module is built to keep:
 
 * **Narrow intent.** The model never authors a command string or an ``op`` argument. It picks one
@@ -19,7 +35,7 @@ Two properties this module is built to keep:
   installed in the registry, its names are in ``allowed_actions``, AND the run's ``AgentIO``
   actually carries a ``connector_sandbox``. A plain web-research run satisfies none of them, and
   a run missing only the last gets a clean "no sandbox in this run" observation rather than any
-  filesystem access. Nothing installs this pack by default — the caller does, deliberately:
+  filesystem access. Nothing installs this pack by default — the caller does, deliberately::
 
       engine.install_action_pack(SandboxToolPack(settings=engine.settings))
 
@@ -34,28 +50,15 @@ from typing import Any, Dict, List, Optional, Type
 
 from agent.app.idea_policies.actions import LeafAction
 from agent.app.idea_policies.extra_actions.base import fail, ok
-
-
-#: Detail keys accepted for "the path to work on", most specific first. A weak model names this
-#: slot inconsistently; accepting its synonyms costs nothing and saves a wasted step.
-_PATH_KEYS = ("path", "file", "relpath", "filename", "dir", "directory")
-
-
-def _detail(details: Dict[str, Any], *keys: str) -> Optional[str]:
-    """First non-empty string among ``keys`` in ``details`` (else ``None``)."""
-    for key in keys:
-        value = details.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-        if value is not None and not isinstance(value, (dict, list)) and str(value).strip():
-            return str(value).strip()
-    return None
+from agent.app.sandbox_dispatch import dispatch_sandbox_action
 
 
 class SandboxLeafAction(LeafAction):
     """Base for the sandbox actions: resolve the run's sandbox, or refuse cleanly.
 
-    Subclasses implement :meth:`run` and never touch the filesystem themselves.
+    Subclasses are declarations — a ``name``, an ``args_hint`` and a docstring the expansion menu
+    reads. None of them touches the filesystem, or even the argument object: :meth:`run` hands the
+    action name and the node's details straight to the shared dispatcher.
     """
 
     #: Set on the subclass; kept only for the failure message when no sandbox is wired.
@@ -73,32 +76,8 @@ class SandboxLeafAction(LeafAction):
         return await self.run(sandbox, dict(node.details or {}))
 
     async def run(self, sandbox: Any, details: Dict[str, Any]) -> Dict[str, Any]:
-        raise NotImplementedError()
-
-    def _path(self, details: Dict[str, Any], default: Optional[str] = None) -> Optional[str]:
-        return _detail(details, *_PATH_KEYS) or default
-
-    def _confined(self, sandbox: Any, details: Dict[str, Any], default: Optional[str] = None):
-        """``(relpath, resolved)`` for this node's path slot, or ``(relpath, None)`` on escape."""
-        relpath = self._path(details, default)
-        if relpath is None:
-            return None, None
-        return relpath, sandbox.confine(relpath)
-
-    def _confined_file(self, sandbox: Any, details: Dict[str, Any]):
-        """``(workdir-relative path, None)`` for an existing confined FILE, else ``(None, error)``.
-
-        Distinguishes the two refusals a weak model must react to differently: a path that
-        escapes the workdir (rephrase it) versus one that simply is not there (make it first).
-        """
-        relpath, target = self._confined(sandbox, details)
-        if relpath is None:
-            return None, fail(self.name, "missing 'path' detail (str)")
-        if target is None:
-            return None, fail(self.name, f"path escapes the workdir: {relpath}")
-        if not target.is_file():
-            return None, fail(self.name, f"no such file in the workdir: {relpath}")
-        return sandbox.rel(target), None
+        """Dispatch this action's slots through the shared dispatcher and adapt the result."""
+        return self._from_sandbox(await dispatch_sandbox_action(sandbox, self.name, details))
 
     def _from_sandbox(self, result: Dict[str, Any], **extra: Any) -> Dict[str, Any]:
         """Map a ``SandboxConnector`` result dict onto the leaf action-result shape.
@@ -115,10 +94,6 @@ class SandboxLeafAction(LeafAction):
         failure.update({key: value for key, value in payload.items() if key != "error"})
         return failure
 
-    async def _readonly(self, sandbox: Any, argv: List[str], **extra: Any) -> Dict[str, Any]:
-        """Run one allow-listed read-only command through the sandbox and map its result."""
-        return self._from_sandbox(await sandbox.run_readonly(self.name, argv), **extra)
-
 
 # --- file actions --------------------------------------------------------------------------
 
@@ -127,7 +102,8 @@ class ReadFileAction(SandboxLeafAction):
     """Read a text file from the sandbox workdir.
 
     Confinement: the path is resolved under the workdir by ``SandboxConnector.confine``; anything
-    that escapes it (``..``, an absolute path, a symlink out) is refused, not read.
+    that escapes it (``..``, an absolute path, a symlink out) is refused, not read. A file over
+    the configured ``max_file_bytes`` is refused before it is read at all.
 
     Reads from node details:
       - `path` (str): workdir-relative file path (required).
@@ -137,12 +113,6 @@ class ReadFileAction(SandboxLeafAction):
 
     name = "read_file"
     args_hint = "details={path}"
-
-    async def run(self, sandbox: Any, details: Dict[str, Any]) -> Dict[str, Any]:
-        relpath = self._path(details)
-        if relpath is None:
-            return fail(self.name, "missing 'path' detail (str)")
-        return self._from_sandbox(await sandbox.read_file(relpath))
 
 
 class WriteFileAction(SandboxLeafAction):
@@ -161,17 +131,6 @@ class WriteFileAction(SandboxLeafAction):
     name = "write_file"
     args_hint = "details={path, content}"
 
-    async def run(self, sandbox: Any, details: Dict[str, Any]) -> Dict[str, Any]:
-        relpath = self._path(details)
-        if relpath is None:
-            return fail(self.name, "missing 'path' detail (str)")
-        content = details.get("content")
-        if content is None:
-            content = details.get("text")
-        if content is None:
-            return fail(self.name, "missing 'content' detail (str)")
-        return self._from_sandbox(await sandbox.write_file(relpath, str(content)))
-
 
 class ListDirAction(SandboxLeafAction):
     """List one directory inside the sandbox workdir.
@@ -182,14 +141,11 @@ class ListDirAction(SandboxLeafAction):
     Reads from node details:
       - `path` (str): workdir-relative directory, default the workdir root.
 
-    Returns `{path, entries, output}`.
+    Returns `{path, entries, output}` (long listings are capped, with the overflow counted).
     """
 
     name = "list_dir"
     args_hint = "details={path?}"
-
-    async def run(self, sandbox: Any, details: Dict[str, Any]) -> Dict[str, Any]:
-        return self._from_sandbox(await sandbox.list_dir(self._path(details, "") or ""))
 
 
 # --- read-only shell actions ---------------------------------------------------------------
@@ -208,14 +164,6 @@ class CountLinesAction(SandboxLeafAction):
     name = "count_lines"
     args_hint = "details={path, pattern?}"
 
-    async def run(self, sandbox: Any, details: Dict[str, Any]) -> Dict[str, Any]:
-        rel, refusal = self._confined_file(sandbox, details)
-        if refusal is not None:
-            return refusal
-        pattern = _detail(details, "pattern", "match")
-        argv = ["grep", "-c", "--", pattern, rel] if pattern else ["wc", "-l", rel]
-        return await self._readonly(sandbox, argv, path=rel)
-
 
 class WordCountAction(SandboxLeafAction):
     """Count words in a workdir file (``wc -w``).
@@ -228,12 +176,6 @@ class WordCountAction(SandboxLeafAction):
 
     name = "word_count"
     args_hint = "details={path}"
-
-    async def run(self, sandbox: Any, details: Dict[str, Any]) -> Dict[str, Any]:
-        rel, refusal = self._confined_file(sandbox, details)
-        if refusal is not None:
-            return refusal
-        return await self._readonly(sandbox, ["wc", "-w", rel], path=rel)
 
 
 class HeadFileAction(SandboxLeafAction):
@@ -249,17 +191,6 @@ class HeadFileAction(SandboxLeafAction):
     name = "head_file"
     args_hint = "details={path, lines?}"
 
-    async def run(self, sandbox: Any, details: Dict[str, Any]) -> Dict[str, Any]:
-        rel, refusal = self._confined_file(sandbox, details)
-        if refusal is not None:
-            return refusal
-        try:
-            lines = int(_detail(details, "lines", "n", "count") or 10)
-        except (TypeError, ValueError):
-            lines = 10
-        lines = max(1, min(200, lines))
-        return await self._readonly(sandbox, ["head", "-n", str(lines), rel], path=rel)
-
 
 class DiskUsageAction(SandboxLeafAction):
     """Report the size of a workdir directory or file (``du -sh``).
@@ -272,15 +203,6 @@ class DiskUsageAction(SandboxLeafAction):
 
     name = "disk_usage"
     args_hint = "details={path?}"
-
-    async def run(self, sandbox: Any, details: Dict[str, Any]) -> Dict[str, Any]:
-        relpath, target = self._confined(sandbox, details, ".")
-        if target is None:
-            return fail(self.name, f"path escapes the workdir: {relpath}")
-        if not target.exists():
-            return fail(self.name, f"no such path under the workdir: {relpath}")
-        rel = sandbox.rel(target)
-        return await self._readonly(sandbox, ["du", "-sh", rel], path=rel)
 
 
 class FindFilesAction(SandboxLeafAction):
@@ -298,12 +220,6 @@ class FindFilesAction(SandboxLeafAction):
     name = "find_files"
     args_hint = "details={name: \"<filename glob, e.g. *.py>\"}"
 
-    async def run(self, sandbox: Any, details: Dict[str, Any]) -> Dict[str, Any]:
-        pattern = _detail(details, "name", "glob", "pattern", "filename")
-        if pattern is None:
-            return fail(self.name, "missing 'name' detail (a filename glob, e.g. '*.py')")
-        return await self._readonly(sandbox, ["find", ".", "-name", pattern, "-type", "f"])
-
 
 class SandboxToolPack:
     """The workdir file + read-only shell actions, as one installable bundle.
@@ -316,6 +232,9 @@ class SandboxToolPack:
 
     Use ``install_action_pack(..., allow=False)`` to register the classes without permitting them
     (dispatch stays closed until the names are added to ``allowed_actions``).
+
+    This list — not :data:`agent.app.sandbox_dispatch.ACTION_NAMES` — is what the engine can reach.
+    See this module's docstring for why ``patch_file`` and the execution actions are not on it.
     """
 
     name = "sandbox_tools"

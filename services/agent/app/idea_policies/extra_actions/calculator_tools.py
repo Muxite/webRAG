@@ -44,7 +44,7 @@ from agent.app.idea_policies.extra_actions.base import fail
 from agent.app.idea_policies.extra_actions.sandbox_tools import SandboxLeafAction
 
 #: Detail keys accepted for "the code to run", most specific first. Mirrors the alias list the
-#: codebench leaf loop already accepts (``execution_compiled_code._CODE_KEYS``) plus the synonyms a
+#: shared sandbox dispatcher already accepts (``sandbox_dispatch.CODE_KEYS``) plus the synonyms a
 #: weak model reaches for; naming the slot differently should not cost a step.
 _CODE_KEYS = ("code", "script", "source", "snippet", "python", "program",
               "expression", "expr", "content", "path", "file")

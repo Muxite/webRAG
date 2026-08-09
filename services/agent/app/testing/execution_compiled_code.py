@@ -5,9 +5,11 @@ Same thesis, different domain: an expensive model authors a static DAG plan offl
 runtime model only EXECUTES it. The wave/topology machinery is shared verbatim (``compiled_plan``
 is domain-agnostic); only two things change:
 
-  * the leaf's action vocabulary — ``write_file|read_file|list_dir|run_python|run_pytest|
-    patch_file|search_web|finish`` against a ``connector_sandbox.SandboxConnector`` workdir,
-    instead of ``search|visit|finish`` against the web;
+  * the leaf's action vocabulary — every action in ``sandbox_dispatch.ACTION_NAMES`` (plus
+    ``finish``) against a ``connector_sandbox.SandboxConnector`` workdir, instead of
+    ``search|visit|finish`` against the web. The dispatch itself is shared with the native
+    engine's ``LeafAction`` pack (see :mod:`agent.app.sandbox_dispatch`) so the two cannot drift
+    on which argument aliases they accept;
   * the composition step — ``agg_mode: "sandbox_submit"`` runs :func:`_compose_submit`, which only
     CHECKS that the plan's declared deliverable files exist. It deliberately does not score
     correctness: grading happens later, in a separate fresh container that re-runs the canonical
@@ -38,6 +40,7 @@ from agent.app.agent_io import AgentIO
 from agent.app.connector_sandbox import SandboxConnector
 from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.idea_policies.config import SandboxActionConfig
+from agent.app.sandbox_dispatch import ACTION_NAMES, dispatch_sandbox_action
 from agent.app.telemetry import TelemetrySession
 from agent.app.testing import json_telemetry as _json_telemetry
 from agent.app.testing.compiled_plan import (
@@ -62,26 +65,31 @@ _CODE_LEAF_SYSTEM = (
     "- run_python(code): run Python in the workdir (inline code, or the path of a .py file).\n"
     "- run_pytest(path): run pytest on a test file or directory; returns the pass/fail output.\n"
     "- search_web(query): web search; returns titles+URLs+snippets.\n"
+    "- find_files(name): list files matching a filename glob, e.g. '*.py'.\n"
+    "- head_file(path, lines): show the first N lines of a file (default 10).\n"
+    "- count_lines(path, pattern): count a file's lines, or only the lines matching 'pattern'.\n"
+    "- word_count(path): count the words in a file.\n"
+    "- disk_usage(path): report the size of a file or directory.\n"
     "- finish(summary): stop, and state what you produced.\n"
     "Rules: write COMPLETE, runnable code — never placeholders, '...' or 'TODO'. After writing "
     "code, RUN it (run_pytest when a test file exists) and fix what fails before finishing; do "
     "not claim success you have not observed. Never edit or delete a test file to make it pass. "
     "Each step return ONLY JSON: {\"thought\": \"...\", \"action\": \"write_file|read_file|"
-    "list_dir|run_python|run_pytest|patch_file|search_web|finish\", \"args\": {...}}."
+    "list_dir|run_python|run_pytest|patch_file|search_web|find_files|head_file|count_lines|"
+    "word_count|disk_usage|finish\", \"args\": {...}}."
 )
 
 # Arg aliases a weak model reaches for. The plan authors the instruction, but the model authors
-# the JSON, so accept the near-misses instead of burning a step on "INVALID ARGS".
-_PATH_KEYS = ("path", "relpath", "file", "filename", "target", "file_path")
-_CONTENT_KEYS = ("content", "text", "body", "code", "data")
-_CODE_KEYS = ("code", "script", "source", "content", "path", "file")
-_QUERY_KEYS = ("query", "q", "search", "text")
+# the JSON, so accept the near-misses instead of burning a step on "INVALID ARGS". The sandbox
+# actions' own alias tables live in ``sandbox_dispatch`` (shared with the native engine's pack);
+# only ``finish`` is this loop's own verb, so only its aliases are listed here.
 _SUMMARY_KEYS = ("summary", "answer", "result", "message", "text")
 
 #: The sandbox vocabulary — what actually counts as a sandbox action (``finish``, an unknown verb
 #: and a failed LLM call all touch nothing, so none of them inflate ``sandbox_actions_count``).
-_SANDBOX_ACTIONS = ("write_file", "read_file", "list_dir", "patch_file",
-                    "run_python", "run_pytest", "search_web")
+#: The full shared set: inside the codebench container, running the agent's own code IS the point,
+#: so unlike the native engine's opt-in pack this arm advertises everything the dispatcher offers.
+_SANDBOX_ACTIONS = ACTION_NAMES
 
 
 def _arg(args: Dict[str, Any], *keys: str) -> str:
@@ -155,24 +163,14 @@ def _observation(result: Dict[str, Any], obs_chars: int) -> str:
 
 async def _dispatch_action(sandbox: SandboxConnector, action: str, args: Dict[str, Any]) -> Dict[str, Any]:
     """Run ONE sandbox action for the leaf loop. Never raises: an unknown action or a bad
-    argument comes back as a failed result the model can read and correct."""
-    if action == "write_file":
-        return await sandbox.write_file(_arg(args, *_PATH_KEYS), _arg(args, *_CONTENT_KEYS))
-    if action == "read_file":
-        return await sandbox.read_file(_arg(args, *_PATH_KEYS))
-    if action == "list_dir":
-        return await sandbox.list_dir(_arg(args, *_PATH_KEYS))
-    if action == "patch_file":
-        return await sandbox.patch_file(_arg(args, *_PATH_KEYS), _arg(args, "old", "old_text", "find"),
-                                        _arg(args, "new", "new_text", "replace"))
-    if action == "run_python":
-        return await sandbox.run_python(_arg(args, *_CODE_KEYS))
-    if action == "run_pytest":
-        return await sandbox.run_pytest(_arg(args, *_PATH_KEYS))
-    if action == "search_web":
-        return await sandbox.search_web(_arg(args, *_QUERY_KEYS))
-    return {"ok": False, "action": action or "(none)",
-            "error": f"unknown action; use {'/'.join(_SANDBOX_ACTIONS)}/finish"}
+    argument comes back as a failed result the model can read and correct.
+
+    The translation itself lives in :func:`agent.app.sandbox_dispatch.dispatch_sandbox_action`,
+    shared with the native engine's ``LeafAction`` pack; this wrapper only adds ``finish`` — a
+    loop verb, not a sandbox action — to the vocabulary an unknown verb is measured against.
+    """
+    return await dispatch_sandbox_action(sandbox, action, args,
+                                         vocabulary=tuple(_SANDBOX_ACTIONS) + ("finish",))
 
 
 async def _run_code_leaf(sandbox: SandboxConnector, agent_io: AgentIO, instruction: str, expect: str,

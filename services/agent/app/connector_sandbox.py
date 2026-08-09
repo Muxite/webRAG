@@ -43,6 +43,12 @@ from agent.app.idea_policies.config import SandboxActionConfig
 # the head and the tail and mark the elision explicitly.
 OUTPUT_CHAR_CAP = 4000
 
+# Cap on the entries one ``list_dir`` reports back. Same bounded-observation reasoning as
+# OUTPUT_CHAR_CAP: a node_modules-sized directory is thousands of names, which buries the useful
+# signal and costs a weak model its whole context — and unlike stdout there is no "both ends" to
+# preserve, so the first N (sorted) plus an explicit count of what was dropped is the honest view.
+DIR_ENTRY_CAP = 200
+
 # A ``run_python`` argument is treated as a FILE when it looks like a path to an existing file
 # under the workdir; anything else is treated as an inline program.
 _PY_SUFFIXES = (".py",)
@@ -53,6 +59,38 @@ _PY_SUFFIXES = (".py",)
 #: allow-list is what makes the surface safe to expose as leaf actions; adding a writing command to
 #: it would silently widen every caller's blast radius, so don't.
 READONLY_COMMANDS = frozenset({"wc", "grep", "du", "find", "head"})
+
+
+def _encoding_fault(text: str) -> Optional[str]:
+    """Why ``text`` cannot be encoded to UTF-8, or ``None`` when it can.
+
+    Every string that reaches this connector came out of a model-authored JSON object, and
+    ``json.loads('{"content": "\\ud800"}')` SUCCEEDS — the parser is happy to hand back a lone
+    surrogate that no UTF-8 encoder will take. Writing it (``Path.write_text``) or passing it to
+    ``exec`` raises ``UnicodeEncodeError``, which is a ``UnicodeError``/``ValueError`` and so slips
+    past an ``except OSError``. On the engine's non-parallel path that took down the whole run
+    rather than one leaf. Checking first turns it into an ordinary observation, and — matching this
+    codebase's "degrade honestly" convention — refuses rather than silently rewriting the content
+    with replacement characters the model never asked for.
+    """
+    try:
+        text.encode("utf-8")
+    except UnicodeError:
+        return "contains characters that cannot be encoded (a lone surrogate such as '\\ud800')"
+    return None
+
+
+def _argv_fault(token: str) -> Optional[str]:
+    """Why ``token`` cannot be passed to ``create_subprocess_exec``, or ``None`` when it can.
+
+    Same class of bug as :func:`_encoding_fault` one layer down, and reachable from every
+    subprocess action — inline ``run_python`` code, a ``grep`` pattern, a ``find`` glob. An
+    embedded NUL is the second case: ``os.fsencode`` raises a bare ``ValueError("embedded null
+    byte")``, which no caller here caught either.
+    """
+    if "\x00" in token:
+        return "contains a null byte"
+    return _encoding_fault(token)
 
 
 def _truncate(text: str, cap: int = OUTPUT_CHAR_CAP) -> str:
@@ -162,6 +200,11 @@ class SandboxConnector(ConnectorBase):
         if target is None:
             return self._denied("write_file", relpath)
         text = "" if content is None else str(content)
+        fault = _encoding_fault(text)
+        if fault is not None:
+            return self._done("write_file", started, {
+                "ok": False, "action": "write_file", "path": str(relpath),
+                "error": f"content {fault}; re-send it as plain text"})
         size = len(text.encode("utf-8", "replace"))
         if size > int(self.limits.max_file_bytes):
             return self._done("write_file", started, {
@@ -179,7 +222,7 @@ class SandboxConnector(ConnectorBase):
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text, encoding="utf-8")
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:  # UnicodeError: see _encoding_fault (backstop)
             return self._done("write_file", started, {
                 "ok": False, "action": "write_file", "path": rel, "error": f"write failed: {exc}"})
         self._leaf_files_written.add(rel)
@@ -189,7 +232,14 @@ class SandboxConnector(ConnectorBase):
         })
 
     async def read_file(self, relpath: str, max_chars: int = OUTPUT_CHAR_CAP) -> Dict[str, Any]:
-        """Read a workdir file back (truncated to ``max_chars`` for the observation)."""
+        """Read a workdir file back (truncated to ``max_chars`` for the observation).
+
+        Refuses BEFORE reading anything when the file is over ``max_file_bytes``, the same
+        pre-flight ``write_file``/``patch_file`` already do. ``write_file``'s own budget does not
+        cover this: a file can enter the workdir through the starter fixture, a ``run_python`` body
+        calling ``open()``, or the task image itself, and materializing all of it in memory just to
+        throw away everything past ``max_chars`` is cost with no reader.
+        """
         started = time.perf_counter()
         target = self.confine(relpath)
         if target is None:
@@ -198,6 +248,16 @@ class SandboxConnector(ConnectorBase):
         if not target.is_file():
             return self._done("read_file", started, {
                 "ok": False, "action": "read_file", "path": rel, "error": f"no such file: {rel}"})
+        try:
+            size = target.stat().st_size
+        except OSError as exc:
+            return self._done("read_file", started, {
+                "ok": False, "action": "read_file", "path": rel, "error": f"read failed: {exc}"})
+        if size > int(self.limits.max_file_bytes):
+            return self._done("read_file", started, {
+                "ok": False, "action": "read_file", "path": rel, "bytes": size,
+                "error": f"file is {size} bytes, over the {self.limits.max_file_bytes}-byte limit; "
+                         f"read part of it instead (head_file, or grep it with count_lines)"})
         try:
             text = target.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
@@ -208,7 +268,11 @@ class SandboxConnector(ConnectorBase):
             "output": _truncate(text, max_chars)})
 
     async def list_dir(self, relpath: str = "") -> Dict[str, Any]:
-        """List one workdir directory (``""`` = the root). Directories are marked with a ``/``."""
+        """List one workdir directory (``""`` = the root). Directories are marked with a ``/``.
+
+        Capped at :data:`DIR_ENTRY_CAP` entries; the overflow is reported as a count rather than
+        dropped silently, so the model knows it is looking at a partial listing.
+        """
         started = time.perf_counter()
         target = self.confine(relpath)
         if target is None:
@@ -217,14 +281,21 @@ class SandboxConnector(ConnectorBase):
         if not target.is_dir():
             return self._done("list_dir", started, {
                 "ok": False, "action": "list_dir", "path": rel, "error": f"not a directory: {rel}"})
-        entries: List[str] = []
+        found: List[str] = []
         for child in sorted(target.iterdir(), key=lambda p: p.name):
             if child.name == "__pycache__":
                 continue
-            entries.append(f"{child.name}/" if child.is_dir() else child.name)
-        return self._done("list_dir", started, {
+            found.append(f"{child.name}/" if child.is_dir() else child.name)
+        entries = found[:DIR_ENTRY_CAP]
+        dropped = len(found) - len(entries)
+        result = {
             "ok": True, "action": "list_dir", "path": rel, "entries": entries,
-            "output": "\n".join(entries) if entries else "(empty)"})
+            "total_entries": len(found), "truncated": bool(dropped),
+            "output": "\n".join(entries) if entries else "(empty)",
+        }
+        if dropped:
+            result["output"] += f"\n...and {dropped} more"
+        return self._done("list_dir", started, result)
 
     async def patch_file(self, relpath: str, old: str, new: str) -> Dict[str, Any]:
         """Replace the FIRST exact occurrence of ``old`` with ``new`` in a workdir file.
@@ -253,6 +324,11 @@ class SandboxConnector(ConnectorBase):
         except OSError as exc:
             return self._done("patch_file", started, {
                 "ok": False, "action": "patch_file", "path": rel, "error": f"read failed: {exc}"})
+        fault = _encoding_fault(old_text) or _encoding_fault(new_text)
+        if fault is not None:
+            return self._done("patch_file", started, {
+                "ok": False, "action": "patch_file", "path": rel,
+                "error": f"content {fault}; re-send the snippet as plain text"})
         occurrences = content.count(old_text)
         if occurrences == 0:
             return self._done("patch_file", started, {
@@ -267,7 +343,7 @@ class SandboxConnector(ConnectorBase):
                          f"{self.limits.max_file_bytes}-byte limit"})
         try:
             target.write_text(patched, encoding="utf-8")
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:  # UnicodeError: see _encoding_fault (backstop)
             return self._done("patch_file", started, {
                 "ok": False, "action": "patch_file", "path": rel, "error": f"write failed: {exc}"})
         note = "" if occurrences == 1 else f" (matched {occurrences}x, replaced the first)"
@@ -331,17 +407,30 @@ class SandboxConnector(ConnectorBase):
         A timeout kills the child's whole process group (see :meth:`_kill_process_group`) and is
         reported as a normal (failed) result — an infinite loop in generated code is an ordinary
         outcome here, not an infrastructure error.
+
+        Malformed argv is the other "ordinary outcome" that used to escape as an exception. Every
+        token here is model-authored (inline ``run_python`` code, a ``grep`` pattern, a ``find``
+        glob), and two shapes of it kill the launch rather than the program: a lone surrogate
+        (``UnicodeEncodeError``) and an embedded NUL (a bare ``ValueError``). Both are checked
+        up-front — precisely, so a genuine ``ValueError`` from a real bug still surfaces instead of
+        being reported to a model as its own mistake.
         """
         started = time.perf_counter()
         self._record_io(direction="in", operation=f"sandbox_{action}",
                         payload={"argv": argv[:3], "timeout_s": timeout_s, "path": path})
+        for token in argv:
+            fault = _argv_fault(str(token))
+            if fault is not None:
+                return self._done(action, started, {
+                    "ok": False, "action": action, "path": path,
+                    "error": f"could not start: an argument {fault}; re-send it as plain text"})
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv, cwd=str(self.workdir), env=self._subprocess_env(),
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                 start_new_session=True,  # own process group, so a timeout can kill the whole tree
             )
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:  # UnicodeError: see _argv_fault (backstop)
             return self._done(action, started, {
                 "ok": False, "action": action, "path": path, "error": f"could not start: {exc}"})
         try:

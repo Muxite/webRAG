@@ -8,6 +8,7 @@ every action returns a dict and never raises, the write budgets are enforced, an
 actions run inside the workdir with truncated output and a real timeout kill.
 """
 import asyncio
+import json
 import sys
 import time
 from pathlib import Path
@@ -15,8 +16,17 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from agent.app.connector_sandbox import OUTPUT_CHAR_CAP, SandboxConnector, _truncate
+from agent.app.connector_sandbox import (
+    DIR_ENTRY_CAP,
+    OUTPUT_CHAR_CAP,
+    SandboxConnector,
+    _truncate,
+)
 from agent.app.idea_policies.config import SandboxActionConfig
+
+#: A lone surrogate, constructed the way one actually reaches this connector: a model emits it,
+#: ``json.loads`` accepts it happily, and every UTF-8 encoder downstream refuses it.
+LONE_SURROGATE = json.loads('{"content": "\\ud800"}')["content"]
 
 
 def _sandbox(tmp_path: Path, **limit_overrides) -> SandboxConnector:
@@ -121,7 +131,107 @@ def test_patch_file_miss_is_actionable(tmp_path):
     assert (sb.workdir / "m.py").read_text() == "x = 1\n"
 
 
+# --- malformed model-authored input is a result, never an exception -----------------------------
+def test_write_file_with_unencodable_content_fails_cleanly(tmp_path):
+    """A lone surrogate used to raise ``UnicodeEncodeError`` straight out of the connector.
+
+    ``UnicodeEncodeError`` is a ``UnicodeError``/``ValueError``, so it slipped past the
+    ``except OSError`` here; on the engine's non-parallel path that took down the WHOLE run rather
+    than the one leaf that authored the bad content.
+    """
+    sb = _sandbox(tmp_path)
+    result = asyncio.run(sb.write_file("bad.txt", LONE_SURROGATE))
+    assert result["ok"] is False
+    assert "cannot be encoded" in result["error"]
+    assert not (sb.workdir / "bad.txt").exists(), "refuse, do not silently rewrite the content"
+
+
+def test_patch_file_with_unencodable_replacement_fails_cleanly(tmp_path):
+    sb = _sandbox(tmp_path)
+    asyncio.run(sb.write_file("m.py", "x = 1\n"))
+    result = asyncio.run(sb.patch_file("m.py", "x = 1", LONE_SURROGATE))
+    assert result["ok"] is False and "cannot be encoded" in result["error"]
+    assert (sb.workdir / "m.py").read_text() == "x = 1\n", "the file must be left untouched"
+
+
+@pytest.mark.parametrize("bad, expected", [
+    (LONE_SURROGATE, "cannot be encoded"),
+    ("\x00", "null byte"),
+])
+def test_run_python_with_malformed_inline_code_fails_cleanly(tmp_path, bad, expected):
+    """The SAME bug class one layer down, in the shared ``_run`` subprocess launcher.
+
+    ``create_subprocess_exec`` also only had ``except OSError`` around it, and every read-only
+    action goes through it too — so a surrogate (``UnicodeEncodeError``) or an embedded NUL (a
+    bare ``ValueError("embedded null byte")``) in model-authored argv crashed the run.
+    """
+    sb = _sandbox(tmp_path)
+    result = asyncio.run(sb.run_python(f"print('x'){bad}"))
+    assert result["ok"] is False
+    assert "could not start" in result["error"] and expected in result["error"]
+
+
+@pytest.mark.parametrize("bad, expected", [
+    (LONE_SURROGATE, "cannot be encoded"),
+    ("\x00", "null byte"),
+])
+def test_readonly_command_with_a_malformed_pattern_fails_cleanly(tmp_path, bad, expected):
+    """Reachable from the NATIVE engine today: ``count_lines``/``find_files`` pass a
+    model-authored pattern straight into argv."""
+    sb = _sandbox(tmp_path)
+    asyncio.run(sb.write_file("notes.txt", "alpha\n"))
+    result = asyncio.run(sb.run_readonly("count_lines", ["grep", "-c", "--", f"a{bad}", "notes.txt"]))
+    assert result["ok"] is False
+    assert "could not start" in result["error"] and expected in result["error"]
+
+
+def test_a_real_valueerror_is_not_swallowed_as_a_model_mistake(tmp_path, monkeypatch):
+    """Widening the catch must not turn a genuine bug into "your argument was malformed"."""
+    sb = _sandbox(tmp_path)
+
+    async def boom(*args, **kwargs):
+        raise ValueError("a real bug in our own code")
+
+    monkeypatch.setattr("asyncio.create_subprocess_exec", boom)
+    with pytest.raises(ValueError, match="a real bug"):
+        asyncio.run(sb.run_python("print(1)"))
+
+
 # --- caps --------------------------------------------------------------------------------------
+def test_read_file_refuses_an_oversize_file_before_reading_it(tmp_path):
+    """The pre-read guard ``write_file``/``patch_file`` always had: a file can enter the workdir
+    without passing the write budget (starter fixture, a ``run_python`` body's own ``open()``), so
+    the read side cannot assume everything on disk is under the limit."""
+    sb = _sandbox(tmp_path, max_file_bytes=32)
+    (sb.workdir / "big.txt").write_text("y" * 500, encoding="utf-8")
+    result = asyncio.run(sb.read_file("big.txt"))
+    assert result["ok"] is False
+    assert "over the 32-byte limit" in result["error"] and result["bytes"] == 500
+    assert "output" not in result, "an oversize file must not be materialized into the result"
+    # ...and a file under the limit still reads normally
+    asyncio.run(sb.write_file("small.txt", "ok\n"))
+    assert asyncio.run(sb.read_file("small.txt"))["output"] == "ok\n"
+
+
+def test_list_dir_caps_its_entries_and_says_how_many_it_dropped(tmp_path):
+    sb = _sandbox(tmp_path)
+    for i in range(DIR_ENTRY_CAP + 7):
+        (sb.workdir / f"f{i:04d}.txt").write_text("x", encoding="utf-8")
+    result = asyncio.run(sb.list_dir(""))
+    assert result["ok"] is True
+    assert len(result["entries"]) == DIR_ENTRY_CAP
+    assert result["total_entries"] == DIR_ENTRY_CAP + 7 and result["truncated"] is True
+    assert result["output"].endswith("...and 7 more"), "a partial listing must say it is partial"
+
+
+def test_list_dir_under_the_cap_is_not_marked_truncated(tmp_path):
+    sb = _sandbox(tmp_path)
+    asyncio.run(sb.write_file("a.py", "a"))
+    result = asyncio.run(sb.list_dir(""))
+    assert result["truncated"] is False and result["total_entries"] == 1
+    assert "more" not in result["output"]
+
+
 def test_max_file_bytes_rejects_an_oversize_write(tmp_path):
     sb = _sandbox(tmp_path, max_file_bytes=10)
     result = asyncio.run(sb.write_file("big.py", "x" * 11))
