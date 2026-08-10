@@ -23,8 +23,9 @@
 # for everything else, and is the ONLY thing joined to codebench_sandbox — badmodel-ollama
 # itself never is.
 set -euo pipefail
-LAB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CB_DIR="$LAB_DIR/codebench"
+CB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$CB_DIR/.." && pwd)"
+LAB_DIR="$REPO_ROOT/badmodel-lab"
 NET="${CODEBENCH_NET:-codebench_sandbox}"
 SEARXNG_CTR="${CODEBENCH_SEARXNG_CTR:-badmodel-playground-searxng}"
 SEARXNG_PROFILE="${CODEBENCH_SEARXNG_PROFILE:-4gb}"   # any playground profile works — searxng has no depends_on

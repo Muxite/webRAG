@@ -7,7 +7,7 @@ original framing ("Mars's escape velocity") was too easy: escape velocity is one
 commonly published planetary trivia figures (NASA's own Mars Fact Sheet states it directly as
 "5.03 km/s"), so a model can ace all five tolerance bands purely from training-data memorization,
 with ZERO web search and ZERO computation — which is exactly what happened. The aider transcript
-(badmodel-lab/codebench/results/runs/coordinator_batch2/c48__aider__qwen2.5_14b/submission/
+(codebench/results/runs/coordinator_batch2/c48__aider__qwen2.5_14b/submission/
 .aider.chat.history.md) shows qwen2.5:14b writing the correct v_esc = sqrt(2GM/R) formula in code,
 correctly computing it internally, and then discarding that computation to `return published_esc_vel`
 — i.e. reciting the memorized trivia figure instead of trusting its own derivation, and scoring 5/5
@@ -19,7 +19,7 @@ same body, different formula.
 
 REVISED AGAIN 2026-08-07: round-2 live calibration showed the sqrt(2)-formula retargeting above
 was STILL not enough — Aider scored 1.0/1.0 again. Its round-3 submission
-(badmodel-lab/codebench/results/runs/coordinator_batch3/c48__aider__qwen2.5_14b/submission/
+(codebench/results/runs/coordinator_batch3/c48__aider__qwen2.5_14b/submission/
 mars_escape.py) never calls search_web at all (confirmed by grepping its own
 .aider.chat.history.md — the only mentions of "search" in the whole transcript are the literal
 instructions copy-pasted FROM the task prompt); it just recites Mars's mass and radius from

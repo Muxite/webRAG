@@ -7,7 +7,7 @@ original framing ("how many Earth days does Mercury take to orbit the Sun") was 
 sidereal orbital period ("about 88 days") is one of the most commonly memorized planetary trivia
 figures there is, so a model can ace all five tolerance bands purely from training-data
 memorization, with ZERO web search and ZERO computation. The aider transcript
-(badmodel-lab/codebench/results/runs/coordinator_batch2/c50__aider__qwen2.5_14b/submission/
+(codebench/results/runs/coordinator_batch2/c50__aider__qwen2.5_14b/submission/
 .aider.chat.history.md) shows qwen2.5:14b writing the Kepler's-law computation in code AND stating
 the correct semi-major axis, then discarding all of that to `return direct_value` (a hardcoded
 "87.97" recited from memory) — scoring 5/5 (100%) without ever calling search_web. Since our own

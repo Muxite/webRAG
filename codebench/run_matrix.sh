@@ -10,9 +10,9 @@
 # results/runs.jsonl) is skipped instead of re-run, so restarting after a stop/kill neither
 # duplicates rows nor re-spends on completed (incl. paid-API-anchor) cells.
 set -uo pipefail
-LAB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CB_DIR="$LAB_DIR/codebench"
-REPO_ROOT="$(cd "$LAB_DIR/.." && pwd)"
+CB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$CB_DIR/.." && pwd)"
+LAB_DIR="$REPO_ROOT/badmodel-lab"
 
 IFS=' ' read -r -a SUBJECTS <<< "${CODEBENCH_SUBJECTS:-$(python3 -c "
 import yaml

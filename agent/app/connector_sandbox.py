@@ -18,7 +18,7 @@ read-only rootfs, dropped caps, tmpfs ``/work``, an outer wall-clock kill):
     anything that escapes it (``..`` traversal, an absolute path, a symlink pointing out) is
     refused. This guards OUR file abstractions only; it does nothing about a ``run_python`` body
     that calls ``open()`` itself, which is why the agent image also strips every canonical-test
-    package (see ``badmodel-lab/codebench/agents/badmodel/Dockerfile``).
+    package (see ``codebench/agents/badmodel/Dockerfile``).
   * :class:`agent.app.idea_policies.config.SandboxActionConfig` — per-action subprocess timeouts
     and the per-leaf write budget (``max_file_bytes`` / ``max_files_per_leaf``).
 """

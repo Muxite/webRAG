@@ -1,6 +1,6 @@
 # Root-level build context excludes for anything built from repo-root context: the
 # main agent/.dockerfile (via services/docker-compose.yml's agent-related services) and
-# badmodel-lab/playground/Dockerfile.agent + badmodel-lab/codebench/agents/badmodel/Dockerfile,
+# badmodel-lab/playground/Dockerfile.agent + codebench/agents/badmodel/Dockerfile,
 # which COPY from both services/ and badmodel-lab/. services/.dockerignore covers the
 # services/-scoped builds (gateway/apicli/connector_api/tests) separately and is untouched
 # by this file.

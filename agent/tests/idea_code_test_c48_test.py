@@ -8,7 +8,7 @@ from memory, with zero search_web calls and zero real computation. First revisio
 escape velocity -> Mars circular orbital velocity (same body, different formula).
 
 2026-08-07: round-2 live calibration showed that revision was STILL not enough — Aider's actual
-round-3 submission (badmodel-lab/codebench/results/runs/coordinator_batch3/
+round-3 submission (codebench/results/runs/coordinator_batch3/
 c48__aider__qwen2.5_14b/submission/mars_escape.py) never called search_web at all; it recited
 Mars's mass and radius from training-data memory (accurate to ~0.2-0.4%) and computed the correct
 formula, landing well inside the tightest band. Retargeting the FORMULA did nothing because the
@@ -212,9 +212,9 @@ def test_compiled_plan_leaks_no_ground_truth_numbers():
         assert leaked not in plan_text, leaked
 
 
-def test_materialize_task_end_to_end(tmp_path):
+def test_materialize_task_end_to_end(tmp_path, codebench_materialize_script):
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "badmodel-lab" / "codebench" / "materialize_task.py"
+    script = codebench_materialize_script
     assert script.exists(), script
 
     env = {**os.environ, "PYTHONPATH": str(repo_root)}

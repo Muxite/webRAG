@@ -47,8 +47,8 @@ degenerate/bonus cases; (d) assert `get_grading_payload()` shape; (e) assert `ge
 structure, JSON-serializability, and that it leaks nothing (no canonical test assertions, no
 answer values — describe the contract, never the answer, exactly like c06's plan); (f) an
 end-to-end `materialize_task.py <id> --out <tmp_path>` subprocess run asserting the on-disk output
-matches the module's own return values exactly (`badmodel-lab/codebench/materialize_task.py`,
-invoke with `PYTHONPATH=.:services`).
+matches the module's own return values exactly (`codebench/materialize_task.py`,
+invoke with `PYTHONPATH=.:services:agent`).
 
 ## 1. Security constraints (binding on you as author, from this system's own adversarial review)
 
@@ -122,10 +122,10 @@ CODEBENCH_TASK_IDS="c<NN>" \
 CODEBENCH_SUBJECTS="<best local model tag>" \
 CODEBENCH_AGENT_KINDS="badmodel aider" \
 CODEBENCH_RUN_TAG="calibrate_c<NN>" \
-  ./badmodel-lab/codebench/run_matrix.sh
+  ./codebench/run_matrix.sh
 ```
-Check `badmodel-lab/codebench/results/runs.jsonl` (or the per-cell `grade_report.json` under
-`badmodel-lab/codebench/results/runs/calibrate_c<NN>/`) for the score on both agent kinds. **The
+Check `codebench/results/runs.jsonl` (or the per-cell `grade_report.json` under
+`codebench/results/runs/calibrate_c<NN>/`) for the score on both agent kinds. **The
 local model must NOT score 100% on either.** If it does, the task is too easy — harden it (add a
 tighter tolerance band, a trickier edge case, a less googleable framing) and re-run the battery.
 Release the lock when done:

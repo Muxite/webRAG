@@ -1,6 +1,6 @@
 """Container ENTRYPOINT for the codebench *badmodel* agent (the compiled-scaffold coding arm).
 
-Run by ``badmodel-lab/codebench/agents/badmodel/Dockerfile``'s
+Run by ``codebench/agents/badmodel/Dockerfile``'s
 ``ENTRYPOINT ["python", "-m", "app.codebench_run_task"]``, dispatched by
 ``run_agent_sandbox.sh`` with the same CLI contract the Aider baseline gets::
 
@@ -55,7 +55,7 @@ _logger = logging.getLogger("codebench_run_task")
 def copy_starter_fixture(task_dir: Path, workdir: Path) -> int:
     """Copy ``{task-dir}/repo/`` into ``workdir`` (created if absent). Returns the file count.
 
-    Mirrors ``badmodel-lab/codebench/agents/aider/run_task.sh``'s ``cp -r "$TASK_DIR/repo/." ...``
+    Mirrors ``codebench/agents/aider/run_task.sh``'s ``cp -r "$TASK_DIR/repo/." ...``
     so both agent kinds start from a byte-identical tree.
     """
     workdir.mkdir(parents=True, exist_ok=True)

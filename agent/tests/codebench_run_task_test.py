@@ -1,7 +1,7 @@
 """Offline unit tests for the codebench container entrypoint (app/codebench_run_task.py) — free.
 
 Pins the CLI/filesystem contract the sandbox harness depends on
-(``badmodel-lab/codebench/run_agent_sandbox.sh`` passes ``--model/--task-dir/--workdir``): the
+(``codebench/run_agent_sandbox.sh`` passes ``--model/--task-dir/--workdir``): the
 starter fixture is copied in exactly like the Aider baseline does, the plan comes from
 ``plan.json`` and nothing else, the run drives the real compiled-code executor, and the process
 exits 0 even when the run fails (the harness grades the extracted ``/work``, and a non-zero exit

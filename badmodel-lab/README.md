@@ -52,6 +52,11 @@ CHART_SPEC.md        LinkedIn 3x2 + 1x1 chart spec (from the design agent)
 results/             cells.jsonl (attribution) + cells_long.csv (chart input)
 ```
 
+The Docker-sandboxed coding-benchmark harness that used to live at `codebench/` here moved to a
+top-level `codebench/` directory (sibling to `badmodel-lab/`) as of the 2026-08-09 cycle — it's
+benchmark infrastructure, not lab-specific mitigation content, and the task definitions it exercises
+already live in main. It still reads this directory's `roster.yaml`/`tiers.yaml` in place.
+
 ## Safety notes
 
 - Uses a **dedicated** ollama container; never pulls into or touches `yappers-ollama`.

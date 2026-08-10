@@ -15,7 +15,7 @@ original six-country set was too easy: every country sat 11-49 million clear of 
 threshold, and the per-country tolerance bands were generous enough (25-50% wide) that a model
 answering purely from training-data memory, with ZERO web search, still landed inside every band
 and got the classification count exactly right (10/10, 100%) — see the aider transcript
-(badmodel-lab/codebench/results/runs/coordinator_batch2/c45__aider__qwen2.5_14b/submission/
+(codebench/results/runs/coordinator_batch2/c45__aider__qwen2.5_14b/submission/
 .aider.chat.history.md), which opens with "### Population Estimates (as of 2023):" and a table
 recited from memory, never calling search_web. Its Tanzania figure (61.0M) was ~11-15% stale
 relative to the current (2024-2026) figure, and its South Africa figure (59.0M) was ~6% stale, but

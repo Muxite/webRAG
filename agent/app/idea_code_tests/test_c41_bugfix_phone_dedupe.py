@@ -76,7 +76,7 @@ whether it's a `1`; and drops blank/no-digit entries instead of deduping them), 
 correct fix — proving each one's exact pass/fail signature against the real canonical suite via
 pytest. It also directly re-runs the ACTUAL round-3 submitted source code from both the badmodel
 and Aider harnesses (reproduced verbatim from
-badmodel-lab/codebench/results/runs/coordinator_batch4/c41__{aider,badmodel}__qwen2.5_14b/
+codebench/results/runs/coordinator_batch4/c41__{aider,badmodel}__qwen2.5_14b/
 submission/dedupe_list.py, adapted only to this task's new function/module name) against the new
 canonical suite: both fail 7 of the 9 hidden cases, since neither implements ANY digit-based
 normalization at all.

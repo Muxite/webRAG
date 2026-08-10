@@ -6,7 +6,7 @@ materialize_task.py end-to-end.
 
 2026-08-06: task hardened after live calibration showed the original six-country version could be
 aced by a model reciting stale population figures purely from memory (no search_web call at all;
-see badmodel-lab/codebench/results/runs/coordinator_batch2/c45__aider__qwen2.5_14b/). Two
+see codebench/results/runs/coordinator_batch2/c45__aider__qwen2.5_14b/). Two
 near-threshold countries (Colombia, South Korea) were added; this validator's own independently
 re-verified figures below come from fresh web-search re-verification done during the hardening
 pass (not copied from the module's own docstring on faith).
@@ -83,7 +83,7 @@ def test_near_threshold_countries_have_a_real_but_thin_margin():
 def test_a_plausible_stale_recall_pattern_now_fails_the_keystone():
     """Directly reproduces the exact failure this task was hardened against: the historical
     winning submission's own recalled figures for the original six countries (see
-    badmodel-lab/codebench/results/runs/coordinator_batch2/c45__aider__qwen2.5_14b/submission/
+    codebench/results/runs/coordinator_batch2/c45__aider__qwen2.5_14b/submission/
     country_pop.py), plus a plausible stale/rounded-down guess for the new Colombia entry (its
     population is widely misremembered as "about 48 million" from its pre-2018-census reputation).
     This must miscount relative to the current, independently-verified ground truth above --
@@ -220,9 +220,9 @@ def test_compiled_plan_leaks_no_ground_truth_numbers():
         assert leaked not in plan_text, leaked
 
 
-def test_materialize_task_end_to_end(tmp_path):
+def test_materialize_task_end_to_end(tmp_path, codebench_materialize_script):
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "badmodel-lab" / "codebench" / "materialize_task.py"
+    script = codebench_materialize_script
     assert script.exists(), script
 
     env = {**os.environ, "PYTHONPATH": str(repo_root)}

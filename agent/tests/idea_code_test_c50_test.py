@@ -5,7 +5,7 @@ Docker, no LLM.
 2026-08-06: task hardened after live calibration showed the original "Mercury orbital period"
 framing could be aced by a model reciting the commonly-published trivia figure (~88 days) purely
 from memory, with zero search_web calls and zero real computation (see
-badmodel-lab/codebench/results/runs/coordinator_batch2/c50__aider__qwen2.5_14b/). The task now
+codebench/results/runs/coordinator_batch2/c50__aider__qwen2.5_14b/). The task now
 asks for Mercury's SYNODIC period (time between successive same alignments relative to Earth and
 the Sun), a different, less commonly memorized quantity that genuinely requires combining
 Mercury's own orbital period with Earth's via the synodic-period formula -- this validator
@@ -63,7 +63,7 @@ def test_the_famous_sidereal_period_figure_is_now_a_bad_answer():
     """Directly reproduces the exact failure this task was hardened against: the historical
     winning submission computed Kepler's-law derivation internally, then discarded it and returned
     the well-known sidereal-period figure instead (see
-    badmodel-lab/codebench/results/runs/coordinator_batch2/c50__aider__qwen2.5_14b/submission/
+    codebench/results/runs/coordinator_batch2/c50__aider__qwen2.5_14b/submission/
     mercury_orbit.py, which literally has `return direct_value` where direct_value=87.97 after
     computing kepler_period_days). That figure must now fail every band tighter than the 25% one."""
     rel_error = abs(_MERCURY_SIDEREAL_DAYS - c50._TRUE_DAYS) / c50._TRUE_DAYS
@@ -128,9 +128,9 @@ def test_compiled_plan_leaks_no_ground_truth_numbers():
         assert leaked not in plan_text, leaked
 
 
-def test_materialize_task_end_to_end(tmp_path):
+def test_materialize_task_end_to_end(tmp_path, codebench_materialize_script):
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "badmodel-lab" / "codebench" / "materialize_task.py"
+    script = codebench_materialize_script
     assert script.exists(), script
 
     env = {**os.environ, "PYTHONPATH": str(repo_root)}

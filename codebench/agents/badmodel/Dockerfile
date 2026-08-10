@@ -5,7 +5,7 @@
 # the compiled-scaffold coding entrypoint instead of playground.boot.
 #
 # Build order: codebench-base -> this image. Build context MUST be the repo root, e.g.:
-#   docker build -f badmodel-lab/codebench/agents/badmodel/Dockerfile -t codebench-badmodel .
+#   docker build -f codebench/agents/badmodel/Dockerfile -t codebench-badmodel .
 #
 # MAINTENANCE NOTE: duplicates agent/.dockerfile's dependency-install steps
 # rather than deriving from it (same tradeoff playground/Dockerfile.agent already made).

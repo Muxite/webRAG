@@ -1,7 +1,7 @@
 """
 codebench task c01 — hard/visible, sequence computation.
 
-First task in the coding-agent benchmark (badmodel-lab/codebench/), proving out the
+First task in the coding-agent benchmark (codebench/), proving out the
 task-module contract materialize_task.py consumes (see its module docstring). Deliberately
 the simplest possible hard task: one pure function, no I/O, no multi-file structure — the
 point of c01 is to validate the harness plumbing end-to-end, not to be discriminating.

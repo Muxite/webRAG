@@ -23,7 +23,7 @@ Output layout:
                                                discard before trusting the submission
     tasks/<id>/meta.json             <- category/visibility/keystone_test_ids/entrypoint
 
-Usage: PYTHONPATH=. python badmodel-lab/codebench/materialize_task.py c01 --out badmodel-lab/codebench/tasks
+Usage: PYTHONPATH=. python codebench/materialize_task.py c01 --out codebench/tasks
 """
 from __future__ import annotations
 

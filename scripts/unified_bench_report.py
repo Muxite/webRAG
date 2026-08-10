@@ -28,7 +28,7 @@ markdown view, and mutates nothing.
   the correct pattern (read cells for ``place``/``profile``, join by ``run_id`` onto the real
   scored result JSONs); this script follows it. Treating a cells row as a scorable result
   would invent rows that never had a score.
-* ``badmodel-lab/codebench/results/runs.jsonl`` — the codebench Docker pipeline's per-cell
+* ``codebench/results/runs.jsonl`` — the codebench Docker pipeline's per-cell
   rows. These DO carry real ``score``/``duration_s``/``usd``/``tests_passed`` fields and map
   straight onto the common schema.
 
@@ -96,7 +96,7 @@ except Exception:  # noqa: BLE001
     _is_local_row_impl = None
 
 DEFAULT_CELLS = _ROOT / "badmodel-lab" / "results" / "cells.jsonl"
-DEFAULT_CODE_RUNS = _ROOT / "badmodel-lab" / "codebench" / "results" / "runs.jsonl"
+DEFAULT_CODE_RUNS = _ROOT / "codebench" / "results" / "runs.jsonl"
 
 COMMON_FIELDS: List[str] = [
     "run_id", "timestamp", "benchmark_type", "model", "task_id", "score", "passed",

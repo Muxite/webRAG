@@ -389,7 +389,7 @@ def test_mutant_skip_blank_fails_exactly_the_predicted_cases():
 
 # --------------------------------------------------------------------------------------------
 # The REAL round-3 submitted source from both harnesses, reproduced verbatim from
-# badmodel-lab/codebench/results/runs/coordinator_batch4/c41__{aider,badmodel}__qwen2.5_14b/
+# codebench/results/runs/coordinator_batch4/c41__{aider,badmodel}__qwen2.5_14b/
 # submission/dedupe_list.py (renamed function/import only) -- the strongest possible evidence
 # that this replacement discriminates the actual failure mode observed live, not a hypothetical.
 # --------------------------------------------------------------------------------------------
@@ -521,9 +521,9 @@ def test_compiled_plan_structure_and_no_leaked_values():
     json.dumps(plan)
 
 
-def test_materialize_task_end_to_end(tmp_path):
+def test_materialize_task_end_to_end(tmp_path, codebench_materialize_script):
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "badmodel-lab" / "codebench" / "materialize_task.py"
+    script = codebench_materialize_script
     assert script.exists(), script
 
     env = {**os.environ, "PYTHONPATH": str(repo_root)}

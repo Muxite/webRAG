@@ -38,8 +38,8 @@ compiled_plans/
 .barrage_prep/
 # codebench: materialize_task.py's rendered task fixtures and run results — regenerable
 # from agent/app/idea_code_tests/*.py, never a source artifact
-badmodel-lab/codebench/tasks/
-badmodel-lab/codebench/results/
+codebench/tasks/
+codebench/results/
 # Coverage data file — regenerated on every pytest --cov run
 .coverage
 # Benchmark analysis script output (PNGs + CSVs) — regenerable, same category as idea_test_results/

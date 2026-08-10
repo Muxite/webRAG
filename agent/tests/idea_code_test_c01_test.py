@@ -4,7 +4,7 @@ Adversarial offline checks for codebench task c01 (nth-even-fib-sum) — no Dock
 Mirrors the spirit of execution_compiled_*_validators_test.py: prove the task module's own
 claims are internally consistent (ground truth is actually correct, keystone ids reference
 real tests, the compiled plan is well-formed) BEFORE anything ever reaches a live sandbox.
-Also exercises badmodel-lab/codebench/materialize_task.py end-to-end against this task,
+Also exercises codebench/materialize_task.py end-to-end against this task,
 since c01 is the first task that script has ever had to render — a schema mismatch here
 would silently break every downstream harness script.
 """
@@ -95,9 +95,9 @@ def test_compiled_plan_structure():
     json.dumps(plan)
 
 
-def test_materialize_task_end_to_end(tmp_path):
+def test_materialize_task_end_to_end(tmp_path, codebench_materialize_script):
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "badmodel-lab" / "codebench" / "materialize_task.py"
+    script = codebench_materialize_script
     assert script.exists(), script
 
     env = {**os.environ, "PYTHONPATH": str(repo_root)}

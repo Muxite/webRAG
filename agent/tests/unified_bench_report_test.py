@@ -43,7 +43,7 @@ CELL_LINES = [
 ]
 
 RUNS_LINES = [
-    # verbatim shape of badmodel-lab/codebench/results/runs.jsonl
+    # verbatim shape of codebench/results/runs.jsonl
     {"run_id": "calibrate_c33", "model": "qwen2.5:14b", "agent_kind": "badmodel",
      "task_id": "c33", "task_category": "hard", "test_visibility": "hidden",
      "sandbox_exit_code": "0", "duration_s": 265.0, "sandbox_actions_count": 10,

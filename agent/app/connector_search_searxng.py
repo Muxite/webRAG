@@ -1,6 +1,6 @@
 """``ConnectorSearch`` backed by a self-hosted, keyless SearXNG instance instead of Brave.
 
-The codebench coding sandbox (``badmodel-lab/codebench/``) runs on an ``--internal`` Docker
+The codebench coding sandbox (``codebench/``) runs on an ``--internal`` Docker
 network with no route to the real internet: its ONLY web surface is the bundled SearXNG container
 reachable at ``SEARXNG_URL``. ``connector_search.ConnectorSearch`` hardcodes Brave's URL twice
 (``__init__``'s ``self.url`` and a second literal inside ``query_search``) and hard-requires

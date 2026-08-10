@@ -14,7 +14,7 @@ function-validators are the source of truth there. A soft coding task has no suc
 truth (that is exactly what makes it soft — a hard task's pytest suite is the ground truth,
 a soft one has none), so this rubric's ``mean`` is intended to eventually BECOME the task's
 score, populating ``judge_mean`` (and thus the effective score) in
-badmodel-lab/codebench/score_and_record.py's ``category == "soft"`` branch.
+codebench/score_and_record.py's ``category == "soft"`` branch.
 
 This module does NOT wire that in. score_and_record.py still records soft cells unscored.
 That integration is deliberately deferred: it makes the harness spend real judge tokens on

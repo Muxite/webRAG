@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Sibling to analyze.py, for the coding-agent benchmark (badmodel-lab/codebench/) instead
+"""Sibling to analyze.py, for the coding-agent benchmark (codebench/) instead
 of the QA benchmark. Reads codebench/results/runs.jsonl (score_and_record.py's row schema —
 see that script's module docstring for why it's a sibling schema, not a literal extension
 of cells.jsonl) and reports the badmodel-vs-aider comparison per (model, task_category).
 
-Usage: ./.venv/bin/python badmodel-lab/analyze_code.py [--results-file PATH]
+Usage: ./.venv/bin/python codebench/analyze_code.py [--results-file PATH]
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-DEFAULT_RESULTS_FILE = Path(__file__).resolve().parent / "codebench" / "results" / "runs.jsonl"
+DEFAULT_RESULTS_FILE = Path(__file__).resolve().parent / "results" / "runs.jsonl"
 
 
 def _mean(xs: list[float]) -> float | None:

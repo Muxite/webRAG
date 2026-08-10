@@ -13,7 +13,7 @@ is domain-agnostic); only two things change:
   * the composition step — ``agg_mode: "sandbox_submit"`` runs :func:`_compose_submit`, which only
     CHECKS that the plan's declared deliverable files exist. It deliberately does not score
     correctness: grading happens later, in a separate fresh container that re-runs the canonical
-    tests against the extracted submission (``badmodel-lab/codebench/run_grade.sh``), because an
+    tests against the extracted submission (``codebench/run_grade.sh``), because an
     agent with real code execution can trivially fake a self-reported pass.
 
 ``execution_compiled.py`` is untouched — the QA benchmark path must stay byte-for-byte identical.
@@ -289,7 +289,7 @@ def _compose_submit(sandbox: SandboxConnector, composition: Dict[str, Any]) -> D
 
     This is a SUBMISSION CHECK, not a score. It never runs the agent's code, never trusts a
     self-reported pytest result, and never emits a pass/fail verdict on the task: correctness is
-    decided later by ``badmodel-lab/codebench/run_grade.sh``, in a fresh container that re-runs the
+    decided later by ``codebench/run_grade.sh``, in a fresh container that re-runs the
     canonical tests against the extracted workdir. Its only job is a clean end-of-run summary the
     entrypoint can log (and a harness-side signal that the agent produced nothing at all).
     """
