@@ -59,7 +59,7 @@ step past what was evaluated this pass.
 ## Current test baseline
 
 `PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests` →
-**4660 passed, 18 skipped, 0 failed** (as of commit `eb8cc9ac`). Note the `.:services:agent`
+**4663 passed, 18 skipped, 0 failed** (as of commit `d702c697`). Note the `.:services:agent`
 PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` directory on 2026-08-09
 (concurrent session, `8d45df3a`); the old `PYTHONPATH=services:services/agent` form is stale.
 
@@ -116,13 +116,24 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
    doesn't strip the quotes will also 403 and look identical to "Serper is down." Serper itself
    **is live and working** (verified with a real request, 200 OK) — this is a wiring gap, not an
    outage.
-6. **codebench's JSON-embedded source-code write protocol corrupts ~40% of qwen2.5:14b's `badmodel`
-   submissions** (SyntaxError on compile — triple-quote miscounting and double-escaped newlines),
-   vs 0% for aider on the identical tasks. Root-caused with file-level examples in
-   `docs/handoffs/AGENT_FAILURE_MODES_2026-08-10.md` (2026-08-10 read-only failure-mode analysis) —
-   the single most concrete, actionable item that analysis surfaced. Well-scoped bug-fix cycle
-   candidate: move `write_file`'s one-shot full-file JSON string toward something closer to aider's
-   diff/search-replace format, or add a repair/validation pass before grading.
+6. ~~**codebench's JSON-embedded source-code write protocol corrupts ~40% of qwen2.5:14b's
+   `badmodel` submissions**~~ — partially addressed offline 2026-08-10 (`d702c697`). Traced the
+   corruption to the MODEL's own output: `write_file`'s `content` string is syntactically valid
+   JSON (so it parses cleanly) but semantically broken Python (double-escaped newlines, collapsed
+   triple-quotes) — invisible to JSON validation, and nothing downstream ever compiled the file
+   back, so runs often burned their whole 10-step budget never discovering the submission was dead
+   on arrival. Fix: `execution_compiled_code.py`'s leaf loop now `compile()`-checks any `.py` file
+   immediately after a successful `write_file` and downgrades the step to a failure with the
+   `SyntaxError` message when it doesn't compile — giving the model a chance to self-correct within
+   its existing write→run→read-failure→patch→re-run loop, same as it already does for pytest
+   failures. Deliberately scoped to `execution_compiled_code.py` (codebench-specific), not the
+   shared `SandboxConnector`/`sandbox_dispatch` the native engine's language-agnostic sandbox pack
+   also uses. **This does not fix the model's underlying escaping habit** — it converts a silent
+   failure into a visible, actionable one; a live codebench re-run against the same failing tasks
+   would confirm whether self-correction within budget actually recovers scores (not yet done —
+   live spend, needs authorization). The more invasive fix (moving `write_file`'s wire format away
+   from one-shot full-file JSON strings toward something like aider's diff/search-replace, which had
+   0% corruption on the same model+tasks) is still open if this doesn't move the needle enough.
 
 **Track 3 of cycle 1 (small filler) is done, committed as `1871a71d`.** Findings, for context on
 anything that references them later: `m02`'s zero-variance 0.50 score was a grounding-regex gap
