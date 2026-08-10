@@ -97,12 +97,22 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
    `agent/app/AGENT_CONTINUUM.md` names specific `cells.jsonl` fields as ones that "may never
    bridge" into main's schema — that tension needs its own Plan stage before deciding what "fold
    in" even means here, not a rushed follow-on to cycle 2.
-3. **Two small, already-identified cleanup items**, found during cycle 2's `badmodel-lab`
-   inventory but out of scope there: `badmodel-lab/localagent/` (a control-loop precursor
-   `AGENT_CONTINUUM.md` already says to retire "once the graph engine matches or exceeds it" — that
-   condition may already be true, worth checking) and `badmodel-lab/playground/pkg/
-   connector_search_searxng.py` (main's own `connector_search_searxng.py` docstring calls it "a
-   twin... that predates" it — an acknowledged stale duplicate).
+3. ~~**Two small, already-identified cleanup items**~~ — investigated 2026-08-10, **both turn out
+   to be "don't touch," not deletions**:
+   - `badmodel-lab/localagent/` retirement condition ("once the graph engine matches or exceeds it
+     on localagent's own task suite") is explicitly **NOT met yet**: `agent/app/TECHNIQUE_INVENTORY.md`
+     itself says, as of the most current status tracking, "`SandboxToolPack` (file/shell tools) —
+     architecturally sound, **zero accuracy-lift data yet**." `localagent/RESULTS_P1.md` has real
+     per-model Wilson-lower numbers on its 6-task suite (file_count/find/write/memory/web_fact/
+     cross_cutting) to compare against — nobody has run the graph engine against that same suite to
+     produce the other half of the comparison. Not a quick check; needs its own live/local
+     benchmark validation before retirement is justified.
+   - `badmodel-lab/playground/pkg/connector_search_searxng.py` is **not stale** — it's actively
+     imported by `badmodel-lab/playground/pkg/chat_entrypoint.py`. Main's own docstring's "a twin
+     that predates it" was read too literally; the fuller docstring explains it's a *deliberate*
+     packaging-boundary duplicate ("kept where it is because the playground image ships its own
+     package"), not accidental drift. Deleting it would break the playground Docker image's
+     imports.
 4. ~~**Branch-merge evaluation** for `autoscale`/`autoscale-redux`~~ — done 2026-08-10, both deleted
    as fully superseded. See Git state above.
 5. ~~**~16 `scripts/*.sh` benchmark drivers export the wrong search-provider key.**~~ — fixed
