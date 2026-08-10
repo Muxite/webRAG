@@ -5,6 +5,24 @@ session, but they go stale fast once another session lands unrelated commits, an
 consistent point where a plan gets challenged before code gets written. This doc replaces that habit
 with a repeatable loop, sized to the change instead of applied uniformly.
 
+## What a cycle is for
+
+A cycle is any of four things, or a combination:
+
+- **Feature** — new capability, new tool, new benchmark surface.
+- **Bug fix** — a real, reproduced defect traced to a root cause, not a symptom patch.
+- **Cleanup** — retiring dead/superseded code, de-duplicating, or relocating something to its
+  natural home when it's drifted from it (cycle 2's codebench fold-in was this: infrastructure that
+  had ended up living inside a lab-scoped directory it didn't conceptually belong to).
+- **Branch merge** — evaluating whether work sitting on another branch (`git branch -a` is worth a
+  periodic look — this repo currently also has `autoscale`/`autoscale-redux` sitting unmerged)
+  should land on `master` rather than drift further from it.
+
+The loop and sizing below apply the same way to all four — a cleanup cycle still needs a real Plan
+stage (what's actually unused vs. quietly load-bearing? — see lesson 2 in Provenance below), and a
+branch-merge cycle still needs adversarial review (has the incoming branch's code drifted from
+what master now assumes?), not just a mechanical `git merge`.
+
 ## The loop
 
 | Stage | What happens | Skip when |
