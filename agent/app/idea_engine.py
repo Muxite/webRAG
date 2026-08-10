@@ -651,17 +651,21 @@ class IdeaDagEngine:
             branch_pair = find_branch_pair(graph, current_id)
             leaf_statuses = {cid: graph.get_node(cid).status.value for cid in leaf_children if graph.get_node(cid)}
             self._logger.info(f"[STEP {step_index}] ALL LEAVES COMPLETE ({len(leaf_children)}): {leaf_statuses} — creating merge")
-            if (
-                node.details.get("_got_reexpanded")
-                and not self.merge.should_create_merge_node(graph, current_id)
-            ):
-                # This node is a re-expanded leaf whose new children are all done
-                # and don't form a mergeable set (e.g. a single follow-up child):
-                # its follow-up work is complete. Mark it DONE and hand back to the
-                # parent so the new subtree's results reach finalize — instead of
-                # looping forever on a merge the merge policy will never create.
+            if not self.merge.should_create_merge_node(graph, current_id):
+                # This node's children are all done and don't form a mergeable set
+                # (e.g. a single linear child, or `enable_recursive_merge` off) —
+                # `should_create_merge_node` is a deterministic function of the
+                # child set, so it can never flip to True on a later step. Not
+                # scoping this to `_got_reexpanded` nodes (as it once was) matters:
+                # any ordinary node with < 2 children hit `_handle_merge_creation`,
+                # whose own no-merge-needed branch returns `node_id` — the SAME
+                # node this step started on — so `branch_pair.needs_merge()` would
+                # re-evaluate identically forever, silently exhausting the step
+                # budget on the extremely common single-child-chain shape (the
+                # `good_adaptive` self-loop bug's second half). Mark it DONE and
+                # hand back to the parent so the subtree's results reach finalize.
                 self._logger.info(
-                    f"[STEP {step_index}] REEXPAND COMPLETE: node {current_id[:8]} "
+                    f"[STEP {step_index}] NO MERGE NEEDED: node {current_id[:8]} "
                     f"children done, marking DONE"
                 )
                 node.status = IdeaNodeStatus.DONE

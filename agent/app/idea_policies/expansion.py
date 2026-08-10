@@ -1390,7 +1390,15 @@ class LlmExpansionPolicy(ExpansionPolicy):
                     
                     if extracted_url:
                         details[DetailKey.URL.value] = extracted_url
-                        if source_node_id:
+                        # A source resolving to `parent_node_id` itself means the URL came from
+                        # the node CURRENTLY being expanded (e.g. re-expanding a just-completed
+                        # search leaf into a visit follow-up) — its result is already in hand
+                        # right here, not something to defer. Wiring `requires_data` to it anyway
+                        # deadlocks the engine: that node can only reach DONE once this very child
+                        # completes, so `IdeaDagEngine.step()`'s "wait for required data" gate
+                        # would return the same node_id forever (silently exhausting the step
+                        # budget with no error — the `good_adaptive` self-loop bug).
+                        if source_node_id and source_node_id != parent_node_id:
                             source_node = graph.get_node(source_node_id)
                             if source_node:
                                 from agent.app.idea_policies.action_constants import NodeDetailsExtractor
