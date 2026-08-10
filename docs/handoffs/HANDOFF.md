@@ -59,19 +59,39 @@ step past what was evaluated this pass.
 ## Current test baseline
 
 `PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests` →
-**4658 passed, 18 skipped, 0 failed** (as of commit `1871a71d`). Note the `.:services:agent`
+**4660 passed, 18 skipped, 0 failed** (as of commit `eb8cc9ac`). Note the `.:services:agent`
 PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` directory on 2026-08-09
 (concurrent session, `8d45df3a`); the old `PYTHONPATH=services:services/agent` form is stale.
 
 ## What's open — candidates for the next cycle, roughly in priority order
 
-1. **`good_adaptive`'s self-loop bug** (the single highest-value open item). The barrage's own
-   live confirmation smoke found `idea_engine.py`'s re-expansion guard (~line 585) can make a node
-   loop back to itself for ~47 steps and silently exhaust its step budget on a common task shape
-   ("given no URLs, search then visit"), scoring near-zero with no error signal anywhere in the
-   driver's accounting. Reproduced 2/2 on affected tasks. **Do not launch the full ~$30 barrage
-   relaunch, or at minimum don't trust its `good_adaptive`/`max_burn` numbers, until this is fixed
-   and re-verified live.** Full detail in `[[project_ladder_benchmark]]` memory.
+1. ~~**`good_adaptive`'s self-loop bug**~~ — root-caused and fixed offline 2026-08-10
+   (`eb8cc9ac`), **but still needs a live re-verification smoke before the barrage relaunch is
+   unblocked** (never spend without explicit go-ahead at execution time). Root cause turned out to
+   be TWO independent deadlocks, both silent (no exception, no error field — the run just burns its
+   whole step budget returning the same node id every step):
+   - **Self-sourced `requires_data`.** Re-expanding a completed leaf (e.g. a search) passes the
+     leaf's own `node_id` into `LlmExpansionPolicy._parse_candidates` as `parent_node_id`. If the
+     model's follow-up is a bare "visit" with no explicit URL, `_extract_url_from_path_context_with_
+     source` walks `graph.path_to_root(parent_node_id)` — INCLUSIVE of the node itself — and on the
+     exact "given no URLs, search then visit" shape, the leaf's own just-produced search result is
+     the only URL source on that path. The new visit child's `requires_data.source_node_id` gets
+     wired back to its own parent, which can only reach `DONE` once that same child finishes —
+     `IdeaDagEngine.step()`'s "wait for required data" gate then returns the source node id (itself)
+     forever. Fixed in `expansion.py`: skip `requires_data` entirely when the resolved source is the
+     node currently being expanded (the URL is already in hand, nothing to wait for).
+   - **Merge-creation self-loop for <2 children.** Once leaf #1 was fixed, the SAME test kept
+     failing one level up: any ordinary (non-reexpanded) node with a single completed child and no
+     merge node hits `_handle_merge_creation`, whose `should_create_merge_node` is a deterministic
+     function of child count (`< 2` children -> always `False`) — so `return node_id` on that branch
+     re-evaluates identically every step, forever. A near-identical guard already existed in
+     `step()` but was scoped only to `_got_reexpanded` nodes (its own comment described this exact
+     failure mode); broadened it to apply whenever `should_create_merge_node` is `False`, regardless
+     of re-expansion, matching the precedent that guard already set.
+   Reproduced offline with a real (non-fake) `LlmExpansionPolicy` + a full `engine.step()` drive
+   loop in `agent/tests/reexpand_self_source_deadlock_test.py` — both tests failed against
+   pre-fix code (one hanging at each deadlock in turn) and pass now; full suite green (4660
+   passed/18 skipped, +2 new). Full detail in `[[project_ladder_benchmark]]` memory.
 2. **The QA-lab fold-in** — deliberately deferred out of cycle 2's scope. `badmodel-lab/analyze.py`,
    `results/cells.jsonl`, `roster.yaml`/`tiers.yaml`/`profiles/` are still lab-scoped.
    `agent/app/AGENT_CONTINUUM.md` names specific `cells.jsonl` fields as ones that "may never
