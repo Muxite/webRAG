@@ -100,6 +100,45 @@ def test_leaf_recovers_from_unparseable_json(tmp_path):
     assert record["finished"] is True and (sb.workdir / "a.py").exists()
 
 
+def test_leaf_surfaces_a_syntax_error_in_written_python_immediately(tmp_path):
+    """A `write_file` whose content is syntactically valid JSON but semantically broken Python
+    (the real failure mode found in the codebench failure-mode analysis: qwen2.5:14b
+    double-escapes newlines, landing literal backslash-n characters in the file instead of real
+    line breaks — one file, one line, no traceback) must be surfaced to the model in the SAME
+    step's observation, not silently accepted. Before this, `write_file` only validated bytes/UTF-8,
+    so a step that wrote unparseable Python still reported `ok=True`, and — per the real run
+    summaries — the model often never spent a later step running/reading the file to discover it,
+    exhausting the whole leaf budget on a submission that was dead on arrival."""
+    sb = _sandbox(tmp_path)
+    corrupted = "def f():\\n    return 1\\n"  # literal backslash-n, not a real newline
+    io = _ScriptedIO([_write("a.py", corrupted), _FINISH])
+    record = asyncio.run(ecc._run_code_leaf(sb, io, "write a.py", "", "m", 5, 2000, 512))
+    write_step = record["steps"][0]
+    assert write_step["action"] == "write_file"
+    assert write_step["ok"] is False, "syntactically-broken Python must not report success"
+    assert "SyntaxError" in write_step["observation"]
+    # The file is still on disk exactly as sent (nothing is silently rewritten/repaired — the
+    # model needs to see and fix its own mistake, not have it papered over).
+    assert (sb.workdir / "a.py").read_text() == corrupted
+
+
+def test_leaf_write_file_still_succeeds_for_valid_python(tmp_path):
+    """Regression: the syntax check must not false-positive on ordinary valid Python."""
+    sb = _sandbox(tmp_path)
+    io = _ScriptedIO([_write("a.py", "def f():\n    return 1\n"), _FINISH])
+    record = asyncio.run(ecc._run_code_leaf(sb, io, "write a.py", "", "m", 5, 2000, 512))
+    assert record["steps"][0]["ok"] is True
+    assert (sb.workdir / "a.py").read_text() == "def f():\n    return 1\n"
+
+
+def test_leaf_write_file_syntax_check_ignores_non_python_files(tmp_path):
+    """A non-.py file with content that wouldn't compile as Python is not this check's business."""
+    sb = _sandbox(tmp_path)
+    io = _ScriptedIO([_write("notes.txt", "this is not python at all {{{"), _FINISH])
+    record = asyncio.run(ecc._run_code_leaf(sb, io, "write notes", "", "m", 5, 2000, 512))
+    assert record["steps"][0]["ok"] is True
+
+
 def test_leaf_parses_a_fenced_json_decision(tmp_path):
     """A ```json fence around the object is a real action, not a wasted step.
 

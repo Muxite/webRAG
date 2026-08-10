@@ -161,16 +161,54 @@ def _observation(result: Dict[str, Any], obs_chars: int) -> str:
     return (f"ERROR: {error}\n{body}" if body else f"ERROR: {error}")[:obs_chars]
 
 
+def _syntax_check_written_python(sandbox: SandboxConnector, result: Dict[str, Any]) -> Dict[str, Any]:
+    """Downgrade a successful ``write_file`` to a failure when the ``.py`` it just wrote does not
+    compile.
+
+    Root cause this guards against (see ``docs/handoffs/AGENT_FAILURE_MODES_2026-08-10.md``): a
+    weak local model's ``content`` string can be syntactically VALID JSON — so ``write_file``'s own
+    UTF-8/byte checks pass — while being semantically broken Python (a collapsed triple-quote, or
+    the whole file landing as one line of literal ``\\n`` text instead of real newlines, both
+    observed verbatim in real qwen2.5:14b codebench submissions). Nothing upstream of this ever
+    reads the file back, so the leaf loop silently reports success and frequently exhausts its
+    entire step budget on a submission that was dead on arrival. Reading the file straight off disk
+    (rather than re-deriving ``content`` from ``args``) uses the exact bytes that were actually
+    persisted, so this can't drift from whatever alias the dispatcher resolved.
+    """
+    if result.get("action") != "write_file" or not result.get("ok"):
+        return result
+    path = result.get("path") or ""
+    if not str(path).endswith(".py"):
+        return result
+    try:
+        text = (sandbox.workdir / path).read_text(encoding="utf-8")
+    except OSError:
+        return result
+    try:
+        compile(text, path, "exec")
+    except SyntaxError as exc:
+        return {
+            **result,
+            "ok": False,
+            "error": f"{path} does not compile: SyntaxError: {exc.msg} (line {exc.lineno})",
+        }
+    return result
+
+
 async def _dispatch_action(sandbox: SandboxConnector, action: str, args: Dict[str, Any]) -> Dict[str, Any]:
     """Run ONE sandbox action for the leaf loop. Never raises: an unknown action or a bad
     argument comes back as a failed result the model can read and correct.
 
     The translation itself lives in :func:`agent.app.sandbox_dispatch.dispatch_sandbox_action`,
     shared with the native engine's ``LeafAction`` pack; this wrapper only adds ``finish`` — a
-    loop verb, not a sandbox action — to the vocabulary an unknown verb is measured against.
+    loop verb, not a sandbox action — to the vocabulary an unknown verb is measured against. It
+    also runs the codebench-specific ``.py`` syntax check (see
+    :func:`_syntax_check_written_python`) — deliberately NOT in the shared dispatcher, which is
+    also used by the native engine's general-purpose (language-agnostic) sandbox pack.
     """
-    return await dispatch_sandbox_action(sandbox, action, args,
-                                         vocabulary=tuple(_SANDBOX_ACTIONS) + ("finish",))
+    result = await dispatch_sandbox_action(sandbox, action, args,
+                                           vocabulary=tuple(_SANDBOX_ACTIONS) + ("finish",))
+    return _syntax_check_written_python(sandbox, result)
 
 
 async def _run_code_leaf(sandbox: SandboxConnector, agent_io: AgentIO, instruction: str, expect: str,
