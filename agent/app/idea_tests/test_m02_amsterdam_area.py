@@ -66,8 +66,12 @@ def validate_grounding(result: Dict[str, Any], observability: Dict[str, Any]) ->
     # name) -- "Amsterdam_Island" is a redirect. A real, correct visit can land on either URL
     # (confirmed live: en.wikipedia.org/wiki/%C3%8Ele_Amsterdam returns HTTP 200, title "Île
     # Amsterdam - Wikipedia", not a broken link) and both slugs contain "amsterdam", so match
-    # either rather than only the assumed-canonical one.
-    cited = bool(re.search(r"wiki/[a-z0-9%_-]*amsterdam", text))
+    # either rather than only the assumed-canonical one. The "Île" prefix reaches us in three
+    # renderings -- percent-encoded (%C3%8Ele_), literal ("Île_"), and JSON-escaped ("Île_",
+    # since extract_final_text dumps dict deliverables with ensure_ascii) -- so the slug class
+    # must be any non-delimiter run, not just ASCII alphanumerics. Anchoring on "wiki/" still
+    # rejects the hallucinated non-Wikipedia sources weak models substitute here.
+    cited = bool(re.search(r"wiki/[^\s\"'<>)\]]*amsterdam", text))
     return {"check": "grounding", "passed": cited, "score": 1.0 if cited else 0.0,
             "reason": f"source cited={cited}"}
 

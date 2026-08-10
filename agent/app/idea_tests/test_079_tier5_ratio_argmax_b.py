@@ -513,6 +513,20 @@ def get_compiled_plan() -> Dict[str, Any]:
 
     Encodes STRUCTURE ONLY: names the five GIVEN stations and their regions, but leaks no
     generation figure, no capacity figure, no ratio value, and not which station wins.
+
+    DELIBERATELY NOT wired to the ``ratio_argmax`` composition kill-switch that tests 064 and
+    088 use, despite sharing their dual-field shape (two labelled numbers off ONE page). This
+    task's numerator is the only one in the family with a HETEROGENEOUS unit: Wikipedia prints
+    Bennett's and Bratsk's annual generation in TWh and the other three stations' in GWh, and
+    the leaf instruction above deliberately asks for the unit "exactly as shown" and forbids
+    converting — the TWh→GWh conversion is part of what the task tests. ``_compose_ratio_argmax``
+    carries ONE global ``multiplier`` and ONE ``numerator_unit`` label for the whole comparison,
+    with no per-item scaling, so it would divide 15 (TWh) by 2,907 (MW) and render the row as
+    "generation=15 GWh ... ratio=0.005" — a confidently WRONG figure, exactly the failure mode
+    the composers exist to prevent. It also silently costs ``validate_coverage`` the two TWh
+    stations (5/5 -> 3/5), since their real figures never reach the deliverable. Wiring this task
+    safely needs per-item unit normalisation in the composer, not a plan change here; see
+    ``ratio_argmax_composition_test.py`` for the pinned counter-example.
     """
     leaves: List[Dict[str, Any]] = []
     for e in ENTITIES:

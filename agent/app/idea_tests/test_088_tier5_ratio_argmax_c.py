@@ -90,6 +90,7 @@ Ground truth (verified against live English Wikipedia 2026-06-27 — each river'
 """
 
 from typing import Dict, Any, List
+import os
 import re
 from agent.app.idea_test_utils import extract_final_text
 
@@ -481,6 +482,18 @@ def get_compiled_plan() -> Dict[str, Any]:
 
     Encodes STRUCTURE ONLY: names the five GIVEN rivers and their regions, but leaks no
     discharge figure, no length figure, no ratio value, and not which river wins.
+
+    Composition kill-switch (Part D Stage 1 validation, off by default): when
+    ``IDEA_TEST_COMPILED_COMPOSITION_KILLSWITCH`` is set, the plan additionally declares
+    ``agg_mode: "computed"`` plus a ``ratio_argmax`` ``composition`` over the five leaves,
+    routing every division AND the argmax through ``execution_compiled._compose_ratio_argmax``
+    (deterministic arithmetic) instead of the free-text aggregation prompt below. This task is
+    wired for it because it has test 064's exact dual-field shape — BOTH quantities sit on ONE
+    page, so one leaf yields two labelled numbers — and, unlike test 079, its two fields have a
+    single fixed unit each (m3/s and km), so no per-item conversion is needed; the composer
+    carries one global ``multiplier``, not a per-item one. Unset (the default) reproduces
+    today's plan dict exactly — the ``aggregation`` string stays byte-identical either way,
+    since it remains the fallback whenever composition can't resolve honestly.
     """
     leaves: List[Dict[str, Any]] = []
     for e in ENTITIES:
@@ -498,7 +511,7 @@ def get_compiled_plan() -> Dict[str, Any]:
             "expect": "Mean discharge (m³/s) and total length (km), both labelled — source URL",
             "depends_on": [],
         })
-    return {
+    plan: Dict[str, Any] = {
         "leaves": leaves,
         "aggregation": (
             "You now have, for each of the five rivers, two figures: its mean discharge (m³/s) "
@@ -513,3 +526,18 @@ def get_compiled_plan() -> Dict[str, Any]:
             "discharge (m³/s) and total length (km), and (c) cite each river's source URL."
         ),
     }
+    if os.environ.get("IDEA_TEST_COMPILED_COMPOSITION_KILLSWITCH", "") not in ("", "0", "false", "False"):
+        plan["agg_mode"] = "computed"
+        plan["composition"] = {
+            "op": "ratio_argmax",
+            "answer_noun": "river",
+            "value_label": "discharge-to-length ratio",
+            "numerator_label": "discharge",
+            "denominator_label": "length",
+            "numerator_unit": "m3/s",
+            "denominator_unit": "km",
+            "ratio_unit": "m3/(s*km)",
+            "round_digits": 3,
+            "items": [{"leaf": e["key"], "label": e["name"]} for e in ENTITIES],
+        }
+    return plan

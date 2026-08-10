@@ -75,7 +75,10 @@ def validate_grounding(result: Dict[str, Any], observability: Dict[str, Any]) ->
     text = extract_final_text(result).lower()
     # Same fix as test_m02_amsterdam_area.py: the island's real canonical English Wikipedia
     # title is "Île Amsterdam" (Amsterdam_Island is a redirect) -- confirmed live via curl.
-    cited = bool(re.search(r"wiki/[a-z0-9%_-]*amsterdam", text))
+    # This task's deliverable is a dict, so extract_final_text json.dumps it with
+    # ensure_ascii=True and the redirect slug arrives as "wiki/Île_amsterdam" -- hence the
+    # permissive slug class rather than an ASCII-alphanumeric one.
+    cited = bool(re.search(r"wiki/[^\s\"'<>)\]]*amsterdam", text))
     return {"check": "grounding", "passed": cited, "score": 1.0 if cited else 0.0,
             "reason": f"source cited={cited}"}
 
