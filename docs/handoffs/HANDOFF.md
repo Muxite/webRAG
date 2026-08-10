@@ -116,6 +116,13 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
    doesn't strip the quotes will also 403 and look identical to "Serper is down." Serper itself
    **is live and working** (verified with a real request, 200 OK) — this is a wiring gap, not an
    outage.
+6. **codebench's JSON-embedded source-code write protocol corrupts ~40% of qwen2.5:14b's `badmodel`
+   submissions** (SyntaxError on compile — triple-quote miscounting and double-escaped newlines),
+   vs 0% for aider on the identical tasks. Root-caused with file-level examples in
+   `docs/handoffs/AGENT_FAILURE_MODES_2026-08-10.md` (2026-08-10 read-only failure-mode analysis) —
+   the single most concrete, actionable item that analysis surfaced. Well-scoped bug-fix cycle
+   candidate: move `write_file`'s one-shot full-file JSON string toward something closer to aider's
+   diff/search-replace format, or add a repair/validation pass before grading.
 
 **Track 3 of cycle 1 (small filler) is done, committed as `1871a71d`.** Findings, for context on
 anything that references them later: `m02`'s zero-variance 0.50 score was a grounding-regex gap
