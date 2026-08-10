@@ -41,10 +41,20 @@ Two real cycles have run so far, both fully committed on `master`:
 currently ~149 commits ahead of `origin/master`, **not pushed** (push is a separate, explicit
 decision each time, not a standing default).
 
-Two other branches sit unmerged and unevaluated: `autoscale` (own commit message: "partially
-working, mostly broken" — needs real evaluation, don't assume it's mergeable) and
-`autoscale-redux` ("file cleanup" — unknown scope). Per `docs/DEV_CYCLE.md`'s branch-merge
-category, evaluating these is legitimate future-cycle work — nobody's looked at them yet.
+`autoscale` and `autoscale-redux` were evaluated (2026-08-10) and deleted — both fully superseded.
+`autoscale-redux` was a strict `git` ancestor of `master` (zero unique commits). `autoscale`'s real
+contribution (`services/lambda_autoscaling/lambda_function.py`) was independently redone and merged
+via a later, cleaner commit (`1fbed65c "autoscale complete"`, 2026-02-07) that's *itself* now
+archived under `services/_legacy-aws/` since the project no longer deploys via AWS ECS; its frontend
+components (`TaskCard.tsx`, `StatusBar.tsx`, etc.) targeted a `frontend/src/components/` layout that
+no longer exists post-rebuild (`frontend/src/app/...`). Deleted SHAs for recovery if ever needed:
+`autoscale`=`57f43e54`, `autoscale-redux`=`8f3efd78`.
+
+One more branch ref is worth a follow-up: local `compiled-scaffold-dag` (confirmed a `git` ancestor
+of `master` — genuinely merged) still can't `git branch -d` cleanly because its *remote* tracking
+ref (`origin/compiled-scaffold-dag`) is stale relative to local `HEAD`, not because the merge is in
+question. Needs `-D` (force) or a remote-ref update to clean up; left alone for now since that's a
+step past what was evaluated this pass.
 
 ## Current test baseline
 
@@ -73,7 +83,8 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
    condition may already be true, worth checking) and `badmodel-lab/playground/pkg/
    connector_search_searxng.py` (main's own `connector_search_searxng.py` docstring calls it "a
    twin... that predates" it — an acknowledged stale duplicate).
-4. **Branch-merge evaluation** for `autoscale`/`autoscale-redux` — see Git state above.
+4. ~~**Branch-merge evaluation** for `autoscale`/`autoscale-redux`~~ — done 2026-08-10, both deleted
+   as fully superseded. See Git state above.
 5. **~16 `scripts/*.sh` benchmark drivers export the wrong search-provider key.** Found while
    closing out Track 3 (below): `ConnectorConfig.search_provider` defaults to `"serper"`, but only
    `badmodel-lab/run_cell.sh`/`run_adaptive_cell.sh` actually export `SERPER_KEY`. Every
