@@ -13,6 +13,7 @@ mkdir -p "$OUT/_validate_new"
 keyval(){ grep -E "^$1=" services/keys.env | cut -d= -f2- | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/'; }
 export OPENROUTER_API_KEY="$(keyval OPENROUTER_API_KEY)"
 export SEARCH_API_KEY="$(keyval SEARCH_API_KEY)"
+export SERPER_KEY="$(keyval SERPER_KEY)"
 export LLM_PROVIDER=openrouter MODEL_API_URL=https://openrouter.ai/api/v1 CHROMA_URL=http://localhost:8001
 export DEFAULT_TIMEOUT=45 DEFAULT_DELAY=2 JITTER_SECONDS=0.5
 export IDEA_TEST_CONCURRENCY=1 IDEA_TEST_PARALLEL_ACTION_LIMIT=1

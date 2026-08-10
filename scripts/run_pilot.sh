@@ -8,6 +8,7 @@ cd "$(dirname "$0")/.."
 
 export OPENROUTER_API_KEY="$(grep -E '^OPENROUTER_API_KEY=' services/keys.env | cut -d= -f2- | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/')"
 export SEARCH_API_KEY="$(grep -E '^SEARCH_API_KEY=' services/keys.env | cut -d= -f2- | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/')"
+export SERPER_KEY="$(grep -E '^SERPER_KEY=' services/keys.env | cut -d= -f2- | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/')"
 export LLM_PROVIDER=openrouter MODEL_API_URL=https://openrouter.ai/api/v1
 export CHROMA_URL=http://localhost:8001 DEFAULT_TIMEOUT=45 DEFAULT_DELAY=2 JITTER_SECONDS=0.5
 

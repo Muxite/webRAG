@@ -38,6 +38,7 @@ USD_CEILING="${USD_CEILING:-8.00}"
 keyval() { grep -E "^$1=" services/keys.env | cut -d= -f2- | tr -d '\r\n' | sed -E 's/^"(.*)"$/\1/'; }
 export OPENROUTER_API_KEY="$(keyval OPENROUTER_API_KEY)"
 export SEARCH_API_KEY="$(keyval SEARCH_API_KEY)"
+export SERPER_KEY="$(keyval SERPER_KEY)"
 export LLM_PROVIDER=openrouter
 export MODEL_API_URL=https://openrouter.ai/api/v1
 export CHROMA_URL=http://localhost:8001
