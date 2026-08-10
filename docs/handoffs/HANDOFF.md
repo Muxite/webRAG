@@ -59,7 +59,7 @@ step past what was evaluated this pass.
 ## Current test baseline
 
 `PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests` →
-**4663 passed, 18 skipped, 0 failed** (as of commit `d702c697`). Note the `.:services:agent`
+**4664 passed, 18 skipped, 0 failed** (as of commit `935ebb22`). Note the `.:services:agent`
 PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` directory on 2026-08-09
 (concurrent session, `8d45df3a`); the old `PYTHONPATH=services:services/agent` form is stale.
 
@@ -105,17 +105,16 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
    twin... that predates" it — an acknowledged stale duplicate).
 4. ~~**Branch-merge evaluation** for `autoscale`/`autoscale-redux`~~ — done 2026-08-10, both deleted
    as fully superseded. See Git state above.
-5. **~16 `scripts/*.sh` benchmark drivers export the wrong search-provider key.** Found while
-   closing out Track 3 (below): `ConnectorConfig.search_provider` defaults to `"serper"`, but only
-   `badmodel-lab/run_cell.sh`/`run_adaptive_cell.sh` actually export `SERPER_KEY`. Every
-   `scripts/*.sh` driver (including all `barrage_continue*.sh`) still only exports the old,
-   documented-stale `SEARCH_API_KEY` (Brave) — so any of those drivers hands the Serper backend a
-   Brave key and gets a silent 403 on every search. One-line fix per driver
-   (`export SERPER_KEY="$(keyval SERPER_KEY)"`), not yet applied anywhere outside `badmodel-lab`.
-   Also: `services/keys.env`'s `SERPER_KEY` value is double-quote-wrapped — a naive parser that
-   doesn't strip the quotes will also 403 and look identical to "Serper is down." Serper itself
-   **is live and working** (verified with a real request, 200 OK) — this is a wiring gap, not an
-   outage.
+5. ~~**~16 `scripts/*.sh` benchmark drivers export the wrong search-provider key.**~~ — fixed
+   2026-08-10 (`935ebb22`). All 17 affected drivers (the count was slightly off — 17, not ~16) now
+   `export SERPER_KEY="$(keyval SERPER_KEY)"` (or the inline grep/sed form for the 2 drivers that
+   don't define `keyval()`) alongside the existing `SEARCH_API_KEY` export. Verified the existing
+   `keyval()` helper already strips `services/keys.env`'s double-quote-wrapping correctly (extracted
+   a clean 40-char key, no stray quotes) — that half of the concern was already handled, just never
+   wired to `SERPER_KEY`. Added `agent/tests/search_key_wiring_test.py` — a regression guard that
+   fails if any future `scripts/*.sh` driver sources `SEARCH_API_KEY` from `keys.env` without also
+   sourcing `SERPER_KEY`, so this exact gap can't reappear silently. Full suite green (4664/18
+   skipped). Serper itself was already confirmed live and working — this was purely a wiring gap.
 6. ~~**codebench's JSON-embedded source-code write protocol corrupts ~40% of qwen2.5:14b's
    `badmodel` submissions**~~ — partially addressed offline 2026-08-10 (`d702c697`). Traced the
    corruption to the MODEL's own output: `write_file`'s `content` string is syntactically valid
