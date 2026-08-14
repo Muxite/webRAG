@@ -11,8 +11,6 @@ backend** (this host, via Docker Compose + Tailscale Funnel), not AWS — see Qu
 ECS/ECR/CloudWatch deploy path remains in-repo and functional as a secondary/legacy option, not
 the documented default anymore.
 
-**LLM provider (2026-05):** Default provider is OpenRouter — set `LLM_PROVIDER=openrouter`, `OPENROUTER_API_KEY=...` in `services/keys.env`, and use OR slugs like `openai/gpt-5-mini` or `anthropic/claude-opus-4.7` as `MODEL_NAME`. To bypass OR and call OpenAI directly, set `LLM_PROVIDER=openai_compatible` and revert `MODEL_API_URL` to `https://api.openai.com/v1`.
-
 ## How It Works
 
 Every request becomes a **mandate** — a free-form research question — handed to a controller
@@ -143,8 +141,10 @@ paired A/B (`baseline` → `good_adaptive`) testing whether a cheap model (`gpt-
 of its own tokens via the adaptive loop closes part of the accuracy gap to a strong reference model.
 A first full run was stopped after surfacing a ChromaDB concurrency hang plus several fairness and
 statistical-validity bugs; the fix set (32 items across driver safety, model reliability, infra
-fairness, validator correctness, and the grounding/re-expansion gate) is landed and offline-tested
-(1,951 passed / 18 skipped / 0 failed), and a clean relaunch is queued next.
+fairness, validator correctness, and the grounding/re-expansion gate) is landed, offline-tested
+(1,951 passed / 18 skipped / 0 failed), and — as of a 2026-08-14 targeted live smoke — confirmed to
+actually resolve the deadlock in a real run. The full barrage relaunch is unblocked; running it is
+the next step, and this section gets its own results once it has.
 
 ## Features
 
@@ -364,3 +364,16 @@ docs/             Architecture, security, benchmark plots
 - **2026-05:** Default LLM provider migrated to OpenRouter (note near the top).
 - **2026-06:** **Compiled-scaffold pivot** — an expensive model authors a DAG plan once, offline; a cheap model executes it live, recovering premium-model accuracy at a fraction of cost (see Benchmark Results above). Alongside it: a duplicate `shared/` module tree and a stale forked engine copy were deleted, and the 1,600+-line engine controller was broken into focused modules.
 - **2026-07:** **Native adaptive engine** — the compiled scaffold's lessons (structured planning, reasoning-effort discipline) ported into the live, non-compiled DAG loop as opt-in, default-off mechanisms: confidence-gated re-expansion, backtrack, price-tier token budgets (see Notes above and [`ADAPTIVE_ENGINE.md`](agent/app/ADAPTIVE_ENGINE.md)). Currently mid-relaunch of a live cost/accuracy A/B (the "ladder benchmark") testing whether the adaptive loop closes the gap between cheap and premium models.
+- **2026-08:** **Repo restructure + a repeatable dev-cycle methodology.** `services/agent/` moved to
+  a top-level `agent/`, legacy AWS deploy code archived under `services/_legacy-aws/`, and
+  `badmodel-lab/codebench/` (the Docker coding-benchmark harness) folded into a top-level
+  `codebench/` — both cross-cutting moves fixed real silent-failure bugs (bash root-anchor
+  depth-counting, a Python default path that returned `[]` instead of erroring). Work now happens
+  directly on `master` (the long-lived `compiled-scaffold-dag` branch was fast-forward-merged in
+  and retired) under a repeatable **Plan → Adversarial review → Test → Benchmark → Implement → Run →
+  Analyze** loop (`docs/DEV_CYCLE.md`, invoked via the `/cycle` skill) that replaced one-off
+  per-session handoff docs. Two live cycles have run; a third pass root-caused and fixed two
+  independent silent self-loop deadlocks in the adaptive engine's re-expansion/merge logic (found by
+  a live confirmation smoke, not by the offline suite or adversarial review — see
+  `docs/handoffs/HANDOFF.md`). Live-verification smokes for that fix and a codebench write-protocol
+  fix are the two open threads going into the next cycle.

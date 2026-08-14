@@ -2,8 +2,9 @@
 
 Euglena / webRAG is configured entirely through environment variables (loaded from
 `services/keys.env` — copy [`services/keys.env.example`](../services/keys.env.example) to start).
-The codebase reads **139** variables today; this page documents the ones you need to run the
-system. For the authoritative, always-current full list run:
+The codebase reads **198** variables today (116 runtime + 82 `IDEA_TEST_*` benchmark-only); this
+page documents the ones you need to run the system, not an exhaustive listing. For the
+authoritative, always-current full list run:
 
 ```bash
 python scripts/list_env_vars.py          # grouped, with read sites + defaults
@@ -11,9 +12,12 @@ python scripts/list_env_vars.py --names  # bare names, for diffing against this 
 ```
 
 Variables fall into three groups: **Required** (a real query won't run without them),
-**Optional** (sensible defaults; override to tune), and **Benchmark-only** (`IDEA_TEST_*`, 45
+**Optional** (sensible defaults; override to tune), and **Benchmark-only** (`IDEA_TEST_*`, 82
 variables used solely by the offline test harness — see the benchmark recipe, not needed in
-production).
+production). `scripts/list_env_vars.py` scans `services/` and `agent/`; before 2026-08-14 it only
+scanned `services/` and silently missed everything under top-level `agent/` (the 2026-08-09
+restructure moved the agent code there without updating this script) — the old **139**/**45**
+counts on this page were stale because of that gap, now fixed.
 
 ---
 

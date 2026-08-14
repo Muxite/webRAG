@@ -15,8 +15,11 @@ A cycle is any of four things, or a combination:
   natural home when it's drifted from it (cycle 2's codebench fold-in was this: infrastructure that
   had ended up living inside a lab-scoped directory it didn't conceptually belong to).
 - **Branch merge** — evaluating whether work sitting on another branch (`git branch -a` is worth a
-  periodic look — this repo currently also has `autoscale`/`autoscale-redux` sitting unmerged)
-  should land on `master` rather than drift further from it.
+  periodic look) should land on `master` rather than drift further from it. Cycle 1 ran this
+  evaluation on `autoscale`/`autoscale-redux` (2026-08-10): both turned out fully superseded and
+  were deleted, not merged — see `docs/handoffs/HANDOFF.md`'s "Git state" section for the current
+  branch inventory and reasoning, and for any newer branches that show up on a later
+  `git branch -a` pass.
 
 The loop and sizing below apply the same way to all four — a cleanup cycle still needs a real Plan
 stage (what's actually unused vs. quietly load-bearing? — see lesson 2 in Provenance below), and a
@@ -94,7 +97,8 @@ Most stages already have a tool-shaped home; the loop above is mainly what ties 
 ## Provenance
 
 This structure was designed and its first cycle run on 2026-08-09. Cycle 1 caught three concrete
-lessons worth keeping in mind for future cycles:
+lessons worth keeping in mind for future cycles; a fourth was caught during the 2026-08-14
+live-reverification pass on cycle 1's own fix set:
 
 1. A handoff doc (`BARRAGE_RELAUNCH_HANDOFF.md`) turned out to be ~15% stale against `HEAD` within
    two weeks — several of its listed fixes had already shipped under unrelated commits, while its
@@ -112,3 +116,10 @@ lessons worth keeping in mind for future cycles:
    Nothing upstream of a live run would have surfaced this — it's why "run benchmarks" stays a real
    stage even when a change looks purely infrastructural, and why a smoke's job is to look for
    exactly this kind of silent failure, not just confirm the driver doesn't crash.
+4. "Live-reverify a fix" is itself invalid unless the artifact under test was actually rebuilt from
+   the fixed code. A 2026-08-14 codebench reverification's first attempt silently tested stale
+   pre-fix behavior because `codebench-badmodel`'s Docker image `COPY`s the agent code in at build
+   time, not a live mount, and hadn't been rebuilt since before the fix commit — caught only because
+   the result looked wrong enough to investigate, not by any automated check. Nothing in this repo
+   stamps an image with the git SHA it was built from or warns when that SHA is behind `HEAD`; worth
+   adding if codebench live verification becomes routine rather than one-off.

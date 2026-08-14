@@ -35,22 +35,19 @@ Two real cycles have run so far, both fully committed on `master`:
 
 ## Git state
 
-**Work now happens directly on `master`**, not a long-lived feature branch. Every branch this repo
-has, as of 2026-08-14 — local and remote — is accounted for below; re-run `git branch -a -v` at the
-start of a branch-merge cycle (`docs/DEV_CYCLE.md`) to catch anything new since.
+**Work now happens directly on `master`**, not a long-lived feature branch. `master` is the only
+local branch as of 2026-08-14; re-run `git branch -a -v` at the start of a branch-merge cycle
+(`docs/DEV_CYCLE.md`) to catch anything new since.
 
 | Branch | Where | Status |
 |---|---|---|
-| `master` | local + `origin/master` | **The one branch anyone should commit to.** 161 commits ahead of `origin/master`, **not pushed** (push is a separate, explicit decision each time, not a standing default) — `origin/master` hasn't moved since 2026-06-16. |
-| `compiled-scaffold-dag` | local + `origin/compiled-scaffold-dag` | **Retired, safe to delete.** The prior working branch; fast-forward-merged into `master` on 2026-08-09. Confirmed a strict `git` ancestor of both `master` and its own `origin/compiled-scaffold-dag` (zero unique commits either direction) — `git branch -d compiled-scaffold-dag` now succeeds cleanly (an earlier note here claiming it couldn't due to a stale remote tracking ref no longer holds; left undeleted only because deleting it wasn't itself in scope for any cycle yet). `origin/compiled-scaffold-dag` is additionally ~1 month further behind local (last remote commit 2026-07-10) and never needs pushing. |
-| `autoscale` | `origin/autoscale` only (local deleted) | **Dead, evaluated 2026-08-10.** Not an ancestor of `master` — its real contribution (`services/lambda_autoscaling/lambda_function.py`) was independently redone via a later, cleaner commit (`1fbed65c "autoscale complete"`, 2026-02-07) that's itself now archived under `services/_legacy-aws/` since the project no longer deploys via AWS ECS. Its frontend components (`TaskCard.tsx`, `StatusBar.tsx`, etc.) targeted a `frontend/src/components/` layout that no longer exists post-rebuild (`frontend/src/app/...`). Deleted local SHA for recovery if ever needed: `57f43e54`. The remote copy was never deleted; harmless to leave or prune. |
-| `autoscale-redux` | `origin/autoscale-redux` only (local deleted) | **Dead, evaluated 2026-08-10.** A strict `git` ancestor of `master` at evaluation time (zero unique commits) — fully superseded, not merged. Deleted local SHA: `8f3efd78`. Same remote-prune note as `autoscale` above. |
+| `master` | local + `origin/master` | **The one branch anyone should commit to.** ~162 commits ahead of `origin/master`, **not pushed** (push is a separate, explicit decision each time, not a standing default) — `origin/master` hasn't moved since 2026-06-16. |
+| `compiled-scaffold-dag` | deleted locally 2026-08-14 | The prior working branch; fast-forward-merged into `master` on 2026-08-09, then deleted once retired. `git branch -d` refused it (its upstream `origin/compiled-scaffold-dag` never received those commits, so git's merge check fails against upstream even though it's a strict ancestor of `master` — confirmed via `git merge-base --is-ancestor` before forcing); deleted with `-D`, safely, since master already contains everything. Recovery SHA if ever needed: `f22a55c0`. |
+| `origin/compiled-scaffold-dag` | remote-only, untouched | Stale (last remote commit 2026-07-10, ~1 month behind the local branch it tracked). Left alone — harmless, never needs pushing, wasn't in scope for the 2026-08-14 cleanup. |
+| `autoscale`, `autoscale-redux` | deleted, both local (2026-08-10) and remote (2026-08-14) | **Fully gone.** Evaluated 2026-08-10 as fully superseded (see below), local copies deleted then; remote copies (`origin/autoscale`, `origin/autoscale-redux`) pruned 2026-08-14 via `git push origin --delete`. Recovery SHAs if ever needed: `autoscale`=`57f43e54`, `autoscale-redux`=`8f3efd78`. `autoscale`'s real contribution (`services/lambda_autoscaling/lambda_function.py`) was independently redone via a later, cleaner commit (`1fbed65c "autoscale complete"`, 2026-02-07), itself now archived under `services/_legacy-aws/`; its frontend components targeted a `frontend/src/components/` layout that no longer exists post-rebuild. `autoscale-redux` was a strict `git` ancestor of `master` at evaluation time (zero unique commits) — fully superseded, not merged. |
 
-None of the four remote-only/stale refs above (`origin/master` behind, `origin/compiled-scaffold-dag`,
-`origin/autoscale`, `origin/autoscale-redux`) are acted on automatically by anything in this repo —
-they just sit on the remote until someone explicitly pushes `master` and/or prunes the dead ones
-(`git push origin --delete autoscale autoscale-redux`), which is a deliberate, separate decision,
-not something a doc pass performs on its own.
+Only `origin/master` (behind) and `origin/compiled-scaffold-dag` (stale, harmless) remain as loose
+remote state; neither is acted on automatically by anything in this repo.
 
 ## Current test baseline
 
@@ -63,7 +60,21 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
 
 **All six items below are resolved**, five with no further action pending and one (item 6) with a
 newly-confirmed-necessary follow-up. Kept struck-through, not deleted, for the reasoning trail.
-**Both live re-verifications authorized 2026-08-14 (budget: $2, both approved) are now DONE:**
+**Both live re-verifications authorized 2026-08-14 (budget: $2, both approved) are now DONE.**
+
+**Candidates for the next cycle, surfaced by this pass:**
+1. **The full barrage relaunch is unblocked** (item 1's fix is live-confirmed) but **not yet
+   authorized or run** — running it is the obvious next Medium/Large cycle.
+2. **Codebench's write-protocol redesign** (item 6) — moving `write_file` off one-shot full-file
+   JSON strings toward something like aider's diff/search-replace format — is now confirmed
+   necessary, not optional. Needs its own Plan stage before code gets written; a `patch_file`
+   compile-check variant (currently missing) should land alongside it.
+3. **Search-leaf query composition bug** — AND-joins multi-entity names into one query instead of
+   OR/splitting per-entity, found live on task 084 (fails safely, not a regression). Worth flagging
+   to `strategy-tuner`: no "reformulate on repeated zero-result retry" fallback exists for this
+   shape.
+4. **Codebench image-freshness guard** (see Provenance lesson 4 below) — a cheap nice-to-have, not
+   urgent unless codebench live verification becomes routine.
 
 1. **`good_adaptive` self-loop fix — CONFIRMED LIVE.** Fresh smoke (`reverify_selfloop_20260814`,
    `openai/gpt-5-mini`, tasks 052/084, baseline+good_adaptive, $0.26 of the $2 ceiling spent).

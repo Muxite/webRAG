@@ -1,5 +1,11 @@
 # Bad-Model Lab — Session Handoff
 
+> **This file's narrative stops at 2026-07-29.** For current project-wide state (repo restructure,
+> the dev-cycle methodology, the two badmodel-lab structural-cleanup candidates evaluated and
+> rejected 2026-08-10, model-tier-list rounds, codebench batch work), start at
+> `docs/handoffs/HANDOFF.md` instead. Kept here unedited below as the debugging/decision trail for
+> the plan-library dogfood and the `got_dedup` memory-pollution bug — still accurate for that scope.
+
 > ## ⚠️ STATUS UPDATE (2026-07-29, continued overnight) — plan library built, dogfooded, and
 > ## HONESTLY does not help yet; a second, more consequential bug found along the way
 >

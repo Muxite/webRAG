@@ -2,9 +2,10 @@
 """
 Audit every environment variable the codebase reads.
 
-Greps the `services/` tree for env-var access (`os.environ.get("X")`, `os.getenv("X")`,
-`os.environ["X"]`) and prints each variable, its read sites, and a default if a literal one is
-given at the call site. Keeps docs/CONFIGURATION.md honest and catches drift over time.
+Greps the `services/` and `agent/` trees for env-var access (`os.environ.get("X")`,
+`os.getenv("X")`, `os.environ["X"]`) and prints each variable, its read sites, and a default if a
+literal one is given at the call site. Keeps docs/CONFIGURATION.md honest and catches drift over
+time.
 
 Usage:
     python scripts/list_env_vars.py            # grouped table
@@ -18,7 +19,7 @@ import sys
 from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCAN_DIR = os.path.join(ROOT, "services")
+SCAN_DIRS = [os.path.join(ROOT, "services"), os.path.join(ROOT, "agent")]
 
 # os.environ.get("X"[, "default"])  |  os.getenv("X"[, "default"])  |  os.environ["X"]
 _PATTERNS = [
@@ -30,25 +31,26 @@ _PATTERNS = [
 
 def scan() -> dict[str, dict]:
     found: dict[str, dict] = defaultdict(lambda: {"files": set(), "default": ""})
-    for dirpath, _dirs, files in os.walk(SCAN_DIR):
-        if "/.venv" in dirpath or "/__pycache__" in dirpath or "/node_modules" in dirpath:
-            continue
-        for fn in files:
-            if not fn.endswith(".py"):
+    for scan_dir in SCAN_DIRS:
+        for dirpath, _dirs, files in os.walk(scan_dir):
+            if "/.venv" in dirpath or "/__pycache__" in dirpath or "/node_modules" in dirpath:
                 continue
-            path = os.path.join(dirpath, fn)
-            try:
-                text = open(path, encoding="utf-8").read()
-            except (OSError, UnicodeDecodeError):
-                continue
-            rel = os.path.relpath(path, ROOT)
-            for pat in _PATTERNS:
-                for m in pat.finditer(text):
-                    name = m.group(1)
-                    found[name]["files"].add(rel)
-                    default = (m.group(2) if m.lastindex and m.lastindex >= 2 else "") or ""
-                    if default and not found[name]["default"]:
-                        found[name]["default"] = default.strip()
+            for fn in files:
+                if not fn.endswith(".py"):
+                    continue
+                path = os.path.join(dirpath, fn)
+                try:
+                    text = open(path, encoding="utf-8").read()
+                except (OSError, UnicodeDecodeError):
+                    continue
+                rel = os.path.relpath(path, ROOT)
+                for pat in _PATTERNS:
+                    for m in pat.finditer(text):
+                        name = m.group(1)
+                        found[name]["files"].add(rel)
+                        default = (m.group(2) if m.lastindex and m.lastindex >= 2 else "") or ""
+                        if default and not found[name]["default"]:
+                            found[name]["default"] = default.strip()
     return found
 
 
