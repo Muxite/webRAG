@@ -65,6 +65,20 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
 
 ## What's open — candidates for the next cycle, roughly in priority order
 
+**All six items below are now resolved as of 2026-08-11** (kept struck-through, not deleted, for
+the reasoning trail — each entry explains what was actually found, which matters if any of it gets
+revisited). Two genuinely open threads remain, both gated on live-spend authorization at execution
+time, not pre-authorized here:
+1. A fresh live confirmation smoke for the `good_adaptive` self-loop fix (item 1) — needed before
+   the full barrage relaunch can trust `good_adaptive`/`max_burn` numbers.
+2. A live codebench re-run against the tasks that hit the JSON-corruption bug (item 6) — to confirm
+   whether surfacing the `SyntaxError` in-loop actually recovers scores, or whether the more
+   invasive write-protocol change (moving off one-shot full-file JSON strings) is still needed.
+
+Everything else that was open going into this session — the branch-merge evaluation, the QA-lab
+fold-in question, the two badmodel-lab cleanup candidates, and the Serper key-wiring gap — is
+closed with no further action pending.
+
 1. ~~**`good_adaptive`'s self-loop bug**~~ — root-caused and fixed offline 2026-08-10
    (`eb8cc9ac`), **but still needs a live re-verification smoke before the barrage relaunch is
    unblocked** (never spend without explicit go-ahead at execution time). Root cause turned out to
@@ -92,11 +106,16 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
    loop in `agent/tests/reexpand_self_source_deadlock_test.py` — both tests failed against
    pre-fix code (one hanging at each deadlock in turn) and pass now; full suite green (4660
    passed/18 skipped, +2 new). Full detail in `[[project_ladder_benchmark]]` memory.
-2. **The QA-lab fold-in** — deliberately deferred out of cycle 2's scope. `badmodel-lab/analyze.py`,
-   `results/cells.jsonl`, `roster.yaml`/`tiers.yaml`/`profiles/` are still lab-scoped.
-   `agent/app/AGENT_CONTINUUM.md` names specific `cells.jsonl` fields as ones that "may never
-   bridge" into main's schema — that tension needs its own Plan stage before deciding what "fold
-   in" even means here, not a rushed follow-on to cycle 2.
+2. ~~**The QA-lab fold-in**~~ — evaluated 2026-08-11, **no fold-in needed**. Full reasoning in
+   `docs/superpowers/specs/2026-08-11-qa-lab-fold-in-evaluation-design.md`: the codebench precedent
+   doesn't generalize (codebench was infrastructure that had drifted into a lab-scoped directory;
+   `roster.yaml`/`tiers.yaml`/`profiles/`/`cells.jsonl` are genuinely lab-specific *experiment
+   configuration*, the intentional "big specific library" half of the capability-continuum
+   philosophy). The cross-cutting reporting need this was meant to solve is already solved
+   structurally by `scripts/unified_bench_report.py`'s dual-read (no shared directory required),
+   and the genuinely unfinished piece (field-name bridging) is already correctly scoped in
+   `agent/app/AGENT_CONTINUUM.md`'s own roadmap item 4, in progress. `badmodel-lab/analyze.py`,
+   `results/cells.jsonl`, `roster.yaml`, `tiers.yaml`, `profiles/` all stay where they are.
 3. ~~**Two small, already-identified cleanup items**~~ — investigated 2026-08-10, **both turn out
    to be "don't touch," not deletions**:
    - `badmodel-lab/localagent/` retirement condition ("once the graph engine matches or exceeds it
