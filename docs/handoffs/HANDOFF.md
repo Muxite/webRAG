@@ -35,26 +35,22 @@ Two real cycles have run so far, both fully committed on `master`:
 
 ## Git state
 
-**Work now happens directly on `master`**, not a long-lived feature branch. `compiled-scaffold-dag`
-(the prior working branch, 122+ commits ahead of its own remote) was fast-forward-merged into
-`master` on 2026-08-09 and should be treated as retired — don't keep committing to it. `master` is
-currently ~149 commits ahead of `origin/master`, **not pushed** (push is a separate, explicit
-decision each time, not a standing default).
+**Work now happens directly on `master`**, not a long-lived feature branch. Every branch this repo
+has, as of 2026-08-14 — local and remote — is accounted for below; re-run `git branch -a -v` at the
+start of a branch-merge cycle (`docs/DEV_CYCLE.md`) to catch anything new since.
 
-`autoscale` and `autoscale-redux` were evaluated (2026-08-10) and deleted — both fully superseded.
-`autoscale-redux` was a strict `git` ancestor of `master` (zero unique commits). `autoscale`'s real
-contribution (`services/lambda_autoscaling/lambda_function.py`) was independently redone and merged
-via a later, cleaner commit (`1fbed65c "autoscale complete"`, 2026-02-07) that's *itself* now
-archived under `services/_legacy-aws/` since the project no longer deploys via AWS ECS; its frontend
-components (`TaskCard.tsx`, `StatusBar.tsx`, etc.) targeted a `frontend/src/components/` layout that
-no longer exists post-rebuild (`frontend/src/app/...`). Deleted SHAs for recovery if ever needed:
-`autoscale`=`57f43e54`, `autoscale-redux`=`8f3efd78`.
+| Branch | Where | Status |
+|---|---|---|
+| `master` | local + `origin/master` | **The one branch anyone should commit to.** 161 commits ahead of `origin/master`, **not pushed** (push is a separate, explicit decision each time, not a standing default) — `origin/master` hasn't moved since 2026-06-16. |
+| `compiled-scaffold-dag` | local + `origin/compiled-scaffold-dag` | **Retired, safe to delete.** The prior working branch; fast-forward-merged into `master` on 2026-08-09. Confirmed a strict `git` ancestor of both `master` and its own `origin/compiled-scaffold-dag` (zero unique commits either direction) — `git branch -d compiled-scaffold-dag` now succeeds cleanly (an earlier note here claiming it couldn't due to a stale remote tracking ref no longer holds; left undeleted only because deleting it wasn't itself in scope for any cycle yet). `origin/compiled-scaffold-dag` is additionally ~1 month further behind local (last remote commit 2026-07-10) and never needs pushing. |
+| `autoscale` | `origin/autoscale` only (local deleted) | **Dead, evaluated 2026-08-10.** Not an ancestor of `master` — its real contribution (`services/lambda_autoscaling/lambda_function.py`) was independently redone via a later, cleaner commit (`1fbed65c "autoscale complete"`, 2026-02-07) that's itself now archived under `services/_legacy-aws/` since the project no longer deploys via AWS ECS. Its frontend components (`TaskCard.tsx`, `StatusBar.tsx`, etc.) targeted a `frontend/src/components/` layout that no longer exists post-rebuild (`frontend/src/app/...`). Deleted local SHA for recovery if ever needed: `57f43e54`. The remote copy was never deleted; harmless to leave or prune. |
+| `autoscale-redux` | `origin/autoscale-redux` only (local deleted) | **Dead, evaluated 2026-08-10.** A strict `git` ancestor of `master` at evaluation time (zero unique commits) — fully superseded, not merged. Deleted local SHA: `8f3efd78`. Same remote-prune note as `autoscale` above. |
 
-One more branch ref is worth a follow-up: local `compiled-scaffold-dag` (confirmed a `git` ancestor
-of `master` — genuinely merged) still can't `git branch -d` cleanly because its *remote* tracking
-ref (`origin/compiled-scaffold-dag`) is stale relative to local `HEAD`, not because the merge is in
-question. Needs `-D` (force) or a remote-ref update to clean up; left alone for now since that's a
-step past what was evaluated this pass.
+None of the four remote-only/stale refs above (`origin/master` behind, `origin/compiled-scaffold-dag`,
+`origin/autoscale`, `origin/autoscale-redux`) are acted on automatically by anything in this repo —
+they just sit on the remote until someone explicitly pushes `master` and/or prunes the dead ones
+(`git push origin --delete autoscale autoscale-redux`), which is a deliberate, separate decision,
+not something a doc pass performs on its own.
 
 ## Current test baseline
 
@@ -65,19 +61,64 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
 
 ## What's open — candidates for the next cycle, roughly in priority order
 
-**All six items below are now resolved as of 2026-08-11** (kept struck-through, not deleted, for
-the reasoning trail — each entry explains what was actually found, which matters if any of it gets
-revisited). Two genuinely open threads remain, both gated on live-spend authorization at execution
-time, not pre-authorized here:
-1. A fresh live confirmation smoke for the `good_adaptive` self-loop fix (item 1) — needed before
-   the full barrage relaunch can trust `good_adaptive`/`max_burn` numbers.
-2. A live codebench re-run against the tasks that hit the JSON-corruption bug (item 6) — to confirm
-   whether surfacing the `SyntaxError` in-loop actually recovers scores, or whether the more
-   invasive write-protocol change (moving off one-shot full-file JSON strings) is still needed.
+**All six items below are resolved**, five with no further action pending and one (item 6) with a
+newly-confirmed-necessary follow-up. Kept struck-through, not deleted, for the reasoning trail.
+**Both live re-verifications authorized 2026-08-14 (budget: $2, both approved) are now DONE:**
 
-Everything else that was open going into this session — the branch-merge evaluation, the QA-lab
-fold-in question, the two badmodel-lab cleanup candidates, and the Serper key-wiring gap — is
-closed with no further action pending.
+1. **`good_adaptive` self-loop fix — CONFIRMED LIVE.** Fresh smoke (`reverify_selfloop_20260814`,
+   `openai/gpt-5-mini`, tasks 052/084, baseline+good_adaptive, $0.26 of the $2 ceiling spent).
+   Task 052/good_adaptive directly re-exercised the fixed re-expansion code path and completed
+   cleanly in 12/50 steps (`pending_nodes_count=0`, score 0.2917 vs baseline 0.2083). Task 084
+   showed no trace of the old deadlock signature (pre-fix: burned to step 49/50, 1 node stuck
+   "pending", `visits=0`; post-fix: both arms stopped cleanly at step 5/50 with 0 pending nodes) —
+   confirmed by absence. **The full barrage relaunch can now trust `good_adaptive` numbers.** A
+   genuinely new, unrelated failure mode surfaced during this check (see below, not a regression).
+
+6. **codebench syntax-check fix — mechanism confirmed working, but INSUFFICIENT to recover
+   scores. The deeper write-protocol fix is now confirmed necessary, not just "still open."**
+   First re-run attempt was invalid — caught and corrected mid-session: `codebench-badmodel`'s
+   Dockerfile `COPY agent /app/agent`s at BUILD time, not a live mount, and the image hadn't been
+   rebuilt since before the fix commit, so the first live rerun silently exercised stale pre-fix
+   code. Rebuilt the image (`docker build -f codebench/agents/badmodel/Dockerfile -t
+   codebench-badmodel:latest .`) and re-ran (`reverify_syntaxfix_take2_20260814`, qwen2.5:14b,
+   the 6 worst-hit tasks: c30/c35/c36/c42/c22/c40) — confirmed the fix's own compile-check *is*
+   present and firing in the rebuilt image (verified by extracting the module from the image
+   directly). Result: **only 1/6 tasks (c35) fully recovered** (score 1.0, clean compile). **4/6
+   (c30, c36, c42, c40) still ended up with a syntax-corrupted final submission** — independently
+   confirmed by compiling each raw output file directly (unterminated triple-quote, unindent
+   mismatch, unmatched paren — exactly the corruption classes the check targets). The run summaries'
+   `"last successful action"` for the still-broken cells is often `read_file`, not `write_file`:
+   the model saw the `SyntaxError` observation but never landed a second passing `write_file` to
+   the same path before its 10-step budget ran out, and `write_file` doesn't retract the bad
+   content it already persisted to disk when the compile-check downgrades it to a failure — so a
+   model that can't successfully self-correct just submits whatever was last written, broken or
+   not. (c22 scored 0.0 for a different reason this run — a genuine logic failure, `pytest_rc=1`,
+   not corruption; but the original corruption on c22 came via `patch_file` in the first
+   [invalid-image] rerun, which the syntax-check fix doesn't cover at all — scoped to `write_file`
+   only.) **Conclusion: the fix converts a 100%-silent failure into a visible, actionable one (as
+   designed), but qwen2.5:14b's self-correction success rate within the existing step budget is too
+   low (1/6 here) to call this "recovered."** The invasive fix flagged as a fallback — moving
+   `write_file`'s wire format off one-shot full-file JSON strings toward something closer to
+   aider's diff/search-replace format (0% corruption on the identical model+tasks) — is the
+   confirmed next step, not an optional one. A `patch_file` variant of the same compile-check
+   (currently a real gap) should go with it.
+
+**Process lesson from this reverification pass**: codebench live verification is silently invalid
+unless the Docker image is rebuilt after any engine code change — nothing catches this
+automatically today (no image-freshness check, no CI gate). Worth a cheap guard (e.g. stamp the
+image with the git SHA it was built from, warn if it doesn't match `HEAD`) if codebench live
+verification becomes routine.
+
+**New failure mode found during the `good_adaptive` reverification (unrelated to that fix, fails
+safely, not a regression)**: on task 084's multi-entity no-URL shape, the search-leaf's retry logic
+composed one `site:en.wikipedia.org "name1" "name2" ...` query AND-ing all six target lake names
+together instead of OR-ing or splitting per-entity — virtually guaranteed 0 results, since no single
+page names all six. Both arms retried the *identical* failing query twice rather than reformulating,
+then the grounding gate correctly refused to fabricate an answer rather than hallucinate. Confirmed
+via a prior pre-fix run of the same task, which instead composed an OR'd query and got 10 results —
+this is model-sampling variance in query construction, not a regression from the self-loop fix
+(untouched code path). Worth flagging to `strategy-tuner`: no "reformulate on repeated zero-result
+retry" fallback exists for this shape.
 
 1. ~~**`good_adaptive`'s self-loop bug**~~ — root-caused and fixed offline 2026-08-10
    (`eb8cc9ac`), **but still needs a live re-verification smoke before the barrage relaunch is
@@ -157,11 +198,12 @@ closed with no further action pending.
    failures. Deliberately scoped to `execution_compiled_code.py` (codebench-specific), not the
    shared `SandboxConnector`/`sandbox_dispatch` the native engine's language-agnostic sandbox pack
    also uses. **This does not fix the model's underlying escaping habit** — it converts a silent
-   failure into a visible, actionable one; a live codebench re-run against the same failing tasks
-   would confirm whether self-correction within budget actually recovers scores (not yet done —
-   live spend, needs authorization). The more invasive fix (moving `write_file`'s wire format away
-   from one-shot full-file JSON strings toward something like aider's diff/search-replace, which had
-   0% corruption on the same model+tasks) is still open if this doesn't move the needle enough.
+   failure into a visible, actionable one. **Live-reverified 2026-08-14** (see the summary at the
+   top of this section): confirmed the mechanism fires correctly, but self-correction within the
+   existing step budget only succeeded 1/6 times — not enough to call this "recovered." The more
+   invasive fix (moving `write_file`'s wire format away from one-shot full-file JSON strings toward
+   something like aider's diff/search-replace, which had 0% corruption on the same model+tasks) is
+   now the confirmed next step.
 
 **Track 3 of cycle 1 (small filler) is done, committed as `1871a71d`.** Findings, for context on
 anything that references them later: `m02`'s zero-variance 0.50 score was a grounding-regex gap
@@ -173,10 +215,13 @@ it would silently mislabel a converted figure; a negative-case test pins exactly
 re-attempts this the naive way later. Item 5 above (the Serper key-wiring gap) was found as a
 byproduct of this item's Serper-liveness check.
 
-**Explicitly not authorized by any existing plan**: the full barrage launch (blocked on item 1
-above), any codebench live-matrix scale-up past a single smoke cell, and wiring codebench's
-LLM-judge for soft-task grading (spends real money per grade, deliberately left for explicit
-authorization).
+**Explicitly not authorized by any existing plan**: the full barrage launch (item 1's blocker is now
+cleared as of the 2026-08-14 live reverification, but the launch itself is still a separate,
+not-yet-requested decision), any codebench live-matrix scale-up past a single smoke cell, and wiring
+codebench's LLM-judge for soft-task grading (spends real money per grade, deliberately left for
+explicit authorization). Implementing item 6's now-confirmed-necessary write-protocol change is also
+not yet authorized — it needs its own Plan stage (this is a Medium-sized change, not a quick follow-
+on) before any code gets written.
 
 ## How to run things (live = real $)
 
