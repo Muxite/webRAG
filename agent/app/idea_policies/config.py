@@ -89,6 +89,15 @@ class GoTConfig:
     reexpand_max_iterations_standard: int = 1
     reexpand_max_iterations_strong: int = 1
     reexpand_temperature: float = 0.2
+    # Emit ``reason`` BEFORE the ``needs_followup`` boolean it justifies, in
+    # ``check_needs_followup``. Opt-in, default OFF; JSON key is derived as
+    # ``got_reexpand_followup_reason_first_enabled``. Doubly dormant by default -- the
+    # whole path is already gated by ``reexpand_enabled`` above.
+    #
+    # promptbench v2 (2026-08-19): the largest measured effect in the run, pooled
+    # A2-A1 = +0.196, CI [+0.080, +0.312], permutation p = 0.0064. End-to-end transfer
+    # is unmeasured.
+    reexpand_followup_reason_first_enabled: bool = False
     step_confidence_judge_enabled: bool = False
     step_confidence_judge_temperature: float = 0.0
     step_confidence_judge_sample_every: int = 1
@@ -394,11 +403,22 @@ class MergeConfig:
     # Same reservation cap as ``FinalConfig.max_tokens`` (merge output is bounded by the same
     # deliverable); see ``idea_dag_settings._MAX_TOKENS_RESERVATION_CAP``.
     max_tokens: Optional[int] = 32768
+    # Emit ``goal_evaluation`` BEFORE the ``goal_achieved`` boolean it justifies, in both
+    # of merge's ordering sources (the prompt template and the merge schema hint). Opt-in,
+    # default OFF: the assembled merge system message is byte-identical when false.
+    #
+    # promptbench v2 (2026-08-19): the shipped boolean-first ordering is DEGENERATE on 5/5
+    # models -- each answered ACHIEVED on 100% of a balanced set, scoring chance while
+    # judging nothing. No paired contrast is even computable against a constant. Reason-first
+    # scored up to 0.929. Authorized by the pre-registered gate as flagged and default OFF;
+    # end-to-end transfer is unmeasured.
+    goal_evaluation_first_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",
         "temperature": "merge_temperature",
         "max_tokens": "merge_max_tokens",
+        "goal_evaluation_first_enabled": "merge_goal_evaluation_first_enabled",
     }
 
     @classmethod
@@ -411,11 +431,22 @@ class VerifyConfig:
     model: Optional[str] = None
     temperature: float = 0.2
     max_tokens: Optional[int] = 1024
+    # Emit ``reasoning`` BEFORE the ``verdict`` it justifies. Opt-in, default OFF.
+    #
+    # promptbench v2 (2026-08-19): pooled A2-A1 = +0.142, CI [+0.053, +0.232],
+    # permutation p = 0.0119, positive on 5/5 models -- the pre-registered primary.
+    # End-to-end transfer is unmeasured.
+    #
+    # Interacts with ``max_tokens`` above: reasoning-first spends the 1024-token budget on
+    # prose before the verdict, so a live A/B must report parse-failure rate alongside
+    # accuracy. See ``VerifyLeafAction._REASON_FIRST_SYSTEM_PROMPT``.
+    reason_first_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "verify_model",
         "temperature": "verify_temperature",
         "max_tokens": "verify_max_tokens",
+        "reason_first_enabled": "verify_reason_first_enabled",
     }
 
     @classmethod

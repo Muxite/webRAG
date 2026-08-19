@@ -16,6 +16,31 @@ from agent.app.idea_policies.confidence_early_exit import load_rule as load_earl
 _logger = logging.getLogger(__name__)
 
 
+# Reason-before-answer variant of the shipped ``got_reexpand_followup_system_prompt``,
+# selected under ``got_reexpand_followup_reason_first_enabled``. Only the
+# ``needs_followup`` / ``reason`` pair is swapped; every other byte is identical.
+#
+# Copied from the SETTINGS value, NOT from the inline default a few lines below in
+# ``check_needs_followup`` -- that default is a 347-char fossil that never runs, because
+# ``settings.get(key, default)`` prefers the JSON's 614-char version, and the extra text
+# carries real behavioural constraints. Deriving the variant from the fossil would have
+# shipped a prompt the engine has never sent.
+#
+# promptbench v2 (2026-08-19): this is the largest measured effect in the run --
+# pooled A2-A1 = +0.196, CI [+0.080, +0.312], permutation p = 0.0064. Opt-in, default OFF;
+# end-to-end transfer is unmeasured.
+_FOLLOWUP_REASON_FIRST_SYSTEM_PROMPT = (
+    "You are a follow-up detector in a Graph-of-Thought research system. A leaf task "
+    "has just completed and produced a result. Decide whether that result reveals a "
+    "GENUINE, concrete follow-up investigation that is required to satisfy the parent "
+    "goal and is not already covered by existing sibling tasks. Only answer true when "
+    "the resolved content names a specific new entity, page, or question that must be "
+    "investigated next (e.g. a disambiguation survivor that points to a further "
+    "target). Answer false for vague, speculative, or already-answered follow-ups. "
+    "Return JSON: {\"reason\": string, \"needs_followup\": boolean}."
+)
+
+
 class GoTOperations:
 
     def __init__(self, settings: Dict[str, Any], io: AgentIO, memory_manager: Optional[MemoryManager] = None):
@@ -170,6 +195,10 @@ class GoTOperations:
             "parent goal and not already covered by existing sibling tasks. Return JSON: "
             "{\"needs_followup\": boolean, \"reason\": string}.",
         )
+        # Opt-in reason-before-answer ordering. Already doubly dormant: this whole path
+        # is gated by got_reexpand_enabled.
+        if self._cfg.got.reexpand_followup_reason_first_enabled:
+            system_prompt = _FOLLOWUP_REASON_FIRST_SYSTEM_PROMPT
         user_content = json.dumps({
             "mandate": mandate,
             "parent_goal": parent_goal,

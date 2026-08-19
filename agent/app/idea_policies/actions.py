@@ -18,6 +18,7 @@ from agent.app.agent_io import AgentIO
 from agent.app.observation import clean_operation
 from agent.app.llm_backends import json_instruction_from_response_format, accepts_reasoning_effort
 from agent.app.model_tiers import tier_token_multiplier, is_reasoning_model
+from agent.app.idea_dag_schemas import MERGE_JSON_SCHEMA_GOAL_EVAL_FIRST
 from agent.app.idea_policies.base import IdeaActionType, DetailKey, IdeaNodeStatus
 from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.action_constants import (
@@ -1994,6 +1995,27 @@ class PlanLibrarySearchLeafAction(LeafAction):
 class MergeLeafAction(LeafAction):
     name = "merge"
 
+    # Reason-before-answer variant of the shipped ``merge_system_prompt``, selected under
+    # ``merge_goal_evaluation_first_enabled``. Only the ``goal_achieved`` /
+    # ``goal_evaluation`` pair is swapped; every other byte, including the doubled braces
+    # the settings copy carries, is identical.
+    #
+    # Copied from the SETTINGS value rather than derived from it at runtime. A runtime
+    # ``str.replace`` would silently match nothing if the shipped text were ever edited,
+    # turning the flag into an invisible no-op; the derivation is asserted by
+    # ``reason_first_ordering_test`` instead, so that edit fails loudly.
+    #
+    # It is a source constant rather than a new settings key on purpose: ``settings.get``
+    # prefers the JSON, and this subsystem already carries one fossil default that never
+    # runs because of it. A second JSON-shadows-source surface is not worth the symmetry.
+    _GOAL_EVAL_FIRST_SYSTEM_PROMPT = (
+        "You are the Aggregate operation in a Graph-of-Thought system. Combine child "
+        "node results into a coherent summary. Remove redundancy, extract key findings. "
+        "Evaluate if the original goal has been achieved. Return JSON: {{summary: string, "
+        "key_findings: [string, ...], goal_evaluation: string, goal_achieved: boolean, "
+        "missing_requirements: [string, ...]}}."
+    )
+
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         import json
         node = None
@@ -2010,6 +2032,11 @@ class MergeLeafAction(LeafAction):
                 )
             
             system_template = self.settings.get("merge_system_prompt", "")
+            # Opt-in reason-before-answer ordering. Substituted only when a base template
+            # already resolved, so the flag cannot resurrect the no-prompts concatenation
+            # fallback below by turning an empty template into a non-empty one.
+            if system_template and self._cfg.merge.goal_evaluation_first_enabled:
+                system_template = self._GOAL_EVAL_FIRST_SYSTEM_PROMPT
             user_template = self.settings.get("merge_user_prompt", "")
             planning_addendum = str(
                 self.settings.get(
@@ -2077,6 +2104,11 @@ class MergeLeafAction(LeafAction):
             # convey the shape as a prompt instruction and use ``json_object`` mode
             # instead (mirrors the expansion stage; provider-agnostic).
             json_schema = self.settings.get("merge_json_schema")
+            # The second of merge's two ordering sources: this schema is dumped into the
+            # SAME system message as the template above. Reorder both or the model reads
+            # two conflicting orders.
+            if self._cfg.merge.goal_evaluation_first_enabled:
+                json_schema = MERGE_JSON_SCHEMA_GOAL_EVAL_FIRST
             schema_hint = (
                 json_instruction_from_response_format({"type": "json_schema", "json_schema": json_schema})
                 if json_schema
@@ -2193,6 +2225,35 @@ class VerifyLeafAction(LeafAction):
 
     name = "verify"
 
+    # Reason-before-answer variant of the shipped ``verify_system_prompt``, selected under
+    # ``verify_reason_first_enabled``. Only the position of ``reasoning`` moves.
+    #
+    # Copied from the SETTINGS value, NOT from ``_DEFAULT_SYSTEM_PROMPT`` below: the two
+    # differ in typography (settings uses an ASCII hyphen where the constant uses an em
+    # dash, and doubles its braces), and settings is what actually ships. Deriving from the
+    # constant would change three things at once and stop the A/B isolating field order.
+    #
+    # promptbench v2 (2026-08-19): pooled A2-A1 = +0.142, CI [+0.053, +0.232],
+    # permutation p = 0.0119, positive on 5/5 models. Opt-in, default OFF.
+    #
+    # Known risk no offline test can catch: ``verify_max_tokens`` defaults to 1024, and
+    # reasoning-first spends output budget on prose BEFORE the verdict, so a verbose model
+    # can truncate and fall into the UNVERIFIABLE JSONDecodeError branch below. The
+    # "<one sentence>" constraint is retained for exactly this reason; any live A/B on this
+    # flag must report parse-failure rate, not just accuracy.
+    _REASON_FIRST_SYSTEM_PROMPT = (
+        "You are the Verify operation in a Graph-of-Thought fact-checking system. "
+        "Given a CLAIM and EVIDENCE collected from web pages, decide whether the claim "
+        "is supported. Rely ONLY on the provided evidence - never on prior knowledge. "
+        "If the evidence contradicts the claim, identify the authoritative source URL "
+        "that contradicts it and quote the exact contradicting sentence. Return strict "
+        "JSON: {{\"reasoning\": \"<one sentence>\", \"verdict\": "
+        "\"TRUE\"|\"PARTIALLY_TRUE\"|\"FALSE\"|\"UNVERIFIABLE\", \"confidence\": 0.0-1.0, "
+        "\"supporting_url\": \"<url or empty>\", \"contradicting_url\": \"<url or empty>\", "
+        "\"quote\": \"<verbatim sentence from evidence>\"}}. Use UNVERIFIABLE only when "
+        "the evidence does not address the claim."
+    )
+
     _DEFAULT_SYSTEM_PROMPT = (
         "You are the Verify operation in a Graph-of-Thought fact-checking system. "
         "Given a CLAIM and EVIDENCE collected from web pages, decide whether the claim "
@@ -2302,6 +2363,9 @@ class VerifyLeafAction(LeafAction):
                 f"[SOURCE {i + 1}] {e['url']}\n{e['content']}" for i, e in enumerate(evidence)
             )
             system_content = self.settings.get("verify_system_prompt") or self._DEFAULT_SYSTEM_PROMPT
+            # Opt-in reason-before-answer ordering.
+            if self._cfg.verify.reason_first_enabled:
+                system_content = self._REASON_FIRST_SYSTEM_PROMPT
             user_content = f"CLAIM:\n{claim}\n\nEVIDENCE:\n{evidence_text}"
             messages = PromptBuilder.build_messages(system_content=system_content, user_content=user_content)
 

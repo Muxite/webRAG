@@ -230,6 +230,61 @@ MERGE_JSON_SCHEMA: Dict[str, Any] = {
 }
 
 
+# Reason-before-answer variant of ``MERGE_JSON_SCHEMA``: ``goal_evaluation`` is emitted
+# BEFORE the ``goal_achieved`` boolean it justifies. Selected under
+# ``merge_goal_evaluation_first_enabled``; opt-in, default OFF.
+#
+# The merge system message carries the field order TWICE -- once in the prompt template
+# and once in this schema, rendered to a hint by ``json_instruction_from_response_format``.
+# Reordering only one leaves the model reading two conflicting orders, so the flag swaps
+# both together.
+#
+# Deliberately NOT registered in ``DEFAULT_JSON_SCHEMAS`` -- the default hint stays
+# byte-identical when the flag is off. Same shape as ``EXPANSION_JSON_SCHEMA_WITH_EXPECT``.
+#
+# ``required`` is unchanged: promoting ``goal_evaluation`` to required would be a second,
+# unmeasured change riding along with the ordering one.
+#
+# Motivation (promptbench v2, 2026-08-19): the shipped boolean-first ordering is
+# DEGENERATE on 5/5 models tested -- every one answered ACHIEVED on 100% of a balanced
+# set, scoring chance while judging nothing. Reason-first scored up to 0.929.
+MERGE_JSON_SCHEMA_GOAL_EVAL_FIRST: Dict[str, Any] = {
+    "name": "merge_result",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "summary": {
+                "type": "string"
+            },
+            "key_findings": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            },
+            "goal_evaluation": {
+                "type": "string"
+            },
+            "goal_achieved": {
+                "type": "boolean"
+            },
+            "missing_requirements": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            }
+        },
+        "required": [
+            "summary",
+            "key_findings",
+            "goal_achieved"
+        ],
+        "additionalProperties": False
+    }
+}
+
+
 DEFAULT_JSON_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "expansion_json_schema": EXPANSION_JSON_SCHEMA,
     "evaluation_json_schema": EVALUATION_JSON_SCHEMA,
