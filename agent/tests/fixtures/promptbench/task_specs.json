@@ -1,0 +1,1438 @@
+{
+  "schema": 1,
+  "source": "agent.app.idea_tests",
+  "specs": [
+    {
+      "candidates": [
+        {
+          "desc": "",
+          "key": "koller",
+          "name": "Jan Koller",
+          "slug_rx": "wiki/jan_koller",
+          "survivor": true
+        },
+        {
+          "desc": "",
+          "key": "klose",
+          "name": "Miroslav Klose",
+          "slug_rx": "wiki/miroslav_klose",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "keane",
+          "name": "Robbie Keane",
+          "slug_rx": "wiki/robbie_keane",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "tomasson",
+          "name": "Jon Dahl Tomasson",
+          "slug_rx": "wiki/jon_dahl_tomasson",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "larsson",
+          "name": "Henrik Larsson",
+          "slug_rx": "wiki/henrik_larsson",
+          "survivor": false
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_059_tier5_computed_ratio_argmax",
+      "statement": "You are given NO URLs \u2014 search to find the pages you need, then READ them (do not guess from memory). For EACH of the following five retired forwards, open the player's Wikipedia page and read TWO integers from the infobox senior 'National team' row: the player's total senior international GOALS and his total senior international APPEARANCES (caps):\n  1. Jan Koller (Czech Republic)\n  2. Miroslav Klose (Germany)\n  3. Robbie Keane (Republic of Ireland)\n  4. Jon Dahl Tomasson (Denmark)\n  5. Henrik Larsson (Sweden)\n\nThen COMPUTE, for each player, his GOALS-PER-APPEARANCE ratio = total goals / total caps (this ratio is NOT printed on the page \u2014 you must divide the two figures yourself). COMPARE the five ratios and determine which player has the HIGHEST goals-per-appearance ratio. Note: the answer is the largest RATIO, which is NOT necessarily the player with the most goals, nor the one with the most appearances.\n\nReport (a) which player has the highest goals-per-appearance ratio (a single player name \u2014 the keystone), (b) that player's computed ratio value, (c) all five players' goals and appearances (the ten figures you looked up), and (d) the exact source URL of every page you read.",
+      "test_id": "059",
+      "test_name": "Tier 5: Computed-ratio argmax (highest goals-per-appearance)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "",
+          "key": "jengish_chokusu",
+          "name": "Jengish Chokusu",
+          "slug_rx": "wiki/jengish_chokusu|wiki/pobeda_peak|wiki/tomur",
+          "survivor": true
+        },
+        {
+          "desc": "",
+          "key": "gongga",
+          "name": "Mount Gongga",
+          "slug_rx": "wiki/mount_gongga|wiki/gongga_shan|wiki/minya_konka",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "kongur_tagh",
+          "name": "Kongur Tagh",
+          "slug_rx": "wiki/kongur_tagh",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "ismoil_somoni",
+          "name": "Ismoil Somoni Peak",
+          "slug_rx": "wiki/ismoil_somoni_peak|wiki/communism_peak",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "muztagh_ata",
+          "name": "Muztagh Ata",
+          "slug_rx": "wiki/muztagh_ata|wiki/muztagata",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "noshaq",
+          "name": "Noshaq",
+          "slug_rx": "wiki/noshaq|wiki/nowshak",
+          "survivor": false
+        }
+      ],
+      "difficulty": "8/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_062_tier5_prominence_argmax",
+      "statement": "You are given NO URLs \u2014 search to find the pages you need, then READ them (do not guess from memory). For EACH of the following six mountains, open the peak's Wikipedia page and read ONE figure directly from the infobox: its TOPOGRAPHIC PROMINENCE in metres (the height of the summit above its highest connecting saddle / key col \u2014 this is NOT the same as the peak's elevation above sea level):\n  1. Jengish Chokusu (Kyrgyzstan / China)\n  2. Mount Gongga (China (Sichuan))\n  3. Kongur Tagh (China (Xinjiang))\n  4. Ismoil Somoni Peak (Tajikistan)\n  5. Muztagh Ata (China (Xinjiang))\n  6. Noshaq (Afghanistan / Pakistan)\n\nThen COMPARE the six prominence figures and determine which mountain has the HIGHEST topographic prominence. IMPORTANT: the most topographically prominent peak is NOT necessarily the tallest by elevation, nor the most famous \u2014 you must read each peak's prominence from its page rather than reasoning from how tall or well-known the mountain is.\n\nReport (a) which mountain has the highest topographic prominence (a single peak name \u2014 the keystone), (b) that peak's prominence in metres, (c) all six peaks' prominence figures, and (d) the exact source URL of every page you read.",
+      "test_id": "062",
+      "test_name": "Tier 5: Page-only prominence argmax (most topographically prominent peak)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "",
+          "key": "issyk_kul",
+          "name": "Issyk-Kul",
+          "slug_rx": "wiki/issyk[\\s\\-_]*kul",
+          "survivor": true
+        },
+        {
+          "desc": "",
+          "key": "victoria",
+          "name": "Lake Victoria",
+          "slug_rx": "wiki/lake_victoria",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "ladoga",
+          "name": "Lake Ladoga",
+          "slug_rx": "wiki/lake_ladoga",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "erie",
+          "name": "Lake Erie",
+          "slug_rx": "wiki/lake_erie",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "winnipeg",
+          "name": "Lake Winnipeg",
+          "slug_rx": "wiki/lake_winnipeg",
+          "survivor": false
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_064_tier5_computed_ratio_argmax_wide",
+      "statement": "You are given NO URLs \u2014 search to find the pages you need, then READ them (do not guess from memory). For EACH of the following five lakes, open the lake's Wikipedia page and read TWO numbers from the infobox: the lake's water VOLUME (in cubic kilometres, km^3) and its SURFACE AREA (in square kilometres, km^2):\n  1. Issyk-Kul (Kyrgyzstan)\n  2. Lake Victoria (East Africa)\n  3. Lake Ladoga (Russia)\n  4. Lake Erie (North America)\n  5. Lake Winnipeg (Canada)\n\nThen COMPUTE, for each lake, its VOLUME-TO-SURFACE-AREA ratio = volume / surface area (this quotient is the lake's mean depth; in km^3/km^2 it comes out in kilometres, so multiply by 1000 to read it in metres \u2014 no page prints this cross-lake comparison, you must divide the two figures yourself). COMPARE the five ratios and determine which lake has the HIGHEST volume-to-surface-area ratio. Note: the answer is the largest RATIO, which is NOT necessarily the lake with the largest volume, nor the one with the largest surface area.\n\nReport (a) which lake has the highest volume-to-surface-area ratio (a single lake name \u2014 the keystone), (b) that lake's computed ratio value (its mean depth, in metres), (c) all five lakes' volume and surface area (the ten figures you looked up), and (d) the exact source URL of every page you read.",
+      "test_id": "064",
+      "test_name": "Tier 5: Computed-ratio argmax, wide-margin (highest volume-to-surface-area)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "",
+          "key": "sognefjorden",
+          "name": "Sognefjorden",
+          "slug_rx": "wiki/sognefjord(?:en)?",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "hardangerfjord",
+          "name": "Hardangerfjord",
+          "slug_rx": "wiki/hardangerfjord",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "jervis_inlet",
+          "name": "Jervis Inlet",
+          "slug_rx": "wiki/jervis_inlet",
+          "survivor": true
+        },
+        {
+          "desc": "",
+          "key": "romsdalsfjord",
+          "name": "Romsdalsfjord",
+          "slug_rx": "wiki/romsdalsfjord",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "lysefjord",
+          "name": "Lysefjord",
+          "slug_rx": "wiki/lysefjord",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "milford_sound",
+          "name": "Milford Sound",
+          "slug_rx": "wiki/milford_sound",
+          "survivor": false
+        }
+      ],
+      "difficulty": "8/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_075_tier5_kth_largest",
+      "statement": "You are given NO URLs \u2014 search to find the pages you need, then READ them (do not guess from memory). For EACH of the following six fjords and fjord-type water bodies, open the entity's Wikipedia page and read ONE figure directly from the infobox: its MAXIMUM DEPTH in metres.\n  1. Sognefjorden (Norway)\n  2. Hardangerfjord (Norway)\n  3. Jervis Inlet (British Columbia, Canada)\n  4. Romsdalsfjord (Norway)\n  5. Lysefjord (Norway)\n  6. Milford Sound (New Zealand)\n\nThen SORT the six maximum-depth figures from deepest to shallowest and determine which entity is the THIRD DEEPEST (rank 3 out of 6). IMPORTANT: the third-deepest entity is NOT necessarily the largest, the longest, or the most well-known water body in the set \u2014 you must read each entity's maximum depth from its page and sort the actual figures rather than reasoning from fame or prominence.\n\nReport (a) which entity is the third deepest (a single name \u2014 the keystone), (b) that entity's maximum depth in metres, (c) all six entities' maximum depth figures listed in rank order (1st deepest through 6th deepest), and (d) the exact source URL of every page you read.",
+      "test_id": "075",
+      "test_name": "Tier 5: Page-only depth k=3 ordinal (3rd deepest of six fjords)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "",
+          "key": "russky",
+          "name": "Russky Bridge",
+          "slug_rx": "wiki/russky.bridge",
+          "survivor": true
+        },
+        {
+          "desc": "",
+          "key": "edong",
+          "name": "Edong Yangtze River Bridge",
+          "slug_rx": "wiki/edong",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "tatara",
+          "name": "Tatara Bridge",
+          "slug_rx": "wiki/tatara.bridge",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "normandie",
+          "name": "Pont de Normandie",
+          "slug_rx": "wiki/pont.de.normand",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "rion_antirion",
+          "name": "Rion-Antirion Bridge",
+          "slug_rx": "wiki/(?:rion-antirion|rio.{0,12}antirr?io)",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "helgeland",
+          "name": "Helgeland Bridge",
+          "slug_rx": "wiki/helgeland.bridge",
+          "survivor": false
+        }
+      ],
+      "difficulty": "8/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_077_tier5_pageonly_argmax",
+      "statement": "You are given NO URLs \u2014 search to find the pages you need, then READ them (do not guess from memory). For EACH of the following six bridges, open the bridge's Wikipedia page and read ONE figure directly from the infobox: its LONGEST SPAN in metres \u2014 the length of the bridge's central span between its main supports (this is NOT the total bridge length, which includes approach spans):\n  1. Russky Bridge (Russia)\n  2. Edong Yangtze River Bridge (China)\n  3. Tatara Bridge (Japan)\n  4. Pont de Normandie (France)\n  5. Rion-Antirion Bridge (Greece)\n  6. Helgeland Bridge (Norway)\n\nThen COMPARE the six span figures and determine which bridge has the LONGEST main span. IMPORTANT: the bridge with the longest main span is NOT necessarily the most famous bridge in the list \u2014 you must read each bridge's span figure from its page rather than reasoning from how well-known the bridge is.\n\nReport (a) which bridge has the longest main span (a single bridge name \u2014 the keystone), (b) that bridge's longest span in metres, (c) all six bridges' span figures, and (d) the exact source URL of every page you read.",
+      "test_id": "077",
+      "test_name": "Tier 5: Page-only bridge-span argmax (longest main span among six bridges)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "",
+          "key": "churchill_falls",
+          "name": "Churchill Falls Generating Station",
+          "slug_rx": "wiki/churchill_falls",
+          "survivor": true
+        },
+        {
+          "desc": "",
+          "key": "wac_bennett",
+          "name": "W.A.C. Bennett Dam",
+          "slug_rx": "wiki/w\\.a\\.c\\._bennett|wiki/gordon.*shrum",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "bratsk",
+          "name": "Bratsk Hydroelectric Power Station",
+          "slug_rx": "wiki/bratsk",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "guri",
+          "name": "Guri Dam",
+          "slug_rx": "wiki/guri",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "kariba",
+          "name": "Kariba Dam",
+          "slug_rx": "wiki/kariba",
+          "survivor": false
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_079_tier5_ratio_argmax_b",
+      "statement": "You are given NO URLs \u2014 search to find the pages you need, then READ them (do not guess from memory). For EACH of the following five hydroelectric generating stations, open the station's Wikipedia page and read TWO numbers from the infobox: (A) the station's annual energy generation (in GWh or TWh \u2014 note the unit carefully) and (B) its installed capacity (in MW):\n  1. Churchill Falls Generating Station (Labrador, Canada)\n  2. W.A.C. Bennett Dam (British Columbia, Canada)\n  3. Bratsk Hydroelectric Power Station (Siberia, Russia)\n  4. Guri Dam (Bol\u00edvar State, Venezuela)\n  5. Kariba Dam (Zambia/Zimbabwe border)\n\nIMPORTANT: some Wikipedia pages report annual generation in TWh (terawatt-hours) rather than GWh (gigawatt-hours). Convert any TWh figure to GWh by multiplying by 1,000 before doing any arithmetic (1 TWh = 1,000 GWh).\n\nThen COMPUTE, for each station, its ANNUAL-GENERATION-TO-INSTALLED-CAPACITY ratio = annual generation (GWh) / installed capacity (MW). This quotient, in GWh/MW, equals the station's equivalent full-load hours per year when multiplied by 1,000 \u2014 no Wikipedia page prints this cross-station comparison, you must divide the two figures yourself. COMPARE the five ratios and determine which station has the HIGHEST ratio. Note: the answer is the largest RATIO, which is NOT necessarily the station with the largest annual generation, nor the one with the largest installed capacity.\n\nReport (a) which station has the highest annual-generation-to-capacity ratio (a single station name \u2014 the keystone), (b) that station's computed ratio value (in GWh/MW, or equivalently in equivalent full-load hours/year = ratio \u00d7 1,000), (c) all five stations' annual generation (GWh) and installed capacity (MW) (the ten figures you looked up), and (d) the exact source URL of every page you read.",
+      "test_id": "079",
+      "test_name": "Tier 5: Computed-ratio argmax, wide-margin (highest annual-generation-to-installed-capacity, hydroelectric stations)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "",
+          "key": "ohiggins",
+          "name": "Lake O'Higgins / San Mart\u00edn",
+          "slug_rx": "wiki/.*higgins",
+          "survivor": true
+        },
+        {
+          "desc": "",
+          "key": "crater_lake",
+          "name": "Crater Lake",
+          "slug_rx": "wiki/crater_lake",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "matano",
+          "name": "Lake Matano",
+          "slug_rx": "wiki/lake_matano|wiki/matano",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "hornindalsvatnet",
+          "name": "Hornindalsvatnet",
+          "slug_rx": "wiki/hornindalsvatnet",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "quesnel",
+          "name": "Quesnel Lake",
+          "slug_rx": "wiki/quesnel_lake",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "como",
+          "name": "Lake Como",
+          "slug_rx": "wiki/lake_como",
+          "survivor": false
+        }
+      ],
+      "difficulty": "8/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_084_tier5_pageonly_argmax_b",
+      "statement": "You are given NO URLs \u2014 search to find the pages you need, then READ them (do not guess from memory). For EACH of the following six lakes, open the lake's Wikipedia page and read ONE figure directly from the infobox: its MAXIMUM DEPTH in metres (the deepest measured point below the surface \u2014 this is NOT the lake's elevation above sea level):\n  1. Lake O'Higgins / San Mart\u00edn (Argentina / Chile)\n  2. Crater Lake (United States)\n  3. Lake Matano (Indonesia)\n  4. Hornindalsvatnet (Norway)\n  5. Quesnel Lake (Canada)\n  6. Lake Como (Italy)\n\nThen COMPARE the six maximum-depth figures and determine which lake is the DEEPEST. IMPORTANT: the deepest lake is NOT necessarily the most famous or the largest by surface area \u2014 you must read each lake's maximum depth from its page rather than reasoning from how well-known the lake is.\n\nReport (a) which lake has the greatest maximum depth (a single lake name \u2014 the keystone), (b) that lake's maximum depth in metres, (c) all six lakes' maximum-depth figures, and (d) the exact source URL of every page you read.",
+      "test_id": "084",
+      "test_name": "Tier 5: Page-only max-depth argmax b (deepest lake, fame decoy at 2nd)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "",
+          "key": "fly",
+          "name": "Fly River",
+          "slug_rx": "wiki/fly_river",
+          "survivor": true
+        },
+        {
+          "desc": "",
+          "key": "mekong",
+          "name": "Mekong",
+          "slug_rx": "wiki/mekong",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "fraser",
+          "name": "Fraser River",
+          "slug_rx": "wiki/fraser_river",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "niger",
+          "name": "Niger River",
+          "slug_rx": "wiki/niger_river",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "salween",
+          "name": "Salween River",
+          "slug_rx": "wiki/salween_river",
+          "survivor": false
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_088_tier5_ratio_argmax_c",
+      "statement": "You are given NO URLs \u2014 search to find the pages you need, then READ them (do not guess from memory). For EACH of the following five rivers, open the river's Wikipedia page and read TWO numbers from the infobox: (A) the river's mean (average) DISCHARGE in m\u00b3/s (cubic metres per second) and (B) its total LENGTH in km (kilometres):\n  1. Fly River (Papua New Guinea)\n  2. Mekong (Southeast Asia)\n  3. Fraser River (British Columbia, Canada)\n  4. Niger River (West Africa)\n  5. Salween River (China / Myanmar)\n\nThen COMPUTE, for each river, its DISCHARGE-TO-LENGTH ratio = mean discharge (m\u00b3/s) / total length (km). This quotient gives the average discharge contributed per kilometre of river course \u2014 no Wikipedia page prints this cross-river comparison, you must divide the two figures yourself. COMPARE the five ratios and determine which river has the HIGHEST discharge-to-length ratio. Note: the answer is the largest RATIO, which is NOT necessarily the river with the largest mean discharge, nor the one with the greatest total length.\n\nReport (a) which river has the highest discharge-to-length ratio (a single river name \u2014 the keystone), (b) that river's computed ratio value (in m\u00b3/(s\u00b7km)), (c) all five rivers' mean discharge (m\u00b3/s) and total length (km) (the ten figures you looked up), and (d) the exact source URL of every page you read.",
+      "test_id": "088",
+      "test_name": "Tier 5: Computed-ratio argmax, wide-margin (highest mean-discharge-to-length ratio, rivers)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "",
+          "key": "deriner",
+          "name": "Deriner Dam",
+          "slug_rx": "wiki/deriner",
+          "survivor": true
+        },
+        {
+          "desc": "",
+          "key": "altinkaya",
+          "name": "Alt\u0131nkaya Dam",
+          "slug_rx": "wiki/alt(?:%c4%b1|\u0131|i)nkaya",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "oymapinar",
+          "name": "Oymap\u0131nar Dam",
+          "slug_rx": "wiki/oymap(?:%c4%b1|\u0131|i)nar",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "hasan_ugurlu",
+          "name": "Hasan U\u011furlu Dam",
+          "slug_rx": "wiki/hasan_u(?:%c4%9f|\u011f|g)urlu",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "ataturk",
+          "name": "Atat\u00fcrk Dam",
+          "slug_rx": "wiki/atat(?:%c3%bc|\u00fc|u)rk",
+          "survivor": false
+        },
+        {
+          "desc": "",
+          "key": "karakaya",
+          "name": "Karakaya Dam",
+          "slug_rx": "wiki/karakaya",
+          "survivor": false
+        }
+      ],
+      "difficulty": "8/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_091_tier5_dam_argmax_turkey",
+      "statement": "You are given NO URLs \u2014 search to find the pages you need, then READ them (do not guess from memory). For EACH of the following six dams in Turkey, open the dam's Wikipedia page and read ONE number from the infobox: the dam's structural HEIGHT (the 'Height' row, in metres):\n  1. Deriner Dam (\u00c7oruh River, Artvin)\n  2. Alt\u0131nkaya Dam (K\u0131z\u0131l\u0131rmak, Samsun)\n  3. Oymap\u0131nar Dam (Manavgat River, Antalya)\n  4. Hasan U\u011furlu Dam (Ye\u015fil\u0131rmak, Samsun)\n  5. Atat\u00fcrk Dam (Euphrates, \u015eanl\u0131urfa)\n  6. Karakaya Dam (Euphrates, Diyarbak\u0131r)\n\nThen COMPARE the six heights and determine which SINGLE dam is the TALLEST (greatest structural height in metres). No Wikipedia page prints this cross-dam comparison \u2014 you must read each dam's own infobox height and compare the six figures yourself. Note: the answer is the tallest of THESE SIX dams, which is not necessarily the most famous dam in the list, and not necessarily the tallest dam in Turkey overall.\n\nReport (a) which of the six dams is the tallest (a single dam name \u2014 the keystone), (b) that dam's height in metres, (c) all six dams' heights (the six figures you looked up), and (d) the exact source URL of every page you read.",
+      "test_id": "091",
+      "test_name": "Tier 5: Page-only height argmax, wide-margin fame-decoy (tallest of six named dams in Turkey)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Harvard Mark I / IBM ASCC (the famous early 'Mark I')",
+          "key": "harvard",
+          "name": "Harvard Mark I",
+          "slug_rx": "wiki/harvard_mark_i",
+          "survivor": false
+        },
+        {
+          "desc": "the Manchester Baby / Small-Scale Experimental Machine (SSEM)",
+          "key": "baby",
+          "name": "Manchester Baby (SSEM)",
+          "slug_rx": "wiki/manchester_baby",
+          "survivor": false
+        },
+        {
+          "desc": "the Manchester Mark 1 (the university research machine)",
+          "key": "manchester",
+          "name": "Manchester Mark 1",
+          "slug_rx": "wiki/manchester_mark_1",
+          "survivor": false
+        },
+        {
+          "desc": "the Ferranti Mark 1 (the commercial machine)",
+          "key": "ferranti",
+          "name": "Ferranti Mark 1",
+          "slug_rx": "wiki/ferranti_mark_1",
+          "survivor": true
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b4,?050\\b",
+      "module": "test_110_tier5_mark1_commercial_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has two stages; the second stage's target is unknown until the first is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Several early computers carry the name 'Mark 1 / Mark I':\n  1. Harvard Mark I \u2014 the Harvard Mark I / IBM ASCC (the famous early 'Mark I')\n  2. Manchester Baby (SSEM) \u2014 the Manchester Baby / Small-Scale Experimental Machine (SSEM)\n  3. Manchester Mark 1 \u2014 the Manchester Mark 1 (the university research machine)\n  4. Ferranti Mark 1 \u2014 the Ferranti Mark 1 (the commercial machine)\nExactly ONE of these was the first COMMERCIALLY AVAILABLE general-purpose ELECTRONIC computer. Open EACH machine's page and read its own 'first' / commercial claim to determine which one \u2014 the others were an electromechanical relay one-off, an experimental prototype, or a university research machine. Determine the status of all four; do not simply guess the most famous one.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving (first commercially available) machine's page and read the number of VACUUM TUBES (valves) it contained, directly from the page.\n\nReport: (a) the number of vacuum tubes/valves in the survivor machine (this single figure is the keystone answer); (b) which of the four machines was the survivor and the status of each of the four; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "110",
+      "test_name": "Tier 5: Branch-eliminate then chain ('Mark 1' computers -> first-commercial Ferranti Mark 1 -> valve count)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Berlin Marathon (the famous flat, fast world-record course)",
+          "key": "berlin",
+          "name": "Berlin Marathon",
+          "slug_rx": "wiki/berlin_marathon",
+          "survivor": false
+        },
+        {
+          "desc": "the Boston Marathon (Hopkinton to Boston, point-to-point)",
+          "key": "boston",
+          "name": "Boston Marathon",
+          "slug_rx": "wiki/boston_marathon",
+          "survivor": true
+        },
+        {
+          "desc": "the London Marathon",
+          "key": "london",
+          "name": "London Marathon",
+          "slug_rx": "wiki/london_marathon",
+          "survivor": false
+        },
+        {
+          "desc": "the Chicago Marathon (flat and fast)",
+          "key": "chicago",
+          "name": "Chicago Marathon",
+          "slug_rx": "wiki/chicago_marathon",
+          "survivor": false
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [
+        "459",
+        "metre"
+      ],
+      "keystone_pattern": "\\b459\\b|\\b140\\s*(?:m|metre|meter)s?\\b",
+      "module": "test_111_tier5_marathon_record_ineligible_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has two stages; the second stage's target is unknown until the first is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four of the World Marathon Majors:\n  1. Berlin Marathon \u2014 the Berlin Marathon (the famous flat, fast world-record course)\n  2. Boston Marathon \u2014 the Boston Marathon (Hopkinton to Boston, point-to-point)\n  3. London Marathon \u2014 the London Marathon\n  4. Chicago Marathon \u2014 the Chicago Marathon (flat and fast)\nExactly ONE of these courses is NOT eligible for world records, because it is too net-downhill and too point-to-point (it fails the drop / start-finish-separation limits). Open EACH marathon's page and read its record-eligibility note to determine which one \u2014 the other three are record-eligible. Determine the status of all four; do not simply guess the most famous fast course.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving (record-ineligible) marathon's page and read the NET ELEVATION DROP from its start to its finish, directly from the page.\n\nReport: (a) the net elevation drop of the survivor course from start to finish (this single figure is the keystone answer); (b) which of the four was the survivor and each course's record-eligibility status; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "111",
+      "test_name": "Tier 5: Branch-eliminate then chain (World Marathon Majors -> record-ineligible Boston -> net elevation drop)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "Voyager 1 (the famous interstellar probe)",
+          "key": "voyager1",
+          "name": "Voyager 1",
+          "slug_rx": "wiki/voyager_1",
+          "survivor": false
+        },
+        {
+          "desc": "Pioneer 10",
+          "key": "pioneer10",
+          "name": "Pioneer 10",
+          "slug_rx": "wiki/pioneer_10",
+          "survivor": true
+        },
+        {
+          "desc": "Pioneer 11 (which went on to Saturn)",
+          "key": "pioneer11",
+          "name": "Pioneer 11",
+          "slug_rx": "wiki/pioneer_11",
+          "survivor": false
+        },
+        {
+          "desc": "the Galileo orbiter",
+          "key": "galileo",
+          "name": "Galileo orbiter",
+          "slug_rx": "wiki/galileo_",
+          "survivor": false
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b2\\.74\\b|\\b258\\s*kg\\b",
+      "module": "test_112_tier5_first_to_jupiter_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has two stages; the second stage's target is unknown until the first is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four spacecraft that visited Jupiter:\n  1. Voyager 1 \u2014 Voyager 1 (the famous interstellar probe)\n  2. Pioneer 10 \u2014 Pioneer 10\n  3. Pioneer 11 \u2014 Pioneer 11 (which went on to Saturn)\n  4. Galileo orbiter \u2014 the Galileo orbiter\nExactly ONE of these was the FIRST spacecraft to FLY BY Jupiter. Open EACH probe's page and read its mission-firsts to determine which one \u2014 one of the others was first to fly by Saturn, one first to ORBIT Jupiter, and one is the famous later interstellar probe. Determine the status of all four; do not simply guess the most famous probe.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving (first-to-fly-by-Jupiter) probe's page and read its HIGH-GAIN ANTENNA dish diameter (in metres), directly from the page.\n\nReport: (a) the survivor probe's high-gain antenna dish diameter in metres (this single figure is the keystone answer); (b) which of the four was the survivor and each probe's Jupiter mission-first; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "112",
+      "test_name": "Tier 5: Branch-eliminate then chain (Jupiter probes -> first-to-Jupiter Pioneer 10 -> antenna diameter)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "Windsor Castle (the largest inhabited castle)",
+          "key": "windsor",
+          "name": "Windsor Castle",
+          "slug_rx": "wiki/windsor_castle",
+          "survivor": false
+        },
+        {
+          "desc": "Prague Castle",
+          "key": "prague",
+          "name": "Prague Castle",
+          "slug_rx": "wiki/prague_castle",
+          "survivor": false
+        },
+        {
+          "desc": "Malbork Castle (the Teutonic Knights' castle in Poland)",
+          "key": "malbork",
+          "name": "Malbork Castle",
+          "slug_rx": "wiki/malbork_castle",
+          "survivor": true
+        },
+        {
+          "desc": "Mehrangarh Fort (in Jodhpur, India)",
+          "key": "mehrangarh",
+          "name": "Mehrangarh Fort",
+          "slug_rx": "wiki/mehrangarh",
+          "survivor": false
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b18\\.038\\b|\\b21\\s*ha\\b|\\b52\\s*acres?\\b|\\b44\\.57\\b",
+      "module": "test_113_tier5_largest_castle_by_area_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has two stages; the second stage's target is unknown until the first is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four castles/forts that carry a superlative claim:\n  1. Windsor Castle \u2014 Windsor Castle (the largest inhabited castle)\n  2. Prague Castle \u2014 Prague Castle\n  3. Malbork Castle \u2014 Malbork Castle (the Teutonic Knights' castle in Poland)\n  4. Mehrangarh Fort \u2014 Mehrangarh Fort (in Jodhpur, India)\nExactly ONE of these is the largest castle in the world by LAND AREA (and the world's largest brick castle). Open EACH castle's page and read its own superlative/area claim to determine which one \u2014 the others are the largest INHABITED castle, the largest ancient castle complex, and a hilltop fort. Determine the status of all four; do not simply guess the most famous one.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving (largest-by-area) castle's page and read its enclosed land area (in hectares or acres), directly from the page.\n\nReport: (a) the survivor castle's enclosed land area (this single figure is the keystone answer); (b) which of the four was the survivor and each one's superlative claim; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "113",
+      "test_name": "Tier 5: Branch-eliminate then chain (largest castles -> largest-by-area Malbork -> enclosed land area)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the London Underground (the oldest metro overall)",
+          "key": "london",
+          "name": "London Underground",
+          "slug_rx": "wiki/london_underground",
+          "survivor": false
+        },
+        {
+          "desc": "Budapest Metro Line 1 (the Millennium Underground)",
+          "key": "budapest",
+          "name": "Line 1 (Budapest Metro)",
+          "slug_rx": "wiki/line_1_\\(budapest_metro\\)|budapest_metro",
+          "survivor": true
+        },
+        {
+          "desc": "the Athens metro's oldest line (ISAP Line 1)",
+          "key": "athens",
+          "name": "Athens Metro (ISAP Line 1)",
+          "slug_rx": "wiki/line_1_\\(athens_metro\\)|isap|athens_metro",
+          "survivor": false
+        },
+        {
+          "desc": "the Chicago 'L' (elevated railway)",
+          "key": "chicago",
+          "name": "Chicago 'L'",
+          "slug_rx": "wiki/chicago_",
+          "survivor": false
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b4\\.4\\s*km\\b|\\b11\\s*stations?\\b",
+      "module": "test_114_tier5_oldest_continental_metro_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has two stages; the second stage's target is unknown until the first is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four 'oldest metro' claimants:\n  1. London Underground \u2014 the London Underground (the oldest metro overall)\n  2. Line 1 (Budapest Metro) \u2014 Budapest Metro Line 1 (the Millennium Underground)\n  3. Athens Metro (ISAP Line 1) \u2014 the Athens metro's oldest line (ISAP Line 1)\n  4. Chicago 'L' \u2014 the Chicago 'L' (elevated railway)\nExactly ONE of these is the oldest ELECTRIFIED UNDERGROUND metro on the EUROPEAN CONTINENT (mainland Europe). Open EACH system's page and read its opening date and type to determine which one \u2014 of the others, one is older but off the continent, one is an elevated railway, and one had its underground line electrified later. Determine the status of all four; do not simply guess the most famous oldest metro.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving line's page and read its total LENGTH in km (or its number of stations), directly from the page.\n\nReport: (a) the survivor line's length in km or its station count (this single figure is the keystone answer); (b) which of the four was the survivor and each system's opening/type; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "114",
+      "test_name": "Tier 5: Branch-eliminate then chain (oldest metros -> oldest-continental Budapest Line 1 -> length/stations)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Sahara (the famous hot desert)",
+          "key": "sahara",
+          "name": "Sahara Desert",
+          "slug_rx": "wiki/sahara",
+          "survivor": false
+        },
+        {
+          "desc": "the Arabian Desert",
+          "key": "arabian",
+          "name": "Arabian Desert",
+          "slug_rx": "wiki/arabian_desert",
+          "survivor": false
+        },
+        {
+          "desc": "the Antarctic (polar) Desert",
+          "key": "antarctic",
+          "name": "Antarctic Desert",
+          "slug_rx": "wiki/antarctic|polar_desert",
+          "survivor": true
+        },
+        {
+          "desc": "the Gobi Desert",
+          "key": "gobi",
+          "name": "Gobi Desert",
+          "slug_rx": "wiki/gobi_desert",
+          "survivor": false
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b89\\.2\\b",
+      "module": "test_115_tier5_largest_desert_polar_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has three stages; each stage's target is unknown until the previous stage is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four deserts:\n  1. Sahara Desert \u2014 the Sahara (the famous hot desert)\n  2. Arabian Desert \u2014 the Arabian Desert\n  3. Antarctic Desert \u2014 the Antarctic (polar) Desert\n  4. Gobi Desert \u2014 the Gobi Desert\nExactly ONE of these is the LARGEST desert in the world by area. Remember that a desert is defined by low PRECIPITATION, not by heat or sand. Open the relevant pages and read the desert definition and area ranking to determine which one \u2014 do NOT simply name the most famous hot desert. Determine the classification/area of all four.\n\nSTAGE 2 \u2014 follow the survivor forward. The surviving (largest) desert's coldest location is home to a research station that holds a world temperature record. Identify THAT station.\n\nSTAGE 3 \u2014 read the keystone. Open that station's page and read the lowest reliably recorded natural surface temperature there, in degrees Celsius, directly from the page.\n\nReport: (a) that record low temperature in \u00b0C (this single figure is the keystone answer); (b) which of the four deserts was the survivor and each desert's classification; (c) which station it was; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "115",
+      "test_name": "Tier 5: Branch-eliminate then chain (largest deserts (polar trap) -> Antarctic -> Vostok record low)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Chicxulub crater in Yucat\u00e1n, Mexico \u2014 the famous 'dinosaur' (K-Pg) impact crater",
+          "key": "chicxulub",
+          "name": "Chicxulub crater",
+          "slug_rx": "wiki/chicxulub_crater",
+          "survivor": false
+        },
+        {
+          "desc": "the Vredefort impact structure (Vredefort Dome) in the Free State, South Africa",
+          "key": "vredefort",
+          "name": "Vredefort impact structure",
+          "slug_rx": "wiki/vredefort",
+          "survivor": true
+        },
+        {
+          "desc": "the Sudbury Basin in Ontario, Canada",
+          "key": "sudbury",
+          "name": "Sudbury Basin",
+          "slug_rx": "wiki/sudbury_basin",
+          "survivor": false
+        },
+        {
+          "desc": "the Chesapeake Bay impact crater in Virginia, USA",
+          "key": "chesapeake",
+          "name": "Chesapeake Bay impact crater",
+          "slug_rx": "wiki/chesapeake_bay_impact_crater",
+          "survivor": false
+        }
+      ],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b2\\.023\\b|\\b2,?023\\s*(?:ma\\b|million)",
+      "module": "test_116_tier5_impact_crater_eliminate_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has three stages; each stage's target is unknown until the previous stage is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Consider these four terrestrial impact structures:\n  1. Chicxulub crater \u2014 the Chicxulub crater in Yucat\u00e1n, Mexico \u2014 the famous 'dinosaur' (K-Pg) impact crater\n  2. Vredefort impact structure \u2014 the Vredefort impact structure (Vredefort Dome) in the Free State, South Africa\n  3. Sudbury Basin \u2014 the Sudbury Basin in Ontario, Canada\n  4. Chesapeake Bay impact crater \u2014 the Chesapeake Bay impact crater in Virginia, USA\nExactly ONE of these is the one described on its OWN page as the LARGEST VERIFIED / CONFIRMED impact structure on Earth \u2014 and it is NOT the famous dinosaur/K-Pg crater (whose page instead calls it the largest mostly-INTACT crater). Open EACH structure's page and read its ranking/description to determine which one. Determine the status of all four; do not simply pick the most famous one.\n\nSTAGE 2 \u2014 elect the survivor. Identify the single structure that is the largest verified impact structure on Earth.\n\nSTAGE 3 \u2014 read the keystone. Open that structure's page and read its AGE in BILLIONS OF YEARS (Ga) directly from the infobox.\n\nReport: (a) the survivor structure's AGE in Ga (this single figure is the keystone answer); (b) which of the four was the survivor and each candidate's ranking/description; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "116",
+      "test_name": "Tier 5: Branch-eliminate then chain (impact craters -> Vredefort age)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "Fort George in Niagara-on-the-Lake, Ontario, Canada \u2014 the War of 1812 fort",
+          "key": "ontario",
+          "name": "Fort George, Ontario",
+          "slug_rx": "wiki/fort_george_\\(ontario\\)|wiki/fort_george,_ontario",
+          "survivor": false
+        },
+        {
+          "desc": "Fort George near Ardersier, north-east of Inverness, Scotland",
+          "key": "highland",
+          "name": "Fort George, Highland",
+          "slug_rx": "wiki/fort_george,_highland",
+          "survivor": true
+        },
+        {
+          "desc": "Fort George in New York City \u2014 the colonial-era fort at the tip of Manhattan",
+          "key": "newyork",
+          "name": "Fort George (Manhattan)",
+          "slug_rx": "wiki/fort_george_\\(manhattan\\)|wiki/fort_george,_new_york",
+          "survivor": false
+        },
+        {
+          "desc": "Fort George in Saint Peter Port, Guernsey \u2014 the Channel Islands garrison",
+          "key": "guernsey",
+          "name": "Fort George, Guernsey",
+          "slug_rx": "wiki/fort_george,_guernsey",
+          "survivor": false
+        }
+      ],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b92,?673\\b",
+      "module": "test_117_tier5_fort_george_eliminate_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has three stages; each stage's target is unknown until the previous stage is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Several fortifications are named 'Fort George':\n  1. Fort George, Ontario \u2014 Fort George in Niagara-on-the-Lake, Ontario, Canada \u2014 the War of 1812 fort\n  2. Fort George, Highland \u2014 Fort George near Ardersier, north-east of Inverness, Scotland\n  3. Fort George (Manhattan) \u2014 Fort George in New York City \u2014 the colonial-era fort at the tip of Manhattan\n  4. Fort George, Guernsey \u2014 Fort George in Saint Peter Port, Guernsey \u2014 the Channel Islands garrison\nExactly ONE is the vast still-garrisoned 18th-century GEORGIAN ARTILLERY BASTION fort built near Inverness after the Battle of Culloden (the Jacobite rising of 1745) \u2014 NOT the battle-famous War-of-1812 fort. Open EACH fort's page and read its era/description to determine which one. Determine the status of all four; do not simply pick the most battle-famous one.\n\nSTAGE 2 \u2014 elect the survivor. Identify the single Georgian bastion fort built after Culloden near Inverness.\n\nSTAGE 3 \u2014 read the keystone. Open that fort's page and read its ORIGINAL CONSTRUCTION BUDGET (the estimated/original cost) directly from the text.\n\nReport: (a) the survivor fort's original construction budget in pounds (this single figure is the keystone answer); (b) which of the four forts was the survivor and each candidate's era/description; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "117",
+      "test_name": "Tier 5: Branch-eliminate then chain (Fort George -> Highland fort construction budget)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the common ostrich \u2014 the world's largest living bird, of the African savanna",
+          "key": "ostrich",
+          "name": "Common ostrich",
+          "slug_rx": "wiki/common_ostrich|wiki/ostrich",
+          "survivor": false
+        },
+        {
+          "desc": "the emu \u2014 the second-largest living bird, of open Australia",
+          "key": "emu",
+          "name": "Emu",
+          "slug_rx": "wiki/emu",
+          "survivor": false
+        },
+        {
+          "desc": "the southern cassowary \u2014 a ratite of New Guinea and NE Australia",
+          "key": "cassowary",
+          "name": "Southern cassowary",
+          "slug_rx": "wiki/southern_cassowary|wiki/cassowary",
+          "survivor": true
+        },
+        {
+          "desc": "the greater rhea \u2014 a large ratite of the South American grasslands",
+          "key": "rhea",
+          "name": "Greater rhea",
+          "slug_rx": "wiki/greater_rhea|wiki/rhea",
+          "survivor": false
+        }
+      ],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b12\\s*cm\\b|\\b4\\.7\\s*in",
+      "module": "test_118_tier5_ratite_eliminate_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has three stages; each stage's target is unknown until the previous stage is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Consider these four large flightless ratites:\n  1. Common ostrich \u2014 the common ostrich \u2014 the world's largest living bird, of the African savanna\n  2. Emu \u2014 the emu \u2014 the second-largest living bird, of open Australia\n  3. Southern cassowary \u2014 the southern cassowary \u2014 a ratite of New Guinea and NE Australia\n  4. Greater rhea \u2014 the greater rhea \u2014 a large ratite of the South American grasslands\nExactly ONE is the RAINFOREST ratite of New Guinea and NE Australia, noted for a dagger-like inner-toe claw and a reputation as a dangerous bird \u2014 NOT the biggest (the ostrich). Open EACH bird's page and read its range/traits to determine which one. Determine the status of all four; do not simply pick the largest.\n\nSTAGE 2 \u2014 elect the survivor. Identify the single dangerous rainforest ratite of New Guinea / NE Australia.\n\nSTAGE 3 \u2014 read the keystone. Open that bird's page and read the LENGTH of its dagger-like INNER-TOE CLAW directly from the text.\n\nReport: (a) the survivor bird's inner-toe claw length in cm (this single figure is the keystone answer); (b) which of the four ratites was the survivor and each candidate's range/traits; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "118",
+      "test_name": "Tier 5: Branch-eliminate then chain (ratites -> southern cassowary claw length)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Tsar Bell in the Moscow Kremlin \u2014 the largest bell ever cast",
+          "key": "tsar",
+          "name": "Tsar Bell",
+          "slug_rx": "wiki/tsar_bell",
+          "survivor": false
+        },
+        {
+          "desc": "the Great Bell of Dhammazedi, once at the Shwedagon Pagoda \u2014 believed the largest bell ever cast",
+          "key": "dhammazedi",
+          "name": "Great Bell of Dhammazedi",
+          "slug_rx": "wiki/great_bell_of_dhammazedi",
+          "survivor": false
+        },
+        {
+          "desc": "the Mingun Bell in Myanmar",
+          "key": "mingun",
+          "name": "Mingun Bell",
+          "slug_rx": "wiki/mingun_bell",
+          "survivor": true
+        },
+        {
+          "desc": "the Liberty Bell in Philadelphia \u2014 famously cracked",
+          "key": "liberty",
+          "name": "Liberty Bell",
+          "slug_rx": "wiki/liberty_bell",
+          "survivor": false
+        }
+      ],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b55,?555\\b|\\b90,?718\\b|\\b199,?999\\b",
+      "module": "test_119_tier5_great_bell_eliminate_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has three stages; each stage's target is unknown until the previous stage is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Consider these four historic great bells:\n  1. Tsar Bell \u2014 the Tsar Bell in the Moscow Kremlin \u2014 the largest bell ever cast\n  2. Great Bell of Dhammazedi \u2014 the Great Bell of Dhammazedi, once at the Shwedagon Pagoda \u2014 believed the largest bell ever cast\n  3. Mingun Bell \u2014 the Mingun Bell in Myanmar\n  4. Liberty Bell \u2014 the Liberty Bell in Philadelphia \u2014 famously cracked\nExactly ONE is the INTACT historic giant bell that actually RINGS \u2014 as opposed to being cracked, never rung, or lost \u2014 NOT the largest ever cast (the Tsar Bell, which is cracked and has never been rung). Open EACH bell's page and read its intact/ringing status to determine which one. Determine the status of all four; do not equate 'largest cast' with the answer.\n\nSTAGE 2 \u2014 elect the survivor. Identify the single intact great bell that actually rings.\n\nSTAGE 3 \u2014 read the keystone. Open that bell's page and read its WEIGHT in the local unit VISS (or in kg/tons) directly from the text.\n\nReport: (a) the survivor bell's weight in viss (this single figure is the keystone answer); (b) which of the four bells was the survivor and each candidate's status; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "119",
+      "test_name": "Tier 5: Branch-eliminate then chain (great bells -> Mingun Bell weight in viss)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "Cleopatra's Needle in London, on the Victoria Embankment beside the Thames",
+          "key": "london",
+          "name": "Cleopatra's Needle, London",
+          "slug_rx": "wiki/cleopatra%27s_needle,_london|wiki/cleopatra's_needle,_london",
+          "survivor": false
+        },
+        {
+          "desc": "Cleopatra's Needle in New York City",
+          "key": "newyork",
+          "name": "Cleopatra's Needle, New York City",
+          "slug_rx": "wiki/cleopatra%27s_needle_\\(new_york|wiki/cleopatra's_needle_\\(new_york",
+          "survivor": true
+        },
+        {
+          "desc": "the Luxor Obelisk on the Place de la Concorde in Paris",
+          "key": "paris",
+          "name": "Luxor Obelisk (Paris)",
+          "slug_rx": "wiki/luxor_obelisk",
+          "survivor": false
+        },
+        {
+          "desc": "the Vatican Obelisk in St. Peter's Square, Rome",
+          "key": "vatican",
+          "name": "Vatican Obelisk (Rome)",
+          "slug_rx": "wiki/vatican_obelisk",
+          "survivor": false
+        }
+      ],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b112\\s*-?\\s*days?\\b",
+      "module": "test_120_tier5_obelisk_eliminate_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has three stages; each stage's target is unknown until the previous stage is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Consider these four famous Egyptian obelisks:\n  1. Cleopatra's Needle, London \u2014 Cleopatra's Needle in London, on the Victoria Embankment beside the Thames\n  2. Cleopatra's Needle, New York City \u2014 Cleopatra's Needle in New York City\n  3. Luxor Obelisk (Paris) \u2014 the Luxor Obelisk on the Place de la Concorde in Paris\n  4. Vatican Obelisk (Rome) \u2014 the Vatican Obelisk in St. Peter's Square, Rome\nExactly ONE is BOTH one of the genuine 'Cleopatra's Needles' AND standing in the WESTERN HEMISPHERE (New York City's Central Park) \u2014 NOT the famous London one, and NOT the Paris (Luxor) or Vatican obelisks, which are NOT Cleopatra's Needles at all. Open EACH obelisk's page and read its identity/location to determine which one. Determine the status of all four; do not simply pick the most famous one.\n\nSTAGE 2 \u2014 elect the survivor. Identify the single genuine Cleopatra's Needle in the Western Hemisphere (New York's Central Park).\n\nSTAGE 3 \u2014 read the keystone. Open that obelisk's page and read how many DAYS it took to move the obelisk from the Quarantine Station to its final position in Central Park.\n\nReport: (a) the number of DAYS the move took (this single figure is the keystone answer); (b) which of the four obelisks was the survivor and each candidate's identity/location; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "120",
+      "test_name": "Tier 5: Branch-eliminate then chain (Cleopatra's Needles -> NY obelisk transit days)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "Mammoth Cave in Kentucky, USA",
+          "key": "mammoth",
+          "name": "Mammoth Cave",
+          "slug_rx": "wiki/mammoth_cave",
+          "survivor": false
+        },
+        {
+          "desc": "the Sarawak Chamber (Gua Nasib Bagus) in Gunung Mulu National Park, Malaysia",
+          "key": "sarawak",
+          "name": "Sarawak Chamber (Gua Nasib Bagus)",
+          "slug_rx": "wiki/sarawak_chamber",
+          "survivor": false
+        },
+        {
+          "desc": "Optymistychna Cave near Korolivka, Ukraine",
+          "key": "optymistychna",
+          "name": "Optymistychna Cave",
+          "slug_rx": "wiki/optymistychna_cave",
+          "survivor": false
+        },
+        {
+          "desc": "Krubera (Voronya) Cave in the Arabika Massif, Abkhazia",
+          "key": "krubera",
+          "name": "Krubera (Voronya) Cave",
+          "slug_rx": "wiki/krubera_cave|wiki/kruber",
+          "survivor": true
+        }
+      ],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b16[.,]058\\b|\\b16,?058\\s*m\\b",
+      "module": "test_121_tier5_record_cave_eliminate_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This task has three stages; each stage's target is unknown until the previous stage is resolved.\n\nSTAGE 1 \u2014 eliminate to one survivor. Consider these four record-holding caves:\n  1. Mammoth Cave \u2014 Mammoth Cave in Kentucky, USA\n  2. Sarawak Chamber (Gua Nasib Bagus) \u2014 the Sarawak Chamber (Gua Nasib Bagus) in Gunung Mulu National Park, Malaysia\n  3. Optymistychna Cave \u2014 Optymistychna Cave near Korolivka, Ukraine\n  4. Krubera (Voronya) Cave \u2014 Krubera (Voronya) Cave in the Arabika Massif, Abkhazia\nExactly ONE is the DEEPEST known cave on Earth \u2014 NOT the famous LONGEST cave (Mammoth), the largest chamber (Sarawak), or the longest gypsum cave (Optymistychna). Open EACH cave's page and read its record/superlative to determine which one. Determine the status of all four; do not equate 'famous cave' with 'the deepest'.\n\nSTAGE 2 \u2014 elect the survivor. Identify the single deepest known cave on Earth.\n\nSTAGE 3 \u2014 read the keystone. Open that cave's page and read its total mapped/surveyed LENGTH in km directly from the infobox \u2014 this is DIFFERENT from its headline DEPTH.\n\nReport: (a) the survivor cave's total mapped LENGTH in km (this single figure is the keystone answer \u2014 NOT its depth); (b) which of the four caves was the survivor and each candidate's record/superlative; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "121",
+      "test_name": "Tier 5: Branch-eliminate then chain (record caves -> Krubera mapped length)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Arecibo Telescope in Puerto Rico (a 305 m spherical dish)",
+          "key": "arecibo",
+          "name": "Arecibo Telescope",
+          "slug_rx": "wiki/arecibo_telescope",
+          "survivor": false
+        },
+        {
+          "desc": "RATAN-600 in Russia (a large ring-reflector radio telescope)",
+          "key": "ratan",
+          "name": "RATAN-600",
+          "slug_rx": "wiki/ratan-600",
+          "survivor": false
+        },
+        {
+          "desc": "the Green Bank Telescope in West Virginia (a fully steerable dish)",
+          "key": "greenbank",
+          "name": "Green Bank Telescope",
+          "slug_rx": "wiki/green_bank_telescope",
+          "survivor": false
+        },
+        {
+          "desc": "the Five-hundred-meter Aperture Spherical Telescope (FAST) in Guizhou, China",
+          "key": "fast",
+          "name": "FAST (Five-hundred-meter Aperture Spherical Telescope)",
+          "slug_rx": "wiki/five-hundred-meter_aperture_spherical|wiki/fast_\\(",
+          "survivor": true
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [
+        "984"
+      ],
+      "keystone_pattern": "\\b300[\\s-]*(?:m\\b|met(?:er|re)s?)|\\b984\\b",
+      "module": "test_122_tier5_filled_aperture_telescope_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). Two stages; the second stage's target is unknown until the first is resolved. Be disciplined: one quick check per candidate, do NOT shortcut to the famous one.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four large single-dish radio telescopes:\n  1. Arecibo Telescope \u2014 the Arecibo Telescope in Puerto Rico (a 305 m spherical dish)\n  2. RATAN-600 \u2014 RATAN-600 in Russia (a large ring-reflector radio telescope)\n  3. Green Bank Telescope \u2014 the Green Bank Telescope in West Virginia (a fully steerable dish)\n  4. FAST (Five-hundred-meter Aperture Spherical Telescope) \u2014 the Five-hundred-meter Aperture Spherical Telescope (FAST) in Guizhou, China\nExactly ONE of these is the largest FILLED-APERTURE single-dish radio telescope that is CURRENTLY IN OPERATION. Open EACH telescope's page and check its status: one famous candidate has collapsed and is no longer operational, one is a ring reflector (not a filled aperture), and one is a smaller fully steerable dish. Determine the status of all four; do NOT simply pick the most famous name.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving telescope's page. Although its physical dish is very large, only a SMALLER circle is ILLUMINATED (used) at any one time. Read that illuminated / effective aperture diameter in metres, directly from the page.\n\nReport: (a) the survivor's ILLUMINATED aperture diameter in metres (this single figure is the keystone answer); (b) which of the four was the survivor and each one's status; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "122",
+      "test_name": "Tier 5 targeted: survivor (largest operational filled-aperture single-dish telescope -> illuminated aperture)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "USS Nautilus (SSN-571), a famous early nuclear-powered vessel",
+          "key": "nautilus",
+          "name": "USS Nautilus (SSN-571)",
+          "slug_rx": "wiki/uss_nautilus",
+          "survivor": false
+        },
+        {
+          "desc": "NS Savannah, an early nuclear-powered ship",
+          "key": "savannah",
+          "name": "NS Savannah",
+          "slug_rx": "wiki/ns_savannah",
+          "survivor": false
+        },
+        {
+          "desc": "USS Enterprise (CVN-65), a nuclear-powered warship",
+          "key": "enterprise",
+          "name": "USS Enterprise (CVN-65)",
+          "slug_rx": "wiki/uss_enterprise_\\(cvn",
+          "survivor": false
+        },
+        {
+          "desc": "USS Long Beach (CGN-9), a nuclear-powered warship",
+          "key": "longbeach",
+          "name": "USS Long Beach (CGN-9)",
+          "slug_rx": "wiki/uss_long_beach",
+          "survivor": true
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b15[,\\s]?540\\b",
+      "module": "test_123_tier5_first_nuclear_surface_warship_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). Two stages; the second stage's target is unknown until the first is resolved. Be disciplined: one quick check per candidate, do NOT shortcut to the famous one.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four early nuclear-powered vessels:\n  1. USS Nautilus (SSN-571) \u2014 USS Nautilus (SSN-571), a famous early nuclear-powered vessel\n  2. NS Savannah \u2014 NS Savannah, an early nuclear-powered ship\n  3. USS Enterprise (CVN-65) \u2014 USS Enterprise (CVN-65), a nuclear-powered warship\n  4. USS Long Beach (CGN-9) \u2014 USS Long Beach (CGN-9), a nuclear-powered warship\nExactly ONE of these is the world's first nuclear-powered SURFACE WARSHIP (surface combatant). Open EACH ship's page and read its TYPE and commissioning date: one famous candidate is a submarine (not a surface ship), one is a civilian merchant ship (not a warship), and one nuclear warship was commissioned LATER than the survivor. Determine the type/status of all four; do NOT simply pick the first nuclear ship you recall.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving warship's page and read its DISPLACEMENT in tons, directly from the page.\n\nReport: (a) the survivor's displacement in tons (this single figure is the keystone answer); (b) which of the four was the survivor and each one's type/status; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "123",
+      "test_name": "Tier 5 targeted: survivor (first nuclear-powered surface warship -> displacement)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "Concorde, the Anglo-French supersonic airliner",
+          "key": "concorde",
+          "name": "Concorde",
+          "slug_rx": "wiki/concorde",
+          "survivor": false
+        },
+        {
+          "desc": "the Boeing 2707, an American SST design",
+          "key": "boeing2707",
+          "name": "Boeing 2707",
+          "slug_rx": "wiki/boeing_2707",
+          "survivor": false
+        },
+        {
+          "desc": "the Lockheed L-2000, an American SST proposal",
+          "key": "lockheed2000",
+          "name": "Lockheed L-2000",
+          "slug_rx": "wiki/lockheed_l-2000",
+          "survivor": false
+        },
+        {
+          "desc": "the Soviet Tupolev Tu-144 supersonic airliner",
+          "key": "tu144",
+          "name": "Tupolev Tu-144",
+          "slug_rx": "wiki/tupolev_tu-144",
+          "survivor": true
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b2[,\\s]?125\\b|1[,\\s]?320\\s*mph|1[,\\s]?147\\s*kn",
+      "module": "test_124_tier5_first_sst_in_service_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). Two stages; the second stage's target is unknown until the first is resolved. Be disciplined: one quick check per candidate, do NOT shortcut to the famous one.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four supersonic-transport (SST) airliner programmes:\n  1. Concorde \u2014 Concorde, the Anglo-French supersonic airliner\n  2. Boeing 2707 \u2014 the Boeing 2707, an American SST design\n  3. Lockheed L-2000 \u2014 the Lockheed L-2000, an American SST proposal\n  4. Tupolev Tu-144 \u2014 the Soviet Tupolev Tu-144 supersonic airliner\nExactly ONE of these was the FIRST SST airliner to ENTER COMMERCIAL SERVICE. Open EACH aircraft's page and read whether it entered service and WHEN: two of the American designs were cancelled and never entered service, and the most famous one entered service slightly LATER than the survivor. Determine the service status of all four; do NOT simply pick the most famous supersonic airliner.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving aircraft's page and read its maximum CRUISING SPEED in km/h, directly from the page.\n\nReport: (a) the survivor's cruising speed in km/h (this single figure is the keystone answer); (b) which of the four was the survivor and each one's service status; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "124",
+      "test_name": "Tier 5 targeted: survivor (first SST airliner to enter service -> cruising speed)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Golden Gate Bridge in San Francisco",
+          "key": "goldengate",
+          "name": "Golden Gate Bridge",
+          "slug_rx": "wiki/golden_gate_bridge",
+          "survivor": false
+        },
+        {
+          "desc": "the Millau Viaduct in France",
+          "key": "millau",
+          "name": "Millau Viaduct",
+          "slug_rx": "wiki/millau_viaduct",
+          "survivor": false
+        },
+        {
+          "desc": "the Duge Bridge (Beipanjiang) in Guizhou, China",
+          "key": "duge",
+          "name": "Duge Bridge (Beipanjiang)",
+          "slug_rx": "wiki/duge_bridge|wiki/beipanjiang",
+          "survivor": false
+        },
+        {
+          "desc": "the Huajiang Canyon Bridge in Guizhou, China",
+          "key": "huajiang",
+          "name": "Huajiang Canyon Bridge",
+          "slug_rx": "wiki/huajiang_canyon_bridge",
+          "survivor": true
+        }
+      ],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_125_tier5_highest_bridge_deck_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). Two stages; the second stage's target is unknown until the first is resolved. Be disciplined: one quick check per candidate, do NOT shortcut to the famous one.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four bridges:\n  1. Golden Gate Bridge \u2014 the Golden Gate Bridge in San Francisco\n  2. Millau Viaduct \u2014 the Millau Viaduct in France\n  3. Duge Bridge (Beipanjiang) \u2014 the Duge Bridge (Beipanjiang) in Guizhou, China\n  4. Huajiang Canyon Bridge \u2014 the Huajiang Canyon Bridge in Guizhou, China\nExactly ONE of these is CURRENTLY the world's HIGHEST bridge, measured by DECK HEIGHT above the ground/water it spans (not the tallest by structure, and not a former record holder). Open EACH bridge's page and read its deck-height claim and recency: one is a famous iconic bridge with a low deck, one is the world's TALLEST bridge by structural height (not the same as highest deck), and one HELD the highest-bridge record until it was surpassed in 2025. Determine the status of all four; do NOT confuse 'highest' with 'tallest' or the former record holder.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving bridge's page and read its DECK HEIGHT above the river in metres, directly from the page.\n\nReport: (a) the survivor's deck height in metres (this single figure is the keystone answer); (b) which of the four was the survivor and each one's status; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "125",
+      "test_name": "Tier 5 targeted: survivor (world's highest bridge by deck height -> deck height)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Nintendo Game Boy",
+          "key": "gameboy",
+          "name": "Nintendo Game Boy",
+          "slug_rx": "wiki/game_boy",
+          "survivor": false
+        },
+        {
+          "desc": "the Atari Lynx",
+          "key": "lynx",
+          "name": "Atari Lynx",
+          "slug_rx": "wiki/atari_lynx",
+          "survivor": false
+        },
+        {
+          "desc": "the Sega Game Gear",
+          "key": "gamegear",
+          "name": "Sega Game Gear",
+          "slug_rx": "wiki/game_gear",
+          "survivor": false
+        },
+        {
+          "desc": "the Milton Bradley Microvision",
+          "key": "microvision",
+          "name": "Milton Bradley Microvision",
+          "slug_rx": "wiki/microvision",
+          "survivor": true
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_126_tier5_first_cartridge_handheld_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). Two stages; the second stage's target is unknown until the first is resolved. Be disciplined: one quick check per candidate, do NOT shortcut to the famous one.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four handheld game consoles that use interchangeable cartridges:\n  1. Nintendo Game Boy \u2014 the Nintendo Game Boy\n  2. Atari Lynx \u2014 the Atari Lynx\n  3. Sega Game Gear \u2014 the Sega Game Gear\n  4. Milton Bradley Microvision \u2014 the Milton Bradley Microvision\nExactly ONE of these was the FIRST handheld game console with interchangeable ROM cartridges. Open EACH console's page and read its RELEASE YEAR: three of them were released in 1989-1990, while one appeared a full decade earlier. Determine the release year of all four; do NOT simply pick the most famous cartridge handheld.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving console's page and read its LCD SCREEN RESOLUTION in pixels, directly from the page.\n\nReport: (a) the survivor's LCD resolution in pixels (this single figure is the keystone answer); (b) which of the four was the survivor and each one's release year; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "126",
+      "test_name": "Tier 5 targeted: survivor (first cartridge-based handheld console -> LCD resolution)",
+      "waypoints": []
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Bugatti Chiron hypercar",
+          "key": "bugatti",
+          "name": "Bugatti Chiron",
+          "slug_rx": "wiki/bugatti_chiron",
+          "survivor": false
+        },
+        {
+          "desc": "Thrust2, an earlier record car",
+          "key": "thrust2",
+          "name": "Thrust2",
+          "slug_rx": "wiki/thrust2",
+          "survivor": false
+        },
+        {
+          "desc": "the Bloodhound LSR project",
+          "key": "bloodhound",
+          "name": "Bloodhound LSR",
+          "slug_rx": "wiki/bloodhound_lsr|wiki/bloodhound_ssc",
+          "survivor": false
+        },
+        {
+          "desc": "ThrustSSC, a jet-propelled land-speed vehicle",
+          "key": "thrustssc",
+          "name": "ThrustSSC",
+          "slug_rx": "wiki/thrustssc",
+          "survivor": true
+        }
+      ],
+      "difficulty": "9/10",
+      "keystone_literals": [],
+      "keystone_pattern": "763\\.035|\\b763\\s*mph|1[,\\s]?227\\.985|1[,\\s]?228\\s*km",
+      "module": "test_127_tier5_first_supersonic_land_speed_survivor",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). Two stages; the second stage's target is unknown until the first is resolved. Be disciplined: one quick check per candidate, do NOT shortcut to the famous one.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four fast land vehicles:\n  1. Bugatti Chiron \u2014 the Bugatti Chiron hypercar\n  2. Thrust2 \u2014 Thrust2, an earlier record car\n  3. Bloodhound LSR \u2014 the Bloodhound LSR project\n  4. ThrustSSC \u2014 ThrustSSC, a jet-propelled land-speed vehicle\nExactly ONE of these is the FIRST (and only) land vehicle to officially BREAK THE SOUND BARRIER and hold the outright world land speed record. Open EACH vehicle's page and read its record status: one is a production hypercar (a different category \u2014 the production-car speed record, not the outright LSR), one held the outright record but was SUBSONIC, and one has only made test runs without setting an official record. Determine the status of all four; do NOT equate 'fastest car' with a famous production hypercar.\n\nSTAGE 2 \u2014 read the keystone. Open the surviving vehicle's page and read its official record SPEED in mph, directly from the page.\n\nReport: (a) the survivor's record speed in mph (this single figure is the keystone answer); (b) which of the four was the survivor and each one's record status; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "127",
+      "test_name": "Tier 5 targeted: survivor (first land vehicle to break the sound barrier -> record speed)",
+      "waypoints": []
+    },
+    {
+      "candidates": [],
+      "difficulty": "10/10",
+      "keystone_literals": [
+        "565",
+        "165"
+      ],
+      "keystone_pattern": "\\b565\\b|\\b165\\b",
+      "module": "test_134_tier5_eiffel_garabit_arch_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This is a low-context CHAIN: each hop's target is only knowable after you resolve the previous hop, and you must recognise EXACTLY when the chain terminates.\n\nHOP 1 \u2014 the internal iron ARMATURE (skeleton) of the Statue of Liberty was engineered by a specific French engineer. Open the Statue of Liberty page and read WHO that engineer was.\n\nHOP 2 \u2014 that same engineer later built a GREAT WROUGHT-IRON RAILWAY ARCH VIADUCT spanning the Truy\u00e8re river gorge in the Massif Central of France, completed in 1884. Identify THAT viaduct. Do NOT report his most famous Paris tower, and do NOT report the Statue of Liberty itself \u2014 the answer is the railway viaduct.\n\nHOP 3 \u2014 open the viaduct's page and read its TOTAL LENGTH (or its main arch span) in metres directly from the page.\n\nReport: (a) the viaduct's LENGTH in metres (this single figure is the keystone answer); (b) which structure it is and who engineered it; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "134",
+      "test_name": "Tier 5: Stop/continue chain (Statue of Liberty -> Gustave Eiffel -> Garabit Viaduct length)",
+      "waypoints": [
+        {
+          "key": "start",
+          "name": "Statue of Liberty",
+          "name_rx": "statue\\s+of\\s+liberty|liberty\\s+enlightening",
+          "role": "start",
+          "slug_rx": "wiki/statue_of_liberty"
+        },
+        {
+          "key": "creator",
+          "name": "Gustave Eiffel",
+          "name_rx": "\\beiffel\\b",
+          "role": "intermediate",
+          "slug_rx": "wiki/gustave_eiffel"
+        },
+        {
+          "key": "terminal",
+          "name": "Garabit Viaduct",
+          "name_rx": "garabit",
+          "role": "terminal",
+          "slug_rx": "wiki/garabit"
+        }
+      ]
+    },
+    {
+      "candidates": [],
+      "difficulty": "10/10",
+      "keystone_literals": [
+        "322"
+      ],
+      "keystone_pattern": "\\b1,?057\\b|\\b322\\b",
+      "module": "test_135_tier5_roebling_ohio_bridge_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This is a low-context CHAIN: each hop's target is only knowable after you resolve the previous hop, and you must recognise EXACTLY when the chain terminates.\n\nHOP 1 \u2014 the Brooklyn Bridge's designer / chief engineer DIED before the bridge was built. Open the Brooklyn Bridge page and read WHO that engineer was.\n\nHOP 2 \u2014 years earlier, that same engineer had completed a SUSPENSION BRIDGE over the Ohio River between Cincinnati and Covington (opened 1867), which was the longest suspension bridge in the world at the time. Identify THAT bridge. Do NOT report the Brooklyn Bridge itself, and do NOT report any of the engineer's OTHER bridges (e.g. at Niagara).\n\nHOP 3 \u2014 open that bridge's page and read its MAIN SPAN (in feet or metres) from the page.\n\nReport: (a) the Cincinnati bridge's MAIN SPAN (this single figure is the keystone answer); (b) which bridge it is and who engineered it; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "135",
+      "test_name": "Tier 5: Stop/continue chain (Brooklyn Bridge -> John A. Roebling -> Cincinnati bridge span)",
+      "waypoints": [
+        {
+          "key": "start",
+          "name": "Brooklyn Bridge",
+          "name_rx": "brooklyn\\s+bridge",
+          "role": "start",
+          "slug_rx": "wiki/brooklyn_bridge"
+        },
+        {
+          "key": "creator",
+          "name": "John A. Roebling",
+          "name_rx": "john\\s+a\\.?\\s+roebling|\\broebling\\b",
+          "role": "intermediate",
+          "slug_rx": "wiki/john_a\\.?_roebling(?!_suspension)"
+        },
+        {
+          "key": "terminal",
+          "name": "John A. Roebling Suspension Bridge (Cincinnati)",
+          "name_rx": "cincinnati|covington|roebling_suspension|roebling\\s+suspension",
+          "role": "terminal",
+          "slug_rx": "roebling_suspension_bridge|wiki/[^ ]*cincinnati"
+        }
+      ]
+    },
+    {
+      "candidates": [],
+      "difficulty": "10/10",
+      "keystone_literals": [
+        "692",
+        "211"
+      ],
+      "keystone_pattern": "\\b692\\b|\\b211\\b",
+      "module": "test_136_tier5_brunel_great_eastern_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This is a low-context CHAIN: each hop's target is only knowable after you resolve the previous hop, and you must recognise EXACTLY when the chain terminates.\n\nHOP 1 \u2014 the Clifton Suspension Bridge was designed by a celebrated Victorian engineer. Open the Clifton Suspension Bridge page and read WHO that engineer was.\n\nHOP 2 \u2014 that same engineer designed an enormous iron STEAMSHIP that was by far the LARGEST SHIP ever built at the time of her 1858 launch. Identify THAT ship. Do NOT report the Clifton bridge itself, and do NOT report the engineer's EARLIER famous ship (the one whose iron-hulled 1843 vessel is preserved in Bristol).\n\nHOP 3 \u2014 open that ship's page and read her LENGTH (in feet or metres) directly from it.\n\nReport: (a) the ship's LENGTH (this single figure is the keystone answer); (b) which ship it is and who designed it; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "136",
+      "test_name": "Tier 5: Stop/continue chain (Clifton Suspension Bridge -> Brunel -> SS Great Eastern length)",
+      "waypoints": [
+        {
+          "key": "start",
+          "name": "Clifton Suspension Bridge",
+          "name_rx": "clifton\\s+suspension|clifton\\s+bridge",
+          "role": "start",
+          "slug_rx": "wiki/clifton_suspension_bridge"
+        },
+        {
+          "key": "creator",
+          "name": "Isambard Kingdom Brunel",
+          "name_rx": "\\bbrunel\\b",
+          "role": "intermediate",
+          "slug_rx": "wiki/isambard_kingdom_brunel"
+        },
+        {
+          "key": "terminal",
+          "name": "SS Great Eastern",
+          "name_rx": "great\\s+eastern",
+          "role": "terminal",
+          "slug_rx": "wiki/ss_great_eastern|wiki/great_eastern"
+        }
+      ]
+    },
+    {
+      "candidates": [],
+      "difficulty": "10/10",
+      "keystone_literals": [
+        "307",
+        "336"
+      ],
+      "keystone_pattern": "\\b307\\b|\\b336\\b",
+      "module": "test_137_tier5_telford_pontcysyllte_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This is a low-context CHAIN: each hop's target is only knowable after you resolve the previous hop, and you must recognise EXACTLY when the chain terminates.\n\nHOP 1 \u2014 the Menai Suspension Bridge in Wales was engineered by a famous Scottish civil engineer. Open the Menai Suspension Bridge page and read WHO that engineer was.\n\nHOP 2 \u2014 that same engineer built a celebrated navigable AQUEDUCT that carries a canal high over the River Dee at Pontcysyllte, completed in 1805. Identify THAT aqueduct. Do NOT report the Menai bridge itself, and do NOT report the engineer's OTHER works (e.g. the Caledonian Canal).\n\nHOP 3 \u2014 open that aqueduct's page and read its TOTAL LENGTH (in metres or yards) from it.\n\nReport: (a) the aqueduct's TOTAL LENGTH (this single figure is the keystone answer); (b) which aqueduct it is and who engineered it; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "137",
+      "test_name": "Tier 5: Stop/continue chain (Menai Suspension Bridge -> Thomas Telford -> Pontcysyllte Aqueduct length)",
+      "waypoints": [
+        {
+          "key": "start",
+          "name": "Menai Suspension Bridge",
+          "name_rx": "menai\\s+suspension|menai\\s+bridge",
+          "role": "start",
+          "slug_rx": "wiki/menai_suspension_bridge"
+        },
+        {
+          "key": "creator",
+          "name": "Thomas Telford",
+          "name_rx": "\\btelford\\b",
+          "role": "intermediate",
+          "slug_rx": "wiki/thomas_telford"
+        },
+        {
+          "key": "terminal",
+          "name": "Pontcysyllte Aqueduct",
+          "name_rx": "pontcysyllte",
+          "role": "terminal",
+          "slug_rx": "wiki/pontcysyllte"
+        }
+      ]
+    },
+    {
+      "candidates": [],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b29,?002\\b",
+      "module": "test_138_tier5_everest_waugh_survey_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This is a low-context CHAIN: each hop's target is only knowable after you resolve the previous hop, and you must recognise EXACTLY which figure the chain asks for.\n\nHOP 1 \u2014 Mount Everest is named in honour of a former Surveyor General of India, but the name Everest was actually PROPOSED by that man's SUCCESSOR as Surveyor General (NOT by the namesake himself). Open the Mount Everest page and read WHO proposed the name.\n\nHOP 2 \u2014 that successor led the Great Trigonometrical Survey that first fixed the peak's height and PUBLICLY ANNOUNCED it in 1856.\n\nHOP 3 \u2014 read the height IN FEET that his 1856 survey publicly DECLARED. This declared value was deliberately set a couple of feet ABOVE the exact computed figure. Report the DECLARED 1856 figure \u2014 NOT the exact rounded computed value, and NOT any modern re-surveyed height.\n\nReport: (a) the 1856 publicly declared height in feet (this single figure is the keystone answer); (b) who proposed the name and announced the height; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "138",
+      "test_name": "Tier 5: Stop/continue chain (Mount Everest -> Andrew Scott Waugh -> 1856 declared height)",
+      "waypoints": [
+        {
+          "key": "start",
+          "name": "Mount Everest",
+          "name_rx": "mount\\s+everest|\\beverest\\b",
+          "role": "start",
+          "slug_rx": "wiki/mount_everest"
+        },
+        {
+          "key": "creator",
+          "name": "Andrew Scott Waugh",
+          "name_rx": "\\bwaugh\\b",
+          "role": "intermediate",
+          "slug_rx": "wiki/andrew_scott_waugh"
+        },
+        {
+          "key": "terminal",
+          "name": "the 1856 declared survey height",
+          "name_rx": "\\b1856\\b|great\\s+trigonometric|declared",
+          "role": "terminal",
+          "slug_rx": "wiki/george_everest"
+        }
+      ]
+    },
+    {
+      "candidates": [],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "\\b1,?323\\b",
+      "module": "test_139_tier5_gaudi_pedrera_chain",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). This is a low-context CHAIN: each hop's target is only knowable after you resolve the previous hop, and you must recognise EXACTLY when the chain terminates.\n\nHOP 1 \u2014 the Sagrada Fam\u00edlia basilica in Barcelona was designed by a famous Catalan architect. Open the Sagrada Fam\u00edlia page and read WHO that architect was.\n\nHOP 2 \u2014 that same architect designed a STONE APARTMENT building at 92 Passeig de Gr\u00e0cia in Barcelona, nicknamed 'La Pedrera' (the stone quarry). Identify THAT building. Do NOT report the Sagrada Fam\u00edlia itself, and do NOT report his OTHER, more colourful building further down the same avenue (Passeig de Gr\u00e0cia) \u2014 the answer is the one nicknamed La Pedrera.\n\nHOP 3 \u2014 open that building's page and read its FLOOR AREA per floor (in square metres).\n\nReport: (a) the building's FLOOR AREA per floor in square metres (this single figure is the keystone answer); (b) which building it is and who designed it; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "139",
+      "test_name": "Tier 5: Stop/continue chain (Sagrada Fam\u00edlia -> Antoni Gaud\u00ed -> Casa Mil\u00e0 floor area)",
+      "waypoints": [
+        {
+          "key": "start",
+          "name": "Sagrada Fam\u00edlia",
+          "name_rx": "sagrada\\s+fam[i\u00ed]lia",
+          "role": "start",
+          "slug_rx": "wiki/sagrada_fam"
+        },
+        {
+          "key": "creator",
+          "name": "Antoni Gaud\u00ed",
+          "name_rx": "gaud[i\u00ed]",
+          "role": "intermediate",
+          "slug_rx": "wiki/antoni_gaud"
+        },
+        {
+          "key": "terminal",
+          "name": "Casa Mil\u00e0 (La Pedrera)",
+          "name_rx": "casa\\s+mil[\u00e0a]|pedrera",
+          "role": "terminal",
+          "slug_rx": "wiki/casa_mil"
+        }
+      ]
+    },
+    {
+      "candidates": [
+        {
+          "desc": "the Ob, in western Siberia, Russia",
+          "key": "ob",
+          "name": "Ob",
+          "slug_rx": "wiki/ob\\b|wiki/ob_\\(river\\)|wiki/ob_river",
+          "survivor": true
+        },
+        {
+          "desc": "the Lena, in eastern Siberia, Russia",
+          "key": "lena",
+          "name": "Lena",
+          "slug_rx": "wiki/lena_\\(river\\)|wiki/lena_river",
+          "survivor": false
+        },
+        {
+          "desc": "the Amur, on the Russia/China border",
+          "key": "amur",
+          "name": "Amur",
+          "slug_rx": "wiki/amur",
+          "survivor": false
+        },
+        {
+          "desc": "the Kolyma, in far north-eastern Siberia, Russia",
+          "key": "kolyma",
+          "name": "Kolyma",
+          "slug_rx": "wiki/kolyma",
+          "survivor": false
+        }
+      ],
+      "difficulty": "10/10",
+      "keystone_literals": [],
+      "keystone_pattern": "",
+      "module": "test_148_tier5_survivor_reconcile_subset_sum",
+      "statement": "You are given NO URLs \u2014 navigate Wikipedia yourself and READ the pages (do not guess from memory). Three stages; each stage depends on the one before it.\n\nSTAGE 1 \u2014 eliminate to one survivor. Four great rivers:\n  1. the Ob \u2014 the Ob, in western Siberia, Russia\n  2. the Lena \u2014 the Lena, in eastern Siberia, Russia\n  3. the Amur \u2014 the Amur, on the Russia/China border\n  4. the Kolyma \u2014 the Kolyma, in far north-eastern Siberia, Russia\nExactly ONE of these four empties into the KARA SEA. Open EACH river's page and read its MOUTH from the infobox to decide which one; where the infobox names a gulf, an estuary or a delta rather than a sea, work out which sea that body of water belongs to. Determine the mouth of all four; do not simply pick the one you have heard of.\n\nSTAGE 2 \u2014 reconcile two conflicting lengths for the surviving river. Two different lengths circulate for it and BOTH appear on its own article: one is the length of the RIVER ITSELF (source confluence to mouth); the other, much larger, is the length of the combined RIVER SYSTEM measured through its longest tributary \u2014 a figure widely quoted because that system ranks among the longest in the world. Apply this rule: use the length of the RIVER ITSELF; the combined-system figure is NOT the river's length. Do not average them.\n\nSTAGE 3 \u2014 compute the keystone. Consider these four further rivers:\n  - the Irtysh\n  - the Ishim\n  - the Tobol\n  - the Vilyuy\nOpen EACH one's page and read (i) its own LENGTH in km and (ii) the river or sea it flows into. Count a river ONLY IF it satisfies BOTH conditions:\n  (A) it lies within the SURVIVING river's drainage basin \u2014 i.e. its water ultimately reaches the surviving river (this can be indirect: a river that flows into a tributary of the survivor is still in the basin), AND\n  (B) its own length is MORE THAN 2,000 km.\nThen ADD UP: the surviving river's own reconciled length (from stage 2) PLUS the lengths of every counted river. Not all four qualify \u2014 some fail (A), some fail (B).\n\nReport (a) that total in km (a single number \u2014 the keystone answer); (b) which river survived stage 1 and the mouth of each of the four candidates; (c) the two conflicting lengths from stage 2, saying which one you used and why the other was rejected; and (d) for each of the four stage-3 rivers, its length, what it flows into, and whether you counted it; citing the exact Wikipedia URL of every page you read.",
+      "test_id": "148",
+      "test_name": "Tier 5: Survivor -> conflicting-source reconciliation -> constrained subset-sum (Kara Sea river basin)",
+      "waypoints": []
+    }
+  ]
+}
