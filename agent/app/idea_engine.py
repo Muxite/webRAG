@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, List, Tuple
 import asyncio
 import hashlib
 import logging
+import re
 
 from agent.app.idea_dag import IdeaDag, IdeaNode
 from agent.app.idea_policies.base import IdeaNodeStatus
@@ -47,6 +48,28 @@ from agent.app import idea_sequencing
 from agent.app import idea_node_state
 
 
+_QUOTED_PHRASE_RE = re.compile(r'"([^"]+)"')
+
+
+def _reformulate_multi_entity_query(query: Optional[str]) -> Optional[str]:
+    """OR-join a query's quoted phrases when it bundles 2+ distinct entity names.
+
+    Multiple quoted names AND together and rarely appear on one page. OR-joining
+    asks for any of them, which per-entity lookup needs.
+    :param query: Query string that produced zero results.
+    :return: OR-joined reformulation, or None if fewer than two phrases or already OR-joined.
+    """
+    if not query or " OR " in query:
+        return None
+    phrases = _QUOTED_PHRASE_RE.findall(query)
+    if len(phrases) < 2:
+        return None
+    remainder = _QUOTED_PHRASE_RE.sub("", query)
+    remainder = re.sub(r"\s+", " ", remainder).strip()
+    or_joined = " OR ".join(f'"{p}"' for p in phrases)
+    return f"{or_joined} {remainder}" if remainder else or_joined
+
+
 class IdeaDagEngine:
     def __init__(
         self,
@@ -63,29 +86,12 @@ class IdeaDagEngine:
         post_expansion_hooks: Optional[List[PostExpansionHook]] = None,
     ):
         self._logger = logging.getLogger(self.__class__.__name__)
-        # Merge any caller overrides over the JSON defaults so a partial settings
-        # dict still resolves every knob (consistent with the policy classes,
-        # which already merge). The typed config view is the canonical reader.
         self.settings = {**load_idea_dag_settings(), **(settings or {})}
         self._cfg = IdeaConfig.from_settings(self.settings)
-        # Tool availability is typed config (`ToolsConfig`): the action menu starts from
-        # `tools.core_actions`, which carries the run's own `allowed_actions` through unchanged
-        # unless an operator sets `tools_core_actions`. Must run BEFORE the plan-library patch
-        # below (which appends to this list) and before the policies snapshot the settings dict.
         self._apply_tools_config()
-        # On-demand plan library (opt-in, default OFF -> byte-identical): the ONE place the
-        # action becomes reachable. Both readers of `allowed_actions` — this class's
-        # `_execute_action` dispatch gate and `LlmExpansionPolicy`'s prompt action menu — read
-        # a settings dict derived from THIS one, so patching here covers both. It must happen
-        # BEFORE the policies are constructed below: `LlmExpansionPolicy.__init__` merges its
-        # settings into a NEW dict, so it takes a snapshot rather than a live reference.
-        # A fresh list (never an in-place append): the value may be the caller's own list.
         self._patch_allowed_actions()
         self.io = io
         self.model_name = model_name
-        # Built BEFORE the expansion policy: the policy takes the registry by reference purely to
-        # describe allowed non-core actions in its prompt (a name the model is never told the
-        # meaning of is dispatchable but not selectable), so it must exist first.
         self.actions = actions or LeafActionRegistry(settings=self.settings)
         self.expansion = expansion or LlmExpansionPolicy(
             io=io, settings=self.settings, model_name=model_name, actions=self.actions,
@@ -94,10 +100,6 @@ class IdeaDagEngine:
         self.selection = selection or BestScoreSelectionPolicy(settings=self.settings)
         self.decomposition = decomposition or ScoreThresholdDecompositionPolicy(settings=self.settings)
         self.merge = merge or SimpleMergePolicy(settings=self.settings)
-        # The opt-in tool packs armed in `ToolsConfig` — the first production call site for
-        # `install_action_pack`. AFTER the registry and the expansion policy exist, because
-        # `allow_actions` updates the policy's own settings snapshot (the prompt's action menu)
-        # as well as the dispatch gate. Both packs default OFF -> byte-identical.
         self._install_configured_tool_packs()
         self.contracts = contracts or default_contract_registry()
         self.post_expansion_hooks: List[PostExpansionHook] = (
@@ -118,18 +120,15 @@ class IdeaDagEngine:
 
         The core action menu is declarative now: ``tools_core_actions`` wins when set, otherwise
         ``ToolsConfig`` carries the run's existing ``allowed_actions`` through verbatim. So this
-        rewrites the same list on every run that does not configure it — byte-identical, and a
+        rewrites the same list on every run that does not configure it. Byte-identical, and a
         caller's narrowed menu (``debug_runner``, tests) is still respected.
         """
         self.settings["allowed_actions"] = list(self._cfg.tools.core_actions)
 
     def _install_configured_tool_packs(self) -> None:
-        """Install (and permit) the opt-in tool packs armed in ``ToolsConfig``.
+        """Install opt-in tool packs armed in ToolsConfig.
 
-        Each enabled pack is installed WHOLE — the registry learns every class it ships — but only
-        the configured subset reaches ``allowed_actions``, so "sandbox on, ``read_file`` only" is a
-        config change rather than an edit to ``SandboxToolPack.ACTION_CLASSES``. Imports are local
-        so a flag-off run (the default) never imports a pack it will not use.
+        Only configured subset reaches allowed_actions. Imports are local to avoid loading unused packs.
         """
         cfg = self._cfg.tools
         if cfg.sandbox_pack_enabled:
@@ -146,7 +145,7 @@ class IdeaDagEngine:
             self.install_action_pack(CalculatorToolPack(settings=self.settings), allow=True)
 
     def _patch_allowed_actions(self) -> None:
-        """Add ``plan_library_search`` to the action menu — only when both flags are armed.
+        """Add ``plan_library_search`` to the action menu. Only when both flags are armed.
 
         No-op otherwise, so ``allowed_actions`` (and therefore both the dispatch gate and the
         expansion prompt's menu) is byte-identical on every unarmed run, including one whose
@@ -167,13 +166,13 @@ class IdeaDagEngine:
         for an action to be genuinely usable and they live in three places:
           1. the REGISTRY must know the class (dispatch resolves by name through it);
           2. ``settings["allowed_actions"]`` must contain the name (``_execute_action``'s gate);
-          3. the EXPANSION POLICY's own settings copy must contain it too — the policy snapshots
+          3. the EXPANSION POLICY's own settings copy must contain it too. The policy snapshots
              settings at construction, so assigning a fresh list to ``engine.settings`` after the
              fact updates the dispatch gate while leaving the prompt's action menu stale, and the
              model then never proposes the action it is now allowed to run.
 
-        Pass ``allow=False`` to register without permitting (the higher-stakes packs — e.g. the
-        sandbox file/shell tools — are meant to be opted into deliberately, one run at a time).
+        Pass ``allow=False`` to register without permitting (the higher-stakes packs, e.g. the
+        sandbox file/shell tools, are meant to be opted into deliberately, one run at a time).
 
         :param pack: Anything with an ``ACTION_CLASSES`` list (see ``extra_actions/pack.py``).
         :param allow: Whether to add the installed names to ``allowed_actions``.
@@ -239,7 +238,7 @@ class IdeaDagEngine:
         if run_id and self._checkpointer:
             try:
                 cp = await self._checkpointer.load(run_id)
-            except Exception as exc:  # noqa: BLE001 — checkpoint load must never crash a run
+            except Exception as exc:  # noqa: BLE001. Checkpoint load must never crash a run
                 self._logger.warning(f"[RUN] Checkpoint load failed for run_id={run_id}: {exc}")
                 cp = None
             if cp and isinstance(cp.get("snapshot"), dict):
@@ -255,7 +254,7 @@ class IdeaDagEngine:
                     self._logger.info(
                         f"[RUN] Resumed run_id={run_id} from checkpoint step={steps - 1}, current_id={current_id}"
                     )
-                except Exception as exc:  # noqa: BLE001 — corrupt checkpoint should not block a fresh run
+                except Exception as exc:  # noqa: BLE001. Corrupt checkpoint should not block a fresh run
                     self._logger.warning(f"[RUN] Checkpoint restore failed; starting fresh: {exc}")
                     graph = None
                     current_id = None
@@ -275,7 +274,7 @@ class IdeaDagEngine:
         # harness). Wire it as the shared loop's per-step hook so `_run_loop` stays generic.
         on_step = None
         if run_id and self._checkpointer:
-            async def on_step(graph, current_id, steps):  # noqa: A002 — mirror caller names
+            async def on_step(graph, current_id, steps):  # noqa: A002. Mirror caller names
                 try:
                     await self._checkpointer.save(
                         run_id,
@@ -287,7 +286,7 @@ class IdeaDagEngine:
                             "got_dead_end_count": getattr(self._got, "dead_end_count", 0) if self._got else 0,
                         },
                     )
-                except Exception as exc:  # noqa: BLE001 — checkpoint save must never crash a run
+                except Exception as exc:  # noqa: BLE001. Checkpoint save must never crash a run
                     self._logger.warning(f"[RUN] Checkpoint save failed at step {steps - 1}: {exc}")
 
         graph, current_id, steps = await self._run_loop(
@@ -340,7 +339,7 @@ class IdeaDagEngine:
             self._logger.info(f"[RUN] === STEP {steps}/{max_steps} ===")
             try:
                 current_id = await self.step(graph, current_id, steps)
-            except Exception as exc:  # noqa: BLE001 — fail_soft callers finalize partial state
+            except Exception as exc:  # noqa: BLE001. Fail_soft callers finalize partial state
                 if not fail_soft:
                     raise
                 self._logger.error(f"[RUN] Step {steps} failed: {exc}", exc_info=True)
@@ -355,9 +354,6 @@ class IdeaDagEngine:
                 if prune_ids:
                     self._got.prune_nodes(graph, prune_ids)
 
-            # Fix #3: backtrack on dead-end chains. Gated by
-            # `got_backtrack_enabled` (default False); when on, redirect
-            # `current_id` away from a low-score path.
             if (
                 self._got
                 and current_id
@@ -371,13 +367,6 @@ class IdeaDagEngine:
                     )
                     current_id = target
 
-            # A6: calibrated high-confidence early exit — the THIRD outcome at this decision
-            # point, alongside "keep going" and "backtrack". Gated by
-            # `native_confidence_early_exit_enabled` (default False); when on AND the shipped
-            # calibration artifact certifies a rule that the run's accumulated step-confidence
-            # history clears, stop expanding entirely and go straight to finalize. Placed after
-            # backtrack (a dead-end chain must be abandoned before it can be called "done") and
-            # before `on_step` so the checkpoint records the state we actually finalize from.
             if (
                 self._got
                 and self._cfg.got.confidence_early_exit_enabled
@@ -389,7 +378,7 @@ class IdeaDagEngine:
                     metadata={"judged_steps": len(self._step_confidences), "step": steps},
                 )
                 self._logger.info(
-                    f"[RUN] STEP {steps}: calibrated early exit — finalizing after "
+                    f"[RUN] STEP {steps}: calibrated early exit. Finalizing after "
                     f"{len(self._step_confidences)} judged step(s)"
                 )
                 if on_step is not None:
@@ -418,15 +407,9 @@ class IdeaDagEngine:
                     self._logger.warning(f"[RUN] VALIDATION WARNING: No actions created after step 3 (total nodes: {graph.node_count()})")
 
             if current_id is None:
-                # Soft grounding gate: if the mandate needs substantiated (visited)
-                # evidence and we are not grounded yet, inject the missing follow-through
-                # and run another pass. Capped by `grounding_max_replans`; never hangs.
                 if self._grounding_replan(graph, mandate, steps, max_steps):
                     current_id = graph.root_id()
                     continue
-                # Same one-time coverage budget extension for the `step()`-returned-None exit
-                # path (distinct from top-of-loop budget exhaustion). Re-activates the root so
-                # the extended budget can re-check the missing candidates.
                 _cov_ext = self._candidate_coverage_extension(graph, mandate)
                 if _cov_ext > 0:
                     max_steps += _cov_ext
@@ -439,12 +422,6 @@ class IdeaDagEngine:
                 self._logger.warning(f"[RUN] Step {steps} returned None, breaking loop")
                 break
             else:
-                # Root-done early exit (folded in from the benchmark harness so both paths
-                # share it). If step() handed control back to a DONE root the plan is
-                # complete — but a substantiation mandate that is not yet grounded earns one
-                # more capped follow-through pass before we stop. In production step()
-                # returns None for a done root, so this branch is effectively harness-only;
-                # keeping it here means run() and the harness cannot diverge on it.
                 node = graph.get_node(current_id)
                 if node and node.status == IdeaNodeStatus.DONE and current_id == graph.root_id():
                     if self._grounding_replan(graph, mandate, steps, max_steps):
@@ -485,7 +462,7 @@ class IdeaDagEngine:
                 _cov = evaluate_candidate_coverage(graph, mandate)
                 if not _cov.satisfied:
                     _coverage_incomplete = _cov
-            except Exception as exc:  # noqa: BLE001 — the gate must never crash finalize
+            except Exception as exc:  # noqa: BLE001. The gate must never crash finalize
                 self._logger.warning(f"[COVERAGE] pre-finalize check failed: {exc}")
 
         final_payload = await build_final_payload(
@@ -540,7 +517,7 @@ class IdeaDagEngine:
                 )
             else:
                 self._record_decision("finalize", node_id=graph.root_id(), chosen="finalized")
-        except Exception as exc:  # noqa: BLE001 — never crash finalize on grounding
+        except Exception as exc:  # noqa: BLE001. Never crash finalize on grounding
             self._logger.warning(f"[GROUNDING] final grounding check failed: {exc}")
 
         self._logger.info(f"[RUN] Final payload created, graph has {graph.node_count()} nodes, {len(pending_nodes) if pending_nodes else 0} pending")
@@ -602,7 +579,7 @@ class IdeaDagEngine:
         # in-progress subtree, hand control down to it so step()'s escape hatch
         # drives that subtree. Without this, the children-processing below would
         # treat the re-expanded child (ACTIVE, with an action_result AND its own
-        # children) as an executable leaf and re-run its action — clobbering its
+        # children) as an executable leaf and re-run its action. Clobbering its
         # status back to DONE and orphaning the freshly-spawned children.
         for child_id in node.children:
             child = graph.get_node(child_id)
@@ -650,20 +627,8 @@ class IdeaDagEngine:
         if all_leaves_complete and not merge_children:
             branch_pair = find_branch_pair(graph, current_id)
             leaf_statuses = {cid: graph.get_node(cid).status.value for cid in leaf_children if graph.get_node(cid)}
-            self._logger.info(f"[STEP {step_index}] ALL LEAVES COMPLETE ({len(leaf_children)}): {leaf_statuses} — creating merge")
+            self._logger.info(f"[STEP {step_index}] ALL LEAVES COMPLETE ({len(leaf_children)}): {leaf_statuses}. Creating merge")
             if not self.merge.should_create_merge_node(graph, current_id):
-                # This node's children are all done and don't form a mergeable set
-                # (e.g. a single linear child, or `enable_recursive_merge` off) —
-                # `should_create_merge_node` is a deterministic function of the
-                # child set, so it can never flip to True on a later step. Not
-                # scoping this to `_got_reexpanded` nodes (as it once was) matters:
-                # any ordinary node with < 2 children hit `_handle_merge_creation`,
-                # whose own no-merge-needed branch returns `node_id` — the SAME
-                # node this step started on — so `branch_pair.needs_merge()` would
-                # re-evaluate identically forever, silently exhausting the step
-                # budget on the extremely common single-child-chain shape (the
-                # `good_adaptive` self-loop bug's second half). Mark it DONE and
-                # hand back to the parent so the subtree's results reach finalize.
                 self._logger.info(
                     f"[STEP {step_index}] NO MERGE NEEDED: node {current_id[:8]} "
                     f"children done, marking DONE"
@@ -698,7 +663,7 @@ class IdeaDagEngine:
                     if source_node_id:
                         source_node = graph.get_node(source_node_id)
                         # A source that has already RUN (or vanished) and still owes data will
-                        # never deliver it — returning to it just spins the step budget away on
+                        # never deliver it. Returning to it just spins the step budget away on
                         # a node the engine has given up on, and letting the dependent run would
                         # silently read some other sibling's results. Retire the dependent
                         # instead so the parent can still merge what did work. (BLOCKED is a
@@ -796,7 +761,7 @@ class IdeaDagEngine:
 
         Composed of two phases split out so batch callers can parallelize the
         expensive read-only `_reexpand_check` (an independent LLM call per sibling)
-        while keeping the mutating `_apply_reexpand` phase sequential — the latter
+        while keeping the mutating `_apply_reexpand` phase sequential. The latter
         re-checks the shared `max_total_nodes` ceiling so concurrent siblings can
         never overshoot it. The single-node path (this method) composes them
         sequentially, so its behavior is byte-identical to the pre-split version.
@@ -810,14 +775,14 @@ class IdeaDagEngine:
         """The per-lineage re-expansion budget actually in force: the static
         ``got.reexpand_max_iterations`` (flag off, the byte-identical default), or a band picked
         via ``model_tiers.capability_tier(self.model_name)`` when ``reexpand_max_iterations_tiered_
-        enabled`` is on — weak models get more bounded re-expansion attempts, strong models taper
+        enabled`` is on. Weak models get more bounded re-expansion attempts, strong models taper
         toward the current default.
 
         ALL THREE budget-check sites (``_reexpand_check``, ``_apply_reexpand``,
         ``_reexpand_guards_ok``) must read through this single method, not
         ``self._cfg.got.reexpand_max_iterations`` directly: this exact knob was previously found to
         be silently inert at one call site for any value > 1 (see the comment in
-        ``_apply_reexpand``) — a partial port that missed one of the three sites would reintroduce
+        ``_apply_reexpand``). A partial port that missed one of the three sites would reintroduce
         that failure mode for the weak tier specifically.
         """
         if not self._cfg.got.reexpand_max_iterations_tiered_enabled:
@@ -859,7 +824,7 @@ class IdeaDagEngine:
             return None
         # C1a routing: mirrors `_confidence_triggers_reexpand`'s tool-failure gate. If the
         # leaf's "success" is actually a tool failure (empty search results, empty visit
-        # content), a fresh subtree would just repeat the same failing fetch — the bounded
+        # content), a fresh subtree would just repeat the same failing fetch. The bounded
         # in-place connector retry (`_maybe_retry_tool_failure`, already run before this
         # point) is the correct recovery, not re-expansion. Without this the follow-up
         # detector could still be asked to judge a tool-failure result and re-expand off
@@ -889,7 +854,7 @@ class IdeaDagEngine:
         Must be called sequentially (never inside a gather): it re-reads the
         `max_total_nodes` ceiling immediately before expanding so that when several
         siblings passed the read-only gate concurrently, only as many as the budget
-        allows actually expand — the counter/ceiling accounting stays correct because
+        allows actually expand. The counter/ceiling accounting stays correct because
         there is no `await` between this ceiling read and the graph-growing expansion
         for any *other* node (each apply runs to completion before the next starts).
         """
@@ -931,7 +896,7 @@ class IdeaDagEngine:
         before = len(node.children)
         expand_result = await self._handle_expansion_node(graph, node_id, step_index, None)
         if not expand_result or len(node.children) <= before:
-            # Expansion produced nothing — revert markers so the node finalizes normally.
+            # Expansion produced nothing. Revert markers so the node finalizes normally.
             node.details.pop("_got_reexpanded", None)
             node.status = IdeaNodeStatus.DONE
             self._logger.info(f"[STEP {step_index}] REEXPAND: no children produced for {node_id[:8]}; reverting")
@@ -940,7 +905,7 @@ class IdeaDagEngine:
         node.details["_got_reexpand_count"] = count + 1
         # Propagate the lineage re-expansion budget DOWN to the freshly spawned children.
         # A re-expanded node immediately owns children, so it can never re-expand a second
-        # time itself (both re-expand gates skip nodes WITH children) — without this, the
+        # time itself (both re-expand gates skip nodes WITH children). Without this, the
         # `reexpand_max_iterations` knob was inert for any value > 1, because each new child
         # leaf started at count 0 and the lineage only stopped growing when it hit
         # `max_total_nodes`. Seeding each new child with the parent's post-increment count
@@ -995,8 +960,8 @@ class IdeaDagEngine:
         ``PlanLibrary.__init__`` parses and validates every ``templates/*.json`` off disk and
         runs the manifest drift check, so it is neither free nor cheap to repeat: building one
         per expansion step would re-read the whole corpus at every node of every run. One per
-        engine instance is the right grain — a worker handles one mandate at a time (RabbitMQ
-        prefetch=1) and the corpus cannot change mid-run — and building it lazily keeps a
+        engine instance is the right grain. A worker handles one mandate at a time (RabbitMQ
+        prefetch=1) and the corpus cannot change mid-run. And building it lazily keeps a
         flag-off run from touching the disk at all.
         """
         if self._plan_library_corpus_cache is None:
@@ -1012,15 +977,15 @@ class IdeaDagEngine:
         call_site: str,
         origin: str,
     ) -> "_plan_search.SearchResolution":
-        """One plan-library retrieval attempt for ``node`` — the engine's side of it.
+        """One plan-library retrieval attempt for ``node``. The engine's side of it.
 
         The pipeline itself (query -> rank -> fill -> both logs) lives in
         ``idea_policies.plan_library_search`` because the on-demand leaf action runs exactly
         the same one and a ``LeafAction`` has no engine handle to borrow it from; keeping one
         implementation is what stops the two call sites drifting into different logged fields
         or different fail-toward-silence rules. What belongs HERE is the wiring of the engine's
-        collaborators — the per-instance corpus, this run's IO and contracts, the model/timeout
-        knobs — plus the outer net: any exception at all (a broken corpus, a connector blowing
+        collaborators. The per-instance corpus, this run's IO and contracts, the model/timeout
+        knobs, plus the outer net: any exception at all (a broken corpus, a connector blowing
         up) becomes an empty resolution, never a degraded run.
 
         ``RetrievalResult.decision`` IS the confidence gate. The thresholds behind it
@@ -1041,7 +1006,7 @@ class IdeaDagEngine:
                 fallback_model=self._cfg.generation.fallback_model,
                 timeout_seconds=self._cfg.timeouts.expansion or self._cfg.timeouts.llm,
             )
-        except Exception as exc:  # noqa: BLE001 — the library never breaks a run
+        except Exception as exc:  # noqa: BLE001. The library never breaks a run
             self._logger.warning(f"[STEP {step_index}] PLAN LIBRARY: retrieval failed: {exc}")
             return _plan_search.EMPTY
 
@@ -1051,8 +1016,8 @@ class IdeaDagEngine:
         """Try to answer this expansion from the plan library instead of the LLM.
 
         Returns ``(candidates, parent_details)`` when a pre-authored template matched
-        confidently and filled — the caller then skips both the memory enrichment and the
-        expansion policy entirely — and ``(None, None)`` for every other outcome: no match, a
+        confidently and filled. The caller then skips both the memory enrichment and the
+        expansion policy entirely, and ``(None, None)`` for every other outcome: no match, a
         suggest-only score, a slot-fill failure, or any exception at all. Fails toward silence
         exactly like ``contract_satisfaction.py`` and like retrieval's own downgrades: a
         library problem may never degrade a run that would otherwise have planned organically.
@@ -1068,7 +1033,7 @@ class IdeaDagEngine:
             self._logger.info(
                 f"[STEP {step_index}] PLAN LIBRARY: no template applied "
                 f"({getattr(result, 'decision', 'error')}: {getattr(result, 'reason', '')}) "
-                f"— expanding organically"
+                f". Expanding organically"
             )
             return None, None
         self._logger.info(
@@ -1092,7 +1057,7 @@ class IdeaDagEngine:
         # ON-DEMAND path: `_maybe_plan_library_reexpand` already resolved a template (the leaf
         # action matched, filled and logged it) and left the finished expansion here for us, so
         # both call sites converge on this single expansion entry point rather than each
-        # growing children their own way. Single-use — popped on read; only ever present when
+        # growing children their own way. Single-use. Popped on read; only ever present when
         # both plan-library flags are armed.
         pending = node.details.pop(_plan_library.PLAN_LIBRARY_PENDING, None)
         if isinstance(pending, dict):
@@ -1189,7 +1154,7 @@ class IdeaDagEngine:
 
         # Plan-library post-expand wiring, only for a library-sourced expansion (the flag rides
         # in from the short-circuit; organic candidates never carry these markers, so an
-        # unconditional call would merely no-op — see `plan_library_auto_shortcircuit_test`):
+        # unconditional call would merely no-op (see `plan_library_auto_shortcircuit_test`):
         #   * the template's aggregation guidance lands on the PARENT as `details.intent`,
         #     which is the channel `MergeLeafAction` reads as `parent_intent`;
         #   * blueprint-level `depends_on` becomes a real `requires_data` node reference, which
@@ -1239,7 +1204,7 @@ class IdeaDagEngine:
                 child.details[DetailKey.IS_LEAF.value] = True
 
             # Contract log (env-gated, no-op unless IDEA_TEST_CONTRACT_LOG): record the
-            # contract this leaf was created WITH — here rather than in the expansion
+            # contract this leaf was created WITH. Here rather than in the expansion
             # policy, because only now is the candidate a real graph node with an id and a
             # lineage to join its later `contract_resolved` verdict to. The whole block
             # (including the ancestor walk) is skipped when the flag is off. `origin` /
@@ -1320,7 +1285,7 @@ class IdeaDagEngine:
         if callable(rec):
             try:
                 rec(stage=stage, **kwargs)
-            except Exception:  # noqa: BLE001 — tracing must never crash a run
+            except Exception:  # noqa: BLE001. Tracing must never crash a run
                 pass
 
     def _candidate_coverage_extension(self, graph: IdeaDag, mandate: str) -> int:
@@ -1328,7 +1293,7 @@ class IdeaDagEngine:
         visit-backed candidate-coverage gate is unsatisfied; 0 otherwise.
 
         Design (do not scale or repeat):
-        * Triggered ONLY by ``evaluate_candidate_coverage`` — a deterministic, visit-backed
+        * Triggered ONLY by ``evaluate_candidate_coverage``. A deterministic, visit-backed
           check that ignores node titles and search snippets and the model's own self-report
           of progress/confidence. Nothing the model *says* about itself can earn this budget.
         * FIXED size (``got_candidate_coverage_budget_extension``), never proportional to how
@@ -1346,7 +1311,7 @@ class IdeaDagEngine:
             return 0
         try:
             cov = evaluate_candidate_coverage(graph, mandate)
-        except Exception:  # noqa: BLE001 — the gate must never crash a run
+        except Exception:  # noqa: BLE001. The gate must never crash a run
             return 0
         if cov.satisfied:
             return 0
@@ -1365,7 +1330,7 @@ class IdeaDagEngine:
         not grounded, inject follow-through deterministically via the enforcement hooks
         (no extra LLM expansion) and ask the run loop to continue. Bounded by
         `grounding_max_replans` (default 2) so a model that cannot navigate still finalizes
-        — flagged ungrounded — rather than hanging.
+        (flagged ungrounded) rather than hanging.
         """
         telemetry = getattr(self.io, "telemetry", None)
 
@@ -1379,14 +1344,14 @@ class IdeaDagEngine:
 
         # Deterministic candidate-coverage gate (opt-in). For "branch-eliminate" task
         # shapes (K similarly-named candidates, one distinguishing criterion), require
-        # that every named candidate has been touched before finalizing — otherwise a
+        # that every named candidate has been touched before finalizing. Otherwise a
         # weak model tends to elect the most familiar one and stop early. Fails open on
         # any non-enumerated mandate. Guarded so behavior is byte-identical when off.
         cov = None
         if self._cfg.got.candidate_coverage_enabled:
             try:
                 cov = evaluate_candidate_coverage(graph, mandate)
-            except Exception:  # noqa: BLE001 — the gate must never crash a run
+            except Exception:  # noqa: BLE001. The gate must never crash a run
                 cov = None
 
         try:
@@ -1425,11 +1390,11 @@ class IdeaDagEngine:
         for hook in self.post_expansion_hooks:
             try:
                 hook.apply(graph, root_id, steps, mandate, self._logger, telemetry=telemetry)
-            except Exception as exc:  # noqa: BLE001 — a hook must never crash a run
+            except Exception as exc:  # noqa: BLE001. A hook must never crash a run
                 self._logger.warning(f"[GROUNDING] hook failed: {exc}")
         injected = graph.node_count() - before
         # No follow-through injected: normally we finalize (nothing would change). But an
-        # unsatisfied coverage gate still forces a pass — re-activating the root lets the
+        # unsatisfied coverage gate still forces a pass. Re-activating the root lets the
         # executor re-expand and check the remaining candidates. Bounded by the replan cap.
         if injected <= 0 and not cov_unsatisfied:
             _decide("ungrounded-no-followup", res, replans=replans)
@@ -1581,11 +1546,27 @@ class IdeaDagEngine:
                 for cid in eligible
             )
             if all_executable_leaves:
-                self._logger.info(
-                    f"[STEP {step_index}] AUTO-PARALLEL: {len(eligible)} independent "
-                    f"leaf siblings, executing concurrently"
-                )
-                execute_all = True
+                # `parallel_requires_evidence` off (default): unchanged -- every
+                # executable-leaf batch is trusted as independent, exactly as before. On:
+                # require idea_sequencing.siblings_are_independent's positive evidence (a
+                # deterministic, no-LLM check) instead of trusting the heuristic alone.
+                independent = True
+                reason: Optional[str] = None
+                if self._cfg.engine.parallel_requires_evidence:
+                    independent, reason = idea_sequencing.siblings_are_independent(
+                        graph, eligible, node, self._logger,
+                    )
+                if independent:
+                    self._logger.info(
+                        f"[STEP {step_index}] AUTO-PARALLEL: {len(eligible)} independent "
+                        f"leaf siblings, executing concurrently"
+                    )
+                    execute_all = True
+                elif reason is not None:
+                    self._logger.info(
+                        f"[STEP {step_index}] AUTO-PARALLEL SKIPPED ({reason}): "
+                        f"{len(eligible)} leaf siblings not batched"
+                    )
 
         if execute_all and self._cfg.engine.allow_execute_all_children and not has_dependencies:
             ready_children = [
@@ -1594,6 +1575,18 @@ class IdeaDagEngine:
             ]
             if not ready_children:
                 return node_id
+
+            # `defer_unresolved_slots` off (default): unchanged. On: drop any candidate
+            # whose details still carry a literal unfilled placeholder from THIS step's
+            # batch -- its siblings run, and it becomes eligible again next step. Never
+            # drops every candidate (see defer_unresolved_slot_candidates's progress
+            # guarantee).
+            if self._cfg.engine.defer_unresolved_slots:
+                ready_children = idea_sequencing.defer_unresolved_slot_candidates(
+                    graph, ready_children, step_index, self._logger,
+                )
+                if not ready_children:
+                    return node_id
 
             parallel_limit = max(1, self._cfg.engine.parallel_action_limit)
             self._logger.info(
@@ -1653,7 +1646,7 @@ class IdeaDagEngine:
                         done_children.append(cid)
 
             # Opt-in decorrelated per-step confidence judge for the batch-completed siblings
-            # (the auto-parallel path bypasses `_apply_action_result`, so wire it here too —
+            # (the auto-parallel path bypasses `_apply_action_result`, so wire it here too.
             # the same coverage requirement the re-expansion check has). No-op when the flag
             # is off; per-sibling judge calls run concurrently inside the batch helper.
             if done_children:
@@ -1787,11 +1780,11 @@ class IdeaDagEngine:
         """Run ``_execute_action`` under the per-action timeout watchdog.
 
         The per-type action cap (``_action_timeout_for``, default 20s) must bound EVERY
-        routing path, not only the auto-parallel gather — which already wraps its calls
+        routing path, not only the auto-parallel gather. Which already wraps its calls
         in ``asyncio.wait_for`` (see ``_run_one``). Leaf, merge, and single-best-child
         selection previously called ``_execute_action`` bare, so on those paths (the
-        default engine variant, with auto-parallel off) a slow action — e.g. a ``visit``
-        fanning out to many URLs on slow sites, times the in-place tool-retry loop — could
+        default engine variant, with auto-parallel off) a slow action (e.g. a ``visit``
+        fanning out to many URLs on slow sites, times the in-place tool-retry loop). Could
         wedge the whole cell, since there is no run-level watchdog to catch it. On expiry
         we mark the node FAILED (so the step loop does not re-execute it) and return None,
         matching how the auto-parallel path degrades a timed-out child.
@@ -1851,7 +1844,7 @@ class IdeaDagEngine:
                     node.status = IdeaNodeStatus.FAILED
                     return result
         
-        # Resolve by NAME through the registry, not by coercing into the IdeaActionType enum —
+        # Resolve by NAME through the registry, not by coercing into the IdeaActionType enum.
         # LeafActionRegistry.register()/install_pack() let a caller register a custom action
         # under a name that was never added to the enum, and this is the one place that
         # decides whether such a name is actually reachable from the model's own selection.
@@ -1914,14 +1907,17 @@ class IdeaDagEngine:
         """Bounded in-place retry of a TOOL failure (opt-in; no-op unless
         ``connector_retry_on_failure_enabled``).
 
-        A tool failure is a fetch/search that returned no usable evidence — a timeout, an
+        A tool failure is a fetch/search that returned no usable evidence. A timeout, an
         HTTP error, or an EMPTY payload (no search results / no extractable content). The
         re-expansion loop is the wrong response to a *transient* one: a fresh subtree just
         repeats the same failing call. Here we simply re-run the SAME action, up to
         ``connector_retry_max_attempts`` times with a small growing backoff, returning the
         first non-failure result (or the last attempt's result if all fail). Fully bounded,
         so it can never hang or loop; permanent failures (``retryable=False`` and not a
-        success-with-empty) are not retried.
+        success-with-empty) are not retried. One exception to "same action, same query": an
+        empty SEARCH whose query bundles multiple quoted entity names gets OR-joined before
+        the retry (see ``_reformulate_search_query_if_multi_entity``). Resending the
+        identical AND-shaped query would just fail again.
         """
         if not self._cfg.action.connector_retry_on_failure_enabled:
             return result
@@ -1936,6 +1932,7 @@ class IdeaDagEngine:
             attempt += 1
             if backoff > 0:
                 await asyncio.sleep(backoff * attempt)
+            self._reformulate_search_query_if_multi_entity(graph, node_id, result)
             self._logger.info(
                 f"[TOOL-RETRY] node {node_id[:8]} tool_failure; retrying same action "
                 f"(attempt {attempt}/{max_attempts})"
@@ -1953,7 +1950,7 @@ class IdeaDagEngine:
         Retry a transient-ish failure: a success-with-EMPTY payload (search/visit returned
         nothing) OR an explicit failure flagged ``retryable`` (timeout / 5xx / network /
         empty-content). Do NOT retry a permanent failure (``retryable=False``, e.g. HTTP
-        403/404/401) — re-running it just burns the budget.
+        403/404/401). Re-running it just burns the budget.
         """
         from agent.app.idea_policies.action_constants import ActionResultExtractor
         if not ActionResultExtractor.is_tool_failure(result):
@@ -1964,6 +1961,34 @@ class IdeaDagEngine:
             return True  # success-with-empty payload: worth a transient retry
         return ActionResultExtractor.is_retryable(result)
 
+    def _reformulate_search_query_if_multi_entity(self, graph: IdeaDag, node_id: str, result) -> None:
+        """Before retrying an empty SEARCH, OR-join a multi-quoted-entity query in place.
+
+        No-op for non-search actions, non-empty results, or a query that isn't multi-entity
+        shaped (``_reformulate_multi_entity_query`` returns ``None``). Mutates the node's
+        stored query via ``graph.update_details`` so the next ``action.execute`` call in the
+        retry loop reads the reformulated query fresh (``SearchLeafAction`` re-fetches the
+        node from the graph on every call, it never caches).
+        """
+        from agent.app.idea_policies.action_constants import ActionResultKey
+        if not isinstance(result, dict):
+            return
+        if result.get(ActionResultKey.ACTION.value) != IdeaActionType.SEARCH.value:
+            return
+        if result.get(ActionResultKey.RESULTS.value):
+            return  # not empty, nothing to reformulate
+        node = graph.get_node(node_id)
+        if node is None:
+            return
+        query = NodeDetailsExtractor.get_query(node.details, fallback_title=node.title)
+        reformulated = _reformulate_multi_entity_query(query)
+        if reformulated:
+            self._logger.info(
+                f"[TOOL-RETRY] node {node_id[:8]} reformulating multi-entity query: "
+                f"{query!r} -> {reformulated!r}"
+            )
+            graph.update_details(node_id, {DetailKey.QUERY.value: reformulated})
+
     async def _apply_action_result(self, graph: IdeaDag, node_id: str, step_index: int) -> str:
         """Single shared completion point for every executed action.
 
@@ -1971,7 +1996,7 @@ class IdeaDagEngine:
         the sequential-dependency branch, and the two merge paths) route a
         successful `_execute_action` through here rather than calling
         `_handle_action_result` directly. This records the result's status
-        bookkeeping and — when the node lands DONE — offers it the bounded
+        bookkeeping and (when the node lands DONE) offers it the bounded
         re-expansion follow-up check. Centralizing here means the re-expansion
         escape hatch fires regardless of which routing branch drove the node to
         completion, with no per-branch duplication. `_maybe_reexpand_leaf` is a
@@ -1984,7 +2009,7 @@ class IdeaDagEngine:
         if node and node.status == IdeaNodeStatus.DONE:
             # Contract log (env-gated, no-op unless IDEA_TEST_CONTRACT_LOG): what the
             # deterministic contract check made of this completed leaf. Calls
-            # `_evaluate_contract` rather than `_contract_verdict` on purpose — the log
+            # `_evaluate_contract` rather than `_contract_verdict` on purpose. The log
             # audits the contract MECHANISM, so it must observe every completion, including
             # on runs where the re-expansion lever it feeds is switched off.
             if _contract_log.enabled():
@@ -1995,7 +2020,7 @@ class IdeaDagEngine:
             # On-demand plan library: an ADOPTED template search becomes real children here
             # (no-op unless both plan-library flags are armed and this node IS such a search).
             # Runs FIRST among the re-expansion triggers: a node it expands then has children,
-            # which gates it out of all three below — the retrieved plan wins over an invented
+            # which gates it out of all three below. The retrieved plan wins over an invented
             # follow-up, which is the whole point of having asked for one.
             await self._maybe_plan_library_reexpand(graph, node_id, step_index)
             confidences = await self._maybe_judge_step_confidence(graph, node_id, step_index)
@@ -2029,7 +2054,7 @@ class IdeaDagEngine:
         ``sample_every`` subsamples (judge every Nth completion) to bound the added call
         volume; the counter advances deterministically in the given order so subsampling is
         reproducible regardless of concurrency. The judge (``GoTOperations.judge_step_confidence``)
-        sees only trajectory-visible context — never the grep validators or ground truth — so the
+        sees only trajectory-visible context (never the grep validators or ground truth). So the
         logged sequence is a genuine E-valuator substrate, decorrelated from the final
         grep-computed label. The per-leaf judge calls run concurrently; this never raises.
 
@@ -2079,7 +2104,7 @@ class IdeaDagEngine:
 
         A candidate must be an existing, childless, non-merge leaf with a SUCCESSFUL action
         result, inside both the per-lineage ``reexpand_max_iterations`` budget and the global
-        ``max_total_nodes`` ceiling — so termination is guaranteed identically no matter which
+        ``max_total_nodes`` ceiling. So termination is guaranteed identically no matter which
         trigger (step-confidence, contract satisfaction, or the follow-up detector) fired.
         No LLM call, no mutation.
         """
@@ -2097,7 +2122,7 @@ class IdeaDagEngine:
         if not ActionResultExtractor.is_success(result):
             return False
         # C1a routing: if the leaf's "success" is actually a TOOL failure (the fetch/search
-        # returned no usable evidence), do NOT re-expand — a fresh subtree would just repeat
+        # returned no usable evidence), do NOT re-expand. A fresh subtree would just repeat
         # the failing fetch. The bounded in-place connector retry is the right recovery for
         # that; re-expansion is reserved for a page that genuinely loaded but lacks the answer.
         # No-op unless `tool_failure_recovery_enabled` (default off -> byte-identical).
@@ -2119,7 +2144,7 @@ class IdeaDagEngine:
 
         Returns ``None`` when the lever is off or the check has NO verdict (the leaf
         retrieved nothing checkable, or its contract text yields neither a measurable datum
-        nor an identity token) — callers then fall back to the previous signal. Never raises
+        nor an identity token). Callers then fall back to the previous signal. Never raises
         and never mutates; costs no LLM call.
 
         The lever gate is HERE and the computation is in ``_evaluate_contract`` so the
@@ -2148,7 +2173,7 @@ class IdeaDagEngine:
         try:
             from agent.app.idea_policies.contract_satisfaction import evaluate_step_contract
             verdict = evaluate_step_contract(node, mandate)
-        except Exception as exc:  # noqa: BLE001 — a gate must never crash a run
+        except Exception as exc:  # noqa: BLE001. A gate must never crash a run
             self._logger.warning(f"[CONTRACT] check failed (node={node_id}): {exc}")
             return None
         return verdict if verdict.applicable else None
@@ -2167,8 +2192,8 @@ class IdeaDagEngine:
         exactly the same bounds as every other trigger. No LLM call, no mutation.
 
         F33 corrective (no-op unless ``got.contract_reexpand_enabled``): the judge's number
-        is anti-calibrated — a coherent WRONG page scores high and a correct-but-partial page
-        scores low — so it may not overrule a leaf whose CONTRACT is demonstrably satisfied
+        is anti-calibrated. A coherent WRONG page scores high and a correct-but-partial page
+        scores low. So it may not overrule a leaf whose CONTRACT is demonstrably satisfied
         (the required payload/datum/subject is present in the retrieved evidence). Where the
         contract check has no verdict, the judge still decides, exactly as before.
         """
@@ -2195,7 +2220,7 @@ class IdeaDagEngine:
         No-op unless ``got.step_confidence_reexpand_enabled`` is set (JSON default False),
         so flag-off behavior is byte-identical. Applied SEQUENTIALLY (never inside a
         gather): each ``_apply_reexpand`` re-reads the ``max_total_nodes`` ceiling before
-        growing the graph, so concurrent siblings can never overshoot it — mirroring the
+        growing the graph, so concurrent siblings can never overshoot it. Mirroring the
         follow-up re-expansion path. Independent of ``got.reexpand_enabled``: the shared
         ``_apply_reexpand`` machinery is trigger-agnostic, so a run can drive re-expansion
         from confidence alone, from the follow-up detector, or from both.
@@ -2225,7 +2250,7 @@ class IdeaDagEngine:
         contract check reports a missing payload / required datum / subject re-expands: the
         step did not deliver what the task required, which is a signal about task PROGRESS
         rather than about how confident a judge feels. Unlike the confidence loop this needs
-        no ``GoTOperations`` and no judge LLM call — it is free — so it fires on every
+        no ``GoTOperations`` and no judge LLM call (it is free). So it fires on every
         completed leaf, including runs with the step-confidence judge off entirely. Applied
         SEQUENTIALLY (never inside a gather): each ``_apply_reexpand`` re-reads the
         ``max_total_nodes`` ceiling before growing the graph.
@@ -2251,7 +2276,7 @@ class IdeaDagEngine:
         No-op unless ``plan_library.enabled`` and ``plan_library.action_enabled`` are both set
         (JSON default False -> byte-identical), the completed node's action is
         ``plan_library_search``, and its result reports ``adopted=True``. The leaf action is
-        read-only by design — it ranks, fills and reports — so this is where the graph actually
+        read-only by design (it ranks, fills and reports). So this is where the graph actually
         grows, alongside every other re-expansion trigger and under the SAME
         ``_reexpand_guards_ok`` termination bounds.
 
@@ -2304,7 +2329,7 @@ class IdeaDagEngine:
                 origin=_plan_library.ORIGIN_ACTION,
                 contracts=self.contracts,
             )
-        except Exception as exc:  # noqa: BLE001 — a rebuild failure is silence, not a crash
+        except Exception as exc:  # noqa: BLE001. A rebuild failure is silence, not a crash
             self._logger.warning(
                 f"[STEP {step_index}] PLAN LIBRARY: rebuilding '{template_id}' failed: {exc}"
             )
@@ -2390,10 +2415,23 @@ class IdeaDagEngine:
                         if action_type == IdeaActionType.SEARCH:
                             self._logger.debug(f"[DATA_FLOW] Node {node_id} (search) now provides {contract_name}")
 
+                # Deterministic (LLM-free) value threading for a downstream hop (opt-in, JSON
+                # default OFF -> byte-identical when off). See idea_policies/waypoint.py for the
+                # extraction design and the wrong-page false-positive measurement that gates it
+                # behind a page-identity guard.
+                if self._cfg.engine.waypoint_enabled:
+                    try:
+                        from agent.app.idea_policies import waypoint as _waypoint
+                        wp = _waypoint.build_waypoint(node, result, action, node_id, step_index)
+                        if wp is not None:
+                            node.details["waypoint"] = wp.as_dict()
+                    except Exception as exc:  # noqa: BLE001 -- extraction must never fail a leaf
+                        self._logger.warning(f"[WAYPOINT] extraction failed (node={node_id}): {exc}")
+
                 node.status = IdeaNodeStatus.DONE
                 return ResultStatus.SUCCESS.value
             # Fix #9: VISIT empty-content path flipped `success` to False above.
-            # Previously the code fell through to `node.status = DONE` anyway —
+            # Previously the code fell through to `node.status = DONE` anyway.
             # a latent bug. With `visit_empty_content_retryable` (default True),
             # the node now falls through to the retry/fail branch below.
             if not self._cfg.action.visit_empty_content_retryable:

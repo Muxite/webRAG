@@ -23,6 +23,9 @@ import json
 import os
 import sys
 
+from agent.app.idea_test_utils import visited_evidence
+from agent.app.testing.utils import build_validation_evidence
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -63,6 +66,41 @@ def main() -> int:
             data = json.load(fh)
         result = data["execution"]
         obs = data["execution"]["observability"]
+
+        # Evidence-dependent tasks (012/021/022/023) prove grounding by matching a claimed fact
+        # against the fetched page text. That text reaches validators at RUN time via
+        # `observability["evidence"]`, projected by `runner.run_complete_test` from
+        # `telemetry.documents_seen`. But `idea_test_runner` strips `telemetry_raw` from the
+        # persisted result at the default report verbosity (<FULL), so it is not recoverable here.
+        # Re-scoring anyway would silently zero every grounded check and report a large, entirely
+        # fictitious regression. Measured on a real 2026-08-15 run: 0.944 live -> 0.417 re-scored.
+        # Refuse loudly instead. Re-run the cell, or capture with IDEA_TEST_REPORT_VERBOSITY=3.
+        needs_evidence = any(
+            "evidence" in (getattr(fn, "__doc__", "") or "").lower()
+            or "grounding" in (getattr(fn, "__doc__", "") or "").lower()
+            for fn in validators
+        )
+        if needs_evidence and not (obs.get("evidence") or {}).get("visited"):
+            if "telemetry_raw" in data.get("execution", {}):
+                obs = dict(obs)
+                obs["evidence"] = build_validation_evidence(data["execution"]["telemetry_raw"])
+            elif visited_evidence(result, obs):
+                # No telemetry_raw, but `visited_evidence()` (which every evidence-aware validator
+                # calls internally) can still recover per-page evidence from `result["graph"]`
+                # itself for the `graph`/`naive_discretion` variants -- those persist visit
+                # content on every node regardless of report verbosity. Leave `obs` as-is; nothing
+                # to pre-inject, the validator will do the same fallback lookup on its own.
+                pass
+            else:
+                print(
+                    f"{os.path.basename(path):70s} SKIPPED. Task {args.test_id} scores against "
+                    "fetched-page evidence, which this result no longer carries "
+                    "(telemetry_raw stripped at default verbosity, and no populated graph to fall "
+                    "back on). Re-scoring would fabricate a regression. Re-run the cell, or capture "
+                    "with IDEA_TEST_REPORT_VERBOSITY=3.",
+                    file=sys.stderr,
+                )
+                continue
 
         grep_validations = []
         scores = []

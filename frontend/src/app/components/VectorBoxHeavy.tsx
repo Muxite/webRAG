@@ -21,7 +21,6 @@ export default function VectorBoxHeavy({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Main container with enhanced gradient border */}
       <div
         className={`relative border-2 ${paddingClass}`}
         style={{
@@ -30,7 +29,6 @@ export default function VectorBoxHeavy({
           boxShadow: `0 0 15px ${borderColor}30, inset 0 0 15px ${borderColor}15`,
         }}
       >
-        {/* Content */}
         <div className="relative z-10">{children}</div>
       </div>
     </div>

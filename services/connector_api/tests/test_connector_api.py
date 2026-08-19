@@ -144,7 +144,7 @@ def test_visit_connection_error_is_reachable_false(make_client):
     body = resp.json()
     assert body["reachable"] is False
     assert body["status"] is None
-    assert body["browser_fallback_used"] is False  # error result w/ status -> no fallback
+    assert body["browser_fallback_used"] is False
     assert "cannot connect" in body["reason"].lower()
 
 
@@ -278,7 +278,6 @@ def test_lifespan_constructs_and_cleans_up(monkeypatch):
     with TestClient(app) as client:
         resp = client.get("/health")
         assert resp.status_code == 200
-    # Shutdown should have invoked cleanup on the injected connectors.
     assert fake_search.reset_called is True
     assert fake_http.reset_called is True
     assert fake_browser.closed is True

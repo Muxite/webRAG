@@ -1,17 +1,14 @@
-"""Sequential reordering / state-dependency helpers from :class:`IdeaDagEngine`.
+"""Sequential reordering and state-dependency helpers from IdeaDagEngine.
 
-Behavior-preserving helpers that (a) reorder a selected child so data-producing
-work (search / URL-bearing visit) runs before data-consuming work
-(think / save / merge, and URL-less visits that need a sibling search), and
-(b) detect implicit state dependencies among sibling candidates so the engine
-falls back to sequential execution. State is passed in explicitly so the engine
-remains the sole stateful orchestrator.
+Reorders children so data-producing work (search, visits with URLs) runs before
+data-consuming work (think, save, merge). Detects state dependencies among
+siblings to decide between parallel and sequential execution.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from agent.app.idea_dag import IdeaDag, IdeaNode
 from agent.app.idea_policies import DetailKey
@@ -126,3 +123,112 @@ def detect_state_dependencies(
         return True
 
     return False
+
+
+def siblings_are_independent(
+    graph: IdeaDag,
+    candidate_ids: List[str],
+    mandate: IdeaNode,
+    logger: logging.Logger,
+) -> Tuple[bool, str]:
+    """Check if candidates can safely execute in parallel (deterministic, no LLM).
+
+    Applies ordered rules: state dependencies, unresolved slots, concrete URLs,
+    mixed search/visit with URLs, disjoint searches, else no independence.
+
+    :returns: (independent, reason) with reason for debugging.
+    """
+    if detect_state_dependencies(graph, candidate_ids, logger):
+        return False, "state_dependency"
+
+    from agent.app.idea_policies.base import IdeaActionType
+    from agent.app.idea_policies.dataflow import unresolved_slots
+
+    nodes: List[IdeaNode] = []
+    for node_id in candidate_ids:
+        node = graph.get_node(node_id)
+        if node is not None:
+            nodes.append(node)
+
+    for node in nodes:
+        if unresolved_slots(node.details, title=node.title):
+            return False, "unresolved_slot"
+
+    def _concrete_url(details) -> Optional[str]:
+        for key in ("optional_url", DetailKey.URL.value, DetailKey.LINK.value, "url", "link"):
+            value = details.get(key)
+            if isinstance(value, str) and value.startswith(("http://", "https://")):
+                return value
+        return None
+
+    if nodes and all(
+        NodeDetailsExtractor.get_action(n.details) == IdeaActionType.VISIT.value
+        and _concrete_url(n.details)
+        for n in nodes
+    ):
+        return True, "concrete_urls"
+
+    if nodes:
+        actions = {NodeDetailsExtractor.get_action(n.details) for n in nodes}
+        if actions == {IdeaActionType.SEARCH.value, IdeaActionType.VISIT.value} and all(
+            _concrete_url(n.details)
+            for n in nodes
+            if NodeDetailsExtractor.get_action(n.details) == IdeaActionType.VISIT.value
+        ):
+            return True, "mixed_search_visit"
+
+    if nodes and all(
+        NodeDetailsExtractor.get_action(n.details) == IdeaActionType.SEARCH.value
+        for n in nodes
+    ):
+        queries = set()
+        for n in nodes:
+            query = NodeDetailsExtractor.get_query(n.details, fallback_title=n.title)
+            if isinstance(query, str) and query.strip():
+                queries.add(" ".join(query.strip().lower().split()))
+        if len(queries) >= 2:
+            return True, "disjoint_searches"
+
+    return False, "no_independence_evidence"
+
+
+def defer_unresolved_slot_candidates(
+    graph: IdeaDag,
+    ready_children: List[str],
+    step_index: int,
+    logger: logging.Logger,
+) -> List[str]:
+    """Drop slot-bearing candidates from this step's ready set.
+
+    Defers only one candidate per step if other siblings can proceed. Guarantees
+    forward progress by never deferring a candidate twice.
+
+    :param ready_children: Node ids filtered to this step's action-ready set.
+    :returns: ready_children with deferred candidates removed.
+    """
+    from agent.app.idea_policies.dataflow import unresolved_slots
+
+    deferrable: List[tuple] = []
+    for candidate_id in ready_children:
+        node = graph.get_node(candidate_id)
+        if node is None:
+            continue
+        if node.details.get("__dataflow_deferred_step") is not None:
+            continue
+        slots = unresolved_slots(node.details, title=node.title)
+        if slots:
+            deferrable.append((candidate_id, slots))
+
+    if not deferrable or len(deferrable) >= len(ready_children):
+        return ready_children
+
+    deferred_ids = {candidate_id for candidate_id, _ in deferrable}
+    kept = [cid for cid in ready_children if cid not in deferred_ids]
+    for candidate_id, slots in deferrable:
+        node = graph.get_node(candidate_id)
+        node.details["__dataflow_deferred_step"] = step_index
+        logger.info(
+            f"[STEP {step_index}] DATAFLOW DEFER: node {candidate_id} has an unresolved "
+            f"slot in {slots}; deferring to next step ({len(kept)} sibling(s) proceed)"
+        )
+    return kept

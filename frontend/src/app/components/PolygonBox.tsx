@@ -3,13 +3,13 @@ import React, { useEffect, useRef, useState } from "react";
 interface PolygonBoxProps {
   children: React.ReactNode;
   className?: string;
-  density?: number; // How many points per side (default: 20)
-  spikiness?: number; // How much variation in the edge (default: 15)
-  margin?: number; // SVG margin from edge (default: 1)
-  padding?: number; // Content padding in Tailwind units (default: 5)
-  borderColor?: string; // Border color (default: #06b6d4)
-  borderThickness?: number; // Border thickness (default: 1)
-  fillColor?: string; // Fill color (default: transparent)
+  density?: number;
+  spikiness?: number;
+  margin?: number;
+  padding?: number;
+  borderColor?: string;
+  borderThickness?: number;
+  fillColor?: string;
 }
 
 export default function PolygonBox({
@@ -50,14 +50,14 @@ export default function PolygonBox({
     const extension = 20;
     
     if (density === 0) {
-      lines.push(`M ${-extension} ${margin} L ${width / 2} ${margin}`); // Top left to center
-      lines.push(`M ${width / 2} ${margin} L ${width + extension} ${margin}`); // Top center to right
-      lines.push(`M ${width - margin} ${-extension} L ${width - margin} ${height / 2}`); // Right top to center
-      lines.push(`M ${width - margin} ${height / 2} L ${width - margin} ${height + extension}`); // Right center to bottom
-      lines.push(`M ${width + extension} ${height - margin} L ${width / 2} ${height - margin}`); // Bottom right to center
-      lines.push(`M ${width / 2} ${height - margin} L ${-extension} ${height - margin}`); // Bottom center to left
-      lines.push(`M ${margin} ${height + extension} L ${margin} ${height / 2}`); // Left bottom to center
-      lines.push(`M ${margin} ${height / 2} L ${margin} ${-extension}`); // Left center to top
+      lines.push(`M ${-extension} ${margin} L ${width / 2} ${margin}`);
+      lines.push(`M ${width / 2} ${margin} L ${width + extension} ${margin}`);
+      lines.push(`M ${width - margin} ${-extension} L ${width - margin} ${height / 2}`);
+      lines.push(`M ${width - margin} ${height / 2} L ${width - margin} ${height + extension}`);
+      lines.push(`M ${width + extension} ${height - margin} L ${width / 2} ${height - margin}`);
+      lines.push(`M ${width / 2} ${height - margin} L ${-extension} ${height - margin}`);
+      lines.push(`M ${margin} ${height + extension} L ${margin} ${height / 2}`);
+      lines.push(`M ${margin} ${height / 2} L ${margin} ${-extension}`);
       return lines;
     }
 
@@ -156,7 +156,6 @@ export default function PolygonBox({
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
-      {/* SVG Border Lines */}
       <svg
         className="absolute inset-0 pointer-events-none"
         width={dimensions.width}

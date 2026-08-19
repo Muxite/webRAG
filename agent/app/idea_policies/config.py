@@ -12,15 +12,15 @@ typed attributes. ``IdeaConfig.from_settings(settings)`` builds every group.
 
 Defaults here mirror the production values shipped in ``idea_dag_settings.json``
 (not always the historical per-call-site fallback, which sometimes disagreed with
-the JSON — e.g. ``action_max_retries`` was ``0`` at one call site but ``2`` in the
+the JSON (e.g. ``action_max_retries`` was ``0`` at one call site but ``2``) in the
 JSON that always overrode it). Because the JSON always supplies these keys, the
 runtime value is unchanged; the dataclass default only governs the rare case of a
 key being absent. The handful of keys genuinely absent from the JSON
 (``semantic_dedup_*``, ``sequential_prune_siblings``, ``final_max_prompt_chars``,
 ``require_score``) keep their original call-site default.
 
-Content keys — prompts (``*_system_prompt`` / ``*_user_prompt`` /
-``*_planning_addendum``) and JSON schemas (``*_json_schema``) — are intentionally
+Content keys (prompts: ``*_system_prompt`` / ``*_user_prompt`` /
+``*_planning_addendum``, and JSON schemas: ``*_json_schema``) are intentionally
 *not* modelled here; they remain dict/document content read directly from settings.
 """
 
@@ -77,13 +77,13 @@ class GoTConfig:
     reexpand_enabled: bool = False
     reexpand_max_iterations: int = 1
     # Capability-tiered re-expansion budget (opt-in, layered on top of reexpand_max_iterations
-    # above — this flag alone is a no-op; ``_effective_reexpand_max_iterations`` in idea_engine.py
-    # is the single place all THREE re-expansion budget check sites read through, required because
-    # this exact knob was once silently inert at one call site for any value > 1 — see the comment
-    # there). When on, the effective budget is picked via ``model_tiers.capability_tier``: weak
-    # models get more bounded re-expansion attempts (the native-engine-appropriate analog of
-    # badmodel-lab's per-page extraction retry lever — see the capability-continuum plan), strong
-    # models taper toward the current default. Placeholders pending live calibration.
+    # above; this flag alone is a no-op). The _effective_reexpand_max_iterations in idea_engine.py
+    # is the single place all THREE re-expansion budget check sites read through. This is required
+    # because the exact knob was once silently inert at one call site for any value > 1 (see
+    # comment there). When on, effective budget is picked via model_tiers.capability_tier: weak
+    # models get more bounded re-expansion attempts (native-engine analog of badmodel-lab's
+    # per-page extraction retry lever, see capability-continuum plan), strong models taper
+    # toward the current default. Placeholders pending live calibration.
     reexpand_max_iterations_tiered_enabled: bool = False
     reexpand_max_iterations_weak: int = 2
     reexpand_max_iterations_standard: int = 1
@@ -95,12 +95,12 @@ class GoTConfig:
     step_confidence_judge_model: Optional[str] = None
     step_confidence_reexpand_enabled: bool = False
     step_confidence_reexpand_threshold: float = 0.5
-    # F33 — re-base the re-expansion trigger on CONTRACT SATISFACTION instead of the
-    # anti-calibrated step-confidence judge (opt-in, default OFF -> byte-identical). When on,
-    # a completed retrieval leaf whose deterministic contract check reports a missing payload /
-    # datum / subject re-expands (no judge LLM call needed), and a leaf whose contract is
-    # demonstrably SATISFIED is protected from the judge's low-score trigger. Where the check
-    # has no verdict (``applicable=False``) the confidence trigger still applies as before.
+    # F33: re-base re-expansion trigger on CONTRACT SATISFACTION instead of the
+    # anti-calibrated step-confidence judge (opt-in, default OFF for byte-identity).
+    # A completed retrieval leaf whose contract check reports missing payload/datum/subject
+    # re-expands without an LLM judge call. A leaf whose contract is demonstrably SATISFIED
+    # is protected from the judge's low-score trigger. When the check has no verdict
+    # (applicable=False) the confidence trigger still applies as before.
     contract_reexpand_enabled: bool = False
     reexpand_corrective_context_enabled: bool = False
     candidate_coverage_enabled: bool = False
@@ -124,14 +124,14 @@ class GoTConfig:
     backtrack_enabled: bool = False
     backtrack_dead_end_threshold: int = 5
     backtrack_low_score_threshold: float = 0.3
-    # A6 — the SYMMETRIC counterpart of the step-confidence trigger above. A1 only ever adds
+    # A6: the SYMMETRIC counterpart of the step-confidence trigger above. A1 only ever adds
     # compute (a distrusted step re-expands); this stops the loop and finalizes when the
     # accumulated confidence prefix clears a CALIBRATED bar, so an easy mandate does not pay
     # for steps it does not need. The bar is not hand-picked: it is derived from held-out
-    # (confidence-sequence, eventual-label) pairs with a certified false-stop rate and shipped
-    # in ``confidence_early_exit_calibration.json`` (see ``idea_policies/confidence_early_exit.py``).
-    # Opt-in, default OFF -> byte-identical; ``margin`` is an extra conservatism knob on top of
-    # the calibrated threshold and ``min_judged_steps`` a floor below which no rule may fire.
+    # (confidence-sequence, eventual-label) pairs with certified false-stop rate and shipped
+    # in confidence_early_exit_calibration.json (see idea_policies/confidence_early_exit.py).
+    # Opt-in, default OFF for byte-identity. Margin is extra conservatism on top of the
+    # calibrated threshold; min_judged_steps is a floor below which no rule fires.
     confidence_early_exit_enabled: bool = False
     confidence_early_exit_margin: float = 0.05
     confidence_early_exit_min_judged_steps: int = 2
@@ -139,13 +139,12 @@ class GoTConfig:
     telemetry_routing_score_model: Optional[str] = None
     telemetry_routing_generate_model: Optional[str] = None
 
-    #: Fields whose JSON key is NOT the ``got_``-prefixed field name. The A6 early-exit knobs
-    #: belong to this group (they are GoT control-loop decisions, siblings of
-    #: ``backtrack_enabled``/``step_confidence_*``) but are named with the ``native_`` prefix
-    #: the rest of the native-engine A-series uses (``native_vote_k_enabled``,
-    #: ``native_reasoning_effort_discipline_enabled``). Deliberately NOT called ``_KEYS``:
-    #: that ClassVar means "override the *bare field name*" in every ``_build`` group, and
-    #: reusing the name here with a ``got_``-prefixed fallback would give it two meanings.
+    #: Fields whose JSON key is NOT the got_-prefixed field name. The A6 early-exit knobs
+    #: are GoT control-loop decisions (siblings of backtrack_enabled/step_confidence_*) but
+    #: named with the native_ prefix that the native-engine A-series uses (native_vote_k_enabled,
+    #: native_reasoning_effort_discipline_enabled). Deliberately NOT called _KEYS: that ClassVar
+    #: means "override the bare field name" in every _build group. Reusing the name here with
+    #: a got_-prefixed fallback would give it two meanings.
     _NATIVE_KEYS: ClassVar[dict] = {
         "confidence_early_exit_enabled": "native_confidence_early_exit_enabled",
         "confidence_early_exit_margin": "native_confidence_early_exit_margin",
@@ -195,15 +194,12 @@ class TimeoutConfig:
     llm: int = 60
     final: int = 180
     expansion: int = 180
-    # 2026-08-08: merge previously had NO dedicated field here, so
-    # idea_engine.py::_action_timeout_for's `getattr(self._cfg.timeouts, "merge", None)` always
-    # returned None and silently fell back to the generic `action` timeout (20s) — while a merge
-    # call synthesizes from ALL of its children's raw page content concatenated in one LLM call
-    # (confirmed live: 150-210KB / ~19K tokens for a 4-leaf task), which routinely exceeds 20s for
-    # a local model. Found via a real barrage: every qwen2.5:14b merge node failed
-    # `"timeout after 20.0s"`, stranding an otherwise-fully-grounded run onto a cruder finalize
-    # fallback. 180 matches final/expansion's existing generous default for the same class of
-    # single-call-over-large-context action.
+    # Merge previously had no dedicated field here, so idea_engine.py's _action_timeout_for
+    # returned None and fell back to generic action timeout (20s). A merge call synthesizes from
+    # all children's raw page content concatenated in one LLM call (confirmed: 150-210KB for
+    # 4-leaf tasks). This exceeds 20s for local models. Found via barrage: every qwen2.5:14b
+    # merge node timed out at 20s, stranding otherwise-grounded runs to finalize fallback.
+    # 180 matches final/expansion's generous default for single-call-over-large-context.
     merge: int = 180
 
     _KEYS: ClassVar[dict] = {
@@ -236,11 +232,14 @@ class ExpansionConfig:
     max_detail_chars: int = 5000
     expect_contract_enabled: bool = False
     # Prompt hygiene for weak models: label the context blob as read-only INPUT and restate the
-    # {candidates: [...]} output shape right after it. Both default OFF so the shipped prompt
-    # bytes are unchanged; ``echo_retry_enabled`` is a separate lever on purpose so the prompt
-    # fix and the retry safety net can be ablated independently. See expansion.py's
-    # ``_INPUT_FRAMING_HEADER`` block for the telemetry that motivated them.
-    input_output_framing_enabled: bool = False
+    # {candidates: [...]} output shape right after it. Live-proven 2026-08-06 (eliminated 5/8
+    # raw-completion echo failures on qwen2.5:0.5b/llama3.2:1b, 0/16 after) and defaulted ON
+    # 2026-08-14: the `baseline` benchmark arm pins it back to `False` explicitly so the
+    # "adaptive OFF" ladder rung stays byte-identical regardless of this default.
+    # ``echo_retry_enabled`` is a separate lever on purpose so the prompt fix and the retry
+    # safety net can be ablated independently. It stays OFF (no measurable benefit shown yet).
+    # See expansion.py's ``_INPUT_FRAMING_HEADER`` block for the telemetry that motivated them.
+    input_output_framing_enabled: bool = True
     echo_retry_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
@@ -307,65 +306,63 @@ class EvaluationConfig:
 class FinalConfig:
     model: Optional[str] = None
     temperature: float = 0.3
-    # Capped at the provider RESERVATION ceiling (see
-    # ``idea_dag_settings._MAX_TOKENS_RESERVATION_CAP``): the old 120000 reserved ~30x the largest
-    # deliverable ever observed and 402'd once a daily credit cap drained.
+    # Capped at provider RESERVATION ceiling (see idea_dag_settings._MAX_TOKENS_RESERVATION_CAP).
+    # Old 120000 reserved ~30x the largest deliverable ever observed and triggered HTTP 402 errors
+    # when daily credit cap drained.
     max_tokens: Optional[int] = 32768
     chroma_results: int = 10
     max_prompt_chars: int = 200000  # absent from JSON; original call-site default
     allow_partial_success: bool = True
-    # F31 — hard grounding gate before finalize (opt-in, default OFF -> byte-identical). When on
-    # and the run opened ZERO pages on a grounded-research mandate, the answer is not presented as
-    # a researched result: it is banner-flagged as ungrounded, its unverifiable URLs are stripped,
-    # and success/goal_achieved are forced False rather than laundering parametric memory.
+    # F31: hard grounding gate before finalize (opt-in, default OFF for byte-identity). When on
+    # and the run opened ZERO pages on a grounded-research mandate, the answer is not presented
+    # as researched. It is banner-flagged as ungrounded, unverifiable URLs are stripped, and
+    # success/goal_achieved are forced False rather than laundering parametric memory.
     require_grounding: bool = False
-    # C1b — approximator-stripped k-sample vote for the terminal answer (opt-in). When
-    # ``native_vote_k_enabled`` and ``native_vote_k`` >= 2, the finalize answer is extracted k
-    # times (anchor temp-0 + diverse temps), normalized via the approximator-stripped vote key,
-    # and the majority wins (tie-break toward the anchor). k=1 (or the flag off) == exactly one
-    # extraction, the current behavior -> byte-identical default.
+    # C1b: approximator-stripped k-sample vote for terminal answer (opt-in). When
+    # native_vote_k_enabled and native_vote_k >= 2, finalize answer is extracted k times
+    # (anchor temp-0 + diverse temps), normalized via approximator-stripped vote key, and
+    # majority wins (tie-break toward anchor). k=1 or flag off equals one extraction, current
+    # behavior, for byte-identity default.
     native_vote_k_enabled: bool = False
     native_vote_k: int = 1
-    # Capability-tiered vote-k (opt-in, layered on top of native_vote_k_enabled above — this flag
-    # alone, without the master switch, is a no-op). When both are on, ``native_vote_k`` is
-    # OVERRIDDEN by a band picked via ``model_tiers.capability_tier``: weak models get more
-    # redundant finalize votes, strong models taper toward k=1 (fully off downstream). Ported
-    # PATTERN (not the numbers) from the compiled-scaffold harness's proven ``_votes_for_model``
-    # auto-tapering (cheap=5/unknown=3/mid=3/premium=2 there) — deliberately NOT copied verbatim,
-    # since those were calibrated for a cheap per-page thin-extraction vote, not a full
-    # finalize-prompt rerun, and that harness's 4-bucket unknown≠cheap split has no equivalent
-    # here (``capability_tier`` deliberately collapses unknown into weak). These are placeholders
-    # pending live calibration (see the capability-continuum plan); do not treat as tuned values.
+    # Capability-tiered vote-k (opt-in, layered on top of native_vote_k_enabled; this flag
+    # alone without the master switch is a no-op). When both are on, native_vote_k is overridden
+    # by a band picked via model_tiers.capability_tier: weak models get more redundant finalize
+    # votes, strong models taper toward k=1 (fully off downstream). Pattern ported (not numbers)
+    # from compiled-scaffold's _votes_for_model auto-tapering (cheap=5/unknown=3/mid=3/premium=2)
+    # but not copied verbatim. Those were calibrated for cheap per-page thin-extraction vote, not
+    # full finalize-prompt rerun. That harness's 4-bucket unknown≠cheap split has no equivalent
+    # here (capability_tier deliberately collapses unknown into weak). These are placeholders
+    # pending live calibration (see capability-continuum plan); do not treat as tuned values.
     native_vote_k_tiered_enabled: bool = False
     native_vote_k_weak: int = 3
     native_vote_k_standard: int = 2
     native_vote_k_strong: int = 1
-    # Size-band refinement WITHIN the weak band, for LOCAL (unpriced) models only (opt-in, layered
-    # on top of native_vote_k_tiered_enabled above — this flag alone is a no-op). When on, a model
-    # whose tag encodes a parameter count (``model_tiers.local_model_size_band``) uses the matching
-    # band below instead of the flat ``native_vote_k_weak``; an unparseable tag (``phi3:mini``,
-    # ``tinyllama``) or any priced model keeps the flat tiered value exactly, so this can only ever
-    # refine, never reinterpret. Rationale for the taper (badmodel-lab reachable-tier means): <2B
-    # scores 0.25-0.54 and its failures are often a malformed/absent extraction that one more sample
-    # can rescue, while >=12B scores 0.97 — at the paid-API ceiling — where blanket finalize
-    # redundancy buys nothing and costs the most wall-clock (a big local model is the SLOWEST thing
-    # to re-run, the small ones the cheapest). Big local models still need the mitigation stack for
-    # their specific failure modes; those are targeted levers, not this blanket one. Placeholders
-    # pending live calibration, like the tier bands above.
+    # Size-band refinement within the weak band for LOCAL (unpriced) models only (opt-in, layered
+    # on top of native_vote_k_tiered_enabled; this flag alone is a no-op). When on, a model whose
+    # tag encodes parameter count (model_tiers.local_model_size_band) uses the matching band
+    # instead of flat native_vote_k_weak. Unparseable tags (phi3:mini, tinyllama) or any priced
+    # model keeps flat tiered value, so this can only refine, never reinterpret. Rationale for
+    # the taper (badmodel-lab reachable-tier): <2B scores 0.25-0.54, failures often malformed
+    # extraction that one more sample rescues; >=12B scores 0.97 (paid-API ceiling), where
+    # blanket finalize redundancy buys nothing and costs most wall-clock (big local models are
+    # slowest to re-run, small ones cheapest). Big local models still need mitigation stack for
+    # specific failure modes (targeted levers, not this blanket one). Placeholders pending live
+    # calibration, like tier bands above.
     native_vote_k_size_band_enabled: bool = False
     native_vote_k_local_tiny: int = 4
     native_vote_k_local_small: int = 3
     native_vote_k_local_medium: int = 2
     native_vote_k_local_large: int = 1
-    # Post-synthesis reconcile chain (opt-in, default OFF -> byte-identical). Each pass runs ONLY
-    # for answer-shaped tasks (see ``final_recompute_shapes``) and fails open (keeps the prior
-    # draft on empty/error/timeout). ``final_recompute_enabled``: re-list the exact source values
-    # (verbatim quote + URL) and re-derive the answer, correcting an arithmetic/extraction slip.
-    # ``final_verify_enabled``: demand a verbatim passage that supports the draft, else replace it
-    # with what the evidence actually says. ``final_variations_enabled`` (with ``final_variations_k``
-    # framings): the DECORRELATED alternative to k-vote — answer K differently-framed versions of the
-    # question independently, then reconcile — surfacing the correct value where one framing misreads.
-    # Order when several are on: variations->collate, then recompute, then verify.
+    # Post-synthesis reconcile chain (opt-in, default OFF for byte-identity). Each pass runs
+    # only for answer-shaped tasks (see final_recompute_shapes) and fails open (keeps prior draft
+    # on empty/error/timeout). final_recompute_enabled: re-list exact source values (verbatim
+    # quote + URL) and re-derive answer, correcting arithmetic/extraction slip. final_verify_enabled:
+    # demand verbatim passage that supports draft, else replace with what evidence actually says.
+    # final_variations_enabled (with final_variations_k framings): decorrelated alternative to
+    # k-vote. Answer K differently-framed versions of question independently, then reconcile to
+    # surface correct value where one framing misreads. Order when several are on: variations,
+    # then recompute, then verify.
     final_recompute_enabled: bool = False
     final_verify_enabled: bool = False
     final_variations_enabled: bool = False
@@ -428,7 +425,7 @@ class VerifyConfig:
 
 @dataclass(frozen=True)
 class PlanLibraryConfig:
-    """Retrieval-augmented planning — the ``plan_library_*`` keys.
+    """Retrieval-augmented planning. The ``plan_library_*`` keys.
 
     A new subsystem rather than a GoT-optimisation knob, so it gets its own group and does
     NOT use ``GoTConfig``'s ``got_`` auto-prefix. ``enabled`` is the master switch;
@@ -436,7 +433,7 @@ class PlanLibraryConfig:
     match replaces the LLM's invented decomposition) and ``action_enabled`` the on-demand
     ``plan_library_search`` leaf action (the model asks for a strategy itself, and an adopted
     one grows children through ``_maybe_plan_library_reexpand``). The two sub-flags are
-    independent — auto-only, on-demand-only or both — mirroring the
+    independent (auto-only, on-demand-only or both) mirroring the
     ``got_step_confidence_judge_enabled``/``got_step_confidence_reexpand_enabled``
     relationship. All default OFF -> byte-identical.
 
@@ -464,13 +461,13 @@ class PlanLibraryConfig:
 
 @dataclass(frozen=True)
 class StrategyLibraryConfig:
-    """Retrieval-augmented *advice* — the ``strategy_library_*`` keys.
+    """Retrieval-augmented *advice*. The ``strategy_library_*`` keys.
 
     The sibling of :class:`PlanLibraryConfig`, modelled on it directly, for the OTHER library:
     ``strategy_library/`` holds generalized prose notes rather than slot-parameterized DAG
-    blueprints, and is consumed on the ``graph_compiled`` path — spliced into the offline
-    authoring meta-prompt (``testing/scaffold_compiler``) and into that path's aggregation
-    prompt — rather than through the native engine's expansion.
+    blueprints, and is consumed on the ``graph_compiled`` path (spliced into the offline
+    authoring meta-prompt ``testing/scaffold_compiler`` and into that path's aggregation
+    prompt) rather than through the native engine's expansion.
 
     One flag, not three: unlike the plan library there is no auto-vs-on-demand choice to make,
     because a note is never *applied*, only appended to a prompt. Default OFF -> byte-identical.
@@ -478,7 +475,7 @@ class StrategyLibraryConfig:
     Deliberately carries NO similarity threshold, for the same reason ``PlanLibraryConfig``
     does not: the decision constant lives next to the retrieval that owns it
     (``strategy_library/retrieval.APPLY_THRESHOLD``), and a second engine-level gate would
-    silently disagree with it. Nor does it carry a leak-gate switch — the gate is not optional.
+    silently disagree with it. Nor does it carry a leak-gate switch. The gate is not optional.
     """
 
     enabled: bool = False
@@ -508,13 +505,13 @@ def _action_names(raw: Any) -> Tuple[str, ...]:
 
 @dataclass(frozen=True)
 class ToolsConfig:
-    """Which tools a run may use — the ``tools_*`` keys.
+    """Which tools a run may use. The ``tools_*`` keys.
 
     Tool availability used to be a bare content key (``allowed_actions``, a literal list set at
     each entry point) plus an unused extension point: ``IdeaDagEngine.install_action_pack`` was
     built and unit-tested but had no production call site, so "run this task with the calculator
     but no file writes" was not expressible without editing code. This group makes it declarative,
-    modelled on :class:`PlanLibraryConfig` — master flag per pack, independent sub-flags, all
+    modelled on :class:`PlanLibraryConfig`. Master flag per pack, independent sub-flags, all
     default OFF -> byte-identical.
 
     ``core_actions`` is the always-available menu (today's hard-coded six, in their order).
@@ -572,19 +569,19 @@ class ActionConfig:
     visit_page_concurrency: int = 5
     visit_link_selection_model: Optional[str] = None
     visit_empty_content_retryable: bool = True
-    # A3b — reasoning-effort/token discipline for native leaf micro-prompts (opt-in). When on,
+    # A3b: reasoning-effort/token discipline for native leaf micro-prompts (opt-in). When on,
     # a reasoning-model executor's perception/selection micro-prompt uses reasoning_effort=minimal
     # and its token budget is floored so hidden reasoning can't starve the completion (the
     # content=None bug fixed on the compiled path). Default OFF -> byte-identical.
     native_reasoning_effort_discipline_enabled: bool = False
     native_reasoning_min_tokens_floor: int = 2048
-    # A5 — price-tier parameter tiering for native executor micro-prompts (opt-in). When on, a
+    # A5: price-tier parameter tiering for native executor micro-prompts (opt-in). When on, a
     # micro-prompt's token budget scales by the executor model's price tier (cheap stays tight,
     # mid/premium get headroom). Default OFF -> byte-identical.
     price_tier_param_tiering_enabled: bool = False
-    # C1a — tool-failure recovery (opt-in). ``connector_retry_on_failure_enabled``: when a leaf
+    # C1a: tool-failure recovery (opt-in). ``connector_retry_on_failure_enabled``: when a leaf
     # action returns a TOOL failure (empty/timeout/HTTP-error fetch, no search results), retry the
-    # SAME action in place with bounded backoff before deciding the node's fate — so a TRANSIENT
+    # SAME action in place with bounded backoff before deciding the node's fate. So a TRANSIENT
     # failure recovers at the source instead of the re-expansion loop spawning a subtree that
     # repeats the failing fetch. ``tool_failure_recovery_enabled``: route the low-confidence
     # re-expansion trigger AWAY from re-expanding a leaf whose low score was caused by a tool
@@ -609,10 +606,10 @@ class SandboxActionConfig:
     """Limits for the CODE-domain sandbox actions (the ``sandbox_*`` settings keys).
 
     The web-research arms act on the world through ``search``/``visit``; the coding arm
-    (``graph_compiled_code`` — see ``testing/execution_compiled_code.py``) acts on a writable
+    (``graph_compiled_code``, see ``testing/execution_compiled_code.py``) acts on a writable
     workdir through ``connector_sandbox.SandboxConnector``. These are that connector's cost/blast
     bounds: where the workdir lives, how long one subprocess action may run, and how much a single
-    leaf may write. They are DEFENCE IN DEPTH, not the security boundary — the container itself
+    leaf may write. They are DEFENCE IN DEPTH, not the security boundary. The container itself
     (read-only rootfs, dropped caps, tmpfs ``/work``, outer 900s wall-clock kill) is that.
     """
 
@@ -620,7 +617,7 @@ class SandboxActionConfig:
     run_pytest_timeout_seconds: int = 30
     run_python_timeout_seconds: int = 15
     #: Wall-clock bound on ONE allow-listed read-only shell command (``connector_sandbox``'s
-    #: ``run_readonly``: wc/grep/du/find/head). Small on purpose — these inspect a scratch workdir,
+    #: ``run_readonly``: wc/grep/du/find/head). Small on purpose. These inspect a scratch workdir,
     #: so anything slower than this is a pathological pattern or tree, not useful work. Matches the
     #: 10s bound the ported ``badmodel-lab/localagent/tools/shell.py`` used.
     shell_timeout_seconds: int = 10
@@ -639,7 +636,7 @@ class SandboxActionConfig:
     #: run already gathered (max of six numbers, a ratio, a subset sum), which is milliseconds even
     #: with interpreter start-up. Anything slower is a runaway loop, and inside a latency-sensitive
     #: web-research leaf it is cheaper to hand the model a fast "timed out" observation it can retry
-    #: than to stall the step. Matches ``shell_timeout_seconds`` — same "inspect something small"
+    #: than to stall the step. Matches ``shell_timeout_seconds``. Same "inspect something small"
     #: class of work.
     calculator_timeout_seconds: int = 10
 
@@ -698,6 +695,25 @@ class EngineConfig:
     got_prune_interval_steps: int = 5
     log_dag_ascii: bool = True
     log_dag_step_interval: int = 1
+    # Deterministic (LLM-free) value threading: extract the datum a completed VISIT leaf's
+    # page carries (a number near its contract's own cue wording, or an entity/place via
+    # `action_result.link_contexts`) and stash it on the node as `details["waypoint"]` for a
+    # downstream hop. See `idea_policies/waypoint.py`. Opt-in and default OFF: a wrong-page
+    # false-positive rate measurement (`scripts/replay_waypoints.py --precision`) gates this on
+    # a page-identity guard rather than emitting freely.
+    waypoint_enabled: bool = False  # absent from JSON
+    # Deterministic (LLM-free) unresolved-slot detection for `search`/`visit` candidates
+    # (idea_policies/dataflow.py's `unresolved_slots`) and the two engine call sites it
+    # feeds (idea_sequencing.py's `siblings_are_independent` /
+    # `defer_unresolved_slot_candidates`). A read-only census
+    # (scripts/measure_dataflow_slots.py) found 19/418 chain-task search/visit leaves
+    # executed with a literal unfilled placeholder (e.g. `<to be determined after previous
+    # visit>`) still in `optional_url`/`query`/`link_idea` -- 0% false positives (incl. on
+    # fan-out batches), 3 failed outright, 16 were "silently repaired" by
+    # VisitLeafAction's unscoped sibling-URL scavenging fallback. Both opt-in and default
+    # OFF pending a live A/B.
+    parallel_requires_evidence: bool = False  # absent from JSON
+    defer_unresolved_slots: bool = False  # absent from JSON
 
     _KEYS: ClassVar[dict] = {}
 

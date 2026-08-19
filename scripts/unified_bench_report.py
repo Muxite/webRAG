@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified cross-benchmark report — one common view over the QA and codebench pipelines.
+Unified cross-benchmark report: one common view over the QA and codebench pipelines.
 
 **The gap this closes**: the two benchmark pipelines write deliberately different result
 formats (``score_and_record.py``'s own docstring calls ``runs.jsonl`` "a SIBLING to
@@ -11,10 +11,10 @@ markdown view, and mutates nothing.
 
 **What it reads (and, importantly, what each file actually is)**
 
-* ``agent/idea_test_results/*.json`` — the main harness's per-cell results. This is
+* ``agent/idea_test_results/*.json``: the main harness's per-cell results. This is
   the ONLY source of QA scores. Loaded through ``scripts/bench_common.py``
   (``discover_files`` + ``load_row``), the canonical shared loader already used by
-  ``recovery_curve.py`` / ``level_ladder.py`` / ``mine_failure_taxonomy.py`` — NOT a private
+  ``recovery_curve.py`` / ``level_ladder.py`` / ``mine_failure_taxonomy.py``. NOT a private
   re-parse. That directory is hostile to naive globbing (three incompatible top-level shapes
   under one extension, plus legacy timestamped subdirectories), and ``bench_common`` already
   encodes the right scope; a fifth parser would just drift from the other four.
@@ -22,13 +22,13 @@ markdown view, and mutates nothing.
   top-level ``*_r*.json`` only (legacy timestamped subdirs are NOT recursed), ``_report_*``
   debug dumps excluded by name, and ``*_summary.json`` aggregates dropped by ``load_row``
   (they carry no top-level ``validation.overall_score``).
-* ``badmodel-lab/results/cells.jsonl`` — **attribution only, not scores.** Every row is
+* ``badmodel-lab/results/cells.jsonl``: **attribution only, not scores.** Every row is
   ``{run_id, model, place, profile, tier, ids, runs, t}``: a run-launch ledger with no
   score/cost/duration field anywhere in it. ``badmodel-lab/analyze.py`` already establishes
   the correct pattern (read cells for ``place``/``profile``, join by ``run_id`` onto the real
   scored result JSONs); this script follows it. Treating a cells row as a scorable result
   would invent rows that never had a score.
-* ``codebench/results/runs.jsonl`` — the codebench Docker pipeline's per-cell
+* ``codebench/results/runs.jsonl``: the codebench Docker pipeline's per-cell
   rows. These DO carry real ``score``/``duration_s``/``usd``/``tests_passed`` fields and map
   straight onto the common schema.
 
@@ -37,7 +37,7 @@ markdown view, and mutates nothing.
     {run_id, timestamp, benchmark_type: "qa"|"code", model, task_id, score, passed,
      cost_usd, duration_s, origin, source_file, extra: {...}}
 
-``extra`` preserves the type-specific columns the aggregate view flattens away — QA's
+``extra`` preserves the type-specific columns the aggregate view flattens away. QA's
 ``level``/``variant``/``effort_tier``/``task_tier``/``bucket``/``grounding_pass``/
 ``keystone_pass``/``run_idx``/``place``/``profile``, code's ``agent_kind``/``tests_passed``/
 ``tests_total``/``keystone_pass``/``task_category``. Barrage analysis needs those, not just a
@@ -47,13 +47,13 @@ Note on ``tier``: this repo has three different "tier" axes (see AGENT_CONTINUUM
 warning comment in ``badmodel-lab/analyze.py``). They are kept apart here by name, never
 merged: ``extra["effort_tier"]`` is the runtime effort knob (``bench_common``'s ``tier``);
 ``extra["task_tier"]`` is the task-difficulty tier resolved from the task id via analyze.py's
-``TIER_BY_TASK`` (its documented rule — the ledger's own value mislabels tiers that share a
+``TIER_BY_TASK`` (its documented rule. The ledger's own value mislabels tiers that share a
 run_id, and in practice often holds a task-id list); ``extra["cells_tier"]`` keeps the raw
 ledger value it fell back to.
 
 **Cross-source overlap / precedence.** The same ``run_id`` legitimately appears in
 cells.jsonl and in the idea_test_results filenames (e.g. every ``bml__*`` run). That is a
-join, not two rows — the readers here structurally cannot emit a second row for it, since
+join, not two rows. The readers here structurally cannot emit a second row for it, since
 cells.jsonl produces no rows at all. ``merge_rows`` additionally enforces the rule for any
 residual collision (e.g. a codebench task also run through the main harness, or a duplicate
 append inside one source): rows are keyed by logical cell, the higher-precedence source wins
@@ -106,7 +106,7 @@ COMMON_FIELDS: List[str] = [
 # Which source wins when two rows describe the same logical cell. codebench's Docker grading
 # pipeline outranks the main harness for code cells (it is the thing that actually ran the
 # tests); the main harness outranks cells.jsonl always, because cells.jsonl has no score to
-# contribute in the first place — it only ever adds attribution metadata.
+# contribute in the first place. It only ever adds attribution metadata.
 SOURCE_PRECEDENCE: Dict[str, int] = {
     "cells_attribution": 1,
     "idea_test_results": 2,
@@ -169,7 +169,7 @@ def _read_json(path: Path) -> Optional[Dict[str, Any]]:
 
 
 def _match_run_id(basename: str, run_ids: Sequence[str]) -> Optional[str]:
-    """Longest ``run_id`` prefix of a result filename — analyze.py's join key, reused when
+    """Longest ``run_id`` prefix of a result filename. Analyze.py's join key, reused when
     the lab module is importable so the two stay identical by construction."""
     if _LAB is not None:
         return _LAB.match_run_id(basename, run_ids)
@@ -205,9 +205,7 @@ def _benchmark_type(task_id: Optional[str], variant: Optional[str]) -> str:
     return "qa"
 
 
-# --------------------------------------------------------------------------------------
 # Readers
-# --------------------------------------------------------------------------------------
 
 def read_cells_attribution(path: Path = DEFAULT_CELLS) -> Dict[str, Dict[str, Any]]:
     """``run_id -> {place, profile, cells_tier, cells_model, cells_ids, ...}`` from cells.jsonl.
@@ -299,7 +297,7 @@ def read_qa_rows(*, run_ids: Optional[Sequence[str]] = None, since: str = "",
     Scores/costs/durations come from ``bench_common.load_row`` (the canonical loader), never
     from cells.jsonl; ``attribution`` only decorates the row's ``extra`` bag with
     ``place``/``profile``/``task_tier`` when the filename matches a launched cell. A cells.jsonl
-    run_id with no result file on disk therefore contributes NO row — it never had a score.
+    run_id with no result file on disk therefore contributes NO row. It never had a score.
     """
     attribution = attribution or {}
     run_id_keys = list(attribution)
@@ -341,7 +339,7 @@ def read_qa_rows(*, run_ids: Optional[Sequence[str]] = None, since: str = "",
 
 
 def read_code_rows(path: Path = DEFAULT_CODE_RUNS) -> List[Dict[str, Any]]:
-    """Normalized rows from codebench's ``runs.jsonl`` (real scores — unlike cells.jsonl).
+    """Normalized rows from codebench's ``runs.jsonl`` (real scores, unlike cells.jsonl).
 
     ``usd`` is currently always null there (local models via the Ollama proxy) and there is no
     timestamp column; both stay ``None`` rather than being inferred, matching
@@ -371,7 +369,7 @@ def read_code_rows(path: Path = DEFAULT_CODE_RUNS) -> List[Dict[str, Any]]:
             "task_id": r.get("task_id"),
             "score": float(score) if isinstance(score, (int, float)) else None,
             # A hard task's score is partial credit (tests_passed/tests_total); the binary
-            # success gate is keystone_pass, so that — not a score threshold — is "passed".
+            # success gate is keystone_pass, so that, not a score threshold, is "passed".
             "passed": bool(keystone) if keystone is not None else None,
             "cost_usd": r.get("usd"),
             "duration_s": r.get("duration_s"),
@@ -394,15 +392,13 @@ def read_code_rows(path: Path = DEFAULT_CODE_RUNS) -> List[Dict[str, Any]]:
     return rows
 
 
-# --------------------------------------------------------------------------------------
 # Merge / aggregate
-# --------------------------------------------------------------------------------------
 
 def row_key(row: Dict[str, Any]) -> tuple:
     """The logical cell a row describes. Two rows sharing this key are the same cell.
 
     Includes the repeat index / agent_kind so genuinely distinct repeats of one cell (r1/r2/r3,
-    badmodel vs aider) stay separate rows — deduping those would silently destroy the sample
+    badmodel vs aider) stay separate rows. Deduping those would silently destroy the sample
     size every mean in this report depends on. By the same rule a codebench task executed twice
     through two different pipelines (Docker grading vs a harness smoke check) stays two rows:
     those are two executions, not one cell seen twice. Only rows agreeing on every component
@@ -488,9 +484,7 @@ def aggregate(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-# --------------------------------------------------------------------------------------
 # Rendering
-# --------------------------------------------------------------------------------------
 
 def _fmt(x: Any, nd: int = 3) -> str:
     return f"{x:.{nd}f}" if isinstance(x, (int, float)) else "-"
@@ -511,7 +505,7 @@ def render_markdown(rows: Sequence[Dict[str, Any]], agg: Sequence[Dict[str, Any]
         if (r.get("extra") or {}).get("profile") is not None:
             attributed += 1
     lines = [
-        f"# Unified benchmark report — {len(rows)} cell(s) across "
+        f"# Unified benchmark report. {len(rows)} cell(s) across "
         f"{len({r['benchmark_type'] for r in rows})} benchmark type(s)",
         "",
         "## Sources",
@@ -528,7 +522,7 @@ def render_markdown(rows: Sequence[Dict[str, Any]], agg: Sequence[Dict[str, Any]
         f"(joined onto {attributed} row(s))",
         "",
         "`cells.jsonl` contributes attribution only (place/profile/task_tier joined by run_id),",
-        "never rows — it records launched cells, not scores.",
+        "never rows. It records launched cells, not scores.",
         "",
         "## Mean score / pass rate / cost by model x benchmark_type",
         "",
@@ -548,7 +542,7 @@ def render_markdown(rows: Sequence[Dict[str, Any]], agg: Sequence[Dict[str, Any]
         "pass rate is over the cells that carry a pass/fail verdict (count in brackets): QA's",
         "`validation.overall_passed`, codebench's binary `keystone_pass` (NOT a threshold on the",
         "partial-credit score). Cost: `local` = self-hosted model, no meaningful price;",
-        "`n/a` = priced model whose cost wasn't recorded — a data gap, never shown as $0.00.",
+        "`n/a` = priced model whose cost wasn't recorded. A data gap, never shown as $0.00.",
         "",
     ]
 

@@ -12,7 +12,7 @@ Environment Variables:
 - IDEA_TEST_LOG_LEVEL: Logging level (default: INFO)
 - IDEA_TEST_BROWSER_FALLBACK: "1" (default) gives every execution variant a headless-Chrome
   fallback for bot-blocked visits (401/403/429/503, or a transport-level failure); "0"/"false"/
-  "off"/"no" disables it uniformly across all arms (F18 — previously silently None everywhere).
+  "off"/"no" disables it uniformly across all arms (F18: previously silently None everywhere).
 
 Legacy aliases still supported:
 - IDEA_TEST_PRIORITY -> IDEA_TEST_TOP_N
@@ -59,35 +59,19 @@ from agent.app.testing.report import TestReportGenerator, Verbosity
 
 
 def _browser_fallback_enabled() -> bool:
-    """Whether the harness should give execution variants a real browser-fallback connector.
+    """Whether execution variants get a headless-Chrome fallback connector.
 
-    Default ON, matching production (``interface_agent.py`` always wires a ``ConnectorBrowser``
-    for every arm). The F18 web-connector audit found the benchmark harness previously
-    constructed every ``AgentIO(...)`` with ``connector_browser=None``, so a 401/403 bot-block
-    was an unrecoverable hard failure everywhere — a confound that arbitrarily penalizes
-    whichever arm/task happens to hit a bot-blocked site (measured: it specifically handicapped
-    the ``sonnet sequential_react`` reference). Set ``IDEA_TEST_BROWSER_FALLBACK=0`` to disable
-    it uniformly (e.g. for a deliberate pure-HTTP-only run) instead of leaving it silently
-    inconsistent across variants.
-    :returns: True unless explicitly disabled via env.
+    Default ON. Set IDEA_TEST_BROWSER_FALLBACK=0 to disable.
     """
     raw = os.environ.get("IDEA_TEST_BROWSER_FALLBACK", "1").strip().lower()
     return raw not in ("0", "false", "no", "off")
 
 
 def _make_connector_set(config: ConnectorConfig) -> Dict[str, Any]:
-    """
-    Build one independent set of the connectors used by a single concurrent
-    test-run slot. Each set owns its own ConnectorLLM (whose ``set_model`` mutates
-    mutable per-instance state), so isolating one set per slot lets us run test-runs
-    for DIFFERENT models concurrently without racing on model attribution.
+    """Build one independent connector set for a concurrent test-run slot.
 
-    The browser connector is always constructed (cheap — Playwright/Chromium only
-    launches lazily on the first ``fetch_page()`` call, same as production), but whether
-    it is actually threaded into a run's ``AgentIO`` is gated by
-    :func:`_browser_fallback_enabled` at the call site.
-    :param config: Shared connector configuration (read-only, safe to share).
-    :return: Dict with keys ``llm``, ``search``, ``http``, ``chroma``, ``browser``.
+    Each slot gets its own ConnectorLLM to avoid race conditions when running
+    different models in parallel.
     """
     return {
         "llm": ConnectorLLM(config),
@@ -114,7 +98,7 @@ def _preflight_call_timeout_seconds() -> float:
 
     Default 20 preserves existing behavior for cloud API models. A local (Ollama) model can need
     much longer on any given attempt it is NOT already resident for: 20s covers a warm response but
-    not a cold model-load (found live, 2026-08-07 — barrage20 smoke run: qwen2.5:1.5b's own repeat
+    not a cold model-load (found live, 2026-08-07: barrage20 smoke run: qwen2.5:1.5b's own repeat
     preflight failed silently, empty-string asyncio.TimeoutError, after alternating with a different
     local model evicted it from Ollama's single-loaded-model slot, `OLLAMA_MAX_LOADED_MODELS=1`).
     IDEA_TEST_PREFLIGHT_TIMEOUT_SECONDS lets a caller (e.g. the ladder driver, for local-provider
@@ -284,7 +268,7 @@ async def _run_preflight_parallel(
     mutates instance state, so two checks may never share one). Models are processed in
     waves of ``len(connector_pool)`` so a slot is only ever used by one in-flight check.
     With a pool of size 1 (IDEA_TEST_CONCURRENCY=1) this degenerates to the original serial
-    loop — byte-identical attribution-mode behavior. Returns ``{model: passed}``.
+    loop: byte-identical attribution-mode behavior. Returns ``{model: passed}``.
     """
     pool_size = max(1, len(connector_pool))
     results: Dict[str, bool] = {}
@@ -322,18 +306,18 @@ TEST_PRIORITY_ORDER = [
     "045",  # Micro: single-page fact extraction (2/10) - level=micro, weight=short
     "046",  # Navigation: link-following traversal (7/10) - level=navigation, weight=long
     "047",  # Graph: wiki-race shortest chain (10/10) - level=graph, weight=long
-    # Cross-shape tiered ladder (tier1..tier5) — the graph_compiled / compiler A/B/C suite.
+    # Cross-shape tiered ladder (tier1..tier5): the graph_compiled / compiler A/B/C suite.
     "048",  # Tier 1: single-page fact (2/10) - level=micro, weight=short
     "049",  # Tier 2: two-page combine (4/10) - level=integration, weight=short
     "050",  # Tier 3: URL-free 2-hop search chain (7/10) - level=navigation, weight=long
     "051",  # Tier 4: URL-free 3-hop dependent chain (9/10) - level=graph, weight=long
     "052",  # Tier 5: 6-way fan-out & aggregation / argmin (8/10) - level=graph, weight=long
     "053",  # Tier 5: 6-way fan-out & aggregation / argmax, page-only depths (8/10) - level=graph
-    "054",  # Tier 5: mixed DAG — parallel gather + dependent final hop (8/10) - level=graph
+    "054",  # Tier 5: mixed DAG: parallel gather + dependent final hop (8/10) - level=graph
     "055",  # Reasoning+math: two 2-hop chains + terminal arithmetic difference (9/10) - level=graph
-    "056",  # Cross-source contradiction resolution — fact-check w/ verify leaf (8/10) - level=integration
+    "056",  # Cross-source contradiction resolution: fact-check w/ verify leaf (8/10) - level=integration
     "057",  # Strict JSON structured output under research load (7/10) - level=integration, weight=long
-    "058",  # Long-context needle-in-haystack — buried late-section detail (7/10) - level=navigation, weight=long
+    "058",  # Long-context needle-in-haystack: buried late-section detail (7/10) - level=navigation, weight=long
     "059",  # Reasoning+math: argmax over a COMPUTED ratio (goals/caps), ranking ≠ raw (9/10) - level=graph
     "060",  # Reasoning+math: percentage-change comparison, absolute≠percent winner (9/10) - level=graph
     "061",  # Reasoning+math: two 2-hop chains (film->director->birth year) + terminal arithmetic difference (9/10) - level=graph
@@ -341,49 +325,49 @@ TEST_PRIORITY_ORDER = [
     "063",  # Strict CSV structured output under research load (7/10) - level=integration, weight=long
     "064",  # Reasoning+math: argmax over a COMPUTED ratio (volume/area), WIDE-margin double-decoy (9/10) - level=graph
     "065",  # Tier 5: URL-free 3-hop dependent chain, leak-resistant terminus (town elevation) (9/10) - level=graph, weight=long
-    "066",  # Cross-source contradiction — popular-wrong vs authoritative revised record (8/10) - level=integration
-    "073",  # Tier 5: temporal range filter — COUNT of founding-years within [1940,1963] (9/10) - level=integration
-    "080",  # Tier 5: odd-one-out / negation B — New Guinea river drainage; Sepik is the exception (9/10) - level=integration
-    "081",  # Tier 5: two-constraint numeric AND-filter — reworked to 6 self-describing leaves (9/10) - level=graph, weight=long
-    "090",  # Tier 5: count-with-condition — Icelandic tunnels with length > 4,500 m (8/10) - level=graph
-    "091",  # Tier 5: page-only height argmax, wide-margin fame-decoy — tallest of six Turkish dams (8/10) - level=graph
+    "066",  # Cross-source contradiction: popular-wrong vs authoritative revised record (8/10) - level=integration
+    "073",  # Tier 5: temporal range filter: COUNT of founding-years within [1940,1963] (9/10) - level=integration
+    "080",  # Tier 5: odd-one-out / negation B: New Guinea river drainage; Sepik is the exception (9/10) - level=integration
+    "081",  # Tier 5: two-constraint numeric AND-filter: reworked to 6 self-describing leaves (9/10) - level=graph, weight=long
+    "090",  # Tier 5: count-with-condition: Icelandic tunnels with length > 4,500 m (8/10) - level=graph
+    "091",  # Tier 5: page-only height argmax, wide-margin fame-decoy: tallest of six Turkish dams (8/10) - level=graph
     "092",  # Tier 5: URL-free 3-hop dependent chain B, leak-resistant terminus (Pizarro -> Trujillo elevation) (9/10) - level=graph, weight=long
     "093",  # Tier 5: CVE advisory -> C source root-cause chain B (curl SOCKS5 CVE-2023-38545) (10/10) - level=graph
-    "094",  # Tier 5: two-constraint numeric AND-filter — Norwegian fjords; Trondheimsfjord long-but-shallow (9/10) - level=graph, weight=long
-    "095",  # Tier 5: branch-to-eliminate then chain forward — Rivers Avon (English-Channel survivor) -> Dorset Stour catchment (10/10) - level=graph, weight=long
+    "094",  # Tier 5: two-constraint numeric AND-filter: Norwegian fjords; Trondheimsfjord long-but-shallow (9/10) - level=graph, weight=long
+    "095",  # Tier 5: branch-to-eliminate then chain forward: Rivers Avon (English-Channel survivor) -> Dorset Stour catchment (10/10) - level=graph, weight=long
     "096",  # Tier 5: URL-free 3-hop dependent chain C, leak-resistant terminus (Earhart -> Atchison elevation) (9/10) - level=graph, weight=long
     "097",  # Tier 5: URL-free 3-hop dependent chain D, leak-resistant terminus (Goya -> Fuendetodos elevation) (9/10) - level=graph, weight=long
-    "098",  # Tier 5: branch-to-eliminate then chain forward — Royal Observatories (Cape=southern) -> McClean/Victoria refractor aperture (9/10) - level=graph, weight=long
-    "099",  # Tier 5: branch-to-eliminate then chain forward — St. Stephen's cathedrals (Passau=largest organ) -> organ pipe count (9/10) - level=graph, weight=long
-    "100",  # Tier 5: branch-to-eliminate (argmax) then chain forward — F1 street circuits (Baku=longest) -> Maiden Tower height (9/10) - level=graph, weight=long
-    "101",  # Tier 5: branch-to-eliminate then chain forward — Cassini features (Regio on Iapetus) -> Iapetus mean radius (9/10) - level=graph, weight=long
-    "102",  # Tier 5: branch-to-eliminate then chain forward — musician airports (Armstrong=jazz trumpeter) -> longest runway (9/10) - level=graph, weight=long
-    "103",  # Tier 5: branch-to-eliminate then chain forward — Olympic stadiums (Montreal=inclined tower) -> Montreal Tower height (9/10) - level=graph, weight=long
-    "104",  # Tier 5: branch-eliminate then chain — giant titanosaurs -> most-complete Dreadnoughtus -> scapula length 1.74 m (10/10) - level=graph, weight=long
-    "105",  # Tier 5: branch-eliminate then chain — 'Star of ...' gems -> sapphire-at-AMNH Star of India -> 563.35 ct (10/10) - level=graph, weight=long
-    "106",  # Tier 5: branch-eliminate then chain — Royal Botanic Gardens -> largest-canopy Kolkata -> Great Banyan prop roots 3,772 (10/10) - level=graph, weight=long
-    "107",  # Tier 5: branch-eliminate then chain — tall lighthouses -> tallest-stone Île Vierge -> 360 steps / 82.5 m (10/10) - level=graph, weight=long
-    "108",  # Tier 5: branch-eliminate then chain — Ytterby elements -> highest-Z Ytterbium -> melting point 824 °C (10/10) - level=graph, weight=long
-    "109",  # Tier 5: branch-eliminate then chain — record waterfalls -> European Vinnufossen -> tallest single drop 575 m (10/10) - level=graph, weight=long
-    "110",  # Tier 5: branch-eliminate then chain — 'Mark 1' computers -> first-commercial Ferranti Mark 1 -> valve count (9/10) - level=graph, weight=long
-    "111",  # Tier 5: branch-eliminate then chain — World Marathon Majors -> record-ineligible Boston -> net elevation drop (9/10) - level=graph, weight=long
-    "112",  # Tier 5: branch-eliminate then chain — Jupiter probes -> first-to-Jupiter Pioneer 10 -> antenna diameter (9/10) - level=graph, weight=long
-    "113",  # Tier 5: branch-eliminate then chain — largest castles -> largest-by-area Malbork -> enclosed land area (9/10) - level=graph, weight=long
-    "114",  # Tier 5: branch-eliminate then chain — oldest metros -> oldest-continental Budapest Line 1 -> length/stations (9/10) - level=graph, weight=long
-    "115",  # Tier 5: branch-eliminate then chain — largest deserts (polar trap) -> Antarctic -> Vostok record low (9/10) - level=graph, weight=long
-    "116",  # Tier 5: branch-eliminate then chain — impact craters (Chicxulub decoy) -> largest-verified Vredefort -> age 2.023 Ga (10/10) - level=graph, weight=long
-    "117",  # Tier 5: branch-eliminate then chain — forts 'Fort George' -> post-Culloden Highland fort -> £92,673 build budget (10/10) - level=graph, weight=long
-    "118",  # Tier 5: branch-eliminate then chain — ratites (ostrich decoy) -> dangerous cassowary -> inner-toe claw 12 cm (10/10) - level=graph, weight=long
-    "119",  # Tier 5: branch-eliminate then chain — great bells (Tsar Bell decoy) -> ringing Mingun Bell -> 55,555 viss (10/10) - level=graph, weight=long
-    "120",  # Tier 5: branch-eliminate then chain — Cleopatra's Needles (London/Paris traps) -> NY obelisk -> 112-day transit (10/10) - level=graph, weight=long
-    "121",  # Tier 5: branch-eliminate then chain — record caves (Mammoth decoy) -> deepest Krubera -> mapped length 16.058 km (10/10) - level=graph, weight=long
-    # Compound "stacked-axis" tasks (F34, 2026-08-06) — harder IN KIND than the single-axis 10/10s:
+    "098",  # Tier 5: branch-to-eliminate then chain forward: Royal Observatories (Cape=southern) -> McClean/Victoria refractor aperture (9/10) - level=graph, weight=long
+    "099",  # Tier 5: branch-to-eliminate then chain forward: St. Stephen's cathedrals (Passau=largest organ) -> organ pipe count (9/10) - level=graph, weight=long
+    "100",  # Tier 5: branch-to-eliminate (argmax) then chain forward: F1 street circuits (Baku=longest) -> Maiden Tower height (9/10) - level=graph, weight=long
+    "101",  # Tier 5: branch-to-eliminate then chain forward: Cassini features (Regio on Iapetus) -> Iapetus mean radius (9/10) - level=graph, weight=long
+    "102",  # Tier 5: branch-to-eliminate then chain forward: musician airports (Armstrong=jazz trumpeter) -> longest runway (9/10) - level=graph, weight=long
+    "103",  # Tier 5: branch-to-eliminate then chain forward: Olympic stadiums (Montreal=inclined tower) -> Montreal Tower height (9/10) - level=graph, weight=long
+    "104",  # Tier 5: branch-eliminate then chain: giant titanosaurs -> most-complete Dreadnoughtus -> scapula length 1.74 m (10/10) - level=graph, weight=long
+    "105",  # Tier 5: branch-eliminate then chain: 'Star of ...' gems -> sapphire-at-AMNH Star of India -> 563.35 ct (10/10) - level=graph, weight=long
+    "106",  # Tier 5: branch-eliminate then chain: Royal Botanic Gardens -> largest-canopy Kolkata -> Great Banyan prop roots 3,772 (10/10) - level=graph, weight=long
+    "107",  # Tier 5: branch-eliminate then chain: tall lighthouses -> tallest-stone Île Vierge -> 360 steps / 82.5 m (10/10) - level=graph, weight=long
+    "108",  # Tier 5: branch-eliminate then chain: Ytterby elements -> highest-Z Ytterbium -> melting point 824 °C (10/10) - level=graph, weight=long
+    "109",  # Tier 5: branch-eliminate then chain: record waterfalls -> European Vinnufossen -> tallest single drop 575 m (10/10) - level=graph, weight=long
+    "110",  # Tier 5: branch-eliminate then chain: 'Mark 1' computers -> first-commercial Ferranti Mark 1 -> valve count (9/10) - level=graph, weight=long
+    "111",  # Tier 5: branch-eliminate then chain: World Marathon Majors -> record-ineligible Boston -> net elevation drop (9/10) - level=graph, weight=long
+    "112",  # Tier 5: branch-eliminate then chain: Jupiter probes -> first-to-Jupiter Pioneer 10 -> antenna diameter (9/10) - level=graph, weight=long
+    "113",  # Tier 5: branch-eliminate then chain: largest castles -> largest-by-area Malbork -> enclosed land area (9/10) - level=graph, weight=long
+    "114",  # Tier 5: branch-eliminate then chain: oldest metros -> oldest-continental Budapest Line 1 -> length/stations (9/10) - level=graph, weight=long
+    "115",  # Tier 5: branch-eliminate then chain: largest deserts (polar trap) -> Antarctic -> Vostok record low (9/10) - level=graph, weight=long
+    "116",  # Tier 5: branch-eliminate then chain: impact craters (Chicxulub decoy) -> largest-verified Vredefort -> age 2.023 Ga (10/10) - level=graph, weight=long
+    "117",  # Tier 5: branch-eliminate then chain: forts 'Fort George' -> post-Culloden Highland fort -> £92,673 build budget (10/10) - level=graph, weight=long
+    "118",  # Tier 5: branch-eliminate then chain: ratites (ostrich decoy) -> dangerous cassowary -> inner-toe claw 12 cm (10/10) - level=graph, weight=long
+    "119",  # Tier 5: branch-eliminate then chain: great bells (Tsar Bell decoy) -> ringing Mingun Bell -> 55,555 viss (10/10) - level=graph, weight=long
+    "120",  # Tier 5: branch-eliminate then chain: Cleopatra's Needles (London/Paris traps) -> NY obelisk -> 112-day transit (10/10) - level=graph, weight=long
+    "121",  # Tier 5: branch-eliminate then chain: record caves (Mammoth decoy) -> deepest Krubera -> mapped length 16.058 km (10/10) - level=graph, weight=long
+    # Compound "stacked-axis" tasks (F34, 2026-08-06): harder IN KIND than the single-axis 10/10s:
     # each stacks two or three DISTINCT axis types inside the 6-9 visit budget. NOT part of the
     # active 59 (a separate, later live-$ decision); registered here so they are runnable/orderable.
-    "146",  # Compound: 4 independent 2-hop chains + cross-branch argmax — hydro project -> reservoir -> surface area (Smallwood 6,527 km²) (10/10) - level=graph, weight=long
-    "147",  # Compound: two-constraint AND-filter -> survivor -> disambiguated chain terminus — Alpine lakes -> Lake Constance -> High Rhine 165 km (10/10) - level=graph, weight=long
-    "148",  # Compound: categorical survivor -> conflicting-source reconciliation -> constrained subset-sum — Kara Sea river (Ob) -> 3,700 not 5,410 -> 10,398 km (10/10) - level=graph, weight=long
-    "149",  # Compound B: 4 independent 2-hop chains + cross-branch argmax — observatory -> largest telescope -> primary mirror (VLT 8.2 m) (10/10) - level=graph, weight=long
+    "146",  # Compound: 4 independent 2-hop chains + cross-branch argmax: hydro project -> reservoir -> surface area (Smallwood 6,527 km²) (10/10) - level=graph, weight=long
+    "147",  # Compound: two-constraint AND-filter -> survivor -> disambiguated chain terminus: Alpine lakes -> Lake Constance -> High Rhine 165 km (10/10) - level=graph, weight=long
+    "148",  # Compound: categorical survivor -> conflicting-source reconciliation -> constrained subset-sum: Kara Sea river (Ob) -> 3,700 not 5,410 -> 10,398 km (10/10) - level=graph, weight=long
+    "149",  # Compound B: 4 independent 2-hop chains + cross-branch argmax: observatory -> largest telescope -> primary mirror (VLT 8.2 m) (10/10) - level=graph, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12
@@ -422,7 +406,7 @@ def _is_enabled(value: str) -> bool:
 # researcher start from a named arm and tweak one axis without a hand-written
 # settings file). Values are jsonkey -> literal value (mirrors idea_dag_settings.json
 # types); "baseline" documents the shipped JSON defaults for every opt-in flag this
-# module knows how to override — EXCEPT `final_require_grounding`, which every arm turns
+# module knows how to override; EXCEPT `final_require_grounding`, which every arm turns
 # on: it is a validity gate, not a lever. A run that opened zero pages and answers from the
 # model's weights is a hallucination whatever arm produced it, so refusing to present it as
 # a researched result must not be something one arm gets and another does not.
@@ -443,6 +427,11 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "expansion_expect_contract_enabled": False,
         "native_reasoning_effort_discipline_enabled": False,
         "price_tier_param_tiering_enabled": False,
+        # pinned explicitly (2026-08-14): the JSON global default for this flag was flipped
+        # to true (live-proven echo-fix, see idea_dag_settings.json), but baseline must stay
+        # byte-identical to "adaptive OFF"; without this pin baseline would silently inherit
+        # the new global default via the profile's partial dict .update().
+        "expansion_input_output_framing_enabled": False,
         "final_require_grounding": True,   # validity gate, on in every arm
     },
     "good_adaptive": {
@@ -488,7 +477,7 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "price_tier_param_tiering_enabled": True,
     },
     # "max_burn": the PRODUCTIVE ~5x-burn arm. It is `good_adaptive` (the proven winner)
-    # with the ONE lever that carries the accuracy gain cranked — re-expansion DEPTH — plus
+    # with the ONE lever that carries the accuracy gain cranked (re-expansion DEPTH) plus
     # the supporting knobs that lever needs to actually execute (more steps to run the
     # deeper observe→re-expand cycles, wider hop/beam so there is more page/link space to
     # re-expand INTO), and one extra forced-grounding pass. The burn is self-limiting: it
@@ -499,7 +488,7 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
     # (rewrites goals the cheap model can't meet → unproductive re-expansion), reasoning-effort
     # discipline (a no-op/wrong-direction here), and the price-tier 2x multiplier (a cost bug).
     # The Mode-1 residual ("right page, wrong value", ~30-42% of visited runs) is NOT reachable by
-    # any grounding knob above — re-expansion fixes the wrong PAGE, not the wrong VALUE on the right
+    # any grounding knob above; re-expansion fixes the wrong PAGE, not the wrong VALUE on the right
     # page. It is attacked here by the post-synthesis reconcile chain (recompute + verify + a
     # decorrelated variation ensemble), which runs only on answer-shaped tasks and fails open. Burn
     # now spends on BOTH gaps: grounding (deeper re-expansion) and synthesis (the reconcile chain).
@@ -515,14 +504,14 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "got_reexpand_max_iterations": 4,             # 2 -> 4 (the core accuracy lever)
         "max_steps": 90,                              # 50 -> 90 (or depth-4 re-expansion starves)
         "got_candidate_coverage_enabled": True,       # auto-extends steps so late re-expansions resolve
-        # wider page/link space to re-expand into — cheap hops, not paid searches
+        # wider page/link space to re-expand into: cheap hops, not paid searches
         "visit_link_query_top_k": 25,                 # 15 -> 25
         "max_links_per_visit": 30,                    # 20 -> 30
         "got_beam_max": 7,                            # 5 -> 7 (effective fan-out cap under dynamic beam)
         "max_branching": 7,                           # raise the hard cap to match beam
         # one extra forced-grounding pass (attacks Mode-2 gate-zero)
         "grounding_max_replans": 3,                   # 2 -> 3
-        # confidence trigger: nudge only — the judge is anti-calibrated, do not crank. F33
+        # confidence trigger: nudge only. The judge is anti-calibrated, do not crank. F33
         # supersedes it as the control signal: contract satisfaction decides re-expansion and
         # protects a leaf that DID deliver its datum from the judge's mood.
         "got_step_confidence_reexpand_threshold": 0.55,
@@ -606,7 +595,7 @@ def _apply_got_experiment_overrides(
     if _corrective_ctx:
         idea_settings["got_reexpand_corrective_context_enabled"] = _is_enabled(_corrective_ctx)
     # IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE: the decorrelated per-step confidence judge
-    # (got_step_confidence_judge_enabled) — the E-valuator substrate instrumentation.
+    # (got_step_confidence_judge_enabled): the E-valuator substrate instrumentation.
     _stepconf_override = env.get("IDEA_TEST_GOT_STEP_CONFIDENCE_JUDGE", "").strip()
     if _stepconf_override:
         idea_settings["got_step_confidence_judge_enabled"] = _is_enabled(_stepconf_override)
@@ -614,7 +603,7 @@ def _apply_got_experiment_overrides(
     if _stepconf_every:
         idea_settings["got_step_confidence_judge_sample_every"] = max(1, int(_stepconf_every))
     # IDEA_TEST_GOT_CONFIDENCE_REEXPAND: the confidence->action loop
-    # (got_step_confidence_reexpand_enabled) — a low decorrelated step-confidence score
+    # (got_step_confidence_reexpand_enabled): a low decorrelated step-confidence score
     # drives a bounded re-expansion of the distrusted leaf. Requires the judge to be on.
     _confreexp_override = env.get("IDEA_TEST_GOT_CONFIDENCE_REEXPAND", "").strip()
     if _confreexp_override:
@@ -630,7 +619,7 @@ def _apply_got_experiment_overrides(
     if _backtrack_override:
         idea_settings["got_backtrack_enabled"] = _is_enabled(_backtrack_override)
     # IDEA_TEST_NATIVE_EARLY_EXIT: A6 calibrated high-confidence early exit
-    # (native_confidence_early_exit_enabled) — the symmetric counterpart of the
+    # (native_confidence_early_exit_enabled): the symmetric counterpart of the
     # confidence->re-expansion loop, stopping an easy run instead of extending a shaky one.
     # Requires the step-confidence judge to be on (no judged steps -> no rule input), and it
     # only ever fires if the shipped calibration artifact certifies a rule. No threshold
@@ -679,7 +668,7 @@ def _apply_got_experiment_overrides(
         idea_settings["expansion_expect_contract_enabled"] = _is_enabled(_expectcontract_override)
     # IDEA_TEST_EXPANSION_IO_FRAMING: label the expansion user prompt's context blob as read-only
     # INPUT and restate the {candidates: [...]} output shape right after it
-    # (expansion_input_output_framing_enabled) — the prompt-hygiene fix for a weak model echoing
+    # (expansion_input_output_framing_enabled): the prompt-hygiene fix for a weak model echoing
     # the context back instead of planning.
     _ioframing_override = env.get("IDEA_TEST_EXPANSION_IO_FRAMING", "").strip()
     if _ioframing_override:
@@ -691,19 +680,19 @@ def _apply_got_experiment_overrides(
     if _echoretry_override:
         idea_settings["expansion_echo_retry_enabled"] = _is_enabled(_echoretry_override)
     # IDEA_TEST_GOT_DEDUP: the memory-based duplicate-candidate filter (got_dedup_enabled,
-    # default True — NOT one of the opt-in A1-A5 adaptive levers, it is baseline engine
+    # default True. NOT one of the opt-in A1-A5 adaptive levers, it is baseline engine
     # behavior). Exists so a benchmark can isolate cross-rep memory-persistence effects: the
     # per-mandate memory namespace (agent/app/idea_engine.py's
     # ``idea_dag:{sha256(mandate)[:10]}``) is keyed on mandate TEXT only, not run_id or rep
     # number, so it is NOT cleared between R>1 reps of the same task. A candidate set that is
     # reproducible rep-to-rep (e.g. a plan-library template's deterministic fill) can score
     # >=dedup_threshold_min against its OWN prior rep's stored memory and collapse to
-    # ``filter_duplicate_candidates``'s all-filtered fallback (a single surviving candidate) —
+    # ``filter_duplicate_candidates``'s all-filtered fallback (a single surviving candidate):
     # found during the 2026-07-28/29 plan-library dogfooding run. Toggle here to control for it.
     _gotdedup_override = env.get("IDEA_TEST_GOT_DEDUP", "").strip()
     if _gotdedup_override:
         idea_settings["got_dedup_enabled"] = _is_enabled(_gotdedup_override)
-    # IDEA_TEST_PLAN_LIBRARY / _AUTO / _ACTION: retrieval-augmented planning — the master
+    # IDEA_TEST_PLAN_LIBRARY / _AUTO / _ACTION: retrieval-augmented planning: the master
     # switch (plan_library_enabled), the automatic pre-expansion short-circuit
     # (plan_library_auto_enabled) and the on-demand `plan_library_search` leaf action
     # (plan_library_action_enabled). The master switch plus at least one sub-switch must be on
@@ -719,7 +708,7 @@ def _apply_got_experiment_overrides(
     _planlib_action_override = env.get("IDEA_TEST_PLAN_LIBRARY_ACTION", "").strip()
     if _planlib_action_override:
         idea_settings["plan_library_action_enabled"] = _is_enabled(_planlib_action_override)
-    # IDEA_TEST_STRATEGY_LIBRARY: the OTHER library — generalized prose advice spliced into the
+    # IDEA_TEST_STRATEGY_LIBRARY: the OTHER library: generalized prose advice spliced into the
     # graph_compiled authoring/aggregation prompts (strategy_library_enabled). One switch, no
     # threshold override: strategy_library/retrieval.py owns that constant, exactly as
     # plan_library/retrieval.py does. This is the knob an advice-on/advice-off A/B flips (see
@@ -828,6 +817,11 @@ def _parse_execution_variants(raw: str) -> List[str]:
         "graph_compiled_code": "graph_compiled_code",
         "compiled_code": "graph_compiled_code",
         "code": "graph_compiled_code",
+        # Off-the-shelf, publicly-available agent-system comparison arm (DAG v2 relaunch item 4):
+        # a genuinely third-party orchestration loop (LangGraph), not this repo's own ReAct code.
+        "langgraph_react": "langgraph_react",
+        "langgraph": "langgraph_react",
+        "offtheshelf": "langgraph_react",
     }
     out: List[str] = []
     seen = set()
@@ -873,7 +867,7 @@ def _parse_effort_tiers(raw: str) -> List[int]:
     Parse effort tiers (node budgets) for the recovery-curve sweep.
 
     Each tier is a max-node budget for the graph; ``0`` means "no override"
-    (use the settings defaults — used for full-capability reference runs).
+    (use the settings defaults, used for full-capability reference runs).
     :param raw: Comma/space separated integers.
     :return: Ordered list of tiers (default ``[0]``).
     """
@@ -942,7 +936,7 @@ def _apply_lean_overlay(settings: Dict[str, Any], metadata: Dict[str, Any]) -> D
         "max_total_nodes": 40,
         "max_steps": 12,
         # Big pages (e.g. Wikipedia, 500k+ chars raw) make VisitLeafAction's link
-        # extraction + Chroma embedding the dominant cost — and it can exceed the 20s
+        # extraction + Chroma embedding the dominant cost; and it can exceed the 20s
         # visit timeout. Easy tasks need a fact, not the whole link graph, so cap it.
         "max_links_per_visit": 5,
         # The real token driver: full page content (64k+ chars) flows into the MERGE
@@ -1137,7 +1131,7 @@ def _result_origin(connector_llm: ConnectorLLM) -> str:
 
     Stamped at the source (from the actual resolved provider config) rather than inferred
     downstream from missing pricing data, so reporting code can distinguish "no price
-    applies" from "price data is just missing" — see model_costs.is_local_row.
+    applies" from "price data is just missing"; see model_costs.is_local_row.
     """
     provider = (getattr(getattr(connector_llm, "config", None), "llm_provider", None) or "").strip().lower()
     return "local" if provider in _LOCAL_LLM_PROVIDERS else "api"
@@ -1163,7 +1157,7 @@ async def run_single_test(
     """
     Run a single test for a single model.
     :param connector_browser: Optional headless-Chrome fallback connector, threaded into
-        every execution variant's ``AgentIO`` uniformly (F18 — None disables it uniformly
+        every execution variant's ``AgentIO`` uniformly (F18: None disables it uniformly
         instead of leaving it silently inconsistent across variants).
     :return: Test result dict or None if failed.
     """
@@ -1226,7 +1220,7 @@ async def run_single_test(
         os.replace(tmp_path, out_path)
 
         # Opt-in: emit a square >=1920px PNG of the run's DAG (compiled plan or runtime graph)
-        # alongside the result JSON. Best-effort — visualization must never fail a run.
+        # alongside the result JSON. Best-effort: visualization must never fail a run.
         if os.environ.get("IDEA_TEST_RENDER_DAG", "").lower() in ("1", "true", "yes"):
             try:
                 from agent.app.testing.dag_visualizer import render_result_file
@@ -1524,13 +1518,13 @@ async def main() -> None:
     # runs; unset -> the shipped llm_timeout_seconds default (success path unchanged).
     # IDEA_TEST_EXPANSION_TIMEOUT/IDEA_TEST_FINAL_TIMEOUT added 2026-08-07 (barrage20 smoke
     # finding): idea_engine.py's decision/expansion call site uses
-    # `self._cfg.timeouts.expansion or self._cfg.timeouts.llm` — expansion (default 180) wins
+    # `self._cfg.timeouts.expansion or self._cfg.timeouts.llm`: expansion (default 180) wins
     # whenever set, so raising IDEA_TEST_LLM_TIMEOUT alone never reaches this call at all. A
     # local (Ollama) model generating against a large completion budget on a single consumer GPU
     # can genuinely need more than 180s; without this override every such call hit the SAME
     # 180.1s ceiling regardless of LLM_READ_TIMEOUT, killing every local-model cell in the first
     # live smoke run with a clean rc=0 and zero result (see also final_timeout_seconds, which
-    # already self-scales with prompt size and hard-caps at 600s — override it too for symmetry,
+    # already self-scales with prompt size and hard-caps at 600s; override it too for symmetry,
     # though it was not the one observed failing).
     for _env, _key in (
         ("IDEA_TEST_VISIT_TIMEOUT", "visit_timeout_seconds"),
@@ -1691,7 +1685,7 @@ async def main() -> None:
                             spend_state["tripped"] = True
                             logging.error(
                                 f"[SPEND CEILING] cumulative cost ${spend_state['total_usd']:.4f} "
-                                f">= ${usd_ceiling:.4f} — aborting remaining cells."
+                                f">= ${usd_ceiling:.4f}: aborting remaining cells."
                             )
                 return result
         

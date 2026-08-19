@@ -9,46 +9,14 @@ from typing import Dict, Any, List
 from agent.app.idea_test_utils import count_words, count_chars
 from agent.app.model_costs import estimate_cost, format_cost
 
-# Rough chars-per-token used only when the provider omits a usage block so we can
-# still place a (flagged) cost estimate on the chart instead of $0.
 _CHARS_PER_TOKEN = 4.0
 
-# F17 (infra-failure quarantine): HTTP/provider status codes that represent a payment/quota/
-# rate-limit/provider-capacity problem rather than a genuine model or task failure — 402
-# (payment required), 422 (Brave semantic rejection / malformed request), 429 (rate limit), and
-# 5xx (provider-side failure). A cell whose ONLY web/LLM failures are these should not silently
-# count as a real 0 in an A/B mean (measured: web-error runs scored 0.473 vs 0.720 clean).
 _INFRA_STATUS_CODES = frozenset({402, 422, 429, 500, 502, 503, 504})
-# Timing names whose payload reliably carries a ``status`` key AND whose status reflects the
-# FINAL outcome for that op (connector_http.py's "http_request", connector_search.py's
-# "search_query", agent_io.py's "visit" — the last already folds in a browser-fallback attempt).
-# ``status is None`` here means every attempt (HTTP, and browser if it ran) exhausted with no
-# definitive server response at all (DNS/connect/timeout) — itself an infra symptom, not a
-# content/model judgement — so it's treated as infra too. Deliberately excludes the nested
-# "browser_fetch" timing: a browser failure can legitimately be "page rendered but had no
-# content", which is a content outcome, not infra — the enclosing "visit" entry already reflects
-# whichever of the two paths actually determined the result.
 _INFRA_TIMING_NAMES = frozenset({"http_request", "search_query", "visit"})
 
 
 def _is_infra_timing(timing: Dict[str, Any]) -> bool:
-    """Classify one failed telemetry timing entry as an infra failure (F17).
-
-    Two independent signals are honored:
-      1. An explicit ``payload["infra_failed"] is True`` — set by the connector itself when it
-         has better information than a bare status code (e.g. ``connector_llm.query_llm``
-         classifies timeouts/transport errors that never got a status code at all).
-      2. A ``status`` in ``_INFRA_STATUS_CODES``, or ``status is None`` for an op that normally
-         carries one (a transport-level failure), for the connector/io ops in
-         ``_INFRA_TIMING_NAMES``.
-
-    A timing that already succeeded is never infra-classified, and a status like 401/403/404/405
-    (bot-block / not-found) is deliberately NOT infra — that's the F18 browser-fallback problem,
-    a different failure mode with a different fix.
-
-    :param timing: One entry from ``telemetry.timings``.
-    :returns: True if this failure looks like infra rather than a genuine task/model failure.
-    """
+    """Classify a failed telemetry timing as infra failure or task/model failure."""
     if timing.get("success"):
         return False
     payload = timing.get("payload") or {}
@@ -65,17 +33,38 @@ def _is_infra_timing(timing: Dict[str, Any]) -> bool:
 
 
 def _summarize_infra(timings: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Roll up infra-classified failures across a run's timings for the result JSON.
-
-    :param timings: ``telemetry.timings`` list.
-    :returns: ``{"failed": bool, "failure_count": int, "ops": [name, ...]}``.
-    """
+    """Roll up infra-classified failures for the result JSON."""
     infra_timings = [t for t in timings if _is_infra_timing(t)]
     return {
         "failed": bool(infra_timings),
         "failure_count": len(infra_timings),
         "ops": sorted({t.get("name", "unknown") for t in infra_timings}),
     }
+
+
+def build_validation_evidence(telemetry_raw: Dict[str, Any], max_docs: int = 40,
+                              max_chars_per_doc: int = 50000) -> Dict[str, Any]:
+    """Project telemetry.documents_seen into evidence validators consume.
+
+    Only documents_seen is arm-agnostic (recorded by every variant).
+    """
+    visited: List[Dict[str, str]] = []
+    search_urls: List[str] = []
+    for entry in (telemetry_raw or {}).get("documents_seen") or []:
+        if not isinstance(entry, dict):
+            continue
+        doc = entry.get("document") or {}
+        if not isinstance(doc, dict):
+            continue
+        source = entry.get("source")
+        url = str(doc.get("url") or "").strip()
+        if source == "visit":
+            if len(visited) >= max_docs:
+                continue
+            visited.append({"url": url, "content": str(doc.get("content") or "")[:max_chars_per_doc]})
+        elif source == "search" and url:
+            search_urls.append(url)
+    return {"visited": visited, "search_urls": search_urls}
 
 
 def summarize_observability(result: Dict[str, Any], telemetry, model_name: str = "") -> Dict[str, Any]:
@@ -171,8 +160,6 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
             visit_chars += count_chars(content)
             visit_words += count_words(content)
     
-    # Fixture hit/miss counts: a non-zero miss rate means a model saw evidence the
-    # prewarm did not cover, which is the asymmetry strict replay is meant to remove.
     fixture_hits = 0
     fixture_misses = 0
     for entry in telemetry.events:
@@ -185,7 +172,6 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
         elif fixture_flag == "miss":
             fixture_misses += 1
 
-    # Decision trace + grounding verdict (thought-process observability).
     decisions = list(getattr(telemetry, "decisions", []) or [])
     grounded_flag = None
     for d in decisions:
@@ -200,9 +186,6 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
         replans = int(result.get("grounding_replans", 0) or 0)
     stage_counts = Counter(d.get("stage") for d in decisions if isinstance(d, dict))
 
-    # Opt-in decorrelated per-step confidence trace (present only when the engine ran with
-    # got_step_confidence_judge_enabled). Summarized here so the E-valuator pilot can read an
-    # ordered S1..S_T verifier-score sequence per run alongside the grep-validation substrate.
     step_confidence = None
     if isinstance(output, dict):
         raw_confidences = output.get("step_confidences")
@@ -262,9 +245,6 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
         entry["min_duration"] = round(entry["min_duration"], 4)
         entry["max_duration"] = round(entry["max_duration"], 4)
 
-    # USD cost: price the reported token usage when available, otherwise fall back
-    # to a chars/token approximation flagged as estimated so headline numbers aren't
-    # silently understated when a provider (e.g. some OpenRouter slugs) omits usage.
     cost_estimated = False
     cost_prompt_tokens = llm_prompt_tokens
     cost_completion_tokens = llm_completion_tokens

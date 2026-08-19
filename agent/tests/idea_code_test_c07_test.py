@@ -38,14 +38,11 @@ def test_ground_truth_values_are_internally_correct():
     for name in names:
         assert result[name] == {"region": "us-east-1", "replicas": 3, "instance_name": name}
 
-    # base untouched
     assert base == {"region": "us-east-1", "replicas": 3}
 
-    # independent copies
     result["web-01"]["region"] = "eu-west-1"
     assert result["web-02"]["region"] == "us-east-1"
 
-    # empty names
     assert _independent_generate_configs(base, []) == {}
 
 

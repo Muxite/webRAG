@@ -93,7 +93,6 @@ def test_prune_adaptive_uses_stddev_threshold():
     nodes = [g.add_child(parent_id=g.root_id(), title=f"n-{s}", score=s) for s in scores]
     prune_ids = ops.identify_prune_candidates(g)
     assert nodes[-1].node_id in prune_ids
-    # Higher-scoring nodes should not be pruned.
     for n in nodes[:-1]:
         assert n.node_id not in prune_ids
 

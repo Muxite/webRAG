@@ -5,25 +5,30 @@ This is a deliberately small first draft. It recognises three reasoning shapes t
 have appeared in the tier-4/5 corpus and returns ``None`` (fails OPEN) for anything
 else, so it can never impose the wrong discipline on an unrecognised task:
 
-* ``"branch_eliminate"`` — the mandate enumerates K similarly-named candidates and a
+* ``"branch_eliminate"``: the mandate enumerates K similarly-named candidates and a
   single distinguishing criterion, and asks the agent to eliminate down to one
-  survivor (e.g. ``test_095``: four Rivers Avon, exactly one empties into the English
-  Channel). This is the ONLY shape with matching infrastructure today: the candidate
-  list is detected with ``candidate_coverage.extract_named_candidates`` and there is a
-  real rule file at ``reasoning_rules/branch_eliminate.md``.
+  survivor (e.g. test_095: four Rivers Avon, exactly one empties into the English
+  Channel). This is the shape with the most supporting infrastructure: the candidate
+  list is detected with candidate_coverage.extract_named_candidates and there is a
+  real rule file at reasoning_rules/branch_eliminate.md.
 
-* ``"chain"`` — a single dependency chain where each step's answer is needed to find
-  the next page, with NO candidate-list structure (e.g. ``test_051``, ``test_065``).
-  Keyword heuristic only; no matching rule file exists yet.
+* ``"chain"``: a single dependency chain where each step's answer is needed to find
+  the next page, with NO candidate-list structure (e.g. test_051, test_065).
+  Keyword heuristic; a rule file exists at reasoning_rules/chain.md.
 
-* ``"parallel_merge"`` — two independent chains whose results are combined by an
-  arithmetic operation (e.g. ``test_055``, ``test_061``: absolute difference of two
-  founding years / birth years). Keyword heuristic only; no matching rule file yet.
+* ``"parallel_merge"``: two independent chains whose results are combined by an
+  arithmetic operation (e.g. test_055, test_061: absolute difference of two
+  founding years / birth years). Keyword heuristic; a rule file exists at
+  reasoning_rules/parallel_merge.md.
 
-Only ``branch_eliminate`` reuses real supporting infrastructure; ``chain`` and
-``parallel_merge`` are best-effort keyword detectors and are intentionally less
-rigorous. Order matters: ``parallel_merge`` is checked before ``chain`` because a
-two-chain task literally contains the word "chain".
+All three now have a matching rule file, but branch_eliminate alone reuses real
+supporting infrastructure beyond keyword matching (the candidate-coverage extractor);
+chain and parallel_merge remain best-effort keyword detectors, intentionally
+less rigorous, and their keyword coverage is unmeasured beyond the two/three examples
+each was written against (see docs/handoffs/SHAPE_ADAPTATION_OPEN_QUESTIONS.md Q1
+for the methodology to re-run before trusting this beyond that). Order matters:
+parallel_merge is checked before chain because a two-chain task literally
+contains the word "chain".
 """
 
 from __future__ import annotations
@@ -35,7 +40,7 @@ from agent.app.idea_policies.candidate_coverage import extract_named_candidates
 
 # Disambiguation-style language that, combined with an enumerated candidate list,
 # signals a branch-eliminate shape (as opposed to a plain breadth/fan-out list that
-# also happens to be numbered — e.g. test_052's six novels, test_059's five players).
+# also happens to be numbered, e.g. test_052's six novels, test_059's five players).
 _DISAMBIG_PHRASES = (
     "exactly one of",
     "each stage's target is unknown",
@@ -55,12 +60,22 @@ _PARALLEL_COMBINE_PHRASES = (
     "compute the final answer",
 )
 
-# Single-path dependency chain markers (no candidate-list structure).
+# Single-path dependency chain markers (no candidate-list structure). The first four
+# are the original set, tuned against the two canonical examples (test_051, test_065);
+# the rest widen coverage to the "sequential steps" dialect seen in test_023-style
+# tasks. Deliberately excludes generic hop language ("then", "next", "above",
+# "previous") on its own (those over-match parallel_merge/branch_eliminate tasks that
+# also describe multi-step research informally); every phrase here names the
+# step-to-step DEPENDENCY explicitly, not just sequencing.
 _CHAIN_PHRASES = (
     "dependency chain",
     "research chain",
     "each step's answer is required to find the next",
     "each step can only be answered by reading the previous",
+    "requires sequential steps",
+    "this requires sequential",
+    "each step depends on the previous",
+    "using the answer from the previous step",
 )
 
 
@@ -109,19 +124,18 @@ def classify_shape(mandate: str) -> Optional[str]:
 # Answer-shape classifier (finalize reconcile-chain gate)
 # ---------------------------------------------------------------------------
 #
-# ``classify_answer_shape`` decides whether a mandate asks for a *specific,
-# extractable/derivable answer* (a computation, a count, an argmax/argmin, a
-# disambiguation survivor, or a single factual value) — the tasks where the
-# post-synthesis recompute/verify/variation passes in ``idea_finalize`` can catch a
-# "right page, wrong value" slip. It returns ``None`` (fail-open → the caller SKIPS
-# the passes) for open-ended / narrative work where re-deriving a single value is
-# meaningless and only burns tokens.
+# classify_answer_shape decides whether a mandate asks for a specific,
+# extractable/derivable answer (computation, count, argmax/argmin, disambiguation
+# survivor, or single factual value). This identifies tasks where post-synthesis
+# recompute/verify/variation passes in idea_finalize can catch a "right page, wrong
+# value" slip. Returns None (fail-open, the caller SKIPS the passes) for open-ended
+# or narrative work where re-deriving a single value is meaningless and only burns tokens.
 #
-# It reuses ``classify_shape``'s labels where they already answer the question (a
+# It reuses classify_shape's labels where they already answer the question (a
 # branch-eliminate IS a disambiguation, a parallel-merge IS a computation, a chain
 # resolves to a single value), then falls back to conservative keyword heuristics.
 # Deliberately conservative on the "run" side: an unrecognised phrasing returns
-# ``None`` (skip) rather than guessing, so the passes only spend where the task is
+# None (skip) rather than guessing, so the passes only spend where the task is
 # clearly answer-shaped.
 
 # Disambiguation: pick the one specific item that satisfies a criterion.
@@ -196,11 +210,11 @@ def _is_argmax(text: str) -> bool:
 
 
 def classify_answer_shape(mandate: str) -> Optional[str]:
-    """Classify a mandate into an *answer shape*, or ``None`` for open-ended/narrative.
+    """Classify a mandate into an answer shape, or None for open-ended/narrative.
 
-    Returns one of ``"computation"``, ``"count"``, ``"argmax"``, ``"disambiguation"``,
-    ``"single_value"`` when the task asks for a specific derivable answer, else ``None``.
-    Fails OPEN toward ``None`` (skip) for anything not clearly answer-shaped.
+    Returns one of "computation", "count", "argmax", "disambiguation",
+    "single_value" when the task asks for a specific derivable answer, else None.
+    Fails OPEN toward None (skip) for anything not clearly answer-shaped.
     """
     if not mandate:
         return None

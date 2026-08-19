@@ -11,10 +11,8 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
 );
 
-// Enable logger
 app.use('*', logger(console.log));
 
-// Enable CORS for all routes and methods
 app.use(
   "/*",
   cors({
@@ -26,12 +24,10 @@ app.use(
   }),
 );
 
-// Health check endpoint
 app.get("/make-server-65da8f1f/health", (c) => {
   return c.json({ status: "ok" });
 });
 
-// Signup endpoint
 app.post("/make-server-65da8f1f/signup", async (c) => {
   try {
     const { email, password, name } = await c.req.json();
@@ -64,7 +60,6 @@ app.post("/make-server-65da8f1f/signup", async (c) => {
   }
 });
 
-// System info endpoint
 app.get("/make-server-65da8f1f/system-info", async (c) => {
   try {
     return c.json({
@@ -80,7 +75,6 @@ app.get("/make-server-65da8f1f/system-info", async (c) => {
   }
 });
 
-// User stats endpoint (requires authentication)
 app.get("/make-server-65da8f1f/user-stats", async (c) => {
   try {
     const accessToken = c.req.header("Authorization")?.split(" ")[1];
@@ -115,7 +109,6 @@ app.get("/make-server-65da8f1f/user-stats", async (c) => {
   }
 });
 
-// Get tasks endpoint (requires authentication)
 app.get("/make-server-65da8f1f/tasks", async (c) => {
   try {
     const accessToken = c.req.header("Authorization")?.split(" ")[1];
@@ -138,7 +131,6 @@ app.get("/make-server-65da8f1f/tasks", async (c) => {
   }
 });
 
-// Submit task endpoint (requires authentication)
 app.post("/make-server-65da8f1f/submit-task", async (c) => {
   try {
     const accessToken = c.req.header("Authorization")?.split(" ")[1];
@@ -157,7 +149,6 @@ app.post("/make-server-65da8f1f/submit-task", async (c) => {
       return c.json({ error: "Invalid task parameters" }, 400);
     }
 
-    // Check user has enough ticks
     let ticksStr = await kv.get(`user:${user.id}:ticks`);
     
     // Initialize ticks if not set
@@ -179,7 +170,6 @@ app.post("/make-server-65da8f1f/submit-task", async (c) => {
       }, 400);
     }
 
-    // Create task
     const task = {
       id: crypto.randomUUID(),
       timestamp: new Date().toLocaleString(),
@@ -211,7 +201,6 @@ app.post("/make-server-65da8f1f/submit-task", async (c) => {
         await kv.set(`user:${user.id}:tasks`, JSON.stringify(currentTasks));
       }
 
-      // Deduct ticks
       const currentTicksStr = await kv.get(`user:${user.id}:ticks`);
       const currentTicks = parseInt(currentTicksStr || "1000");
       const newTicks = currentTicks - task.ticksUsed;

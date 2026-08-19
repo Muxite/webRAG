@@ -2,24 +2,24 @@
 """Parallel compute-ladder A/B driver for the NATIVE adaptive engine (LIVE $).
 
 Question: can we get materially better reasoning out of ONE cheap "bad" model by burning more of
-its (cheap) tokens/searches — i.e. does an adaptive agent that re-expands, re-grounds on low
+its (cheap) tokens/searches (i.e. does an adaptive agent that re-expands, re-grounds on low
 confidence, and self-consistency-votes beat the same model run bare? And how close does it get to a
 premium model at a fraction of the cost?
 
 Design (all decided with the caller):
   * ONE cheap agent model (default openai/gpt-5-mini), execution_variant=graph, in three arms that
     spend progressively more compute:
-        baseline      — adaptive OFF (bare cheap model)
-        good_adaptive — re-expansion + confidence-driven re-grounding + corrective context
-        full          — good_adaptive + k-vote x3 + backtrack + expect-contract (max searches/tokens)
-  * A premium REFERENCE bar (default google/gemini-3.1-pro-preview + sequential_react) — the agent
+        baseline: adaptive OFF (bare cheap model)
+        good_adaptive: re-expansion + confidence-driven re-grounding + corrective context
+        full: good_adaptive + k-vote x3 + backtrack + expect-contract (max searches/tokens)
+  * A premium REFERENCE bar (default google/gemini-3.1-pro-preview + sequential_react). The agent
     never uses it; it is only the quality ceiling we compare the cheap ladder against.
   * 8 tasks spanning all 4 adaptive archetypes incl. the D re-expansion flagship; R=5 for the cheap
     ladder, R=3 for the reference.
 
 Why a bespoke driver rather than native_ab_run.sh: that driver is serial (one cell at a time,
 ~14h for this matrix). Here every cell is an ISOLATED process at IDEA_TEST_CONCURRENCY=1 (clean
-per-run cost/score attribution — no shared-connector cross-talk), but up to JOBS run at once for
+per-run cost/score attribution (no shared-connector cross-talk), but up to JOBS run at once for
 wall-clock. Fairness rules are preserved: connector-retry ON in every arm, fixtures OFF, and arms
 of the same (task,rep) are enqueued adjacently so they share the same network window; the analyzer
 pairs on (task,rep). A hard global BUDGET stops enqueueing, and a per-run USD ceiling guards runaways.
@@ -46,23 +46,20 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 
 try:
-    # Reuse the SAME price table the runner uses so recovered cost matches observability.cost.usd.
+    # Recover real spend from the same cost table the runner uses.
     from agent.app.model_costs import estimate_cost as _estimate_cost
 except Exception:  # pragma: no cover - keep the driver runnable even if the import path shifts
     _estimate_cost = None
 
 REPO = "/home/muk/projects/webRAG"
 RESULTS_DIR = f"{REPO}/agent/idea_test_results"
-# Default ladder: floor -> proven winner -> productive max-burn. `full` (k-vote + backtrack +
-# expect-contract) was measured NET-NEGATIVE for cheap models and is dropped; `max_burn` cranks the
-# ONE productive lever (re-expansion depth) instead. Override with --arms for a different shape.
+# Default ladder: baseline (control), good_adaptive (established), max_burn (productive).
+# The full arm (k-vote + backtrack) was net-negative and dropped; max_burn uses deeper re-expansion.
 LADDER_ARMS = ["baseline", "good_adaptive", "max_burn"]
 
-# Chroma isolation/embedding config for this run, populated in main() from CLI args.
-# embedded mode gives each cell subprocess its OWN SQLite file (no cross-subprocess
-# write-lock contention) and runs embedding off the loop via to_thread; embed_device
-# 'cuda'/'auto' pushes embedding to the GPU. Defaults chosen for the barrage relaunch.
-# log_dir (2026-08-07): per-cell stdout/stderr capture dir, see run_cell().
+# Chroma isolation/embedding config. Embedded mode: each cell gets its own SQLite file
+# (no cross-subprocess lock contention) and embedding runs on GPU (embed_device auto/cuda).
+# log_dir: per-cell stdout/stderr capture for debugging failed cells (run_cell()).
 RUN_CFG = {"chroma_mode": "embedded", "embed_device": "auto", "embedded_root": None, "log_dir": None}
 
 
@@ -72,35 +69,30 @@ def cell_db_path(cell):
 
 # Named task sets (see agent/app/BENCHMARK_SUITE_50.md). All ids are validated + deduped.
 TASK_SETS = {
-    # the original 8-task smoke across 4 archetypes
     "smoke8": ["122", "125", "128", "130", "134", "138", "140", "144"],
-    # Tier A: the 24 adaptive-targeted core (4 archetypes x 6), all grounding-gated
     "core24": [f"{n:03d}" for n in range(122, 146)],
-    # The full validated + deduped 50-task suite (Tier A core 24 + B coverage 15 + C depth 11)
     "suite50": (
-        [f"{n:03d}" for n in range(122, 146)]                                   # Tier A (24)
-        + ["049", "055", "059", "060", "067", "072", "075", "041", "062",       # Tier B (15)
+        [f"{n:03d}" for n in range(122, 146)]
+        + ["049", "055", "059", "060", "067", "072", "075", "041", "062",
            "024", "044", "093", "046", "047", "073"]
-        + ["068", "095", "108", "040", "054", "065", "042", "056", "061",       # Tier C (11)
+        + ["068", "095", "108", "040", "054", "065", "042", "056", "061",
            "070", "090"]
     ),
-    # 2026-08-07 diagnostic barrage (not the held barrage1 pre-registration): one exemplar of
-    # every shape in the active 59-suite + 2 cross-domain reasoning tasks (200/206, no web
-    # grounding) + 1 opportunistic stacked-axis task (146, pool-only, never run live before). See
-    # /home/muk/.claude/plans/i-think-the-next-steady-wand.md for the selection rationale.
+    # Diagnostic barrage: exemplar of each shape in the active 59-suite, plus 2 reasoning
+    # tasks (200/206) and 1 stacked-axis task (146) for broader coverage.
     "barrage20": [
         "122", "108", "134", "040", "132", "140", "143", "070", "072", "079",
         "094", "044", "047", "052", "071", "073", "200", "206", "146",
     ],
+    # LangGraph comparison tasks: 10 Tier A single-topic sequential shapes (survivor,
+    # conflicting-source, chain, re-expansion). LangGraph can't run wide parallel fan-out,
+    # so only sequential shapes are included. Built from smoke8 with extra chain/conflicting tasks.
+    "langgraph10": ["122", "125", "128", "129", "130", "134", "135", "138", "140", "144"],
 }
-# F27 — the ACTIVE barrage suite (59), i.e. what `--task-set suite59` in the relaunch command
-# means: `suite50` MINUS task 024 (dropped 2026-07-25 — un-gated AND LLM-judge-scored, so a
-# 0-visit hallucination scored 0.786 and PASSED the 0.75 bar; the file is kept for a future
-# grounding-gated rebuild) PLUS AGENT4's 10 bounded parallel fan-out additions (breadth/argmax/
-# count/AND-filter/nearest thin shapes). Derived from `suite50` rather than re-typed so the two
-# can never silently diverge; pinned against the CI lint gate's own manifest
-# (agent/tests/validator_lint_test.ACTIVE_SUITE_IDS) by adaptive_ladder_run_test.py, so
-# the barrage can never run a task the validator-integrity gate does not check.
+# ACTIVE barrage suite (59): suite50 minus task 024 (un-gated, LLM-judge-scored, had
+# hallucination issues) plus 10 new parallel shapes (breadth/argmax/count/AND-filter/nearest).
+# Derived from suite50 so the two never silently diverge. Pinned against CI lint gate's manifest
+# (validator_lint_test.ACTIVE_SUITE_IDS) so the barrage never runs unchecked tasks.
 TASK_SETS["suite59"] = [t for t in TASK_SETS["suite50"] if t != "024"] + [
     "052", "071", "078", "079", "081", "082", "084", "085", "091", "094",
 ]
@@ -126,21 +118,18 @@ def base_env():
         "LLM_PROVIDER": "openrouter",
         "MODEL_API_URL": "https://openrouter.ai/api/v1",
         "CHROMA_URL": "http://localhost:8001",
-        # F19: 45 was a dead knob — the outer per-action budget (fetch/visit/search_timeout_seconds,
-        # all 20 in idea_dag_settings.json) always binds before this inner aiohttp timeout, so it never
-        # protected anything and only misled anyone tuning it. 20 makes the declared and effective caps
-        # match; retries still get 2 attempts inside the 20s window instead of losing the whole budget
-        # to one hung attempt.
+        # 45s was a dead knob: the outer per-action budget (20s in idea_dag_settings.json) always binds
+        # first, making the inner aiohttp timeout ineffective. Using 20s makes the declared and effective
+        # caps match; retries still get 2 attempts within the window.
         "DEFAULT_TIMEOUT": "20", "DEFAULT_DELAY": "2", "JITTER_SECONDS": "0.5",
-        # fixed harness controls (identical to native_ab_run.sh) ---------------------------------
-        "IDEA_TEST_CONCURRENCY": "1",            # isolate: one run per process
-        "IDEA_TEST_PARALLEL_ACTION_LIMIT": "1",  # mandatory for wide-breadth tasks
-        "IDEA_TEST_FIXTURES": "off",             # native engine explores variably
-        "IDEA_TEST_CONNECTOR_RETRY": "1",        # infra-fairness in EVERY arm
+        "IDEA_TEST_CONCURRENCY": "1",
+        "IDEA_TEST_PARALLEL_ACTION_LIMIT": "1",
+        "IDEA_TEST_FIXTURES": "off",
+        "IDEA_TEST_CONNECTOR_RETRY": "1",
         "IDEA_TEST_EFFORT_TIERS": "0",
-        "IDEA_TEST_PREFLIGHT_JSON_TOKENS": "4096",  # reasoning models pass the JSON gate
+        "IDEA_TEST_PREFLIGHT_JSON_TOKENS": "4096",
         "IDEA_TEST_RUNS": "1",
-        "IDEA_TEST_USD_CEILING": "0.60",         # per-RUN runaway guard (global cap is in this driver)
+        "IDEA_TEST_USD_CEILING": "0.60",
     })
     return env
 
@@ -151,62 +140,43 @@ def cell_env(cell):
     env["IDEA_TEST_MODELS"] = cell["model"]
     env["IDEA_TEST_EXECUTION_VARIANTS"] = cell["variant"]
     env["IDEA_TEST_RUN_ID"] = cell["run_id"]
-    # Grading is deterministic grep (no LLM judge), so the validation model is only preflighted.
-    # Point it at the cell's own model so no SEPARATE (e.g. expensive gpt-5-mini) model is probed —
-    # a mismatched validation model's preflight can 402/abort the whole run (learned the hard way).
+    # Grading is deterministic grep, so validation only needs preflight. Using the cell's own
+    # model avoids spawning an expensive separate model. Mismatched validation models can cause 402
+    # errors that abort the run.
     env["IDEA_TEST_VALIDATION_MODEL"] = cell["model"]
     if cell["arm"]:
         env["IDEA_TEST_ARM"] = cell["arm"]
     else:
         env.pop("IDEA_TEST_ARM", None)
-    # 0a: local-model provider override — route this cell at an OpenAI-compatible local endpoint
-    # (Ollama) instead of OpenRouter. Mirrors badmodel-lab/run_cell.sh's established local-routing
-    # recipe exactly: openai_compatible provider, a non-empty-but-ignored API key (the SDK client
-    # requires a truthy key even though Ollama ignores it), and the JSON preflight gate OFF — a
-    # genuinely weak subject that can't emit clean JSON is exactly what this barrage exists to
-    # observe, not silently drop (default IDEA_TEST_PREFLIGHT_JSON=1 would exclude it entirely).
+    # Local-model routing to OpenAI-compatible endpoint (Ollama) instead of OpenRouter.
+    # Sets openai_compatible provider, a dummy API key (SDK requires truthy), and disables JSON
+    # preflight so genuinely weak models that can't emit clean JSON are observed, not excluded.
     if cell.get("provider"):
         env["LLM_PROVIDER"] = cell["provider"]
         env["MODEL_API_URL"] = cell.get("api_url") or env["MODEL_API_URL"]
         env["OPENAI_API_KEY"] = "ollama"
         env["IDEA_TEST_PREFLIGHT_JSON"] = "0"
-        # Smoke-test finding (2026-08-07): the default 90s LLM_READ_TIMEOUT (tuned for cloud API
-        # latency, F3) is throughput-bound, not network-bound, for local generation — qwen2.5:14b
-        # against a 32768-token completion budget on a single consumer GPU genuinely needs more
-        # wall-clock than that, and with IDEA_TEST_CONNECTOR_RETRY=1's one retry, two consecutive
-        # 90s misses (~180s) killed EVERY q14 cell and q15's larger-prompt cells in the first live
-        # smoke run before any local model finished a single call. 480s gives real generation room
-        # to complete while staying well inside the driver's own 1800s per-cell subprocess cap.
+        # Smoke-test finding: default 90s LLM_READ_TIMEOUT (tuned for cloud API) is insufficient for
+        # local generation. qwen2.5:14b on a consumer GPU needs more time. Two consecutive 90s timeouts
+        # with retry killed all cells before completion. 480s provides room while staying within
+        # the driver's 1800s per-cell subprocess cap.
         env["LLM_READ_TIMEOUT"] = "480"
-        # 2nd smoke-test finding, same run: idea_test_runner.preflight_check_llm has its OWN
-        # hardcoded 20s-per-payload-candidate wait_for, independent of LLM_READ_TIMEOUT — this is
-        # what actually killed q15's task=140 cell (empty-string asyncio.TimeoutError, "No valid
-        # execution models after pre-flight checks. Aborting.", zero output). Root cause: the
-        # global local-model lock (above) only serializes CONCURRENT local cells, it does nothing
-        # about a DIFFERENT local model (e.g. q14) running in between and evicting q15 from
-        # Ollama's single-loaded-model slot (OLLAMA_MAX_LOADED_MODELS=1) — the next q15 cell then
-        # has to cold-load before it can answer even the tiny "reply OK" preflight probe, which
-        # 5 x 20s = 100s isn't reliably enough time for. 120s per candidate covers a cold load.
+        # Preflight has independent 20s-per-candidate timeout that killed some cells. Root cause:
+        # local-model lock only serializes concurrent cells, not different models in sequence. A cold-load
+        # of a different model after eviction from the single-loaded-model slot takes longer than 100s.
+        # 120s per candidate covers cold load time.
         env["IDEA_TEST_PREFLIGHT_TIMEOUT_SECONDS"] = "120"
-        # 3rd smoke-test finding, same run (the real blocker for q14 + q15's larger prompts):
-        # idea_engine.py's decision/expansion call uses `timeouts.expansion or timeouts.llm`
-        # (expansion defaults to 180 and always wins over llm when set) — LLM_READ_TIMEOUT only
-        # bounds the httpx transport, not this engine-level wait_for. Every q14 call hit the SAME
-        # flat 180.1s ceiling regardless of prompt size, killing the cell with rc=0 and zero
-        # output. IDEA_TEST_EXPANSION_TIMEOUT/IDEA_TEST_FINAL_TIMEOUT are new env overrides added
-        # for this (idea_test_runner.py); give local cells real room.
+        # Engine-level decision/expansion timeout (defaults to 180s) hits before LLM_READ_TIMEOUT.
+        # This ceiling killed cells regardless of prompt size. New env overrides
+        # IDEA_TEST_EXPANSION_TIMEOUT/IDEA_TEST_FINAL_TIMEOUT allow local cells sufficient room.
         env["IDEA_TEST_EXPANSION_TIMEOUT"] = "480"
         env["IDEA_TEST_FINAL_TIMEOUT"] = "480"
     if cell.get("telemetry"):
         env["IDEA_TEST_JSON_TELEMETRY"] = "1"
-    # Chroma isolation + embedding device. In embedded mode each cell gets its own
-    # SQLite file (no shared-server contention) at a unique path; embedding runs on the
-    # chosen device (GPU under 'cuda'/'auto').
     env["CHROMA_MODE"] = RUN_CFG["chroma_mode"]
     env["CHROMA_EMBED_DEVICE"] = RUN_CFG["embed_device"]
     if RUN_CFG["chroma_mode"] == "embedded":
         env["CHROMA_EMBEDDED_PATH"] = cell_db_path(cell)
-    # per-cell "burn" env (e.g. deepseek's full arm: extra k-vote + deeper re-expansion)
     for k, v in (cell.get("burn") or {}).items():
         env[k] = str(v)
     return env
@@ -228,7 +198,7 @@ def load_ledger(path):
 
 def save_ledger(path, ledger):
     """Atomic write (temp + os.replace): a crash mid-write must never leave a corrupt ledger that
-    then mis-reports attempt counts — either wrongly resurrecting a dead cell or, worse, wrongly
+    then mis-reports attempt counts: either wrongly resurrecting a dead cell or, worse, wrongly
     declaring a live one dead and abandoning it."""
     tmp = path + ".tmp"
     with open(tmp, "w") as fh:
@@ -243,7 +213,7 @@ def openrouter_key_usage(api_key):
     ``{"data": {"usage": <cumulative USD, all-time>, "limit": ..., "limit_remaining": ..., ...}}``.
     NOT ``/api/v1/credits`` (that path 404s today) and the field is ``usage``, not ``total_usage``.
     Because this is a live, ever-growing counter (not scoped to this campaign), callers baseline it
-    once and compare the delta — see --real-budget wiring in main().
+    once and compare the delta. See --real-budget wiring in main().
     """
     if not api_key:
         return None
@@ -261,7 +231,7 @@ def openrouter_key_usage(api_key):
 
 
 def is_dead(cell, ledger, max_attempts):
-    """True if this cell has been attempted `max_attempts`+ times with no complete result yet —
+    """True if this cell has been attempted `max_attempts`+ times with no complete result yet.
     i.e. it is hopeless and should be given up on rather than resubmitted forever. A cell that
     eventually DID produce a complete result is never dead, no matter its attempt count (checked
     first in `run_cell`, but re-checked here so a stale ledger entry can't override a real result)."""
@@ -275,7 +245,7 @@ def acquire_pid_lock(lock_path):
     """Cross-process guard: refuse to start a second driver against the same run-id/out_dir.
 
     Two drivers racing the same run-id would both see "no result yet" for a cell and submit it
-    twice — running the SAME task concurrently, which cross-contaminates the chroma working memory
+    twice (running the SAME task concurrently, which cross-contaminates the chroma working memory)
     the per-task serialization exists to protect (mem_<sha256(mandate)> is shared across all
     arms/reps of one task), and wastes money on a duplicate run. Raises SystemExit if the lock is
     held by a live process; otherwise claims it and registers an atexit release.
@@ -290,7 +260,7 @@ def acquire_pid_lock(lock_path):
             try:
                 os.kill(old_pid, 0)  # raises if not alive; no-op signal otherwise
             except ProcessLookupError:
-                pass  # stale lock left by a dead process — safe to reclaim
+                pass  # stale lock left by a dead process. Safe to reclaim
             except PermissionError:
                 raise SystemExit(
                     f"lock held by a live pid we can't signal in {lock_path}; refusing to start")
@@ -338,7 +308,7 @@ def has_complete_result(run_id, task):
     Guards against a truncated/partial JSON (e.g. killed mid-write by the 1800s timeout kill)
     being mistaken for a finished cell and skipped forever with no score or cost ever recorded.
     The runner now writes results atomically (temp + os.replace), so a partial file should no
-    longer occur going forward — this also protects any result written before that fix landed.
+    longer occur going forward. This also protects any result written before that fix landed.
     """
     for f in result_files(run_id, task):
         try:
@@ -356,7 +326,7 @@ def recover_cell_usd(run_id, task):
 
     The runner streams `llm_usage` events to `{run_id}_{task}_{raw_model}[_variant].jsonl`; because
     raw model slugs contain '/' (e.g. openai/gpt-4.1-nano), the trace can land in a spurious subdir
-    (`{run_id}_{task}_openai/gpt-4.1-nano.jsonl`) — a runner quirk, not this driver's to fix, so
+    (`{run_id}_{task}_openai/gpt-4.1-nano.jsonl`), a runner quirk, not this driver's to fix, so
     this globs both forms. This is a LOWER BOUND: an LLM call in flight at kill-time emits no usage
     event, and non-LLM spend (search) is not in this trace. Still far better than booking $0 for a
     cell that really spent money.
@@ -393,7 +363,7 @@ def recover_cell_usd(run_id, task):
 
 
 def cell_usd_and_score(run_id, task):
-    """Best-effort (usd, score) for a completed cell — mirrors adaptive_ab_analyze._obs."""
+    """Best-effort (usd, score) for a completed cell. Mirrors adaptive_ab_analyze._obs."""
     usd = score = None
     for f in result_files(run_id, task):
         try:
@@ -416,7 +386,7 @@ AXES = {
         "ladders": [
             {"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 5, "burn": None},
             # The productive burn now lives in the `max_burn` ARM profile (uniform, deeper
-            # re-expansion), not a per-model k-vote override — k-vote was net-negative.
+            # re-expansion), not a per-model k-vote override. K-vote was net-negative.
             {"model": "deepseek/deepseek-v4-flash", "tag": "ds", "reps": 5, "burn": None},
             {"model": "openai/gpt-5.6-luna", "tag": "luna", "reps": 5, "burn": None},
             {"model": "openai/gpt-5.6-terra", "tag": "terra", "reps": 5, "burn": None},
@@ -429,7 +399,7 @@ AXES = {
     # covers strong-vs-weak and local-vs-non-local in one pass. `provider`/`api_url` route a
     # ladder entry at a local OpenAI-compatible endpoint instead of OpenRouter (see cell_env()).
     # qwen2.5:1.5b/qwen2.5:14b are both "subjects" in badmodel-lab/roster.yaml, served from the
-    # same badmodel-ollama container (port 11435) — see badmodel-lab/run_cell.sh for precedent.
+    # same badmodel-ollama container (port 11435). See badmodel-lab/run_cell.sh for precedent.
     "barrage20": {
         "json_telemetry": True,  # capture parse-failure classes; no-op unless read, additive only
         "ladders": [
@@ -444,6 +414,69 @@ AXES = {
         ],
         "reference": {"model": "anthropic/claude-sonnet-5", "tag": "sonnet",
                       "variant": "sequential_react", "reps": 1},
+    },
+    # 2026-08-15 capability-spectrum sweep (DAG v2 vs off-the-shelf LangGraph). The question is
+    # not "is DAG v2 better" in the abstract but "at which point on the model-capability curve, if
+    # any, does its structure earn its cost". Two axes, run under SEPARATE --run-ids so the free
+    # GPU-serial local sweep and the paid API sweep proceed concurrently without contending
+    # (embedded chroma gives every cell its own SQLite file, so cross-driver contamination is not
+    # possible). Neither axis carries a `reference`. A premium ceiling bar is not what this asks.
+    #
+    # Run each axis TWICE, once per execution variant:
+    #   --variant graph           --arms baseline,good_adaptive   (the native ladder)
+    #   --variant langgraph_react --arms good_adaptive            (the external baseline)
+    # The arm label is inert for langgraph_react EXCEPT that `good_adaptive` preserves the
+    # connector-retry parity langgraph_solver's F16 invariant depends on; `baseline` would
+    # silently disable it (connector_retry_on_failure_enabled=False) and handicap that arm only.
+    "capspec_api": {
+        "json_telemetry": True,
+        "ladders": [
+            # super-cheap AND genuinely weak: the cheapest real "bad model on an API" available
+            {"model": "meta-llama/llama-3.2-1b-instruct", "tag": "l1b", "reps": 2, "burn": None},
+            # the established cheap-tier reference point for every prior result in this repo
+            {"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 2, "burn": None},
+            # same headline price as nano, different vendor/family. Guards against the whole
+            # comparison being an artifact of one model's quirks
+            {"model": "google/gemini-2.5-flash-lite", "tag": "flash", "reps": 2, "burn": None},
+        ],
+    },
+    # 2026-08-15, follow-up: chain-shape-only axis. Wave 3 found `sequential_react` matches
+    # `graph:good_adaptive` on score at 1/3 the input tokens with equal evidence volume, which
+    # raises the internal question "what is the graph structure buying?" LangGraph not involved.
+    # If the graph engine's advantage is real it should appear on CHAINS (where a later step must
+    # condition on an earlier one) and nowhere else. Deliberately R=1 over MORE tasks rather than
+    # R=2 over fewer: this session measured that task count, not rep count, is what resolves arm
+    # ranking (keystone gates make per-task scores near-binary).
+    "capspec_chain": {
+        "json_telemetry": True,
+        "ladders": [
+            {"model": "meta-llama/llama-3.2-1b-instruct", "tag": "l1b", "reps": 1, "burn": None},
+            {"model": "openai/gpt-4.1-nano", "tag": "nano", "reps": 1, "burn": None},
+            {"model": "google/gemini-2.5-flash-lite", "tag": "flash", "reps": 1, "burn": None},
+        ],
+    },
+    "capspec_local": {
+        "json_telemetry": True,
+        "ladders": [
+            # tinyllama and phi3:mini have NO tool-calling template. Ollama hard-rejects a
+            # /v1/chat/completions call carrying `tools` with HTTP 400. They are in the roster
+            # precisely so that rejection is RECORDED as the langgraph arm's result rather than
+            # assumed: an off-the-shelf ReAct agent cannot run them at all, while the native
+            # engine only needs the model to emit JSON as text (probed 2026-08-15: both do).
+            {"model": "tinyllama:latest", "tag": "tiny", "reps": 1, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+            {"model": "phi3:mini", "tag": "phi3", "reps": 1, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+            # tool-capable, but tiny. The bottom of the ladder where both arms CAN run
+            {"model": "qwen2.5:0.5b", "tag": "q05", "reps": 1, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+            {"model": "llama3.2:3b", "tag": "l32", "reps": 1, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+            # the strongest local subject that still fits the 12GB card comfortably alongside a
+            # 16k context. Where a "bad model" stops being bad
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 1, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
     },
 }
 
@@ -520,7 +553,7 @@ def run_cell(cell):
         return cell, "skip", 0.0, None, 0.0  # already have a real result → resume-safe
     t0 = time.time()
     # 2026-08-07 finding: 24/72 cells in a live checkpoint-2 run exited rc=0 in normal time with
-    # NO result JSON at all — silently, un-diagnosable, because stdout/stderr previously went
+    # NO result JSON at all. Silently, un-diagnosable, because stdout/stderr previously went
     # straight to DEVNULL. Capture to a per-cell log file (append mode: a resumed retry's output
     # lands after the prior attempt's, so the full attempt history is visible in one place)
     # instead, so the NEXT time this (or anything else) fails silently there's something to read.
@@ -554,13 +587,13 @@ def run_cell(cell):
     dt = time.time() - t0
     usd, score = cell_usd_and_score(cell["run_id"], cell["task"])
     if usd is None:
-        # No result JSON (timeout/crash/kill) — recover real spend from the live trace so --budget
+        # No result JSON (timeout/crash/kill). Recover real spend from the live trace so --budget
         # and --real-budget stay honest instead of booking $0 for a cell that really spent money.
         usd = recover_cell_usd(cell["run_id"], cell["task"])
     status = "ok" if rc == 0 else f"{rc}"
     # Resume experiment (2026-08-07): reclaim the per-cell embedded DB ONLY on a genuine complete
     # result. A killed/timed-out attempt's partial chroma memory (already-fetched, already-embedded
-    # pages) is deliberately LEFT IN PLACE instead — a retry of the SAME cell (same run_id+task ->
+    # pages) is deliberately LEFT IN PLACE instead. A retry of the SAME cell (same run_id+task ->
     # same cell_db_path, see cell_db_path()) starts a fresh subprocess but against that same chroma
     # dir, so the engine's mandate-hash-keyed memory lookup can reuse whatever it already indexed
     # instead of re-fetching/re-embedding from zero on every timeout. Orphaned dirs for cells that
@@ -598,7 +631,7 @@ def main():
                     "top arm gets any per-model burn; default: " + " ".join(LADDER_ARMS))
     ap.add_argument("--variant", default="graph",
                     help="execution_variant for subject (non-reference) cells in --axis mode, "
-                         "e.g. graph, graph_compiled, naive_discretion — lets a second invocation "
+                         "e.g. graph, graph_compiled, naive_discretion. Lets a second invocation "
                          "point the SAME task/model grid at a different technique under a fresh "
                          "--run-id, reusing all resume/lock/budget machinery. Reference cells keep "
                          "their own axis-defined variant regardless (e.g. sequential_react).")
@@ -631,14 +664,14 @@ def main():
     RUN_CFG["embedded_root"] = f"{out_dir}/_chroma"
     if RUN_CFG["chroma_mode"] == "embedded":
         os.makedirs(RUN_CFG["embedded_root"], exist_ok=True)
-    # 2026-08-07: per-cell stdout/stderr capture (see run_cell()) — was DEVNULL, making any
+    # 2026-08-07: per-cell stdout/stderr capture (see run_cell()). Was DEVNULL, making any
     # rc=0-but-no-result cell (a real occurrence, not hypothetical) completely undiagnosable.
     RUN_CFG["log_dir"] = f"{out_dir}/cell_logs"
     os.makedirs(RUN_CFG["log_dir"], exist_ok=True)
 
     # Per-invocation timestamped log: a long barrage is restarted/resumed many times, and a single
     # shared driver.log across invocations (worse, across DIFFERENT axis/model configs reusing a
-    # run-id) made tallies meaningless — confirmed live on a prior run (3 invocations, 2 different
+    # run-id) made tallies meaningless. Confirmed live on a prior run (3 invocations, 2 different
     # axis configs, one shared log, no way to tell which lines belonged to which). One file per
     # invocation makes each run's log unambiguous.
     stamp = time.strftime("%Y%m%d_%H%M%S")
@@ -660,7 +693,7 @@ def main():
     for (m, arm), n in sorted(by_mc.items()):
         emit(f"  {m:<24} {arm:<14} {n} cells")
     if args.dry_run:
-        emit("dry-run — not executing"); return
+        emit("dry-run: not executing"); return
 
     # --- Cross-process run lock (F9/S6): refuse a second driver instance against this run-id.
     acquire_pid_lock(f"{out_dir}/driver.lock")
@@ -678,7 +711,7 @@ def main():
 
     # --- true cumulative ceiling (F8/S2): baseline the OpenRouter key's real all-time usage once
     # per campaign (persisted in the ledger so a restart never resets the clock), then hard-stop
-    # enqueueing on the REAL delta — the only spend number timeouts/kills/in-flight calls can't fool.
+    # enqueueing on the REAL delta. The only spend number timeouts/kills/in-flight calls can't fool.
     or_key = keyval("OPENROUTER_API_KEY")
     real_baseline = (ledger.get("_meta") or {}).get("real_baseline")
     if args.real_budget > 0 and real_baseline is None:
@@ -696,7 +729,7 @@ def main():
     # memory lives in a chroma collection keyed by mandate hash (idea_engine._memo_namespace →
     # mem_<sha256(mandate)>), which is shared across arms/reps of the SAME task. Running two same-task
     # cells at once would cross-contaminate that store. Different tasks are fully independent, so we
-    # still parallelize across the 8 tasks — and arms of a given (task,rep) run back-to-back, which
+    # still parallelize across the 8 tasks. Arms of a given (task,rep) run back-to-back, which
     # preserves the shared-network-window pairing the analyzer relies on.
     spent = 0.0
     done = 0
@@ -714,12 +747,12 @@ def main():
         nonlocal stopped
         if not stopped:
             stopped = True
-            emit(f"!! signal {signum} — draining: no new cells enqueued, in-flight cells finish "
+            emit(f"!! signal {signum}. Draining: no new cells enqueued, in-flight cells finish "
                  f"naturally (send the signal again to hard-abort in-flight subprocesses)")
         else:
             with _CHILDREN_LOCK:
                 procs = list(_CHILDREN.values())
-            emit(f"!! signal {signum} again — hard-aborting {len(procs)} in-flight subprocess(es)")
+            emit(f"!! signal {signum} again. Hard-aborting {len(procs)} in-flight subprocess(es)")
             for p in procs:
                 _kill_process_group(p)
 
@@ -733,7 +766,7 @@ def main():
                 break
             if c["task"] in busy_tasks:
                 continue
-            # 0a: local models share ONE GPU-resident Ollama slot (OLLAMA_MAX_LOADED_MODELS=1) —
+            # 0a: local models share ONE GPU-resident Ollama slot (OLLAMA_MAX_LOADED_MODELS=1).
             # two concurrent local cells on different tasks would fight over it and thrash
             # (constant reload), the same failure class as the chroma hang that burned the prior
             # barrage. Serialize local cells globally; API cells are unaffected and keep
@@ -745,11 +778,11 @@ def main():
                 pending.remove(c)
                 rec = ledger.get(cell_key(c), {})
                 emit(f"  DEAD   task={c['task']} {cell_key(c)} attempts={rec.get('attempts')} "
-                     f"last_status={rec.get('last_status')} — giving up "
+                     f"last_status={rec.get('last_status')}. Giving up "
                      f"(max-attempts={args.max_attempts})")
                 # Resume experiment (2026-08-07): a live cell's partial embedded-chroma memory is
                 # now preserved across a killed/timed-out attempt so a RETRY can reuse it (see
-                # run_cell()) — but a cell that's finally given up on will never retry again, so
+                # run_cell()). But a cell that's finally given up on will never retry again, so
                 # reclaim its orphaned dir here instead of leaking it forever.
                 if RUN_CFG["chroma_mode"] == "embedded" and RUN_CFG["embedded_root"]:
                     shutil.rmtree(cell_db_path(c), ignore_errors=True)
@@ -798,16 +831,16 @@ def main():
                      f"inflight={len(futs)} spent≈${spent:.2f}")
                 if spent >= args.budget and not stopped:
                     stopped = True
-                    emit(f"!! BUDGET ${args.budget:.2f} reached (spent≈${spent:.2f}) — no new cells enqueued")
+                    emit(f"!! BUDGET ${args.budget:.2f} reached (spent≈${spent:.2f}). No new cells enqueued")
                 if args.real_budget > 0 and not stopped and real_baseline is not None:
                     cur = openrouter_key_usage(or_key)  # polled once per finished cell (cheap)
                     if cur is not None and (cur - real_baseline) >= args.real_budget:
                         stopped = True
                         emit(f"!! REAL-BUDGET ${args.real_budget:.2f} reached (true key spend "
-                             f"+${cur - real_baseline:.2f}) — no new cells enqueued")
+                             f"+${cur - real_baseline:.2f}). No new cells enqueued")
             if not stopped:
                 fill(ex)
-    emit(f"DONE — executed {done} cells, spent≈${spent:.2f}, {len(pending)} unstarted. "
+    emit(f"DONE. Executed {done} cells, spent≈${spent:.2f}, {len(pending)} unstarted. "
          f"Analyze with adaptive_ab_analyze.py")
 
 

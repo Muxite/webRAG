@@ -1,20 +1,20 @@
 """
-Calibrated high-confidence early exit (A6) — the pure math, no I/O.
+Calibrated high-confidence early exit (A6) (pure math, no I/O).
 
 The step-confidence judge (``got_step_confidence_judge_enabled``) only ever *adds*
 compute today: a low score drives re-expansion (A1). Nothing short-circuits an easy,
 high-confidence mandate, which is where most of the compute-optimal literature's
 efficiency actually comes from. This module supplies the missing half: a stopping rule
-that says "the trajectory so far looks good enough — stop expanding and finalize".
+that says "the trajectory so far looks good enough, stop expanding and finalize".
 
 Why a calibrated rule and not a hand-picked threshold
 -----------------------------------------------------
 A hand-picked "stop when confidence > 0.9" is unfalsifiable and, on this project's own
-data, wrong (the judge is known to be anti-calibrated — see ``got_contract_reexpand_enabled``'s
-F33 note). The rule here is *derived* from held-out ``(confidence-sequence, eventual-label)``
+data, wrong (the judge is known to be anti-calibrated, see got_contract_reexpand_enabled's
+F33 note). The rule here is derived from held-out (confidence-sequence, eventual-label)
 pairs with a quantified false-stop rate, following E-valuator (arXiv 2512.03109; verified
-against the primary text in ``RESEARCH_NOTES.md``): one calibration example is a whole
-trajectory ``(S₁..S_T, Y)``, never a per-step label.
+against the primary text in RESEARCH_NOTES.md): one calibration example is a whole
+trajectory (S₁..S_T, Y), never a per-step label.
 
 The documented simplification vs. E-valuator
 --------------------------------------------
@@ -24,8 +24,8 @@ disjoint threshold-calibration split (a distribution-free PAC procedure). That n
 the high hundreds *per split*; this repo has 354 usable regular-roster trajectories total.
 So:
 
-* **The classifier is replaced by one scalar prefix statistic** (``running_min`` /
-  ``running_mean`` / ``last`` — see ``STATISTICS``), chosen on the calibration split only.
+* **The classifier is replaced by one scalar prefix statistic** (running_min /
+  running_mean / last, see STATISTICS), chosen on the calibration split only.
   With ~250 calibration trajectories a per-timestep logistic fit would be fitting noise.
 * **The PAC order statistic is replaced by an exact one-sided Clopper–Pearson lower bound**
   on the stop-set precision. Accept a threshold τ at timestep t only if, with confidence
@@ -36,14 +36,14 @@ So:
 * **Multiplicity is handled by Bonferroni** over the timesteps tested, so the family-wise
   confidence is still ``1 - CERTIFICATION_DELTA``.
 * **Fitting is sequential-consistent**: the threshold for timestep t is certified only on
-  the trajectories that reached t *without already having been stopped* — exactly the
-  conditional distribution the rule faces online, so the per-timestep certificates compose.
+  the trajectories that reached t without already having been stopped (exactly the
+  conditional distribution the rule faces online), so per-timestep certificates compose.
 * **When nothing certifies, nothing stops.** ``fit_thresholds`` returns no threshold for a
   timestep it cannot certify, which reproduces E-valuator's own degenerate case (``c_α = ∞``,
   never reject, zero power) rather than shipping an uncertified guess.
 
-Beyond ``MAX_TIMESTEP`` the ``MAX_TIMESTEP`` rule is reused unchanged — E-valuator's
-"ratio held constant beyond ``T_max``" convention.
+Beyond MAX_TIMESTEP the MAX_TIMESTEP rule is reused unchanged (E-valuator's
+"ratio held constant beyond T_max" convention).
 
 The engine reads the fitted rule from the versioned artifact
 ``app/confidence_early_exit_calibration.json`` (written by
@@ -84,14 +84,14 @@ CERTIFICATION_DELTA = 0.05
 #: compute; the driver treats such a rung as not certified.
 MIN_STOP_COVERAGE = 0.05
 #: Selectivity guard. A threshold that fires on more than this fraction of the trajectories
-#: reaching a timestep is not a *high-confidence* rule, it is an unconditional stop that
-#: happens to inherit the base rate — which is exactly what a loose target would certify if
-#: the confidence signal carried no information (the degenerate ``tau = 0`` solution).
+#: reaching a timestep is not a high-confidence rule, it is an unconditional stop that
+#: happens to inherit the base rate (exactly what a loose target would certify if
+#: the confidence signal carried no information, the degenerate tau = 0 solution).
 MAX_STEP_STOP_FRACTION = 0.5
-#: Longest judged prefix modelled; beyond it the ``MAX_TIMESTEP`` rule is reused.
+#: Longest judged prefix modelled; beyond it the MAX_TIMESTEP rule is reused.
 MAX_TIMESTEP = 8
-#: Never stop before this many judged steps, regardless of what the data says — one lucky
-#: high score on the first leaf is not a trajectory.
+#: Never stop before this many judged steps, regardless of what the data says (one lucky
+#: high score on the first leaf is not a trajectory).
 MIN_TIMESTEP = 2
 #: Fraction of trajectories used to FIT; the remainder is held out and only ever measured.
 CALIBRATION_SPLIT = 0.7
@@ -115,7 +115,7 @@ ARTIFACT_VERSION = 1
 class LabelledTrajectory:
     """One calibration example: a whole confidence sequence plus its eventual label.
 
-    Trajectory-level, never per-step — this is E-valuator's ``(S, Y)``.
+    Trajectory-level, never per-step (this is E-valuator's (S, Y)).
     """
 
     confidences: Tuple[float, ...]
@@ -223,8 +223,8 @@ def binomial_tail_ge(successes: int, trials: int, p: float) -> float:
 def clopper_pearson_lower(successes: int, trials: int, delta: float) -> float:
     """Exact one-sided Clopper-Pearson lower bound on a binomial proportion.
 
-    The largest ``p`` with ``P(X >= successes | trials, p) <= delta`` — i.e. with confidence
-    ``1 - delta`` the true success probability is at least the returned value. This is the
+    The largest p with P(X >= successes | trials, p) <= delta (i.e. with confidence
+    1 - delta the true success probability is at least the returned value). This is the
     small-sample stand-in for E-valuator's PAC order-statistic threshold: same
     distribution-free finite-sample guarantee, computed exactly instead of from calibration
     maxima we do not have enough of.
@@ -251,14 +251,14 @@ def certify_threshold(
     delta: float,
     max_stop_fraction: float = MAX_STEP_STOP_FRACTION,
 ) -> Optional[float]:
-    """Smallest threshold whose stop-set is certified at ``target`` precision, else ``None``.
+    """Smallest threshold whose stop-set is certified at target precision, else None.
 
-    ``samples`` are ``(statistic_value, label)`` pairs. Candidate thresholds are the values
+    Samples are (statistic_value, label) pairs. Candidate thresholds are the values
     actually observed (every other threshold induces an identical stop-set). Smallest wins
-    because it maximises coverage — the Clopper-Pearson bound, not the grid, is what keeps a
-    thinly-supported threshold out. ``max_stop_fraction`` rejects the degenerate wide
-    thresholds (notably ``tau`` at the bottom of the range, which stops everything and merely
-    inherits the base rate); see :data:`MAX_STEP_STOP_FRACTION`.
+    because it maximises coverage (the Clopper-Pearson bound, not the grid, is what keeps a
+    thinly-supported threshold out). max_stop_fraction rejects the degenerate wide
+    thresholds (notably tau at the bottom of the range, which stops everything and merely
+    inherits the base rate); see MAX_STEP_STOP_FRACTION.
     """
     if not samples:
         return None
@@ -343,9 +343,9 @@ def evaluate_rule(
     rule: EarlyExitRule,
     margin: float = 0.0,
 ) -> Dict[str, Any]:
-    """Replay ``rule`` over whole trajectories and report what it would actually have done.
+    """Replay rule over whole trajectories and report what it would actually have done.
 
-    This — not the per-timestep fit — is the number to quote: it measures the realised
+    This (not the per-timestep fit) is the number to quote: it measures the realised
     false-stop rate of the composed sequential rule on whatever split it is given.
     """
     total = len(trajectories)
@@ -428,7 +428,7 @@ def load_rule(path: Optional[Path] = None) -> Optional[EarlyExitRule]:
             rule = rule_from_artifact(json.load(handle))
     except FileNotFoundError:
         _logger.warning(f"[EARLY-EXIT] no calibration artifact at {target}; early exit disabled")
-    except Exception as exc:  # noqa: BLE001 — a broken artifact must never break a run
+    except Exception as exc:  # noqa: BLE001 (a broken artifact must never break a run)
         _logger.warning(f"[EARLY-EXIT] unreadable calibration artifact {target}: {exc}")
     _RULE_CACHE[key] = rule
     return rule

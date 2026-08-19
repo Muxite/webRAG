@@ -21,6 +21,8 @@ from typing import Any, Dict, Optional
 
 _logger = logging.getLogger(__name__)
 
+#: Static fallback prices (USD per 1M tokens). Used when cache is absent or expired.
+#: Every benchmark axis model must be pinned here so costs never rest on cache state.
 MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "gpt-5.2": {
         "input_per_million": 1.75,
@@ -33,6 +35,28 @@ MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "gpt-5-nano": {
         "input_per_million": 0.05,
         "output_per_million": 0.40,
+    },
+    "gpt-4.1-nano": {
+        "input_per_million": 0.10,
+        "output_per_million": 0.40,
+    },
+    "gemini-2.5-flash-lite": {
+        "input_per_million": 0.10,
+        "output_per_million": 0.40,
+    },
+    "deepseek-v4-flash": {
+        "input_per_million": 0.14,
+        "output_per_million": 0.28,
+    },
+    # Premium reference bars. Unpriced, these silently mislabel as "local"/free in level_ladder:
+    # i.e. the quality ceiling would appear to cost nothing, inverting the whole cost argument.
+    "claude-sonnet-5": {
+        "input_per_million": 2.00,
+        "output_per_million": 10.00,
+    },
+    "gemini-3.1-pro-preview": {
+        "input_per_million": 2.00,
+        "output_per_million": 12.00,
     },
 }
 
@@ -128,7 +152,7 @@ def _fetch_openrouter_pricing(timeout: float = 5.0) -> Dict[str, Dict[str, float
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read().decode("utf-8")
         body = json.loads(raw)
-    except Exception as exc:  # noqa: BLE001 — best-effort startup fetch
+    except Exception as exc:  # noqa: BLE001; best-effort startup fetch
         _logger.warning("OpenRouter pricing fetch failed: %s", exc)
         return {}
     return _parse_openrouter_models(body)
@@ -245,7 +269,7 @@ def is_local_row(row: Dict[str, Any]) -> bool:
     signal the cost-reporting pipeline already relied on implicitly.
 
     Accepts either a raw result dict (top-level "origin"/"model") or a flattened row
-    (e.g. scripts/bench_common.py::load_row's output) — both use the same key names.
+    (e.g. scripts/bench_common.py::load_row's output); both use the same key names.
 
     :param row: A result dict or flattened row.
     :returns: True if the run should be treated as local/free for cost reporting.

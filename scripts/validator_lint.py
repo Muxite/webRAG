@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-validator_lint.py — static integrity linter for webRAG idea_tests task validators.
+validator_lint.py: static integrity linter for webRAG idea_tests task validators.
 
 Promoted from the pre-barrage audit scratchpad (.barrage_prep/validator_lint.py, AGENT5) into a
 tracked, CI-wired check (F30). Detection logic is unchanged from the audited version.
@@ -84,7 +84,15 @@ def lint_file(path: str) -> List[str]:
         vs = _seg(vf, src)
         # a validator is grounding-independent if its body (and any _keystone_ok it calls,
         # when that keystone doesn't itself ground) never consults visits or the visit-graph.
-        grounds = bool(re.search(r"observability.*visit|\[.visit.\]|_hop_visited|build_visit_link_graph", vs))
+        # `waypoint_chain_coverage`/`waypoint_evidence_ok`/`visited_evidence` (idea_test_utils.py)
+        # are the shared per-waypoint grounding helpers the chain_coverage repair (2026-08-16)
+        # factored the visit-evidence check into -- a validator that delegates to one of them is
+        # grounded even though the grounding logic itself now lives outside this file's AST.
+        grounds = bool(re.search(
+            r"observability.*visit|\[.visit.\]|_hop_visited|build_visit_link_graph|"
+            r"waypoint_chain_coverage|waypoint_evidence_ok|visited_evidence",
+            vs,
+        ))
         calls_ks = "_keystone_ok(" in vs
         ks = _fn(tree, "_keystone_ok")
         ks_grounds = bool(ks and re.search(r"visit|_hop_visited|build_visit", _seg(ks, src)))

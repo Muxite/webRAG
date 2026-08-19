@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 """
-Held-out generalization eval for one strategy note — the promotion gate's evidence.
+Held-out generalization eval for one strategy note. The promotion gate's evidence.
 
 The claim a strategy library has to survive is "you're just memorizing". The answer is not more
 review, it is a number: measure the note's effect on task instances it was NOT derived from
 (``held_out_uplift``), measure the same effect on one it WAS (``seed_fit``), and report the
 ratio. A ratio near 1 means the note transfers to unseen tasks as well as to its own seeds; a
-high seed fit with ~zero held-out uplift is an indirect leak detector — an entry that cleared the
+high seed fit with ~zero held-out uplift is an indirect leak detector. An entry that cleared the
 textual gate but is really remembering something.
 
 Modelled on ``scripts/eval_plan_library_retrieval.py`` (same CLI conventions, same "not a pytest
 test" reasoning: it needs real runs). Two subcommands, because the expensive half must be the
 caller's explicit decision:
 
-  * ``plan``  — prints the exact A/B invocations to run. Spends nothing.
-  * ``score`` — reads the result JSONs those produced, computes the three metrics, and with
+  * ``plan``: prints the exact A/B invocations to run. Spends nothing.
+  * ``score``: reads the result JSONs those produced, computes the three metrics, and with
     ``--write`` stamps them onto the note (which is the ONLY way a note is ever promoted:
     ``strategy_library.schema.is_active`` reads the measured numbers, not the ``status`` field).
 
-The metric is the KEYSTONE check — the hard 0/1 "did it get the right answer" validator — not
+The metric is the KEYSTONE check: the hard 0/1 "did it get the right answer" validator, not
 ``overall_score``, which averages in coverage/citation diagnostics that move for unrelated
 reasons and would dilute exactly the effect being measured. Tasks with no keystone validator
 fall back to ``overall_score`` and are labelled as such in the output.
@@ -66,16 +66,14 @@ DEFAULT_RESULTS_DIR = _ROOT / "agent" / "idea_test_results"
 DEFAULT_VARIANT = "graph_compiled"
 
 
-# --------------------------------------------------------------------------------------
 # reading results
-# --------------------------------------------------------------------------------------
 
 
 def keystone_score(result: Dict[str, Any]) -> Tuple[Optional[float], str]:
     """``(score, which metric)`` for one result file.
 
     Prefers the KEYSTONE validator (hard 0/1, "is the answer right"). Averages when a task has
-    more than one keystone-named check. Falls back to ``validation.overall_score`` — reported
+    more than one keystone-named check. Falls back to ``validation.overall_score``. Reported
     under a different metric name so a mixed set is never silently averaged together.
     """
     validation = (result or {}).get("validation") or {}
@@ -132,9 +130,7 @@ def arm_summary(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-# --------------------------------------------------------------------------------------
 # plan
-# --------------------------------------------------------------------------------------
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
@@ -146,7 +142,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     seeds = set(note.based_on_tasks)
     overlap = sorted(set(args.held_out) & seeds)
     if overlap:
-        print(f"ERROR: {overlap} are seed tasks of '{args.note}' — a held-out uplift measured "
+        print(f"ERROR: {overlap} are seed tasks of '{args.note}'. A held-out uplift measured "
               "on a seed is a seed fit, not a generalization", file=sys.stderr)
         return 1
     if args.seed and set(args.seed) - seeds:
@@ -188,9 +184,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
-# --------------------------------------------------------------------------------------
 # score
-# --------------------------------------------------------------------------------------
 
 
 def _delta(
@@ -227,7 +221,7 @@ def cmd_score(args: argparse.Namespace) -> int:
     seed = [d for d in (_delta(results_dir, args, t) for t in (args.seed or [])) if d]
 
     if not held:
-        print("\nERROR: no held-out cell could be scored — nothing to report.", file=sys.stderr)
+        print("\nERROR: no held-out cell could be scored. Nothing to report.", file=sys.stderr)
         return 1
 
     held_out_uplift = statistics.fmean(d["delta"] for d in held)
@@ -238,7 +232,7 @@ def cmd_score(args: argparse.Namespace) -> int:
     print("seed_fit             : "
           + ("(not measured)" if seed_fit is None else f"{seed_fit:+.4f}  over {len(seed)} seed(s)"))
     print("generalization_ratio : "
-          + ("(undefined — needs a positive seed fit)" if ratio is None else f"{ratio:.3f}"))
+          + ("(undefined - needs a positive seed fit)" if ratio is None else f"{ratio:.3f}"))
 
     metrics = HeldOutMetrics(
         held_out_uplift=round(held_out_uplift, 4),
@@ -257,16 +251,14 @@ def cmd_score(args: argparse.Namespace) -> int:
     print(f"\npromotion gate (held_out_n >= {MIN_HELD_OUT_N}, uplift >= "
           f"{MIN_HELD_OUT_UPLIFT:+.2f}): {verdict}")
     if args.write:
-        print(f"written to {library.notes_dir / (note.note_id + '.json')} — re-run "
+        print(f"written to {library.notes_dir / (note.note_id + '.json')}. Re-run "
               "scripts/sync_strategy_library.py to (un)index it")
     else:
-        print("(dry run — pass --write to stamp these metrics onto the note)")
+        print("(dry run. Pass --write to stamp these metrics onto the note)")
     return 0
 
 
-# --------------------------------------------------------------------------------------
 # CLI
-# --------------------------------------------------------------------------------------
 
 
 def _add_common(parser: argparse.ArgumentParser) -> None:

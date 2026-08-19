@@ -42,8 +42,7 @@ from app.models import (
 SERVICE_NAME = "connector-api"
 SERVICE_VERSION = "0.1.0"
 
-# Statuses on which the production visit path falls back to headless Chromium
-# (bot-protection blocks). Mirrors agent.app.agent_io / connector_browser.
+# Fall back to browser on 401/403 bot-blocks (mirrors agent.app.agent_io).
 BROWSER_FALLBACK_STATUSES = {401, 403}
 
 logger = logging.getLogger("ConnectorAPI")
@@ -245,7 +244,7 @@ def create_app(
         http_result: Optional[RequestResult] = None
         reason: Optional[str] = None
 
-        # --- Attempt 1: plain HTTP (gives real status codes: 404, 500, etc.) ---
+        # Attempt 1: plain HTTP (real status codes).
         try:
             http_result = await _run(http_conn.request("GET", req.url, retries=2), req.timeout)
         except asyncio.TimeoutError:
@@ -256,7 +255,7 @@ def create_app(
         if http_result is not None and not http_result.error:
             return _success_response(req, http_result, via="http", browser_used=False)
 
-        # --- Attempt 2: headless-browser fallback on bot-block / no HTTP status ---
+        # Attempt 2: headless-browser fallback on bot-block or no HTTP status.
         http_status = getattr(http_result, "status", None) if http_result is not None else None
         should_fallback = browser_conn is not None and (
             http_result is None or http_status in BROWSER_FALLBACK_STATUSES
@@ -279,7 +278,7 @@ def create_app(
             if browser_result is not None:
                 reason = f"browser failed: {getattr(browser_result, 'data', 'unknown')}"
 
-        # --- Failure: build a diagnostic verdict (still HTTP 200) ---
+        # Build failure verdict. Still HTTP 200 even on transport errors.
         if http_result is not None and reason is None:
             reason = _describe(http_result)
         return VisitResponse(

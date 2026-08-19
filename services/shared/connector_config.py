@@ -18,13 +18,9 @@ class ConnectorConfig:
         self.llm_api_url = self._resolve_llm_api_url()
         self.openrouter_http_referer = os.environ.get("OPENROUTER_HTTP_REFERER") or "https://euglena.vercel.app"
         self.openrouter_x_title = os.environ.get("OPENROUTER_X_TITLE") or "Euglena"
-        # 2026-08-08: Brave's SEARCH_API_KEY ran out of quota (confirmed live, HTTP 402) and was
-        # replaced with Serper (google.serper.dev, 2500 free queries) as the default provider.
-        # search_provider picks the key AND, via create_search_backend() in connector_search.py,
-        # the connector class — "brave"/"serper" only (searxng stays a manual per-call-site
-        # instantiation, see connector_search_searxng.py's own docstring for why). Brave's own key
-        # is read unchanged from SEARCH_API_KEY so switching back (SEARCH_PROVIDER=brave) needs no
-        # key migration once its quota resets.
+        # Serper (google.serper.dev) replaced Brave on 2026-08-08 after Brave quota exhaustion.
+        # SEARCH_PROVIDER selects both the key and connector class via create_search_backend().
+        # To switch back to Brave, set SEARCH_PROVIDER=brave (key unchanged in SEARCH_API_KEY).
         self.search_provider = (os.environ.get("SEARCH_PROVIDER") or "serper").strip().lower()
         self.search_api_key = (
             os.environ.get("SERPER_KEY") or os.environ.get("SEARCH_API_KEY")
@@ -48,11 +44,11 @@ class ConnectorConfig:
         self.chroma_op_timeout = float(os.environ.get("CHROMA_OP_TIMEOUT", "15"))
         # Bounded chroma (re)connect attempts. The old Retry(max_attempts=10,
         # base_delay=default_delay=2, max_delay=60) summed to a ~302s silent-sleep
-        # storm under contention — one storm per subprocess that lost the client.
+        # storm under contention. One storm per subprocess that lost the client.
         # 2 attempts at retry_base_delay caps a dead-server probe to ~1s.
         self.chroma_init_attempts = int(os.environ.get("CHROMA_INIT_ATTEMPTS", "2"))
         # LLM HTTP timeouts. connect bounds DNS/TCP setup; read bounds a stalled
-        # completion (the "llm_query that never returns" — 40 barrage orphans). The
+        # completion (the "llm_query that never returns". 40 barrage orphans). The
         # SDK's own retries are disabled (max_retries=0 in llm_backends) so
         # ConnectorLLM.Retry stays the single retry authority (no hidden amplification).
         self.llm_connect_timeout = float(os.environ.get("LLM_CONNECT_TIMEOUT", "10"))
@@ -61,7 +57,7 @@ class ConnectorConfig:
         # --- Chroma client mode + embedding device (added with GPU + isolation) ---
         # "http" (default): shared AsyncHttpClient → the Docker server (production path,
         # unchanged). "embedded": a per-process PersistentClient with its OWN SQLite file
-        # — eliminates the cross-subprocess write-lock contention entirely AND lets the
+        # eliminates the cross-subprocess write-lock contention entirely AND lets the
         # (sync) client run under asyncio.to_thread, so embedding finally happens OFF the
         # event loop. The benchmark driver sets embedded + a unique path per cell.
         self.chroma_mode = (os.environ.get("CHROMA_MODE") or "http").strip().lower()

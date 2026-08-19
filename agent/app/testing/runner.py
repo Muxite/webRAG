@@ -22,19 +22,17 @@ from agent.app.testing.execution_sequential import run_sequential_execution
 from agent.app.testing.execution_naive_discretion import run_naive_discretion_execution
 from agent.app.testing.execution_compiled import run_compiled_execution
 from agent.app.testing.execution_compiled_code import run_compiled_code_execution
+from agent.app.testing.execution_langgraph import run_offtheshelf_execution
 from agent.app.testing.validation import ValidationRunner
+from agent.app.testing.utils import build_validation_evidence
 from agent.app.testing import json_telemetry as _json_telemetry
 
 BASELINE_VARIANTS = ("parametric", "naive_rag", "minimal")
-# Single-pass agent comparators that have their own runner (not the GoT engine).
 LINEAR_AGENT_VARIANTS = ("sequential_react",)
-# The no-engineered-structure FLOOR: the engine's own action dispatch, a minimal prompt, and the
-# model's own judgement about what to do with its turns (see execution_naive_discretion.py).
 NAIVE_DISCRETION_VARIANTS = ("naive_discretion",)
-# Cheap-model agents that execute an expensive-model-authored offline plan (no runtime planning).
 COMPILED_AGENT_VARIANTS = ("graph_compiled",)
-# Same, in the CODE domain: leaves act on a sandbox workdir instead of the web.
 COMPILED_CODE_AGENT_VARIANTS = ("graph_compiled_code",)
+OFFTHESHELF_VARIANTS = ("langgraph_react",)
 
 _logger = logging.getLogger(__name__)
 
@@ -81,7 +79,8 @@ async def run_complete_test(
     :param summarize_observability_func: Function to summarize observability.
     :param validation_model: Model name for validation.
     :param execution_variant: graph / sequential_react / naive_discretion / graph_compiled /
-        graph_compiled_code (agents) or parametric / naive_rag / minimal (baseline).
+        graph_compiled_code / langgraph_react (agents) or parametric / naive_rag / minimal
+        (baseline).
     :param connector_browser: Optional headless-Chrome fallback connector. Passed to EVERY
         execution variant uniformly (F18) so no arm is structurally handicapped relative to
         another just because it happened to hit a bot-blocked site.
@@ -97,9 +96,6 @@ async def run_complete_test(
             connector_http=connector_http,
             connector_chroma=connector_chroma,
             connector_browser=connector_browser,
-            # F16: this arm reads only the `connector_retry_*` keys — the same tool-retry flag
-            # the graph arms honor — so an arm comparison isn't skewed by the reference model
-            # being the only one that never gets a second chance at a flaky search/visit.
             idea_settings=idea_settings,
             run_stamp=run_stamp,
             summarize_observability_func=summarize_observability_func,
@@ -126,9 +122,6 @@ async def run_complete_test(
             connector_http=connector_http,
             connector_chroma=connector_chroma,
             connector_browser=connector_browser,
-            # This path is env-driven and reads exactly one settings key
-            # (``strategy_library_enabled``); passing the dict costs nothing and keeps the
-            # flag on the same typed-config chain as every other opt-in knob.
             idea_settings=idea_settings,
             run_stamp=run_stamp,
             summarize_observability_func=summarize_observability_func,
@@ -142,6 +135,19 @@ async def run_complete_test(
             connector_http=connector_http,
             connector_chroma=connector_chroma,
             connector_browser=connector_browser,
+            run_stamp=run_stamp,
+            summarize_observability_func=summarize_observability_func,
+        )
+    elif execution_variant in OFFTHESHELF_VARIANTS:
+        execution_result = await run_offtheshelf_execution(
+            test_module=test_module,
+            model_name=model_name,
+            connector_llm=connector_llm,
+            connector_search=connector_search,
+            connector_http=connector_http,
+            connector_chroma=connector_chroma,
+            connector_browser=connector_browser,
+            idea_settings=idea_settings,
             run_stamp=run_stamp,
             summarize_observability_func=summarize_observability_func,
         )
@@ -181,16 +187,26 @@ async def run_complete_test(
     }
     observability = execution_result.get("observability", {})
 
+    # Grounding validators need the fetched page TEXT to check a claimed fact against its source.
+    # `result["graph"]` can't supply it uniformly (only `graph`/`naive_discretion` populate a
+    # graph; every other arm returns `_empty_graph()`), so evidence is projected from telemetry,
+    # which every arm records, into a COPY of observability for validation only. The persisted
+    # `observability` is left untouched; the same text already ships in `execution.telemetry_raw`.
+    validation_observability = dict(observability) if isinstance(observability, dict) else {}
+    validation_observability["evidence"] = build_validation_evidence(
+        execution_result.get("telemetry_raw") or {}
+    )
+
     validation_result = await validation_runner.run(
         result=result,
-        observability=observability,
+        observability=validation_observability,
         connector_llm=connector_llm,
     )
 
     # F17: surface an infra-failure quarantine flag at the top of the result so downstream
     # scoring/analysis can exclude a cell poisoned by a 402/422/429/5xx/transport failure
     # instead of silently counting it as a genuine 0 (see testing/utils.summarize_observability
-    # for the classification). The score itself is left untouched — this only tags it.
+    # for the classification). The score itself is left untouched; this only tags it.
     infra_block = observability.get("infra") if isinstance(observability, dict) else None
     infra_failed = bool(infra_block.get("failed")) if isinstance(infra_block, dict) else False
 

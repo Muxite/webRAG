@@ -29,11 +29,11 @@ def _safe_serialize_details(details: Dict[str, Any]) -> str:
 
 # --- malformed-expansion-JSON repair ---------------------------------------------------------
 # A cheap executor model that emits prose-wrapped, fence-wrapped or TRUNCATED JSON used to fall
-# through a single non-nesting regex (``\{[^{}]*"candidates"[^{}]*\}``) that cannot match once the
-# candidates array contains objects — i.e. always. The plan silently became EMPTY (no children ->
+# through a single non-nesting regex (\{[^{}]*"candidates"[^{}]*\}) that cannot match once the
+# candidates array contains objects (always true). The plan silently became EMPTY (no children ->
 # a tool-free run). These helpers salvage the object instead: brace-balanced extraction first,
 # then a bounded "close the open brackets at the last complete element" repair for truncation.
-# Every path fails safe (``None`` -> the caller returns an empty plan), never raises.
+# Every path fails safe (None -> the caller returns an empty plan), never raises.
 _JSON_REPAIR_MAX_STARTS = 32     # candidate '{' offsets tried for a complete object
 _JSON_REPAIR_MAX_CUTS = 64       # truncation cut points tried, longest first
 _TRAILING_COMMA_RE = re.compile(r",(\s*[}\]])")
@@ -59,7 +59,7 @@ def _scan_json(text: str, start: int) -> tuple[Optional[int], List[str], List[in
     :returns: ``(end, stack, cuts)`` where ``end`` is the index AFTER the matching closing
         bracket (``None`` if the value never closes, i.e. truncated), ``stack`` is the still-open
         bracket list at the end of the text, and ``cuts`` are offsets just past a COMPLETE nested
-        value — the only places a truncated fragment may safely be cut before auto-closing.
+        value. The only places a truncated fragment may safely be cut before auto-closing.
     """
     stack: List[str] = []
     cuts: List[int] = []
@@ -107,12 +107,12 @@ def _autoclose(fragment: str) -> Optional[str]:
 def _repair_json_object(content: str, required_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Best-effort recovery of a JSON object from a malformed LLM response.
 
-    Order: (1) every ``{`` offset is tried as the start of a brace-balanced object — this is what
-    handles fences/prose around an otherwise VALID object with nested structures; (2) if nothing
+    Order: (1) every ``{`` offset is tried as the start of a brace-balanced object (this is what
+    handles fences/prose around an otherwise VALID object with nested structures); (2) if nothing
     complete parses the payload is treated as TRUNCATED and repaired by cutting back to the last
     complete nested value and closing the open brackets; (3) a bare top-level array is accepted as
     the ``required_key`` list (a frequent cheap-model shape slip). Returns ``None`` when the text is
-    genuinely unrepairable — the caller degrades to an empty plan rather than raising.
+    genuinely unrepairable. The caller degrades to an empty plan rather than raising.
     """
     if not content:
         return None
@@ -125,7 +125,7 @@ def _repair_json_object(content: str, required_key: Optional[str] = None) -> Opt
     starts = [i for i, ch in enumerate(text) if ch == "{"][:_JSON_REPAIR_MAX_STARTS]
 
     # An object that parses but lacks ``required_key`` is only a fallback, and only from the
-    # OUTERMOST offset — a later ``{`` is an inner element (e.g. one candidate), never the plan.
+    # OUTERMOST offset. A later ``{`` is an inner element (e.g. one candidate), never the plan.
     best: Optional[Dict[str, Any]] = None
     for start in starts:
         end, _stack, _cuts = _scan_json(text, start)
@@ -152,7 +152,7 @@ def _repair_json_object(content: str, required_key: Optional[str] = None) -> Opt
                 return data
 
     # A bare top-level array of candidates ("[{...}, {...}]" with no wrapper object). Only when the
-    # payload actually STARTS with the array — an inner array under some other key is that key's
+    # payload actually STARTS with the array. An inner array under some other key is that key's
     # data, not the plan, and re-labelling it would invent candidates.
     bracket = text.find("[")
     if required_key and bracket == 0:
@@ -168,14 +168,14 @@ def _repair_json_object(content: str, required_key: Optional[str] = None) -> Opt
 
 
 # Opt-in expansion addendum (``expansion_expect_contract_enabled``): borrows the compiled
-# path's leaf discipline — one atomic fact per leaf, read off an authoritative page (never
+# path's leaf discipline. One atomic fact per leaf, read off an authoritative page (never
 # guessed from memory), reported as an EXACT value alongside its source URL. Injected into
 # the expansion system prompt only when the flag is on (default path is byte-identical).
 _EXPECT_CONTRACT_ADDENDUM = (
     "MEASURABLE OUTPUT CONTRACT: for every LEAF candidate (a concrete search/visit/think "
     "sub-task that resolves ONE fact), add an \"expect\" field at the candidate's top level: "
     "a single line naming the EXACT value to report AND requiring its source URL alongside "
-    "it. Keep each leaf to ONE atomic fact read off an authoritative page — never guessed "
+    "it. Keep each leaf to ONE atomic fact read off an authoritative page. Never guessed "
     "from memory. Example: \"expect\": \"the exact founding year (e.g. 1861) AND the source "
     "URL it was read from\". Omit \"expect\" for non-leaf or aggregation candidates."
 )
@@ -185,24 +185,24 @@ _EXPECT_CONTRACT_ADDENDUM = (
 # The shipped expansion USER prompt opens with an OUTPUT instruction immediately followed by an
 # INPUT blob:
 #     Return your response as valid JSON. {"path": [...], "parent_id": ..., "event_log": [...]}
-# Read literally, that sentence says "return this object" — and the expected output shape
+# Read literally, that sentence says "return this object", and the expected output shape
 # ({candidates: [...]}) is stated exactly once, far away, on the LAST line of a long system prompt.
 #
 # Live telemetry (2026-08-06, qwen2.5:0.5b, native `graph` variant, phase=native_expansion) shows a
 # weak model doing what the text says: of 8 syntactically-valid completions, 5 echoed the "path"
 # context straight back, 1 echoed the schema hint's own {"name": "expansion_result", "schema": ...}
 # envelope complete with placeholder values, and only 2 produced a real {"candidates": [...]} plan.
-# This is NOT a malformed-JSON problem (every one parsed) — it is the WRONG SHAPE, which nothing
+# This is NOT a malformed-JSON problem (every one parsed). It is the WRONG SHAPE, which nothing
 # downstream can rescue: no ``candidates`` key means ``_create_fallback_candidate`` fires, and for
 # the ROOT node (whose title IS the mandate) it emits a search whose query is the mandate's first
-# 100 characters — an instruction preamble, not an entity — so the run makes zero page visits.
+# 100 characters (an instruction preamble, not an entity). So the run makes zero page visits.
 #
 # The fix is pure prompt hygiene, in the spirit of the leaf-extraction source-ask removal: drop the
 # misleading lead sentence, label the blob as read-only INPUT, and restate the OUTPUT shape
-# immediately AFTER it — the recency position the model was already copying from.
+# immediately AFTER it. The recency position the model was already copying from.
 _INPUT_FRAMING_HEADER = (
     "INPUT CONTEXT (read-only). The JSON below is this run's own history and state. It is DATA "
-    "FOR YOU TO READ — not a template to fill in, not an example of your answer, and never "
+    "FOR YOU TO READ. Not a template to fill in, not an example of your answer, and never "
     "something to copy back."
 )
 _INPUT_FRAMING_FOOTER = (
@@ -239,11 +239,11 @@ def frame_expansion_user_prompt(user: str) -> str:
 
 # --- opt-in input-echo retry (``expansion_echo_retry_enabled``) ----------------------------------
 # Safety net for whatever fraction of the failure above the prompt fix alone does not resolve, and
-# deliberately narrow: it fires ONLY on the echo shape (parsed object, no usable ``candidates``,
-# but one of the input/schema keys present), never on malformed JSON — ``_repair_json_object``
-# already owns that class. Hard-bounded at ONE extra call per expansion, mirroring the compiled
+# deliberately narrow: it fires ONLY on the echo shape (parsed object, no usable candidates,
+# but one of the input/schema keys present), never on malformed JSON (_repair_json_object
+# already owns that class). Hard-bounded at ONE extra call per expansion, mirroring the compiled
 # path's leaf-extract retry lever.
-#: Keys that only ever appear in what the model was SHOWN — the user message's context blob
+#: Keys that only ever appear in what the model was SHOWN. The user message's context blob
 #: ("path"/"parent_id"/"parent_title"/"blocked_sites"/"errors"/"memories"/"event_log", plus the
 #: per-entry "node_id"), or the schema hint's envelope ("name"/"schema").
 _ECHO_INPUT_KEYS = (
@@ -274,7 +274,7 @@ def detect_input_echo(content: Optional[str]) -> Optional[str]:
         return None
     try:
         data = json.loads(content)
-    except Exception:  # noqa: BLE001 — malformed JSON is a different failure class
+    except Exception:  # noqa: BLE001 (malformed JSON is a different failure class)
         return None
     if not isinstance(data, dict) or data.get("candidates"):
         return None
@@ -290,7 +290,7 @@ def detect_input_echo(content: Optional[str]) -> Optional[str]:
 # ``LeafActionRegistry.register()``/``install_pack()`` used to reach the model as a bare NAME in the
 # ``{allowed_actions}`` sentence and nothing else: dispatchable (since the enum-coercion fix) but
 # not practically selectable, because the prompt never said what it does, what it takes, or when it
-# beats search+visit. This block closes that gap — it lists exactly the allowed NON-CORE actions,
+# beats search+visit. This block closes that gap. It lists exactly the allowed NON-CORE actions,
 # each with its own one-line description + argument shape, and reconciles them with the "every
 # data-gathering task must include at least one visit" rule that would otherwise veto them.
 #
@@ -313,7 +313,7 @@ EXTRA_ACTIONS_MENU_PLACEHOLDER = "{extra_actions_menu}"
 def build_extra_actions_menu(lines: List[str]) -> str:
     """Render the prompt block for ``lines`` (already-formatted per-action menu lines).
 
-    Returns ``""`` for an empty list — the caller relies on that to keep the default prompt
+    Returns ``""`` for an empty list. The caller relies on that to keep the default prompt
     byte-identical.
     """
     if not lines:
@@ -325,7 +325,7 @@ def build_extra_actions_menu(lines: List[str]) -> str:
 # The CORE actions' model-facing prose is hand-written in exactly one place: the shipped
 # ``expansion_system_prompt``'s ``ACTIONS:`` block. A loop that is not the Generate operation (the
 # flat ``naive_discretion`` variant) still has to describe the same tools to the model, and a
-# hand-copied second version of that prose would drift — so it reads the block back out of the
+# hand-copied second version of that prose would drift. So it reads the block back out of the
 # settings instead. Holding the TOOL DOCUMENTATION fixed across arms is the point: an arm
 # comparison is then attributable to structure, not to one arm's tools being better explained.
 _CORE_ACTIONS_BLOCK_HEADER = "ACTIONS:"
@@ -340,8 +340,8 @@ def core_actions_menu_lines(
     attached, in the prompt's own order. The template's doubled braces (``details={{query}}``)
     are unescaped, since a caller outside ``str.format`` should show the model real braces.
 
-    An allowed action the block does not document produces nothing — ``merge`` has no
-    hand-written entry because it is engine-driven rather than model-selected — mirroring
+    An allowed action the block does not document produces nothing. ``merge`` has no
+    hand-written entry because it is engine-driven rather than model-selected. Mirroring
     ``LeafActionRegistry.menu_lines``' rule that the menu never advertises what it cannot
     describe. ``allowed=None`` returns every documented entry.
 
@@ -384,7 +384,7 @@ def core_actions_menu_lines(
 # or "none" means byte-identical prompt behavior. Exemplars are read from disk once
 # and cached per name for the process lifetime.
 #
-# DISPROVEN, kept only for reference — do not reach for this as a default. Live R=3
+# DISPROVEN, kept only for reference. Do not reach for this as a default. Live R=3
 # validation (ADAPTIVE_DISTILLATION_HANDOFF.md Phase 1) found narrative exemplars
 # unreliable on weak models: they backfired twice on the branch_eliminate/mixed
 # shape (the model copied the exemplar's surface structure, not its intent, and
@@ -419,7 +419,7 @@ def _load_reasoning_exemplar() -> str:
         _EXEMPLAR_WARNED.add(name)
         logging.getLogger("LlmExpansionPolicy").warning(
             "[EXPANSION] IDEA_TEST_REASONING_EXEMPLAR=%r is a DISPROVEN mechanism "
-            "(see ADAPTIVE_DISTILLATION_HANDOFF.md Phase 1) — it backfired on the "
+            "(see ADAPTIVE_DISTILLATION_HANDOFF.md Phase 1). It backfired on the "
             "hardest task shape in live R=3 validation. Kept for reference only; "
             "prefer IDEA_TEST_REASONING_RULES instead.",
             name,
@@ -451,7 +451,7 @@ def _load_reasoning_exemplar() -> str:
 # skip. Fully independent of IDEA_TEST_REASONING_EXEMPLAR; either can be set alone.
 # Follows the same convention: unset/none/invalid means byte-identical prompt behavior.
 # Rule files are read from disk once and cached per name for the process lifetime.
-_RULES_NAMES = ("branch_eliminate",)
+_RULES_NAMES = ("branch_eliminate", "chain", "parallel_merge")
 _RULES_DIR = Path(__file__).resolve().parent.parent / "reasoning_rules"
 _RULES_CACHE: Dict[str, str] = {}
 _RULES_WARNED: set = set()
@@ -499,26 +499,36 @@ def _load_reasoning_rules() -> str:
     return _read_rules_block(name)
 
 
-def _auto_reasoning_rules(mandate: str) -> str:
-    """Auto-select a rule-checklist block from the mandate's classified shape.
+def _auto_reasoning_rules(mandate: str, local_text: str = "") -> str:
+    """Auto-select a rule-checklist block from the task's classified shape.
 
     Only invoked when IDEA_TEST_REASONING_RULES is UNSET (the manual override always
-    wins). Uses the deterministic ``classify_shape``. Today only ``branch_eliminate``
-    has a matching rule file, so a correctly-classified ``chain``/``parallel_merge``
-    mandate intentionally yields NO block (documented gap — no placeholder files are
-    fabricated). Fails open to "" for unclassified mandates."""
+    wins). Classifies the ROOT mandate first and uses it whenever it resolves to a
+    shape with a rule file. This is the path with real supporting infrastructure
+    (``branch_eliminate``) and must never regress. ``local_text`` (the node currently
+    being expanded's own sub-goal/title, when available) is only consulted as a
+    fallback when the root mandate does not resolve to a usable shape: root-level task
+    statements and per-node action titles use different vocabulary registers (prose
+    vs. a one-line title), so this is additive coverage, not a replacement for root
+    classification. Fails open to "" for unclassified mandates."""
     shape = classify_shape(mandate or "")
-    if not shape:
-        return ""
-    if shape not in _RULES_NAMES or not (_RULES_DIR / f"{shape}.md").exists():
-        logging.getLogger("LlmExpansionPolicy").info(
-            "[EXPANSION] Auto-classified mandate shape=%s but no reasoning rule file "
-            "exists yet; skipping auto-injection.",
-            shape,
-        )
-        return ""
+    source = "root mandate"
+    if not shape or shape not in _RULES_NAMES or not (_RULES_DIR / f"{shape}.md").exists():
+        local_shape = classify_shape(local_text or "") if local_text else None
+        if local_shape and local_shape in _RULES_NAMES and (_RULES_DIR / f"{local_shape}.md").exists():
+            shape = local_shape
+            source = "node-local goal"
+        else:
+            if shape:
+                logging.getLogger("LlmExpansionPolicy").info(
+                    "[EXPANSION] Auto-classified mandate shape=%s but no reasoning rule "
+                    "file exists yet; skipping auto-injection.",
+                    shape,
+                )
+            return ""
     logging.getLogger("LlmExpansionPolicy").info(
-        "[EXPANSION] Auto-selected reasoning rules for classified shape=%s", shape
+        "[EXPANSION] Auto-selected reasoning rules for classified shape=%s (source=%s)",
+        shape, source,
     )
     return _read_rules_block(shape)
 
@@ -526,11 +536,11 @@ def _auto_reasoning_rules(mandate: str) -> str:
 class LlmExpansionPolicy(ExpansionPolicy):
     """Generate operation: ask the model for this node's children.
 
-    :param actions: The engine's live ``LeafActionRegistry``. Optional and read-only — it is
+    :param actions: The engine's live ``LeafActionRegistry``. Optional and read-only. It is
         used solely to DESCRIBE allowed non-core actions in the prompt (see
         ``build_extra_actions_menu``). Passing the engine's own instance (rather than a copy)
         means an action registered after construction still gets described. ``None`` (a
-        standalone policy, e.g. in a test) simply renders no menu — and since only a NON-CORE
+        standalone policy, e.g. in a test) simply renders no menu. And since only a NON-CORE
         action can ever produce a menu line, that is the same prompt a default registry gives.
     """
 
@@ -555,7 +565,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
             return ""
         try:
             return build_extra_actions_menu(registry.menu_lines(allowed))
-        except Exception as exc:  # noqa: BLE001 — a menu is an enhancement, never a failure mode
+        except Exception as exc:  # noqa: BLE001. A menu is an enhancement, never a failure mode
             self._logger.warning(f"[EXPANSION] Could not build the extra-actions menu: {exc}")
             return ""
 
@@ -569,7 +579,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
         # object. Strict structured output (OpenAI/Azure) rejects any object lacking
         # ``additionalProperties: false``, which we cannot add without forbidding the
         # action keys (query/url/mandate/...). So convey the candidate shape as a
-        # text instruction and drop to ``json_object`` mode (provider-agnostic — no
+        # text instruction and drop to ``json_object`` mode (provider-agnostic. No
         # model-name special-casing).
         json_schema = self.settings.get("expansion_json_schema")
         # Opt-in: when the measurable-output contract is enabled, use the schema variant
@@ -643,8 +653,8 @@ class LlmExpansionPolicy(ExpansionPolicy):
             self._logger.debug(f"[EXPANSION] LLM Output preview: {output_preview}")
             # Bad-model lab (env-gated, no-op by default): classify WHY a weak model's plan
             # JSON failed. ``parsed_ok`` is the raw completion's JSON-syntax validity BEFORE
-            # ``_parse_candidates``' repair fallback — same measure as the react leaf call
-            # sites — so the whole block (including the throwaway parse) is skipped when the
+            # ``_parse_candidates``' repair fallback. Same measure as the react leaf call
+            # sites. So the whole block (including the throwaway parse) is skipped when the
             # flag is off.
             if _json_telemetry.enabled():
                 try:
@@ -702,7 +712,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
                         self._logger.info(
                             f"[EXPANSION] Echo retry parsed {len(candidates)} candidates"
                         )
-                    except Exception as retry_err:  # noqa: BLE001 — a retry never sinks a run
+                    except Exception as retry_err:  # noqa: BLE001. A retry never sinks a run
                         self._logger.warning(f"[EXPANSION] Echo retry failed: {retry_err}")
             if not candidates:
                 self._logger.error(f"[EXPANSION] CRITICAL: No candidates parsed from LLM response!")
@@ -962,7 +972,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
                 .replace(EXTRA_ACTIONS_MENU_PLACEHOLDER, menu_substitution)
             )
         # Templates that do not host the placeholder (alternate settings files, custom prompts)
-        # still get the menu — appended, in the same way the planning addendum below is.
+        # still get the menu. Appended, in the same way the planning addendum below is.
         if extra_menu and not hosts_placeholder:
             system = f"{system}\n\n{extra_menu}" if system else extra_menu
         planning_addendum = str(
@@ -979,7 +989,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
             system = f"{system}\n\n{_EXPECT_CONTRACT_ADDENDUM}" if system else _EXPECT_CONTRACT_ADDENDUM
         # Optional prompt prefixes, ordered top-to-bottom: reasoning exemplar (a
         # narrative demonstration) then the imperative rule checklist, then the existing
-        # system template. The two env vars are fully independent — either may be set alone.
+        # system template. The two env vars are fully independent. Either may be set alone.
         prefix_blocks = []
         exemplar_block = _load_reasoning_exemplar()
         if exemplar_block:
@@ -987,8 +997,10 @@ class LlmExpansionPolicy(ExpansionPolicy):
         rules_block = _load_reasoning_rules()
         if not rules_block and not os.environ.get("IDEA_TEST_REASONING_RULES", "").strip():
             # Env var UNSET: fall back to deterministic auto-classification of the root
-            # mandate. Manual IDEA_TEST_REASONING_RULES (set) always takes priority.
-            rules_block = _auto_reasoning_rules(self._root_mandate(graph))
+            # mandate, with the node currently being expanded's own local goal text as
+            # an additive fallback signal (see _auto_reasoning_rules). Manual
+            # IDEA_TEST_REASONING_RULES (set) always takes priority.
+            rules_block = _auto_reasoning_rules(self._root_mandate(graph), self._node_local_goal(node))
         if rules_block:
             prefix_blocks.append(rules_block)
         # Single-use human steer injected via the interactive debugger (agent-debug
@@ -1009,7 +1021,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
         # engine only writes this detail when the flag is on, so the default path never sees
         # it). Surfaces the triggering confidence-judge/follow-up-detector reason once, then
         # consume-and-clear so it never leaks into a later, unrelated expansion of this or any
-        # other node — mirroring the HUMAN_FEEDBACK single-use pattern above.
+        # other node. Mirroring the HUMAN_FEEDBACK single-use pattern above.
         if DetailKey.REEXPAND_REASON.value in node.details:
             reexpand_reason = node.details.pop(DetailKey.REEXPAND_REASON.value, None)
             if isinstance(reexpand_reason, str) and reexpand_reason.strip():
@@ -1094,11 +1106,26 @@ class LlmExpansionPolicy(ExpansionPolicy):
             return str(root.details.get("mandate") or "")
         return ""
 
+    def _node_local_goal(self, node: Optional["IdeaNode"]) -> str:
+        """Best-effort local sub-goal text for a node, for per-node shape classification
+        (used only as a fallback signal, see ``_auto_reasoning_rules``). Falls through
+        GOAL -> ORIGINAL_GOAL -> title; "" if none carry usable text."""
+        if not node:
+            return ""
+        details = node.details or {}
+        for key in (DetailKey.GOAL.value, DetailKey.ORIGINAL_GOAL.value):
+            val = details.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        if isinstance(node.title, str) and node.title.strip():
+            return node.title.strip()
+        return ""
+
     def _mandate_urls(self, graph: Optional["IdeaDag"]) -> List[str]:
         """URLs named in the root mandate (the task statement), in order.
 
         Used to recover a visit candidate's URL when the LLM emitted a visit node
-        without one — explicit-URL mandates otherwise fail because the planner names
+        without one. Explicit-URL mandates otherwise fail because the planner names
         the page in the title but drops the URL from details.
         """
         if graph is None:
@@ -1320,7 +1347,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
         meta = data.get("meta")
         if not isinstance(meta, dict):
             # A weak model can emit a truthy-but-wrong-shaped "meta" (seen live: `true`, and
-            # separately a flat list) — `meta or {}` only substitutes on FALSY values, so a
+            # separately a flat list). `meta or {}` only substitutes on FALSY values, so a
             # malformed truthy meta survives to `dict(meta)` below and throws TypeError, killing
             # the whole expansion step instead of just ignoring the bad field.
             meta = {}
@@ -1330,7 +1357,15 @@ class LlmExpansionPolicy(ExpansionPolicy):
                 continue
             action = candidate.get(DetailKey.ACTION.value)
             title = candidate.get("title") or ""
-            details = candidate.get("details") or {}
+            # Same failure mode as the `meta` guard above, and for the same reason: `or {}`
+            # substitutes only on FALSY values, so a truthy-but-wrong-shaped `details` (live
+            # 2026-08-15, llama3.2:3b: a LIST where an object belongs) survived to `dict(details)`
+            # and raised ValueError. That exception escaped `_parse_candidates` and killed the
+            # WHOLE expansion step. Every sibling candidate lost, engine falls back to an
+            # action-less node, no tool ever called, grounding gate scores the run 0.
+            details = candidate.get("details")
+            if not isinstance(details, dict):
+                details = {}
             if action:
                 details = dict(details)
                 details[DetailKey.ACTION.value] = action
@@ -1392,12 +1427,12 @@ class LlmExpansionPolicy(ExpansionPolicy):
                         details[DetailKey.URL.value] = extracted_url
                         # A source resolving to `parent_node_id` itself means the URL came from
                         # the node CURRENTLY being expanded (e.g. re-expanding a just-completed
-                        # search leaf into a visit follow-up) — its result is already in hand
+                        # search leaf into a visit follow-up). Its result is already in hand
                         # right here, not something to defer. Wiring `requires_data` to it anyway
                         # deadlocks the engine: that node can only reach DONE once this very child
                         # completes, so `IdeaDagEngine.step()`'s "wait for required data" gate
                         # would return the same node_id forever (silently exhausting the step
-                        # budget with no error — the `good_adaptive` self-loop bug).
+                        # budget with no error (the `good_adaptive` self-loop bug).
                         if source_node_id and source_node_id != parent_node_id:
                             source_node = graph.get_node(source_node_id)
                             if source_node:
@@ -1417,13 +1452,13 @@ class LlmExpansionPolicy(ExpansionPolicy):
                         self._logger.info(f"[EXPANSION] Proactively extracted URL for visit candidate '{title[:50]}...': {extracted_url[:60]}...")
                     else:
                         # Last resort: recover from a URL named in the mandate (explicit-URL
-                        # tasks otherwise fail — the planner names the page but drops the URL).
+                        # tasks otherwise fail (the planner names the page but drops the URL).
                         recovered = self._match_mandate_url(title, self._mandate_urls(graph))
                         if recovered:
                             details[DetailKey.URL.value] = recovered
                             self._logger.info(f"[EXPANSION] Recovered visit URL from mandate for '{title[:50]}...': {recovered[:60]}...")
                         else:
-                            # No URL yet — KEEP the node. In a search-driven task the visit's
+                            # No URL yet. KEEP the node. In a search-driven task the visit's
                             # URL is resolved at execution time from a sibling search's results
                             # (VisitLeafAction._extract_urls_from_parent_search_results); dropping
                             # it here would break the search->visit pipeline (visits=0).
