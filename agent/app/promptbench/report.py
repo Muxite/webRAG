@@ -97,6 +97,12 @@ def apply_exclusions(summaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if loco is not None and loco > 10.0:
             reasons.append("UNDERPOWERED: loco swing > 10.0 pp")
 
+        # n_clusters counts error rows, so a cell whose every call failed in
+        # transport can still clear the 5-cluster rule and reach the printer with
+        # None metrics. Local Ollama produced no such cell; API endpoints do.
+        if row_summary.get("n", 0) == 0:
+            reasons.append("NO USABLE ROWS: every cell errored in transport")
+
         if reasons:
             row_summary["excluded"] = True
             row_summary["exclusion_reason"] = "; ".join(reasons)

@@ -16,6 +16,7 @@ import random
 
 import pytest
 
+from agent.app.promptbench import analyze
 from agent.app.promptbench.stats_pooled import (
     DeltaRecord,
     cluster_bootstrap_ci,
@@ -170,3 +171,74 @@ def test_per_model_directions_feed_the_consistency_display():
     directions = per_model_directions(pooled_delta_records(synth(0.3), "A2", "A1", "verify"))
     assert len(directions) == 5
     assert all(isinstance(v, float) for v in directions.values())
+
+
+# ---------------------------------------------------------------------------
+# The empty contrast: every model disqualified on one side or the other
+# ---------------------------------------------------------------------------
+#
+# The exclusion rule drops a model from a contrast when EITHER side is
+# disqualified. When that consumes the whole roster, pooled_report correctly
+# returns mean_delta=None -- and the printer formatted it unconditionally and
+# died with a TypeError, after the summary table had already printed, so the run
+# looked half-finished. On the v2 roster this is six contrasts including the
+# entire goal_achieved family, whose A1 baseline is degenerate on one model and
+# 44.6% parse-failed on the other. Truncating there would have left the summary
+# table showing 672 goal_achieved rows above a primary section that never
+# mentions the family: it reads as "we measured this" when we did not.
+
+
+def _fully_excluded():
+    """calibration/SHIPPED on the v2 roster: both models disqualified, one on the
+    C_A1 baseline and both on the SHIPPED arm."""
+    rows = [
+        {"family": "calibration", "variant": variant, "model": model,
+         "item_id": f"it-{c}", "cluster": f"cl{c}", "correct": True}
+        for c in range(6)
+        for model in ("qwen2.5:0.5b", "qwen2.5:7b")
+        for variant in ("C_A1", "SHIPPED")
+    ]
+    excluded = {
+        ("qwen2.5:0.5b", "calibration", "C_A1"),
+        ("qwen2.5:0.5b", "calibration", "SHIPPED"),
+        ("qwen2.5:7b", "calibration", "SHIPPED"),
+    }
+    return rows, excluded
+
+
+def test_a_contrast_whose_models_are_all_excluded_is_still_reported():
+    rows, excluded = _fully_excluded()
+    reports = analyze.primary(rows, "calibration", 50, excluded)
+    shipped = [r for r in reports if r["arm"] == "SHIPPED"]
+    assert len(shipped) == 1
+    assert shipped[0]["n_pairs"] == 0
+    assert shipped[0]["mean_delta"] is None
+    assert shipped[0]["measured"] is False
+    assert shipped[0]["all_models_excluded"] is True
+    assert shipped[0]["models_excluded"] == ["qwen2.5:0.5b", "qwen2.5:7b"]
+
+
+def test_the_report_renders_the_empty_contrast_instead_of_crashing(capsys):
+    rows, excluded = _fully_excluded()
+    analyze.print_primary(analyze.primary(rows, "calibration", 50, excluded),
+                          "calibration")
+    out = capsys.readouterr().out
+    assert "SHIPPED" in out
+    assert "NOT MEASURED" in out
+    assert "all models excluded" in out
+    assert "qwen2.5:7b" in out
+
+
+def test_the_none_guard_does_not_blank_out_a_contrast_that_did_measure():
+    """A guard that rendered every delta as a dash would also never crash."""
+    reports = analyze.primary(synth(0.30), "verify", 200, set())
+    a2 = [r for r in reports if r["arm"] == "A2"]
+    assert a2 and a2[0]["measured"] is True
+    assert a2[0]["mean_delta"] is not None
+
+
+def test_a_measured_contrast_still_prints_its_number(capsys):
+    analyze.print_primary(analyze.primary(synth(0.30), "verify", 200, set()), "verify")
+    out = capsys.readouterr().out
+    assert "NOT MEASURED" not in out
+    assert any(ln.startswith("A2 ") and "+0." in ln for ln in out.splitlines())

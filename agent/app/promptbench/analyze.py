@@ -21,6 +21,7 @@ import argparse
 import json
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -156,17 +157,23 @@ def summary_table(rows: List[dict]) -> List[dict]:
 
 
 def print_summary(table: List[dict]) -> None:
-    print(f"\n{'family':15s} {'model':16s} {'arm':14s} {'n':>3s} {'acc':>6s} "
+    print(f"\n{'family':15s} {'model':28s} {'arm':14s} {'n':>3s} {'acc':>6s} "
           f"{'parse':>6s} {'abst':>6s} {'ct':>6s} {'acc/1k':>7s} {'loco':>6s} {'bias':>5s}  flag")
-    print("-" * 124)
+    print("-" * 136)
     for s in table:
         loco = "-" if s["loco_swing_pp"] is None else f"{s['loco_swing_pp']:.1f}"
         apk = "-" if s["acc_per_1k_ct"] is None else f"{s['acc_per_1k_ct']:.1f}"
         flag = s["exclusion_reason"] if s["excluded"] else ""
         bias = "-" if s["majority_pred_frac"] is None else f"{s['majority_pred_frac']:.2f}"
-        print(f"{s['family']:15s} {s['model']:16s} {s['variant']:14s} {s['n']:3d} "
-              f"{s['accuracy']:6.3f} {s['parse_failure_rate']:6.3f} "
-              f"{s['abstention_rate']:6.3f} {s['mean_completion_tokens']:6.1f} "
+        # summarize() returns None metrics for a cell with no usable rows, which is
+        # what a wholly transport-errored cell looks like. Local Ollama never
+        # produced one; API endpoints are where they appear.
+        acc = "-" if s["accuracy"] is None else f"{s['accuracy']:.3f}"
+        pf = "-" if s["parse_failure_rate"] is None else f"{s['parse_failure_rate']:.3f}"
+        abst = "-" if s["abstention_rate"] is None else f"{s['abstention_rate']:.3f}"
+        ct = "-" if s["mean_completion_tokens"] is None else f"{s['mean_completion_tokens']:.1f}"
+        print(f"{s['family']:15s} {s['model']:28s} {s['variant']:14s} {s['n']:3d} "
+              f"{acc:>6s} {pf:>6s} {abst:>6s} {ct:>6s} "
               f"{apk:>7s} {loco:>6s} {bias:>5s}  {flag}")
 
 
@@ -202,9 +209,24 @@ def primary(rows: List[dict], family: str, iters: int, excluded: set) -> List[di
         # Drop a model from this contrast when EITHER side is disqualified: an arm
         # judged against an excluded baseline is as unusable as an excluded arm.
         dropped = {m for (m, f, v) in excluded if f == family and v in (arm, baseline)}
+        # Which models actually placed calls on either side of this contrast. The
+        # check above reads the RAW rows and so cannot see the exclusions, which
+        # means `dropped` can swallow every model and leave zero surviving pairs.
+        # That contrast must still be reported as unmeasured: v2's whole
+        # goal_achieved family lands here because its A1 baseline is degenerate on
+        # one model and 44.6% parse-failed on the other, and dropping it silently
+        # would leave the summary table showing 672 goal_achieved rows above a
+        # primary section that never mentions the family.
+        present = {r.get("model") for r in rows
+                   if r.get("family") == family
+                   and r.get("variant") in (arm, baseline)
+                   and "error" not in r}
         usable = [r for r in rows if not (r.get("family") == family and r.get("model") in dropped)]
         report = pooled_report(usable, arm, baseline, family, iters=iters)
         report["models_excluded"] = sorted(dropped)
+        report["models_present"] = sorted(present)
+        report["all_models_excluded"] = bool(present) and present <= dropped
+        report["measured"] = report["n_pairs"] > 0
         out.append(report)
     return out
 
@@ -221,11 +243,23 @@ def print_primary(reports: List[dict], family: str) -> None:
         ci = "-" if not r["ci95"] else f"[{r['ci95'][0]:+.3f}, {r['ci95'][1]:+.3f}]"
         hw = "-" if r["ci_halfwidth"] is None else f"{r['ci_halfwidth']:.3f}"
         p = "-" if r["permutation_p"] is None else f"{r['permutation_p']:.4f}"
+        # Rendered as a string, like ci95/halfwidth/perm p above it. An unmeasured
+        # contrast prints a dash rather than killing the whole report with a
+        # TypeError -- and it prints, rather than vanishing.
+        d = "-" if r["mean_delta"] is None else f"{r['mean_delta']:+.3f}"
         star = "  *" if r["ci_excludes_zero"] else ""
-        drop = f"  (excluded: {', '.join(r['models_excluded'])})" if r.get("models_excluded") else ""
+        if r.get("all_models_excluded"):
+            note = ("  NOT MEASURED: all models excluded "
+                    f"({', '.join(r['models_excluded'])})")
+        elif r["n_pairs"] == 0:
+            note = "  NOT MEASURED: no item appears in both arms"
+        elif r.get("models_excluded"):
+            note = f"  (excluded: {', '.join(r['models_excluded'])})"
+        else:
+            note = ""
         print(f"{r['arm']:14s} {r['n_pairs']:6d} {r['n_clusters']:5d} {r['n_models']:4d} "
-              f"{r['mean_delta']:+8.3f} {ci:>18s} {hw:>7s} {p:>8s} "
-              f"{r['direction_pos_neg']:>6s}{star}{drop}")
+              f"{d:>8s} {ci:>18s} {hw:>7s} {p:>8s} "
+              f"{r['direction_pos_neg']:>6s}{star}{note}")
 
 
 # ---------------------------------------------------------------------------
@@ -263,14 +297,14 @@ def print_contrasts(cs: List[dict], family: str) -> None:
     print(f"\nCONSISTENCY DISPLAY -- per-model paired vs {baseline_for(family)} (family={family})")
     print("  Not the headline: a sign test over k models cannot report p below "
           "2*(1/2)^k, which is 0.0625 at k=5.")
-    print(f"{'model':16s} {'arm':14s} {'n':>3s} {'delta':>8s} {'ci95':>7s} "
+    print(f"{'model':28s} {'arm':14s} {'n':>3s} {'delta':>8s} {'ci95':>7s} "
           f"{'dz':>6s} {'p':>7s} {'p_holm':>7s}")
-    print("-" * 78)
+    print("-" * 90)
     for c in cs:
         ph = f"{c['p_holm']:.3f}" if "p_holm" in c else "-"
         pv = "-" if c["p"] is None else f"{c['p']:.3f}"
         sig = "  *" if (c.get("p_holm", c["p"]) or 1.0) < 0.05 else ""
-        print(f"{c['model']:16s} {c['arm']:14s} {c['n']:3d} "
+        print(f"{c['model']:28s} {c['arm']:14s} {c['n']:3d} "
               f"{c['mean_delta']:+8.3f} {c['ci95']:7.3f} {c['cohen_dz']:6.2f} "
               f"{pv:>7s} {ph:>7s}{sig}")
 
@@ -309,9 +343,9 @@ def print_calibration(table: List[dict]) -> None:
     print(f"\nCALIBRATION (family=calibration). Bar is the LLM-FREE structural "
           f"baseline AUC {FREE_BASELINE_AUC}, from CONFIDENCE_JUDGE_MISCALIBRATION.md,")
     print("  not 0.5 -- an arm below it has not earned its LLM call.")
-    print(f"{'model':16s} {'arm':12s} {'n':>4s} {'noconf':>7s} {'meanC':>6s} {'brier':>6s} "
+    print(f"{'model':28s} {'arm':12s} {'n':>4s} {'noconf':>7s} {'meanC':>6s} {'brier':>6s} "
           f"{'ece':>6s} {'auc':>6s} {'slope':>7s} {'reli':>6s} {'reso':>6s}  flag")
-    print("-" * 118)
+    print("-" * 130)
     for s in table:
         def f(key, fmt="{:6.3f}"):
             v = s.get(key)
@@ -323,21 +357,52 @@ def print_calibration(table: List[dict]) -> None:
             flags.append(f"below free baseline {FREE_BASELINE_AUC}")
         if s.get("slope") is not None and s["slope"] < 0:
             flags.append("ANTI-CALIBRATED: slope < 0")
-        print(f"{s['model']:16s} {s['variant']:12s} {s['n']:4d} {f('no_confidence_rate','{:7.3f}')} "
+        print(f"{s['model']:28s} {s['variant']:12s} {s['n']:4d} {f('no_confidence_rate','{:7.3f}')} "
               f"{f('mean_confidence')} {f('brier')} {f('ece')} {f('auc')} "
               f"{f('slope','{:7.3f}')} {f('reliability')} {f('resolution')}  {'; '.join(flags)}")
 
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--runs", default="agent/idea_test_results/promptbench_runs.jsonl")
+    p.add_argument("--runs", nargs="+",
+                   default=["agent/idea_test_results/promptbench_runs.jsonl"],
+                   help="one or more JSONL run files; rows are pooled into ONE estimate "
+                        "and the raw files stay untouched")
     p.add_argument("--json-out", default="")
     p.add_argument("--bootstrap-iters", type=int, default=10000)
     a = p.parse_args(argv)
 
-    rows = regrade_shipped(load(Path(a.runs)))
+    # The roster spans several files because the runner appends per --out and the
+    # local/API tiers use different endpoints and keys. Provenance is carried on
+    # the row rather than implied by which file was passed.
+    rows = []
+    sources = []
+    for path in a.runs:
+        src = Path(path)
+        loaded = load(src)
+        for r in loaded:
+            r["source_file"] = src.name
+        rows.extend(loaded)
+        sources.append({"path": str(src), "rows": len(loaded),
+                        "models": sorted({r.get("model") for r in loaded if r.get("model")})})
+
+    # pooled_delta_records builds by_arm[(model, variant)][item_id], so a repeated
+    # cell key is last-write-wins and invisible. The runner cannot produce one
+    # within a single file; loading several makes it reachable. A duplicate means
+    # two different answers were recorded for one prompt, and picking one quietly
+    # is the same class of error as printing an unmeasured contrast as measured.
+    dupes = {k: n for k, n in Counter(r.get("cell") for r in rows if r.get("cell")).items()
+             if n > 1}
+    if dupes:
+        print(f"FATAL: {len(dupes)} cell key(s) appear in more than one run file, "
+              f"e.g. {sorted(dupes)[:3]}", file=sys.stderr)
+        return 2
+
+    rows = regrade_shipped(rows)
     n_err = sum(1 for r in rows if "error" in r)
-    print(f"rows: {len(rows)}  transport errors: {n_err}")
+    print(f"rows: {len(rows)}  transport errors: {n_err}  files: {len(a.runs)}")
+    for s in sources:
+        print(f"  {s['path']}: {s['rows']} rows, models {', '.join(s['models'])}")
 
     table = summary_table(rows)
     print_summary(table)
@@ -348,8 +413,8 @@ def main(argv=None) -> int:
         for m, f, v in sorted(excluded):
             print(f"  {f}/{m}/{v}")
 
-    result: Dict[str, object] = {"summary": table, "primary": {}, "contrasts": {},
-                                 "excluded_cells": sorted(excluded)}
+    result: Dict[str, object] = {"sources": sources, "summary": table, "primary": {},
+                                 "contrasts": {}, "excluded_cells": sorted(excluded)}
     for family in sorted({r.get("family") for r in rows if r.get("family")}):
         reports = primary(rows, family, a.bootstrap_iters, excluded)
         print_primary(reports, family)
@@ -362,6 +427,20 @@ def main(argv=None) -> int:
     cal = calibration_table(rows)
     print_calibration(cal)
     result["calibration"] = cal
+
+    # The per-family tables are far apart in a long run, so an omission is easy to
+    # scroll past. Collect them once, and put them in the JSON too, so a null
+    # mean_delta is never the only signal that a contrast went unmeasured.
+    unmeasured = [(f, r["arm"], r["models_excluded"])
+                  for f, reps in result["primary"].items() for r in reps
+                  if not r.get("measured")]
+    if unmeasured:
+        print(f"\nNOT MEASURED -- {len(unmeasured)} contrast(s) had zero surviving pairs "
+              f"after the pre-registered exclusions:")
+        for f, arm, models in unmeasured:
+            print(f"  {f}/{arm}: all models excluded ({', '.join(models)})")
+    result["unmeasured_contrasts"] = [{"family": f, "arm": a_, "models_excluded": m}
+                                      for f, a_, m in unmeasured]
 
     if a.json_out:
         Path(a.json_out).write_text(json.dumps(result, indent=2, default=str))
