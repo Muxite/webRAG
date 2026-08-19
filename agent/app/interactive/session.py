@@ -14,6 +14,8 @@ from agent.app.idea_policies.action_constants import NodeDetailsExtractor
 from agent.app.interactive.renderer import Renderer
 from agent.app.interactive.controller import Controller, Action, Cmd
 from agent.app.interactive.stats import StatsTracker
+from agent.app.interactive.thoughts import ThoughtBuffer
+from agent.app.interactive import thought_log as _thought_log
 
 _log = logging.getLogger(__name__)
 
@@ -35,6 +37,17 @@ class DebugSession:
         self._quit = False
         self._stats = StatsTracker(graph)
         self._out = print
+
+        # Best-effort: reach telemetry off the engine's AgentIO. Tolerate stub engines
+        # (tests) and telemetry-disabled runs, both of which leave this None; ThoughtBuffer
+        # degrades gracefully in that case (empty Thoughts, never raises).
+        io = getattr(engine, "io", None)
+        telemetry = getattr(io, "telemetry", None)
+        self._thoughts = ThoughtBuffer(telemetry)
+
+        root = graph.get_node(graph.root_id())
+        label = root.title[:80] if root else ""
+        self._thought_log = _thought_log.from_env(label=label)
 
     async def run(self) -> Dict[str, Any]:
         root_id = self._graph.root_id()
@@ -184,11 +197,14 @@ class DebugSession:
             safety += 1
             self._step += 1
             self._stats.tick(depth)
+            self._thoughts.capture(self._step, current)
             try:
                 nxt = await self._engine.step(self._graph, current, self._step)
             except Exception as exc:
                 self._out(f"{'  ' * depth}  error: {exc}")
                 break
+            finally:
+                self._record_thought(self._step, current)
             if nxt is None:
                 break
 
@@ -249,6 +265,14 @@ class DebugSession:
                 self._apply_feedback(node, cmd.arg)
                 continue
 
+            if cmd.action == Action.THOUGHT:
+                self._handle_thought()
+                continue
+
+            if cmd.action == Action.WHY:
+                self._handle_why()
+                continue
+
             return cmd.action
 
     def _apply_edit(self, node: IdeaNode) -> None:
@@ -285,6 +309,21 @@ class DebugSession:
         self._graph.update_details(node.node_id, {DetailKey.HUMAN_FEEDBACK.value: note})
         self._out("  feedback queued for next expansion.")
 
+    def _handle_thought(self) -> None:
+        latest = self._thoughts.latest()
+        if latest is None:
+            self._out("  (no thought recorded yet - step first)")
+            return
+        self._out(Renderer.thought_card(latest))
+
+    def _handle_why(self) -> None:
+        latest = self._thoughts.latest()
+        decisions = latest.decisions if latest else []
+        if not decisions:
+            self._out("  (no decisions recorded yet - step first)")
+            return
+        self._out(Renderer.decision_card(decisions))
+
     def _handle_info(self, cmd: Cmd, node: IdeaNode) -> None:
         arg = cmd.arg.strip().lower()
         if arg == "nodes":
@@ -318,12 +357,25 @@ class DebugSession:
             return None
         self._step += 1
         self._stats.tick()
+        self._thoughts.capture(self._step, node_id)
         try:
             return await self._engine.step(self._graph, node_id, self._step)
         except Exception as exc:
             self._out(f"  engine error: {exc}")
             _log.error(f"engine step error: {exc}", exc_info=True)
             return None
+        finally:
+            self._record_thought(self._step, node_id)
+
+    def _record_thought(self, step: int, node_id: Optional[str]) -> None:
+        """Collect the step's Thought off the buffer and append it to the file log, if any.
+
+        Called from a `finally` block so a failed step's thought is still captured (the
+        exception itself already went through `_engine_step`'s / `_autorun`'s own handling).
+        """
+        thought = self._thoughts.collect(step, node_id)
+        if self._thought_log is not None:
+            self._thought_log.write(thought)
 
     def _print_live(self) -> None:
         self._out(Renderer.stats_panel(self._stats))

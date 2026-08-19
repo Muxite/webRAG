@@ -15,6 +15,8 @@ class Action(Enum):
     GRAPH = auto()
     EDIT = auto()
     FEEDBACK = auto()
+    THOUGHT = auto()
+    WHY = auto()
     HELP = auto()
     QUIT = auto()
 
@@ -47,6 +49,10 @@ _ALIASES = {
     "edit": Action.EDIT,
     "f": Action.FEEDBACK,
     "feedback": Action.FEEDBACK,
+    "t": Action.THOUGHT,
+    "thought": Action.THOUGHT,
+    "w": Action.WHY,
+    "why": Action.WHY,
     "h": Action.HELP,
     "help": Action.HELP,
     "?": Action.HELP,

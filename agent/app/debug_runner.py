@@ -107,11 +107,34 @@ async def _shutdown_connectors(*connectors) -> None:
             pass
 
 
+def _full_capture_enabled() -> bool:
+    """IDEA_DEBUG_FULL_CAPTURE defaults on; only an explicit 0/false/no/off turns it off."""
+    val = os.environ.get("IDEA_DEBUG_FULL_CAPTURE")
+    if val is None:
+        return True
+    return val.strip().lower() not in ("0", "false", "no", "off", "")
+
+
 async def _build(llm, search, http, chroma, model, settings, mandate):
     # Namespace is derived exactly as the engine does (via the shared helper), so
     # the debug collection/telemetry ids line up with what engine.prepare() wires.
     ns = IdeaDagEngine._memo_namespace(mandate)
     telem = TelemetrySession(enabled=True, mandate=mandate, correlation_id=f"debug_{ns}")
+
+    if _full_capture_enabled():
+        # Mirrors testing/execution.py's report_verbosity>=3 behavior: capture raw
+        # connector payloads instead of {chars: N} summaries, so the debugger's
+        # thought buffer can show real prompts/completions.
+        llm.set_full_capture(True)
+        search.set_full_capture(True)
+        http.set_full_capture(True)
+        chroma.set_full_capture(True)
+        if "IDEA_TEST_REPORT_VERBOSITY" not in os.environ:
+            # Keeps decision rationale/alternatives in telemetry (see
+            # telemetry.py:_decision_detail_enabled); don't clobber an explicit setting.
+            os.environ["IDEA_TEST_REPORT_VERBOSITY"] = "2"
+        print("  [debug] full connector payload capture enabled (raw prompts/completions retained in telemetry)")
+
     io = AgentIO(
         connector_llm=llm,
         connector_search=search,

@@ -191,6 +191,222 @@ class Renderer:
         return "\n".join(lines)
 
     @staticmethod
+    def _clip(text: str, max_chars: int) -> str:
+        """Clip text to max_chars, always noting how much was omitted (never silent)."""
+        text = text or ""
+        if len(text) <= max_chars:
+            return text
+        omitted = len(text) - max_chars
+        return f"{text[:max_chars]}\n  … [clipped, {omitted} more chars omitted]"
+
+    @staticmethod
+    def _pick(d: Dict[str, Any], keys: List[str]) -> Optional[Any]:
+        """Return the first present, non-None value among the given keys of a dict."""
+        for k in keys:
+            if isinstance(d, dict) and d.get(k) is not None:
+                return d.get(k)
+        return None
+
+    @staticmethod
+    def _thought_title(thought: Any) -> Optional[str]:
+        title = getattr(thought, "node_title", None)
+        if title:
+            return title
+        for ev in (getattr(thought, "events", None) or []):
+            if isinstance(ev, dict):
+                t = ev.get("title") or ev.get("node_title")
+                if t:
+                    return t
+        return None
+
+    @staticmethod
+    def thought_card(thought: Any, max_payload_chars: int = 2000, color: bool = True) -> str:
+        """Render one step's LLM interaction(s): system/user prompt and raw completion.
+
+        `thought` is duck-typed with attributes: step_index, node_id, decisions,
+        events, llm_calls (list of dicts with model/prompt_text/completion_text/usage),
+        truncated. Missing attributes degrade gracefully rather than raising.
+        """
+        b, d, r = (B, D, R) if color else ("", "", "")
+        cyn, mag, red = (CYN, MAG, RED) if color else ("", "", "")
+
+        step_index = getattr(thought, "step_index", None)
+        node_id = getattr(thought, "node_id", None)
+        decisions = getattr(thought, "decisions", None) or []
+        llm_calls = getattr(thought, "llm_calls", None) or []
+        truncated = getattr(thought, "truncated", False)
+        title = Renderer._thought_title(thought)
+
+        stage = None
+        if decisions:
+            first = decisions[0]
+            if isinstance(first, dict):
+                stage = first.get("stage")
+            else:
+                stage = getattr(first, "stage", None)
+
+        header = f"Step {step_index if step_index is not None else '?'}"
+        if stage:
+            header += f" | stage={stage}"
+        sid = str(node_id)[:8] if node_id else "?"
+        header += f" | node={sid}"
+        if title:
+            header += f" | {str(title)[:60]}"
+
+        lines: List[str] = [Renderer.section(header) if color else f"-- {header} --"]
+        _a = lines.append
+
+        if truncated:
+            _a(f"  {mag}(thought record truncated){r}")
+
+        if not llm_calls:
+            _a(f"  {d}(no llm calls recorded for this step){r}")
+
+        for i, call in enumerate(llm_calls):
+            call = call if isinstance(call, dict) else {}
+            model = call.get("model")
+            usage = call.get("usage") or {}
+            elapsed = Renderer._pick(call, ["elapsed_s", "duration_s", "latency_s"])
+
+            meta_parts = []
+            if model:
+                meta_parts.append(f"model={model}")
+            if elapsed is not None:
+                meta_parts.append(f"time={elapsed:.2f}s" if isinstance(elapsed, (int, float)) else f"time={elapsed}")
+            if usage:
+                pt = usage.get("prompt_tokens")
+                ct = usage.get("completion_tokens")
+                tt = usage.get("total_tokens")
+                tok_parts = []
+                if pt is not None:
+                    tok_parts.append(f"prompt={pt}")
+                if ct is not None:
+                    tok_parts.append(f"completion={ct}")
+                if tt is not None:
+                    tok_parts.append(f"total={tt}")
+                if tok_parts:
+                    meta_parts.append("tokens[" + " ".join(tok_parts) + "]")
+            meta = "  ".join(meta_parts)
+            _a(f"  {b}call {i + 1}/{len(llm_calls)}{r}" + (f"  {d}({meta}){r}" if meta else ""))
+
+            messages = call.get("messages")
+            raw_out = Renderer._pick(call, ["completion_text", "raw_out", "raw_output", "output_text"])
+
+            if isinstance(messages, list) and messages:
+                for msg in messages:
+                    role = msg.get("role") if isinstance(msg, dict) else None
+                    content = msg.get("content") if isinstance(msg, dict) else msg
+                    role_label = str(role).upper() if role else "?"
+                    _a(f"  {cyn}{role_label}{r}:")
+                    _a(textwrap.indent(Renderer._clip(str(content), max_payload_chars), "    "))
+                if raw_out is not None:
+                    _a(f"  {cyn}RAW OUT{r}:")
+                    _a(textwrap.indent(Renderer._clip(str(raw_out), max_payload_chars), "    "))
+            else:
+                system_text = Renderer._pick(call, ["system_text", "system_prompt", "system"])
+                user_text = Renderer._pick(call, ["user_text", "user_prompt", "prompt_text", "prompt"])
+
+                if system_text is not None:
+                    _a(f"  {cyn}SYSTEM{r}:")
+                    _a(textwrap.indent(Renderer._clip(str(system_text), max_payload_chars), "    "))
+                if user_text is not None:
+                    _a(f"  {cyn}USER{r}:")
+                    _a(textwrap.indent(Renderer._clip(str(user_text), max_payload_chars), "    "))
+                if raw_out is not None:
+                    _a(f"  {cyn}RAW OUT{r}:")
+                    _a(textwrap.indent(Renderer._clip(str(raw_out), max_payload_chars), "    "))
+                if system_text is None and user_text is None and raw_out is None:
+                    _a(f"  {d}(no raw payload - full capture was off){r}")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def _alt_label_and_kept(alt: Any, chosen: Any) -> "tuple[str, Optional[Any], Optional[bool]]":
+        """Derive a display label, comparison id, and kept/dropped tag for one alternative.
+
+        Handles plain strings, dicts, and arbitrary objects. Never returns an
+        empty label for a non-empty input.
+
+        :param alt: One alternative entry (str, dict, or other object).
+        :param chosen: The decision's chosen value, used to derive kept/dropped
+            when the alternative itself doesn't carry a "kept" flag.
+        :return: (label, alt_id, kept) tuple.
+        """
+        if isinstance(alt, str):
+            label = alt
+            alt_id = alt
+            kept = (alt_id == chosen) if chosen is not None else None
+            return label, alt_id, kept
+
+        if isinstance(alt, dict):
+            label = alt.get("label") or alt.get("id") or alt.get("title") or alt.get("chosen") or alt.get("name")
+            if not label:
+                label = repr(alt) if alt else "?"
+            kept = alt.get("kept")
+            alt_id = alt.get("id") or alt.get("label") or alt.get("title")
+            if kept is None and chosen is not None and alt_id is not None:
+                kept = (alt_id == chosen)
+            return str(label), alt_id, kept
+
+        # Arbitrary object: try attribute access for common keys, else fall back to repr/str.
+        for key in ("label", "id", "title", "chosen", "name"):
+            val = getattr(alt, key, None)
+            if val:
+                label = str(val)
+                alt_id = val
+                kept = (alt_id == chosen) if chosen is not None else None
+                return label, alt_id, kept
+        label = str(alt) if alt is not None else "?"
+        return label, None, None
+
+    @staticmethod
+    def decision_card(decisions: Any, color: bool = True) -> str:
+        """Render telemetry decision records (stage/chosen/score/grounded/rationale/alternatives)."""
+        b, d, r = (B, D, R) if color else ("", "", "")
+        grn, red, yel = (GRN, RED, YEL) if color else ("", "", "")
+
+        if not decisions:
+            return f"  {d}(no decisions recorded){r}"
+
+        lines: List[str] = []
+        for i, dec in enumerate(decisions):
+            dec = dec if isinstance(dec, dict) else (dec.__dict__ if hasattr(dec, "__dict__") else {})
+            stage = dec.get("stage", "?")
+            chosen = dec.get("chosen")
+            score = dec.get("score")
+            grounded = dec.get("grounded")
+            rationale = dec.get("rationale")
+            alternatives = dec.get("alternatives") or []
+
+            lines.append(f"  {b}decision {i + 1}{r} stage={stage}")
+            if chosen is not None:
+                lines.append(f"    chosen    : {chosen}")
+            if score is not None:
+                lines.append(f"    score     : {score}")
+            if grounded is not None:
+                gtag = f"{grn}yes{r}" if grounded else f"{red}no{r}"
+                lines.append(f"    grounded  : {gtag}")
+            if rationale:
+                lines.append(f"    rationale : {str(rationale)[:200]}")
+
+            if alternatives:
+                lines.append(f"    alternatives ({len(alternatives)}):")
+                for alt in alternatives:
+                    label, alt_id, kept = Renderer._alt_label_and_kept(alt, chosen)
+                    if kept is True:
+                        tag = f"{grn}[kept]{r}"
+                    elif kept is False:
+                        tag = f"{yel}[dropped]{r}"
+                    else:
+                        tag = ""
+                    lines.append(f"      - {label} {tag}".rstrip())
+            lines.append("")
+
+        while lines and lines[-1] == "":
+            lines.pop()
+        return "\n".join(lines)
+
+    @staticmethod
     def help_text() -> str:
         return (
             f"\n{B}Commands:{R}\n"
@@ -204,6 +420,8 @@ class Renderer:
             f"  {CYN}g{R}         graph (full ASCII DAG)\n"
             f"  {CYN}e{R}         edit (override this node's resolved content)\n"
             f"  {CYN}f{R} <note>  feedback (one-shot human steer for next expansion)\n"
+            f"  {CYN}t{R}         thought (raw LLM prompt/completion for the last step)\n"
+            f"  {CYN}w{R}         why (telemetry decision trail for the last step)\n"
             f"  {CYN}q{R}         quit\n"
             f"  {CYN}h{R} / {CYN}?{R}     help\n"
         )

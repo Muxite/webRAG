@@ -251,16 +251,28 @@ class ConnectorLLM(ConnectorBase):
 
         messages = payload.get("messages") or []
         prompt_text = "\n".join(str(item.get("content", "")) for item in messages if isinstance(item, dict))
+        in_payload = {
+            "model": model_name,
+            "prompt_chars": len(prompt_text),
+            "prompt_words": len(prompt_text.split()),
+            "max_tokens": payload.get("max_tokens"),
+            "max_completion_tokens": payload.get("max_completion_tokens"),
+        }
+        # Only include the real prompt text when full capture is on, so default
+        # telemetry stays byte-identical (no text blowup in the result JSON).
+        if getattr(self, "_full_capture", False):
+            in_payload["prompt_text"] = prompt_text
+            # Also record the per-message role/content pairs, so callers can
+            # distinguish system/user/assistant text instead of one flat blob.
+            in_payload["messages"] = [
+                {"role": item.get("role"), "content": item.get("content")}
+                for item in messages
+                if isinstance(item, dict)
+            ]
         self._record_io(
             direction="in",
             operation="llm_query",
-            payload={
-                "model": model_name,
-                "prompt_chars": len(prompt_text),
-                "prompt_words": len(prompt_text.split()),
-                "max_tokens": payload.get("max_tokens"),
-                "max_completion_tokens": payload.get("max_completion_tokens"),
-            },
+            payload=in_payload,
         )
 
         max_attempts = 3
@@ -325,14 +337,17 @@ class ConnectorLLM(ConnectorBase):
                 success=True,
                 payload={"model": model_name, "completion_chars": len(content)},
             )
+            out_payload = {
+                "model": model_name,
+                "completion_chars": len(content),
+                "completion_words": len(content.split()),
+            }
+            if getattr(self, "_full_capture", False):
+                out_payload["completion_text"] = content
             self._record_io(
                 direction="out",
                 operation="llm_query",
-                payload={
-                    "model": model_name,
-                    "completion_chars": len(content),
-                    "completion_words": len(content.split()),
-                },
+                payload=out_payload,
             )
             return content
         except Exception as e:
