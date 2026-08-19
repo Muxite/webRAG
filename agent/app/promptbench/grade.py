@@ -1,7 +1,7 @@
 import dataclasses
 import json
 import re
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse, urlunparse
 
 
@@ -49,13 +49,20 @@ def grade_regex(raw: str, pattern: str) -> Verdict:
         return Verdict(correct=False, parsed=raw.strip(), parse_failed=False, abstained=False)
 
 
-def _extract_from_json(raw: str) -> Optional[str]:
-    fenced = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
-    candidates = fenced if fenced else []
-    json_objs = re.findall(r"\{[^{}]*\}", raw, re.DOTALL)
-    candidates.extend(json_objs)
+def _json_candidates(raw: str) -> List[str]:
+    """Substrings of a completion that might parse as a JSON object.
 
-    for cand in candidates:
+    Fenced blocks first, then bare braces, so a model that both explains itself and
+    emits a code fence is read from the fence.
+    """
+    fenced = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
+    candidates = list(fenced)
+    candidates.extend(re.findall(r"\{[^{}]*\}", raw, re.DOTALL))
+    return candidates
+
+
+def _extract_from_json(raw: str) -> Optional[str]:
+    for cand in _json_candidates(raw):
         try:
             data = json.loads(cand)
             if isinstance(data, dict):
@@ -70,6 +77,66 @@ def _extract_from_json(raw: str) -> Optional[str]:
         except Exception:
             continue
     return None
+
+
+def extract_confidence(raw: str) -> Optional[float]:
+    """Pull a stated confidence out of a completion, or None if there isn't one.
+
+    Two shapes are accepted, because the arms ask for two: a numeric
+    ``"confidence"`` field, and ``C_verbal``'s ``"certainty"`` band. The band
+    mapping lives in ``calibration.VERBAL_BANDS`` and is declared in source --
+    inferring it from the observed outcomes would let the arm be tuned after the
+    fact into whatever ordering best fit the data.
+
+    Out-of-range numbers are rejected rather than clamped. A model answering "95"
+    for 95% is not stating a probability, and clamping it to 1.0 would silently
+    convert a formatting failure into maximal confidence -- the single most
+    damaging direction for a calibration metric to be wrong in.
+    """
+    if not raw or not raw.strip():
+        return None
+    from agent.app.promptbench.calibration import VERBAL_BANDS, is_finite_probability
+
+    for cand in _json_candidates(raw):
+        try:
+            data = json.loads(cand)
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        if "confidence" in data and is_finite_probability(data["confidence"]):
+            return float(data["confidence"])
+        band = data.get("certainty")
+        if isinstance(band, str) and band.strip().lower() in VERBAL_BANDS:
+            return VERBAL_BANDS[band.strip().lower()]
+
+    m = re.search(r'"?confidence"?\s*[:=]\s*(0?\.\d+|0|1(?:\.0+)?)', raw, re.IGNORECASE)
+    if m:
+        value = float(m.group(1))
+        if is_finite_probability(value):
+            return value
+
+    m = re.search(r"\b(certain|likely|unsure|guessing)\b", raw, re.IGNORECASE)
+    if m:
+        return VERBAL_BANDS[m.group(1).lower()]
+    return None
+
+
+def grade_confidence(
+    raw: str,
+    expected: str,
+    choices: Sequence[str],
+    abstain_choices: Optional[Sequence[str]] = None,
+) -> Tuple[Verdict, Optional[float]]:
+    """Grade a calibration arm: the answer, plus the confidence it stated.
+
+    The answer goes through ``grade_enum`` unchanged, so a calibration cell's
+    accuracy is measured exactly like an A-arm cell's and the two remain
+    comparable. A missing confidence is ``None`` -- reported as its own column,
+    never defaulted to 0.5, which would fabricate a perfectly average judge out
+    of a model that said nothing.
+    """
+    return grade_enum(raw, expected, choices, abstain_choices), extract_confidence(raw)
 
 
 def grade_enum(

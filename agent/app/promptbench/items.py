@@ -41,9 +41,21 @@ STATEMENT_CHARS = 900
 VERIFY_CHOICES = ("SATISFIES", "VIOLATES")
 
 
+def load_all_specs(path: Path | str = FIXTURE) -> List[Dict[str, Any]]:
+    """Every spec in the fixture, unfiltered.
+
+    The registry loads through here. ``load_specs`` below narrows to candidate-set
+    specs, which is right for the two families in this module and silently wrong for
+    any family built on another structure: routing ``keystone_claim`` through it
+    dropped 30 items to 12 and 15 clusters to 6, with no error anywhere -- the
+    keystone-only modules simply never reached their builder.
+    """
+    return list(json.loads(Path(path).read_text())["specs"])
+
+
 def load_specs(path: Path | str = FIXTURE) -> List[Dict[str, Any]]:
-    data = json.loads(Path(path).read_text())
-    return [s for s in data["specs"] if s.get("candidates")]
+    """Specs carrying a candidate set -- what ``verify`` and ``select`` are built from."""
+    return [s for s in load_all_specs(path) if s.get("candidates")]
 
 
 def _statement_excerpt(spec: Dict[str, Any]) -> str:

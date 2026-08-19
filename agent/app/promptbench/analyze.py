@@ -1,11 +1,18 @@
 """Analyse a promptbench run against the pre-registration.
 
-Applies the exclusion rules first, then reports. Significance uses the repo's
-existing primitives (``scripts/adaptive_ab_analyze``) rather than re-deriving
-them: ``signflip_p`` enumerates exactly for small n, ``holm`` corrects the
-secondary arms only, ``ci95`` is Student-t.
+Applies the exclusion rules first, then reports. The PRIMARY estimate is the
+pooled per-item contrast in ``stats_pooled`` -- cluster-bootstrapped over task
+modules, equal weight per model. The per-model sign test still prints, labelled a
+consistency display, because v1's headline was that sign test and its p-value
+floors at 0.0625 on five models (see ``stats_pooled``'s header).
 
-The primary comparison is judged once, on ``verify`` -- the balanced family.
+Significance for the secondary arms uses the repo's existing primitives
+(``scripts/adaptive_ab_analyze``) rather than re-deriving them: ``signflip_p``
+enumerates exactly for small n, ``holm`` corrects the secondary arms only.
+
+Each family is judged against its own baseline: ``A1`` (the engine's convention)
+for the answer-position ladder, ``C_A1`` (the engine's {confidence, reason} order)
+for the calibration ladder.
 """
 
 from __future__ import annotations
@@ -15,10 +22,16 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 sys.path.insert(0, "scripts")
 
+from agent.app.promptbench.calibration import (  # noqa: E402
+    FREE_BASELINE_AUC,
+    summarize_calibration,
+)
+from agent.app.promptbench.factors import CALIBRATION_VARIANTS  # noqa: E402
+from agent.app.promptbench.families import REGISTRY  # noqa: E402
 from agent.app.promptbench.report import (  # noqa: E402
     accuracy_per_1k_completion_tokens,
     apply_exclusions,
@@ -26,25 +39,26 @@ from agent.app.promptbench.report import (  # noqa: E402
     paired_deltas,
     summarize,
 )
+from agent.app.promptbench.stats_pooled import pooled_report  # noqa: E402
 
 import adaptive_ab_analyze as ab  # noqa: E402
 
 PRIMARY_BASELINE = "A1"          # the engine's convention
+CALIBRATION_BASELINE = "C_A1"    # the engine's {confidence, reason} order
 PRIMARY_CONTRASTS = ("A0", "A2", "A3", "A4", "SHIPPED")
-SECONDARY = ("F_json", "G_nostatement")
+SECONDARY = ("F_json", "G_nostatement", "G_noevidence")
 MODEL_ORDER = ["qwen2.5:0.5b", "qwen2.5:1.5b", "llama3.2:3b", "qwen2.5:7b",
-               "openai/gpt-4.1-nano"]
+               "openai/gpt-4.1-nano", "google/gemini-2.5-flash-lite"]
 
 
-# The engine's shipped verify prompt uses a different verdict vocabulary
-# (TRUE/FALSE, not SATISFIES/VIOLATES). Without this alias, the SHIPPED arm scores
-# a 92% parse failure on completions that are well-formed per what the engine asks for.
-SHIPPED_ALIASES = {
-    "TRUE": "SATISFIES",
-    "PARTIALLY_TRUE": "SATISFIES",
-    "FALSE": "VIOLATES",
-    "UNVERIFIABLE": None,          # a genuine abstention
-}
+def baseline_for(family: str) -> str:
+    return CALIBRATION_BASELINE if family == "calibration" else PRIMARY_BASELINE
+
+
+def contrasts_for(family: str) -> tuple:
+    if family == "calibration":
+        return tuple(v for v in CALIBRATION_VARIANTS if v != CALIBRATION_BASELINE) + ("SHIPPED",)
+    return PRIMARY_CONTRASTS
 
 
 def load(path: Path) -> List[dict]:
@@ -56,37 +70,45 @@ def load(path: Path) -> List[dict]:
 
 
 def regrade_shipped(rows: List[dict]) -> List[dict]:
-    """Re-grade the SHIPPED arm through the engine's own verdict vocabulary.
+    """Re-grade every SHIPPED cell through its own family's verdict vocabulary.
 
-    Only applies to ``verify``, whose judgement is binary in both vocabularies.
-    SHIPPED x select is dropped: a four-way truth verdict cannot name one of
-    five candidates, so that cell asks an incoherent question and its number
-    would mean nothing.
+    The engine's prompts answer in their own words -- ``TRUE``/``FALSE`` for
+    verify, a boolean for merge and follow-up -- while each family's OPTIONS line
+    offers that family's tokens. v1 lost the whole SHIPPED arm to this: models
+    emitted well-formed ``{"verdict": "FALSE"}`` and scored a 92% parse failure.
+
+    The alias table per family is declared in ``families.py`` and applied here,
+    never silently: a token with no mapping stays a parse failure rather than being
+    guessed at, and a mapping to ``None`` is a genuine abstention.
     """
     out = []
     for r in rows:
         if r.get("variant") != "SHIPPED" or "error" in r:
             out.append(r)
             continue
-        if r.get("family") != "verify":
+        family = REGISTRY.get(str(r.get("family")))
+        if family is None or not family.has_shipped:
             continue                                    # structurally incoherent; drop
+        aliases = family.shipped_aliases
         raw = r.get("raw") or r.get("raw_head") or ""
-        m = re.search(r'"verdict"\s*:\s*"([A-Z_]+)"', raw)
+        m = re.search(r'"(?:verdict|answer|goal_achieved|needs_followup)"\s*:\s*"?([A-Za-z_]+)"?',
+                      raw)
         if not m:
             out.append(r)
             continue
-        token = m.group(1)
-        # A model may answer in EITHER vocabulary: the engine's schema asks for
-        # TRUE/FALSE, while the OPTIONS line offers SATISFIES/VIOLATES, and the
-        # stronger models simply reconcile the two and use the latter inside the
-        # former's JSON. Both readings are correct compliance and both count.
-        if token in ("SATISFIES", "VIOLATES"):
-            mapped = token
+        token = m.group(1).upper()
+        # A model may answer in EITHER vocabulary: the engine's schema asks for its
+        # own tokens while the OPTIONS line offers the family's, and stronger models
+        # simply reconcile the two. Both readings are correct compliance.
+        if token in {c.upper() for c in family.choices}:
+            mapped: Optional[str] = next(c for c in family.choices if c.upper() == token)
+        elif token in aliases:
+            mapped = aliases[token]
         else:
-            mapped = SHIPPED_ALIASES.get(token, "__unmapped__")
+            mapped = "__unmapped__"
         r = dict(r)
         if mapped is None:
-            r.update(correct=False, parse_failed=False, abstained=True, parsed="UNVERIFIABLE")
+            r.update(correct=False, parse_failed=False, abstained=True, parsed=token)
         elif mapped == "__unmapped__":
             r.update(correct=False, parse_failed=True, abstained=False, parsed=None)
         else:
@@ -134,27 +156,90 @@ def summary_table(rows: List[dict]) -> List[dict]:
 
 
 def print_summary(table: List[dict]) -> None:
-    print(f"\n{'family':7s} {'model':16s} {'arm':14s} {'n':>3s} {'acc':>6s} "
+    print(f"\n{'family':15s} {'model':16s} {'arm':14s} {'n':>3s} {'acc':>6s} "
           f"{'parse':>6s} {'abst':>6s} {'ct':>6s} {'acc/1k':>7s} {'loco':>6s} {'bias':>5s}  flag")
-    print("-" * 116)
+    print("-" * 124)
     for s in table:
         loco = "-" if s["loco_swing_pp"] is None else f"{s['loco_swing_pp']:.1f}"
         apk = "-" if s["acc_per_1k_ct"] is None else f"{s['acc_per_1k_ct']:.1f}"
         flag = s["exclusion_reason"] if s["excluded"] else ""
         bias = "-" if s["majority_pred_frac"] is None else f"{s['majority_pred_frac']:.2f}"
-        print(f"{s['family']:7s} {s['model']:16s} {s['variant']:14s} {s['n']:3d} "
+        print(f"{s['family']:15s} {s['model']:16s} {s['variant']:14s} {s['n']:3d} "
               f"{s['accuracy']:6.3f} {s['parse_failure_rate']:6.3f} "
               f"{s['abstention_rate']:6.3f} {s['mean_completion_tokens']:6.1f} "
               f"{apk:>7s} {loco:>6s} {bias:>5s}  {flag}")
 
 
+# ---------------------------------------------------------------------------
+# PRIMARY: pooled, cluster-bootstrapped
+# ---------------------------------------------------------------------------
+
+def excluded_cells(table: List[dict]) -> set:
+    """(model, family, variant) triples the pre-registered rules disqualify."""
+    return {(s["model"], s["family"], s["variant"]) for s in table if s["excluded"]}
+
+
+def apply_cell_exclusions(rows: List[dict], excluded: set) -> List[dict]:
+    """Drop disqualified cells before the primary estimate is computed.
+
+    The exclusions have to reach the pooled path, not just the printed summary.
+    v1's ``qwen2.5:1.5b`` answered SATISFIES on 100% of its **A1 baseline** -- a
+    degenerate cell scoring exactly 0.500 on a balanced set while judging nothing.
+    Every delta measured against it is meaningless, so v1 dropped that model from
+    the verify contrasts entirely. A pooled estimate that quietly kept it would be
+    averaging real deltas together with arithmetic against a constant.
+    """
+    return [r for r in rows
+            if (r.get("model"), r.get("family"), r.get("variant")) not in excluded]
+
+
+def primary(rows: List[dict], family: str, iters: int, excluded: set) -> List[dict]:
+    baseline = baseline_for(family)
+    out = []
+    for arm in contrasts_for(family):
+        if not any(r.get("variant") == arm and r.get("family") == family for r in rows):
+            continue
+        # Drop a model from this contrast when EITHER side is disqualified: an arm
+        # judged against an excluded baseline is as unusable as an excluded arm.
+        dropped = {m for (m, f, v) in excluded if f == family and v in (arm, baseline)}
+        usable = [r for r in rows if not (r.get("family") == family and r.get("model") in dropped)]
+        report = pooled_report(usable, arm, baseline, family, iters=iters)
+        report["models_excluded"] = sorted(dropped)
+        out.append(report)
+    return out
+
+
+def print_primary(reports: List[dict], family: str) -> None:
+    if not reports:
+        return
+    print(f"\nPRIMARY -- pooled per-item, cluster-bootstrapped over task modules "
+          f"(family={family}, baseline={baseline_for(family)})")
+    print(f"{'arm':14s} {'pairs':>6s} {'clus':>5s} {'mdl':>4s} {'delta':>8s} "
+          f"{'ci95':>18s} {'halfw':>7s} {'perm p':>8s} {'dir':>6s}")
+    print("-" * 92)
+    for r in reports:
+        ci = "-" if not r["ci95"] else f"[{r['ci95'][0]:+.3f}, {r['ci95'][1]:+.3f}]"
+        hw = "-" if r["ci_halfwidth"] is None else f"{r['ci_halfwidth']:.3f}"
+        p = "-" if r["permutation_p"] is None else f"{r['permutation_p']:.4f}"
+        star = "  *" if r["ci_excludes_zero"] else ""
+        drop = f"  (excluded: {', '.join(r['models_excluded'])})" if r.get("models_excluded") else ""
+        print(f"{r['arm']:14s} {r['n_pairs']:6d} {r['n_clusters']:5d} {r['n_models']:4d} "
+              f"{r['mean_delta']:+8.3f} {ci:>18s} {hw:>7s} {p:>8s} "
+              f"{r['direction_pos_neg']:>6s}{star}{drop}")
+
+
+# ---------------------------------------------------------------------------
+# CONSISTENCY DISPLAY: the per-model sign test v1 used as its headline
+# ---------------------------------------------------------------------------
+
 def contrasts(rows: List[dict], family: str) -> List[dict]:
+    baseline = baseline_for(family)
     models = sorted({r["model"] for r in rows if r.get("family") == family and "error" not in r},
                     key=_order)
     out = []
     for model in models:
-        for arm in PRIMARY_CONTRASTS + SECONDARY:
-            deltas = paired_deltas(rows, arm, PRIMARY_BASELINE, model=model, family=family)
+        for arm in tuple(contrasts_for(family)) + SECONDARY:
+            deltas = paired_deltas(rows, arm, baseline, model=model, family=family)
             if not deltas:
                 continue
             n, mean, ci, dz = ab.paired_stats(deltas)
@@ -173,7 +258,11 @@ def contrasts(rows: List[dict], family: str) -> List[dict]:
 
 
 def print_contrasts(cs: List[dict], family: str) -> None:
-    print(f"\nPAIRED vs {PRIMARY_BASELINE} (the engine's convention) -- family={family}")
+    if not cs:
+        return
+    print(f"\nCONSISTENCY DISPLAY -- per-model paired vs {baseline_for(family)} (family={family})")
+    print("  Not the headline: a sign test over k models cannot report p below "
+          "2*(1/2)^k, which is 0.0625 at k=5.")
     print(f"{'model':16s} {'arm':14s} {'n':>3s} {'delta':>8s} {'ci95':>7s} "
           f"{'dz':>6s} {'p':>7s} {'p_holm':>7s}")
     print("-" * 78)
@@ -186,10 +275,64 @@ def print_contrasts(cs: List[dict], family: str) -> None:
               f"{pv:>7s} {ph:>7s}{sig}")
 
 
+# ---------------------------------------------------------------------------
+# CALIBRATION
+# ---------------------------------------------------------------------------
+
+def calibration_table(rows: List[dict]) -> List[dict]:
+    cells: Dict[tuple, List[dict]] = {}
+    for r in rows:
+        if r.get("family") != "calibration" or "error" in r:
+            continue
+        cells.setdefault((r["model"], r["variant"]), []).append(r)
+    out = []
+    for (model, variant), group in cells.items():
+        pairs = [(r.get("confidence"), bool(r.get("correct"))) for r in group
+                 if r.get("confidence") is not None]
+        stats = summarize_calibration([c for c, _ in pairs], [k for _, k in pairs])
+        stats.update({
+            "model": model,
+            "variant": variant,
+            "n_cells": len(group),
+            # Not folded into the metrics: a model that states no number is a
+            # different failure from one that states a bad number, and averaging
+            # them would hide both.
+            "no_confidence_rate": 1.0 - (len(pairs) / len(group)) if group else None,
+        })
+        out.append(stats)
+    return sorted(out, key=lambda s: (_order(s["model"]), s["variant"]))
+
+
+def print_calibration(table: List[dict]) -> None:
+    if not table:
+        return
+    print(f"\nCALIBRATION (family=calibration). Bar is the LLM-FREE structural "
+          f"baseline AUC {FREE_BASELINE_AUC}, from CONFIDENCE_JUDGE_MISCALIBRATION.md,")
+    print("  not 0.5 -- an arm below it has not earned its LLM call.")
+    print(f"{'model':16s} {'arm':12s} {'n':>4s} {'noconf':>7s} {'meanC':>6s} {'brier':>6s} "
+          f"{'ece':>6s} {'auc':>6s} {'slope':>7s} {'reli':>6s} {'reso':>6s}  flag")
+    print("-" * 118)
+    for s in table:
+        def f(key, fmt="{:6.3f}"):
+            v = s.get(key)
+            return "-" if v is None else fmt.format(v)
+        flags = []
+        if s.get("degenerate"):
+            flags.append("DEGENERATE: one constant confidence")
+        if s.get("auc") is not None and not s.get("beats_free_baseline"):
+            flags.append(f"below free baseline {FREE_BASELINE_AUC}")
+        if s.get("slope") is not None and s["slope"] < 0:
+            flags.append("ANTI-CALIBRATED: slope < 0")
+        print(f"{s['model']:16s} {s['variant']:12s} {s['n']:4d} {f('no_confidence_rate','{:7.3f}')} "
+              f"{f('mean_confidence')} {f('brier')} {f('ece')} {f('auc')} "
+              f"{f('slope','{:7.3f}')} {f('reliability')} {f('resolution')}  {'; '.join(flags)}")
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--runs", default="agent/idea_test_results/promptbench_runs.jsonl")
     p.add_argument("--json-out", default="")
+    p.add_argument("--bootstrap-iters", type=int, default=10000)
     a = p.parse_args(argv)
 
     rows = regrade_shipped(load(Path(a.runs)))
@@ -199,11 +342,26 @@ def main(argv=None) -> int:
     table = summary_table(rows)
     print_summary(table)
 
-    result = {"summary": table, "contrasts": {}}
+    excluded = excluded_cells(table)
+    if excluded:
+        print(f"\nexcluded cells (pre-registered rules), applied to the primary too: {len(excluded)}")
+        for m, f, v in sorted(excluded):
+            print(f"  {f}/{m}/{v}")
+
+    result: Dict[str, object] = {"summary": table, "primary": {}, "contrasts": {},
+                                 "excluded_cells": sorted(excluded)}
     for family in sorted({r.get("family") for r in rows if r.get("family")}):
+        reports = primary(rows, family, a.bootstrap_iters, excluded)
+        print_primary(reports, family)
+        result["primary"][family] = reports
+
         cs = contrasts(rows, family)
         print_contrasts(cs, family)
         result["contrasts"][family] = cs
+
+    cal = calibration_table(rows)
+    print_calibration(cal)
+    result["calibration"] = cal
 
     if a.json_out:
         Path(a.json_out).write_text(json.dumps(result, indent=2, default=str))

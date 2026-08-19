@@ -16,7 +16,7 @@ from agent.app.promptbench.factors import (
     ALL_VARIANTS,
     PRIMARY_VARIANTS,
     build_prompt,
-    shipped_instruction,
+    is_applicable,
 )
 from agent.app.promptbench.items import (
     build_select_items,
@@ -62,11 +62,14 @@ def test_census_reports_what_was_dropped_rather_than_hiding_it():
 # No prompt may contain its own answer
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("variant", PRIMARY_VARIANTS)
+@pytest.mark.parametrize("variant", [v for v in PRIMARY_VARIANTS if is_applicable("select", v)])
 def test_select_prompts_do_not_single_out_the_answer(variant):
     """Every candidate is named in a select prompt -- that is the options list.
     The failure this guards against is the answer being singled out, e.g. the
-    survivor named where the distractors are not."""
+    survivor named where the distractors are not.
+
+    SHIPPED is excluded by ``is_applicable``: select has no shipped arm, because a
+    four-way truth verdict cannot name one of five candidates."""
     for item in SELECT:
         ctx = PromptContext(family="select", variant=variant, model="test")
         prompt = build_prompt(item.runtime, ctx)
@@ -95,8 +98,10 @@ def test_exposing_a_label_taints_the_signal_oracle():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("variant", ALL_VARIANTS)
-def test_every_variant_renders_for_both_families(variant):
+def test_every_applicable_variant_renders_for_both_families(variant):
     for family, items in (("verify", VERIFY), ("select", SELECT)):
+        if not is_applicable(family, variant):
+            continue
         ctx = PromptContext(family=family, variant=variant, model="test")
         prompt = build_prompt(items[0].runtime, ctx)
         assert prompt.strip()
@@ -120,22 +125,12 @@ def test_g_nostatement_actually_withholds_the_statement():
 
 
 # ---------------------------------------------------------------------------
-# SHIPPED parity -- the arm must be the engine's real text
+# SHIPPED parity lives in promptbench_shipped_parity_test.py
+#
+# It moved there once there were four shipped sources instead of one, spread
+# across a class constant and three settings keys. That file is also the one
+# factors.py has always cited.
 # ---------------------------------------------------------------------------
-
-def test_shipped_arm_is_imported_from_the_engine_not_retyped():
-    from agent.app.idea_policies.actions import VerifyLeafAction
-
-    assert shipped_instruction() == VerifyLeafAction._DEFAULT_SYSTEM_PROMPT
-
-
-def test_shipped_prompt_still_asks_for_the_answer_before_the_justification():
-    """The premise of the whole cycle. If the engine is changed to put the
-    reasoning first, this test fails and the pre-registered comparison has to
-    be re-stated rather than silently re-interpreted."""
-    text = shipped_instruction()
-    assert text.index('"verdict"') < text.index('"reasoning"')
-
 
 def test_shipped_arm_appears_in_the_rendered_prompt():
     item = VERIFY[0]

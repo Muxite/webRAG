@@ -111,6 +111,74 @@ services:
     networks:
       - enet
 
+  # ---------------------------------------------------------------------------
+  # promptbench -- offline prompt-shape / calibration micro-eval.
+  #
+  #   docker compose --profile promptbench run --rm promptbench --census
+  #   docker compose --profile promptbench run --rm promptbench \
+  #       --models qwen2.5:0.5b qwen2.5:7b --families verify calibration \
+  #       --variants A0 A1 A2 --out agent/idea_test_results/promptbench_runs.jsonl
+  #   docker compose --profile promptbench run --rm promptbench-analyze \
+  #       --runs agent/idea_test_results/promptbench_runs.jsonl
+  #
+  # Its own profile, so neither service starts with the default stack. Both are
+  # one-shot and therefore carry no `restart:` (rule 2 exempts one-shot containers).
+  #
+  # SOURCE IS MOUNTED, NOT BAKED. agent/.dockerfile COPYs the agent in at build
+  # time, and DEV_CYCLE.md lesson 4 records a codebench reverification that
+  # silently tested PRE-FIX code because its image predated the fix and nothing
+  # stamps an image with the SHA it was built from. A read-only mount makes that
+  # class of bug impossible here rather than merely detectable.
+  #
+  # No GPU reservation: inference belongs to badmodel-ollama, which holds
+  # OLLAMA_MAX_LOADED_MODELS=1 on a 12 GB card. Reserving here would contend with it.
+  # badmodel-ollama joins this file's `enet` as external `euglena_enet`, so it is
+  # reachable by service name. On the host the default stays :11435 and nothing
+  # about the documented host workflow changes.
+  promptbench:
+    profiles: ["promptbench"]
+    build:
+      context: ..
+      dockerfile: agent/.dockerfile
+    working_dir: /app
+    entrypoint: ["python", "-m", "agent.app.promptbench.runner"]
+    # Write JSONL as the host user, not root. Without this the results file lands
+    # root-owned on the host and the next HOST-side run cannot append to it -- the
+    # host and container workflows are meant to share one resumable output file.
+    user: "${PROMPTBENCH_UID:-1000}:${PROMPTBENCH_GID:-1000}"
+    volumes:
+      - ../agent:/app/agent:ro
+      - ../scripts:/app/scripts:ro
+      # Nested read-write mount so JSONL rows land on the HOST and the existing
+      # host-side analysis keeps working on them unchanged.
+      - ../agent/idea_test_results:/app/agent/idea_test_results:rw
+    environment:
+      - PYTHONPATH=/app
+      - PROMPTBENCH_BASE_URL=http://badmodel-ollama:11434/v1
+      - PROMPTBENCH_API_KEY=ollama
+    env_file:
+      - .env
+      - keys.env
+    networks:
+      - enet
+
+  promptbench-analyze:
+    profiles: ["promptbench"]
+    build:
+      context: ..
+      dockerfile: agent/.dockerfile
+    working_dir: /app
+    entrypoint: ["python", "-m", "agent.app.promptbench.analyze"]
+    user: "${PROMPTBENCH_UID:-1000}:${PROMPTBENCH_GID:-1000}"
+    volumes:
+      - ../agent:/app/agent:ro
+      - ../scripts:/app/scripts:ro
+      - ../agent/idea_test_results:/app/agent/idea_test_results:rw
+    environment:
+      - PYTHONPATH=/app
+    networks:
+      - enet
+
   agent-test:
     profiles: ["test"]
     build:
