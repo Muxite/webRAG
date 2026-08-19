@@ -33,9 +33,7 @@ PRIMARY_VARIANTS = ("A0", "A1", "A2", "A3", "A4", "SHIPPED")
 SECONDARY_VARIANTS = ("F_json", "G_nostatement")
 ALL_VARIANTS = PRIMARY_VARIANTS + SECONDARY_VARIANTS
 
-# ---------------------------------------------------------------------------
-# Shape instructions. The ONLY thing that varies across the primary ladder.
-# ---------------------------------------------------------------------------
+# Shape instructions. Only the answer-position and verbosity instruction changes.
 
 _SHAPES: Dict[str, str] = {
     "A0": "Reply with exactly one of the options above and nothing else.",
@@ -54,9 +52,6 @@ def shipped_instruction() -> str:
     return VerifyLeafAction._DEFAULT_SYSTEM_PROMPT
 
 
-# ---------------------------------------------------------------------------
-# Family bodies
-# ---------------------------------------------------------------------------
 
 def _verify_body(runtime: Mapping[str, Any], *, include_statement: bool = True) -> str:
     parts = []

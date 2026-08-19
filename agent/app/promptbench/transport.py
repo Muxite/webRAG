@@ -27,7 +27,7 @@ class ScriptedLLM:
         if not self._responses:
             raise RuntimeError("ScriptedLLM response queue is exhausted")
         text = self._responses.pop(0)
-        # prompt and completion tokens can be approximated or non-negative
+        # Token counts are approximated via word split, sufficient for test mocking.
         prompt_tokens = len(prompt.split()) if prompt else 0
         completion_tokens = len(text.split()) if text else 0
         return Completion(

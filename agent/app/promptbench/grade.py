@@ -16,11 +16,8 @@ class Verdict:
 def normalize_url(url: str) -> str:
     """Normalize URL by ignoring scheme, case, trailing slash, fragment, and query string."""
     parsed = urlparse(url)
-    # Ignore scheme (keep empty or standard), lower case netloc and path, strip trailing slash from path, drop params, query, fragment
     netloc = parsed.netloc.lower()
     path = parsed.path.lower().rstrip("/")
-    # urlunparse format: (scheme, netloc, path, params, query, fragment)
-    # Using empty scheme so comparison ignores scheme
     return urlunparse(("", netloc, path, "", "", ""))
 
 
@@ -28,14 +25,11 @@ def grade_url(raw: str, expected_url: str) -> Verdict:
     if not raw or not raw.strip():
         return Verdict(correct=False, parsed=None, parse_failed=True, abstained=False)
 
-    # Find URL in raw text
-    # Match standard http/https URLs
     url_pattern = r'https?://[^\s<>"\')]+'
     matches = re.findall(url_pattern, raw)
     if not matches:
         return Verdict(correct=False, parsed=None, parse_failed=True, abstained=False)
 
-    # Use the last URL found or the one marked
     found_url = matches[-1].rstrip(".,;!?:")
     norm_found = normalize_url(found_url)
     norm_expected = normalize_url(expected_url)
@@ -56,12 +50,8 @@ def grade_regex(raw: str, pattern: str) -> Verdict:
 
 
 def _extract_from_json(raw: str) -> Optional[str]:
-    # Try parsing whole string or fenced json / json substring
-    # Check for fenced code block ```json ... ``` or ``` ... ```
     fenced = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
     candidates = fenced if fenced else []
-
-    # Also look for standalone JSON objects { ... }
     json_objs = re.findall(r"\{[^{}]*\}", raw, re.DOTALL)
     candidates.extend(json_objs)
 
@@ -108,11 +98,9 @@ def grade_enum(
         )
 
     # 2. Look for explicit markers like "Answer:", "Final answer:", "Verdict:", etc.
-    # We strip markdown formatting like ** around words.
     marker_pattern = r"(?:final\s+answer|answer|verdict|choice|conclusion)\s*:\s*(\*+)?([A-Za-z0-9_-]+)(\*+)?"
     marker_matches = re.findall(marker_pattern, raw, re.IGNORECASE)
     if marker_matches:
-        # Take the last marker match
         candidate_word = marker_matches[-1][1]
         if candidate_word.lower() in choice_map:
             matched_choice = choice_map[candidate_word.lower()]
@@ -125,14 +113,9 @@ def grade_enum(
                 abstained=False,
             )
 
-    # 3. Locate every occurrence of every choice, as a WHOLE STRING.
-    #
-    # Word-tokenising first (the original approach) silently cannot see a
-    # multi-word option: "Boston Marathon" is never a single \w+ token, so a
-    # completion that answered it perfectly parsed as nothing at all. That
-    # defect fell entirely on the prose arms of families with multi-word
-    # options while leaving JSON arms untouched, which is a difference between
-    # graders masquerading as a difference between prompt shapes.
+    # Word boundary search: tokenization by word breaks would miss multi-word options
+    # like "Boston Marathon" (not a single token), causing perfect answers to parse as nothing.
+    # This defect would bias prose arms with multi-word options while leaving JSON untouched.
     cleaned = re.sub(r"[*_`]", "", raw).strip()
     occurrences = []
     for choice in choices:
@@ -149,27 +132,22 @@ def grade_enum(
         return Verdict(correct=(choice == expected), parsed=choice,
                        parse_failed=False, abstained=False)
 
-    # Unambiguous: only one distinct option is mentioned anywhere.
     distinct = {c for _, _, c in occurrences}
     if len(distinct) == 1:
         return _verdict(occurrences[0][2])
 
-    # 4. Positional disambiguation, applied SYMMETRICALLY so that neither
-    #    answer-first nor answer-last is privileged -- privileging either would
-    #    bias the very comparison this benchmark exists to make.
-    #
-    #    answer-first (A0/A1): the completion opens with an option, and any
-    #    other option appears later, inside the justification.
+    # Positional disambiguation, applied SYMMETRICALLY so neither answer-first nor
+    # answer-last is privileged, avoiding bias in this benchmark comparison.
+    # answer-first (A0/A1): the completion opens with an option.
     head = [o for o in occurrences if o[0] == 0]
     if head:
         return _verdict(max(head, key=lambda o: o[1] - o[0])[2])
 
-    #    answer-last (A2/A3/A4): the completion CLOSES with an option. The
-    #    window is tight on purpose -- "either SUPPORTED or REFUTED, hard to
-    #    say" must stay a parse failure rather than silently scoring REFUTED.
+    # answer-last (A2/A3/A4): the completion closes with an option.
+    # The tight window prevents ambiguous phrasings like "either X or Y, hard to say"
+    # from silently scoring Y instead of failing to parse.
     tail = [o for o in occurrences if o[1] >= len(cleaned) - 2]
     if tail:
         return _verdict(tail[-1][2])
 
-    # Genuinely ambiguous: several options, none in an answer position.
     return Verdict(correct=False, parsed=None, parse_failed=True, abstained=False)

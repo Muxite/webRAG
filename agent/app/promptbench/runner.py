@@ -64,7 +64,7 @@ def run(models: List[str], variants: List[str], families: List[str], reps: int,
     ran = 0
     t_start = time.time()
     with out_path.open("a") as fh:
-        for model in models:                       # outermost: one model load per pass
+        for model in models:
             for family, items in fam_items.items():
                 for variant in variants:
                     for rep in range(reps):
@@ -105,11 +105,9 @@ def run(models: List[str], variants: List[str], families: List[str], reps: int,
                                 "completion_tokens": c.completion_tokens,
                                 "cached_prompt_tokens": c.cached_prompt_tokens,
                                 "latency_s": round(c.latency_s, 3),
-                                # Keep enough of the completion to RE-GRADE offline.
-                                # A 200-char head was not enough: it holds the
-                                # answer for answer-first shapes and truncates it
-                                # away for reasoning-first ones, so any regrade
-                                # would silently favour the former.
+                                # 1500 chars allows offline re-grading. 200 chars was insufficient:
+                                # it captures the answer for answer-first shapes but truncates it for
+                                # reasoning-first ones, creating bias in any regrade.
                                 "raw": c.text[:1500],
                                 "raw_head": c.text[:200].replace("\n", " "),
                             }) + "\n")
