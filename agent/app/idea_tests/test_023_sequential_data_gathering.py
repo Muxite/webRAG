@@ -25,11 +25,9 @@ def get_test_metadata() -> Dict[str, Any]:
 def get_task_statement() -> str:
     """Return task statement."""
     return (
-        "Find information about the 'Rust programming language' from official sources (not Wikipedia). "
-        "You must: (1) First search for the official Rust website, (2) Visit the official website, "
-        "(3) Extract the current stable version number, (4) Then search for 'Rust installation guide', "
-        "(5) Visit at least one installation guide page, (6) Extract the installation method for your operating system. "
-        "This requires sequential steps: search -> visit -> extract -> search again -> visit -> extract."
+        "Report the following about the 'Rust programming language': "
+        "(1) the current stable version number, and (2) the installation method for your operating system. "
+        "Both facts must come from official Rust sources (not Wikipedia), with citations."
     )
 
 

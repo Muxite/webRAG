@@ -24,11 +24,10 @@ def get_test_metadata() -> Dict[str, Any]:
 def get_task_statement() -> str:
     """Return task statement."""
     return (
-        "Search for and visit the official documentation page for 'Docker' (not Wikipedia). "
+        "Find Docker's official documentation (not Wikipedia) and verify the information there. "
         "Extract the following information: "
         "(1) What Docker is (brief definition), (2) The latest stable version number, "
-        "(3) Three key features or capabilities, (4) A link to the installation guide. "
-        "You must visit the official documentation website directly."
+        "(3) Three key features or capabilities, (4) A link to the installation guide."
     )
 
 

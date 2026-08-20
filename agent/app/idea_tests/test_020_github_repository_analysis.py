@@ -24,7 +24,7 @@ def get_task_statement() -> str:
     return (
         "Visit the GitHub repository at https://github.com/python/cpython and extract the following information: "
         "(1) The primary programming language used, (2) The number of stars (approximate), (3) The license type, "
-        "(4) A brief description of what the repository is. You must visit the GitHub page directly - do not rely on search results."
+        "(4) A brief description of what the repository is."
     )
 
 
