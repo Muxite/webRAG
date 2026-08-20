@@ -15,7 +15,7 @@ from __future__ import annotations
 import pytest
 
 from agent.app.idea_dag import IdeaDag
-from agent.app.idea_engine import IdeaDagEngine
+from agent.app.idea_engine import IdeaDagEngine, _reformulate_multi_entity_query
 from agent.app.idea_policies.action_constants import ActionResultBuilder, ActionResultExtractor
 from agent.app.idea_policies import BestScoreSelectionPolicy, SimpleMergePolicy
 from agent.app.idea_policies.action_constants import ActionResultKey
@@ -224,6 +224,139 @@ async def test_transient_failure_retried_then_recovers():
     out = await engine._maybe_retry_tool_failure(graph, "n", action, _TRANSIENT_FAILURE)
     assert out is _GOOD_VISIT
     assert action.calls == 1
+
+
+# ---------------------------------------------------------------------------
+# _reformulate_multi_entity_query — pure function
+# ---------------------------------------------------------------------------
+def test_reformulate_or_joins_multiple_quoted_phrases():
+    query = '"Lake A" "Lake B" "Lake C" site:en.wikipedia.org'
+    out = _reformulate_multi_entity_query(query)
+    assert out == '"Lake A" OR "Lake B" OR "Lake C" site:en.wikipedia.org'
+
+
+def test_reformulate_no_op_for_single_quoted_phrase():
+    assert _reformulate_multi_entity_query('"Lake A" site:en.wikipedia.org') is None
+
+
+def test_reformulate_no_op_for_unquoted_query():
+    assert _reformulate_multi_entity_query("lake depth comparison wikipedia") is None
+
+
+def test_reformulate_no_op_when_already_or_joined():
+    already = '"Lake A" OR "Lake B" site:en.wikipedia.org'
+    assert _reformulate_multi_entity_query(already) is None
+
+
+def test_reformulate_no_op_for_empty_or_none():
+    assert _reformulate_multi_entity_query("") is None
+    assert _reformulate_multi_entity_query(None) is None
+
+
+def test_reformulate_with_no_remainder_after_quotes():
+    assert _reformulate_multi_entity_query('"Lake A" "Lake B"') == '"Lake A" OR "Lake B"'
+
+
+# ---------------------------------------------------------------------------
+# _reformulate_search_query_if_multi_entity + retry-loop wiring
+# ---------------------------------------------------------------------------
+def _search_node(graph: IdeaDag, query: str):
+    return graph.add_child(
+        graph.root_id(),
+        "leaf",
+        details={
+            DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+            DetailKey.IS_LEAF.value: True,
+            DetailKey.QUERY.value: query,
+        },
+    )
+
+
+_EMPTY_SEARCH_RESULT = ActionResultBuilder.success(action="search", results=[])
+
+
+@pytest.mark.asyncio
+async def test_multi_entity_query_reformulated_before_retry():
+    action = _CountingAction([_GOOD_SEARCH])
+    engine = _make_engine(
+        action,
+        connector_retry_on_failure_enabled=True,
+        connector_retry_backoff_seconds=0.0,
+        connector_retry_max_attempts=2,
+    )
+    graph = IdeaDag(root_title="root")
+    node = _search_node(graph, '"Lake A" "Lake B" "Lake C" site:en.wikipedia.org')
+
+    out = await engine._maybe_retry_tool_failure(graph, node.node_id, action, _EMPTY_SEARCH_RESULT)
+
+    assert out is _GOOD_SEARCH
+    reformulated_query = graph.get_node(node.node_id).details[DetailKey.QUERY.value]
+    assert reformulated_query == '"Lake A" OR "Lake B" OR "Lake C" site:en.wikipedia.org'
+
+
+@pytest.mark.asyncio
+async def test_single_entity_query_left_unchanged_on_retry():
+    action = _CountingAction([_GOOD_SEARCH])
+    engine = _make_engine(
+        action,
+        connector_retry_on_failure_enabled=True,
+        connector_retry_backoff_seconds=0.0,
+        connector_retry_max_attempts=2,
+    )
+    graph = IdeaDag(root_title="root")
+    original_query = '"Lake A" site:en.wikipedia.org'
+    node = _search_node(graph, original_query)
+
+    await engine._maybe_retry_tool_failure(graph, node.node_id, action, _EMPTY_SEARCH_RESULT)
+
+    assert graph.get_node(node.node_id).details[DetailKey.QUERY.value] == original_query
+
+
+@pytest.mark.asyncio
+async def test_non_search_tool_failure_query_not_reformulated():
+    # A visit failure must never trigger query reformulation, even with a multi-quoted title.
+    action = _CountingAction([_GOOD_VISIT])
+    engine = _make_engine(
+        action,
+        connector_retry_on_failure_enabled=True,
+        connector_retry_backoff_seconds=0.0,
+    )
+    graph = IdeaDag(root_title="root")
+    node = graph.add_child(
+        graph.root_id(),
+        "leaf",
+        details={
+            DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+            DetailKey.IS_LEAF.value: True,
+            DetailKey.QUERY.value: '"Lake A" "Lake B" site:en.wikipedia.org',
+        },
+    )
+    original_query = node.details[DetailKey.QUERY.value]
+
+    await engine._maybe_retry_tool_failure(graph, node.node_id, action, _TRANSIENT_FAILURE)
+
+    assert graph.get_node(node.node_id).details[DetailKey.QUERY.value] == original_query
+
+
+@pytest.mark.asyncio
+async def test_reformulation_is_idempotent_across_repeated_retries():
+    # Always-empty search: reformulation should apply once on the first retry, then the
+    # already-OR-joined query is left alone on the second retry attempt (no double-join).
+    action = _CountingAction([_EMPTY_SEARCH_RESULT])
+    engine = _make_engine(
+        action,
+        connector_retry_on_failure_enabled=True,
+        connector_retry_backoff_seconds=0.0,
+        connector_retry_max_attempts=2,
+    )
+    graph = IdeaDag(root_title="root")
+    node = _search_node(graph, '"Lake A" "Lake B" site:en.wikipedia.org')
+
+    await engine._maybe_retry_tool_failure(graph, node.node_id, action, _EMPTY_SEARCH_RESULT)
+
+    assert graph.get_node(node.node_id).details[DetailKey.QUERY.value] == (
+        '"Lake A" OR "Lake B" site:en.wikipedia.org'
+    )
 
 
 # ---------------------------------------------------------------------------
