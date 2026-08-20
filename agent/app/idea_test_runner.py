@@ -463,6 +463,22 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "tool_failure_recovery_enabled": True,
         "final_require_grounding": True,   # validity gate, on in every arm
     },
+    # E1's ablation arm (ASSUMPTION_AUDIT.md PART 5): `good_adaptive` with the memory-based
+    # duplicate-candidate filter removed, so a paired run against `good_adaptive` isolates dedup
+    # and nothing else. Written as a profile rather than an IDEA_TEST_GOT_DEDUP env override
+    # because the ladder driver selects arms, not per-arm environments; the two dicts must stay
+    # in sync, which is what `idea_test_runner_got_flags_test.py` pins.
+    "good_adaptive_nodedup": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "got_dedup_enabled": False,        # the one axis under test
+    },
     "reexpand_only": {
         "got_reexpand_enabled": True,
         "got_reexpand_max_iterations": 2,

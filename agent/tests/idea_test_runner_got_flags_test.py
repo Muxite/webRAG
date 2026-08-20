@@ -63,6 +63,9 @@ def _base():
         "got_beam_max": 5,
         "max_branching": 5,
         "grounding_max_replans": 2,
+        # memory-based duplicate-candidate filter: shipped default ON, and the one axis E1's
+        # `good_adaptive_nodedup` arm ablates.
+        "got_dedup_enabled": True,
         # reason-first field ordering (reasoning before verdict), see
         # idea_test_runner_reason_first_flags_test.py for their dedicated coverage.
         "merge_goal_evaluation_first_enabled": False,
@@ -410,6 +413,32 @@ def test_arm_good_adaptive_expands_expected_flags():
     # Not part of this arm.
     assert settings["native_vote_k_enabled"] is False
     assert settings["got_backtrack_enabled"] is False
+
+
+def test_arm_good_adaptive_nodedup_differs_from_good_adaptive_only_in_dedup():
+    """E1's ablation arm must isolate dedup: same flags as `good_adaptive`, dedup off.
+
+    A drift here would silently turn the paired A/B into a multi-lever comparison, so the two
+    profiles are diffed against each other rather than spot-checked flag by flag.
+    """
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    ablation = _GOT_ARM_PROFILES["good_adaptive_nodedup"]
+    assert set(ablation) - set(base) == {"got_dedup_enabled"}
+    assert set(base) - set(ablation) == set()
+    assert all(ablation[k] == v for k, v in base.items())
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_nodedup"})
+    assert settings["got_dedup_enabled"] is False
+    assert settings["got_reexpand_enabled"] is True
+    # Beam/branching must be identical across the two arms (the risk logged with E1).
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    assert control["got_dedup_enabled"] is True
+    assert settings["max_branching"] == control["max_branching"]
+    assert settings["got_beam_max"] == control["got_beam_max"]
 
 
 def test_arm_reexpand_only_expands_expected_flags():
