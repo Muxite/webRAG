@@ -2,11 +2,11 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 13 cycles
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 17 cycles
 below are committed; the run continues past this point.
 
-**Spend so far: ~$0.95 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
-5352 passed / 18 skipped (zero failures across the whole run).
+**Spend so far: ~$1.37 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+5373 passed / 18 skipped (zero failures across the whole run).
 
 ---
 
@@ -139,6 +139,44 @@ so it needs its own live A/B before flipping on). The "declared" half (planner-s
 `requires_data` instead of a premature seed URL) and a smaller "hijacked" class (chrome/sidebar
 links winning a scavenge fallback) are flagged as separate future items, not fixed this cycle.
 
+**Cycle 14 — expansion-side detail truncation, same bug class as Cycle 12** (`354219fd`). The
+mid-JSON raw truncation bug found on the evaluation side existed on the plan-generation side too,
+worse: 60.6% of candidate details were still over budget even after existing compaction, producing
+invalid JSON 100% of the time it triggered. Fixed with the same budget-aware serializer (shared into
+a new `detail_serialization.py` module used by both policies). **The planner routinely could not see
+which URL a prior sibling had fetched, or that sibling's outgoing link menu** — confirmed via
+before/after examples recovering `visit_url` on real stored runs. Shipped unconditional, same
+reasoning as Cycle 12 (no defensible reason to keep sending the planner broken JSON by default).
+
+**Cycle 15 — live chain-task comparison after cumulative unconditional fixes** (benchmark run, no
+code change). Ran the exact 9-task chain set from `CAPABILITY_SPECTRUM_RESULTS_2026-08-15.md`
+(source of the historical 10W/7T/11L finding) against `graph:good_adaptive`, `sequential_react`, and
+`langgraph_react`, comparing fresh numbers to the pre-tonight baseline. **Result: the gap did not
+close at n=1** (2W/2T/5L vs pre-fix 3W/2T/4L) — `seq_react` improved more than `graph` did, though
+day-to-day live-web noise can't be ruled out at this n. More valuably, this run **surfaced a new,
+distinct, precisely-traced failure mode**: task 136 terminated after exactly 1 of 2 needed hops
+despite a correctly-low (0.20) step-confidence judge score, motivating Cycle 16.
+
+**Cycle 16 — F35: subject-only contract vetoes correct low-confidence signals** (`1b739bcd`). Traced
+task 136's failure to its root: a "contract satisfaction" check (F33, pre-existing) was overriding
+the step-confidence judge's re-expansion trigger by treating "opened a page whose text matches my
+own goal's words" as satisfaction — true of every intermediate hop of an unfinished chain, not just
+genuinely complete work. **Measured offline across 400 stored runs: 68% of low-confidence-judge
+vetoes (171/251) rest on this subject-only check, not a verified datum.** Fixed with a new flag
+(`got_contract_veto_requires_datum_enabled`, default OFF — a live-measurable behavior change
+touching 68% of veto sites, not a pure bug fix) requiring a contract to have actually verified a
+measurable datum before it can override the judge. Verified by offline replay of the exact failing
+node before spending any live budget.
+
+**Cycle 17 — live A/B of the F35 fix** (benchmark run). Confirmed the mechanism works exactly as
+predicted on the traced case: task 136 re-expanded on 4/5 ON-flag reps (4-5 visits vs OFF's 1),
+scoring 0.290 vs 0.183 (partial win — chain_coverage improved but a downstream keystone-extraction
+gap remains unresolved on nano). Aggregate across the 9 chain tasks: directionally positive but
+noisy (+0.017 unweighted / +0.066 excluding one outlier task), 3 clear wins, 1 apparent loss traced
+to two OTHER pre-existing bugs unrelated to this flag (judge overconfidence at the 0.6-0.7 band, and
+a wrong-page disambiguation/dedup issue) — not a regression the fix caused. **Read: promising, not
+yet sufficient for a default flip — needs a larger multi-model confirmation run.**
+
 ---
 
 ## Open threads for the next cycle
@@ -165,14 +203,25 @@ links winning a scavenge fallback) are flagged as separate future items, not fix
 9. **Duplicate sibling visit URLs — "hijacked" class** (Cycle 13, 4 groups): a declared URL fetch
    fails and falls into a link-scavenge fallback that ranks sidebar/chrome links (e.g. a donation
    page) ahead of real content. Chrome-filtering the scavenge pool is the lever.
-10. **Same truncation bug in `expansion.py`** (Cycle 12 finding, not yet fixed): the identical
-    mid-JSON raw-truncation pattern exists at the plan-generation prompt site too; even after
-    existing compaction, 68.7% (3886/5654) of compacted candidate details still exceed the 5000-char
-    budget. Same fix pattern as Cycle 12's evaluation-side fix, but touches plan generation so wants
-    its own cycle/tests.
+10. **Same truncation bug in `expansion.py`: FIXED** (Cycle 14, commit 354219fd) — see above.
 11. **`visit_sibling_url_dedup` flag** (Cycle 13): needs a live A/B before flipping on — it's a real
     routing change (second sibling gets candidate #2 instead of the shared top hit), not a pure
     efficiency win.
+12. **`got_contract_veto_requires_datum_enabled` (F35, Cycle 16-17)**: promising single-task/small-n
+    signal, needs a larger multi-model confirmation run before a default flip. Also surfaced two
+    independent follow-on bugs during its A/B, neither caused by the flag: judge overconfidence in
+    the 0.6-0.7 step-confidence band (a task scored 0.7 confidence on a step whose own stated
+    reasoning acknowledged incompleteness), and a wrong-page disambiguation/dedup issue (visited
+    `La_Pedrera` instead of `La_Pedrera,_Barcelona`, extracting a wrong datum from a similar-but-
+    wrong page). Both worth their own cycles.
+13. **Chain-task gap did not close at n=1** (Cycle 15) despite four unconditional fixes landing —
+    the residual gap traces to F35 (now addressed, pending validation) and likely judge-confidence
+    calibration, not the data-visibility bugs fixed in Cycles 2/12/14. Re-run the same 9-task chain
+    comparison at higher n once F35's A/B is more conclusive, to see if the combination actually
+    closes the historical 10W/7T/11L pattern.
+14. **Capability-spectrum re-run using LangGraph arm**: Cycle 15 confirmed `langgraph_react` runs
+    cleanly as a first-class variant in `idea_test_runner.py` (no wiring needed) — this was blocking
+    item 7 above, now resolved; the re-run itself is still not done.
 
 ## Methodology notes (holding from last night, reconfirmed)
 
