@@ -3,6 +3,12 @@
 **Written 2026-08-19. Documentation only — no code was changed and no live run was spent
 producing it.** Every `file:line` below was read and verified at the time of writing.
 
+**Amended 2026-08-20.** Later cycles acted on it, so it is no longer documentation-only:
+T1-1 fixed, T1-2 deleted, T3-1 and T3-3 given default-OFF levers, T3-2 and T3-5 resolved by
+reading rather than by running, E2/E4 retired. Each entry carries its own dated status line;
+where a status disagrees with the 2026-08-19 body text above it, the status is current and
+the body is preserved as the original finding.
+
 Companion to [`TECHNIQUE_INVENTORY.md`](TECHNIQUE_INVENTORY.md), which is the validation
 ledger for *mechanisms* (does technique X help?). This document covers the layer beneath
 that: the **constants and structural choices that were typed before anyone had data**, and
@@ -335,17 +341,56 @@ results across all `links_*` collections and sorts by raw distance
 (`all_results.sort(key=lambda x: x[0])`) with no floor — a link at distance 0.99 is admitted
 on equal footing with one at 0.1 provided it lands in the top-k.
 
-### T3-2. Two chunkers disagree 5x, with no stated reason
+**LEVER ADDED 2026-08-20, default OFF.** `memory_retrieval_similarity_floor` (0.0 =
+historical behaviour) is a typed `MemoryConfig` field wired into `MemoryManager`, applied in
+`retrieve_relevant_memories` — the single choke point every memory-backed channel goes
+through (dedup, step-confidence, expansion split-retrieval, finalize pooling). It converts
+through `similarity_from_distance` against the collection's *own* space, so the floor is a
+real cosine number on `l2` and `cosine` collections alike (the T1-1 hazard is not re-made),
+returns fewer than `n_results` when it bites, and logs the drop rate so an inert setting is
+visible as one. `similarity` is now attached to every retrieved memory dict unconditionally,
+which is the instrumentation E3 needs to pick a value. **The value is not calibrated** —
+this is the lever E3 was blocked on, not its result. Pinned by
+`agent/tests/memory_similarity_floor_test.py`.
+
+*Still uncovered:* the link-ranking path. `_query_links_from_chroma` reads chroma directly
+rather than through `MemoryManager`, so the floor does not reach it. Deliberate: it pools
+across `links_*` collections whose distances are not obviously commensurable with `mem_*`
+ones, and one floor spanning both would be a second uncalibrated number rather than the same
+one.
+
+### T3-2. Two chunkers disagree 5x — RESOLVED 2026-08-20, not a finding
 
 | Path | Size | Overlap | Style | Site |
 |---|---|---|---|---|
 | Memory (internal_thought / observation) | 800 | 100 | sentence-aware | `idea_memory.py:27-28` |
 | Oversized VISIT documents | 4000 | 400 | plain char-slice | `config.py:662-663` |
 
-Conceptually the same job — split long text for retrieval — with independently chosen
-constants differing 5x, no comment explaining the gap, and no experiment behind either. The
-sentence-aware chunker additionally uses a magic `chunk_size * 0.2` lookback window when
-hunting for a sentence boundary (`idea_memory.py:146`).
+The original entry's premise — "conceptually the same job" — is **wrong**, and the split is
+justified by a mechanism rather than by drift. The two chunkers do not feed the same
+consumer:
+
+* **800/100** slices text into *chroma documents*, one embedding call each. Chroma's bundled
+  `all-MiniLM-L6-v2` truncates at 256 wordpieces (~1000 English characters). A memory chunk
+  materially larger than that is embedded **from its prefix only**: the tail is stored as
+  searchable text under a vector that does not describe it. 800 sits just under the embedder
+  ceiling, which is the constraint, and "reconciling" it up to 4000 would silently discard
+  ~75% of every chunk's semantic content from the index.
+* **4000/400** slices an oversized page into *DAG sub-problem nodes*
+  (`idea_chunking.create_chunk_subproblems`, gated at `document_chunk_threshold: 200000`),
+  each a SEARCH node whose `chunk_content` an LLM reads. Its unit is "how much page text one
+  node's LLM call should reason over." It never reaches an embedding call. Those nodes' own
+  action results are later written to memory and re-chunked at 800, so the two are layered,
+  not competing.
+
+Git archaeology agrees they were never a pair: the memory constants date to `9f1c82ef`
+(2026-02-21, the original GoT implementation), the document ones to `eb9124af` (2026-02-27,
+a separate change). **E4 is retired** — there is no A/B to run, because 4000 in the memory
+chunker is not a rival setting, it is a truncation bug waiting to happen. The reasoning is
+now a comment on `MemoryManager.__init__` so the next reader does not re-derive it.
+
+The `chunk_size * 0.2` sentence-boundary lookback (`idea_memory.py:146`) remains an
+unexplained magic number; it only moves a split point within one chunk, so it is T3-6 material.
 
 ### T3-3. Retrieved chunks enter prompts in insertion order, never re-ranked
 
@@ -361,12 +406,46 @@ Chroma's ANN ordering is trusted as final. Given the known position-sensitivity 
 context — which is precisely what the promptbench cycle was investigating on the output
 side — this is the input-side analogue and is unmeasured.
 
-### T3-4. Flat 2000-char memory budget
+**Re-diffed 2026-08-20: the entry pointed at the wrong site, and the real one is worse.**
+
+*The `prompt_builder` numbering is near-dead surface.* `add_retrieved_context` has **zero
+call sites** outside its own module, so `TickPromptBuilder`'s `[i + 1]` list is only ever
+populated through the constructor — by `agent.py`, the legacy tick agent, not the DAG
+engine. `FinalPromptBuilder`'s numbering (`prompt_builder.py:253`) is reached by
+`idea_finalize.py` only on the fallback branch where a prompt template is missing, and it is
+handed a **single** pre-formatted string, so the numbering renders as a lone `[1]`. Neither
+mislabels a ranking that a shipped run can actually see; not worth a prompt-bytes change.
+
+*The real ordering defect is in the finalize pooling.*
+`_retrieve_final_chroma_context` (`idea_finalize.py:427`) issues **four** query batches —
+mandate, up to 3 merge summaries, node titles, up to 5 URLs — pools the results, dedups on
+`content[:200]`, and keeps the first `final_chroma_results` (10) **in the order the batches
+were issued**. So a distance-0.9 hit from the mandate query displaces a distance-0.1 hit
+from the URL query purely because the mandate was asked first. The distance was available on
+every row the whole time. The repo already does this correctly one module over:
+`_query_links_from_chroma` sorts its pooled results by distance.
+
+**LEVER ADDED, default OFF.** `final_context_rank_by_similarity` (`MemoryConfig`) sorts the
+pool by the retrieval-computed `similarity` before the cap. The sort is stable, so equal
+similarities keep arrival order and OFF stays the exact historical path. Pinned by
+`agent/tests/memory_similarity_floor_test.py`. A true reranker (cross-encoder over the pool)
+remains unbuilt and out of scope: this only makes the existing, weak ANN signal actually
+govern the truncation it was already being ignored by.
+
+### T3-4. Flat 2000-char memory budget — DOWNGRADED 2026-08-20
 
 `format_memories_for_llm(..., max_chars: int = 2000)` (`idea_memory.py:394`) truncates the
 formatted memory block at a flat character count regardless of model context window or query
 complexity, greedily keeping earlier entries and dropping the remainder without
 summarization. A 200k-context model and a 4k-context model get the same 2000 chars.
+
+**The 2000 is never used.** Both live call sites pass their own budget — finalize 80000
+(`idea_finalize.py:507`), expansion 4000 (`expansion.py:945`) — so the default is a
+signature floor for ad-hoc callers, not a shipped constraint. What survives of the finding
+is that *those two* numbers are themselves unjustified, and that the loop `break`s at the
+first overflowing entry rather than skipping it. The `break` is now documented as deliberate
+(a memory block is a ranked prefix; admitting a short low-ranked entry over a long
+high-ranked one would silently reorder it) rather than left to read as an oversight.
 
 ### T3-5. `strategy_library` threshold — self-flagged UNCALIBRATED
 
@@ -381,6 +460,18 @@ summarization. A 200k-context model and a 4k-context model get the same 2000 cha
 `APPLY_THRESHOLD = 0.50`, `TOP_K = 1`. That eval script has never been run — no results file
 exists. The comment is the finding; this audit's only contribution is confirming the debt is
 still outstanding.
+
+**RESOLVED-AS-INERT 2026-08-20.** The threshold is not merely uncalibrated, it is
+**unreachable**: `strategy_library/notes/` contains only its `README.md`, so
+`StrategyLibrary.retrieve` returns `fallthrough_no_match` on the `if not self.notes` branch
+*before* issuing any query, and `APPLY_THRESHOLD` is never compared against anything. No
+shipped number depends on it and no live behaviour can change if it is wrong.
+
+The obvious cheap action — "run the eval script" — is not available and never was. The
+script's `plan` subcommand prints paid A/B invocations for **a named note**, and `score`
+reads the result JSONs those produce; with an empty corpus there is nothing to name. The
+blocking step is *authoring and seeding the first note*, not running a script. Recorded so
+the next cycle does not re-open this expecting a free win.
 
 ### T3-6. Minor magic numbers
 
@@ -539,20 +630,30 @@ whose own spread is the real bottleneck.
 
 **Arms:** no floor (shipped) vs floor at cosine 0.3 / 0.5, returning fewer than `n_results`
 when the floor bites.
-**Blocked on T1-1** for the dedup path specifically — a floor expressed in cosine terms
-cannot be layered onto a call site that miscomputes cosine. Applies cleanly to the
-prompt-context path (`prompt_builder`) meanwhile.
 **Metric:** task score; also log floor-triggered drop rate, since a floor that never fires is
 another inert lever and should be caught before it ships.
 
-### E4 — Chunk size reconciliation
+**UNBLOCKED + READY 2026-08-20 — the lever exists, the live A/B is not run.** T1-1 (the
+cosine/l2 conversion) is fixed, so a cosine-denominated floor is now meaningful on every
+memory path; `memory_retrieval_similarity_floor` implements it at `MemoryManager`'s single
+retrieval choke point (see T3-1), default `0.0` = shipped behaviour. Set it via the
+`IDEA_TEST_GOT_*`-style settings override in `_GOT_ARM_PROFILES`. The drop-rate log line the
+metric asks for (`[MEMORY:FLOOR] dropped n/m ...`) ships with it, and `similarity` is now on
+every retrieved row, so **the distribution can be measured offline from a recorded run
+first** — do that before picking 0.3 vs 0.5, since a floor above the corpus's typical
+similarity would gut retrieval and one below its floor would be inert. Neither arm is worth
+paying for until that histogram exists.
+
+### E4 — Chunk size reconciliation — **RETIRED, no run needed**
 
 **Claim under test:** the 5x split (T3-2) is unjustified; one setting dominates.
 
-**Arms:** memory chunker at 800 (shipped) vs 4000; document chunker at 4000 (shipped) vs 800.
-**Caveat that shapes the design:** chunk size changes what is *stored*, so arms cannot share
-a warmed Chroma instance — each needs its own ingest. More expensive than E1–E3, which is why
-it ranks below them despite being conceptually simple.
+**Retired 2026-08-20:** the claim's premise is false. The two chunkers feed different
+consumers — 800 sizes *embedding* documents against MiniLM's 256-wordpiece ceiling, 4000
+sizes *DAG sub-problem nodes* for an LLM to read, and the latter never reaches an embedding
+call. There is no shared axis to A/B along, and the "reconciled" arm (memory chunker at
+4000) would embed only each chunk's prefix. See T3-2 for the full argument and the git dates
+showing the constants were never introduced as a pair.
 
 ### E5 — Delete-or-wire the dead keys — **$0, no live run**
 
