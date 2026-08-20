@@ -32,6 +32,10 @@ class LlmEvaluationPolicy(EvaluationPolicy):
         super().__init__(settings=settings)
         self.io = io
         self.model_name = model_name
+        # Without this every `evaluate` call died on the first `self._logger` use: the ones
+        # inside the try landed in the except branch and returned 0.0 for a node the judge had
+        # actually scored, the one before it propagated.
+        self._logger = logging.getLogger(self.__class__.__name__)
         self._cfg = IdeaConfig.from_settings(self.settings)
 
     async def evaluate(self, graph: IdeaDag, node_id: str) -> float:
@@ -54,6 +58,11 @@ class LlmEvaluationPolicy(EvaluationPolicy):
                 graph.evaluate(node_id, penalty_score)
                 node.details[DetailKey.EVALUATION.value] = {
                     "score": penalty_score,
+                    # `raw_score is None` means the judge was never asked (this path returns the
+                    # fixed base score without an LLM call); a judge that answered but got clipped
+                    # records its pre-cap opinion instead. Do not read None as "judge said 0".
+                    "raw_score": None,
+                    "capped": True,
                     "rationale": "Action not executed - missing action_result",
                     "penalty": "no_action_result",
                 }
@@ -84,9 +93,12 @@ class LlmEvaluationPolicy(EvaluationPolicy):
             )
             self._logger.debug(f"[EVALUATION] LLM response: {content[:200] if content else 'None'}...")
             score, rationale = self._parse_score(content)
+            raw_score = score
+            capped = False
 
             if has_action and not has_result:
                 score = min(score, float(self._cfg.evaluation.no_action_result_score_cap))
+                capped = score != raw_score
                 rationale = f"{rationale} [PENALTY: action not executed]"
 
             weighted_score = score * self._cfg.evaluation.weight_for(action)
@@ -94,7 +106,12 @@ class LlmEvaluationPolicy(EvaluationPolicy):
 
             self._logger.debug(f"[EVALUATION] Node {node_id} scored: {weighted_score}")
             graph.evaluate(node_id, weighted_score)
-            node.details[DetailKey.EVALUATION.value] = {"score": weighted_score, "rationale": rationale}
+            node.details[DetailKey.EVALUATION.value] = {
+                "score": weighted_score,
+                "raw_score": raw_score,
+                "capped": capped,
+                "rationale": rationale,
+            }
             return weighted_score
         except Exception as exc:
             self._logger.error(f"[EVALUATION] Exception during evaluation: {exc}", exc_info=True)
@@ -264,6 +281,13 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
             if not scores and content:
                 self._logger.warning(f"[EVALUATION_BATCH] Failed to parse scores from response. Content length: {len(content)}, Content: {content[:1000]}")
             
+            # The judge's own opinion, before the unexecuted-work cap / base-score fallback
+            # rewrites it. Recorded per node as `raw_score` so the flat-score census can tell a
+            # genuinely undifferentiated judge from one whose spread the cap flattened. A node
+            # missing here never got a judge opinion at all (`raw_score` stays None).
+            raw_scores: Dict[str, float] = dict(scores)
+            capped_ids: set[str] = set()
+
             from agent.app.idea_policies.action_constants import NodeDetailsExtractor
             for node_id in candidate_ids:
                 node = graph.get_node(node_id)
@@ -277,8 +301,11 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
                 if has_action and not has_result:
                     if node_id in scores:
                         scores[node_id] = min(scores[node_id], float(self._cfg.evaluation.no_action_result_score_cap))
+                        if scores[node_id] != raw_scores[node_id]:
+                            capped_ids.add(node_id)
                     else:
                         scores[node_id] = float(self._cfg.evaluation.no_action_result_base_score)
+                        capped_ids.add(node_id)
                         self._logger.warning(f"[EVALUATION_BATCH] Node {node_id} has action '{action}' but no result - penalizing to base score")
 
                 if node_id in scores:
@@ -292,7 +319,11 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
                     continue
                 try:
                     graph.evaluate(node_id, score)
-                    node.details[DetailKey.EVALUATION.value] = {"score": score}
+                    node.details[DetailKey.EVALUATION.value] = {
+                        "score": score,
+                        "raw_score": raw_scores.get(node_id),
+                        "capped": node_id in capped_ids,
+                    }
                     _rec = getattr(getattr(self.io, "telemetry", None), "record_decision", None)
                     if callable(_rec):
                         _rec(stage="evaluation", node_id=node_id, chosen=node.title[:80],
