@@ -23,11 +23,15 @@ The agent uses a **Graph-of-Thought (GoT)** execution model:
 
 Two execution modes: `graph` (parallel, 90.6% pass rate) and `sequential` (depth-first baseline, 46.9% pass rate).
 
-Two research variants build on the same engine: **`graph_compiled`** executes a DAG plan an
-expensive model authored once, offline (see Benchmark Results in the root README), and the native
-`graph` mode can run with opt-in **adaptive mechanisms** (confidence-gated re-expansion, backtrack,
-reasoning-effort discipline) layered on top of the base loop above — both are default-off and
-byte-identical to the base loop when disabled.
+The base loop above is **DAG v1** (2026-02–03) — native throughout, not compiled. Two later
+generations build on it: **Compiled v1** (`graph_compiled`, 2026-06) executes a DAG plan an
+expensive model authored once, offline (see Benchmark Results in the root README); **DAG v2**
+(2026-07–present, the actively developed generation) runs the native `graph` mode with opt-in
+**adaptive mechanisms** (confidence-gated re-expansion, backtrack, reasoning-effort discipline)
+layered on top of the DAG v1 base loop, and can optionally draw on Compiled v1 as a small,
+adjustable-scope layer. Both Compiled v1 and DAG v2's adaptive mechanisms are default-off and
+byte-identical to the DAG v1 base loop when disabled. Full
+terminology and roadmap: root [README](../README.md#versioning).
 
 See [Agent Architecture](../agent/app/AGENT_ARCHITECTURE.md) for full details, or the
 deeper, line-cited [Idea Engine](../agent/app/IDEA_ENGINE.md) and

@@ -13,7 +13,7 @@ the documented default anymore.
 
 ## How It Works
 
-Every request becomes a **mandate** — a free-form research question — handed to a controller
+Every request becomes a **mandate**, which is a free-form research question handed to a controller
 (`IdeaDagEngine`) that owns a directed acyclic graph (DAG) of "thought" nodes and a ChromaDB
 memory. It decomposes, acts, and merges until it has an answer:
 
@@ -47,21 +47,59 @@ is deterministic Python keeping those calls grounded. Full internals:
 
 ## Two things live in this repo
 
-1. **Euglena, the product** — a hosted GoT web-research agent (frontend, gateway, quotas,
-   auth). Winding down; kept running on the local backend, low-maintenance mode.
-2. **The adaptive-engine research line** — an active, actively-developed research platform (built
-   on top of the same agent engine). It started with the compiled scaffold below — the project's
-   first big benchmark result — then pivoted to porting those lessons into the live DAG loop
+1. **Euglena, the product:** a hosted GoT web-research agent (frontend, gateway, quotas, auth),
+   winding down and kept running on the local backend in low-maintenance mode.
+2. **The adaptive-engine research line:** an actively-developed research platform (built
+   on top of the same agent engine). It started with the compiled scaffold below, the project's
+   first big benchmark result, then pivoted to porting those lessons into the live DAG loop
    itself as opt-in adaptive mechanisms (see Notes further down). This is where current
    development effort goes; see `docs/handoffs/HANDOFF.md` for the latest committed session-by-session state.
    The **Benchmark Results** section right below documents the closed-out compiled-scaffold
    proof — not the product, and not the still-running adaptive-engine A/B.
 
-## Benchmark Results — Compiled Scaffold (closed-out proof, 2026-06/07)
+## Versioning
+
+This repo's architecture comes in named generations, referenced throughout these docs and in the
+Timeline below:
+
+| Name | Landed | What it is |
+|---|---|---|
+| **DAG v1** | 2026-02 → 03 | The original Graph-of-Thought rewrite — live LLM calls at every expand/evaluate/merge step, with no offline-authored plan. |
+| **Compiled v1** | 2026-06 | An expensive model authors a full DAG plan once, offline; a cheap model executes that fixed plan on every request (see Benchmark Results below). |
+| **DAG v2** | 2026-07 → present | The current native-DAG improvement series, built on DAG v1's base loop, porting Compiled v1's planning lessons back in as opt-in adaptive mechanisms (see Notes below). |
+| **v3** | planned | Moves past one-shot mandates toward a more continuable, chatbot-like interaction; folds in codebench and additional tool/capability work deferred out of v2. |
+
+**Why the emphasis stays on native DAG work, not compiled:** Compiled v1 authors a plan with one
+expensive LLM call and reuses it, using pre-computed structure as its mechanism. Compared to DAG
+v1/v2's native reasoning, compiled trades adaptability for a narrower, harder-to-validate gain — a
+fixed plan can't react to what a step actually reveals, and testing it well means testing every
+plan shape it can produce. Native DAG improvements generalize across more tasks, stay easier to
+test, and make the more interesting story to explain, in interviews and in these docs. DAG v2
+treats a compiled layer as one adjustable option among several.
+
+**The library, not a hand-edited prompt:** the concrete form that layer takes inside DAG v2 is a
+small, general-purpose library of prompt and reasoning guidance
+([`agent/app/strategy_library/`](agent/app/strategy_library/notes/README.md),
+[`agent/app/plan_library/`](agent/app/plan_library/)) — pitfalls to watch for, phrasing that
+avoids known failure modes, the kind of thing that used to mean hand-editing a prompt every time a
+benchmark run exposed a new weak spot. Formalizing that editing into a library lets it improve
+over time and get reused across tasks instead of living only in one prompt's edit history. It
+stays deliberately small: one general-purpose snippet applicable to many kinds of benchmark
+question, not one written guide per question — `strategy_library/`'s promotion gate (held out on
+≥2 tasks, ≥5% uplift) exists specifically to keep it that way.
+
+**The goal, restated:** raise the reasoning and agentic performance of cheaper models on publicly
+available endpoints until they're competitive with more expensive models. There are many candidate
+mechanisms for this — structure, memory, voting, calibration, compiled or native planning, and
+more still being tried — and the constraint that keeps them honest is cost: whatever a mechanism
+costs to run must stay cheaper than just calling the more expensive model directly, or it hasn't
+earned its place.
+
+## Benchmark Results — Compiled v1 (closed-out proof, 2026-06/07)
 
 **The compiled scaffold thesis:** instead of letting a cheap model improvise its own research
-plan step-by-step, split the job in two — an expensive model authors an execution plan (a DAG:
-which sub-facts to gather, in what order, what depends on what) **once, offline**; a cheap model
+plan step-by-step, let an expensive model author an execution plan (a DAG:
+which sub-facts to gather, in what order, what depends on what) **once, offline**. A cheap model
 executes that fixed plan **live, on every request**. The plan is the expensive part, paid for
 once and reused forever; the part that runs on every request is cheap.
 
@@ -115,12 +153,14 @@ from-scratch ReAct loop on the harder tasks.
 Full package (9 charts, raw + aggregated CSVs, significance tables, honest caveats) lives in
 [`linkedin_package_38tests_2026-07-08/`](linkedin_package_38tests_2026-07-08/README_LINKEDIN.md).
 
-## Notes: The Adaptive Engine (newer, in progress)
+## Notes: DAG v2 — The Native Adaptive Engine (in progress)
 
-The compiled scaffold above proved *what* a good plan buys you, but it authors that plan once,
-offline, and executes it blind — it can't react to what a step actually reveals. The current line
-of work ports those lessons into the **native (non-compiled) engine** so it reasons adaptively
-mid-run: plan → act → **observe the step** → decide the next move (re-expand, backtrack, or stop).
+**Compiled v1** above proved what a good plan buys you: it authors that plan once, offline, using
+an expensive model, and executes it live with a cheap one. **DAG v2** ports those lessons into the
+native, non-compiled engine so it reasons adaptively mid-run: plan → act → **observe the step** →
+decide the next move (re-expand, backtrack, or stop) — reacting to what a step actually reveals,
+which a fixed offline plan can't do. (Compiled v1 is available inside DAG v2 as an optional,
+small-scope layer — see Versioning above.)
 
 ```mermaid
 flowchart LR
@@ -360,10 +400,10 @@ docs/             Architecture, security, benchmark plots
 ## Timeline
 
 - **2025-10 → 2026-01:** Started as a single-shot LLM `Connector` + CLI; grew a FastAPI gateway, then reached MVP.
-- **2026-02 → 2026-03:** Rewritten around a **Graph-of-Thought DAG engine** — decompose into subproblems, execute `search`/`visit`/`think`/`save` leaves, merge upward (see How It Works above). AWS ECS wound down in favor of the local backend (Ops note near the top).
+- **2026-02 → 2026-03 — DAG v1:** Rewritten around a **Graph-of-Thought DAG engine** — decompose into subproblems, execute `search`/`visit`/`think`/`save` leaves, merge upward (see How It Works above). Native throughout: no offline-authored plan, every expand/evaluate/merge step is a live LLM call. AWS ECS wound down in favor of the local backend (Ops note near the top).
 - **2026-05:** Default LLM provider migrated to OpenRouter (note near the top).
-- **2026-06:** **Compiled-scaffold pivot** — an expensive model authors a DAG plan once, offline; a cheap model executes it live, recovering premium-model accuracy at a fraction of cost (see Benchmark Results above). Alongside it: a duplicate `shared/` module tree and a stale forked engine copy were deleted, and the 1,600+-line engine controller was broken into focused modules.
-- **2026-07:** **Native adaptive engine** — the compiled scaffold's lessons (structured planning, reasoning-effort discipline) ported into the live, non-compiled DAG loop as opt-in, default-off mechanisms: confidence-gated re-expansion, backtrack, price-tier token budgets (see Notes above and [`ADAPTIVE_ENGINE.md`](agent/app/ADAPTIVE_ENGINE.md)). Currently mid-relaunch of a live cost/accuracy A/B (the "ladder benchmark") testing whether the adaptive loop closes the gap between cheap and premium models.
+- **2026-06 — Compiled v1:** an expensive model authors a DAG plan once, offline; a cheap model executes it live, recovering premium-model accuracy at a fraction of cost (see Benchmark Results above). Alongside it: a duplicate `shared/` module tree and a stale forked engine copy were deleted, and the 1,600+-line engine controller was broken into focused modules.
+- **2026-07 → present — DAG v2:** Compiled v1's lessons (structured planning, reasoning-effort discipline) ported into the live, non-compiled DAG loop as opt-in, default-off mechanisms: confidence-gated re-expansion, backtrack, price-tier token budgets (see Notes above and [`ADAPTIVE_ENGINE.md`](agent/app/ADAPTIVE_ENGINE.md)). Currently mid-relaunch of a live cost/accuracy A/B (the "ladder benchmark") testing whether the adaptive loop closes the gap between cheap and premium models. Plan for finishing this generation: a hugely expanded, harder benchmark set than DAG v1's, repeating some of DAG v1's own tasks to measure improvement directly, dropping the sequential-mode comparison arm, and adding a new arm that compares the same model run through an off-the-shelf, publicly available agent system in current use. Codebench and additional tool/capability work are deliberately deferred to v3.
 - **2026-08:** **Repo restructure + a repeatable dev-cycle methodology.** `services/agent/` moved to
   a top-level `agent/`, legacy AWS deploy code archived under `services/_legacy-aws/`, and
   `badmodel-lab/codebench/` (the Docker coding-benchmark harness) folded into a top-level
@@ -377,3 +417,4 @@ docs/             Architecture, security, benchmark plots
   a live confirmation smoke, not by the offline suite or adversarial review — see
   `docs/handoffs/HANDOFF.md`). Live-verification smokes for that fix and a codebench write-protocol
   fix are the two open threads going into the next cycle.
+- **planned — v3:** Move past one-shot mandates toward a more continuable, chatbot-like interaction — stopping mid-run and picking a task back up, rather than only submit-and-wait for a deliverable. Folds in codebench and the tools/capabilities held out of v2. Whether task continuation ships as part of finishing v2 or waits for v3 is still open, to be settled by whichever proves more practical once v2's benchmark work is underway.

@@ -33,6 +33,94 @@ Two real cycles have run so far, both fully committed on `master`:
   instead of crashing). Verified live post-move: rebuilt all 5 Docker images, ran a real sandbox→
   grade→record cycle at the new path, confirmed both reporting tools pick it up.
 
+## Versioning: DAG v1 → Compiled v1 → DAG v2 → v3 (planned)
+
+The engine's history now has names, established 2026-08-14 — use them going forward instead of
+"the adaptive engine work" / "the compiled thing": **DAG v1** (2026-02–03 native GoT rewrite, not
+compiled), **Compiled v1** (2026-06 offline-plan campaign), **DAG v2** (2026-07–present, the
+generation everything in this handoff belongs to), **v3** (planned). Full glossary and rationale:
+root `README.md#versioning`.
+
+**DAG v2's remaining scope, as decided 2026-08-14:** finish the generation with a hugely expanded,
+harder benchmark set than DAG v1's — including some repeated DAG v1 tasks to measure direct
+improvement, dropping the sequential-mode comparison arm DAG v1 used, and adding a new arm
+comparing the same model run through an off-the-shelf, publicly available agent system in current
+use. Codebench and additional tool/capability integrations are deliberately deferred to v3.
+
+**v3's scope:** move past one-shot mandates toward a more continuable, chatbot-like interaction —
+stopping mid-run and picking a task back up, rather than only submit-and-wait for a deliverable.
+
+**Open, not yet decided:** whether task continuation (resuming/extending a run rather than
+one-shot submit-and-wait — something neither DAG v1 nor DAG v2 handles well today) ships as part
+of finishing DAG v2 or waits for v3. Left for whichever turns out more practical once DAG v2's
+benchmark work is underway.
+
+**Ladder-rung correction found 2026-08-14, while investigating whether to flip two flags
+default-on ahead of the relaunch:** `agent/app/BENCHMARK_SUITE_50.md`'s rung table (still 3 rungs,
+`baseline → good_adaptive → full`) is **stale**. `scripts/LADDER_PREREGISTRATION.md` and
+`agent/app/TECHNIQUE_INVENTORY.md` (both more recent) record that the old `full` arm — which
+bundled k-vote + backtrack + expect-contract + reasoning-effort-discipline + price-tier-tiering —
+was **measured net-negative (−0.003 nano, −0.075 deepseek at ~2× cost) and already dropped**. It's
+been replaced by a `max_burn` arm (`good_adaptive` + deeper re-expansion + wider hop/beam + the
+finalize reconcile chain), which explicitly excludes reasoning-effort-discipline as "a no-op/
+wrong-direction" lever in this context, plus price-tier-tiering, backtrack, and expect-contract.
+The real current ladder is `baseline → good_adaptive → max_burn`, not the 3-rung table
+`BENCHMARK_SUITE_50.md` still shows. Whoever scopes the DAG v2 relaunch's runner config should use
+`max_burn`, not `full`, and should NOT flip `native_reasoning_effort_discipline_enabled` to
+default-on — that contradicts this more recent finding. `BENCHMARK_SUITE_50.md` itself hasn't been
+corrected yet (out of scope for this pass; flagging so the next person doesn't work from the stale
+table).
+
+**`expansion_input_output_framing_enabled` flipped default-on 2026-08-14** (live-proven
+2026-08-06, see `README.md#versioning`'s DAG v2 section) — `idea_dag_settings.json` and
+`ExpansionConfig`'s Python default both now `True`. The `baseline` arm profile
+(`idea_test_runner.py::_GOT_ARM_PROFILES`) pins it back to `False` explicitly so the "adaptive
+OFF" ladder rung stays byte-identical; 8 offline tests that had hard-coded the old "default off"
+assumption were updated to match (full suite green: 4674 passed / 18 skipped).
+
+## DAG v2 relaunch preflight — STOPPED, agenda handed off (2026-08-15)
+
+The relaunch was about to run and was **stopped by an adversarial review**. Four
+benchmark-invalidating bugs were found and fixed; one widely-propagated documented claim was
+retracted as false. A $0.045 / 13-cell live smoke on `openai/gpt-4.1-nano` produced the first
+DAG v2 vs LangGraph numbers. **All of it is uncommitted (37 files).**
+
+- **Evidence:** `docs/handoffs/DAG_V2_PREFLIGHT_2026-08-15.md` — the bugs, the retraction, the
+  smoke table, the cheap-relaunch costing (~$20–30 vs ~$60).
+- **Agenda:** `docs/handoffs/BENCHMARK_POLICY_HANDOFF_2026-08-15.md` — background, open policy
+  questions Q1–Q8, ranked DAG v2 improvement candidates, working agreements.
+
+**Superseded later the same day by a ~525-cell live sweep ($1.35).** Start here instead:
+
+- **`docs/handoffs/CAPABILITY_SPECTRUM_PREREG_2026-08-15.md`** — design + falsification criteria,
+  written before any cell ran.
+- **`docs/handoffs/CAPABILITY_SPECTRUM_RESULTS_2026-08-15.md`** — 8 models (tinyllama 1.1B →
+  cheap APIs) × 5 arms. Headlines: off-the-shelf `create_react_agent` **cannot run 4 of 8 models**
+  (no tool-calling endpoint, reproduced on ollama *and* OpenRouter); the active-59 is 56/59 at
+  difficulty ≥8 so it cannot measure weak models; the token premium is re-sent context, not
+  reasoning (34:1 in:out, and raising LangGraph's budget burned 4.9× the tokens for +0.016).
+  Six recorded corrections, including one thesis-supporting result published at n=6 and retracted
+  at n=10. **Standing contract adopted: arm comparisons are paired by (model, task) and
+  run-complete.**
+- **`docs/handoffs/SHAPE_ADAPTATION_HANDOFF_2026-08-15.md`** — the current thread. A causal
+  diagnosis of why DAG v2 loses on sequential tasks: `classify_shape` labels the live chain set
+  **1/10**, `detect_state_dependencies`' dataflow path has fired **0 times in 476 cells**, so
+  `AUTO-PARALLEL` batches chain hops into one step and hop 2 never sees hop 1's answer.
+  **The blocker for shape-adaptive work is the sensor, not the strategy layer.** Carries the
+  in-flight `auto_parallel_siblings: false` experiment and what to do next.
+
+Worst bug, for context: grounding evidence was sourced from `result["graph"]`, which only 2 of 7
+execution variants populate. On a real cell this scored `sequential_react` 0.417 instead of 0.944
+against the graph arm's 0.750 — i.e. it would have reported the graph engine winning a comparison
+it actually lost. Fixed via telemetry-projected `observability["evidence"]`, with a cross-arm
+parity test.
+
+Headline open question: DAG v2 spends 7–13× the tokens while making **fewer** tool calls than a
+linear agent, and ties with LangGraph on fan-out/disambiguation shapes at ~1/10th the cost. It
+wins clearly on the 3-hop chain shape (0.767 vs 0.575, and +0.48 over its own baseline). Whether
+the token premium should be redirected into evidence volume is Q2 and is the cheapest high-value
+experiment available.
+
 ## Git state
 
 **Work now happens directly on `master`**, not a long-lived feature branch. `master` is the only
@@ -62,19 +150,22 @@ PYTHONPATH — `services/agent/` was restructured to a top-level `agent/` direct
 newly-confirmed-necessary follow-up. Kept struck-through, not deleted, for the reasoning trail.
 **Both live re-verifications authorized 2026-08-14 (budget: $2, both approved) are now DONE.**
 
-**Candidates for the next cycle, surfaced by this pass:**
+**Candidates for the next (DAG v2) cycle, surfaced by this pass:**
 1. **The full barrage relaunch is unblocked** (item 1's fix is live-confirmed) but **not yet
-   authorized or run** — running it is the obvious next Medium/Large cycle.
-2. **Codebench's write-protocol redesign** (item 6) — moving `write_file` off one-shot full-file
-   JSON strings toward something like aider's diff/search-replace format — is now confirmed
-   necessary, not optional. Needs its own Plan stage before code gets written; a `patch_file`
-   compile-check variant (currently missing) should land alongside it.
-3. **Search-leaf query composition bug** — AND-joins multi-entity names into one query instead of
+   authorized or run** — running it is the obvious next Medium/Large cycle. Per the 2026-08-14
+   versioning/roadmap plan, fold in the expanded/harder benchmark set, repeated DAG v1 tasks, the
+   dropped sequential-mode arm, and the `diverse_ground` A/B into this same relaunch rather than
+   spending twice — see `README.md#versioning` and `.claude/plans/cheeky-seeking-sedgewick.md`.
+2. **Search-leaf query composition bug** — AND-joins multi-entity names into one query instead of
    OR/splitting per-entity, found live on task 084 (fails safely, not a regression). Worth flagging
    to `strategy-tuner`: no "reformulate on repeated zero-result retry" fallback exists for this
    shape.
-4. **Codebench image-freshness guard** (see Provenance lesson 4 below) — a cheap nice-to-have, not
-   urgent unless codebench live verification becomes routine.
+
+**Moved to v3-scope, no longer DAG v2 next-cycle candidates (2026-08-14):** codebench's
+write-protocol redesign (item 6 below) and its image-freshness guard (see Provenance lesson 4
+below) are both codebench-specific — per today's versioning doc, codebench is v3-bucket material,
+not DAG v2's benchmark story. Both remain real, still-open items; they just don't compete for the
+next DAG v2 cycle's slot anymore. Revisit when v3 work starts.
 
 1. **`good_adaptive` self-loop fix — CONFIRMED LIVE.** Fresh smoke (`reverify_selfloop_20260814`,
    `openai/gpt-5-mini`, tasks 052/084, baseline+good_adaptive, $0.26 of the $2 ceiling spent).

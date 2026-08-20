@@ -8,13 +8,18 @@ _Last updated 2026-07-11. Companion docs: `ADAPTIVE_DISTILLATION_HANDOFF.md` (re
 
 ## 1. The thesis in one paragraph
 
-The compiled-scaffold campaign **proved** that a cheap model executing a well-structured,
-pre-authored DAG plan (`graph_compiled`) reaches ≈ premium quality at a fraction of the cost. But
-`graph_compiled` authors the entire plan upfront and executes it blindly — it cannot react to what a
-step reveals. **The goal is the native (non-compiled) engine reasoning adaptively mid-run:**
-plan → act → **observe the step** → decide the next move (re-expand, backtrack, or stop). `graph_compiled`
-is the *teacher* whose lessons we port into the native loop; it is **not** the goal. This document
-describes the native engine as it stands after that porting work.
+This document describes **DAG v2**, the native generation that follows **DAG v1** (the 2026-02–03
+Graph-of-Thoughts rewrite) and draws lessons from **Compiled v1** (the 2026-06 compiled-scaffold
+campaign) — full generation naming and roadmap in the root `README.md#versioning`. Compiled v1
+(`graph_compiled`) authors a full DAG plan once, offline, with an expensive model, then executes
+that fixed plan live and unreactively with a cheap model — it reaches ≈ premium quality at a
+fraction of the cost, using a pre-authored plan as its mechanism. Compared to Compiled v1, DAG v2
+reasons adaptively mid-run on top of the DAG v1 base loop: plan → act → **observe the step** →
+decide the next move (re-expand, backtrack, or stop), porting Compiled v1's planning lessons into
+a live loop that reacts to what a step actually reveals. Compiled v1 remains available inside
+DAG v2 as an optional, adjustable-scope layer (§4 below). Native reasoning improvements are the
+emphasis, since they generalize across more tasks and are easier to validate than a single
+offline-authored plan.
 
 ---
 

@@ -120,9 +120,16 @@ tests, same one pre-existing unrelated failure — see "Known gaps" below).
 
 ## Staged roadmap beyond Stage 1
 
-Named here so later stages aren't invented from scratch each time, not committed to a schedule:
+Named here so later stages aren't invented from scratch each time, not committed to a schedule.
+**Versioning note (2026-08-14):** this whole roadmap is v3-scope, not DAG v2. DAG v2 (the current
+generation) is native-DAG reasoning-quality work on the existing mandate shape; this roadmap is
+about expanding what kinds of actions/tasks the agent can take on, which is v3's own definition
+("additional tool/capability integrations"). See root `README.md#versioning`. Item 1 below already
+shipped and is genuinely useful, but it's v3-bucket material that landed early, not part of DAG
+v2's benchmark story — don't count it as DAG v2 progress.
 
 1. **Populate the tool registry — DONE 2026-08-06 for file/shell; memory/web deliberately skipped.**
+   **(v3-scope, shipped early.)**
    `localagent/tools/{files,shell}.py` ported as `SandboxToolPack`
    (`idea_policies/extra_actions/sandbox_tools.py`), delegating to the existing
    `SandboxConnector` (codebench's already-security-reviewed confinement) rather than
@@ -147,16 +154,16 @@ Named here so later stages aren't invented from scratch each time, not committed
    `hacker_news_top` when they were the clear best fit, and reasonably preferred the existing
    `visit` action over the new `wikipedia_summary` for an encyclopedia-summary mandate — the menu
    makes an action selectable, it does not force it, which is the correct behavior.
-2. **Wire tier-gated response parsing** — JSON action objects (strong tier, current default) vs.
+2. **(v3-scope.)** **Wire tier-gated response parsing** — JSON action objects (strong tier, current default) vs.
    typed-slot IR (`badmodel-lab/localagent/ir.py`'s router→slot-fill→validate→typed-repair pattern,
    weak tier) — as a helper inside leaf execution, gated by `capability_tier()`. Only after E3
    (below) validates it's worth building, isolated from `localagent`'s other control-flow
    differences.
-3. **Retire `badmodel-lab/localagent/loop.py`'s control flow** once the graph engine matches or
+3. **(v3-scope.)** **Retire `badmodel-lab/localagent/loop.py`'s control flow** once the graph engine matches or
    beats it on localagent's own task suite (file/shell/memory/web-read) — not before. Its typed-slot
    IR primitives (`ir.py`, `actions.py`, `state.py`) are small and reusable regardless of whether the
    outer loop itself survives.
-4. **Unify benchmark reporting — in progress, not closed.** `badmodel-lab/analyze.py` now bridges
+4. **(v3-owned, already in progress, not blocking DAG v2.)** **Unify benchmark reporting — in progress, not closed.** `badmodel-lab/analyze.py` now bridges
    `model`/`score`/`usd`/`visits` (Stage 1) plus `grounding_pass` (prefers the authoritative
    `obs.grounding.grounded` flag, same precedence `bench_common.load_row()` uses, before falling
    back to its own grep-based proxy) and `latency_s` (2026-08-06: `canon.get("secs")` — a real
@@ -167,7 +174,7 @@ Named here so later stages aren't invented from scratch each time, not committed
    (completion-only vs. prompt+completion), the same kind of false-cousin `tier` already warns
    against. Remaining candidates, not yet done: `place`/`profile`/`leaf_mode`/`tier`/`test_id` are
    genuinely badmodel-lab-specific (no `bench_common` equivalent) and may never bridge.
-5. **Full orthogonal ExecutionStyle × ActionVocabulary × ResponseParsingStrategy protocol system**
+5. **(v3-scope.)** **Full orthogonal ExecutionStyle × ActionVocabulary × ResponseParsingStrategy protocol system**
    — deliberately NOT built now. Two of three independent architecture proposals this session
    flagged it as premature: today, 2 of those 3 axes have exactly one real implementation each, and
    a protocol built for a cross-product that doesn't yet exist is speculative generality. Revisit

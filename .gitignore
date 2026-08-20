@@ -49,3 +49,5 @@ scripts/_ladder_out/
 scripts/_xtier_out/
 # Weekly engineering report PDFs exported to repo root (session artifact, not source)
 webRAG_weekly_report_*.pdf
+# Local research cache (fetched web pages + papers, PDF + parsed markdown) — not a source artifact
+docs/research/web/

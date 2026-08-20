@@ -28,9 +28,35 @@ variations). We do **not** claim to beat the premium reference — the claim is 
   graph arms' lift over it isolates the value of the structure, not mere persistence.
 - **Reference bar (NOT used by the agent):** `anthropic/claude-sonnet-5` + `sequential_react` — the
   quality ceiling we approach, not beat.
+- **Sequential-mode arm dropped (2026-08-15):** DAG v1 used a bare `sequential`/`chain`/`cot`
+  execution-variant arm for its comparison; DAG v2 drops it — `sequential` is the dead 0-visit
+  legacy path (see `execution_sequential.py`'s alias table), distinct from `sequential_react`
+  above which stays as the non-agent reference bar only. `sequential`/`chain`/`cot` must never
+  appear in `--variant`/`IDEA_TEST_EXECUTION_VARIANTS` for this relaunch.
 - **Tasks:** the 59-task validity suite (4 adaptive archetypes as the spine + diverse-shape coverage);
   see `BENCHMARK_SUITE_50.md`. Power comes from the TASK count, not reps.
 - **Replication:** R=5 per cheap cell (interleaved, shared network window), R=3 for the reference.
+- **`diverse_ground` A/B folded in (2026-08-15):** `STAGED_BARRAGE_PLAN.md`'s Phase 3b (staged
+  2026-07-08, never run) shares this relaunch's run-id/budget bookkeeping instead of a separate
+  pass: tasks 055-060, `openai/gpt-4.1-nano` + `openai/gpt-5-mini`, R=3, ~$2, four invocations
+  (`parametric` / `graph` / `graph_compiled` with `IDEA_TEST_COMPILED_AGG_MODE=single` /
+  `graph_compiled` with `IDEA_TEST_COMPILED_AGG_MODE=diverse_ground`). Gate: `diverse_ground >=
+  single` on the math/reasoning tasks (055/059/060). Prior evidence (2026-06-27 optscan run,
+  `test_058`'s pinned `agg_mode="single"`) already leans toward regression — this is a
+  confirmatory re-test on different models, not a re-run of known results.
+
+- **Preflight blockers (2026-08-15):** an adversarial review found four benchmark-invalidating
+  bugs (worst: grounding evidence sourced from `result["graph"]`, which only two variants emit —
+  measured 0.944 → 0.417 on a real `sequential_react` cell, enough to invert the headline) and
+  retracted the "task 024's hallucination provably passes 0.75" claim. All fixed; **the relaunch
+  still has open items before it runs.** See `docs/handoffs/DAG_V2_PREFLIGHT_2026-08-15.md`.
+- **Required for this relaunch:** `IDEA_TEST_REPORT_VERBOSITY=3` if results must stay re-scorable
+  (the default strips `telemetry_raw`, and the evidence-scored tasks cannot be re-scored without
+  it — `rescore_results.py` now refuses rather than fabricating a regression).
+- **Report score, cost AND visits per shape.** The smoke found DAG v2 spending 7–13× the tokens
+  while making FEWER tool calls than a linear agent, and tying with LangGraph on fan-out shapes at
+  1/13th the cost while winning clearly on chain shapes. Pooling shapes averages that real win
+  into a wash; a score-only table hides the cost gap.
 
 ## Fairness (held fixed across arms — a fair battle)
 

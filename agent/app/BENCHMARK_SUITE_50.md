@@ -56,7 +56,11 @@ Optional ablation rungs available for mechanism isolation: `reexpand_only`, `con
 **Shape balance (the original 49 active, i.e. 50 minus 024):** survivor 9 · chain 9 · conflicting 8 · re-expansion 6 · computation 6 · count 4 · argmax 2 · CVE 2 · navigation 2 · breadth 0 · temporal 1. See "Growing to 60" below for the full 59-task shape balance (breadth restored to 1 via 052).
 
 ## The other 24 valid tasks (dropped as redundant shapes, available if N needs to grow)
-Branch-eliminate/survivor overflow: 069, 099, 104, 110, 113, 116, 118, 121 (121's gate fixed 2026-07-25, still pool — see F28 below). Chain overflow: 023, 050, 096. Argmax: 077 (091 promoted 2026-07-23, see below). Computation: 064 (gate fixed 2026-07-25, still pool — see F28 below; 071/085/094 promoted 2026-07-23, see below). Count: — . Breadth: 012, 015, 021 (052 promoted 2026-07-23, see below). CVE: 028. Nav: — . (Full 74-valid list in the validation run.)
+Branch-eliminate/survivor overflow: 069, 099, 104, 110, 113, 116, 118, 121 (121's gate fixed 2026-07-25, still pool — see F28 below). Chain overflow: 023 (gate-fixed 2026-08-15, still pool — see F35 below), 050, 096. Argmax: 077 (091 promoted 2026-07-23, see below). Computation: 064 (gate fixed 2026-07-25, still pool — see F28 below; 071/085/094 promoted 2026-07-23, see below). Count: — . Breadth: 012, 021 (both gate-fixed 2026-08-15, still pool — see F35 below; 052 promoted 2026-07-23, see below; 015 unresolved — see line below, out of F35's scope). Technical-documentation: 022 (gate-fixed 2026-08-15, still pool — see F35 below; not part of the original 74-valid count, its validity status was never recorded in the 2026-07-22 audit). CVE: 028. Nav: — . (Full 74-valid list in the validation run.)
+
+**Known doc inconsistency, unresolved (out of F35's scope):** 015 appears both in the substance-invalid
+range `013–020` below and in this pool line's predecessor — never reconciled. Do not treat 015 as valid
+without re-auditing it directly.
 
 ## Growing to 60 — the 10 additions (2026-07-23, AGENT4 suite-expansion audit)
 
@@ -149,6 +153,60 @@ Offline validator tests: `agent/tests/test_14{6,7,8,9}_*_validators_test.py` (69
 green). Ids registered in `idea_test_runner.TEST_PRIORITY_ORDER`. **Deliberately NOT added to
 `ACTIVE_SUITE_IDS`/`TASK_SETS`** — promoting any of them into a live barrage is a separate, later
 $-spend decision; the `validator_lint_test` hard gate remains scoped to the active 59.
+
+## F35 (2026-08-15) — 012/021/022/023 gate-fixed for DAG v2's DAG-v1-repeat comparison; 024 stays dropped
+
+DAG v2 relaunch prep proposed repeating some literal DAG v1-era tasks (`test_001`-`024`) to
+measure direct improvement. Static audit (`grep -c "_keystone_ok"`) put 012/021/022/023/024 in
+the same "no gate at all" bucket as the F27/F28 regression class — but a **dynamic** probe found
+the real picture is worse and different in kind: these are count-based partial-credit tasks
+(link_count / news_sources / definition / version / etc.), not single-keystone-regex tasks like
+121/084, so F28's one-line `_keystone_ok(result, observability)` fix does not transfer as-is.
+
+Scoring note (verified 2026-08-15, `testing/validation.py:190-224`): `overall_score` is the
+unweighted mean over the function validators **plus the LLM judge as one additional term**, and
+`overall_passed` is `>= 0.75`. All four of these tasks return `None` from
+`get_llm_validation_function()`, so for THEM the divisor is just the function count and the
+means below are the real scores.
+
+Two-stage empirical audit: **(1)** a pure zero-visit hallucination clears the 0.75 bar only on
+**022** (0.750, exactly at the line) — 012/021/023's existing partial-credit visit/search
+counters already drag a zero-effort fabrication below 0.75 (0.500 / 0.700 / 0.500). **(2)** The
+sharper, realistic attack — doing the *minimum* real search/visit calls needed to satisfy each
+task's count checks, then fabricating all the substantive content — clears 0.75 on **all four**
+(012: 1.000, 021: 0.900, 022: 0.833, 023: 0.929), because none of these tasks' content validators
+(link text, headlines, definitions, version numbers, install methods) ever checked the claim
+against what was actually fetched, only against activity counters.
+
+**Fix:** each content-claim validator now requires the claim to be genuinely evidenced by the
+real fetched page content/domain in `result["graph"]`'s visit `action_result`s — verbatim
+substring match for precise facts (version numbers, dates), word-overlap ratio for prose
+(definitions, headlines, features), domain match for source claims (news outlets, official
+sites). Raw activity counters (`visit.count`, `search.count`) were left as-is — a real search/
+visit API call already can't be faked, so the exploit was always in the unchecked downstream
+content, not the counters. Verified with a 3-scenario probe per task (zero-visit /
+minimal-real-visit-then-fabricate / fully-honest-grounded): all four now score well below 0.75 on
+both fabrication scenarios while honest, genuinely-grounded completions still clear it. Offline
+coverage: `agent/tests/test_0{12,21,22,23}_*_validators_test.py` (13 cases, green; full repo
+suite 4687 passed / 18 skipped).
+
+**024 stays dropped** (F27, deliberately not remediated) — kept only as a future grounding-gated
+rebuild candidate.
+
+**Correction to the F27 "0.786" figure (2026-08-15).** F27, this file's header, `F28`'s note,
+`scripts/adaptive_ladder_run.py`'s `suite59` comment and `validator_lint_test.py`'s docstring all
+state that 024's 0-visit hallucination "scores 0.786 and PASSES the 0.75 bar". **The number is
+right; the conclusion drawn from it is not.** 0.786 is the mean over 024's SEVEN function
+validators, but 024 *does* define an LLM judge (`test_024_...py:252`), and `validation.py:223`
+divides by N+1 — so the score `ValidationRunner` actually stores is `5.5/8 = 0.6875`, which
+**fails** the bar unless the judge itself awards ≥ 0.50. Since that judge is explicitly told
+"Visit actions executed: 0" and asked whether ≥2 sources were visited, it most likely scores near
+0 and the hallucination most likely FAILS. **The decision to drop 024 still stands on its own
+merits** — it is genuinely un-gated, and an un-gated task whose pass/fail turns on an LLM judge's
+mood is not a measurement instrument. Only the "a hallucination provably passes" claim is
+unsupported; do not repeat it. The originating error is `.barrage_prep/AGENT5_validator_integrity.md:81`,
+which labels the 7-validator mean "DETERMINISTIC MEAN ... (PASSES the 0.75 bar)" after correctly
+noting two lines earlier that the judge is averaged in.
 
 ## Invalid (71) — do NOT run
 - **Substance failures (drop permanently, ~41):** 001–011, 013–020, 026, 027, 029–039, 043, 045, 048, 053, 063, 066 (single-fact / format-only / memorized-trivia / non-discriminating / leaked-URLs-in-prompt).
