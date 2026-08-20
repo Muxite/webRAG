@@ -17,3 +17,8 @@ asciidag
 fastapi
 uvicorn[standard]
 matplotlib
+# LangGraph off-the-shelf comparison arm (agent.app.langgraph_solver), item 4 of the DAG v2
+# relaunch scoping plan — a genuine external ReAct baseline, not this repo's own scaffolding.
+langgraph
+langchain-openai
+langchain-core
