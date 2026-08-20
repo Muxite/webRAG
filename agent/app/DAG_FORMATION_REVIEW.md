@@ -160,6 +160,13 @@ REPORTED context that makes this concrete: `expansion.py:185-200` documents live
 fallback emitted a search whose query was the mandate's first 100 characters — an instruction
 preamble, not an entity — and the run made zero page visits.
 
+**PARTIALLY ADDRESSED (instrumentation only).** Every fallback branch now stamps
+``DetailKey.FALLBACK_EXPANSION`` on the candidate it emits, the collapse is logged at WARNING,
+and the final payload carries ``degenerate_fallback_count`` when any fired (absent otherwise, so
+a healthy run's payload shape is unchanged). Nothing reacts to the tag yet: repairing the
+collapsed subtree needs the re-planning path F6 describes, which does not exist.
+(``expansion_degenerate_fallback_test.py``.)
+
 ### F8. Shape classification happens before any information exists, and changes nothing — VERIFIED
 
 `classify_shape` (`shape_classifier.py:103-120`) keyword-matches the **raw mandate string**
@@ -186,6 +193,14 @@ produced by an earlier context-blind call (F1).
 ancestor path" to "what a canned template produces," on the strength of a text snippet never
 validated against the whole task's information needs.
 
+**RESOLVED (scope guard, unconditional).** `retrieval.AUTO_APPLY_THRESHOLD` (0.50) is calibrated
+over ROOT queries only — the eval set's positives are whole task statements — so a non-root node
+on the AUTOMATIC path must now clear `NON_ROOT_AUTO_APPLY_THRESHOLD` (0.54, the weakest correct
+positive on that eval set) instead. Between the two bars the match degrades to `suggest`, i.e.
+organic expansion. Non-root matching stays available, at a higher bar; the on-demand action keeps
+the calibrated bar, since there the model asked for a strategy for that node.
+(`plan_library_auto_shortcircuit_test.py`, `plan_library_search_action_test.py`.)
+
 ---
 
 ## PART 2 — Ranked findings
@@ -197,9 +212,9 @@ validated against the whole task's information needs.
 | F5 | Correct dependency builder exists but only for templates | High | Medium |
 | F3 | Dependency edges invented by URL-sniffing, visit-only | High | Medium |
 | F6 | One-shot formation; no re-plan path for expanded nodes | High | Medium |
-| F7 | Malformed plan collapses to one degenerate node, unflagged | High | **Low** |
+| F7 | Malformed plan collapses to one degenerate node, unflagged | High | **Low** — PARTIAL: now flagged |
 | F2 | Depth never chosen, tracked, or capped | Medium | Low |
-| F9 | Template short-circuit can hijack non-root subtrees | Medium | Low |
+| F9 | Template short-circuit can hijack non-root subtrees | Medium | Low — RESOLVED |
 | F4 | `execute_all_children` declared before children exist | Medium | Medium |
 | F8 | Shape classifier: pre-information, advisory-only, 4-19% recall | Low (inert) | Low |
 

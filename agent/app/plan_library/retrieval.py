@@ -85,6 +85,15 @@ TOP_K = 5
 #: asymmetry is deliberate: a missed hit costs only today's organic expansion, while a
 #: false hit is still caught downstream by slot arity and the ``expect`` contract.
 AUTO_APPLY_THRESHOLD = 0.50
+#: The bar a NON-ROOT node must clear to auto-apply a template (F9). The calibration above is
+#: over ROOT queries only: the eval set's positives are whole task statements, so 0.50 has never
+#: been validated against a deeper node's query text — text an earlier context-blind expansion
+#: invented, matched with no sight of siblings or of the whole task. A hit there swaps a
+#: subtree's shape for a canned one on the strength of a snippet nobody checked, so it must
+#: match at least as well as the WEAKEST correct positive on the eval set (0.54) rather than
+#: merely beating the negatives' ceiling. Reachable by construction (every eval positive clears
+#: it); a non-root hit between the two bars degrades to ``suggest``, i.e. organic expansion.
+NON_ROOT_AUTO_APPLY_THRESHOLD = 0.54
 #: The negatives' ceiling. Single-entity mandates (the micro/format tiers) sit just under it
 #: because MiniLM barely encodes cardinality; the structural backstop for them is slot-fill,
 #: where a list slot's ``min_arity`` rejects a one-entity mandate outright.
@@ -207,6 +216,12 @@ class FillOutcome:
 # --------------------------------------------------------------------------------------
 # query text
 # --------------------------------------------------------------------------------------
+
+
+def auto_apply_threshold_for(is_root: bool) -> float:
+    """The auto-apply bar for this node's position: the calibrated one at the root, the
+    stricter :data:`NON_ROOT_AUTO_APPLY_THRESHOLD` below it."""
+    return AUTO_APPLY_THRESHOLD if is_root else NON_ROOT_AUTO_APPLY_THRESHOLD
 
 
 def build_query_text(node: "IdeaNode", is_root: bool = False) -> str:

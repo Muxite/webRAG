@@ -461,6 +461,24 @@ async def test_execute_reports_a_miss_without_spending_a_fill(monkeypatch, tmp_p
 
 
 @pytest.mark.asyncio
+async def test_the_on_demand_path_keeps_the_calibrated_bar_below_the_root(monkeypatch, tmp_path):
+    """F9's stricter non-root bar is scoped to the AUTOMATIC short-circuit. An action node is
+    non-root by construction, but here the model asked for a strategy for that node and the
+    answer becomes an explicit re-expansion, so the calibrated threshold still governs:
+    similarity 0.52 clears 0.50 and is adopted (it would fall through on the automatic path)."""
+    engine = _make_engine()
+    _wire(engine, monkeypatch, tmp_path, [("argmax_t", 0.48, "argmax")])  # similarity 0.52
+    graph = _graph()
+    node = _search_node(graph)
+
+    action = LeafActionRegistry(settings=engine.settings).get("plan_library_search")
+    result = await action.execute(graph, node.node_id, engine.io)
+
+    assert R.AUTO_APPLY_THRESHOLD <= 0.52 < R.NON_ROOT_AUTO_APPLY_THRESHOLD
+    assert result["adopted"] is True and result["adopted_template_id"] == "argmax_t"
+
+
+@pytest.mark.asyncio
 async def test_execute_logs_the_attempt_under_the_on_demand_call_site(monkeypatch, tmp_path):
     """The shared pipeline logs both streams for BOTH call sites — only the label differs."""
     contract_out = tmp_path / "contract_log.jsonl"

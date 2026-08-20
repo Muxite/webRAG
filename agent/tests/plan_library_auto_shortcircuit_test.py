@@ -802,3 +802,79 @@ async def test_slot_fill_receives_the_raw_mandate_not_the_collapsed_query(tmp_pa
     # and the proof it mattered: the fill succeeded, off the deterministic extractor alone
     assert expansion.calls == 0
     assert len(_leaves(graph, graph.get_node(graph.root_id()))) == len(_PEAKS)
+
+
+# --------------------------------------------------------------------------------------
+# F9 — the non-root scope guard
+# --------------------------------------------------------------------------------------
+# The thresholds in `retrieval.py` are calibrated over ROOT queries (the eval set's positives
+# are whole task statements). A deeper node is matched on text an earlier context-blind
+# expansion invented, so on the AUTOMATIC path it must clear the stricter
+# `NON_ROOT_AUTO_APPLY_THRESHOLD` before a canned template may replace its subtree's shape.
+# 0.48 distance == 0.52 similarity: over the calibrated bar (0.50), under the strict one (0.54).
+_BETWEEN_THE_BARS = [("argmax_t", 0.48, "argmax")]
+_OVER_BOTH_BARS = [("argmax_t", 0.30, "argmax")]
+
+
+def test_the_strict_bar_applies_below_the_root_only():
+    assert R.auto_apply_threshold_for(True) == R.AUTO_APPLY_THRESHOLD
+    assert R.auto_apply_threshold_for(False) == R.NON_ROOT_AUTO_APPLY_THRESHOLD
+    assert R.NON_ROOT_AUTO_APPLY_THRESHOLD > R.AUTO_APPLY_THRESHOLD
+
+
+@pytest.mark.asyncio
+async def test_the_root_still_auto_applies_at_the_calibrated_threshold(tmp_path):
+    """Regression: the calibrated bar is unchanged where it was calibrated."""
+    engine, expansion = _make_engine()
+    _wire(engine, tmp_path, _BETWEEN_THE_BARS)
+    graph = _graph()
+
+    await engine._handle_expansion_node(graph, graph.root_id(), 0, None)
+
+    assert expansion.calls == 0
+    assert len(_leaves(graph, graph.get_node(graph.root_id()))) == len(_PEAKS)
+
+
+@pytest.mark.asyncio
+async def test_a_non_root_match_between_the_bars_no_longer_hijacks_its_subtree(tmp_path):
+    engine, expansion = _make_engine()
+    _wire(engine, tmp_path, _BETWEEN_THE_BARS)
+    graph = _graph()
+    parent = graph.add_child(graph.root_id(), "parent goal", details={})
+
+    await engine._handle_expansion_node(graph, parent.node_id, 0, None)
+
+    assert expansion.calls == 1, "the same score the root would have applied falls through here"
+    assert len(parent.children) == len(_ORGANIC_CANDIDATES)
+    assert all(adapter.PLAN_LIBRARY_ORIGIN not in c.details for c in _children(graph, parent))
+
+
+@pytest.mark.asyncio
+async def test_a_non_root_match_over_the_strict_bar_still_applies(tmp_path):
+    """The guard raises the bar; it does not disable non-root templates."""
+    engine, expansion = _make_engine()
+    _wire(engine, tmp_path, _OVER_BOTH_BARS)
+    graph = _graph()
+    parent = graph.add_child(graph.root_id(), "parent goal", details={})
+
+    await engine._handle_expansion_node(graph, parent.node_id, 0, None)
+
+    assert expansion.calls == 0
+    assert len(_leaves(graph, parent)) == len(_PEAKS)
+
+
+@pytest.mark.asyncio
+async def test_the_between_the_bars_decision_is_logged_as_a_suggestion(monkeypatch, tmp_path):
+    """The fall-through is recorded as `suggest` (the match was real, the bar was not met),
+    which is what separates this from a genuine no-match in the retrieval log."""
+    _, retrieval_out = _enable_logs(monkeypatch, tmp_path)
+    engine, _ = _make_engine()
+    _wire(engine, tmp_path, _BETWEEN_THE_BARS)
+    graph = _graph()
+    parent = graph.add_child(graph.root_id(), "parent goal", details={})
+
+    await engine._handle_expansion_node(graph, parent.node_id, 0, None)
+
+    row = _rows(retrieval_out)[0]
+    assert row["decision"] == R.DECISION_SUGGEST
+    assert row["slot_fill"] == "not_attempted", "a below-bar match never spends a slot-fill call"

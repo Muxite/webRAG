@@ -4,10 +4,11 @@ The automatic pre-expansion short-circuit (``IdeaDagEngine._plan_library_auto_sh
 and the on-demand leaf action (``actions.PlanLibrarySearchLeafAction``) ask the library the
 same question and must answer it identically: build the query text off the node, rank the
 corpus, and — only once a hit has qualified — spend the pipeline's single slot-extraction call
-and adapt the filled template into GoT candidates. They differ ONLY in the two labels they
-carry (``origin`` for the graph, ``call_site`` for the logs) and in what their caller does with
-the answer: the automatic path feeds ``_handle_expansion_node``, the action reports a result
-dict its node's completion hook later rebuilds children from.
+and adapt the filled template into GoT candidates. They differ in the two labels they carry
+(``origin`` for the graph, ``call_site`` for the logs), in the auto-apply bar a non-root node
+must clear (stricter on the automatic path, see :func:`resolve`), and in what their caller does
+with the answer: the automatic path feeds ``_handle_expansion_node``, the action reports a
+result dict its node's completion hook later rebuilds children from.
 
 **Why a module and not an ``IdeaDagEngine`` method.** A :class:`~agent.app.idea_policies.
 actions.LeafAction` is constructed with no reference back to the engine — deliberately: the
@@ -93,12 +94,25 @@ async def resolve(
     extractor matches at line starts, so a collapsed copy silently loses an enumerated
     candidate list and degrades every fill to an LLM-only (or empty) one.
     """
-    query_text = _retrieval.build_query_text(node, is_root=(node.node_id == graph.root_id()))
+    is_root = node.node_id == graph.root_id()
+    query_text = _retrieval.build_query_text(node, is_root=is_root)
     mandate = extract_mandate(graph, node.node_id)
+    # Scope guard (F9): the AUTOMATIC short-circuit substitutes a template for whatever node
+    # is being stepped, including deep ones whose query text an earlier context-blind expansion
+    # invented. The thresholds are calibrated on ROOT-level task statements only, so a non-root
+    # node has to clear a stricter bar before it may hijack its subtree's shape. The on-demand
+    # action keeps the calibrated bar: there the model asked for a strategy for that node, and
+    # the answer is an explicit re-expansion rather than a silent replacement.
+    auto_apply_threshold = (
+        _retrieval.auto_apply_threshold_for(is_root)
+        if call_site == _retrieval.CALL_SITE_AUTO
+        else _retrieval.AUTO_APPLY_THRESHOLD
+    )
     result = await library.retrieve(
         getattr(io, "connector_chroma", None),
         query_text,
         archetype_hint=_retrieval.archetype_hint_for(mandate or query_text),
+        auto_apply_threshold=auto_apply_threshold,
     )
     outcome = None
     if result.auto_apply:
