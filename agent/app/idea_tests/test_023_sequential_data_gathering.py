@@ -57,20 +57,24 @@ def get_success_criteria() -> List[str]:
 
 
 def validate_searches(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate multiple searches executed."""
+    """Validate at least one search executed. Loosened from >=2: the task statement no longer
+    prescribes a search->visit->search->visit path, so a route that reaches both grounded facts
+    with fewer searches must not be scored down for it."""
     search_count = observability.get("search", {}).get("count", 0)
-    passed = search_count >= 2
+    passed = search_count >= 1
     return {
         "check": "multiple_searches",
         "passed": passed,
-        "score": min(1.0, search_count / 2.0),
+        "score": min(1.0, search_count / 1.0),
         "search_count": search_count,
         "reason": f"Found {search_count} search(es)" if passed else "Insufficient searches",
     }
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate multiple visits executed."""
+    """Validate at least two visits executed. Kept at >=2 (not relaxed further): the task's
+    keystone facts genuinely live on two different pages (official site + install guide), so
+    this reflects the destination, not a prescribed route."""
     visit_count = observability.get("visit", {}).get("count", 0)
     passed = visit_count >= 2
     return {
@@ -152,14 +156,16 @@ def validate_installation_method(result: Dict[str, Any], observability: Dict[str
 
 
 def validate_sequential_pattern(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate sequential pattern (search -> visit -> search -> visit)."""
+    """Validate genuine multi-step information gathering (>=1 search, >=2 visits) occurred.
+    Loosened from a fixed search->visit->search->visit count: the statement no longer prescribes
+    that exact shape, so this now checks that real work happened, not a specific step sequence."""
     search_count = observability.get("search", {}).get("count", 0)
     visit_count = observability.get("visit", {}).get("count", 0)
-    passed = search_count >= 2 and visit_count >= 2
+    passed = search_count >= 1 and visit_count >= 2
     return {
         "check": "sequential_pattern",
         "passed": passed,
-        "score": min(1.0, (search_count + visit_count) / 4.0),
+        "score": min(1.0, (search_count + visit_count) / 3.0),
         "search_count": search_count,
         "visit_count": visit_count,
         "reason": f"Sequential pattern: {search_count} searches, {visit_count} visits" if passed else "Sequential pattern not evident",
