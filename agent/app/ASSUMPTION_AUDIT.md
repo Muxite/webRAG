@@ -184,11 +184,65 @@ raw (95% CI [−0.239, −0.047], permutation p=0.004, "earlier is better") beco
 residualised (CI [+0.004, +0.127], p=0.043, "later is marginally better").
 
 The confound is visible directly in the position profile. Position 0 is 56% `search` and
-92.3% already-executed; position 1 is 73% `visit` and 84.1% executed. The judge scores
-`search` 0.369 against `visit` 0.338, and `evaluate_batch` caps an un-executed candidate at
-`evaluation_no_action_result_score_cap`. So planners open with a search, the search scores
-higher **for being a search**, and the raw order effect follows. About three quarters of the
-+0.141 edge disappears once like is compared with like.
+position 1 is 73% `visit`, and the judge scores `search` 0.369 against `visit` 0.338. So
+planners open with a search, the search scores higher **for being a search**, and the raw
+order effect follows. About three quarters of the +0.141 edge disappears once like is compared
+with like. (The `executed` half of the residualisation cell is a control for the *reverse*
+direction only — see T1-3a: the recorded `action_result` is end-of-run state, and no candidate
+has one when it is scored.)
+
+#### T1-3a. Why 55.6% of batches are flat — **scorer mechanics, not judge degeneracy**
+
+The 55.6% invites the reading "an LLM judge handed two different pieces of work the same
+number", which would be a judge-quality bug. It is not what happened. Same corpus, same
+script (`=== why the flat batches are flat ===`):
+
+| the value every sibling shares | batches | of flat | of all |
+|---|---|---|---|
+| exactly `evaluation_no_action_result_score_cap` (0.5) | 164 | 49.7% | 27.6% |
+| inside the batch prompt's `<=0.2` band for unexecuted work | 101 | 30.6% | 17.0% |
+| exactly `evaluation_no_action_result_base_score` (0.4) | 59 | 17.9% | 9.9% |
+| **a value the judge chose freely** (all six are 0.3) | **6** | **1.8%** | **1.0%** |
+
+**98.2% of flat batches sit on a number the engine or its rubric put there.** Corroborating
+candidate-level rates: of 2085 scored candidates, 43.3% sit exactly on the cap, 34.5% inside
+the prompt band, and **7 (0.34%) exceed the cap at all**. Flat rate also *rises* with batch
+width (47% at k=2 → 63% at k=5), the opposite of what chance agreement between independent
+opinions would produce.
+
+**The mechanism is structural, and it is total.** `_expand_or_execute` drops
+DONE/FAILED/SKIPPED children from `eligible` before calling `evaluate_batch`, so **every
+candidate the judge ever sees is pending**. `has_action and not has_result` is therefore true
+for all of them: the code clips each score at 0.5 and the prompt independently orders
+`score <=0.2`. The 0.4 bucket is a third mechanism with the same effect — `evaluate_batch`
+substitutes the base score for any candidate *missing from the judge's response*, so a batch
+the judge under-answered comes out uniform without the judge having compared anything.
+The single post-execution scoring path, `engine.evaluate_parallel_siblings`, is default-off
+and absent from every settings file, which is why only 7 candidates escaped the cap.
+
+Noted while confirming this, not fixed because the intended semantics are genuinely unclear:
+the *per-node* fallback `LlmEvaluationPolicy.evaluate` guards its early penalty return with
+`if has_action and not has_result:` and then re-tests the same thing as
+`if action_result is None:`, which is true by construction — so it returns
+`no_action_result_base_score` **without ever calling the judge**, and its own `min(score, cap)`
+block twenty lines later is unreachable. The two policies disagree about what an unscored
+pending action is worth (0.4 flat vs a capped judge call). Only the batch path ships, so this
+costs nothing today; making the per-node path match would add an LLM call per candidate.
+
+**What this does and does not license.** It retires "the evaluator is a broken judge" as an
+explanation of the flat rate: on the one question the corpus can pose to the judge — a shared
+mid-range value it picked itself — the answer is 1.0% of batches. It does **not** retire the
+downstream consequence. Selection, `beam_after_evaluation`, pruning and backtrack still read a
+number that carries no ordering in 55.6% of batches, and no prompt change fixes that while
+scoring runs before execution. `EVALUATION_SCORE_PREDICTIVE_POWER.md` §4.1 already names the
+prerequisite: **score outcomes, not plans**.
+
+**Blocked on instrumentation.** "Would the judge have discriminated absent the cap?" is
+unanswerable offline: `_evaluate_batch_chunk` writes `details["evaluation"] = {"score": score}`
+*after* clipping and weighting, so the raw score is discarded (0 of 2610 recorded evaluation
+dicts carry a rationale either, unchanged from the 0/767 measured on 2026-08-02). Recording
+the pre-cap value is the cheap enabling step and it is a behaviour-neutral change; it was left
+out of this cycle deliberately to keep the diagnosis from perturbing in-flight arms.
 
 **What this settles, and what it does not.** The naming is accidentally defensible: keeping
 the head of the list does beat a coin flip on the shipped score, so arrival-order truncation

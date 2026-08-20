@@ -21,10 +21,12 @@ scorer rather than of the ordering:
 1. **Action composition.** Position 0 is disproportionately ``search`` and position 1
    disproportionately ``visit`` (planners open with a search), and the judge does not score
    the two kinds alike. A raw position-vs-score correlation partly measures that.
-2. **Execution state.** ``evaluate_batch`` caps a candidate at
-   ``evaluation_no_action_result_score_cap`` when it has an action but no ``action_result``
-   yet, and the rate of "already executed" falls with arrival position. That alone would
-   manufacture an earlier-is-better gradient.
+2. **Execution state.** The recorded ``action_result`` is the node's state at the END of the
+   run, not at scoring time: ``_expand_or_execute`` filters DONE/FAILED/SKIPPED children out
+   of ``eligible`` before calling ``evaluate_batch``, so every candidate is pending when it is
+   scored and ``evaluation_no_action_result_score_cap`` binds on all of them alike. The flag
+   still belongs in the residualisation cell, but as a control for the REVERSE direction --
+   a candidate's score helps decide whether it ever runs -- rather than as a cause of it.
 
 A third caveat cannot be cleared, only bounded: a re-expanded parent
 (``_got_reexpand_count``) appends a SECOND batch of children to the same list, so positions
@@ -55,6 +57,7 @@ import argparse
 import json
 import math
 import random
+import re
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -67,6 +70,15 @@ RESULTS_DIR_DEFAULT = REPO_ROOT / "agent" / "idea_test_results"
 #: Permutation seed. Fixed so a re-run of the same corpus reprints the same p-values.
 DEFAULT_SEED = 20260820
 DEFAULT_PERMUTATIONS = 2000
+
+SETTINGS_PATH = REPO_ROOT / "agent" / "app" / "idea_dag_settings.json"
+
+#: Fallbacks matching ``EvaluationConfig``, used only when the settings file cannot be read.
+FALLBACK_CAP = 0.5
+FALLBACK_BASE = 0.4
+#: The ceiling ``evaluation_batch_system_prompt`` states for "nodes with actions but no
+#: action_result". Not a knob; it is a sentence inside the prompt string, recovered by regex.
+FALLBACK_RUBRIC_CEILING = 0.2
 
 
 # --- pure statistics -----------------------------------------------------------------------
@@ -216,6 +228,86 @@ def load_batches(results_dir: Path, pattern: str = "**/*.json") -> List[Batch]:
     return out
 
 
+# --- why a batch is flat ---------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ScoreLandmarks:
+    """The three values a flat batch can land on without the judge having ranked anything.
+
+    ``cap`` and ``base`` are written by ``evaluate_batch`` itself: the first clips whatever the
+    judge said, the second replaces a candidate the judge left out of its response entirely.
+    ``rubric_ceiling`` is not code at all -- it is the sentence *"Nodes with actions but no
+    action_result score <=0.2"* inside ``evaluation_batch_system_prompt``, which applies to
+    every candidate the engine ever scores, since children are evaluated before they run.
+    """
+
+    cap: float = FALLBACK_CAP
+    base: float = FALLBACK_BASE
+    rubric_ceiling: float = FALLBACK_RUBRIC_CEILING
+
+    @classmethod
+    def from_settings_file(cls, path: Path = SETTINGS_PATH) -> "ScoreLandmarks":
+        """Read the live constants so this census cannot silently drift from the engine."""
+        try:
+            settings = json.loads(path.read_text())
+        except Exception:  # noqa: BLE001. Fall back to the shipped defaults
+            return cls()
+        prompt = str(settings.get("evaluation_batch_system_prompt") or "")
+        match = re.search(r"no\s+action_result\s+score\s*<=\s*([0-9]*\.?[0-9]+)", prompt)
+        return cls(
+            cap=float(settings.get("evaluation_no_action_result_score_cap", FALLBACK_CAP)),
+            base=float(settings.get("evaluation_no_action_result_base_score", FALLBACK_BASE)),
+            rubric_ceiling=float(match.group(1)) if match else FALLBACK_RUBRIC_CEILING,
+        )
+
+
+def flat_reason(value: float, landmarks: ScoreLandmarks) -> str:
+    """Which landmark, if any, accounts for a whole batch sharing ``value``.
+
+    Ordered most-specific first: an exact hit on a constant the engine writes outranks mere
+    membership of the prompt's band, because the constant is not an opinion the judge formed.
+    ``free_value`` is the only bucket that means "the judge really did give two different
+    candidates the same middling number", which is the reading "55.6% flat" invites.
+    """
+    if value == landmarks.cap:
+        return "cap"
+    if value == landmarks.base:
+        return "base"
+    if value <= landmarks.rubric_ceiling:
+        return "rubric_band"
+    return "free_value"
+
+
+def flat_census(
+    batches: Sequence[Batch], landmarks: Optional[ScoreLandmarks] = None
+) -> Dict[str, Any]:
+    """Break the flat-batch count down by what the shared score actually is."""
+    marks = landmarks or ScoreLandmarks()
+    flat = [b for b in batches if not b.discriminates]
+    reasons = Counter(flat_reason(b.scores[0], marks) for b in flat)
+    candidates = [c for b in batches for c in b.candidates]
+    return {
+        "landmarks": {"cap": marks.cap, "base": marks.base, "rubric_ceiling": marks.rubric_ceiling},
+        "flat": len(flat),
+        "reasons": dict(reasons),
+        "free_values": dict(
+            Counter(b.scores[0] for b in flat if flat_reason(b.scores[0], marks) == "free_value")
+        ),
+        "candidates": len(candidates),
+        "above_cap": sum(1 for c in candidates if c.score > marks.cap),
+        "at_cap": sum(1 for c in candidates if c.score == marks.cap),
+        "in_rubric_band": sum(1 for c in candidates if c.score <= marks.rubric_ceiling),
+        "flat_by_width": {
+            k: {
+                "n": sum(1 for b in batches if len(b.candidates) == k),
+                "flat": sum(1 for b in batches if len(b.candidates) == k and not b.discriminates),
+            }
+            for k in sorted({len(b.candidates) for b in batches})
+        },
+    }
+
+
 # --- analysis ------------------------------------------------------------------------------
 
 
@@ -329,6 +421,7 @@ def build_report(
             "flat": len(batches) - len(discriminating),
             "batch_sizes": dict(sorted(Counter(len(b.candidates) for b in batches).items())),
         },
+        "flat_census": flat_census(batches, ScoreLandmarks.from_settings_file()),
         "raw": order_correlation(batches, raw, permutations, seed),
         "residualised": order_correlation(batches, resid, permutations, seed),
         "first_wins": first_wins(batches, raw),
@@ -363,6 +456,38 @@ def render(report: Dict[str, Any]) -> None:
         f"-- no beam, score-ordered or not, can distinguish these"
     )
     print(f"batch sizes: {corpus['batch_sizes']}")
+
+    census = report.get("flat_census")
+    if census and census["flat"]:
+        marks = census["landmarks"]
+        print("\n=== why the flat batches are flat (the shared value) ===")
+        labels = {
+            "cap": f"engine constant {marks['cap']} (no_action_result_score_cap)",
+            "base": f"engine constant {marks['base']} (no_action_result_base_score)",
+            "rubric_band": f"prompt band <={marks['rubric_ceiling']} (unexecuted-work line)",
+            "free_value": "a value the judge chose freely for every sibling",
+        }
+        for key in ("cap", "rubric_band", "base", "free_value"):
+            n = census["reasons"].get(key, 0)
+            print(
+                f"  {labels[key]:56s} {n:4d} {n / census['flat']:6.1%} of flat "
+                f"{n / corpus['batches']:6.1%} of all"
+            )
+        if census["free_values"]:
+            print(f"  free values: {census['free_values']}")
+        cands = census["candidates"]
+        print(
+            f"  of {cands} scored candidates: {census['at_cap']} ({census['at_cap'] / cands:.1%}) "
+            f"sit exactly on the cap, {census['in_rubric_band']} "
+            f"({census['in_rubric_band'] / cands:.1%}) inside the prompt band, and only "
+            f"{census['above_cap']} ({census['above_cap'] / cands:.2%}) escaped the cap at all"
+        )
+        widths = ", ".join(
+            f"k={k}: {row['flat'] / row['n']:.0%} of {row['n']}"
+            for k, row in census["flat_by_width"].items()
+            if row["n"] >= 10
+        )
+        print(f"  flat rate RISES with width ({widths}), the opposite of chance agreement")
 
     def line(label: str, row: Dict[str, Any]) -> None:
         if not row.get("batches"):
