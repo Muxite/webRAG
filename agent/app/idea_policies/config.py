@@ -120,6 +120,20 @@ class GoTConfig:
     # DATUM may veto; a subject-only one leaves the decision to the judge, as before F33.
     # Opt-in, default OFF for byte-identity.
     contract_veto_requires_datum_enabled: bool = False
+    # Sequential A->B fallback triggers. Two flags, not one, so each trigger's contribution
+    # is independently measurable; both are no-ops unless the expansion actually authored an
+    # alternative (``expansion_alternative_branch_enabled``), since without a
+    # ``has_alternative_node`` back-pointer there is nothing to promote.
+    #
+    #   * ``_on_fail_``: the primary ended FAILED. Unambiguous, needs no other signal.
+    #   * ``_on_unverified_``: the primary ended DONE and its step contract is satisfied but
+    #     verified no measurable DATUM — F35's distinction between "opened a page matching
+    #     the words of my own goal" and "actually answered the ask". That signal only exists
+    #     when ``contract_reexpand_enabled`` and ``contract_veto_requires_datum_enabled`` are
+    #     both on, so this trigger requires them rather than silently reading a verdict whose
+    #     datum half nothing else in the run trusts.
+    alternative_branch_promote_on_fail_enabled: bool = False
+    alternative_branch_promote_on_unverified_enabled: bool = False
     reexpand_corrective_context_enabled: bool = False
     # F6 (narrow MVP): re-plan a parent whose whole expansion collapsed to the single guessed
     # candidate `_create_fallback_candidate` emits. Only fires when the parent's ENTIRE child
@@ -264,6 +278,13 @@ class ExpansionConfig:
     # See expansion.py's ``_INPUT_FRAMING_HEADER`` block for the telemetry that motivated them.
     input_output_framing_enabled: bool = True
     echo_retry_enabled: bool = False
+    # Ask the author, once, at ordinary expansion time, for two OPTIONAL structural hints per
+    # candidate: ``alternative_of`` (this candidate is a fallback for that one) and
+    # ``race_group`` (these candidates are different routes to the SAME fact). Swaps in the
+    # ``EXPANSION_JSON_SCHEMA_WITH_BRANCHING`` schema variant and appends a short prompt
+    # addendum; ``idea_policies/alternative_branch.py`` resolves the hints into real node
+    # relationships after ``graph.expand()``. Opt-in, default OFF -> byte-identical prompt.
+    alternative_branch_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "expansion_model",
@@ -274,6 +295,7 @@ class ExpansionConfig:
         "expect_contract_enabled": "expansion_expect_contract_enabled",
         "input_output_framing_enabled": "expansion_input_output_framing_enabled",
         "echo_retry_enabled": "expansion_echo_retry_enabled",
+        "alternative_branch_enabled": "expansion_alternative_branch_enabled",
     }
 
     @classmethod
@@ -427,12 +449,18 @@ class MergeConfig:
     # scored up to 0.929. Authorized by the pre-registered gate as flagged and default OFF;
     # end-to-end transfer is unmeasured.
     goal_evaluation_first_enabled: bool = False
+    # Resolve an authored race group (2+ siblings that are different routes to the SAME fact)
+    # down to ONE winner before aggregating, instead of synthesizing over every route's
+    # result. Purely mechanical: status + contract comparisons, never an LLM judgment call.
+    # Opt-in, default OFF -> ``merge()`` aggregates everything exactly as today.
+    race_winner_selection_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",
         "temperature": "merge_temperature",
         "max_tokens": "merge_max_tokens",
         "goal_evaluation_first_enabled": "merge_goal_evaluation_first_enabled",
+        "race_winner_selection_enabled": "merge_race_winner_selection_enabled",
     }
 
     @classmethod

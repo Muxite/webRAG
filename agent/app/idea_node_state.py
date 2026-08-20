@@ -19,15 +19,22 @@ from agent.app.idea_dag import IdeaDag, IdeaNode
 from agent.app.idea_policies import DetailKey
 from agent.app.idea_policies.base import IdeaNodeStatus
 from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+from agent.app.idea_policies.alternative_branch import is_alternative_pending
 
 
 def is_action_ready(node: IdeaNode, step_index: int) -> bool:
     """Whether ``node``'s action may run at ``step_index``.
 
-    A node is not ready if it has already terminally failed/skipped, or if it
-    is still inside a retry cooldown window.
+    A node is not ready if it has already terminally failed/skipped, if it is a
+    pre-authored fallback still parked behind its primary, or if it is still
+    inside a retry cooldown window.
     """
     if node.status in (IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED):
+        return False
+    # A parked A->B fallback is BLOCKED, and BLOCKED alone is not a dispatch gate here:
+    # without this check the "sequential" fallback races its own primary. Absent marker
+    # (every existing arm) => unchanged.
+    if is_alternative_pending(node):
         return False
     cooldown = node.details.get(DetailKey.ACTION_COOLDOWN_UNTIL.value)
     if isinstance(cooldown, int) and step_index < cooldown:
@@ -38,9 +45,15 @@ def is_action_ready(node: IdeaNode, step_index: int) -> bool:
 def get_pending_executable_nodes(graph: IdeaDag) -> List[IdeaNode]:
     """Action-bearing (non-merge) nodes that have neither a result nor a
     terminal status — i.e. work the engine still owes before it can finalize.
+
+    A parked A->B fallback is excluded: it is deliberately-unexecuted work, not
+    owed work, so counting it would flag every alternative-branch run as having
+    finalized with outstanding nodes.
     """
     pending: List[IdeaNode] = []
     for node in graph.iter_depth_first():
+        if is_alternative_pending(node):
+            continue
         action = NodeDetailsExtractor.get_action(node.details)
         if action and not NodeDetailsExtractor.is_merge_action(node.details):
             has_result = node.details.get(DetailKey.ACTION_RESULT.value) is not None

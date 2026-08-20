@@ -40,6 +40,14 @@ def _base():
         "plan_library_enabled": False,
         "plan_library_auto_enabled": False,
         "plan_library_action_enabled": False,
+        # generic-advice library (Phase 1 playbook wiring) — two independent consumers
+        "strategy_library_enabled": False,
+        "strategy_library_native_expansion_enabled": False,
+        # branching schema + its two consumers (sequential A->B fallback, concurrent race)
+        "expansion_alternative_branch_enabled": False,
+        "got_alternative_branch_promote_on_fail_enabled": False,
+        "got_alternative_branch_promote_on_unverified_enabled": False,
+        "merge_race_winner_selection_enabled": False,
         "native_reasoning_effort_discipline_enabled": False,
         "price_tier_param_tiering_enabled": False,
         # live-proven 2026-08-06, shipped default flipped ON 2026-08-14 — the one exception to
@@ -439,6 +447,73 @@ def test_arm_good_adaptive_nodedup_differs_from_good_adaptive_only_in_dedup():
     assert control["got_dedup_enabled"] is True
     assert settings["max_branching"] == control["max_branching"]
     assert settings["got_beam_max"] == control["got_beam_max"]
+
+
+def test_arm_good_adaptive_playbook_is_good_adaptive_plus_exactly_the_new_axes():
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    playbook = _GOT_ARM_PROFILES["good_adaptive_playbook"]
+    # Everything good_adaptive sets, this arm sets identically -- it is a copy plus axes.
+    assert all(playbook[k] == v for k, v in base.items())
+    assert set(playbook) - set(base) == {
+        "strategy_library_enabled",
+        "strategy_library_native_expansion_enabled",
+        "expansion_alternative_branch_enabled",
+        "got_alternative_branch_promote_on_fail_enabled",
+        "got_alternative_branch_promote_on_unverified_enabled",
+        # a genuine NEW requirement of this arm: it is the unverified trigger's signal
+        # source and good_adaptive leaves it off.
+        "got_contract_veto_requires_datum_enabled",
+        "merge_race_winner_selection_enabled",
+    }
+    settings = _base()
+    _apply_got_experiment_overrides(
+        settings, environ={"IDEA_TEST_ARM": "good_adaptive_playbook"}
+    )
+    for key in set(playbook) - set(base):
+        assert settings[key] is True, key
+    assert settings["final_require_grounding"] is True
+
+
+def test_playbook_ablation_arms_each_add_exactly_one_axis():
+    """Without single-axis ablations a negative combined result is unattributable."""
+    base = set(_GOT_ARM_PROFILES["good_adaptive"])
+    expected = {
+        "good_adaptive_playbook_notes_only": {
+            "strategy_library_enabled",
+            "strategy_library_native_expansion_enabled",
+        },
+        "good_adaptive_playbook_altbranch_only": {
+            "expansion_alternative_branch_enabled",
+            "got_alternative_branch_promote_on_fail_enabled",
+            "got_alternative_branch_promote_on_unverified_enabled",
+            "got_contract_veto_requires_datum_enabled",
+        },
+        "good_adaptive_playbook_race_only": {
+            "expansion_alternative_branch_enabled",
+            "merge_race_winner_selection_enabled",
+        },
+    }
+    for arm, added in expected.items():
+        profile = _GOT_ARM_PROFILES[arm]
+        assert set(profile) - base == added, arm
+        assert all(profile[k] == v for k, v in _GOT_ARM_PROFILES["good_adaptive"].items()), arm
+        assert profile["final_require_grounding"] is True, arm
+    # Every axis of the combined arm is covered by exactly one ablation.
+    covered = set().union(*expected.values())
+    assert covered == set(_GOT_ARM_PROFILES["good_adaptive_playbook"]) - base
+
+
+def test_race_only_arm_arms_no_promotion_trigger():
+    """Race and fallback share the authoring schema flag but nothing else: the race
+    ablation must not smuggle the fallback mechanism in with it."""
+    settings = _base()
+    _apply_got_experiment_overrides(
+        settings, environ={"IDEA_TEST_ARM": "good_adaptive_playbook_race_only"}
+    )
+    assert settings["merge_race_winner_selection_enabled"] is True
+    assert settings["expansion_alternative_branch_enabled"] is True
+    assert settings["got_alternative_branch_promote_on_fail_enabled"] is False
+    assert settings["got_alternative_branch_promote_on_unverified_enabled"] is False
 
 
 def test_arm_reexpand_only_expands_expected_flags():

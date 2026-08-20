@@ -485,6 +485,81 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "final_require_grounding": True,   # validity gate, on in every arm
         "got_dedup_enabled": False,        # the one axis under test
     },
+    # The DAG v2 shape-spectrum arm: `good_adaptive` plus the three new axes that let a
+    # structured run span parallel breadth, sequential chains, AND the middle ground of
+    # "several candidate approaches, some of which fail" — a playbook note in the expansion
+    # prompt, a pre-authored A->B fallback, and a concurrent race resolved to one winner at
+    # the merge point.
+    #
+    # `got_contract_veto_requires_datum_enabled` is a genuine new REQUIREMENT of this arm,
+    # not a copy: `good_adaptive` leaves it off, and the fallback's unverified-datum trigger
+    # has no signal without it. `auto_parallel_siblings` and `enable_recursive_merge` already
+    # default True globally, so they need no override here.
+    "good_adaptive_playbook": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        # axis 1: generic strategic advice, retrieved from the leak-gated library
+        "strategy_library_enabled": True,
+        "strategy_library_native_expansion_enabled": True,
+        # axes 2+3: the branching schema, plus both consumers of what it authors
+        "expansion_alternative_branch_enabled": True,
+        "got_alternative_branch_promote_on_fail_enabled": True,
+        "got_alternative_branch_promote_on_unverified_enabled": True,
+        "got_contract_veto_requires_datum_enabled": True,
+        "merge_race_winner_selection_enabled": True,
+    },
+    # Three single-axis ablations of the arm above (same cheap pattern as
+    # `good_adaptive_nodedup`): each is `good_adaptive` plus exactly ONE of its three new
+    # axes. Without them a negative combined result is unattributable to any one mechanism.
+    "good_adaptive_playbook_notes_only": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "strategy_library_enabled": True,
+        "strategy_library_native_expansion_enabled": True,
+    },
+    # The alt-branch axis carries `contract_veto_requires_datum` with it: it is that
+    # trigger's signal source, not an independent lever, so splitting them would leave this
+    # ablation testing half a mechanism.
+    "good_adaptive_playbook_altbranch_only": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "expansion_alternative_branch_enabled": True,
+        "got_alternative_branch_promote_on_fail_enabled": True,
+        "got_alternative_branch_promote_on_unverified_enabled": True,
+        "got_contract_veto_requires_datum_enabled": True,
+    },
+    # Race needs the schema flag too (nothing authors a `race_group` without it), but NOT
+    # either promotion flag: an authored fallback simply retires unused here.
+    "good_adaptive_playbook_race_only": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "expansion_alternative_branch_enabled": True,
+        "merge_race_winner_selection_enabled": True,
+    },
     "reexpand_only": {
         "got_reexpand_enabled": True,
         "got_reexpand_max_iterations": 2,

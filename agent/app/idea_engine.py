@@ -39,6 +39,7 @@ from agent.app.idea_policies.mandate_requirements import parse_mandate_requireme
 from agent.app.idea_policies.grounding import evaluate_grounding
 from agent.app.idea_policies.candidate_coverage import evaluate_candidate_coverage
 from agent.app.idea_policies import plan_library as _plan_library
+from agent.app.idea_policies import alternative_branch as _alternative_branch
 from agent.app.idea_policies import plan_library_search as _plan_search
 from agent.app.plan_library import retrieval as _plan_retrieval
 from agent.app.testing import contract_log as _contract_log
@@ -1490,6 +1491,19 @@ class IdeaDagEngine:
                     f"onto their producer siblings (sequential execution)"
                 )
 
+        # Branching post-expand wiring (opt-in, `expansion_alternative_branch_enabled`):
+        # the authored `alternative_of` / `race_group` hints name candidate TITLES, and only
+        # now do those candidates have node ids to point at. Same two-phase shape, and same
+        # reason, as the plan-library linking above.
+        if self._cfg.expansion.alternative_branch_enabled and created_children:
+            parked = _alternative_branch.link_alternatives(created_children)
+            raced = _alternative_branch.link_race_groups(node, created_children)
+            if parked or raced:
+                self._logger.info(
+                    f"[STEP {step_index}] BRANCHING: parked {parked} fallback child(ren) "
+                    f"behind their primary; registered {raced} racing child(ren)"
+                )
+
         parent_goal = node.details.get(DetailKey.GOAL.value) or node.title
         if not node.details.get(DetailKey.GOAL.value):
             node.details[DetailKey.GOAL.value] = parent_goal
@@ -1830,6 +1844,12 @@ class IdeaDagEngine:
                 continue
             if child.status in (IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED):
                 continue
+            # Eligibility exclusion 1 of 4 for a parked A->B fallback. Redundant with
+            # `_is_action_ready` below by construction, and stated anyway: this loop is the
+            # canonical "what may run next" filter, so the guard belongs where a reader
+            # looking for it will look.
+            if _alternative_branch.is_alternative_pending(child):
+                continue
             if not self._is_action_ready(child, step_index):
                 continue
             eligible.append(child_id)
@@ -1909,9 +1929,15 @@ class IdeaDagEngine:
             execute_all = False
 
         if execute_all and self._cfg.engine.allow_execute_all_children and not has_dependencies:
+            # Eligibility exclusion 4 of 4: the parallel batch's own candidate list. Stated
+            # explicitly rather than left to `_is_action_ready`, because this is the list
+            # whose contents are dispatched CONCURRENTLY — the one place where letting a
+            # parked fallback slip through would run it alongside its own primary.
             ready_children = [
                 cid for cid in eligible
-                if (c := graph.get_node(cid)) and self._is_action_ready(c, step_index)
+                if (c := graph.get_node(cid))
+                and not _alternative_branch.is_alternative_pending(c)
+                and self._is_action_ready(c, step_index)
             ]
             if not ready_children:
                 return node_id
@@ -1988,8 +2014,23 @@ class IdeaDagEngine:
                     # concurrently across siblings below.
                     self._handle_action_result(graph, cid, step_index)
                     node = graph.get_node(cid)
+                    self._record_race_completion(node, step_index)
                     if node and node.status == IdeaNodeStatus.DONE:
                         done_children.append(cid)
+
+            # Sequential A->B fallback, call site 2 of 2. This path bypasses
+            # `_apply_action_result` entirely, and its FAILED/timeout children `continue` with
+            # no follow-up processing of any kind -- so without this branch the trigger would
+            # simply never fire for a batched sibling. Applied sequentially (never inside a
+            # gather): each promotion re-reads the shared `max_total_nodes` ceiling. A
+            # promoted primary drops out of the DONE follow-up chain below, same preemption
+            # rule as the sequential path.
+            promoted = {
+                cid for cid in ready_children
+                if self._maybe_promote_alternative_branch(graph, cid)
+            }
+            if promoted:
+                done_children = [cid for cid in done_children if cid not in promoted]
 
             # Score the batch. The sequential path evaluates its children before choosing
             # one; this path chooses nothing, so it used to return with every sibling's
@@ -2086,7 +2127,12 @@ class IdeaDagEngine:
             if NodeDetailsExtractor.is_merge_action(child.details):
                 scored_eligible.append(child_id)
                 continue
+            # Eligibility exclusion 3 of 4. This BLOCKED special-case exists to keep a node
+            # that is merely mid-retry in the running, and it is exactly what would wave a
+            # parked fallback through: the fallback is BLOCKED too, and unscored.
             if child.status == IdeaNodeStatus.BLOCKED:
+                if _alternative_branch.is_alternative_pending(child):
+                    continue
                 scored_eligible.append(child_id)
                 continue
             if child.score is None and not allow_unscored:
@@ -2499,6 +2545,13 @@ class IdeaDagEngine:
         """
         status = self._handle_action_result(graph, node_id, step_index)
         node = graph.get_node(node_id)
+        self._record_race_completion(node, step_index)
+        # Sequential A->B fallback, call site 1 of 2. Deliberately OUTSIDE the DONE gate
+        # below: the FAILED case is this mechanism's primary trigger and the existing
+        # follow-up chain never fires for FAILED at all. Checked before F6/confidence-
+        # reexpand so a pre-authored alternative preempts an invented follow-up.
+        if self._maybe_promote_alternative_branch(graph, node_id):
+            return status
         if node and node.status == IdeaNodeStatus.DONE:
             # Contract log (env-gated, no-op unless IDEA_TEST_CONTRACT_LOG): what the
             # deterministic contract check made of this completed leaf. Calls
@@ -2635,6 +2688,93 @@ class IdeaDagEngine:
             return False
         if graph.node_count() >= self._cfg.engine.max_total_nodes:
             return False
+        return True
+
+    @staticmethod
+    def _record_race_completion(node, step_index: int) -> None:
+        """Stamp a race member's completion step, for the winner chain's tie-break.
+
+        The graph keeps no per-node completion time, and this is the only ordering signal
+        available to ``SimpleMergePolicy.select_winner`` at merge time. Written only for a
+        node that actually carries a race label, so it is inert on every other path.
+        """
+        if node is None or not isinstance(node.details, dict):
+            return
+        if not node.details.get(DetailKey.RACE_GROUP.value):
+            return
+        node.details.setdefault(_alternative_branch.RACE_COMPLETED_STEP, step_index)
+
+    def _maybe_promote_alternative_branch(self, graph: IdeaDag, primary_node_id: str) -> bool:
+        """Sequential A->B fallback: release a pre-authored alternative, or retire it.
+
+        Fires only for a node that actually owns a fallback
+        (``DetailKey.HAS_ALTERNATIVE_NODE``, written by
+        ``alternative_branch.link_alternatives``). Every existing arm authors none, so this
+        is a single dict lookup and a ``False`` on every other path.
+
+        Mechanical throughout — status and contract comparisons, zero open-ended judgment,
+        no LLM call. The primary's route is abandoned when:
+
+        * it ended ``FAILED``, or
+        * it ended ``DONE`` with a satisfied step contract that verified no measurable DATUM.
+          That is F35's distinction: satisfied-on-subject-tokens-only means "I opened a page
+          that repeats the words of my own goal", which is true of every wrong-but-plausible
+          route as well. Requires ``contract_veto_requires_datum_enabled`` (with
+          ``contract_reexpand_enabled`` behind ``_contract_verdict``), rather than reading a
+          datum signal nothing else in the run is configured to trust.
+
+        A primary that reaches a terminal status WITHOUT tripping either trigger retires its
+        fallback to ``SKIPPED``. This is not tidying: the fallback is parked in ``BLOCKED``,
+        and a child left BLOCKED forever stalls the parent's
+        ``are_children_ready_to_merge`` check, so the successful case would never merge.
+
+        :returns: True only when a fallback was promoted to ``PENDING`` (the caller then
+            skips the primary's DONE follow-up chain — a pre-authored alternative preempts
+            an invented one, which costs nothing and avoids a wasted LLM call).
+        """
+        node = graph.get_node(primary_node_id)
+        if not node:
+            return False
+        alternative_id = node.details.get(DetailKey.HAS_ALTERNATIVE_NODE.value)
+        if not isinstance(alternative_id, str) or not alternative_id:
+            return False
+        alternative = graph.get_node(alternative_id)
+        if alternative is None or not _alternative_branch.is_alternative_pending(alternative):
+            return False
+        if node.status not in (IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED):
+            return False
+
+        cfg = self._cfg.got
+        reason: Optional[str] = None
+        if node.status == IdeaNodeStatus.FAILED:
+            if cfg.alternative_branch_promote_on_fail_enabled:
+                reason = "primary_failed"
+        elif (
+            cfg.alternative_branch_promote_on_unverified_enabled
+            and cfg.contract_veto_requires_datum_enabled
+        ):
+            verdict = self._contract_verdict(graph, primary_node_id)
+            if verdict is not None and verdict.satisfied and not verdict.datum_verified:
+                reason = "primary_unverified_datum"
+
+        if reason is None or graph.node_count() >= self._cfg.engine.max_total_nodes:
+            alternative.details.pop(_alternative_branch.ALTERNATIVE_PENDING, None)
+            alternative.details[_alternative_branch.ALTERNATIVE_RETIRED] = True
+            alternative.status = IdeaNodeStatus.SKIPPED
+            return False
+
+        alternative.details.pop(_alternative_branch.ALTERNATIVE_PENDING, None)
+        alternative.details[_alternative_branch.ALTERNATIVE_TRIGGER_REASON] = reason
+        alternative.status = IdeaNodeStatus.PENDING
+        self._logger.info(
+            f"[ALT-BRANCH] primary {primary_node_id[:8]} ({node.status.value}, {reason}); "
+            f"promoting pre-authored fallback {alternative_id[:8]}: "
+            f"{alternative.title[:60]}"
+        )
+        self._record_decision(
+            "alternative_branch", node_id=alternative_id, chosen=alternative.title,
+            rationale=reason, metadata={"primary_node_id": primary_node_id},
+        )
         return True
 
     def _contract_verdict(self, graph: IdeaDag, node_id: str):

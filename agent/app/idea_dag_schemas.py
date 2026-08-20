@@ -117,6 +117,88 @@ EXPANSION_JSON_SCHEMA_WITH_EXPECT: Dict[str, Any] = {
     }
 }
 
+# Opt-in variant (``expansion_alternative_branch_enabled``) that carries everything
+# ``EXPANSION_JSON_SCHEMA_WITH_EXPECT`` does plus two OPTIONAL per-candidate structural
+# fields. Both are narrow, fixed-vocabulary questions asked once at ordinary authoring time
+# (no extra LLM call, no open-ended "should I try something else?" self-assessment) — the
+# only shape of structural question a weak model can be expected to answer.
+#
+# Superset rather than a third orthogonal variant: the branching arm always wants the leaf
+# output contract too, and two independently-composable schema dicts would multiply into
+# four variants for one extra flag.
+EXPANSION_JSON_SCHEMA_WITH_BRANCHING: Dict[str, Any] = {
+    "name": "expansion_result",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "candidates": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string"
+                        },
+                        "action": {
+                            "type": "string"
+                        },
+                        "details": {
+                            "type": "object"
+                        },
+                        "expect": {
+                            "type": "string",
+                            "description": (
+                                "Optional. For a LEAF candidate only: a one-line measurable "
+                                "output contract — the exact value to report AND that its "
+                                "source URL must accompany it. Omit for non-leaf/aggregation "
+                                "candidates."
+                            )
+                        },
+                        "alternative_of": {
+                            "type": "string",
+                            "description": (
+                                "Optional. Set ONLY when this candidate is a fallback for "
+                                "another candidate in this same list: the exact title of that "
+                                "other candidate. The fallback is held back and only runs if "
+                                "the candidate it names does not work out. Most candidates "
+                                "leave this unset."
+                            )
+                        },
+                        "race_group": {
+                            "type": "string",
+                            "description": (
+                                "Optional. A short label set on 2+ candidates that are "
+                                "different ways to find the SAME fact and are worth trying "
+                                "concurrently. Use the same label on every member of a group. "
+                                "Leave unset for candidates that each find a DIFFERENT fact."
+                            )
+                        }
+                    },
+                    "required": [
+                        "title",
+                        "action",
+                        "details"
+                    ],
+                    "additionalProperties": False
+                }
+            },
+            "meta": {
+                "type": "object",
+                "properties": {
+                    "execute_all_children": {
+                        "type": "boolean"
+                    }
+                },
+                "additionalProperties": False
+            }
+        },
+        "required": [
+            "candidates"
+        ],
+        "additionalProperties": False
+    }
+}
+
 EVALUATION_JSON_SCHEMA: Dict[str, Any] = {
     "name": "evaluation_result",
     "schema": {

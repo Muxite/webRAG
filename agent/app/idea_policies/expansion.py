@@ -178,6 +178,23 @@ _EXPECT_CONTRACT_ADDENDUM = (
 )
 
 
+# Opt-in expansion addendum (``expansion_alternative_branch_enabled``): explains the two
+# optional structural fields ``EXPANSION_JSON_SCHEMA_WITH_BRANCHING`` advertises. Framed as
+# two fixed-vocabulary questions with an explicit "most candidates leave both unset" default,
+# because a weak model asked an open-ended "is there another way?" answers yes every time and
+# doubles the plan.
+_ALTERNATIVE_BRANCH_ADDENDUM = (
+    "MULTIPLE APPROACHES: when a sub-problem has more than one candidate route, say so with "
+    "one of two OPTIONAL top-level fields on a candidate. Use \"alternative_of\": "
+    "\"<exact title of another candidate>\" when this candidate is a BACKUP that should only "
+    "run if that other candidate does not work out — the backup is held back until then. Use "
+    "\"race_group\": \"<short label>\" on TWO OR MORE candidates that are different ways to "
+    "find the SAME fact and are worth trying at once; put the identical label on every member "
+    "of the group, and use a different label (or none) for candidates that find a DIFFERENT "
+    "fact. Most candidates need neither field. Omit both when in doubt."
+)
+
+
 # Opt-in expansion addendum (``strategy_library_native_expansion_enabled``): the native
 # counterpart of the compiled path's aggregation splice
 # (``testing/execution_compiled.py::_strategy_advice_addendum``). The retrieved note is generic
@@ -596,7 +613,12 @@ class LlmExpansionPolicy(ExpansionPolicy):
         # that advertises the optional per-candidate ``expect`` field, so the text schema
         # hint tells the model it may declare a leaf's measurable target. Default path is
         # byte-identical (the plain schema from settings).
-        if self._cfg.expansion.expect_contract_enabled:
+        # The branching variant is a SUPERSET of the expect variant, so it is checked first
+        # and the two flags compose rather than conflict.
+        if self._cfg.expansion.alternative_branch_enabled:
+            from agent.app.idea_dag_schemas import EXPANSION_JSON_SCHEMA_WITH_BRANCHING
+            json_schema = EXPANSION_JSON_SCHEMA_WITH_BRANCHING
+        elif self._cfg.expansion.expect_contract_enabled:
             from agent.app.idea_dag_schemas import EXPANSION_JSON_SCHEMA_WITH_EXPECT
             json_schema = EXPANSION_JSON_SCHEMA_WITH_EXPECT
         # Opt-in, same lever as the user-prompt framing: ``json_instruction_from_response_format``
@@ -1004,6 +1026,10 @@ class LlmExpansionPolicy(ExpansionPolicy):
         # ``expansion_expect_contract_enabled`` is set. Default path is byte-identical.
         if self._cfg.expansion.expect_contract_enabled:
             system = f"{system}\n\n{_EXPECT_CONTRACT_ADDENDUM}" if system else _EXPECT_CONTRACT_ADDENDUM
+        # Opt-in multiple-approaches fields (fallback / concurrent race). Default path is
+        # byte-identical.
+        if self._cfg.expansion.alternative_branch_enabled:
+            system = f"{system}\n\n{_ALTERNATIVE_BRANCH_ADDENDUM}" if system else _ALTERNATIVE_BRANCH_ADDENDUM
         # Opt-in playbook note, written onto this policy once per run by
         # ``IdeaDagEngine._resolve_native_strategy_advice``. Absent flag, absent attribute or an
         # empty note all leave the prompt byte-identical.
@@ -1412,6 +1438,25 @@ class LlmExpansionPolicy(ExpansionPolicy):
                 elif DetailKey.EXPECT.value in details:
                     # Drop a non-string/empty expect so it never reaches execution.
                     details.pop(DetailKey.EXPECT.value, None)
+
+            # Opt-in: carry the two structural hints through to the node's details so the
+            # post-expand pass (``idea_policies/alternative_branch.py``) can resolve them
+            # against real node ids. Same top-level-or-details tolerance as ``expect``, and
+            # the same drop-if-unusable rule, so a malformed hint never reaches dispatch.
+            if self._cfg.expansion.alternative_branch_enabled:
+                from agent.app.idea_policies import alternative_branch as _alt_branch
+
+                for src_key, dest_key in (
+                    (_alt_branch.ALTERNATIVE_OF_HINT, _alt_branch.ALTERNATIVE_OF_HINT),
+                    (DetailKey.RACE_GROUP.value, DetailKey.RACE_GROUP.value),
+                ):
+                    raw = candidate.get(src_key)
+                    if raw is None:
+                        raw = details.get(dest_key)
+                    if isinstance(raw, str) and raw.strip():
+                        details[dest_key] = raw.strip()
+                    else:
+                        details.pop(dest_key, None)
 
             candidate_goal = candidate.get("goal")
             local_goal: Optional[str] = None

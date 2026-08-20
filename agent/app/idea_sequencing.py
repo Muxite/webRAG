@@ -133,8 +133,9 @@ def siblings_are_independent(
 ) -> Tuple[bool, str]:
     """Check if candidates can safely execute in parallel (deterministic, no LLM).
 
-    Applies ordered rules: state dependencies, unresolved slots, concrete URLs,
-    mixed search/visit with URLs, disjoint searches, else no independence.
+    Applies ordered rules: state dependencies, unresolved slots, a shared race
+    group, concrete URLs, mixed search/visit with URLs, disjoint searches, else
+    no independence.
 
     :returns: (independent, reason) with reason for debugging.
     """
@@ -153,6 +154,23 @@ def siblings_are_independent(
     for node in nodes:
         if unresolved_slots(node.details, title=node.title):
             return False, "unresolved_slot"
+
+    # An authored race group IS a declaration of independence: its members are different
+    # routes to the SAME fact, so none can consume another's output. The four heuristics
+    # below only recognise independence through URL/query shape, and a realistic race pairs
+    # (say) a SEARCH with a THINK, which matches none of them — the group would wrongly
+    # serialize and the concurrency the mechanism exists for would never happen. Checked
+    # after the two safety gates above (a state dependency or an unresolved slot still wins:
+    # those are facts about dispatch, the label is only an authoring hint) and before the
+    # heuristics. Requires the WHOLE batch to share one label, so a mixed batch of racers and
+    # unrelated siblings is not waved through on the racers' evidence.
+    if len(nodes) >= 2:
+        labels = {
+            (n.details.get(DetailKey.RACE_GROUP.value) or "").strip()
+            for n in nodes
+        }
+        if len(labels) == 1 and next(iter(labels)):
+            return True, "race_group"
 
     def _concrete_url(details) -> Optional[str]:
         for key in ("optional_url", DetailKey.URL.value, DetailKey.LINK.value, "url", "link"):

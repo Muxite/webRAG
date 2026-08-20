@@ -182,3 +182,17 @@ class DetailKey(str, Enum):
     # decomposition, so the leaf is also marked ``SKIPPED``. Absent by default (the trigger
     # is opt-in).
     FALLBACK_SUPERSEDED = "fallback_superseded"
+    # Sequential A->B fallback (opt-in, gated by ``expansion_alternative_branch_enabled``):
+    # the node id of the PRIMARY this node is a pre-authored fallback for. Written by
+    # ``idea_policies/alternative_branch.link_alternatives`` once ``graph.expand()`` has
+    # minted real ids, resolved from the authored ``alternative_of`` title hint.
+    ALTERNATIVE_OF_NODE = "alternative_of_node"
+    # The back-pointer of ``ALTERNATIVE_OF_NODE``, written on the PRIMARY: the node id of the
+    # fallback to promote when the primary fails or lands unverified. Its absence (every
+    # existing arm) is what makes ``_maybe_promote_alternative_branch`` a no-op.
+    HAS_ALTERNATIVE_NODE = "has_alternative_node"
+    # Concurrent race-and-merge (same flag): the authored label shared by 2+ siblings that
+    # are different routes to the SAME fact. Read by ``idea_sequencing.siblings_are_independent``
+    # to dispatch the group concurrently and by ``SimpleMergePolicy.select_winner`` to resolve
+    # one winner at the merge point. Absent by default.
+    RACE_GROUP = "race_group"
