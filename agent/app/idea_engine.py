@@ -233,6 +233,7 @@ class IdeaDagEngine:
         self._memory_manager = MemoryManager(
             connector_chroma=self.io.connector_chroma,
             namespace=namespace,
+            similarity_floor=self._cfg.memory.retrieval_similarity_floor,
         )
         self._got = GoTOperations(
             settings=self.settings,

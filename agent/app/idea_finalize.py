@@ -429,7 +429,17 @@ async def _retrieve_final_chroma_context(
     mandate: str,
     graph: IdeaDag,
     n_results: int = 20,
+    rank_by_similarity: bool = False,
 ) -> str:
+    """Pool memories from four query batches (mandate, merge summaries, node titles, URLs).
+
+    ``rank_by_similarity`` decides what the ``n_results`` cap keeps. OFF (shipped) keeps the
+    first ``n_results`` in the order the batches were ISSUED, so a distant hit from the
+    mandate query outranks a near one from the URL query purely because it was asked first
+    (ASSUMPTION_AUDIT.md T3-3). ON sorts by the similarity the retrieval already computed,
+    stably, so equal-similarity rows keep their arrival order and the OFF path stays the
+    exact historical one.
+    """
     if not memory_manager:
         return ""
 
@@ -488,9 +498,13 @@ async def _retrieve_final_chroma_context(
     for uq in url_queries[:5]:
         await _query(uq, 3)
 
+    pooled = all_memories
+    if rank_by_similarity:
+        pooled = sorted(all_memories, key=lambda m: -float(m.get("similarity") or 0.0))
+
     unique = []
     final_seen = set()
-    for mem in all_memories:
+    for mem in pooled:
         content = mem.get("content", "")
         content_key = content[:200]
         if content_key in final_seen:
@@ -826,6 +840,7 @@ async def build_final_payload(
         mandate=mandate,
         graph=graph,
         n_results=n_final_chroma,
+        rank_by_similarity=cfg.memory.final_context_rank_by_similarity,
     )
 
     # Compact merged results — strip large raw content fields

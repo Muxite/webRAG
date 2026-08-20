@@ -3,7 +3,7 @@ import logging
 import uuid
 from typing import List, Dict, Any, Optional
 from agent.app.connector_chroma import ConnectorChroma
-from agent.app.plan_library.retrieval import read_collection_space
+from agent.app.plan_library.retrieval import read_collection_space, similarity_from_distance
 
 #: Creation-time config for a ``mem_*`` collection. Applied only when the collection does
 #: not exist yet; chroma's default would be ``l2`` (SQUARED euclidean), which makes
@@ -22,8 +22,17 @@ class MemoryManager:
 
     :param connector_chroma: ChromaDB connector instance.
     :param namespace: Isolation namespace (hashed into collection name).
-    :param chunk_size: Max characters per chunk.
+    :param chunk_size: Max characters per chunk. 800 is sized to the EMBEDDER, not to a
+        reading window: chroma's bundled ``all-MiniLM-L6-v2`` truncates at 256 wordpieces
+        (~1000 English characters), so anything materially larger is embedded from its
+        prefix only and the tail becomes unsearchable text stored under a vector that does
+        not describe it. This is why it does NOT match ``memory.document_chunk_size``
+        (4000), which slices an oversized page into DAG sub-problem NODES for an LLM to read
+        (``idea_chunking.create_chunk_subproblems``) and never reaches an embedding call.
+        Different jobs, different units; see ASSUMPTION_AUDIT.md T3-2.
     :param chunk_overlap: Overlap characters between consecutive chunks.
+    :param similarity_floor: Minimum cosine similarity a retrieved memory must clear.
+        ``0.0`` (the shipped default) admits everything, which is the historical behaviour.
     """
 
     PARALLEL_CHUNK_THRESHOLD = 20
@@ -34,11 +43,13 @@ class MemoryManager:
         namespace: str,
         chunk_size: int = 800,
         chunk_overlap: int = 100,
+        similarity_floor: float = 0.0,
     ):
         self.connector_chroma = connector_chroma
         self.namespace = namespace
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.similarity_floor = float(similarity_floor or 0.0)
         namespace_hash = hashlib.sha256(namespace.encode("utf-8")).hexdigest()[:12]
         self.collection_name = f"mem_{namespace_hash}"
         self._logger = logging.getLogger(__name__)
@@ -129,17 +140,51 @@ class MemoryManager:
             distances = results.get("distances", [[]])[0] or []
             ids = results.get("ids", [[]])[0] or []
             for i, doc in enumerate(documents):
+                distance = distances[i] if i < len(distances) else 1.0
                 memories.append({
                     "content": doc,
                     "metadata": metadatas[i] if i < len(metadatas) else {},
-                    "distance": distances[i] if i < len(distances) else 1.0,
+                    "distance": distance,
+                    # Converted through the collection's OWN space, so consumers never have
+                    # to redo the l2/cosine arithmetic that T1-1 got wrong. Instrumentation
+                    # only when the floor is off: nothing reads it but the floor and the log.
+                    "similarity": similarity_from_distance(distance, self.distance_space),
                     "id": ids[i] if i < len(ids) else None,
                 })
+            memories = self._apply_similarity_floor(memories, query)
             self._logger.debug(f"Retrieved {len(memories)} memories for query: {query[:100]}")
             return memories
         except Exception as e:
             self._logger.warning(f"Failed to retrieve memories: {e}")
             return []
+
+    def _apply_similarity_floor(
+        self, memories: List[Dict[str, Any]], query: str
+    ) -> List[Dict[str, Any]]:
+        """Drop retrieved memories below :attr:`similarity_floor`.
+
+        A *k*-nearest-neighbour query always returns *k* rows if the corpus holds *k* rows,
+        however far away they are — nearest is not the same as near (ASSUMPTION_AUDIT.md
+        T3-1). The floor is the only place that difference is expressed. It is default-OFF
+        (``0.0``), so a run that does not set it is byte-identical to the historical one;
+        the drop rate is logged whenever it does bite, because a floor that never fires is
+        another inert lever and should be visible as one.
+
+        Returning fewer than ``n_results`` is deliberate: every consumer already handles an
+        empty list (memory degrades, it never breaks a run), so padding with known-irrelevant
+        neighbours would defeat the point.
+        """
+        floor = self.similarity_floor
+        if floor <= 0.0 or not memories:
+            return memories
+        kept = [m for m in memories if m.get("similarity", 0.0) >= floor]
+        dropped = len(memories) - len(kept)
+        if dropped:
+            self._logger.info(
+                f"[MEMORY:FLOOR] dropped {dropped}/{len(memories)} retrieved memories below "
+                f"similarity {floor:.2f} for query: {query[:80]}"
+            )
+        return kept
 
     async def retrieve_memories_split(
         self,
@@ -442,8 +487,15 @@ class MemoryManager:
     def format_memories_for_llm(self, memories: List[Dict[str, Any]], max_chars: int = 2000) -> str:
         """
         Format memories into an LLM-readable string.
+
+        The budget STOPS at the first entry that would overflow rather than skipping it and
+        trying the next: a memory block is a ranked prefix, and admitting a short low-ranked
+        entry over a long high-ranked one would silently reorder it.
+
         :param memories: Memory dicts from retrieve_relevant_memories.
-        :param max_chars: Character budget.
+        :param max_chars: Character budget. Every live caller passes its own (finalize
+            80000, expansion 4000), so this default is a floor for ad-hoc callers, not the
+            budget any shipped path runs under (ASSUMPTION_AUDIT.md T3-4).
         :returns: Formatted string.
         """
         if not memories:

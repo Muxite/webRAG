@@ -708,8 +708,20 @@ class MemoryConfig:
     # an intended call site. Leaf/semantic retrieval keeps using its own explicit top-k.
     max_available_links_for_expansion: int = 50
     grep_context_window: int = 80
+    # Minimum cosine similarity a retrieved memory must clear before it may enter a prompt
+    # (ASSUMPTION_AUDIT.md T3-1: a k-NN query returns k rows however far away they are).
+    # 0.0 = admit everything = the behaviour every measurement to date was taken under, so
+    # this ships OFF; it is a lever for E3, not a tuned value. Raise it only with an A/B.
+    retrieval_similarity_floor: float = 0.0
+    # Rank the finalize prompt's pooled chroma context by similarity before the
+    # final_chroma_results cap, instead of by the order its four query batches were issued
+    # (ASSUMPTION_AUDIT.md T3-3). Off = the historical arrival order.
+    final_context_rank_by_similarity: bool = False
 
-    _KEYS: ClassVar[dict] = {}
+    _KEYS: ClassVar[dict] = {
+        "retrieval_similarity_floor": "memory_retrieval_similarity_floor",
+        "final_context_rank_by_similarity": "final_context_rank_by_similarity",
+    }
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, Any]) -> "MemoryConfig":
