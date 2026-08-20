@@ -1,7 +1,75 @@
 # Design: a unified dependency-DAG with post-evidence scoring and bounded-suffix replanning
 
-Status: design, 2026-08-20. Not built. Large-tier per `docs/DEV_CYCLE.md` — full spec, adversarial
-panel, and pre-registration required before any live spend.
+Status: design + adversarial review complete, 2026-08-20. **Re-scoped after review — see §7.**
+Large-tier per `docs/DEV_CYCLE.md`. §4.1/4.2/4.4 (global authoring pass, dependency-ordered
+dispatch, bounded-suffix replanning) are a **separately-budgeted future project**, not tonight's
+work — the panel found the full spec's validation alone would plausibly cost most or all of the
+remaining budget, and this repo's own evidence (Cycles 15/21/26) says nothing at less than k≥2-3
+under fixture parity should be trusted. §4.3 (post-evidence scoring) turned out to already be
+**empirically tested and insufficient by itself** — see §7's correction. What ships tonight, if
+anything, is the narrower, real slice identified in §7.4.
+
+## 0. Adversarial review findings (two independent panels, full reports in session transcript)
+
+**Panel A (correctness/interaction with tonight's shipped mechanisms) — confirmed problems:**
+- §4.2's claim that `_has_required_data`'s Condition B is "already ancestor-scoped" is backwards —
+  it has no ancestor check at all (`idea_engine.py:1080-1106`); the ancestor-only property observed
+  in practice comes from *who writes* `requires_data` today, not the gate. More importantly, freely
+  authoring `depends_on` edges (as §4.1/4.2 propose) risks silently pulling previously-independent
+  sibling batches out of auto-parallel execution — `idea_sequencing.py`'s `detect_state_dependencies`
+  already serializes any batch where a member carries a data dependency. This is exactly the
+  regression the resolved-value-channel design (`RESOLVED_VALUE_CHANNEL_DESIGN_2026-08-16.md:115-117`)
+  explicitly warned against ("do not widen Condition B... would serialize batches whose dependency is
+  already satisfied"). **A future implementation needs an explicit rule distinguishing a true
+  producer-consumer edge from a soft ordering preference before any global-authoring work starts.**
+- `link_dependencies` (`agent/app/idea_policies/plan_library.py:195-247`, not `plan_library/retrieval.py`
+  as originally assumed) is sibling-scoped and keyed on `PLAN_LIBRARY_LEAF_ID`, a tag that only exists
+  on template-matched nodes. It is **not** directly reusable for organic (non-template) global
+  authoring as originally claimed — it would silently drop every organic dependency reference. Needs
+  a genuine rewrite over a planner-controlled ID space, not reuse.
+- `_resolve_slot` (`idea_engine.py:1124-1199`) hardcodes exactly **one** `source_node_id` per node.
+  `link_dependencies` already hit this same limit and deliberately picks only the deepest single
+  dependency for genuine fan-in cases, with an explicit comment that multi-source fan-in isn't
+  handled. **The mechanism the spec calls "directly reusable" cannot express real fan-in — the exact
+  problem PART 0 names as the headline finding.** Any future implementation needs new multi-source
+  resolution, not reuse of the existing single-source mechanism.
+- F9's non-root template short-circuit guard fires per-node from `_handle_expansion_node`; if a
+  global authoring pass genuinely replaces per-node expansion calls, this guard loses its natural
+  re-entry point unless the redesign still calls into a per-node function for every authored node
+  (unspecified in the original draft).
+
+**Panel B (scope/cost/feasibility) — confirmed problems:**
+- The full spec reads as "build everything, then validate" for a single overnight session with
+  ~$11 remaining. A properly-powered validation of a new arm against 3 existing arms, 9+8 tasks,
+  3 model tiers, k≥2-3 is easily 150-300+ live cells — plausibly $3-15+ by itself, eating most or
+  all of what's left, before accounting for the inevitable rebuild-on-failure iterations
+  implementation always needs.
+- `README.md`'s own documented rationale for staying with native (not compiled) as the emphasis
+  directly warns against exactly what §4.1 proposed making default: "compiled trades adaptability for
+  a narrower, harder-to-validate gain — a fixed plan can't react to what a step actually reveals."
+  §4.4 (bounded-suffix replanning) was the least concretely specified section, yet it's the entire
+  mitigation for this documented objection.
+- "Plan → act → observe → decide" is already `README.md`/`ADAPTIVE_ENGINE.md`'s stated intent for
+  DAG v2, unrealized. This redesign is better framed as *finishing DAG v2's own documented design*
+  than as a new competing architecture — which argues for landing it incrementally against that
+  existing target, not as one big new proposal.
+- **Recommended phasing**: tonight (if anything) = the smallest de-risked slice; next session,
+  separately pre-registered = schema + native dispatch on the chain-set only; future, separately
+  budgeted = full authoring-pass replacement + bounded-suffix replanning.
+
+## §7 correction — the panel's proposed "cheap slice" is already falsified by tonight's own data
+
+Panel B's recommended minimal slice — promote `evaluate_parallel_siblings` from opt-in to default —
+was proposed without full visibility into tonight's cycle history (the panel reviewed this document,
+not the full 26-cycle session). **This exact flag was already live-tested tonight, in Cycle 6**:
+37.5% flat-scoring rate off vs. 40.0% on, p=1.0 (n=31 live). The mechanism does work mechanically
+(the code-level cap lifts, candidates can score above 0.5), but the judge's own opinion still lands
+on the same `<=0.2` "no action result" rubric band regardless of execution status, because the
+rubric text doesn't distinguish "unexecuted" from "executed but scored in a context where the rubric
+still nominally applies." Cycle 11's separate rubric-text rewrite also failed to clear significance.
+**There is no cheap, already-available flag flip that fixes post-evidence scoring — the panel's
+proposed safe slice does not exist as described.** §7.4 below identifies what actually is safely
+buildable tonight instead.
 
 ## 1. Why this document exists
 
@@ -178,6 +246,33 @@ alternate mode selected by a separate variant flag. Concretely:
 - **Not a change to the weak-model-facing action vocabulary** — search/visit/think stays the fixed,
   narrow schema weak models fill one field of at a time; no new open-ended authoring burden is placed
   on any model below the strong planner tier.
+
+### §7.4 — the actual safe slice, for a follow-up session, not tonight
+
+Given the session's remaining budget/time is nearly exhausted (this document was finalized ~12
+hours into the run), no implementation was started tonight. The genuinely safe, valuable,
+narrowly-scoped increment for a follow-up session is **not** a flag flip (§7 correction) and **not**
+the full global-authoring-pass replacement (too risky per Panel A, too expensive to validate per
+Panel B). It is:
+
+**Multi-source fan-in resolution at merge/join nodes only** — extend `_resolve_slot`
+(`idea_engine.py:1124-1199`) or a sibling mechanism to accept multiple `source_node_id`s for a single
+resolution target, scoped *only* to the existing merge/join dispatch path (`SimpleMergePolicy`,
+already single-threaded by construction — no auto-parallel-batching interaction, no Condition-B
+widening, no global-authoring-pass risk). This directly targets PART 0's headline finding ("a chain
+task is hop n+1 consuming hop n's value... a tree cannot express fan-in") at the one place in the
+current architecture where genuine fan-in already structurally exists (a join has multiple parents by
+definition) but the *value-resolution* machinery built tonight (Cycles 1/9/10) can't yet consume more
+than one source. This is additive, offline-testable, doesn't touch the schema or the native
+per-node authoring flow, and sidesteps every risk both panels flagged. It should still get its own
+Plan stage and adversarial self-review before implementation — it is a real, if narrow, engine
+change — but it is right-sized for a single dev cycle, unlike §4.1/4.2/4.4.
+
+The `depends_on` schema field, native dependency-ordered dispatch, and bounded-suffix replanning
+(§4.1/4.2/4.4) remain a separately-budgeted future project, informed by this document and by both
+panels' corrections above — most importantly Panel A's finding that an explicit producer-consumer-vs-
+soft-ordering distinction must be designed *before* any global `depends_on` authoring work starts, or
+it will silently serialize today's auto-parallel batches.
 
 ## 5. Rollout discipline (per `docs/DEV_CYCLE.md`, Large tier)
 
