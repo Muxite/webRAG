@@ -2,10 +2,10 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 20 cycles
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 21 cycles
 below are committed; the run continues past this point.
 
-**Spend so far: ~$2.63 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+**Spend so far: ~$2.83 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
 5387 passed / 18 skipped (zero failures across the whole run).
 
 ---
@@ -211,6 +211,22 @@ failures across 81 of 1167 recorded `graph` runs (6.9%)**. Fixed with a default-
 dead URL excluded (extended to harvest the previous hop's own link menu, since the Chroma link index
 was never written for URL-declaring leaves), and only re-raises if nothing recovers. **Live-confirmed
 on task 135: 0.412 → 0.762**, closing nearly all of the remaining gap to the 0.800 no-dedup baseline.
+
+**Cycle 21 — culmination check: re-run the 9-task chain set with F35 on** (benchmark run, no code
+change). With F35 enabled on top of everything else now live by default, re-ran the exact
+`CAPABILITY_SPECTRUM_RESULTS_2026-08-15.md` 9-task chain set against `sequential_react`. **Honest
+result: the W/T/L tally did not move — bucket-for-bucket identical 2W/2T/5L with or without F35.**
+Task 136 (the traced case) reproduced its improvement independently a second time (0.183→0.333).
+Two apparent regressions (065, 135) carry a strong network-artifact signature (only 1 visit
+recorded, action-level 20s timeouts, short duration) rather than looking F35-caused; excluding them
+the 7-task subset shows a modest positive delta (+0.053), consistent with tonight's earlier finding.
+**Read: F35 stays a real, mechanistically-understood, per-task-effective fix, but is not yet strong
+enough evidence for a default flip** — needs k>=2 reruns on the two ambiguous cells, a second model,
+and ideally a larger chain-task set before that call, since a single win/loss flip on 9 tasks moves
+the tally by more than 10 points. **The chain-vs-seq_react gap itself remains genuinely open** after
+21 cycles of real, verified structural fixes — this appears to be a harder problem than any single
+bug, consistent with Cycle 12's own read that the remaining lever is an architecture change (score
+outcomes, not plans), not another incremental fix.
 
 ---
 
