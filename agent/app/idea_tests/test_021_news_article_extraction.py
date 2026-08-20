@@ -6,7 +6,17 @@ Category: News Content Analysis
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import (
+    extract_final_text, evidence_text as _evidence_text, visited_domains as _visited_domains,
+    visited_evidence as _visited_evidence,
+)
+
+
+_NEWS_DOMAINS = {
+    "reuters": "reuters.com", "bbc": "bbc.co", "cnn": "cnn.com", "guardian": "theguardian.com",
+    "nytimes": "nytimes.com", "wsj": "wsj.com", "ap news": "apnews.com",
+    "the verge": "theverge.com", "techcrunch": "techcrunch.com", "wired": "wired.com",
+}
 
 
 def get_test_metadata() -> Dict[str, Any]:
@@ -55,58 +65,79 @@ def get_success_criteria() -> List[str]:
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate multiple visits executed."""
-    visit_count = observability.get("visit", {}).get("count", 0)
-    passed = visit_count >= 2
+    """GROUNDING: distinct real visited domains, not a raw activity counter — visiting the same
+    page twice (or a failed visit) must not count as covering two different sources."""
+    n = len(_visited_domains(result, observability))
+    passed = n >= 2
     return {
         "check": "multiple_visits",
         "passed": passed,
-        "score": min(1.0, visit_count / 2.0),
-        "visit_count": visit_count,
-        "reason": f"Found {visit_count} visit(s)" if passed else "Insufficient visits",
+        "score": min(1.0, n / 2.0),
+        "visit_count": n,
+        "reason": f"Found {n} distinct visited domain(s)" if passed else "Insufficient distinct visits",
     }
 
 
 def validate_news_sources(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate different news sources visited."""
+    """GROUNDING: a claimed news source only counts if that source's domain was actually
+    visited — naming "Reuters" in the output text is not evidence Reuters was ever read."""
     final_text = extract_final_text(result).lower()
-    news_keywords = ["reuters", "bbc", "cnn", "guardian", "nytimes", "wsj", "ap news", "the verge", "techcrunch", "wired"]
-    found_sources = [kw for kw in news_keywords if kw in final_text]
+    domains = _visited_domains(result, observability)
+    found_sources = [
+        kw for kw, dom in _NEWS_DOMAINS.items()
+        if kw in final_text and any(dom in d for d in domains)
+    ]
     passed = len(found_sources) >= 2
     return {
         "check": "news_sources",
         "passed": passed,
         "score": min(1.0, len(found_sources) / 2.0),
         "sources_found": found_sources,
-        "reason": f"Found {len(found_sources)} news source(s)" if passed else "Insufficient news sources",
+        "reason": f"Found {len(found_sources)} genuinely-visited news source(s)" if passed else "Insufficient grounded news sources",
     }
 
 
 def validate_headlines(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate headlines extracted."""
+    """GROUNDING: a reported headline only counts if most of its words actually appear in the
+    real fetched content of a visited page — otherwise a model can invent a plausible-shaped
+    "Headline: ..." line with no connection to anything it read."""
     final_text = extract_final_text(result)
-    headline_pattern = re.findall(r"(headline|title):\s*([A-Z][^.!?]{20,})", final_text, re.IGNORECASE)
-    has_headlines = len(headline_pattern) >= 2
+    headline_pattern = re.findall(r"(?:headline|title):\s*([A-Z][^.!?]{20,})", final_text, re.IGNORECASE)
+    evidence_text = _evidence_text(result, observability)
+    grounded = 0
+    for headline in headline_pattern:
+        words = re.findall(r"[a-zA-Z]{4,}", headline.lower())
+        hits = sum(1 for w in words if w in evidence_text)
+        if words and hits / len(words) >= 0.5:
+            grounded += 1
+    passed = grounded >= 2
     return {
         "check": "headlines",
-        "passed": has_headlines,
-        "score": min(1.0, len(headline_pattern) / 2.0),
-        "headline_count": len(headline_pattern),
-        "reason": f"Found {len(headline_pattern)} headline(s)" if has_headlines else "Headlines not found",
+        "passed": passed,
+        "score": min(1.0, grounded / 2.0),
+        "headline_count": grounded,
+        "reason": f"Found {grounded} evidence-grounded headline(s)" if passed else "Headlines not grounded in visited content",
     }
 
 
 def validate_dates(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate publication dates mentioned."""
+    """GROUNDING: a claimed publication date only counts if that literal date string appears
+    in the real fetched content of a visited page."""
     final_text = extract_final_text(result)
-    date_pattern = re.findall(r"\b(202[3-5]|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}|\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)", final_text, re.IGNORECASE)
-    has_dates = len(date_pattern) >= 2
+    date_pattern = re.findall(
+        r"\b(?:202[3-5]|jan\w*|feb\w*|mar\w*|apr\w*|may|jun\w*|jul\w*|aug\w*|sep\w*|oct\w*|nov\w*|dec\w*)\s+\d{1,2}\b"
+        r"|\b\d{1,2}\s+(?:jan\w*|feb\w*|mar\w*|apr\w*|may|jun\w*|jul\w*|aug\w*|sep\w*|oct\w*|nov\w*|dec\w*)\b",
+        final_text, re.IGNORECASE,
+    )
+    evidence_text = _evidence_text(result, observability)
+    grounded = [d for d in date_pattern if d.lower() in evidence_text]
+    passed = len(grounded) >= 2
     return {
         "check": "dates",
-        "passed": has_dates,
-        "score": min(1.0, len(date_pattern) / 2.0),
-        "date_count": len(date_pattern),
-        "reason": f"Found {len(date_pattern)} date(s)" if has_dates else "Dates not found",
+        "passed": passed,
+        "score": min(1.0, len(grounded) / 2.0),
+        "date_count": len(grounded),
+        "reason": f"Found {len(grounded)} evidence-grounded date(s)" if passed else "Dates not grounded in visited content",
     }
 
 

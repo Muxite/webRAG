@@ -6,7 +6,10 @@ Category: Sequential Processing
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import (
+    extract_final_text, evidence_text as _evidence_text, visited_domains as _visited_domains,
+    visited_evidence as _visited_evidence,
+)
 
 
 def get_test_metadata() -> Dict[str, Any]:
@@ -82,59 +85,71 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 
 def validate_rust_official(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate Rust official website mentioned."""
+    """GROUNDING: the official Rust site only counts as found if rust-lang.org is one of the
+    actually-visited domains — merely writing "rust-lang.org" in the answer is not evidence it
+    was visited."""
     final_text = extract_final_text(result).lower()
     has_rust = "rust" in final_text
     has_official = "official" in final_text or "rust-lang.org" in final_text or "rustlang.org" in final_text
-    passed = has_rust and has_official
+    domains = _visited_domains(result, observability)
+    visited_official = any("rust-lang.org" in d or "rustlang.org" in d for d in domains)
+    passed = has_rust and has_official and visited_official
     return {
         "check": "rust_official",
         "passed": passed,
         "score": 1.0 if passed else 0.0,
-        "reason": "Rust official website mentioned" if passed else "Rust official site not mentioned",
+        "reason": "Rust official website genuinely visited" if passed else "Rust official site not actually visited",
     }
 
 
 def validate_version(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate version number extracted."""
+    """GROUNDING: the claimed version number must literally appear in the real fetched page
+    content — a fabricated version string won't match what was actually on the page."""
     final_text = extract_final_text(result)
     version_pattern = re.search(r"\b(\d+\.\d+\.\d+|\d+\.\d+)\b", final_text)
-    has_version = bool(version_pattern)
+    evidence_text = _evidence_text(result, observability)
+    has_version = bool(version_pattern) and version_pattern.group(1) in evidence_text
     return {
         "check": "version",
         "passed": has_version,
         "score": 1.0 if has_version else 0.0,
         "version": version_pattern.group(1) if version_pattern else None,
-        "reason": f"Version {version_pattern.group(1)} found" if has_version else "Version not found",
+        "reason": f"Version {version_pattern.group(1)} found and grounded" if has_version else "Version not found or not grounded",
     }
 
 
 def validate_installation_guide(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate installation guide mentioned."""
+    """GROUNDING: a real second page visit (distinct from the official-site visit) must have
+    happened — the task's own sequential shape requires search->visit->search->visit, so
+    claiming an installation guide without a second real visit is unevidenced."""
     final_text = extract_final_text(result).lower()
     has_install = "install" in final_text
     has_guide = "guide" in final_text or "instructions" in final_text or "how to" in final_text
-    passed = has_install and has_guide
+    second_visit = len(_visited_evidence(result, observability)) >= 2
+    passed = has_install and has_guide and second_visit
     return {
         "check": "installation_guide",
         "passed": passed,
         "score": 1.0 if passed else 0.0,
-        "reason": "Installation guide mentioned" if passed else "Installation guide missing",
+        "reason": "Installation guide mentioned with a real second visit" if passed else "Installation guide missing or unevidenced by a real second visit",
     }
 
 
 def validate_installation_method(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate installation method provided."""
+    """GROUNDING: the claimed installation method keyword must literally appear in the real
+    fetched page content, not just in the model's own free-text answer."""
     final_text = extract_final_text(result).lower()
     method_keywords = ["rustup", "cargo", "package manager", "homebrew", "apt", "yum", "chocolatey", "download", "binary"]
-    has_method = any(kw in final_text for kw in method_keywords)
+    evidence_text = _evidence_text(result, observability)
+    grounded_methods = [kw for kw in method_keywords if kw in final_text and kw in evidence_text]
+    has_method = len(grounded_methods) > 0
     has_steps = "step" in final_text or "command" in final_text or "run" in final_text
     passed = has_method and has_steps
     return {
         "check": "installation_method",
         "passed": passed,
-        "score": 0.5 if has_method else 0.0 + (0.5 if has_steps else 0.0),
-        "reason": "Installation method found" if passed else "Installation method missing",
+        "score": (0.5 if has_method else 0.0) + (0.5 if has_steps else 0.0),
+        "reason": "Grounded installation method found" if passed else "Installation method missing or not grounded",
     }
 
 

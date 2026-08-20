@@ -6,7 +6,7 @@ Category: Link Collection & Summarization
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, normalize_url, visited_link_urls
 
 
 def get_test_metadata() -> Dict[str, Any]:
@@ -76,18 +76,43 @@ def _visit_link_evidence(result: Dict[str, Any]) -> List[str]:
     return links
 
 
+def _claimed_wikipedia_urls(result: Dict[str, Any]) -> List[str]:
+    """Wikipedia URLs the answer claims, normalized so they can be compared against the evidence.
+
+    Trailing punctuation matters: the extraction regex stops only at whitespace/`)`/`\\`/`"`, so a
+    markdown or prose answer emitting ``.../wiki/Foo,`` or ``.../wiki/Foo.`` would otherwise never
+    equal the normalized link the page really contained, and an honest agent would be marked
+    ungrounded for its formatting.
+    """
+    raw = re.findall(r"https?://[^\s)\\\"]*wikipedia\.org[^\s)\\\"]*", extract_final_text(result))
+    return list(dict.fromkeys(normalize_url(u.rstrip(".,;:!?*|]}'\"")) for u in raw))
+
+
+def _grounded_wikipedia_urls(result: Dict[str, Any], observability: Dict[str, Any]) -> tuple:
+    """(claimed, grounded) — grounded = claimed URLs the visited pages really contained."""
+    claimed = _claimed_wikipedia_urls(result)
+    evidence = visited_link_urls(result, observability)
+    return claimed, [u for u in claimed if u in evidence]
+
+
 def validate_link_count(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate sufficient links collected."""
-    final_text = extract_final_text(result)
-    wikipedia_urls = re.findall(r"https?://[^\s)\\\"]*wikipedia\.org[^\s)\\\"]*", final_text)
-    unique_urls = len(set(wikipedia_urls))
-    passed = unique_urls >= 10
+    """GROUNDING: only URLs genuinely evidenced by a visited page count toward the 10 required —
+    otherwise padding 1 real link with 9 fabricated ones (which still pass the URL-shape regex)
+    scores as if all 10 were real.
+
+    Evidence is the page's UNCAPPED ``links_full`` (plus URLs appearing verbatim in the fetched
+    text) rather than ``links``, which is capped to ``max_links_per_visit`` — as low as 5 for the
+    sequential variant and under lean mode, where requiring 10 grounded links from the capped
+    field alone would be arithmetically impossible for even a perfect agent.
+    """
+    claimed, grounded = _grounded_wikipedia_urls(result, observability)
+    passed = len(grounded) >= 10
     return {
         "check": "link_count",
         "passed": passed,
-        "score": min(1.0, unique_urls / 10.0),
-        "url_count": unique_urls,
-        "reason": f"Found {unique_urls} Wikipedia URLs",
+        "score": min(1.0, len(grounded) / 10.0),
+        "url_count": len(grounded),
+        "reason": f"{len(grounded)} genuinely-evidenced Wikipedia URL(s) of {len(claimed)} claimed",
     }
 
 
@@ -120,24 +145,25 @@ def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Di
 
 def validate_link_evidence(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Validate output links overlap with visited-page link evidence.
+    GROUNDING (hard, ratio-scored): most of the claimed links must actually appear in the
+    visited page's own link evidence, not just >=1 of them — a single real visit padded with
+    9 fabricated links must NOT score full credit here. Score is the fraction of claimed links
+    that are genuinely evidenced; passing requires that fraction to be high (>=0.8) AND at
+    least 8 links evidenced, so bulk fabrication on top of one token-effort visit fails.
     :param result: Test result.
     :param observability: Observability data.
     :return: Validation result.
     """
-    final_text = extract_final_text(result)
-    output_urls = set(re.findall(r"https?://[^\s)\\\"]*wikipedia\.org[^\s)\\\"]*", final_text))
-    visit_links = set(url for url in _visit_link_evidence(result) if "wikipedia.org" in url.lower())
-    overlap = output_urls.intersection(visit_links)
-    passed = len(overlap) >= 1
+    claimed, grounded = _grounded_wikipedia_urls(result, observability)
+    ratio = (len(grounded) / len(claimed)) if claimed else 0.0
+    passed = len(grounded) >= 8 and ratio >= 0.8
     return {
         "check": "link_evidence_overlap",
         "passed": passed,
-        "score": 1.0 if passed else 0.0,
-        "output_url_count": len(output_urls),
-        "visit_link_count": len(visit_links),
-        "overlap_count": len(overlap),
-        "reason": f"Found {len(overlap)} overlapping link(s)",
+        "score": ratio,
+        "output_url_count": len(claimed),
+        "overlap_count": len(grounded),
+        "reason": f"{len(grounded)}/{len(claimed) or 0} claimed link(s) genuinely evidenced by a visited page",
     }
 
 
