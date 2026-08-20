@@ -739,12 +739,6 @@ class IdeaDagEngine:
             self._logger.warning(f"[STEP {step_index}] Node {node_id} missing required data - cannot execute yet")
             return node.parent_id if node.parent_id else None
 
-        # Sequential dispatch's half of the resolved-value channel (the auto-parallel batch
-        # path never reaches here and wires its own call). No-op unless the flag is on AND
-        # this node's writer declared a slot.
-        self._resolve_slot(graph, node)
-
-
         has_result = node.details.get(DetailKey.ACTION_RESULT.value) is not None
         is_blocked_ready = node.status == IdeaNodeStatus.BLOCKED and self._is_action_ready(node, step_index)
         
@@ -2075,8 +2069,17 @@ class IdeaDagEngine:
         wedge the whole cell, since there is no run-level watchdog to catch it. On expiry
         we mark the node FAILED (so the step loop does not re-execute it) and return None,
         matching how the auto-parallel path degrades a timed-out child.
+
+        This is also where the resolved-value channel fires for every non-batch dispatch.
+        Hooking the leaf handler alone left the merge-creation and best-child-selection
+        routes uncovered -- a live run on task 054 dispatched its only slot-declaring node
+        through the best-child route and produced a byte-identical run with the flags on.
+        The batch path calls ``_execute_action`` bare and keeps its own hook. No-op unless
+        the flag is on AND this node's writer declared a slot.
         """
         node = graph.get_node(node_id)
+        if node is not None:
+            self._resolve_slot(graph, node)
         action_name = NodeDetailsExtractor.get_action(node.details) if node else None
         timeout_s = self._action_timeout_for(action_name)
         try:

@@ -11,10 +11,11 @@ Layers here:
 
   * the resolution itself: waypoint first, contract fallback, and every fail-toward-silence
     branch (no slot, no waypoint, source not DONE, already-filled field);
-  * BOTH dispatch routes. ``_handle_leaf_node`` and the auto-parallel batch's ``_run_one``
-    are separate paths -- the batch one bypasses ``_has_required_data`` entirely -- and a
-    fan-out of dependent hops is this mechanism's core case, so the batch coverage is not
-    optional;
+  * EVERY dispatch route. The auto-parallel batch's ``_run_one`` calls ``_execute_action``
+    bare and carries its own hook; every other route (leaf, merge creation, best-child
+    selection) funnels through ``_execute_action_guarded``, which is where the channel now
+    fires. Hooking ``_handle_leaf_node`` alone left the best-child route uncovered, which a
+    live run on task 054 hit -- so per-route coverage is not optional;
   * the compositions that must not interfere: ``defer_unresolved_slots`` (deferred, then
     resolved on retry) and the join's per-branch waypoint key;
   * a regression lock that ``_has_required_data`` never learns to read ``slot`` -- widening
@@ -396,7 +397,7 @@ def test_contract_getters_decline_non_url_slots_and_junk():
 
 
 # ------------------------------------------------------------------------------------------
-# layer 3 -- BOTH dispatch routes
+# layer 3 -- every dispatch route
 # ------------------------------------------------------------------------------------------
 
 
@@ -413,6 +414,55 @@ async def test_fires_on_the_sequential_leaf_dispatch_path():
     seen = [s for s in RecordingVisitAction.SEEN if s["node_id"] == dependent.node_id]
     assert seen and seen[0]["url"] == _WAYPOINT_URL, "resolved BEFORE the action ran"
     assert seen[0]["optional_url"] == _WAYPOINT_URL
+
+
+@pytest.mark.asyncio
+async def test_fires_on_the_best_child_sequential_selection_path():
+    """The route a live run on task 054 actually took. ``_handle_intermediate_node`` picks a
+    single best child and dispatches it without ever entering ``_handle_leaf_node``, so a hook
+    placed there left this path -- the one a grounding-injected visit node reaches -- resolving
+    nothing at all, flags on or off."""
+    engine = _make_engine()
+    graph, parent, _, dependent = _graph_with_source_and_dependent(
+        source_result=_search_result(_OTHER_URL), source_waypoint=_anchor_waypoint(),
+    )
+
+    assert await engine._handle_intermediate_node(graph, parent.node_id, 0, None) is not None
+
+    assert dependent.status == IdeaNodeStatus.DONE
+    seen = [s for s in RecordingVisitAction.SEEN if s["node_id"] == dependent.node_id]
+    assert seen and seen[0]["url"] == _WAYPOINT_URL, "resolved BEFORE the action ran"
+    assert seen[0]["optional_url"] == _WAYPOINT_URL
+
+
+@pytest.mark.asyncio
+async def test_fires_for_any_caller_of_the_guarded_wrapper():
+    """The consolidation itself: leaf, merge-creation and best-child dispatch all funnel
+    through ``_execute_action_guarded``, so covering the wrapper covers them uniformly -- which
+    is why merge creation needs no hook of its own (and no merge node writes a ``slot`` today)."""
+    engine = _make_engine()
+    graph, parent, _, dependent = _graph_with_source_and_dependent(
+        source_result=_search_result(_OTHER_URL), source_waypoint=_anchor_waypoint(),
+    )
+
+    await engine._execute_action_guarded(graph, parent.node_id, dependent.node_id)
+
+    assert RecordingVisitAction.SEEN[-1]["url"] == _WAYPOINT_URL
+    assert dependent.details["optional_url"] == _WAYPOINT_URL
+
+
+@pytest.mark.asyncio
+async def test_guarded_wrapper_is_a_no_op_on_a_node_without_a_slot():
+    """Centralizing the call must not make it reach further than the leaf hook did."""
+    engine = _make_engine()
+    graph, parent, _, dependent = _graph_with_source_and_dependent(
+        source_result=_search_result(_SOURCE_URL), source_waypoint=_anchor_waypoint(), slot=None,
+    )
+
+    await engine._execute_action_guarded(graph, parent.node_id, dependent.node_id)
+
+    assert RecordingVisitAction.SEEN[-1]["url"] is None
+    assert "optional_url" not in dependent.details
 
 
 @pytest.mark.asyncio
