@@ -287,6 +287,52 @@ scoring cannot help. **Next step on this thread is the prompt, not the flag**: t
 is now the binding constraint, and it should be measured against a batch prompt that ranks
 executed work on what the results contain.
 
+#### T1-3c. The rubric line is **not** the binding constraint either (offline prompt A/B, $0.42, 2026-08-20)
+
+T1-3b named the prompt as the next lever. It was measured before anything was wired:
+`scripts/probe_execution_aware_rubric.py` replays recorded sibling batches **that already have
+`action_result`s** straight to gpt-4.1-nano, off the engine, rebuilding the prompt the way
+`LlmEvaluationPolicy._build_messages` does (same path serialization, same 5000-char detail
+truncation, same user template) with the recorded `evaluation` key stripped so the judge cannot
+read back its own answer. 1083 such batches exist in `agent/idea_test_results`; 60 were sampled
+one-per-source. Three arms: SHIPPED, an execution-aware rewrite (NEW_A: *"a candidate with an
+action and NO action_result has not run yet: score it <=0.2. A candidate that HAS an
+action_result has already run: score it on what that result contains"*), and NEW_A plus an
+anti-tie clause (NEW_B). Two conditions: the batch as recorded, and a **spiked** copy where one
+candidate's result is replaced by a failure payload, which manufactures ground truth (that
+candidate should be uniquely lowest) that the natural condition cannot supply.
+
+| arm | flat rate | mean spread | spike detected (chance 0.35) | substantive − degenerate |
+|---|---|---|---|---|
+| SHIPPED | 0.309 | 0.450 | **0.552** | **+0.292** |
+| NEW_A | 0.276 | 0.492 | 0.661 | +0.290 |
+| NEW_B | 0.220 | 0.517 | 0.621 | +0.319 |
+
+**The shipped rubric already differentiates executed candidates.** Given real results it goes
+flat on 31% of batches, not the 55.6% of T1-3, separates a substantive result from a degenerate
+one by 0.29, and finds a planted failure at 1.55x chance (p=0.004). The rewrite moves everything
+the right way and nothing significantly: paired McNemar on flatness p=1.0 (NEW_A) and p=0.34
+(NEW_B), spread +0.03/+0.06, spike detection +6/−1 discordant pairs, p=0.125. A repeat run at
+the engine's own temperature 0.2 reproduced the same picture (flat 0.296 vs 0.281), and
+test-retest there is tight — mean |Δscore| 0.073, flat-verdict agreement 0.89 — so the null is
+not noise swamping a real effect.
+
+**So the 0.2-flat batch T1-3b saw live is not the rubric sentence.** Replaying the actual
+`eps2_on` post-execution batches (n=11) shows the shipped prompt disagreeing with what the
+engine recorded on the same content — recorded `[0.7, 0.7, 0.7, 0.7]` replays as `[0.2, 0.2,
+0.2, 0.2]`, recorded `[0.0, 0.2]` replays as `[0.8, 0.9]`. Whatever flattens scores in the
+engine survives a prompt rewrite, and the remaining suspects are structural: **65.5% of the
+3493 recorded executed candidates have their details truncated mid-JSON at
+`evaluation_max_detail_chars`** (visit nodes: 1621/1887), the judge is handed one candidate's
+result per 5000 characters with no cross-candidate summary, and the cap/base-score writes of
+T1-3a still fire on every non-`evaluate_parallel_siblings` path.
+
+**Recommendation: do not spend a live A/B on the rubric text.** The effect it would have to
+show is bounded by an offline gap that never cleared p=0.05 on 60 batches. The NEW_A text is
+kept in the probe script as an inactive draft (`NEW_SYSTEM`/`NEW_ADDENDUM`), not in any
+settings file. The next measurement on this thread is the detail budget and what the judge is
+shown, not how it is instructed.
+
 **What this settles, and what it does not.** The naming is accidentally defensible: keeping
 the head of the list does beat a coin flip on the shipped score, so arrival-order truncation
 is not actively throwing away quality. What it is *not* is evidence that the model ranks its

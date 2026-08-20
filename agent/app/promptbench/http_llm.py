@@ -28,10 +28,15 @@ class HttpLLM:
         self.timeout = timeout
 
     def complete(self, prompt: str, *, model: str, temperature: float = 0.0,
-                 max_tokens: int = 400) -> Completion:
+                 max_tokens: int = 400, system: Optional[str] = None) -> Completion:
+        # Promptbench itself sends one user turn, since a family's variant IS the whole
+        # prompt. `system` exists for callers replaying an engine call that splits the two,
+        # where folding the system text into the user turn would change what is measured.
+        messages = ([{"role": "system", "content": system}] if system else [])
+        messages.append({"role": "user", "content": prompt})
         payload = {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
