@@ -69,6 +69,16 @@ class ConnectorConfig:
         # else cpu). Falls back to cpu automatically if the GPU stack is missing.
         self.chroma_embed_device = (os.environ.get("CHROMA_EMBED_DEVICE") or "cpu").strip().lower()
         self.chroma_embed_model = (os.environ.get("CHROMA_EMBED_MODEL") or "all-MiniLM-L6-v2").strip()
+        # --- Query memoization (repeated embed+ANN work inside one run) ---
+        # Every ``query_chroma`` re-embeds its query text and re-runs the ANN search, and the
+        # engine asks the SAME question repeatedly (dedup probes per candidate, split retrieval
+        # issuing one query text per memory_type, sibling nodes sharing a goal). The result is a
+        # pure function of (collection contents, query, n_results, filter, embedding model), so
+        # it is memoized per process and dropped the moment this connector writes to (or loses)
+        # the collection. Set CHROMA_QUERY_CACHE=false to disable.
+        query_cache_value = (os.environ.get("CHROMA_QUERY_CACHE") or "true").strip().lower()
+        self.chroma_query_cache = query_cache_value in ("1", "true", "yes", "on")
+        self.chroma_query_cache_max = int(os.environ.get("CHROMA_QUERY_CACHE_MAX", "256"))
 
         self.rabbitmq_url = os.environ.get("RABBITMQ_URL")
         self.input_queue = os.environ.get("AGENT_INPUT_QUEUE", "agent.mandates")

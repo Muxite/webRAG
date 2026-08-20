@@ -1,8 +1,12 @@
 import asyncio
+import copy
+import hashlib
+import json
 import math
 import os
 import tempfile
 import time
+from collections import OrderedDict
 from typing import Optional, List, Dict, Any
 import chromadb
 from chromadb.config import Settings
@@ -43,6 +47,94 @@ class ConnectorChroma(ConnectorBase):
         self._embedding_function: Any = None
         self._embedding_function_built = False
         self._embedded_path: Optional[str] = None
+        # Query memoization: key -> (collection, result). A query result is a pure function of
+        # the collection's contents and the query, so it is reusable until this connector
+        # changes those contents (write/delete) or loses the client. Bounded LRU.
+        self._query_cache: "OrderedDict[str, Any]" = OrderedDict()
+        self._collection_epochs: Dict[str, int] = {}
+        self.query_cache_hits = 0
+        self.query_cache_misses = 0
+
+    # ----------------------------------------------------------------------------------
+    # query cache
+    # ----------------------------------------------------------------------------------
+
+    def _embedding_identity(self) -> str:
+        """Which embedder a cached result was produced by.
+
+        Chroma embeds query text itself, so the "embedding call" is not a separate call site
+        here — memoizing ``query_chroma`` IS memoizing the embedding. Two collections embedded
+        by different models are different vector spaces, so the model identity belongs in the
+        key even though it cannot change inside one process today (it is read from env once).
+        """
+        device = (self.config.chroma_embed_device or "cpu").lower()
+        if device == "cpu":
+            return "chroma-default-onnx"
+        return f"sentence-transformers:{self.config.chroma_embed_model}:{device}"
+
+    def _query_cache_key(
+        self,
+        collection: str,
+        query_texts: List[str],
+        n_results: int,
+        where: Optional[Dict[str, Any]],
+    ) -> str:
+        """Content hash over everything that can change the answer, including the
+        collection's write epoch (bumped on every add/delete) and the embedder."""
+        payload = json.dumps(
+            {
+                "collection": collection,
+                "epoch": self._collection_epochs.get(collection, 0),
+                "queries": list(query_texts or []),
+                "n_results": int(n_results),
+                "where": where or None,
+                "embedder": self._embedding_identity(),
+            },
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _invalidate_query_cache(self, collection: Optional[str] = None) -> None:
+        """Drop cached answers that a write (or a lost client) may have changed.
+
+        ``collection=None`` clears everything — used when the client is rebuilt or torn down,
+        since the connector cannot know what changed while it was gone.
+        """
+        if collection is None:
+            self._query_cache.clear()
+            self._collection_epochs.clear()
+            return
+        self._collection_epochs[collection] = self._collection_epochs.get(collection, 0) + 1
+        stale = [key for key, (coll, _) in self._query_cache.items() if coll == collection]
+        for key in stale:
+            self._query_cache.pop(key, None)
+
+    def _query_cache_get(self, key: str) -> Any:
+        """Return a defensive copy of a cached result, or None on a miss."""
+        entry = self._query_cache.get(key)
+        if entry is None:
+            return None
+        self._query_cache.move_to_end(key)
+        return copy.deepcopy(entry[1])
+
+    def _query_cache_put(self, key: str, collection: str, result: Any) -> None:
+        """Store a defensive copy, evicting the least recently used entry past the cap."""
+        limit = max(0, int(self.config.chroma_query_cache_max))
+        if limit == 0:
+            return
+        self._query_cache[key] = (collection, copy.deepcopy(result))
+        self._query_cache.move_to_end(key)
+        while len(self._query_cache) > limit:
+            self._query_cache.popitem(last=False)
+
+    def query_cache_stats(self) -> Dict[str, int]:
+        """Hit/miss counters for the query cache (telemetry and tests read this)."""
+        return {
+            "hits": self.query_cache_hits,
+            "misses": self.query_cache_misses,
+            "entries": len(self._query_cache),
+        }
 
     def _embedding_function_or_none(self) -> Any:
         """Resolve the collection embedding function once, honoring ``chroma_embed_device``.
@@ -134,6 +226,8 @@ class ConnectorChroma(ConnectorBase):
         if self._consecutive_failures >= self.FAILURE_TEARDOWN_THRESHOLD:
             self.chroma_api_ready = False
             self._collections.clear()
+            # The connector is about to go blind: anything could change before it is back.
+            self._invalidate_query_cache()
             self._consecutive_failures = 0
 
     async def _try_init_chroma(self) -> bool:
@@ -167,6 +261,7 @@ class ConnectorChroma(ConnectorBase):
             await self._bounded(self._chroma.heartbeat(), "heartbeat")
             # Fresh client → any memoized collections are bound to a dead client.
             self._collections.clear()
+            self._invalidate_query_cache()
             self._consecutive_failures = 0
             self.logger.info("ChromaDB OPERATIONAL (async)")
             self.chroma_api_ready = True
@@ -192,6 +287,7 @@ class ConnectorChroma(ConnectorBase):
                 timeout=self.config.chroma_op_timeout,
             )
             self._collections.clear()
+            self._invalidate_query_cache()
             self._consecutive_failures = 0
             self.logger.info("ChromaDB OPERATIONAL (embedded @ %s)", path)
             self.chroma_api_ready = True
@@ -279,6 +375,7 @@ class ConnectorChroma(ConnectorBase):
                 return False
             await self._op(self._chroma.delete_collection, name=collection)
             self._collections.pop(collection, None)
+            self._invalidate_query_cache(collection)
             return True
         except Exception as e:
             self.logger.warning(f"Failed to delete collection '{collection}': {e}")
@@ -329,6 +426,7 @@ class ConnectorChroma(ConnectorBase):
                 payload={"collection": collection, "count": len(documents)},
             )
             await self._op(coll.add, ids=ids, metadatas=sanitized_metadatas, documents=documents)
+            self._invalidate_query_cache(collection)
             self._on_op_success()
             self._record_timing(
                 name="chroma_add", started_at=started_at, success=True,
@@ -340,6 +438,9 @@ class ConnectorChroma(ConnectorBase):
             )
             return True
         except Exception as e:
+            # A failed add may still have landed rows (timeout on the response, not the write),
+            # so the cached answers for this collection are no longer trustworthy either.
+            self._invalidate_query_cache(collection)
             self._on_op_failure()
             self.logger.error(f"Failed to add to collection '{collection}': {e}")
             self._record_timing(
@@ -428,9 +529,11 @@ class ConnectorChroma(ConnectorBase):
             if coll is None:
                 return False
             await self._op(coll.delete, ids=list(ids))
+            self._invalidate_query_cache(collection)
             self._on_op_success()
             return True
         except Exception as e:
+            self._invalidate_query_cache(collection)
             self._on_op_failure()
             self.logger.error(f"Failed to delete from collection '{collection}': {e}")
             return False
@@ -484,10 +587,43 @@ class ConnectorChroma(ConnectorBase):
         :param n_results: Max results per query.
         :param where: Optional metadata filter.
         :returns: ChromaDB result dict or None on failure.
+
+        Repeated identical queries are served from an in-process cache (see
+        ``_query_cache_key``) that is dropped whenever this connector writes to the collection,
+        so a hit is the same answer the server would give. Telemetry is still recorded on a hit,
+        flagged ``cached``: the trace must keep showing that the engine asked.
         """
         if not await self._ensure_ready():
             return None
         started_at = time.perf_counter()
+        cache_enabled = bool(self.config.chroma_query_cache)
+        cache_key = (
+            self._query_cache_key(collection, query_texts, n_results, where)
+            if cache_enabled else ""
+        )
+        if cache_enabled:
+            cached = self._query_cache_get(cache_key)
+            if cached is not None:
+                self.query_cache_hits += 1
+                self.logger.debug(
+                    "Chroma query cache HIT (collection=%s, queries=%d)", collection, len(query_texts)
+                )
+                self._record_io(
+                    direction="in", operation="chroma_query",
+                    payload={"collection": collection, "queries": len(query_texts),
+                             "n_results": n_results, "where": where, "cached": True},
+                )
+                self._record_timing(
+                    name="chroma_query", started_at=started_at, success=True,
+                    payload={"collection": collection, "queries": len(query_texts), "cached": True},
+                )
+                self._record_io(
+                    direction="out", operation="chroma_query",
+                    payload={"collection": collection, "queries": len(query_texts),
+                             "success": True, "cached": True},
+                )
+                return cached
+            self.query_cache_misses += 1
         try:
             coll = await self.get_or_create_collection(collection)
             if coll is None:
@@ -501,6 +637,8 @@ class ConnectorChroma(ConnectorBase):
                 query_kwargs["where"] = where
             results = await self._op(coll.query, **query_kwargs)
             self._on_op_success()
+            if cache_enabled and results is not None:
+                self._query_cache_put(cache_key, collection, results)
             self._record_timing(
                 name="chroma_query", started_at=started_at, success=True,
                 payload={"collection": collection, "queries": len(query_texts)},
