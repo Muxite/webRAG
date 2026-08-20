@@ -471,7 +471,19 @@ class GoTOperations:
         if dedup_count > 0:
             _logger.info(f"[GoT:DEDUP] Filtered {dedup_count} duplicate candidates out of {len(candidates)}")
 
-        return filtered if filtered else candidates[:1]
+        if filtered:
+            return filtered
+        # BEHAVIOUR CHANGE (2026-08-20, Cycle 18): the all-flagged batch used to fall back to
+        # ``candidates[:1]``, collapsing a whole sibling batch to one candidate. The live A/B
+        # measured that as -0.157 on overall_score (p=0.0007, n=47), driven by chains whose
+        # multi-hop plan the truncation destroyed: 58% of firing batches flagged EVERY
+        # candidate, which is a maximally-uncertain dedup verdict rather than evidence that the
+        # plan is redundant. Flagging everything now means "this similarity judgement is not
+        # usable here", so the batch passes through untouched. Partial flags still filter.
+        _logger.info(
+            f"[GoT:DEDUP] All {len(candidates)} candidates flagged; keeping the batch unfiltered"
+        )
+        return candidates
 
     def compute_dynamic_beam_width(self, graph: IdeaDag) -> int:
         if not self._cfg.got.dynamic_beam_enabled:

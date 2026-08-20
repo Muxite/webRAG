@@ -78,15 +78,14 @@ def test_adaptive_dedup_disabled_returns_fixed():
     assert ops._adaptive_dedup_threshold(g) == 0.85
 
 
-# --- dedup kill-switch and all-filtered fallback ------------------------------------------
+# --- dedup kill-switch and the all-flagged batch -------------------------------------------
 # Groundwork for ASSUMPTION_AUDIT.md's E1 (ablate dedup entirely). The experiment's OFF arm is
 # ``got_dedup_enabled: false`` and nothing else, so what it actually measures depends on two
 # behaviours that nothing pinned before: that the flag short-circuits BOTH entry points before
-# any memory query (otherwise the arms differ in retrieval cost as well as in dedup), and that
-# the all-filtered fallback hands back ``candidates[:1]``. The second is not a corner case: in
-# the recorded log corpus 70 of 154 firing batches (45.5%) flagged every candidate, and 50 of
-# those were single-candidate batches where the fallback restores the only candidate and the
-# arms are byte-identical despite the log announcing a filter.
+# any memory query (otherwise the arms differ in retrieval cost as well as in dedup), and what
+# an all-flagged batch does. The second is not a corner case: in the recorded log corpus 70 of
+# 154 firing batches (45.5%) flagged every candidate, and 50 of those were single-candidate
+# batches where the arms are byte-identical despite the log announcing a filter.
 
 
 class _RecordingMemory:
@@ -133,10 +132,11 @@ async def test_dedup_enabled_drops_the_duplicate_candidate():
 
 
 @pytest.mark.asyncio
-async def test_all_filtered_fallback_restores_the_first_candidate():
-    # Every candidate matches the same stored memory, so `filtered` ends up empty. Returning
-    # nothing would leave the parent childless, so the fallback keeps the head of the list --
-    # which means a "filtered 1 out of 1" batch is a no-op, not a removal.
+async def test_all_flagged_batch_survives_unfiltered():
+    # Every candidate matches the same stored memory, so `filtered` ends up empty. Since the
+    # Cycle 18 A/B (-0.157 overall_score, p=0.0007) the batch is then handed back WHOLE: an
+    # everything-is-a-duplicate verdict is treated as an unusable similarity judgement rather
+    # than as licence to truncate the parent's plan to a single step.
     ops = GoTOperations(
         settings={"got_dedup_enabled": True, "got_adaptive_policies": False,
                   "got_dedup_similarity_threshold": 0.85},
@@ -145,9 +145,37 @@ async def test_all_filtered_fallback_restores_the_first_candidate():
     )
     g = IdeaDag(root_title="root")
     assert await ops.filter_duplicate_candidates([{"title": "only"}], g) == [{"title": "only"}]
-    assert await ops.filter_duplicate_candidates(
-        [{"title": "a"}, {"title": "b"}], g
-    ) == [{"title": "a"}]
+    candidates = [{"title": "a"}, {"title": "b"}, {"title": "c"}]
+    assert await ops.filter_duplicate_candidates(candidates, g) == candidates
+
+
+class _SelectiveMemory(_RecordingMemory):
+    """Reports a duplicate only for candidates whose query starts with `dup_prefix`."""
+
+    def __init__(self, dup_prefix):
+        super().__init__()
+        self._dup_prefix = dup_prefix
+
+    async def retrieve_relevant_memories(self, query, n_results, memory_type):
+        self.queries.append(query)
+        if query.startswith(self._dup_prefix):
+            return [{"distance": 0.0, "metadata": {"node_id": "existing"}}]
+        return []
+
+
+@pytest.mark.asyncio
+async def test_partially_flagged_batch_still_drops_the_duplicates():
+    # The all-flagged carve-out above must not weaken the normal path: when SOME candidates
+    # survive, the flagged ones are still removed.
+    ops = GoTOperations(
+        settings={"got_dedup_enabled": True, "got_adaptive_policies": False,
+                  "got_dedup_similarity_threshold": 0.85},
+        io=None,
+        memory_manager=_SelectiveMemory("dup"),
+    )
+    g = IdeaDag(root_title="root")
+    candidates = [{"title": "dup one"}, {"title": "fresh"}, {"title": "dup two"}]
+    assert await ops.filter_duplicate_candidates(candidates, g) == [{"title": "fresh"}]
 
 
 @pytest.mark.asyncio

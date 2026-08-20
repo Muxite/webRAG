@@ -749,9 +749,10 @@ def _apply_got_experiment_overrides(
     # ``idea_dag:{sha256(mandate)[:10]}``) is keyed on mandate TEXT only, not run_id or rep
     # number, so it is NOT cleared between R>1 reps of the same task. A candidate set that is
     # reproducible rep-to-rep (e.g. a plan-library template's deterministic fill) can score
-    # >=dedup_threshold_min against its OWN prior rep's stored memory and collapse to
-    # ``filter_duplicate_candidates``'s all-filtered fallback (a single surviving candidate):
-    # found during the 2026-07-28/29 plan-library dogfooding run. Toggle here to control for it.
+    # >=dedup_threshold_min against its OWN prior rep's stored memory: found during the
+    # 2026-07-28/29 plan-library dogfooding run. Since Cycle 18 an all-flagged batch passes
+    # through whole instead of collapsing to one, so this costs recall rather than plan steps.
+    # Toggle here to control for it.
     _gotdedup_override = env.get("IDEA_TEST_GOT_DEDUP", "").strip()
     if _gotdedup_override:
         idea_settings["got_dedup_enabled"] = _is_enabled(_gotdedup_override)
