@@ -2,10 +2,10 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 24 cycles
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 25 cycles
 below are committed; the run continues past this point.
 
-**Spend so far: ~$2.98 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+**Spend so far: ~$3.23 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
 5394 passed / 18 skipped (zero failures across the whole run).
 
 ---
@@ -268,6 +268,16 @@ measured net-negative. That false claim had already leaked into `ADAPTIVE_ENGINE
 drift again) and adding a permanent regression guard (`test_no_per_arm_settings_snapshots`) that
 fails if any `idea_dag_settings.*.json` sidecar file reappears, plus generalizing two other tests
 that had a hardcoded 3-file-name assumption baked in.
+
+**Cycle 25 — live A/B of `visit_sibling_url_dedup`** (benchmark run, no code change). Honest
+non-result: the mechanism never fired across 10 tasks chosen for parallel-sibling structure — every
+sibling-URL collision observed in this sample was the "declared" class (explicit matching URLs from
+the planner), which this flag deliberately doesn't touch, not the "fallback" class it targets.
+No regressions in what did run (no PASS→FAIL flips), but under-sampled for a real read — the flag's
+own corpus-wide base rate implies roughly 1 fallback collision per ~12 sibling-visit batches, and
+this run only accumulated 25 batches total across both arms. **Recommendation: re-test with tasks
+specifically selected for URL-less fan-outs, not just parallel/argmax shape** — flag stays opt-in,
+neither confirmed nor invalidated.
 
 ---
 
