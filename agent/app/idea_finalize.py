@@ -28,7 +28,14 @@ _logger = logging.getLogger(__name__)
 
 def _compact_action_result(ar: dict, action: str) -> dict:
     """Strip large content fields from action results to keep merged_json small.
-    Full visit content is captured separately in visit_content."""
+
+    The stripping is lossy on purpose: ``content`` survives here only as a 1000-char
+    preview. Visit bodies are re-read (from ``content_full``, bounded per visit and in
+    total) by ``_collect_all_visit_content`` into the separate ``visit_content`` block,
+    so a visit's page text still reaches the final prompt. Every other large field
+    (``content_with_links``, ``links_full``, ``link_contexts``, ``_links_inline``) is
+    dropped outright and is NOT recovered anywhere else.
+    """
     compact = {}
     large_fields = {
         "content", "content_full", "content_with_links",
@@ -94,7 +101,12 @@ def _collect_all_visit_content(graph: IdeaDag, max_chars_per_visit: int = 15000)
             continue
         url = ar.get("url", "") or ""
         title = ar.get("title", "") or ""
-        content = ar.get("content", "") or ""
+        # ``content`` is the connector's already-truncated payload; ``content_full`` is the
+        # same page uncut and is present on the same dict (see VisitLeafAction's result
+        # builder). Prefer it, exactly as `_has_page_evidence` below already does: this
+        # block applies its OWN `max_chars_per_visit` bound, so reading the pre-truncated
+        # field only threw page text away twice.
+        content = ar.get("content_full") or ar.get("content") or ""
         if not content:
             continue
 

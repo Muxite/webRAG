@@ -13,6 +13,13 @@ from agent.app.idea_policies.base import EvaluationPolicy, DetailKey
 from agent.app.idea_policies.config import IdeaConfig
 
 
+#: Hard ceiling on scoring prompts per batch evaluation. A constant rather than a knob: it
+#: exists only so a pathologically wide parent (accumulated re-expansion children) cannot turn
+#: one evaluation into an unbounded number of LLM calls. Never reached under shipped defaults,
+#: where a parent's children are capped at ``max_branching`` (5) == one chunk.
+_MAX_BATCH_CHUNKS = 4
+
+
 def _safe_serialize_details(details: Dict[str, Any]) -> str:
     try:
         return json.dumps(details, ensure_ascii=True, default=str)
@@ -187,11 +194,44 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
         return await policy.evaluate(graph, node_id)
 
     async def evaluate_batch(self, graph: IdeaDag, parent_id: str, candidate_ids: List[str]) -> Dict[str, float]:
+        """Score every candidate, in prompt-sized chunks.
+
+        ``evaluation_batch_max_candidates`` is a bound on how many candidates fit in ONE
+        scoring prompt, so it used to be applied as ``candidate_ids[:max_candidates]`` --
+        which left every later candidate with ``score is None`` while it stayed selectable
+        (``allow_unscored_selection`` defaults true). That is the engine's evaluation-ordering
+        defect in miniature: a decision consuming a score that was never computed. Chunking
+        keeps the per-prompt bound intact and gives each candidate a real score.
+
+        Single chunk (the shipped ``max_branching == batch_max_candidates == 5`` case) issues
+        exactly the same one call with the same messages as before.
+        """
         parent = graph.get_node(parent_id)
         if not parent:
             return {}
-        max_candidates = self._cfg.evaluation.batch_max_candidates
-        candidate_ids = candidate_ids[:max_candidates]
+        max_candidates = max(1, int(self._cfg.evaluation.batch_max_candidates))
+        chunks = [
+            candidate_ids[i:i + max_candidates]
+            for i in range(0, len(candidate_ids), max_candidates)
+        ][:_MAX_BATCH_CHUNKS]
+        if len(chunks) <= 1:
+            return await self._evaluate_batch_chunk(graph, parent, chunks[0] if chunks else [])
+        dropped = len(candidate_ids) - sum(len(c) for c in chunks)
+        if dropped > 0:
+            self._logger.warning(
+                f"[EVALUATION_BATCH] {len(candidate_ids)} candidates exceeds "
+                f"{_MAX_BATCH_CHUNKS} x {max_candidates}; {dropped} left unscored"
+            )
+        scores: Dict[str, float] = {}
+        for chunk in chunks:
+            scores.update(await self._evaluate_batch_chunk(graph, parent, chunk))
+        return scores
+
+    async def _evaluate_batch_chunk(
+        self, graph: IdeaDag, parent: IdeaNode, candidate_ids: List[str]
+    ) -> Dict[str, float]:
+        if not candidate_ids:
+            return {}
         messages, candidate_id_map = self._build_messages(graph, parent, candidate_ids)
         model_name = self.model_name or self._cfg.evaluation.model
         json_schema = self.settings.get("evaluation_batch_json_schema")

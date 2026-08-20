@@ -745,6 +745,26 @@ class EngineConfig:
     # OFF pending a live A/B.
     parallel_requires_evidence: bool = False  # absent from JSON
     defer_unresolved_slots: bool = False  # absent from JSON
+    # The evaluation-ordering invariant (ENGINE_DESIGN_REVIEW.md PART 3): "a decision that
+    # consumes a score must run after that score exists". Two sites violate it, and each gets
+    # one opt-in, default-OFF flag here because the fix changes graph shape and token spend,
+    # so turning it on invalidates comparisons against in-flight benchmark numbers.
+    #
+    # `beam_after_evaluation`: the expansion beam (`candidates[:max_branching]`) truncates
+    # before any candidate is scored, so the "beam" is really the model's emission order. On:
+    # every surviving candidate becomes a node, the batch evaluator scores them all, and the
+    # beam keeps the top `max_branching` by score (the rest are SKIPPED, marked
+    # `__beam_pruned`). Only binds where selection happens, i.e. the sequential path: an
+    # auto-parallel batch executes every sibling by design, so there is no beam to apply.
+    #
+    # `evaluate_parallel_siblings`: the auto-parallel batch path returns before the
+    # evaluation block, so its siblings keep `score is None` forever -- which is the
+    # documented root cause behind dormant prune/backtrack/confidence machinery
+    # (TECHNIQUE_INVENTORY.md:42-50). On: the batch is scored once its results are in
+    # (one batch call), which is strictly better-informed than the sequential path's
+    # pre-execution scoring (that one is capped by `no_action_result_score_cap`).
+    beam_after_evaluation: bool = False  # absent from JSON
+    evaluate_parallel_siblings: bool = False  # absent from JSON
 
     _KEYS: ClassVar[dict] = {}
 

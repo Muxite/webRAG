@@ -50,6 +50,14 @@ from agent.app import idea_node_state
 
 _QUOTED_PHRASE_RE = re.compile(r'"([^"]+)"')
 
+#: Parent-node detail carrying the beam width an expansion deferred to post-evaluation
+#: (`engine.beam_after_evaluation`). Written by `_handle_expansion_node`, read and popped by
+#: `_apply_beam_after_evaluation` a step later. Never present with the flag off.
+_PENDING_BEAM_KEY = "__pending_beam_width"
+#: Marks a child the post-evaluation beam dropped (kept, SKIPPED, and attributable, exactly
+#: like `__sequential_pruned`, rather than deleted from the graph).
+_BEAM_PRUNED_KEY = "__beam_pruned"
+
 
 def _reformulate_multi_entity_query(query: Optional[str]) -> Optional[str]:
     """OR-join a query's quoted phrases when it bundles 2+ distinct entity names.
@@ -107,6 +115,10 @@ class IdeaDagEngine:
         )
         self._step_index = 0
         self._step_confidences: List[Dict[str, Any]] = []
+        # Additional async observers notified alongside `on_step` (see `_run_loop`), e.g.
+        # the interactive debugger's ThoughtBuffer capture/collect wiring. Registered via
+        # `add_step_observer()`, never replaces the checkpoint-save `on_step` callback.
+        self._step_observers: List[Any] = []
         self._leaf_completion_count = 0
         self._memory_manager: Optional[MemoryManager] = None
         self._got: Optional[GoTOperations] = None
@@ -297,6 +309,28 @@ class IdeaDagEngine:
         self._maybe_log_dag(graph, steps, force=True)
         return final_payload
 
+    def add_step_observer(self, observer) -> None:
+        """Register an additional async ``(graph, current_id, steps)`` hook for `_run_loop`.
+
+        Observers run alongside (not instead of) the `on_step` callback that `run()`
+        wires up for checkpoint saving, so callers like the interactive debugger can
+        subscribe to per-step notifications (e.g. ThoughtBuffer capture/collect) without
+        displacing checkpointing. An observer that raises is logged and skipped; it can
+        never break the run.
+
+        :param observer: async callable ``(graph, current_id, steps) -> None``.
+        :return: None
+        """
+        self._step_observers.append(observer)
+
+    async def _notify_step_observers(self, graph: IdeaDag, current_id: Optional[str], steps: int) -> None:
+        """Invoke every registered step observer, isolating failures per observer."""
+        for observer in self._step_observers:
+            try:
+                await observer(graph, current_id, steps)
+            except Exception as exc:  # noqa: BLE001. An observer must never break the run
+                self._logger.warning(f"[RUN] Step observer failed at step {steps}: {exc}")
+
     async def _run_loop(
         self,
         graph: IdeaDag,
@@ -383,10 +417,12 @@ class IdeaDagEngine:
                 )
                 if on_step is not None:
                     await on_step(graph, current_id, steps)
+                await self._notify_step_observers(graph, current_id, steps)
                 break
 
             if on_step is not None:
                 await on_step(graph, current_id, steps)
+            await self._notify_step_observers(graph, current_id, steps)
 
             if steps == 1:
                 root = graph.get_node(graph.root_id())
@@ -1150,7 +1186,18 @@ class IdeaDagEngine:
             max_branching = self._cfg.engine.max_branching
         hard_cap = self._cfg.engine.max_branching
         max_branching = min(max_branching, hard_cap)
-        created_children = graph.expand(node_id, candidates[:max_branching])
+        # `beam_after_evaluation` off (default): unchanged -- the beam cuts the candidate list
+        # HERE, before a single candidate has been scored, so it selects by the model's
+        # emission order. On: every candidate becomes a node so the batch evaluator can score
+        # it, and `_apply_beam_after_evaluation` (post-evaluation, in the intermediate handler)
+        # applies the same width using those scores. The width travels on the parent because
+        # the two halves run in different steps.
+        if self._cfg.engine.beam_after_evaluation:
+            expanded = candidates
+            node.details[_PENDING_BEAM_KEY] = max_branching
+        else:
+            expanded = candidates[:max_branching]
+        created_children = graph.expand(node_id, expanded)
 
         # Plan-library post-expand wiring, only for a library-sourced expansion (the flag rides
         # in from the short-circuit; organic candidates never carry these markers, so an
@@ -1176,7 +1223,12 @@ class IdeaDagEngine:
         parent_original_goal = node.details.get(DetailKey.ORIGINAL_GOAL.value) or parent_goal
         parent_justification = NodeDetailsExtractor.get_justification(node.details)
         
-        for child_id in node.children[-max_branching:]:
+        # The slice must cover everything `graph.expand` just minted. Identical to the old
+        # `[-max_branching:]` on the default path (where at most `max_branching` were created);
+        # widened only when `beam_after_evaluation` expanded more, so no freshly created child
+        # misses the parent-goal/justification threading below.
+        threaded_span = max(max_branching, len(created_children))
+        for child_id in node.children[-threaded_span:]:
             child = graph.get_node(child_id)
             if not child:
                 continue
@@ -1239,10 +1291,10 @@ class IdeaDagEngine:
                     f"through into their own page visit (grounding follow-through)"
                 )
 
-        self._logger.info(f"[STEP {step_index}] EXPANSION: {len(candidates)} candidates -> {min(len(candidates), max_branching)} children (total nodes: {graph.node_count()})")
+        self._logger.info(f"[STEP {step_index}] EXPANSION: {len(candidates)} candidates -> {len(created_children)} children (total nodes: {graph.node_count()})")
         self._record_decision(
             "expansion", node_id=node_id,
-            chosen=f"{min(len(candidates), max_branching)} sub-problems",
+            chosen=f"{len(created_children)} sub-problems",
             alternatives=[
                 {"title": str(c.get("title", ""))[:80], "action": c.get("action")}
                 for c in (candidates or [])[:8] if isinstance(c, dict)
@@ -1514,6 +1566,12 @@ class IdeaDagEngine:
         meta = node.details.get(DetailKey.EXPANSION_META.value) or {}
         execute_all = bool(meta.get(DetailKey.EXECUTE_ALL_CHILDREN.value)) if isinstance(meta, dict) else False
 
+        # A beam this parent deferred to post-evaluation (`beam_after_evaluation`, default off
+        # -> always falsy) must be applied BEFORE any batch runs. Otherwise the batch path
+        # returns early, every over-beam candidate executes anyway, and the beam is inert.
+        # The pruned survivors batch normally on the next visit, once the width is consumed.
+        pending_beam = bool(node.details.get(_PENDING_BEAM_KEY))
+
         has_dependencies = self._detect_state_dependencies(graph, eligible)
         has_chunk_dependencies = self._detect_chunk_dependencies(graph, eligible)
 
@@ -1568,6 +1626,13 @@ class IdeaDagEngine:
                         f"{len(eligible)} leaf siblings not batched"
                     )
 
+        if execute_all and pending_beam:
+            self._logger.info(
+                f"[STEP {step_index}] BEAM PENDING: evaluating {len(eligible)} children before "
+                f"batching them"
+            )
+            execute_all = False
+
         if execute_all and self._cfg.engine.allow_execute_all_children and not has_dependencies:
             ready_children = [
                 cid for cid in eligible
@@ -1591,7 +1656,8 @@ class IdeaDagEngine:
             parallel_limit = max(1, self._cfg.engine.parallel_action_limit)
             self._logger.info(
                 f"[STEP {step_index}] PARALLEL: Executing {len(ready_children)} children "
-                f"(limit={parallel_limit}, skipping evaluation)"
+                f"(limit={parallel_limit}, "
+                f"{'evaluated after the batch' if self._cfg.engine.evaluate_parallel_siblings else 'skipping evaluation'})"
             )
             semaphore = asyncio.Semaphore(parallel_limit)
 
@@ -1644,6 +1710,15 @@ class IdeaDagEngine:
                     node = graph.get_node(cid)
                     if node and node.status == IdeaNodeStatus.DONE:
                         done_children.append(cid)
+
+            # Score the batch. The sequential path evaluates its children before choosing
+            # one; this path chooses nothing, so it used to return with every sibling's
+            # `score` still None -- which is what leaves prune/backtrack/beam reading a
+            # score that never existed (ENGINE_DESIGN_REVIEW.md PART 3). No-op unless
+            # `evaluate_parallel_siblings` is on. AFTER execution on purpose: the results are
+            # in, so this scores what the siblings actually produced instead of paying the
+            # sequential path's `no_action_result_score_cap` penalty for work not yet done.
+            await self._maybe_evaluate_parallel_batch(graph, node_id, ready_children, step_index)
 
             # Opt-in decorrelated per-step confidence judge for the batch-completed siblings
             # (the auto-parallel path bypasses `_apply_action_result`, so wire it here too.
@@ -1726,6 +1801,11 @@ class IdeaDagEngine:
             self._logger.warning(f"[STEP {step_index}] No eligible children after evaluation")
             return None
 
+        # The deferred half of the beam: no-op unless `beam_after_evaluation` is on AND this
+        # parent's expansion left a width behind. Runs HERE because this is the first point at
+        # which every candidate has a score to be cut by.
+        scored_eligible = self._apply_beam_after_evaluation(graph, node, scored_eligible, step_index)
+
         self._logger.debug(f"[STEP {step_index}] Found {len(scored_eligible)} eligible children")
         original_children = list(node.children)
         node.children = scored_eligible
@@ -1773,6 +1853,112 @@ class IdeaDagEngine:
             return selected.node_id
 
         return node_id
+
+    async def _maybe_evaluate_parallel_batch(
+        self, graph: IdeaDag, parent_id: str, child_ids: List[str], step_index: int
+    ) -> None:
+        """Evaluate an auto-parallel sibling batch once its results are back.
+
+        The batch path executes every eligible child in one step and then returns, skipping
+        the evaluation block the sequential path runs. So under the shipped
+        ``auto_parallel_siblings`` default those nodes keep ``score is None`` for the rest of
+        the run, and every consumer of ``node.score`` (GoT pruning, backtrack's dead-end
+        detection, the post-evaluation beam) silently reads nothing.
+
+        Opt-in via ``engine.evaluate_parallel_siblings`` (default OFF: it adds one batch LLM
+        call per parallel batch, so it moves cost and would invalidate in-flight A/Bs). Uses
+        the same batch policy and the same fallback-to-per-node call as the sequential path.
+        Fails open. A scoring failure must never take down a batch whose actions succeeded.
+        """
+        if not self._cfg.engine.evaluate_parallel_siblings or not child_ids:
+            return
+        pending = [
+            cid for cid in child_ids
+            if (child := graph.get_node(cid)) is not None and child.score is None
+        ]
+        if not pending:
+            return
+        try:
+            if hasattr(self.evaluation, "evaluate_batch"):
+                await self.evaluation.evaluate_batch(graph, parent_id, list(pending))
+            else:
+                for cid in pending:
+                    await self.evaluation.evaluate(graph, cid)
+        except Exception as exc:  # noqa: BLE001. Scoring is advisory, execution already happened
+            self._logger.warning(
+                f"[STEP {step_index}] PARALLEL EVALUATION failed "
+                f"({type(exc).__name__}: {exc}); batch stays unscored"
+            )
+            return
+        scored = sum(
+            1 for cid in pending
+            if (child := graph.get_node(cid)) is not None and child.score is not None
+        )
+        self._logger.info(
+            f"[STEP {step_index}] PARALLEL EVALUATION: scored {scored}/{len(pending)} "
+            f"batch-executed siblings"
+        )
+
+    def _apply_beam_after_evaluation(
+        self, graph: IdeaDag, node: Any, scored_eligible: List[str], step_index: int
+    ) -> List[str]:
+        """Cut this parent's live children down to its deferred beam width, BY SCORE.
+
+        The shipped beam is applied at expansion time (``candidates[:max_branching]``), before
+        any candidate has been evaluated, so it keeps whichever candidates the model happened
+        to emit first. With ``engine.beam_after_evaluation`` on, expansion instead creates
+        every candidate and parks the width here; this runs once the batch evaluator has
+        scored them and keeps the top ``width``.
+
+        Losers are SKIPPED and marked ``__beam_pruned`` rather than deleted, so they stay
+        visible to sibling recovery and to the run's telemetry. An unscored child sorts below
+        every scored one, which is the invariant this whole change exists to enforce. Ties keep
+        arrival order (Python's sort is stable), which matters because a pre-execution score of
+        an unexecuted action leaf is capped at ``no_action_result_score_cap``.
+
+        Returns ``scored_eligible`` unchanged when the flag is off, when no width was parked,
+        or when the frontier already fits.
+        """
+        width = node.details.pop(_PENDING_BEAM_KEY, None) if isinstance(node.details, dict) else None
+        if not self._cfg.engine.beam_after_evaluation or not width:
+            return scored_eligible
+        width = max(1, int(width))
+        if len(scored_eligible) <= width:
+            return scored_eligible
+
+        def _score_of(cid: str) -> float:
+            child = graph.get_node(cid)
+            score = getattr(child, "score", None) if child else None
+            return float(score) if score is not None else -1.0
+
+        ranked = sorted(scored_eligible, key=_score_of, reverse=True)
+        kept, dropped = ranked[:width], ranked[width:]
+        for cid in dropped:
+            child = graph.get_node(cid)
+            if not child or child.status in (
+                IdeaNodeStatus.DONE, IdeaNodeStatus.FAILED, IdeaNodeStatus.SKIPPED,
+            ):
+                continue
+            child.status = IdeaNodeStatus.SKIPPED
+            child.details[_BEAM_PRUNED_KEY] = True
+            child.details["__beam_pruned_parent"] = node.node_id
+        self._logger.info(
+            f"[STEP {step_index}] BEAM (post-evaluation): kept {len(kept)}/{len(scored_eligible)} "
+            f"children by score, pruned {len(dropped)}"
+        )
+        self._record_decision(
+            "beam", node_id=node.node_id,
+            chosen=f"{len(kept)} of {len(scored_eligible)} children",
+            alternatives=[
+                {"title": (c.title[:80] if (c := graph.get_node(cid)) else ""), "score": _score_of(cid)}
+                for cid in dropped
+            ],
+            metadata={"step": step_index, "width": width},
+        )
+        # Preserve the caller's original child order among the survivors: only membership is
+        # the beam's business, ordering downstream (sequential reorder) is not.
+        keep = set(kept)
+        return [cid for cid in scored_eligible if cid in keep]
 
     async def _execute_action_guarded(
         self, graph: IdeaDag, parent_id: str, node_id: str
