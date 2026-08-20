@@ -167,9 +167,39 @@ best guess. It has simply never been tested here, and the naming presumes the an
 formula and calls the area "foundational — not an experimental lever"; it does not address
 selection *ordering*.
 
----
+**MEASURED 2026-08-20 — the assumption is confounded, and the beam has little to select on.**
+`scripts/analyze_candidate_arrival_order.py` answers E2 offline, for $0, from 594 recorded
+sibling batches (2085 scored candidates, 516 result files). A "sibling batch" is one parent's
+`children` list: `IdeaDag.expand` builds it in candidate order, so a child's index **is** its
+arrival position, and `evaluate_batch`'s score lands on the same node. Three numbers:
 
-## PART 2 — Tier 2: inert mechanisms
+| statistic | value |
+|---|---|
+| batches where **every** child scored identically | **330 / 594 = 55.6%** |
+| arrival-first is the unique top scorer (raw score) | **0.551** vs 0.410 chance, **+0.141**, z=+3.82 |
+| same, residualised within `(action, executed)` cells | 0.438 vs 0.403 chance, +0.034, z=+1.31 (ns) |
+
+Per-batch Spearman(position, score) tells the same story with its sign flipping: **−0.143**
+raw (95% CI [−0.239, −0.047], permutation p=0.004, "earlier is better") becomes **+0.066**
+residualised (CI [+0.004, +0.127], p=0.043, "later is marginally better").
+
+The confound is visible directly in the position profile. Position 0 is 56% `search` and
+92.3% already-executed; position 1 is 73% `visit` and 84.1% executed. The judge scores
+`search` 0.369 against `visit` 0.338, and `evaluate_batch` caps an un-executed candidate at
+`evaluation_no_action_result_score_cap`. So planners open with a search, the search scores
+higher **for being a search**, and the raw order effect follows. About three quarters of the
++0.141 edge disappears once like is compared with like.
+
+**What this settles, and what it does not.** The naming is accidentally defensible: keeping
+the head of the list does beat a coin flip on the shipped score, so arrival-order truncation
+is not actively throwing away quality. What it is *not* is evidence that the model ranks its
+own ideas — after controlling for what each candidate is, order carries no reliable signal.
+
+**Planning consequence for `engine.beam_after_evaluation`** (built 2026-08-20, default off).
+Its upside is bounded above by two of these numbers: it can only act on the 44.4% of batches
+whose scores differ at all, and within those the head already holds the top score 55% of the
+time. The lever worth pulling first is the 55.6% — an evaluator that returns one number for
+every sibling makes *every* selection policy downstream of it a no-op, score-ordered or not.
 
 Already established by `TECHNIQUE_INVENTORY.md`; collected here because the *category*
 matters for planning. These cannot be tuned. A sweep over any of them returns null, and that
@@ -360,6 +390,15 @@ promotes E2b (truncate by score — requires moving evaluation before truncation
 control-flow change, so only worth scoping if E2 is positive).
 **Risk logged:** shuffling changes RNG consumption; seed explicitly rather than relying on
 global state, or arms diverge for reasons unrelated to order.
+
+**SUPERSEDED 2026-08-20 — answered offline for $0, no live run needed.** See T1-3 above and
+`scripts/analyze_candidate_arrival_order.py`. Recorded runs already carry both halves of the
+question (arrival position from the `children` list, score from `evaluate_batch`), so the
+shuffle arm was never necessary to learn whether order predicts score. Result: it does on the
+raw score (+0.141 over chance) and does not once the action-composition confound is removed
+(+0.034, ns). **E2b (truncate by score) is therefore not promoted** — the claimed gain is
+bounded by a 44.4% discriminating-batch rate times a 45% first-is-not-top rate, on a score
+whose own spread is the real bottleneck.
 
 ### E3 — Similarity floor on memory retrieval
 
