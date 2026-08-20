@@ -371,6 +371,48 @@ includes 0, dedup is inert as shipped and E1b (fix conversion, re-run) is justif
 someone wants the graph-growth control.
 **Risk logged:** dedup interacts with beam width; hold `max_branching` fixed across arms.
 
+**READY 2026-08-20 — toggle confirmed, firing rate measured offline. The live A/B is not run.**
+
+*The toggle already exists; nothing was added.* `got_dedup_enabled` is a typed field
+(`config.py:118`, default `True`), is present in all three settings files
+(`idea_dag_settings.json:133` and the `.baseline` / `.good_adaptive` variants), and gates
+**both** entry points — `is_duplicate_thought` and `filter_duplicate_candidates` — ahead of
+any memory query, so the OFF arm also spends no retrieval. `idea_test_runner.py` exposes it
+as `IDEA_TEST_GOT_DEDUP`, which is how the benchmark should set it. Pinned by four tests in
+`got_operations_test.py`.
+
+*Firing rate, from the recorded log corpus* (397 driver/cell logs carrying an expansion
+trace: 931 expansions, 2758 candidates offered to dedup):
+
+| | |
+|---|---|
+| expansions where dedup flagged >=1 candidate | 154 / 931 = **16.5%** |
+| candidates flagged duplicate | 225 / 2758 = **8.2%** |
+| candidates **net removed** after the all-filtered fallback | 155 / 2758 = **5.6%** |
+| firing batches where *every* candidate was flagged | 70 / 154 = **45.5%** |
+| firing batches with **zero** net effect (`filtered 1 out of 1`) | **50** |
+
+Two things fall out of that table and both shape the experiment.
+
+**The mechanism is not inert.** 16.5% of expansions is well clear of the pruning/backtrack
+"never fired" bar in PART 2. E1 is a real ablation, not a null-by-construction one.
+
+**The nominal and effective rates differ by a third**, because `filter_duplicate_candidates`
+returns `candidates[:1]` when everything was filtered. In 50 batches that fallback restores
+the *only* candidate, so the arms are byte-identical while the log announces a filter. Any
+analysis counting `[GoT:DEDUP] Filtered` lines as removals overstates the effect by ~31%;
+count 8.2% as nominal and 5.6% as delivered.
+
+**Both numbers are a floor.** Every one of those logs predates the T1-1 conversion fix
+(same day), so they were produced at an effective threshold of cosine 0.925. The corrected
+conversion fires *more* often, and the corpus skews toward chain tasks under `good_adaptive`.
+Treat 16.5% / 5.6% as "dedup is worth ablating", not as the rate the A/B will see.
+
+*What the live A/B should measure*, paired by (task, rep), `max_branching` held fixed:
+task score primary; node count, candidate count and USD secondary; plus the two rates above
+re-derived per arm from the ON arm's logs, so the score delta can be read against how much
+dedup actually did. `IDEA_TEST_GOT_DEDUP=0` vs unset, `core24`, R>=3.
+
 ### E2 — Shuffle candidates before truncation
 
 **Claim under test:** LLM output order carries no quality signal, so

@@ -78,6 +78,85 @@ def test_adaptive_dedup_disabled_returns_fixed():
     assert ops._adaptive_dedup_threshold(g) == 0.85
 
 
+# --- dedup kill-switch and all-filtered fallback ------------------------------------------
+# Groundwork for ASSUMPTION_AUDIT.md's E1 (ablate dedup entirely). The experiment's OFF arm is
+# ``got_dedup_enabled: false`` and nothing else, so what it actually measures depends on two
+# behaviours that nothing pinned before: that the flag short-circuits BOTH entry points before
+# any memory query (otherwise the arms differ in retrieval cost as well as in dedup), and that
+# the all-filtered fallback hands back ``candidates[:1]``. The second is not a corner case: in
+# the recorded log corpus 70 of 154 firing batches (45.5%) flagged every candidate, and 50 of
+# those were single-candidate batches where the fallback restores the only candidate and the
+# arms are byte-identical despite the log announcing a filter.
+
+
+class _RecordingMemory:
+    """Memory manager that fails the test if dedup queries it."""
+
+    distance_space = "cosine"
+
+    def __init__(self, memories=None):
+        self.queries = []
+        self._memories = memories or []
+
+    async def retrieve_relevant_memories(self, query, n_results, memory_type):
+        self.queries.append(query)
+        return self._memories
+
+
+def _dup_memory(node_id="existing", distance=0.0):
+    return _RecordingMemory([{"distance": distance, "metadata": {"node_id": node_id}}])
+
+
+@pytest.mark.asyncio
+async def test_dedup_disabled_short_circuits_before_touching_memory():
+    memory = _dup_memory()
+    settings = {"got_dedup_enabled": False}
+    ops = GoTOperations(settings=settings, io=None, memory_manager=memory)
+    g = IdeaDag(root_title="root")
+    assert await ops.is_duplicate_thought("t", "goal", g) == (False, None)
+    candidates = [{"title": "a"}, {"title": "b"}]
+    assert await ops.filter_duplicate_candidates(candidates, g) == candidates
+    assert memory.queries == []   # the OFF arm spends no retrieval either
+
+
+@pytest.mark.asyncio
+async def test_dedup_enabled_drops_the_duplicate_candidate():
+    ops = GoTOperations(
+        settings={"got_dedup_enabled": True, "got_adaptive_policies": False,
+                  "got_dedup_similarity_threshold": 0.85},
+        io=None,
+        memory_manager=_dup_memory(),
+    )
+    g = IdeaDag(root_title="root")
+    is_dup, node_id = await ops.is_duplicate_thought("t", "goal", g)
+    assert (is_dup, node_id) == (True, "existing")
+
+
+@pytest.mark.asyncio
+async def test_all_filtered_fallback_restores_the_first_candidate():
+    # Every candidate matches the same stored memory, so `filtered` ends up empty. Returning
+    # nothing would leave the parent childless, so the fallback keeps the head of the list --
+    # which means a "filtered 1 out of 1" batch is a no-op, not a removal.
+    ops = GoTOperations(
+        settings={"got_dedup_enabled": True, "got_adaptive_policies": False,
+                  "got_dedup_similarity_threshold": 0.85},
+        io=None,
+        memory_manager=_dup_memory(),
+    )
+    g = IdeaDag(root_title="root")
+    assert await ops.filter_duplicate_candidates([{"title": "only"}], g) == [{"title": "only"}]
+    assert await ops.filter_duplicate_candidates(
+        [{"title": "a"}, {"title": "b"}], g
+    ) == [{"title": "a"}]
+
+
+@pytest.mark.asyncio
+async def test_dedup_without_a_memory_manager_is_inert():
+    ops = GoTOperations(settings={"got_dedup_enabled": True}, io=None, memory_manager=None)
+    g = IdeaDag(root_title="root")
+    assert await ops.is_duplicate_thought("t", "goal", g) == (False, None)
+
+
 def test_prune_below_minimum_node_count_returns_empty():
     ops = _make_ops(got_prune_min_nodes_before_prune=6)
     g = IdeaDag(root_title="root")
