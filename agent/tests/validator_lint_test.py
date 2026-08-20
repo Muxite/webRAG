@@ -121,7 +121,7 @@ def test_idea_tests_directory_lints_clean_on_the_active_suite():
 
 def test_dropped_task_024_still_flags_llm_judge():
     """024 is intentionally KEPT (not deleted, per F27) but EXCLUDED from the active suite because
-    it is un-gated and carries a real LLM judge (AGENT5: a 0-visit hallucination scores 0.786 and
+    it is un-gated and carries a real LLM judge (AGENT5: a 0-visit hallucination scores 0.786 across
     passes). This test pins that it still correctly flags [LLM] -- if it ever stops flagging,
     either the file was fixed (great -- consider re-promoting it) or the lint regressed."""
     findings = lint.lint_file(os.path.join(_IDEA_TESTS_DIR, "test_024_research_document_analysis.py"))
