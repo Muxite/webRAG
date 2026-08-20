@@ -779,6 +779,52 @@ task score primary; node count, candidate count and USD secondary; plus the two 
 re-derived per arm from the ON arm's logs, so the score delta can be read against how much
 dedup actually did. `IDEA_TEST_GOT_DEDUP=0` vs unset, `core24`, R>=3.
 
+**RUN 2026-08-20 — dedup is NOT inert and NOT neutral: turning it OFF scores +0.157 higher.**
+Live A/B, `gpt-4.1-nano`, `graph`, 12 core24 tasks spanning all four archetypes
+(122/125/128/130/134/135/137/138/139/140/143/144), R=4, paired by (task, rep), 47 healthy pairs
+(1 infra cell quarantined), $0.93. Arms are the two `_GOT_ARM_PROFILES` entries `good_adaptive`
+(dedup ON, shipped) and `good_adaptive_nodedup`, which differ in `got_dedup_enabled` and nothing
+else — `max_branching`/`got_beam_max` pinned identical, as E1's risk note required.
+
+| | dedup ON (shipped) | dedup OFF | Δ (ON−OFF) | p (sign-flip) |
+|---|---|---|---|---|
+| task score, per-task means (n=12) | 0.584 | 0.741 | **−0.157 ±0.109** | **0.0059** |
+| task score, per (task,rep) (n=47) | 0.584 | 0.741 | −0.157 ±0.086 | 0.0007 |
+| graph nodes | 6.57 | 9.96 | −3.38 ±2.58 | 0.007 |
+| expansion candidates | 4.00 | 7.04 | −3.04 ±2.64 | 0.014 |
+| USD / run | 0.0079 | 0.0114 | −0.0036 ±0.0027 | 0.010 |
+| $ / solved (score>=0.75) | 0.0205 | 0.0172 | +0.0033 | — |
+
+Cell level: dedup ON better on 10, worse on 30, tied on 7. Ten of twelve tasks are negative or
+flat; the two positive ones (+0.05, +0.004) are inside noise. **Dedup buys exactly the
+graph-growth control it claims** (−34% nodes, −43% candidates, −31% USD/run) **and pays for it in
+accuracy at a rate that makes the trade a loss** — $/solved is *worse* despite the cheaper runs,
+because the runs it makes cheap are the ones it makes wrong. Both arms ground 100% of the time,
+so the Oaxaca split books the whole −0.161 raw gap as REASONING with zero grounding-rate
+component; evidence volume moves with it (visited chars 89k ON vs 154k OFF).
+
+**Mechanism, from the ON arm's own logs** (48 cells, 146 expansions): dedup now fires on **29.5%
+of expansions** (vs the 16.5% floor measured pre-T1-1, exactly the "corrected conversion fires
+more often" prediction), flagging 51 candidates. **25 of the 43 firing batches (58%) flagged
+EVERY candidate**, so `filter_duplicate_candidates` fell back to `candidates[:1]` and collapsed a
+whole sibling batch to one thought. That is the harm channel: dedup is not trimming a redundant
+5th sibling, it is truncating expansions. The flags themselves look defensible in isolation
+(similarity 0.788-0.961 against a dynamic threshold of 0.771-0.835) — near-duplicate *text* is
+simply not the same thing as a redundant *sub-problem*, and the tasks that lose most are the
+chains (135 −0.55, 137 −0.29, 125 −0.34), where consecutive hops are textually near-identical
+("open page X, read value Y") while being exactly the work that must not be merged.
+
+**Pre-registered criteria resolved:** neither CI includes 0, so the "inert as shipped" branch is
+false in both directions. E1b (fix the conversion, re-run) is moot — the conversion is already
+fixed and the corrected mechanism is worse, not better.
+
+**Default NOT flipped.** One model, one task set, n=12 tasks. The finding is strong enough to make
+`got_dedup_enabled: false` the leading default-flip candidate in the backlog, and the honest next
+step is a confirmation run on a second model plus the wider `suite59`, not a flip on this evidence
+alone. Anyone wanting the graph-growth control back should take it from the all-filtered fallback
+instead: keeping the batch when *every* candidate is flagged (rather than keeping one) removes the
+58% of firings that do the damage while leaving the partial-batch trims intact.
+
 ### E2 — Shuffle candidates before truncation
 
 **Claim under test:** LLM output order carries no quality signal, so
@@ -827,6 +873,55 @@ every retrieved row, so **the distribution can be measured offline from a record
 first** — do that before picking 0.3 vs 0.5, since a floor above the corpus's typical
 similarity would gut retrieval and one below its floor would be inert. Neither arm is worth
 paying for until that histogram exists.
+
+**CALIBRATED 2026-08-20 — the histogram exists; recommended floor is 0.40. Default stays
+`0.0`; the live A/B is still not run.**
+
+The `similarity` field is computed at query time and never serialized, so no stored result JSON
+carries the distribution and `[MEMORY:FLOOR]` never fired (every run to date had the floor off).
+`scripts/histogram_memory_similarity.py` gets it for $0 anyway: it rebuilds each run's retrieval
+QUERIES from stored result JSONs exactly as `idea_engine._expand_or_execute` assembles them, and
+re-issues them through the shipped `MemoryManager` against that run's own `mem_*` collection,
+still resident in the HTTP chroma. Local MiniLM embedding, no API call. **3268 retrieved rows,
+60 runs, ~20 collections** (`agent/tests/memory_similarity_histogram_test.py` pins the namespace
+derivation, the query assembly and the floor arithmetic against the engine's own code):
+
+| p1 | p5 | p10 | p25 | median | p75 | p90 | p99 |
+|---|---|---|---|---|---|---|---|
+| 0.192 | 0.330 | 0.463 | 0.590 | **0.663** | 0.750 | 0.820 | 0.922 |
+
+**Shape: one mode at 0.60-0.75 sitting on a flat low tail.** Bucket counts run 30-45 per 0.05 from
+0.15 to 0.40, then climb steeply (104, 91, 188, 325, 543). That flat shelf is the signature of
+"no relevant neighbour existed, so *k*-NN returned whatever was there" — a near-uniform density
+against a rising signal density. **The knee is at 0.40-0.45**, which is what a floor should sit
+at, and neither pre-registered guess is on it: 0.3 cuts 3.9% of rows and empties 0.8% of
+retrieval calls (close to inert), 0.5 cuts 12.2% and empties 4.1% (already eating the rising
+shoulder).
+
+| floor | rows cut | calls left empty |
+|---|---|---|
+| 0.30 | 3.9% | 0.8% |
+| 0.35 | 5.3% | 0.8% |
+| **0.40** | **6.2%** | **1.2%** |
+| 0.45 | 9.4% | 3.3% |
+| 0.50 | 12.2% | 4.1% |
+
+Both columns matter and only the second is about gutting: a floor that trims the 5th neighbour is
+doing its job, a floor that empties the call removes memory from that expansion entirely. At 0.40
+the second is 1.2%.
+
+Two supporting reads. Similarity decays gently by rank (0.692 -> 0.623 from rank 0 to 4), so there
+is no natural *k* to cut at instead — the floor is the right instrument, not a smaller `n_results`.
+And `observations` sit 0.08 below `internal_thoughts` (mean 0.612 vs 0.692), so a single global
+floor bites the page-text side harder; if 0.40 proves too aggressive live, splitting the floor per
+memory type is the next lever, not lowering it.
+
+**Recommended live arm: `memory_retrieval_similarity_floor: 0.40` vs `0.0`.** Not shipped as a
+default — this is a corpus measurement, not an accuracy measurement, and nothing here says the 6%
+it cuts was hurting. Two caveats to carry into that run: the persistent collections have
+accumulated across every run sharing a mandate, so they are at least as full as at query time and
+every similarity above is an UPPER bound (a floor picked from it is conservative, which is the
+safe direction); and the corpus skews to `gpt-4.1-nano` graph runs on the chain-heavy task set.
 
 ### E4 — Chunk size reconciliation — **RETIRED, no run needed**
 
