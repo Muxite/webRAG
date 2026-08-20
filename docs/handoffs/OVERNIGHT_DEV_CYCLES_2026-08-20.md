@@ -2,11 +2,11 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 17 cycles
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 19 cycles
 below are committed; the run continues past this point.
 
-**Spend so far: ~$1.37 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
-5373 passed / 18 skipped (zero failures across the whole run).
+**Spend so far: ~$2.45 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+5380 passed / 18 skipped (zero failures across the whole run).
 
 ---
 
@@ -176,6 +176,29 @@ noisy (+0.017 unweighted / +0.066 excluding one outlier task), 3 clear wins, 1 a
 to two OTHER pre-existing bugs unrelated to this flag (judge overconfidence at the 0.6-0.7 band, and
 a wrong-page disambiguation/dedup issue) — not a regression the fix caused. **Read: promising, not
 yet sufficient for a default flip — needs a larger multi-model confirmation run.**
+
+**Cycle 18 — E3 calibration + E1 dedup live A/B** (`d14be338`, `2e3452cd`, `b85dbb43`). E3: no run
+had ever recorded the `similarity` instrumentation field (nothing serializes it), so reconstructed
+the distribution offline for $0 by re-issuing 60 runs' actual retrieval queries against their still-
+live chroma collections (3268 rows) — median similarity 0.663, with a knee at 0.40-0.45 where
+density stops being a flat low shelf. **Recommended floor for a future A/B: 0.40** (cuts 6.2% of
+rows), not either of the two values that had been informally guessed (0.30 near-inert, 0.50 already
+cuts the productive shoulder). E1: ran the dedup kill-switch live on 12 `core24` tasks × 4 reps
+(47 paired cells). **`got_dedup_enabled` (default True) was found to be significantly HURTING
+score: −0.157 on `overall_score`, p=0.0007.** Traced to mechanism: dedup fires on 29.5% of
+expansions post-T1-1, and 58% of firing batches flag *every* candidate, triggering a
+`candidates[:1]` collapse that destroys multi-hop plans rather than trimming redundant ones — chains
+hit hardest (task 135: −0.55).
+
+**Cycle 19 — fix the dedup all-flagged collapse** (`6b092fbd`). Implemented Cycle 18's own
+recommended narrow fix: when dedup would flag every candidate in a batch, keep the batch unfiltered
+instead of truncating to one (partial-flag behavior unchanged). Shipped **unconditional** — the old
+branch's behavior had no defensible upside once "every sibling looks like a duplicate" is understood
+as a degenerate/unreliable verdict, not a real completeness assessment, and the existing
+`got_dedup_enabled` kill-switch already covers anyone who wants dedup off entirely. **Live-confirmed
+on the three worst-hit tasks: recovers ~61% of the ON/OFF score gap** (task 137 fully recovers and
+edges past the no-dedup baseline; task 135 recovers only partially, suggesting another cost is still
+active there beyond this specific bug).
 
 ---
 
