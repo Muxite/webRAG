@@ -2,10 +2,10 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 22 cycles
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 23 cycles
 below are committed; the run continues past this point.
 
-**Spend so far: ~$2.83 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+**Spend so far: ~$2.98 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
 5393 passed / 18 skipped (zero failures across the whole run).
 
 ---
@@ -244,6 +244,18 @@ today would just redirect the same blind visit onto the F37 chrome pool or an in
 instead of a real target. Documented an explicit fix ordering (F37 → host/language affinity filter →
 a real dependency edge between authored hops → only then withdraw the mandate-URL shortcut) as F38,
 diagnosed not fixed.
+
+**Cycle 23 — live validation of F37** (benchmark run, no code change). Task 046 (the one task in a
+6-task spot-check that actually exercised chrome-page selection) confirmed the fix working exactly
+as designed: 3/15 visits landing on the Wikipedia donate sidebar with the flag off, **zero** with it
+on — the freed-up steps went one hop deeper into legitimate content instead, at 15% lower cost, with
+no score change. The other 5 tasks showed 0 chrome hits in either arm (expected, given the 3%
+corpus-wide base rate) and no regressions — no case of the filter turning a present-but-low-quality
+answer into an outright failure. **Side finding**: `idea_dag_settings.good_adaptive.json` is stale,
+missing ~48 keys (including `final_require_grounding`) present in the current
+`idea_dag_settings.json` — the benchmark agent worked around it by building settings programmatically
+rather than trusting the file; this stale file is a live footgun for any future script that loads it
+directly and should get its own cheap cycle.
 
 ---
 
