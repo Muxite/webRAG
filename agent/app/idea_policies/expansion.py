@@ -14,17 +14,14 @@ if TYPE_CHECKING:
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import ExpansionPolicy, DetailKey, IdeaActionType
 from agent.app.idea_policies.config import IdeaConfig
+from agent.app.idea_policies.detail_serialization import (
+    _safe_serialize_details,
+    _serialize_details_for_prompt,
+)
 from agent.app.idea_policies.shape_classifier import classify_shape
 from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.llm_backends import json_instruction_from_response_format
 from agent.app.testing import json_telemetry as _json_telemetry
-
-
-def _safe_serialize_details(details: Dict[str, Any]) -> str:
-    try:
-        return json.dumps(details, ensure_ascii=True, default=str)
-    except Exception as e:
-        return json.dumps({"error": f"Serialization failed: {str(e)}"}, ensure_ascii=True)
 
 
 # --- malformed-expansion-JSON repair ---------------------------------------------------------
@@ -904,9 +901,12 @@ class LlmExpansionPolicy(ExpansionPolicy):
         for entry in path:
             enhanced_details = self._enhance_details_with_inline_links(entry.details)
             compact_details = self._compact_details_for_expansion(enhanced_details)
-            details_text = _safe_serialize_details(compact_details)
-            if len(details_text) > max_detail_chars:
-                details_text = details_text[:max_detail_chars]
+            # `_compact_details_for_expansion` is not enough on its own: 68.7% (3886/5654) of the
+            # recorded compacted blobs still cross the budget, and the character cut this
+            # replaced left every one of them unterminated, with `url`, `_links_inline` and the
+            # rest of the trailing keys missing from the planner's view of what a sibling
+            # already fetched.
+            details_text = _serialize_details_for_prompt(compact_details, max_detail_chars)
             serialized.append(
                 {
                     "node_id": entry.node_id,

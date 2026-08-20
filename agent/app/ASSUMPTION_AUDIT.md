@@ -392,10 +392,20 @@ flatness, p=0.63 on spike detection (3 fixed-only hits against 1), and the
 substantive-minus-degenerate gap actually narrows (+0.258 to +0.197). n=40 on one model. The
 justification for shipping it is that malformed input to a judge is a defect on its own terms.
 
-**Still open, same defect, not changed here:** `expansion.py:907` cuts the same way for the
-planner prompt. Its `_compact_details_for_expansion` pass is not enough — **68.7% (3886/5654)
-of compacted details still exceed 5000 characters** and get the same mid-JSON cut. That change
-alters plan generation rather than scoring, so it wants its own cycle.
+**The planner prompt had the same defect, fixed in the next cycle.** `expansion.py` cut the same
+way, after its `_compact_details_for_expansion` pass rather than instead of one, so the
+compaction hid the size of the problem without removing it: over the recorded corpus **4843 of
+7998 node details (60.6%) still exceeded 5000 characters once compacted, and all 4843 reached
+the planner unterminated**. The cut usually landed inside `link_contexts`, a field the
+compaction leaves alone, so the budget went to URL keys while the keys serialized after it
+disappeared: `_links_inline` on 42.4%, `visit_url` on 38.0%, `provides_data` on 39.8%,
+`page_title` on 42.3%. A planner choosing what to expand next could not see which URL a sibling
+had already fetched. The three helpers moved to `idea_policies/detail_serialization.py` and
+both prompt sites now call `_serialize_details_for_prompt`; on the corpus that is 4843/4843
+blobs valid and 0 invalid, with ~1000 characters of page text plus the inline link menu still
+shown. Shipped unconditional on the same argument as the evaluation side, with the same caveat
+that it is a correctness fix and not a measured quality win: **a live A/B on plan shape is a
+next-cycle item**, since this changes what the planner sees rather than what a judge scores.
 
 **What this settles, and what it does not.** The naming is accidentally defensible: keeping
 the head of the list does beat a coin flip on the shipped score, so arrival-order truncation
