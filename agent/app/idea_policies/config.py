@@ -661,6 +661,18 @@ class ActionConfig:
     # the cascade; if the cascade resolves nothing NEW the original error is re-raised, so the
     # action's failure surface is unchanged. Off -> byte-identical to the old abort.
     visit_dead_url_fallback_enabled: bool = True
+    # Site-chrome filtering of the visit URL POOL (opt-in). The chrome test added for the dead-URL
+    # recovery harvest is applied there only, so every OTHER pool a URL-less visit resolves from --
+    # ancestor page links (``_extract_url_from_parents``), sibling results, the Chroma link index --
+    # still offers donation appeals, login/create-account forms and portal plumbing as if they were
+    # content. They out-rank real pages because a chrome link routinely carries the leaf's own words
+    # in a campaign/``returnto=`` parameter, and they sit FIRST in a Wikipedia page's link order, so
+    # a score tie resolves to them. 64 of 2134 executed sibling visits in the recorded corpus (3.0%,
+    # across 35 runs) fetched one -- a donation page read as evidence. When on, chrome URLs are
+    # dropped from the resolved pool before selection. A DECLARED URL is never dropped (same
+    # principle as the sibling dedup above: that is the planner's own instruction).
+    # Default OFF -> byte-identical.
+    visit_chrome_link_filter: bool = False
 
     _KEYS: ClassVar[dict] = {
         "max_retries": "action_max_retries",

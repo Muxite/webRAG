@@ -374,6 +374,104 @@ evidence only.
 (the pre-fix winning rep is the one that chose `search`), and the finalizer will answer a
 failed hop from parametric memory rather than reporting the gap.
 
+### F37. Site chrome is a selectable page in every URL pool but the one F36 filtered — VERIFIED
+
+F36 added a chrome test (`donate.`/`login.`/`Special:`/`/w/index.php`/`action=edit`/`returnto=`)
+and applied it inside `_harvest_relative_page_links` only, which runs on exactly one path: a
+declared URL whose fetch RAISED. Cycle 13 left a "hijacked" class (4 of 101 duplicate groups)
+open on the assumption F36 might cover it. Tracing the 6 hijacked groups in the current corpus,
+**it does not**, and the class is much larger than the hijacked count suggests.
+
+**The traced case** is task 078 (`bmladapt__qwen2.5-7b__a2_native_good_adaptive__reachable`,
+node `da437816`): `optional_url` is the literal placeholder `<URL found in search results>`, so
+the leaf resolves at runtime; `requires_data` names the BANGKA search, so the pool it gets is
+Bangka's eight hits, none of which is the Chichagof page it asked for; the leaf and its Flores
+sibling both end on `donate.wikimedia.org` and the merge reads a donation appeal as island
+evidence. Nothing raised, so F36's harvest never ran, and none of the pools that DID run is
+chrome-filtered:
+
+* `_extract_url_from_parents` scores `+50` for `"wikipedia.org" in url` when the leaf mentions
+  Wikipedia — which the donate URL satisfies through its `wmf_campaign=en.wikipedia.org`
+  parameter — then `sort(reverse=True, key=score)` leaves ties in list order. The donate link is
+  **index 0 of every Wikipedia page's link list** (verified: 443 links, donate first, then
+  `Special:CreateAccount`/`Special:UserLogin` with the page title in `returnto=`). Chrome wins
+  every tie by construction.
+* `_extract_url_from_sibling_results` scores by word overlap (a `returnto=Main+Page` parameter
+  literally contains a "Main Page" leaf's words) and falls back to `unique_links[0]` — again the
+  donate link.
+* `_filter_and_prioritize_links`'s older `_is_wiki_chrome` is path-only (`/wiki/special:` etc.),
+  so it catches none of the `donate.` host or `/w/index.php?title=Special%3A...` forms, and the
+  Chroma link index is populated from its output.
+
+**Blast radius** (recorded corpus): **64 of 2134 executed sibling visits (3.0%), across 35 runs**,
+fetched a page the chrome test would reject — 40 of them a donation appeal, the rest
+create-account forms, `Special:WhatLinksHere`, `Portal:`/`Wikipedia:` plumbing. That is ~10x the
+4-group "hijacked" bucket, because most chrome reads are not duplicates.
+
+**FIX (opt-in `action.visit_chrome_link_filter`, default OFF).** `_drop_chrome_urls` applies the
+existing test to the three pools above: ancestor links, sibling results, and the resolved
+`candidate_urls` list before selection. A DECLARED URL is never dropped (same principle as the
+sibling dedup — an explicit URL is the planner's own instruction). An all-chrome pool now yields
+the action's normal no-URL failure instead of a donation page. Default OFF because removing
+candidates changes which pages a run reads and the score effect is unmeasured; the argument for
+turning it on is that no dropped URL can answer a research leaf.
+
+### F38. A chain's later hops are handed the seed URL by the engine, not the model — DIAGNOSED, UNFIXED
+
+Cycle 13's T1-4 left the `declared` half of the duplicate sibling visits (40 of 101 groups) as a
+planner defect to fix later, diagnosed as "a chain hop whose page is named by data that does not
+exist yet should carry `requires_data`, not the seed URL". Two things came out of measuring it.
+
+**1. The majority of the `declared` class is not a bug.** In the current corpus there are 66
+`declared` groups; 12 belong to `naive_discretion` runs (the ReAct baseline's linear step list,
+not planner authoring at all) leaving 54 graph-planner groups. Scoring each member by whether its
+own goal text names any identity token of the URL it declared:
+
+| | groups | example |
+|---|---|---|
+| every member names the page it declared — **legitimate re-read** | 33 (61%) | task 093: three leaves asking three different questions about one pinned `socks.c`; task 022: four facts from `docs.docker.com`; task 138: the 1856 height and its proposer are both on `Mount_Everest` |
+| at least one member's goal names nothing of it — **premature seed** | 21 (39%) | task 040: `Step 1: Visit Nineteen Eighty-Four ...` (names it) beside `Step 2: Visit the author's Wikipedia page` and `Step 3: Visit the town's Wikipedia page` (both handed `/Nineteen_Eighty-Four`) |
+
+Tightening "premature seed" to the copied-seed signature proper (a blind member sitting beside a
+sibling that DOES name the URL) leaves 9 groups. So the fixable share of the `declared` class is
+**17-39%, not a majority** — reading a page twice for two different facts is usually deliberate,
+and the wasteful part of that is a missing page cache, a different problem.
+
+**2. The premature seed is written by the engine.** It is not the model copying a URL.
+`ExpansionPolicy`'s visit-candidate cleanup calls `_match_mandate_url` for any candidate without
+a URL, and that helper opens with:
+
+```python
+if len(urls) == 1:
+    return urls[0]
+```
+
+Task 040's mandate names exactly one URL, so *every* URL-less visit candidate in that task —
+including "Visit the author's Wikipedia page", which cannot be resolved before hop 1 runs — is
+handed `/Nineteen_Eighty-Four` with no title-overlap test, the one the multi-URL branch below it
+does apply. Ten of the corpus's `declared` groups (34 leaf visits) are this single line.
+
+**Why the obvious fix is not safe yet, and what has to land first.** Suppressing the URL leaves
+the leaf to runtime resolution, and in these graphs runtime resolution has nothing trustworthy to
+resolve FROM:
+
+* The hops carry no dependency edge. In `barrage20_p1_mergefix_nano_good_adaptive_rep1_040` the
+  three hops are bare siblings of one parent, `requires_data = None`, `parent_ids` a single
+  parent each — so hop 2 may execute before hop 1 has produced the page that names its target
+  (PART 0 / F3 / F5: the graph is a tree and dependency edges are invented by URL-sniffing).
+* The pool it would fall back to is the one F37 documents: the seed page's own link list, whose
+  first entries are donate/create-account chrome and then the interlanguage links — which is
+  exactly how task 070's four English leaves ended on `hr.wikipedia.org` (T1-4).
+
+So dropping the seed today converts a redundant-but-successful fetch into a blind one. The
+sequence is: F37's chrome filter (landed, off), then an interlanguage/host-affinity filter on the
+same pools, then a real dependency edge between authored chain hops (F5's template builder
+generalised) — and only then withhold the mandate URL from a hop whose goal names nothing of it.
+Worth noting the adaptive engine already recovers these chains a different way: in the run above,
+hop 1's re-expansion authored "Visit the Wikipedia page for the author George Orwell" and then
+"Visit the Wikipedia page for Motihari", both correct, so the flat sibling hops 2 and 3 are dead
+weight rather than the only path to the answer.
+
 ---
 
 ## PART 2 — Ranked findings
@@ -388,6 +486,8 @@ failed hop from parametric memory rather than reporting the gap.
 | F7 | Malformed plan collapses to one degenerate node, unflagged | High | **Low** — PARTIAL: now flagged |
 | F35 | F33's contract veto silences the judge on unfinished chains | High | **Low** — fixed behind a flag |
 | F36 | Dead declared URL aborts past the visit action's own recovery cascade | High | **Low** — fixed, kill-switch |
+| F37 | Site chrome selectable in every URL pool but F36's harvest (3.0% of visits) | High | **Low** — fixed behind a flag |
+| F38 | `_match_mandate_url` hands a chain's later hops the seed URL unconditionally | High | Medium — diagnosed, unfixed |
 | F2 | Depth never chosen, tracked, or capped | Medium | Low |
 | F9 | Template short-circuit can hijack non-root subtrees | Medium | Low — RESOLVED |
 | F4 | `execute_all_children` declared before children exist | Medium | Medium |

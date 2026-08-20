@@ -168,6 +168,7 @@
   "tool_failure_recovery_enabled": false,
   "visit_sibling_url_dedup": false,
   "visit_dead_url_fallback_enabled": true,
+  "visit_chrome_link_filter": false,
   "native_vote_k_enabled": false,
   "native_vote_k": 1,
   "native_vote_k_tiered_enabled": false,

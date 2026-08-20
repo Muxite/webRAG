@@ -485,6 +485,17 @@ where the planner wrote every hop's `url` before the data that would name the la
 existed, so each hop repeats the only URL it knows: the seed. That is a planner defect, and
 suppressing the fetch would only turn a redundant read into a failed one.
 
+**Follow-up (measured, `DAG_FORMATION_REVIEW.md` F37/F38).** Two of the numbers above need
+correcting. The `declared` half is mostly NOT a defect: of 54 graph-planner groups (12 of the
+66 in the wider corpus belong to `naive_discretion`, which does no planner authoring), 61% are
+deliberate re-reads of one page for different facts and 17-39% are the premature seed — and
+"34" was leaf visits, not groups (10 groups). The premature seed itself is engine-written, by
+`ExpansionPolicy._match_mandate_url`'s unconditional single-mandate-URL return, and the
+suppression this entry rules out stays ruled out until the fallback pool and the chain's
+dependency edges are fixed. The `hijacked` class is a URL-pool quality problem, not a
+declared-URL one: **3.0% of all executed sibling visits (64 of 2134, 35 runs) fetched site
+chrome**, which every pool but F36's harvest still offers as a page.
+
 **Existing dedup cannot catch either half.** `got_operations.is_duplicate_thought` runs on
 candidate **title/goal text** at expansion time, and "visit season 1" vs "visit season 2" are
 correctly not duplicates — the collision only exists after resolution. `idea_visit_dedup.

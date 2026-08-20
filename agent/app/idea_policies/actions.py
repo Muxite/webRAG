@@ -720,6 +720,26 @@ class VisitLeafAction(LeafAction):
             or any(marker in target for marker in cls._CHROME_URL_MARKERS)
         )
 
+    def _drop_chrome_urls(self, urls: List[str], where: str) -> List[str]:
+        """``urls`` minus site chrome, when ``action.visit_chrome_link_filter`` is on.
+
+        The chrome test is cheap and the same one the dead-URL harvest already applies; what this
+        adds is applying it to the OTHER pools a URL-less visit resolves from, where a donation
+        appeal or a create-account form is otherwise a selectable "page" (3.0% of executed sibling
+        visits in the recorded corpus landed on one). Everything dropped is a page that can never
+        answer a research leaf, so an empty remainder is left to the caller's own no-URL handling
+        rather than silently restored.
+        """
+        if not urls or not self._cfg.action.visit_chrome_link_filter:
+            return urls
+        kept = [u for u in urls if not self._is_page_chrome_url(u)]
+        if len(kept) != len(urls):
+            self._logger.info(
+                f"[VISIT] Chrome filter: dropped {len(urls) - len(kept)} site-chrome URL(s) "
+                f"from {where} ({len(kept)} left)"
+            )
+        return kept
+
     def _harvest_relative_page_links(
         self,
         graph: IdeaDag,
@@ -839,9 +859,15 @@ class VisitLeafAction(LeafAction):
                 if parent:
                     queue.append((parent, depth + 1))
         
+        if self._cfg.action.visit_chrome_link_filter:
+            kept_urls = set(self._drop_chrome_urls(
+                [candidate[0] for candidate in all_candidates], "ancestor links"
+            ))
+            all_candidates = [c for c in all_candidates if c[0] in kept_urls]
+
         if not all_candidates:
             return None
-        
+
         scored = []
         for candidate in all_candidates:
             url = candidate[0]
@@ -965,9 +991,10 @@ class VisitLeafAction(LeafAction):
                 seen.add(link)
                 unique_links.append(link)
         
+        unique_links = self._drop_chrome_urls(unique_links, "sibling results")
         if not unique_links:
             return None
-        
+
         search_terms = node_title_lower + " " + node_intent
         best_link = None
         best_score = 0
@@ -1793,6 +1820,8 @@ class VisitLeafAction(LeafAction):
                     candidate_urls = [
                         u for u in candidate_urls if self._normalize_visit_url(u) != dead
                     ]
+
+                candidate_urls = self._drop_chrome_urls(candidate_urls, "the resolved pool")
 
                 # Re-read the claims: the extraction above awaited, so a sibling may have
                 # taken a page since this leaf started resolving. Dropping the taken ones
