@@ -43,6 +43,11 @@ INTENTIONALLY_JSON_ABSENT = {
     "sequential_prune_siblings",
     "semantic_dedup_visits_enabled",
     "semantic_dedup_require_hook_source",
+    "waypoint_enabled",
+    "parallel_requires_evidence",
+    "defer_unresolved_slots",
+    "beam_after_evaluation",
+    "evaluate_parallel_siblings",
     # PolicyConfig
     "require_score",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
