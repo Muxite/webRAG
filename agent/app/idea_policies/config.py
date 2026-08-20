@@ -651,6 +651,16 @@ class ActionConfig:
     # instead. An explicitly declared URL is never dropped -- that duplicate is the planner's
     # own instruction, a different defect. Default OFF -> byte-identical.
     visit_sibling_url_dedup: bool = False
+    # Dead declared-URL fallback (kill-switch, default ON). ``io.fetch_url`` RAISES on a permanent
+    # HTTP status (404/403), and that exception used to escape the whole visit action -- skipping
+    # the URL-recovery cascade (parent search hits / sibling results / stored link index) the code
+    # already falls through to when the declared URL merely RETURNS a failure. A planner-guessed
+    # Wikipedia title is the common cause (all but a handful of the 107 permanent visit failures in
+    # the recorded corpus are guessed en.wikipedia.org titles), and the cascade routinely holds the
+    # real page, so a 404 threw away a recoverable hop. When on, the raised failure falls through to
+    # the cascade; if the cascade resolves nothing NEW the original error is re-raised, so the
+    # action's failure surface is unchanged. Off -> byte-identical to the old abort.
+    visit_dead_url_fallback_enabled: bool = True
 
     _KEYS: ClassVar[dict] = {
         "max_retries": "action_max_retries",

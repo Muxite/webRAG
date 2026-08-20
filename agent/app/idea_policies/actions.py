@@ -698,6 +698,102 @@ class VisitLeafAction(LeafAction):
         
         return all_urls
     
+    #: Path/host markers of site CHROME (account, edit, donation, portal plumbing) that survives
+    #: link extraction. Harmless in a link index, but a chrome link can carry the leaf's own words
+    #: in a `returnto=`/campaign parameter, so it out-ranks real content in a lexical pool.
+    _CHROME_URL_MARKERS: ClassVar[Tuple[str, ...]] = (
+        "/w/index.php", "/wiki/special:", "/wiki/help:", "/wiki/portal:",
+        "/wiki/wikipedia:", "/wiki/talk:", "action=edit", "returnto=",
+    )
+    _CHROME_HOST_MARKERS: ClassVar[Tuple[str, ...]] = ("donate.", "login.", "auth.")
+
+    @classmethod
+    def _is_page_chrome_url(cls, url: str) -> bool:
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return False
+        host = (parsed.netloc or "").lower()
+        target = f"{(parsed.path or '').lower()}?{(parsed.query or '').lower()}"
+        return (
+            any(host.startswith(marker) for marker in cls._CHROME_HOST_MARKERS)
+            or any(marker in target for marker in cls._CHROME_URL_MARKERS)
+        )
+
+    def _harvest_relative_page_links(
+        self,
+        graph: IdeaDag,
+        node: IdeaNode,
+        link_idea: str,
+        limit: int,
+        max_depth: int = 3,
+    ) -> List[str]:
+        """Links an ANCESTOR's visited page offered, ranked by overlap with ``link_idea``.
+
+        The recovery pool for a declared URL that turned out not to exist. The Chroma link index
+        cannot serve that case: it is only written for a visit that was FOLLOWING links
+        (``link_count > 1`` or a ``link_idea``), and a leaf that declares its own URL is neither
+        -- so the previous hop's link menu lives only in its own stored action result. On a chain
+        the next hop's real page is routinely IN that menu (the Brooklyn Bridge page links the
+        Roebling bridge that task 135's planner kept inventing a title for).
+
+        Zero-overlap links are dropped rather than ranked last, which is also what keeps page
+        chrome (donation/portal/login links, which name nothing the leaf asked for) out of the
+        pool the selection step then sees.
+        """
+        from agent.app.idea_visit_dedup import url_slug_tokens
+
+        wanted = set(self._URL_WORD_RE.findall((link_idea or "").lower()))
+        if not wanted or limit <= 0:
+            return []
+
+        seen_nodes: Set[str] = set()
+        queue: List[Tuple[IdeaNode, int]] = [(node, 0)]
+        scored: List[Tuple[int, int, str]] = []
+        seen_urls: Set[str] = set()
+
+        while queue:
+            current, depth = queue.pop(0)
+            if depth > max_depth or current.node_id in seen_nodes:
+                continue
+            seen_nodes.add(current.node_id)
+
+            result = current.details.get(DetailKey.ACTION_RESULT.value)
+            if isinstance(result, dict) and result.get("action") == IdeaActionType.VISIT.value:
+                links = result.get("links_full") or result.get("links") or []
+                contexts = result.get("link_contexts") or {}
+                if isinstance(links, list):
+                    for url in links:
+                        if not isinstance(url, str) or url in seen_urls:
+                            continue
+                        if not self._is_valid_url(url) or self._is_page_chrome_url(url):
+                            continue
+                        seen_urls.add(url)
+                        anchor = contexts.get(url, "") if isinstance(contexts, dict) else ""
+                        tokens = set(url_slug_tokens(url)) | set(
+                            self._URL_WORD_RE.findall(str(anchor).lower())
+                        )
+                        overlap = len(
+                            {t for t in tokens if t in wanted} - self._URL_NOISE_TOKENS
+                        )
+                        if overlap:
+                            scored.append((overlap, depth, url))
+
+            if current.parent_id:
+                parent = graph.get_node(current.parent_id)
+                if parent:
+                    queue.append((parent, depth + 1))
+
+        if not scored:
+            return []
+        scored.sort(key=lambda entry: (-entry[0], entry[1]))
+        harvested = [url for _, _, url in scored[:limit]]
+        self._logger.info(
+            f"[VISIT] Harvested {len(harvested)} link(s) from an ancestor's page for "
+            f"'{link_idea[:60]}' (top: {harvested[0][:80]})"
+        )
+        return harvested
+
     def _extract_url_from_parents(self, graph: IdeaDag, node: IdeaNode, max_depth: int = 3) -> Optional[str]:
         visited = set()
         queue = [(node, 0)]
@@ -1587,12 +1683,29 @@ class VisitLeafAction(LeafAction):
             urls_to_visit: List[str] = []
             optional_success = False
             
+            # A declared URL whose fetch RAISES (permanent HTTP status: `io.fetch_url` raises on
+            # 404/403) used to abort the action here, skipping the recovery cascade below that a
+            # RETURNED failure already falls through to. Held instead and re-raised only if the
+            # cascade resolves nothing new, so the failure surface is unchanged when it can't help.
+            declared_url_error: Optional[BaseException] = None
+
             if optional_url and self._is_valid_url(optional_url):
                 # Claimed BEFORE the fetch is awaited: a concurrent sibling that resolves
                 # while this one is in flight has to see the page as taken.
                 if sibling_dedup:
                     self._claim_visit_urls(graph, node, [optional_url])
-                result, _, _ = await self._visit_single_page(optional_url, graph, node, io, intent)
+                if self._cfg.action.visit_dead_url_fallback_enabled:
+                    try:
+                        result, _, _ = await self._visit_single_page(optional_url, graph, node, io, intent)
+                    except Exception as fetch_exc:
+                        declared_url_error = fetch_exc
+                        result = None
+                        self._logger.warning(
+                            f"[VISIT] Declared URL fetch raised ({str(fetch_exc)[:120]}); "
+                            f"falling through to URL recovery"
+                        )
+                else:
+                    result, _, _ = await self._visit_single_page(optional_url, graph, node, io, intent)
                 if result and result.get("success"):
                     content_length = result.get("content_total_chars") or len(result.get("content", "") or "")
                     optional_success = True
@@ -1617,7 +1730,19 @@ class VisitLeafAction(LeafAction):
             
             if not optional_success or link_count > 1:
                 candidate_urls = []
-                
+
+                # A declared URL suppresses the auto-generated link_idea above (a leaf that names
+                # its page has no link to discover). Once that page turns out not to exist, the
+                # leaf DOES need one, or the stored-link query below is skipped and the recovery
+                # cascade has nothing left to try.
+                if declared_url_error is not None and not link_idea:
+                    link_idea = (intent or node.title or "")[:200]
+                    if link_idea:
+                        self._logger.info(
+                            f"[VISIT] Dead declared URL: recovering via link_idea "
+                            f"'{link_idea[:60]}...'"
+                        )
+
                 self._logger.info(
                     f"[VISIT] Attempting to extract URLs from search results. "
                     f"Node: {node_id[:8]}..., link_idea: '{link_idea[:60] if link_idea else 'None'}...', "
@@ -1651,6 +1776,23 @@ class VisitLeafAction(LeafAction):
                             if url not in seen:
                                 candidate_urls.append(url)
                                 seen.add(url)
+
+                if declared_url_error is not None:
+                    harvested = self._harvest_relative_page_links(
+                        graph, node, link_idea or node.title or "",
+                        limit=self._cfg.action.visit_link_query_top_k,
+                    )
+                    seen = set(candidate_urls)
+                    for url in harvested:
+                        if url not in seen:
+                            candidate_urls.append(url)
+                            seen.add(url)
+
+                if declared_url_error is not None and candidate_urls:
+                    dead = self._normalize_visit_url(str(optional_url))
+                    candidate_urls = [
+                        u for u in candidate_urls if self._normalize_visit_url(u) != dead
+                    ]
 
                 # Re-read the claims: the extraction above awaited, so a sibling may have
                 # taken a page since this leaf started resolving. Dropping the taken ones
@@ -1686,6 +1828,8 @@ class VisitLeafAction(LeafAction):
                         else:
                             urls_to_visit.extend(candidate_urls[:needed])
                 else:
+                    if declared_url_error is not None:
+                        raise declared_url_error
                     if not optional_url or not optional_success:
                         parent_urls_found = len(parent_search_urls) if 'parent_search_urls' in locals() else 0
                         chroma_urls_found = len(chroma_urls) if 'chroma_urls' in locals() else 0
@@ -1727,6 +1871,8 @@ class VisitLeafAction(LeafAction):
                         )
             
             if not urls_to_visit:
+                if declared_url_error is not None:
+                    raise declared_url_error
                 if optional_url and self._is_valid_url(optional_url):
                     urls_to_visit = [optional_url]
                 else:
@@ -1812,6 +1958,8 @@ class VisitLeafAction(LeafAction):
                         self._logger.warning(f"[VISIT] Failed to visit {url_to_visit}: {result.get('error', 'Unknown error')}")
             
             if not visited_results:
+                if declared_url_error is not None:
+                    raise declared_url_error
                 attempted_urls = ", ".join([url[:60] for url in urls_to_visit[:3]])
                 error_msg = (
                     f"All URL visits failed. Attempted {len(urls_to_visit)} URL(s): {attempted_urls}"

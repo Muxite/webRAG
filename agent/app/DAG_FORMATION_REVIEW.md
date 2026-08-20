@@ -315,6 +315,67 @@ in its own prompt.
 
 ---
 
+### F36. A dead declared URL aborts the visit action past its own recovery cascade — VERIFIED
+
+Task 135 (Brooklyn Bridge -> John A. Roebling -> Cincinnati bridge main span) kept scoring
+~0.25 after Cycle 19's dedup fix, bimodal across reps (0.833 / 0.333 / 0.233 / 0.250 in
+`dedupfix0820`). The task's score is keystone-gated: three of five checks return 0 unless
+`1,057 ft / 322 m` reaches the answer, so a rep is ~0.8 with the terminal figure and ~0.25
+without. Reading all four reps, **the terminal page was never opened in any of them**
+(`grounding.distinct_visits = 1` in every rep — only Brooklyn Bridge); the 0.833 rep got the
+figure from a search snippet. The three low reps died in three visibly different ways, two of
+which share one mechanism: an **invented Wikipedia title**
+(`.../Cincinnati_and_Northern_Kentucky_Over-the-Rhine_Suspension_Bridge`,
+`.../Cincinnati_Ohio_River_suspension_bridge`), 404, node failed, and the finalizer then
+answered from parametric memory (*"main span is 1,650 feet"*, sourced to "the known
+historical record").
+
+**The mechanism.** `agent_io.fetch_url` RAISES on a permanent HTTP status. That exception
+propagated out of `VisitLeafAction.execute`'s whole `try` to the outer handler, so the
+URL-recovery cascade below the declared-URL fetch (parent search hits -> sibling results ->
+stored link index -> selection) **never ran**. The code plainly intends it to: a declared URL
+that merely RETURNS a failure (blocked site, empty content) logs *"Optional URL visit failed"*
+and falls straight into that cascade. Only the raising path skipped it, so the most common
+failure — a title the planner made up — was the one case that got no recovery at all.
+
+**Blast radius** (recorded corpus, 1167 `graph` run JSONs): 107 permanent visit failures
+across 81 runs (6.9%), all but a handful guessed `en.wikipedia.org` titles. Within-test, runs
+containing one average **-0.101** against runs of the same test without one (confounded —
+a run that invents a URL may be a worse run generally — so read it as an upper bound).
+
+**FIX (kill-switch `visit_dead_url_fallback_enabled`, default ON).** The raised failure is
+held instead of aborting; the cascade runs with the dead URL excluded from every candidate
+pool; if the cascade resolves nothing NEW the original error is re-raised, so the action's
+failure surface (error text, `http_status`, `retryable`, bot-block bookkeeping) is unchanged
+whenever recovery can't help. Two supporting pieces the live evidence forced:
+
+* **The link index cannot serve this case.** `_store_links_in_chroma` only runs for a visit
+  that was FOLLOWING links (`link_count > 1` or a `link_idea`), and a leaf that declares its
+  own URL is neither — so the first live rerun fired the fallback and found an empty pool.
+  `_harvest_relative_page_links` reads the previous hop's link menu out of its stored action
+  result instead, ranked by lexical overlap with the leaf's goal (zero-overlap links dropped).
+  On a chain the next hop's page is routinely in that menu.
+* **Page chrome is filtered from the harvest** (`donate.`/`Special:`/`/w/index.php`/
+  `returnto=`): a chrome link carries the leaf's own words in a `returnto=` parameter, so a
+  lexical pool ranks it above real content — the mechanism behind the observed
+  `donate.wikimedia.org` visits (Cycle 13's "hijacked" class, narrowed here to this pool).
+
+**Live (nano, `graph`/`good_adaptive`, task 135, same day, ~1h apart, no fixtures).** Fix off:
+**0.412** (n=4, `dedupfix0820`). Fallback only, empty pool: 0.610 (n=6, `deadurl0820`) — the
+fallback fired once and recovered nothing, so read that as noise, not effect. Fallback +
+harvest: **0.762** (n=12, `deadurl2_0820` + `deadurl3_0820`), against the no-dedup reference
+bar of 0.800 (n=4). 6 of 8 reps in `deadurl2_0820` hit an invented title; the logs show the
+recovery landing on `John_A._Roebling_Suspension_Bridge` and
+`List_of_longest_suspension_bridge_spans` (both carry the keystone). Sequential runs, not a
+paired A/B — the mechanism is directly observed in the logs, the aggregate is supporting
+evidence only.
+
+**Still open on task 135**: the planner invents a Wikipedia title instead of searching for it
+(the pre-fix winning rep is the one that chose `search`), and the finalizer will answer a
+failed hop from parametric memory rather than reporting the gap.
+
+---
+
 ## PART 2 — Ranked findings
 
 | # | Finding | Severity | Cost to fix |
@@ -326,6 +387,7 @@ in its own prompt.
 | F6 | One-shot formation; no re-plan path for expanded nodes | High | Medium — PARTIAL: degenerate parents only |
 | F7 | Malformed plan collapses to one degenerate node, unflagged | High | **Low** — PARTIAL: now flagged |
 | F35 | F33's contract veto silences the judge on unfinished chains | High | **Low** — fixed behind a flag |
+| F36 | Dead declared URL aborts past the visit action's own recovery cascade | High | **Low** — fixed, kill-switch |
 | F2 | Depth never chosen, tracked, or capped | Medium | Low |
 | F9 | Template short-circuit can hijack non-root subtrees | Medium | Low — RESOLVED |
 | F4 | `execute_all_children` declared before children exist | Medium | Medium |
