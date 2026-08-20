@@ -2,11 +2,11 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 23 cycles
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 24 cycles
 below are committed; the run continues past this point.
 
 **Spend so far: ~$2.98 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
-5393 passed / 18 skipped (zero failures across the whole run).
+5394 passed / 18 skipped (zero failures across the whole run).
 
 ---
 
@@ -256,6 +256,18 @@ missing ~48 keys (including `final_require_grounding`) present in the current
 `idea_dag_settings.json` — the benchmark agent worked around it by building settings programmatically
 rather than trusting the file; this stale file is a live footgun for any future script that loads it
 directly and should get its own cheap cycle.
+
+**Cycle 24 — delete the stale per-arm settings fossils** (`b81c4937`). Investigated the stale-file
+finding from Cycle 23. Turned out worse than "missing keys": `idea_dag_settings.baseline.json` and
+`.good_adaptive.json` predate the `_GOT_ARM_PROFILES` machinery that superseded them (both present in
+the very first GoT commit), are loaded by **zero** code in the repo (verified by grep), and
+`.good_adaptive.json` actively **contradicts** the arm it's named after — it hardcodes
+`native_vote_k_enabled: true`/`k=3`, which the current, canonical arm profile explicitly excludes as
+measured net-negative. That false claim had already leaked into `ADAPTIVE_ENGINE.md` and
+`RESEARCH_LIBRARY.md`, both now corrected. Fixed by **deleting both files** (sync-by-diff would just
+drift again) and adding a permanent regression guard (`test_no_per_arm_settings_snapshots`) that
+fails if any `idea_dag_settings.*.json` sidecar file reappears, plus generalizing two other tests
+that had a hardcoded 3-file-name assumption baked in.
 
 ---
 
