@@ -1,13 +1,15 @@
 # Overnight dev-cycle run: DAG v2 structural fixes + evaluator root cause (2026-08-20)
 
-Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
-$15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 26 cycles
-below are committed; the run continues past this point. **After Cycle 26 the user redirected the
-run toward larger, structural cycles** (real architecture changes informed by literature research)
-rather than continuing to pick off independent small bugs — see the note at the end of this section.
+**FINAL — session closed at ~12h wall-clock (started 2026-08-20 04:11 UTC, closed ~16:00 UTC).**
+Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Budget-bounded run ($15 OpenRouter ceiling)
+dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated by one low-token main
+session. 26 dev cycles landed and committed, followed by a literature-research + architecture-design
+phase (§ below) once the user redirected toward larger structural work. **After Cycle 26 the user
+redirected the run toward larger, structural cycles** rather than continuing to pick off independent
+small bugs — see the closing section at the end of this doc for what that phase produced and why
+implementation was deliberately NOT started tonight.
 
-**Spend so far: ~$3.75 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+**Final spend: ~$3.75 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
 5394 passed / 18 skipped (zero failures across the whole run).
 
 ---
@@ -352,12 +354,56 @@ launched to inform this; see the next entry once that synthesis and the resultin
     cleanly as a first-class variant in `idea_test_runner.py` (no wiring needed) — this was blocking
     item 7 above, now resolved; the re-run itself is still not done.
 
+## Closing phase — architecture research + design (post-Cycle-26)
+
+At the user's explicit direction after Cycle 26, the session shifted from independent bug-fix cycles
+to a literature-informed architecture redesign attempt, with instruction to imagine how a capable
+reasoning agent would actually solve these tasks and design the system's core loop accordingly.
+
+1. **Research pass** (WebSearch, cited sources): surveyed current best-practice agentic architectures
+   — ReAct and its successors (Reflexion, ReWOO, ADaPT, LATS), plan-and-execute vs. interleaved
+   reasoning and the hybrid designs the field is converging on (PIVOT's plan→inspect→evolve→verify),
+   dependency-aware DAG orchestration (LangGraph StateGraph), outcome-vs-plan-text evaluation, and
+   Anthropic's own published agent-design guidance — explicitly weighted for weak-model robustness
+   per a follow-up instruction, since this repo's central thesis is boosting weak/cheap models.
+   Full synthesis in the session transcript; key finding: several of tonight's own narrow fixes
+   (resolved-value channel, F6's fallback re-expansion, F35's contract-veto fix) are already
+   fragments of the exact patterns the literature recommends (ReWOO placeholders, ADaPT
+   failure-triggered decomposition, LATS post-rollout scoring, respectively) — this is a
+   generalization opportunity, not a rewrite from zero.
+2. **Design spec written**: `docs/superpowers/specs/2026-08-20-unified-dependency-dag-and-bounded-replanning-design.md`
+   — proposes a unified architecture (global dependency-DAG authoring, post-evidence scoring,
+   bounded-suffix replanning on mechanical divergence) targeting the four structural problems named
+   throughout tonight's diagnosis (tree-not-DAG, context-blind formation, pre-execution scoring,
+   one-shot formation).
+3. **Adversarial review** (2 independent panels, per this repo's Large-tier convention) found real
+   problems before any code was written: the spec's "directly reusable" claims for `_resolve_slot`
+   and `link_dependencies` don't hold (both are hardcoded to single-source/template-scoped
+   resolution — genuine multi-parent fan-in, the actual headline problem, isn't solved by reuse);
+   freely authoring `depends_on` edges risks silently serializing today's auto-parallel batches,
+   reopening a risk the original resolved-value-channel design explicitly warned against; and the
+   full spec's validation would plausibly cost most or all of the remaining budget. **One panel's
+   proposed "cheap safe slice" (promote `evaluate_parallel_siblings` to default) turned out to already
+   be empirically falsified by tonight's own Cycle 6** (p=1.0, no significant flat-rate change) — a
+   good illustration of why independent review matters even when a panel is well-reasoned: it didn't
+   have visibility into the full 26-cycle history the spec was building on.
+4. **Re-scoped, not implemented**: the spec was corrected with both panels' findings and re-scoped as
+   a foundation document for a *future, separately-budgeted session*. A genuinely narrow, safe,
+   buildable increment was identified for that follow-up (multi-source fan-in resolution scoped only
+   to the existing single-threaded merge/join path — sidesteps every risk both panels flagged), but
+   was **not started tonight** given the session's ~12-hour budget was essentially exhausted by the
+   time review completed. This is the honest, correct outcome of the process, not a shortfall — per
+   this repo's own `docs/DEV_CYCLE.md` provenance notes, adversarial review's whole value is stopping
+   risky work before it starts, and it did exactly that here.
+
 ## Methodology notes (holding from last night, reconfirmed)
 
 - Subagents still don't self-resume on a background monitor firing — the parent must explicitly
   `SendMessage` back in every time. This cost real overhead again tonight; instruct every dispatched
   agent up front to block synchronously in a single tool call rather than end its turn on an
-  assumption.
+  assumption. Note: the Bash tool auto-backgrounds after 600s regardless, so "block synchronously"
+  has a hard ceiling — a background monitor + explicit resume is sometimes unavoidable, not a
+  process failure.
 - Two live A/B smoke attempts tonight were burned entirely on infra (a CRLF-corrupted `SERPER_KEY`
   in `services/keys.env`, then a shell that didn't export it) before any feature signal was
   observed — worth a pre-flight check (`source` the whole keys file, verify a direct curl 200)
@@ -365,3 +411,25 @@ launched to inform this; see the next entry once that synthesis and the resultin
 - Fixture parity (record-then-replay) materially changed a conclusion this session (Cycle 1
   validation: −0.230 confounded → +0.055 clean). Don't trust a live A/B without it when search
   determinism matters to the comparison.
+- A well-scoped adversarial review can catch things even when it's fundamentally right in direction
+  — the reviewer's own recommended fallback ("just do the cheap thing") turned out to be already
+  disproven by this same session's earlier work. Always cross-check a review's proposed alternative
+  against project history, not just its critique of the original proposal.
+
+## Next session — priority order
+
+1. **Multi-source fan-in resolution at merge nodes** (§7.4 of the design spec) — the safe,
+   right-sized slice identified but not built tonight. Needs its own Plan stage.
+2. **F35 contract-veto fix**: k≥2-3 confirmation reruns of tasks 065/135 specifically (their
+   regression looked like network artifact, not a real F35 effect), plus a second model, before any
+   default-flip decision.
+3. **`visit_sibling_url_dedup`**: re-test with tasks selected for genuine URL-less fan-outs, not
+   parallel/argmax shape — tonight's sample never exercised the mechanism.
+4. **F38** (declared-URL premature seed): needs a real dependency edge between authored chain hops
+   before it's safe to fix — see Cycle 22's explicit fix-ordering note.
+5. **The full unified-DAG architecture** (§4.1/4.2/4.4 of the design spec): separately budgeted,
+   separately pre-registered, informed by both adversarial panels' corrections — most importantly,
+   design the producer-consumer-vs-soft-ordering distinction Panel A flagged as missing *before*
+   any `depends_on` authoring work starts.
+6. Everything else in the "Open threads" section above that never got picked up this session (R1
+   GPU work, E4 chunker items already resolved, etc.).
