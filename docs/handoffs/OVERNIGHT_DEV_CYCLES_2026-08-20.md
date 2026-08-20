@@ -2,10 +2,12 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 25 cycles
-below are committed; the run continues past this point.
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 26 cycles
+below are committed; the run continues past this point. **After Cycle 26 the user redirected the
+run toward larger, structural cycles** (real architecture changes informed by literature research)
+rather than continuing to pick off independent small bugs — see the note at the end of this section.
 
-**Spend so far: ~$3.23 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+**Spend so far: ~$3.75 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
 5394 passed / 18 skipped (zero failures across the whole run).
 
 ---
@@ -278,6 +280,31 @@ own corpus-wide base rate implies roughly 1 fallback collision per ~12 sibling-v
 this run only accumulated 25 batches total across both arms. **Recommendation: re-test with tasks
 specifically selected for URL-less fan-outs, not just parallel/argmax shape** — flag stays opt-in,
 neither confirmed nor invalidated.
+
+**Cycle 26 — capability-spectrum re-run vs LangGraph, 3 model tiers** (benchmark run, no code
+change). The flagship comparison of the night: re-ran the original
+`CAPABILITY_SPECTRUM_RESULTS_2026-08-15.md` study's weak/OK/good tier structure (`llama-3.2-3b`,
+`gpt-4.1-nano`, `gemini-2.5-flash`, 8 tasks × 3 arms, k=1, $0.52 spent) with tonight's cumulative
+fixes live and no opt-in flags enabled (representing what actually ships today). **The original
+capability-ordering pattern reproduces cleanly, and more starkly on the weak tier**: `graph` sweeps
+7W/1T/0L vs LangGraph on the weak model, but loses the majority on both OK (3W/5L) and good (3W/1T/
+4L) tiers — the same "better on bad models, worse on good models" shape as the original study.
+**Important nuance carried forward**: the weak-tier win is confirmed **availability-driven, not
+reasoning-driven** — every LangGraph cell on the weak model scored exactly 0.00 in ~0.1s
+(`NotFoundError: no endpoints found that support tool use`), not a quality loss. This repo's DAG and
+`sequential_react` arms both use text/JSON-based tool calls rather than native function-calling APIs,
+so they simply can't be locked out the way LangGraph's `create_react_agent` can — the "we win on bad
+models" finding is really "we don't have a hard floor LangGraph has," which is still a real practical
+advantage but a different mechanism than out-reasoning it. Zero visit-timeout warnings across all 72
+cells, confirming tonight's perf fixes hold roster-wide.
+
+**Redirect after this cycle**: the user asked for larger, structural cycles going forward —
+literature-informed architecture changes aimed at the root causes this session spent 21+ cycles
+tracing (tree-not-DAG, context-blind formation, pre-execution scoring, one-shot formation), rather
+than continuing to pick off independent small bugs one at a time. A research pass on current
+best-practice agentic architectures (ReAct successors, plan-and-execute/replan hybrids,
+dependency-DAG orchestration, outcome-based evaluation, Anthropic's own agent-design guidance) was
+launched to inform this; see the next entry once that synthesis and the resulting design land.
 
 ---
 
