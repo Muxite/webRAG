@@ -2,11 +2,11 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 19 cycles
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 20 cycles
 below are committed; the run continues past this point.
 
-**Spend so far: ~$2.45 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
-5380 passed / 18 skipped (zero failures across the whole run).
+**Spend so far: ~$2.63 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+5387 passed / 18 skipped (zero failures across the whole run).
 
 ---
 
@@ -199,6 +199,18 @@ as a degenerate/unreliable verdict, not a real completeness assessment, and the 
 on the three worst-hit tasks: recovers ~61% of the ON/OFF score gap** (task 137 fully recovers and
 edges past the no-dedup baseline; task 135 recovers only partially, suggesting another cost is still
 active there beyond this specific bug).
+
+**Cycle 20 — F36: dead-URL visits skip their own recovery cascade** (`cadd4843`). Root-caused task
+135's residual gap after Cycle 19's fix. `agent_io.fetch_url` **raises** on a permanent HTTP failure
+(e.g. a planner-invented Wikipedia title that 404s), and that exception propagated straight out of
+`VisitLeafAction.execute`'s try block — skipping the URL-recovery cascade (parent/sibling/link-index
+fallback) that already exists and already runs for every OTHER kind of visit failure. The one case
+with zero recovery was, unsurprisingly, the single most common failure mode: **107 permanent visit
+failures across 81 of 1167 recorded `graph` runs (6.9%)**. Fixed with a default-ON kill-switch
+(`visit_dead_url_fallback_enabled`) that holds the exception, runs the existing cascade with the
+dead URL excluded (extended to harvest the previous hop's own link menu, since the Chroma link index
+was never written for URL-declaring leaves), and only re-raises if nothing recovers. **Live-confirmed
+on task 135: 0.412 → 0.762**, closing nearly all of the remaining gap to the 0.800 no-dedup baseline.
 
 ---
 
