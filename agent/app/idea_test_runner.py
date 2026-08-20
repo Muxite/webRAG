@@ -478,6 +478,11 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "native_vote_k_enabled": True,
         "native_vote_k": 3,
     },
+    "reason_first": {
+        "merge_goal_evaluation_first_enabled": True,
+        "verify_reason_first_enabled": True,
+        "got_reexpand_followup_reason_first_enabled": True,
+    },
     "full": {
         "got_reexpand_enabled": True,
         "got_reexpand_max_iterations": 2,
@@ -682,6 +687,23 @@ def _apply_got_experiment_overrides(
     _expectcontract_override = env.get("IDEA_TEST_EXPECT_CONTRACT", "").strip()
     if _expectcontract_override:
         idea_settings["expansion_expect_contract_enabled"] = _is_enabled(_expectcontract_override)
+    # IDEA_TEST_MERGE_GOAL_EVAL_FIRST: reorder merge's goal-evaluation prompt/schema to
+    # reasoning-before-verdict (merge_goal_evaluation_first_enabled).
+    _merge_goal_eval_first_override = env.get("IDEA_TEST_MERGE_GOAL_EVAL_FIRST", "").strip()
+    if _merge_goal_eval_first_override:
+        idea_settings["merge_goal_evaluation_first_enabled"] = _is_enabled(_merge_goal_eval_first_override)
+    # IDEA_TEST_VERIFY_REASON_FIRST: reorder verify's system prompt to
+    # reasoning-before-verdict (verify_reason_first_enabled).
+    _verify_reason_first_override = env.get("IDEA_TEST_VERIFY_REASON_FIRST", "").strip()
+    if _verify_reason_first_override:
+        idea_settings["verify_reason_first_enabled"] = _is_enabled(_verify_reason_first_override)
+    # IDEA_TEST_GOT_FOLLOWUP_REASON_FIRST: reorder the re-expand followup prompt to
+    # reasoning-before-verdict (got_reexpand_followup_reason_first_enabled).
+    _followup_reason_first_override = env.get("IDEA_TEST_GOT_FOLLOWUP_REASON_FIRST", "").strip()
+    if _followup_reason_first_override:
+        idea_settings["got_reexpand_followup_reason_first_enabled"] = _is_enabled(
+            _followup_reason_first_override
+        )
     # IDEA_TEST_EXPANSION_IO_FRAMING: label the expansion user prompt's context blob as read-only
     # INPUT and restate the {candidates: [...]} output shape right after it
     # (expansion_input_output_framing_enabled): the prompt-hygiene fix for a weak model echoing
