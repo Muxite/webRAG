@@ -333,6 +333,70 @@ kept in the probe script as an inactive draft (`NEW_SYSTEM`/`NEW_ADDENDUM`), not
 settings file. The next measurement on this thread is the detail budget and what the judge is
 shown, not how it is instructed.
 
+#### T1-3d. The truncated details **were** malformed; the live-vs-replay gap **is not** evidence of anything (2026-08-20, $0.09)
+
+T1-3c left two open items. Both are now measured, and they resolve in opposite directions.
+
+**Confirmed: the judge was handed unterminated JSON, and lost the fields that identify the
+work.** `evaluation_max_detail_chars` was applied as `json.dumps(details)[:5000]`, a character
+cut through whatever string the budget lands in — always `action_result`'s page text, which is
+serialized fourth. Over every recorded run: **2888 of 4615 executed candidates crossed the
+budget and 0 of those 2888 produced parseable JSON.** The prompt *envelope* stayed valid (the
+blob is a JSON string value, so `json.dumps` escapes it), so nothing crashed; what the judge
+read inside that value stopped mid-word. Everything serialized after the cut was simply absent:
+
+| field | missing from the prompt | of candidates that had it |
+|---|---|---|
+| `visit_url` | 1982 | **1987 (100%)** |
+| `visit_content_length` | 1982 | 1987 (100%) |
+| `provides_data` | 2056 | 2709 (76%) |
+| `merge_summary` / `goal_achieved` | 359 | 359 (100%) |
+
+The budget was also being spent on duplicates: `content_full` reproduces `content` verbatim on
+**2103/2103** recorded visit results, and `content_with_links` is a third copy.
+
+**Refuted: nothing about the live-vs-replay disagreement needs an engine defect.** The live
+prompt is not recoverable (`connector_llm` records prompt *sizes*, never text), so no byte
+comparison is possible; the two divergent examples were traced by hand instead.
+`[0.7, 0.7, 0.7, 0.7]` is `eps2_on_070` r1, whose four candidates — "visit the page for Chuck
+season 1/2/3/4" — all fetched **the same URL**, `hr.wikipedia.org/wiki/Chuck`, and carry
+byte-identical 8199-character results. A flat score there is the *correct* answer, and the
+replay differs in level because the reconstruction differs: the parent whose path context the
+probe replays is 228090 characters of **end-of-run** state (`merged_results`, `merge_summary`,
+`goal_achieved`) that did not exist when the batch was scored, and the probe issues a plain
+completion where the engine passes `json_mode`, `evaluation_batch_json_schema` and
+`max_tokens: 16384` against the probe's 600. For `[0.0, 0.2]`, the recorded `raw_score` equals
+the recorded `score` with `capped: false` in every `eps2_on` batch: the judge picked those
+numbers itself. **Replaying end-of-run graph state is a corpus artifact, not a measurement of
+the engine**, and no non-determinism claim survives it.
+
+**Fixed, unconditionally.** `_serialize_details_for_prompt` (`evaluation.py`) replaces the
+character cut on all three evaluation prompt sites. It drops the bulk duplicates first, then
+bisects for the largest per-leaf allowance that still fits, so output is valid JSON inside the
+same budget with every key present. Under budget it is byte-identical to before, so the 37% of
+candidates that fit are untouched. On the recorded corpus the fix restores `visit_url` and the
+result flags and still shows ~1200-1500 characters of page text. Nothing defended the old
+behaviour: `_compact_details_for_expansion` shows the planner path already drops the same
+duplicates, evaluation just never got the treatment.
+
+**It is a correctness fix, not a scoring win.** Same probe, an added `--serializations
+legacy fixed` axis, SHIPPED rubric, 40 batches, temperature 0.2, 160 calls, $0.09:
+
+| serialization | flat rate | mean spread | mass <=0.2 | spike detected (chance 0.36) | parse failures |
+|---|---|---|---|---|---|
+| legacy (character cut) | 0.282 | 0.433 | 0.508 | 0.615 (p=0.0023) | 2 |
+| fixed (valid JSON) | 0.225 | 0.401 | 0.381 | 0.675 (p=0.0001) | 0 |
+
+Every headline moves the right way and none of it clears significance: paired McNemar p=0.69 on
+flatness, p=0.63 on spike detection (3 fixed-only hits against 1), and the
+substantive-minus-degenerate gap actually narrows (+0.258 to +0.197). n=40 on one model. The
+justification for shipping it is that malformed input to a judge is a defect on its own terms.
+
+**Still open, same defect, not changed here:** `expansion.py:907` cuts the same way for the
+planner prompt. Its `_compact_details_for_expansion` pass is not enough — **68.7% (3886/5654)
+of compacted details still exceed 5000 characters** and get the same mid-JSON cut. That change
+alters plan generation rather than scoring, so it wants its own cycle.
+
 **What this settles, and what it does not.** The naming is accidentally defensible: keeping
 the head of the list does beat a coin flip on the shipped score, so arrival-order truncation
 is not actively throwing away quality. What it is *not* is evidence that the model ranks its

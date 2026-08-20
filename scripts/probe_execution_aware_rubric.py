@@ -17,7 +17,9 @@ This script tests the prompt in isolation, off the engine, on recorded batches:
 * **Arms.** OLD is the shipped pair of texts. NEW_A rewrites both to condition on execution
   state. NEW_B adds an explicit anti-tie clause on top of NEW_A. Splitting the two keeps
   "the rubric line was the binding constraint" separable from "the judge only spreads when
-  ordered to".
+  ordered to". `--serializations` is a second, orthogonal axis over *what the judge is shown*:
+  `legacy` is the character cut the engine applied to `details` until 2026-08-20 (unparseable
+  past the budget), `fixed` the structure-preserving replacement at the same budget.
 * **Natural condition.** Differentiation on the batch as recorded: flat rate, spread,
   distinct values, how much of the mass still lands in the `<=0.2` band.
 * **Spiked condition.** One candidate per batch (seeded choice) has its `action_result`
@@ -216,14 +218,13 @@ def batches_from_result(payload: Dict[str, Any], source: str, max_detail_chars: 
         path = []
         for anc_id in ancestry(parent_id)[:max_context_nodes]:
             anc = nodes[anc_id]
-            details = json.dumps(_strip_evaluation(anc.get("details") or {}),
-                                 ensure_ascii=True, default=str)[:max_detail_chars]
+            # Serialized at prompt-build time, not here: the detail budget is one of the arms.
             path.append({
                 "node_id": anc_id,
                 "title": anc.get("title") or "",
                 "status": anc.get("status") or "",
                 "score": anc.get("score"),
-                "details": details,
+                "details_obj": _strip_evaluation(anc.get("details") or {}),
             })
         candidates = []
         for child_id in executed:
@@ -289,8 +290,18 @@ def sample_batches(batches: Sequence[ProbeBatch], n: int, seed: int) -> List[Pro
 # --- prompt construction ---------------------------------------------------------------------
 
 
+def serialize_details(details: Dict[str, Any], max_detail_chars: int, mode: str) -> str:
+    """`legacy` is the character cut the engine shipped until 2026-08-20; `fixed` is the
+    structure-preserving replacement (`_serialize_details_for_prompt`) at the same budget."""
+    if mode == "fixed":
+        from agent.app.idea_policies.evaluation import _serialize_details_for_prompt
+        return _serialize_details_for_prompt(details, max_detail_chars)
+    return json.dumps(details, ensure_ascii=True, default=str)[:max_detail_chars]
+
+
 def build_messages(batch: ProbeBatch, arm: str, condition: str, spike_index: int,
-                   max_detail_chars: int, user_template: str) -> Tuple[str, str]:
+                   max_detail_chars: int, user_template: str,
+                   serialization: str = "legacy") -> Tuple[str, str]:
     system, addendum = ARMS[arm]
     system = f"{system}\n\n{addendum}"
     candidates = []
@@ -300,10 +311,15 @@ def build_messages(batch: ProbeBatch, arm: str, condition: str, spike_index: int
             spiked = dict(SPIKE_RESULT)
             spiked["action"] = details.get("action")
             details["action_result"] = spiked
-        text = json.dumps(details, ensure_ascii=True, default=str)[:max_detail_chars]
+        text = serialize_details(details, max_detail_chars, serialization)
         candidates.append({"id": str(idx), "title": cand["title"], "details": text})
+    path = [
+        {k: v for k, v in entry.items() if k != "details_obj"}
+        | {"details": serialize_details(entry["details_obj"], max_detail_chars, serialization)}
+        for entry in batch.path
+    ]
     user = user_template.format(
-        path_json=json.dumps(batch.path, ensure_ascii=True),
+        path_json=json.dumps(path, ensure_ascii=True),
         parent_id=batch.parent_id,
         parent_goal=batch.parent_goal,
         candidates_json=json.dumps(candidates, ensure_ascii=True),
@@ -396,13 +412,18 @@ def run(args: argparse.Namespace) -> int:
             if args.conditions and condition not in args.conditions:
                 continue
             for batch in picked:
-                for arm, rep in [(a, r) for a in ARMS for r in range(args.reps)]:
+                for arm, rep, serialization in [
+                    (a, r, s) for a in ARMS for r in range(args.reps)
+                    for s in args.serializations
+                ]:
                     if args.arms and arm not in args.arms:
                         continue
-                    # rep 0 keeps the original cell key, so a resumed run reuses the cells
-                    # already paid for instead of re-placing them under a renamed key.
+                    # rep 0 and legacy serialization keep the original cell key, so a resumed
+                    # run reuses the cells already paid for instead of re-placing them under a
+                    # renamed key.
                     cell = (f"{args.model}|{arm}|{condition}|{batch.key}"
-                            + (f"|r{rep}" if rep else ""))
+                            + (f"|r{rep}" if rep else "")
+                            + (f"|{serialization}" if serialization != "legacy" else ""))
                     if cell in done:
                         continue
                     if spent >= args.max_usd:
@@ -410,7 +431,7 @@ def run(args: argparse.Namespace) -> int:
                               f"(${spent:.4f}); stopping cleanly", flush=True)
                         return 0
                     system, user = build_messages(batch, arm, condition, spike_for[batch.key],
-                                                  max_detail_chars, user_template)
+                                                  max_detail_chars, user_template, serialization)
                     completion = None
                     last_exc: Optional[Exception] = None
                     # These prompts are ~6k tokens each, so a serial run still trips the
@@ -430,6 +451,7 @@ def run(args: argparse.Namespace) -> int:
                         fh.write(json.dumps({"cell": cell,
                                              "error": f"{type(last_exc).__name__}: {last_exc}",
                                              "arm": arm, "condition": condition,
+                                             "serialization": serialization,
                                              "batch": batch.key}) + "\n")
                         fh.flush()
                         continue
@@ -440,6 +462,7 @@ def run(args: argparse.Namespace) -> int:
                     fh.write(json.dumps({
                         "cell": cell,
                         "arm": arm,
+                        "serialization": serialization,
                         "rep": rep,
                         "temperature": args.temperature,
                         "condition": condition,
@@ -509,6 +532,14 @@ def analyze(paths: Sequence[Path]) -> int:
         print("no usable rows")
         return 1
 
+    # A detail-serialization arm is a different prompt for the same rubric text, so it labels
+    # like one; `legacy` keeps its bare name to stay comparable with the earlier runs.
+    for row in rows:
+        if row.get("serialization", "legacy") != "legacy":
+            row["arm"] = f"{row['arm']}@{row['serialization']}"
+    labels = [a for a in ARMS if any(r["arm"] == a for r in rows)]
+    labels += sorted({r["arm"] for r in rows} - set(labels))
+
     # The arm tables read rep 0 only; repeats are a noise measurement, not extra sample.
     by_cell: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
     for row in rows:
@@ -524,7 +555,7 @@ def analyze(paths: Sequence[Path]) -> int:
     for (arm, condition, _), row in by_cell.items():
         if condition == "natural":
             natural[arm].append(row)
-    for arm in ARMS:
+    for arm in labels:
         rows_a = [r for r in natural.get(arm, []) if all(s is not None for s in r["scores"])]
         if not rows_a:
             continue
@@ -539,7 +570,7 @@ def analyze(paths: Sequence[Path]) -> int:
 
     print()
     print("=== paired vs OLD (natural, same batch) ===")
-    for arm in ("NEW_A", "NEW_B"):
+    for arm in [a for a in labels if a != "OLD"]:
         pairs, spread_delta = [], []
         for (a, condition, batch), row in by_cell.items():
             if a != arm or condition != "natural":
@@ -559,7 +590,7 @@ def analyze(paths: Sequence[Path]) -> int:
     print()
     print("=== degraded-sibling detection (spiked condition) ===")
     print(f"{'arm':7} {'n':>4} {'hit':>5} {'rate':>6} {'chance':>7} {'p':>8} {'flat':>6}")
-    for arm in ARMS:
+    for arm in labels:
         hits, chance, flats = [], [], []
         for (a, condition, _), row in by_cell.items():
             if a != arm or condition != "spiked":
@@ -582,7 +613,7 @@ def analyze(paths: Sequence[Path]) -> int:
 
     print()
     print("=== recorded-degenerate contrast (natural, batches with both kinds) ===")
-    for arm in ARMS:
+    for arm in labels:
         good, bad = [], []
         for (a, condition, _), row in by_cell.items():
             if a != arm or condition != "natural":
@@ -606,7 +637,7 @@ def analyze(paths: Sequence[Path]) -> int:
     if retest:
         print()
         print("=== test-retest (same arm, same batch, repeated call) ===")
-        for arm in ARMS:
+        for arm in labels:
             deltas, same_flat, identical = [], [], []
             for (a, _, _), reps in retest.items():
                 if a != arm:
@@ -653,6 +684,11 @@ def main(argv=None) -> int:
                    help="repeat each cell; measures judge test-retest noise, which bounds "
                         "how large a prompt-arm difference has to be to matter")
     p.add_argument("--arms", nargs="+", default=None, choices=list(ARMS))
+    p.add_argument("--serializations", nargs="+", default=["legacy"],
+                   choices=["legacy", "fixed"],
+                   help="how a node's details are cut down to evaluation_max_detail_chars: the "
+                        "shipped-until-2026-08-20 character cut (legacy, unparseable past the "
+                        "budget) or the structure-preserving replacement (fixed)")
     p.add_argument("--retries", type=int, default=5)
     p.add_argument("--backoff", type=float, default=4.0)
     p.add_argument("--seed", type=int, default=DEFAULT_SEED)
