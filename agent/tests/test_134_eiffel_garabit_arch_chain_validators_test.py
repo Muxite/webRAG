@@ -16,7 +16,23 @@ def _r(text):
     return {"output": {"final_deliverable": text}}
 
 
-_OBS = {"visit": {"count": 4}}
+# Per-waypoint visited-page evidence (the grounding channel validate_chain_coverage now checks
+# instead of an aggregate visit count -- see idea_test_utils.waypoint_chain_coverage).
+_EV_START = {"url": "https://en.wikipedia.org/wiki/Statue_of_Liberty",
+             "content": "The Statue of Liberty's internal iron frame was engineered by Gustave Eiffel."}
+_EV_CREATOR = {"url": "https://en.wikipedia.org/wiki/Gustave_Eiffel",
+               "content": "Gustave Eiffel was a French structural engineer who also designed the "
+                          "internal frame of the Statue of Liberty."}
+_EV_TERMINAL = {"url": "https://en.wikipedia.org/wiki/Garabit_viaduct",
+                "content": "The Garabit Viaduct's total length is 565 m (main arch span 165 m)."}
+_FULL_EVIDENCE = [_EV_START, _EV_CREATOR, _EV_TERMINAL]
+
+
+def _obs(visited=None, n=4):
+    return {"visit": {"count": n}, "evidence": {"visited": _FULL_EVIDENCE if visited is None else visited}}
+
+
+_OBS = _obs()
 
 _FULL_SINGLE = (
     "Hop 1: the Statue of Liberty (https://en.wikipedia.org/wiki/Statue_of_Liberty) internal iron "
@@ -84,10 +100,11 @@ def test_stop_early_gates_to_zero_but_keeps_coverage():
         "Liberty stands 46 m tall (93 m with the pedestal)."
     )
     r = _r(wrong)
-    assert t.validate_keystone_length(r, _OBS)["score"] == 0.0           # no 565/165
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 2 / 3) < 1e-9  # start + engineer
-    assert t.validate_terminal_resolution(r, _OBS)["score"] == 0.0       # gated
-    assert t.validate_citations(r, _OBS)["score"] == 0.0                 # gated
+    partial_obs = _obs([_EV_START, _EV_CREATOR])  # terminal page never visited
+    assert t.validate_keystone_length(r, partial_obs)["score"] == 0.0           # no 565/165
+    assert abs(t.validate_chain_coverage(r, partial_obs)["score"] - 2 / 3) < 1e-9  # start + engineer
+    assert t.validate_terminal_resolution(r, partial_obs)["score"] == 0.0       # gated
+    assert t.validate_citations(r, partial_obs)["score"] == 0.0                 # gated
 
 
 def test_over_hop_gates_to_zero():
@@ -110,16 +127,26 @@ def test_keystone_token_rejects_embedded_and_near_miss():
 def test_partial_coverage_scores_fraction():
     text = "I only investigated the Statue of Liberty and Gustave Eiffel; I did not reach the viaduct."
     r = _r(text)
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 2 / 3) < 1e-9
-    assert t.validate_keystone_length(r, _OBS)["score"] == 0.0
+    partial_obs = _obs([_EV_START, _EV_CREATOR])
+    assert abs(t.validate_chain_coverage(r, partial_obs)["score"] - 2 / 3) < 1e-9
+    assert t.validate_keystone_length(r, partial_obs)["score"] == 0.0
 
 
-def test_chain_coverage_requires_visits_not_just_text():
+def test_chain_coverage_requires_page_evidence_not_just_text():
+    """GROUNDING fix (2026-08-16): a waypoint named in the answer with NO supporting visited-page
+    evidence must not be credited, regardless of how many OTHER pages were visited (no more
+    aggregate visit-count cap) -- and a page that genuinely supports a waypoint restores credit
+    even when the model's own answer would otherwise be capped by a low visit count."""
     r = _r(_FULL_SINGLE)
-    assert t.validate_chain_coverage(r, {"visit": {"count": 0}})["score"] == 0.0
-    assert t.validate_chain_coverage(r, {"visit": {"count": 0}})["passed"] is False
-    assert abs(t.validate_chain_coverage(r, {"visit": {"count": 2}})["score"] - 2 / 3) < 1e-9
-    assert t.validate_chain_coverage(r, {"visit": {"count": 3}})["score"] == 1.0
+    assert t.validate_chain_coverage(r, _obs([]))["score"] == 0.0
+    assert t.validate_chain_coverage(r, _obs([]))["passed"] is False
+    assert abs(t.validate_chain_coverage(r, _obs([_EV_START, _EV_CREATOR]))["score"] - 2 / 3) < 1e-9
+    assert t.validate_chain_coverage(r, _obs(_FULL_EVIDENCE))["score"] == 1.0
+    # A page that supports NONE of the named waypoints (off-topic junk visit) contributes nothing,
+    # even though it is a real, successful visit -- see the donation/Reddit/TikTok regression in
+    # idea_test_utils_test.py for the corpus-derived version of this case.
+    junk = [{"url": "https://www.reddit.com/r/todayilearned/comments/abc123/", "content": "TIL something unrelated."}]
+    assert t.validate_chain_coverage(r, _obs(junk, n=5))["score"] == 0.0
 
 
 def test_no_visits_scores_fraction_and_gate():

@@ -41,7 +41,7 @@ nor the imperial "2,460" ft form, keeping the gate exact.
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, waypoint_chain_coverage
 
 
 # Keystone: the birthplace village's infobox elevation, in metres. Word-bounded so it matches
@@ -57,6 +57,11 @@ HOP_VILLAGE = r"\bfuendetodos\b"
 # GATED citation: the two pages the chain had to read (painter page, village page).
 CITE_PAINTER = r"wiki/francisco_goya"
 CITE_VILLAGE = r"wiki/fuendetodos"
+# The same two hops, shaped for waypoint_chain_coverage's per-waypoint evidence check.
+_CHAIN_WAYPOINTS = [
+    {"name": "painter (Goya)", "name_rx": HOP_PAINTER, "slug_rx": CITE_PAINTER},
+    {"name": "village (Fuendetodos)", "name_rx": HOP_VILLAGE, "slug_rx": CITE_VILLAGE},
+]
 
 
 def get_test_metadata() -> Dict[str, Any]:
@@ -143,13 +148,13 @@ def validate_chain_coverage(result: Dict[str, Any], observability: Dict[str, Any
     even when the obscure terminus is botched, which is the axis that separates a structured agent
     (which carries each hop's result forward) from a linear/parametric one that never reaches the
     intermediate pages at all.
+
+    GROUNDING fix (2026-08-16): credit now requires PER-WAYPOINT visited-page EVIDENCE (see
+    idea_test_utils.waypoint_chain_coverage) -- previously this check had NO grounding at all,
+    crediting the painter/village names on text presence alone regardless of whether either page
+    was ever actually visited.
     """
-    text = _primary_text(result).lower()
-    has_painter = bool(re.search(HOP_PAINTER, text))
-    has_village = bool(re.search(HOP_VILLAGE, text))
-    hits = int(has_painter) + int(has_village)
-    return {"check": "chain_coverage", "passed": hits == 2, "score": hits / 2.0,
-            "reason": f"painter(Goya)={has_painter}, village(Fuendetodos)={has_village}"}
+    return waypoint_chain_coverage(_CHAIN_WAYPOINTS, result, observability, _primary_text(result).lower())
 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

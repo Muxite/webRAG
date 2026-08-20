@@ -33,7 +33,7 @@ the trap numbers (46/93/300/330), so one noisy extraction cannot flip the gate.
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, waypoint_chain_coverage
 
 
 # ── Chain waypoints (single source of truth for statement, validators, plan). Distinct tokens. ──
@@ -149,17 +149,11 @@ def validate_keystone_length(result: Dict[str, Any], observability: Dict[str, An
 
 def validate_chain_coverage(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """UN-gated breadth/decision diagnostic: how many of the three chain waypoints (start, engineer,
-    terminal) the agent actually named — separating a structured agent that traverses the full chain
-    from a linear one that stops at the engineer. Credited count is CAPPED BY the visit count so
-    mandate narration with ZERO reads banks nothing. NOT short-circuited on the keystone."""
-    text = _all_text(result)
-    hits = [w["name"] for w in CHAIN if re.search(w["name_rx"], text, re.IGNORECASE)]
-    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
-    credited = min(len(hits), n_visits)
-    n = len(CHAIN)
-    return {"check": "chain_coverage", "passed": credited == n, "score": credited / n,
-            "reason": f"{credited}/{n} chain waypoints traversed from visited pages "
-                      f"({', '.join(hits[:credited]) or 'none'}; {len(hits)} named, {n_visits} visit(s))"}
+    terminal) the agent both NAMED in its own answer AND has PER-WAYPOINT visited-page EVIDENCE
+    for (GROUNDING fix, 2026-08-16: previously capped only by the AGGREGATE visit count, which let
+    any N visits -- regardless of which pages -- credit up to N named waypoints; see
+    idea_test_utils.waypoint_chain_coverage). NOT short-circuited on the keystone."""
+    return waypoint_chain_coverage(CHAIN, result, observability, _all_text(result))
 
 
 def validate_terminal_resolution(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

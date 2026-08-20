@@ -41,7 +41,7 @@ the gate; only reaching the wrong page can, which is precisely what the chain is
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, waypoint_chain_coverage
 
 
 # Keystone: the birthplace town's infobox elevation, in metres. Word-bounded so it matches
@@ -58,6 +58,12 @@ HOP_TOWN = r"\bparral\b"
 # GATED citation: the two pages the chain had to read (poet page, town page).
 CITE_POET = r"wiki/pablo_neruda"
 CITE_TOWN = r"wiki/parral"
+# The same two hops, shaped for waypoint_chain_coverage's per-waypoint evidence check (name_rx
+# reused verbatim from HOP_POET/HOP_TOWN above; slug_rx from CITE_POET/CITE_TOWN).
+_CHAIN_WAYPOINTS = [
+    {"name": "poet (Neruda)", "name_rx": HOP_POET, "slug_rx": CITE_POET},
+    {"name": "town (Parral)", "name_rx": HOP_TOWN, "slug_rx": CITE_TOWN},
+]
 
 
 def get_test_metadata() -> Dict[str, Any]:
@@ -151,18 +157,12 @@ def validate_chain_coverage(result: Dict[str, Any], observability: Dict[str, Any
     (which carries each hop's result forward) from a linear/parametric one that never reaches the
     intermediate pages at all.
 
-    Credit is CAPPED BY visit count (``min(hits, n_visits)``) so a 0-visit parametric-memory
-    answer that merely recalls the poet/town cannot bank partial credit here without ever browsing.
+    GROUNDING fix (2026-08-16): credit now requires PER-WAYPOINT visited-page EVIDENCE (see
+    idea_test_utils.waypoint_chain_coverage), not just an aggregate visit count -- previously
+    ``min(hits, n_visits)`` let any N visits, regardless of which pages, bank credit for the
+    poet/town names merely echoed in the answer text.
     """
-    text = _primary_text(result).lower()
-    has_poet = bool(re.search(HOP_POET, text))
-    has_town = bool(re.search(HOP_TOWN, text))
-    hits = int(has_poet) + int(has_town)
-    n_visits = int((observability or {}).get("visit", {}).get("count", 0) or 0)
-    credited = min(hits, n_visits)
-    return {"check": "chain_coverage", "passed": credited == 2, "score": credited / 2.0,
-            "reason": f"poet(Neruda)={has_poet}, town(Parral)={has_town}, "
-                      f"{credited}/2 credited ({n_visits} visit(s))"}
+    return waypoint_chain_coverage(_CHAIN_WAYPOINTS, result, observability, _primary_text(result).lower())
 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

@@ -15,7 +15,25 @@ def _r(text):
     return {"output": {"final_deliverable": text}}
 
 
-_OBS = {"visit": {"count": 4}}
+# Per-waypoint visited-page evidence (the grounding channel validate_chain_coverage now checks
+# instead of an aggregate visit count -- see idea_test_utils.waypoint_chain_coverage).
+_EV_START = {"url": "https://en.wikipedia.org/wiki/Sagrada_Familia",
+             "content": "The Sagrada Família is a large unfinished minor basilica designed by "
+                        "Antoni Gaudí."}
+_EV_CREATOR = {"url": "https://en.wikipedia.org/wiki/Antoni_Gaudi",
+               "content": "Antoni Gaudí was a Catalan architect and figurehead of Catalan "
+                          "Modernism."}
+_EV_TERMINAL = {"url": "https://en.wikipedia.org/wiki/Casa_Mila",
+                "content": "Casa Milà, popularly known as La Pedrera, has a per-floor area of "
+                           "1,323 m2."}
+_FULL_EVIDENCE = [_EV_START, _EV_CREATOR, _EV_TERMINAL]
+
+
+def _obs(visited=None, n=4):
+    return {"visit": {"count": n}, "evidence": {"visited": _FULL_EVIDENCE if visited is None else visited}}
+
+
+_OBS = _obs()
 
 _FULL_SINGLE = (
     "Hop 1: the Sagrada Família (https://en.wikipedia.org/wiki/Sagrada_Familia) was designed by "
@@ -79,10 +97,11 @@ def test_ungrounded_correct_value_gates_to_zero():
 def test_stop_early_gates_to_zero_but_keeps_coverage():
     wrong = "The Sagrada Família, by Antoni Gaudí, has a tallest tower of 172.5 m."
     r = _r(wrong)
-    assert t.validate_keystone_area(r, _OBS)["score"] == 0.0
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 2 / 3) < 1e-9
-    assert t.validate_terminal_resolution(r, _OBS)["score"] == 0.0
-    assert t.validate_citations(r, _OBS)["score"] == 0.0
+    partial_obs = _obs([_EV_START, _EV_CREATOR])  # terminal page never visited
+    assert t.validate_keystone_area(r, partial_obs)["score"] == 0.0
+    assert abs(t.validate_chain_coverage(r, partial_obs)["score"] - 2 / 3) < 1e-9
+    assert t.validate_terminal_resolution(r, partial_obs)["score"] == 0.0
+    assert t.validate_citations(r, partial_obs)["score"] == 0.0
 
 
 def test_over_hop_gates_to_zero():
@@ -103,24 +122,34 @@ def test_keystone_token_rejects_embedded_and_near_miss():
 
 
 def test_partial_coverage_scores_fraction():
+    """NOTE: 'La Pedrera' in the sentence collides with the terminal token, so it is NAMED even
+    though the text itself claims only 2 pages were visited. GROUNDING fix (2026-08-16): this is
+    exactly the case the repair targets -- a name that merely appears in the answer text no longer
+    banks credit on its own. Providing evidence for only the 2 pages the text actually claims
+    correctly caps this at 2/3 (previously the aggregate visit count alone, unrelated to which
+    pages were grounded, let this reach 1.0)."""
     text = "I only investigated the Sagrada Família and Antoni Gaudí; I did not reach La Pedrera."
     r = _r(text)
-    # NOTE: 'La Pedrera' in the sentence matches the terminal token, so this names all three.
-    assert t.validate_chain_coverage(r, _OBS)["score"] == 1.0
-    assert t.validate_keystone_area(r, _OBS)["score"] == 0.0
+    partial_obs = _obs([_EV_START, _EV_CREATOR])
+    assert abs(t.validate_chain_coverage(r, partial_obs)["score"] - 2 / 3) < 1e-9
+    assert t.validate_keystone_area(r, partial_obs)["score"] == 0.0
 
 
 def test_partial_coverage_two_of_three():
     text = "I only investigated the Sagrada Família and Antoni Gaudí; I stopped at the architect."
     r = _r(text)
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 2 / 3) < 1e-9
+    partial_obs = _obs([_EV_START, _EV_CREATOR])
+    assert abs(t.validate_chain_coverage(r, partial_obs)["score"] - 2 / 3) < 1e-9
 
 
-def test_chain_coverage_requires_visits_not_just_text():
+def test_chain_coverage_requires_page_evidence_not_just_text():
+    """GROUNDING fix (2026-08-16): a waypoint named in the answer with NO supporting visited-page
+    evidence must not be credited, regardless of how many OTHER pages were visited (no more
+    aggregate visit-count cap)."""
     r = _r(_FULL_SINGLE)
-    assert t.validate_chain_coverage(r, {"visit": {"count": 0}})["score"] == 0.0
-    assert abs(t.validate_chain_coverage(r, {"visit": {"count": 2}})["score"] - 2 / 3) < 1e-9
-    assert t.validate_chain_coverage(r, {"visit": {"count": 3}})["score"] == 1.0
+    assert t.validate_chain_coverage(r, _obs([]))["score"] == 0.0
+    assert abs(t.validate_chain_coverage(r, _obs([_EV_START, _EV_CREATOR]))["score"] - 2 / 3) < 1e-9
+    assert t.validate_chain_coverage(r, _obs(_FULL_EVIDENCE))["score"] == 1.0
 
 
 def test_no_visits_scores_fraction_and_gate():

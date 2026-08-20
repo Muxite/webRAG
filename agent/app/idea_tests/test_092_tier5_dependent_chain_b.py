@@ -42,7 +42,7 @@ built to expose. \\b564\\b also never matches inside "1,850" (ft) nor a larger n
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text
+from agent.app.idea_test_utils import extract_final_text, waypoint_chain_coverage
 
 
 # Keystone: the birthplace town's infobox elevation, in metres. Word-bounded so it matches
@@ -58,6 +58,11 @@ HOP_TOWN = r"\btrujillo\b"
 # GATED citation: the two pages the chain had to read (person page, town page).
 CITE_PERSON = r"wiki/francisco_pizarro"
 CITE_TOWN = r"wiki/trujillo"
+# The same two hops, shaped for waypoint_chain_coverage's per-waypoint evidence check.
+_CHAIN_WAYPOINTS = [
+    {"name": "person (Pizarro)", "name_rx": HOP_PERSON, "slug_rx": CITE_PERSON},
+    {"name": "town (Trujillo)", "name_rx": HOP_TOWN, "slug_rx": CITE_TOWN},
+]
 
 
 def get_test_metadata() -> Dict[str, Any]:
@@ -144,13 +149,13 @@ def validate_chain_coverage(result: Dict[str, Any], observability: Dict[str, Any
     even when the obscure terminus is botched, which is the axis that separates a structured agent
     (which carries each hop's result forward) from a linear/parametric one that never reaches the
     intermediate pages at all.
+
+    GROUNDING fix (2026-08-16): credit now requires PER-WAYPOINT visited-page EVIDENCE (see
+    idea_test_utils.waypoint_chain_coverage) -- previously this check had NO grounding at all,
+    crediting the person/town names on text presence alone regardless of whether either page was
+    ever actually visited.
     """
-    text = _primary_text(result).lower()
-    has_person = bool(re.search(HOP_PERSON, text))
-    has_town = bool(re.search(HOP_TOWN, text))
-    hits = int(has_person) + int(has_town)
-    return {"check": "chain_coverage", "passed": hits == 2, "score": hits / 2.0,
-            "reason": f"person(Pizarro)={has_person}, town(Trujillo)={has_town}"}
+    return waypoint_chain_coverage(_CHAIN_WAYPOINTS, result, observability, _primary_text(result).lower())
 
 
 def validate_citations(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:

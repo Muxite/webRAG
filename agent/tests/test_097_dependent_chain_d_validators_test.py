@@ -20,7 +20,28 @@ def _r(text):
     return {"output": {"final_deliverable": text}}
 
 
-_OBS = {"visit": {"count": 3}}
+# Per-waypoint visited-page evidence (the grounding channel validate_chain_coverage now checks
+# instead of having no grounding at all -- see idea_test_utils.waypoint_chain_coverage). The
+# painter's OWN page already names the birthplace village (that is how hop 2 is meant to work), so
+# visiting it alone grounds both waypoints -- matching the task's own hop mechanics.
+_EV_PAINTER = {"url": "https://en.wikipedia.org/wiki/Francisco_Goya",
+               "content": "Francisco Goya was a Spanish romantic painter, born in Fuendetodos, "
+                          "Aragon, Spain."}
+_EV_VILLAGE = {"url": "https://en.wikipedia.org/wiki/Fuendetodos",
+               "content": "Fuendetodos is a village in the Province of Zaragoza, Aragon. "
+                          "Elevation: 750 m (2,460 ft)."}
+# A fame-decoy -- the city where Goya trained, associated with him but not his birthplace.
+_EV_ZARAGOZA = {"url": "https://en.wikipedia.org/wiki/Zaragoza",
+                "content": "Zaragoza is a city in Aragon, Spain, where Francisco Goya trained, at "
+                           "an elevation of 243 m."}
+_FULL_EVIDENCE = [_EV_PAINTER, _EV_VILLAGE]
+
+
+def _obs(visited=None, n=3):
+    return {"visit": {"count": n}, "evidence": {"visited": _FULL_EVIDENCE if visited is None else visited}}
+
+
+_OBS = _obs()
 
 
 _FULL_SINGLE = (
@@ -67,9 +88,10 @@ def test_fame_decoy_wrong_city_gates_to_zero_but_keeps_breadth():
         "the page for Zaragoza, where he trained, gives an elevation of 243 m."
     )
     r = _r(wrong)
-    assert t.validate_keystone_elevation(r, _OBS)["score"] == 0.0     # "243" != 750
-    assert t.validate_chain_coverage(r, _OBS)["score"] == 1.0          # painter + village retained
-    assert t.validate_citations(r, _OBS)["score"] == 0.0             # gated on keystone
+    decoy_obs = _obs([_EV_PAINTER, _EV_ZARAGOZA])  # visited Zaragoza, not Fuendetodos itself
+    assert t.validate_keystone_elevation(r, decoy_obs)["score"] == 0.0     # "243" != 750
+    assert t.validate_chain_coverage(r, decoy_obs)["score"] == 1.0          # painter + village retained
+    assert t.validate_citations(r, decoy_obs)["score"] == 0.0             # gated on keystone
 
 
 def test_keystone_token_rejects_embedded_number():
@@ -99,9 +121,13 @@ def test_parametric_guess_gates_to_zero():
         "Fuendetodos, Spain. Its elevation is roughly 700 metres above sea level."
     )
     r = _r(guess)
-    assert t.validate_keystone_elevation(r, _OBS)["score"] == 0.0
-    assert t.validate_citations(r, _OBS)["score"] == 0.0
-    assert t.validate_chain_coverage(r, _OBS)["score"] == 1.0
+    # Only the painter's page was ever opened -- it already names the birthplace village itself
+    # (hop 2's own mechanic), so breadth still credits both waypoints; the village's OWN page (and
+    # thus its elevation) was never visited, so the keystone stays 0.
+    painter_only_obs = _obs([_EV_PAINTER])
+    assert t.validate_keystone_elevation(r, painter_only_obs)["score"] == 0.0
+    assert t.validate_citations(r, painter_only_obs)["score"] == 0.0
+    assert t.validate_chain_coverage(r, painter_only_obs)["score"] == 1.0
 
 
 def test_partial_coverage_scores_fraction():
@@ -112,8 +138,21 @@ def test_partial_coverage_scores_fraction():
         "I could not determine the birthplace village or its elevation."
     )
     r = _r(text)
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 0.5) < 1e-9
-    assert t.validate_keystone_elevation(r, _OBS)["score"] == 0.0
+    painter_only_obs = _obs([_EV_PAINTER])
+    assert abs(t.validate_chain_coverage(r, painter_only_obs)["score"] - 0.5) < 1e-9
+    assert t.validate_keystone_elevation(r, painter_only_obs)["score"] == 0.0
+
+
+def test_chain_coverage_requires_page_evidence_not_just_text():
+    """GROUNDING fix (2026-08-16): a waypoint named in the answer with NO supporting visited-page
+    evidence must not be credited -- this task's chain_coverage had NO grounding requirement at
+    all before this fix."""
+    r = _r(_FULL_SINGLE)
+    assert t.validate_chain_coverage(r, _obs([]))["score"] == 0.0
+    assert t.validate_chain_coverage(r, _obs([_EV_PAINTER]))["score"] == 1.0  # village revealed on painter's page
+    assert t.validate_chain_coverage(r, _obs(_FULL_EVIDENCE))["score"] == 1.0
+    junk = [{"url": "https://www.reddit.com/r/art/comments/xyz/", "content": "unrelated art discussion"}]
+    assert t.validate_chain_coverage(r, _obs(junk, n=5))["score"] == 0.0
 
 
 def test_no_visits_scores_fraction_and_gate():

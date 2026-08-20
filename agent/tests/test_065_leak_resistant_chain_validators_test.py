@@ -20,7 +20,30 @@ def _r(text):
     return {"output": {"final_deliverable": text}}
 
 
-_OBS = {"visit": {"count": 3}}
+# Per-waypoint visited-page evidence (the grounding channel validate_chain_coverage now checks
+# instead of an aggregate visit count -- see idea_test_utils.waypoint_chain_coverage). The poet's
+# OWN page already names the birthplace town (that is how hop 2 is meant to work), so visiting it
+# alone grounds both waypoints -- matching the task's own hop mechanics.
+_EV_POET = {"url": "https://en.wikipedia.org/wiki/Pablo_Neruda",
+            "content": "Pablo Neruda was a Chilean poet born in Parral, Chile, awarded the Nobel "
+                       "Prize in Literature in 1971."}
+_EV_TOWN = {"url": "https://en.wikipedia.org/wiki/Parral,_Chile",
+            "content": "Parral is a Chilean town in Linares Province, Maule Region. Elevation: "
+                       "162 m (531 ft)."}
+# The famous Mexican homonym -- a WRONG page that nonetheless genuinely mentions "Parral" in its
+# own content, so a validator matching on content (not just the correct slug) still grounds the
+# "town" waypoint from it; only the separate keystone check (exact elevation figure) rejects it.
+_EV_WRONG_TOWN = {"url": "https://en.wikipedia.org/wiki/Hidalgo_del_Parral",
+                  "content": "Hidalgo del Parral is a city in Chihuahua, Mexico, at an elevation "
+                             "of 1,620 m (5,310 ft)."}
+_FULL_EVIDENCE = [_EV_POET, _EV_TOWN]
+
+
+def _obs(visited=None, n=3):
+    return {"visit": {"count": n}, "evidence": {"visited": _FULL_EVIDENCE if visited is None else visited}}
+
+
+_OBS = _obs()
 
 
 _FULL_SINGLE = (
@@ -68,9 +91,10 @@ def test_homonym_wrong_town_gates_to_zero_but_keeps_breadth():
         "for Hidalgo del Parral gives an elevation of 1,620 m (5,310 ft)."
     )
     r = _r(wrong)
-    assert t.validate_keystone_elevation(r, _OBS)["score"] == 0.0     # "1,620" != 162
-    assert t.validate_chain_coverage(r, _OBS)["score"] == 1.0          # poet + town name retained
-    assert t.validate_citations(r, _OBS)["score"] == 0.0              # gated on keystone
+    wrong_town_obs = _obs([_EV_POET, _EV_WRONG_TOWN])  # visited the WRONG "Parral" page
+    assert t.validate_keystone_elevation(r, wrong_town_obs)["score"] == 0.0     # "1,620" != 162
+    assert t.validate_chain_coverage(r, wrong_town_obs)["score"] == 1.0          # poet + town name retained
+    assert t.validate_citations(r, wrong_town_obs)["score"] == 0.0              # gated on keystone
 
 
 def test_keystone_token_rejects_unbounded_homonym():
@@ -99,9 +123,13 @@ def test_parametric_guess_gates_to_zero():
         "in Parral, Chile. Its elevation is roughly 150 metres above sea level."
     )
     r = _r(guess)
-    assert t.validate_keystone_elevation(r, _OBS)["score"] == 0.0
-    assert t.validate_citations(r, _OBS)["score"] == 0.0
-    assert t.validate_chain_coverage(r, _OBS)["score"] == 1.0
+    # Only the poet's page was ever opened -- it already names the birthplace town itself (hop
+    # 2's own mechanic), so breadth still credits both waypoints; the town's OWN page (and thus
+    # its elevation) was never visited, so the keystone stays 0.
+    poet_only_obs = _obs([_EV_POET])
+    assert t.validate_keystone_elevation(r, poet_only_obs)["score"] == 0.0
+    assert t.validate_citations(r, poet_only_obs)["score"] == 0.0
+    assert t.validate_chain_coverage(r, poet_only_obs)["score"] == 1.0
 
 
 def test_partial_coverage_scores_fraction():
@@ -112,8 +140,22 @@ def test_partial_coverage_scores_fraction():
         "determine the birthplace town or its elevation."
     )
     r = _r(text)
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 0.5) < 1e-9
-    assert t.validate_keystone_elevation(r, _OBS)["score"] == 0.0
+    poet_only_obs = _obs([_EV_POET])
+    assert abs(t.validate_chain_coverage(r, poet_only_obs)["score"] - 0.5) < 1e-9
+    assert t.validate_keystone_elevation(r, poet_only_obs)["score"] == 0.0
+
+
+def test_chain_coverage_requires_page_evidence_not_just_text():
+    """GROUNDING fix (2026-08-16): a waypoint named in the answer with NO supporting visited-page
+    evidence must not be credited, regardless of how many OTHER pages were visited (no more
+    aggregate visit-count cap)."""
+    r = _r(_FULL_SINGLE)
+    assert t.validate_chain_coverage(r, _obs([]))["score"] == 0.0
+    assert abs(t.validate_chain_coverage(r, _obs([_EV_POET]))["score"] - 1.0) < 1e-9  # town revealed on poet's page
+    assert t.validate_chain_coverage(r, _obs(_FULL_EVIDENCE))["score"] == 1.0
+    # A real, successful visit to a page unrelated to either waypoint contributes nothing.
+    junk = [{"url": "https://www.reddit.com/r/books/comments/xyz/", "content": "unrelated book discussion"}]
+    assert t.validate_chain_coverage(r, _obs(junk, n=5))["score"] == 0.0
 
 
 def test_no_visits_scores_fraction_and_gate():
@@ -133,8 +175,9 @@ def test_ungrounded_correct_value_gates_to_zero():
     assert t.validate_keystone_elevation(r, ungrounded_obs)["score"] == 0.0
     assert t.validate_keystone_elevation(r, ungrounded_obs)["passed"] is False
     assert t.validate_citations(r, ungrounded_obs)["score"] == 0.0
-    # Coverage is CAPPED BY visit count (F29 fix): a 0-visit run banks 0 coverage credit even
-    # though the raw text names the poet and town, closing the "parametric recall" leak.
+    # Coverage requires PER-WAYPOINT visited-page EVIDENCE (2026-08-16 grounding fix): a run with
+    # no evidence at all banks 0 coverage credit even though the raw text names the poet and town,
+    # closing the "parametric recall" leak.
     assert t.validate_chain_coverage(r, ungrounded_obs)["score"] == 0.0
     scores = [
         t.validate_visits(r, ungrounded_obs)["score"],

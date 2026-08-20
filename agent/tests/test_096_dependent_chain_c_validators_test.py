@@ -20,7 +20,28 @@ def _r(text):
     return {"output": {"final_deliverable": text}}
 
 
-_OBS = {"visit": {"count": 3}}
+# Per-waypoint visited-page evidence (the grounding channel validate_chain_coverage now checks
+# instead of having no grounding at all -- see idea_test_utils.waypoint_chain_coverage). The
+# aviator's OWN page already names the birthplace town (that is how hop 2 is meant to work), so
+# visiting it alone grounds both waypoints -- matching the task's own hop mechanics.
+_EV_AVIATOR = {"url": "https://en.wikipedia.org/wiki/Amelia_Earhart",
+               "content": "Amelia Earhart was an American aviation pioneer, born in Atchison, "
+                          "Kansas."}
+_EV_TOWN = {"url": "https://en.wikipedia.org/wiki/Atchison,_Kansas",
+            "content": "Atchison is a city in Atchison County, Kansas. Elevation: 869 ft (265 m)."}
+# A fame-decoy -- a larger nearby city page that mentions neither the aviator nor the town, so it
+# cannot ground either waypoint on its own.
+_EV_KANSAS_CITY = {"url": "https://en.wikipedia.org/wiki/Kansas_City,_Missouri",
+                   "content": "Kansas City is a major city in Missouri at an elevation of about "
+                              "276 m."}
+_FULL_EVIDENCE = [_EV_AVIATOR, _EV_TOWN]
+
+
+def _obs(visited=None, n=3):
+    return {"visit": {"count": n}, "evidence": {"visited": _FULL_EVIDENCE if visited is None else visited}}
+
+
+_OBS = _obs()
 
 
 _FULL_SINGLE = (
@@ -67,9 +88,10 @@ def test_fame_decoy_wrong_city_gates_to_zero_but_keeps_breadth():
         "nearby Kansas City sits at an elevation of about 276 m above sea level."
     )
     r = _r(wrong)
-    assert t.validate_keystone_elevation(r, _OBS)["score"] == 0.0     # "276" != 265
-    assert t.validate_chain_coverage(r, _OBS)["score"] == 1.0          # aviator + town retained
-    assert t.validate_citations(r, _OBS)["score"] == 0.0             # gated on keystone
+    decoy_obs = _obs([_EV_AVIATOR, _EV_KANSAS_CITY])  # visited the decoy city, not Atchison itself
+    assert t.validate_keystone_elevation(r, decoy_obs)["score"] == 0.0     # "276" != 265
+    assert t.validate_chain_coverage(r, decoy_obs)["score"] == 1.0          # aviator + town retained
+    assert t.validate_citations(r, decoy_obs)["score"] == 0.0             # gated on keystone
 
 
 def test_keystone_token_rejects_embedded_number():
@@ -99,9 +121,13 @@ def test_parametric_guess_gates_to_zero():
         "Atchison, Kansas. Its elevation is roughly 300 metres above sea level."
     )
     r = _r(guess)
-    assert t.validate_keystone_elevation(r, _OBS)["score"] == 0.0
-    assert t.validate_citations(r, _OBS)["score"] == 0.0
-    assert t.validate_chain_coverage(r, _OBS)["score"] == 1.0
+    # Only the aviator's page was ever opened -- it already names the birthplace town itself (hop
+    # 2's own mechanic), so breadth still credits both waypoints; the town's OWN page (and thus
+    # its elevation) was never visited, so the keystone stays 0.
+    aviator_only_obs = _obs([_EV_AVIATOR])
+    assert t.validate_keystone_elevation(r, aviator_only_obs)["score"] == 0.0
+    assert t.validate_citations(r, aviator_only_obs)["score"] == 0.0
+    assert t.validate_chain_coverage(r, aviator_only_obs)["score"] == 1.0
 
 
 def test_partial_coverage_scores_fraction():
@@ -112,8 +138,21 @@ def test_partial_coverage_scores_fraction():
         "I could not determine the birthplace town or its elevation."
     )
     r = _r(text)
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 0.5) < 1e-9
-    assert t.validate_keystone_elevation(r, _OBS)["score"] == 0.0
+    aviator_only_obs = _obs([_EV_AVIATOR])
+    assert abs(t.validate_chain_coverage(r, aviator_only_obs)["score"] - 0.5) < 1e-9
+    assert t.validate_keystone_elevation(r, aviator_only_obs)["score"] == 0.0
+
+
+def test_chain_coverage_requires_page_evidence_not_just_text():
+    """GROUNDING fix (2026-08-16): a waypoint named in the answer with NO supporting visited-page
+    evidence must not be credited -- this task's chain_coverage had NO grounding requirement at
+    all before this fix."""
+    r = _r(_FULL_SINGLE)
+    assert t.validate_chain_coverage(r, _obs([]))["score"] == 0.0
+    assert t.validate_chain_coverage(r, _obs([_EV_AVIATOR]))["score"] == 1.0  # town revealed on aviator's page
+    assert t.validate_chain_coverage(r, _obs(_FULL_EVIDENCE))["score"] == 1.0
+    junk = [{"url": "https://www.tiktok.com/@someone/video/999", "content": "unrelated video caption"}]
+    assert t.validate_chain_coverage(r, _obs(junk, n=5))["score"] == 0.0
 
 
 def test_no_visits_scores_fraction_and_gate():

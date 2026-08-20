@@ -14,7 +14,24 @@ def _r(text):
     return {"output": {"final_deliverable": text}}
 
 
-_OBS = {"visit": {"count": 4}}
+# Per-waypoint visited-page evidence (the grounding channel validate_chain_coverage now checks
+# instead of an aggregate visit count -- see idea_test_utils.waypoint_chain_coverage).
+_EV_START = {"url": "https://en.wikipedia.org/wiki/Clifton_Suspension_Bridge",
+             "content": "The Clifton Suspension Bridge was designed by Isambard Kingdom Brunel."}
+_EV_CREATOR = {"url": "https://en.wikipedia.org/wiki/Isambard_Kingdom_Brunel",
+               "content": "Isambard Kingdom Brunel was an English civil engineer, one of the most "
+                          "ingenious and prolific figures in engineering history."}
+_EV_TERMINAL = {"url": "https://en.wikipedia.org/wiki/SS_Great_Eastern",
+                "content": "The SS Great Eastern was by far the largest ship ever built at her 1858 "
+                           "launch, with a length of 692 ft (211 m)."}
+_FULL_EVIDENCE = [_EV_START, _EV_CREATOR, _EV_TERMINAL]
+
+
+def _obs(visited=None, n=4):
+    return {"visit": {"count": n}, "evidence": {"visited": _FULL_EVIDENCE if visited is None else visited}}
+
+
+_OBS = _obs()
 
 _FULL_SINGLE = (
     "Hop 1: the Clifton Suspension Bridge (https://en.wikipedia.org/wiki/Clifton_Suspension_Bridge) "
@@ -81,10 +98,11 @@ def test_stop_early_gates_to_zero_but_keeps_coverage():
         "702 ft (214 m)."
     )
     r = _r(wrong)
-    assert t.validate_keystone_length(r, _OBS)["score"] == 0.0
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 2 / 3) < 1e-9
-    assert t.validate_terminal_resolution(r, _OBS)["score"] == 0.0
-    assert t.validate_citations(r, _OBS)["score"] == 0.0
+    partial_obs = _obs([_EV_START, _EV_CREATOR])  # terminal page never visited
+    assert t.validate_keystone_length(r, partial_obs)["score"] == 0.0
+    assert abs(t.validate_chain_coverage(r, partial_obs)["score"] - 2 / 3) < 1e-9
+    assert t.validate_terminal_resolution(r, partial_obs)["score"] == 0.0
+    assert t.validate_citations(r, partial_obs)["score"] == 0.0
 
 
 def test_over_hop_gates_to_zero():
@@ -104,15 +122,23 @@ def test_keystone_token_rejects_embedded_and_near_miss():
 def test_partial_coverage_scores_fraction():
     text = "I only investigated the Clifton Suspension Bridge and Brunel; I never reached the ship."
     r = _r(text)
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 2 / 3) < 1e-9
-    assert t.validate_keystone_length(r, _OBS)["score"] == 0.0
+    partial_obs = _obs([_EV_START, _EV_CREATOR])
+    assert abs(t.validate_chain_coverage(r, partial_obs)["score"] - 2 / 3) < 1e-9
+    assert t.validate_keystone_length(r, partial_obs)["score"] == 0.0
 
 
-def test_chain_coverage_requires_visits_not_just_text():
+def test_chain_coverage_requires_page_evidence_not_just_text():
+    """GROUNDING fix (2026-08-16): a waypoint named in the answer with NO supporting visited-page
+    evidence must not be credited, regardless of how many OTHER pages were visited (no more
+    aggregate visit-count cap). Real corpus example (task 136, nano/good_adaptive): the model
+    visited only the Clifton Suspension Bridge page yet still named and cited the SS Great Eastern
+    from parametric memory -- the old aggregate-visit cap credited it anyway."""
     r = _r(_FULL_SINGLE)
-    assert t.validate_chain_coverage(r, {"visit": {"count": 0}})["score"] == 0.0
-    assert abs(t.validate_chain_coverage(r, {"visit": {"count": 2}})["score"] - 2 / 3) < 1e-9
-    assert t.validate_chain_coverage(r, {"visit": {"count": 3}})["score"] == 1.0
+    assert t.validate_chain_coverage(r, _obs([]))["score"] == 0.0
+    # Only the start page was visited (it names Brunel itself, per HOP 1's own design), so
+    # "start" and "creator" are grounded but "terminal" (SS Great Eastern) is not.
+    assert abs(t.validate_chain_coverage(r, _obs([_EV_START]))["score"] - 2 / 3) < 1e-9
+    assert t.validate_chain_coverage(r, _obs(_FULL_EVIDENCE))["score"] == 1.0
 
 
 def test_no_visits_scores_fraction_and_gate():

@@ -14,7 +14,25 @@ def _r(text):
     return {"output": {"final_deliverable": text}}
 
 
-_OBS = {"visit": {"count": 4}}
+# Per-waypoint visited-page evidence (the grounding channel validate_chain_coverage now checks
+# instead of an aggregate visit count -- see idea_test_utils.waypoint_chain_coverage).
+_EV_START = {"url": "https://en.wikipedia.org/wiki/Brooklyn_Bridge",
+             "content": "The Brooklyn Bridge was designed by John A. Roebling, who died before "
+                        "construction was complete."}
+_EV_CREATOR = {"url": "https://en.wikipedia.org/wiki/John_A._Roebling",
+               "content": "John A. Roebling was a German-American civil engineer known for "
+                          "wire-cable suspension bridge design."}
+_EV_TERMINAL = {"url": "https://en.wikipedia.org/wiki/John_A._Roebling_Suspension_Bridge",
+                "content": "The John A. Roebling Suspension Bridge between Cincinnati and Covington "
+                           "over the Ohio River has a main span of 1,057 ft (322 m)."}
+_FULL_EVIDENCE = [_EV_START, _EV_CREATOR, _EV_TERMINAL]
+
+
+def _obs(visited=None, n=4):
+    return {"visit": {"count": n}, "evidence": {"visited": _FULL_EVIDENCE if visited is None else visited}}
+
+
+_OBS = _obs()
 
 _FULL_SINGLE = (
     "Hop 1: the Brooklyn Bridge (https://en.wikipedia.org/wiki/Brooklyn_Bridge) was designed by "
@@ -82,10 +100,11 @@ def test_stop_early_gates_to_zero_but_keeps_coverage():
         "is 1,595 ft (486 m)."
     )
     r = _r(wrong)
-    assert t.validate_keystone_span(r, _OBS)["score"] == 0.0
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 2 / 3) < 1e-9
-    assert t.validate_terminal_resolution(r, _OBS)["score"] == 0.0
-    assert t.validate_citations(r, _OBS)["score"] == 0.0
+    partial_obs = _obs([_EV_START, _EV_CREATOR])  # terminal page never visited
+    assert t.validate_keystone_span(r, partial_obs)["score"] == 0.0
+    assert abs(t.validate_chain_coverage(r, partial_obs)["score"] - 2 / 3) < 1e-9
+    assert t.validate_terminal_resolution(r, partial_obs)["score"] == 0.0
+    assert t.validate_citations(r, partial_obs)["score"] == 0.0
 
 
 def test_over_hop_gates_to_zero():
@@ -108,15 +127,24 @@ def test_keystone_token_rejects_embedded_and_near_miss():
 def test_partial_coverage_scores_fraction():
     text = "I only investigated the Brooklyn Bridge and John A. Roebling; I did not reach the terminal."
     r = _r(text)
-    assert abs(t.validate_chain_coverage(r, _OBS)["score"] - 2 / 3) < 1e-9
-    assert t.validate_keystone_span(r, _OBS)["score"] == 0.0
+    partial_obs = _obs([_EV_START, _EV_CREATOR])
+    assert abs(t.validate_chain_coverage(r, partial_obs)["score"] - 2 / 3) < 1e-9
+    assert t.validate_keystone_span(r, partial_obs)["score"] == 0.0
 
 
-def test_chain_coverage_requires_visits_not_just_text():
+def test_chain_coverage_requires_page_evidence_not_just_text():
+    """GROUNDING fix (2026-08-16): a waypoint named in the answer with NO supporting visited-page
+    evidence must not be credited, regardless of how many OTHER pages were visited (no more
+    aggregate visit-count cap)."""
     r = _r(_FULL_SINGLE)
-    assert t.validate_chain_coverage(r, {"visit": {"count": 0}})["score"] == 0.0
-    assert abs(t.validate_chain_coverage(r, {"visit": {"count": 2}})["score"] - 2 / 3) < 1e-9
-    assert t.validate_chain_coverage(r, {"visit": {"count": 3}})["score"] == 1.0
+    assert t.validate_chain_coverage(r, _obs([]))["score"] == 0.0
+    assert abs(t.validate_chain_coverage(r, _obs([_EV_START, _EV_CREATOR]))["score"] - 2 / 3) < 1e-9
+    assert t.validate_chain_coverage(r, _obs(_FULL_EVIDENCE))["score"] == 1.0
+    # A real, successful visit to a page unrelated to any waypoint contributes nothing -- the
+    # regression this whole repair exists for (see idea_test_utils_test.py for the corpus-derived
+    # donation-page/Reddit/TikTok version of this case).
+    junk = [{"url": "https://www.tiktok.com/@someone/video/12345", "content": "unrelated video caption"}]
+    assert t.validate_chain_coverage(r, _obs(junk, n=5))["score"] == 0.0
 
 
 def test_no_visits_scores_fraction_and_gate():
