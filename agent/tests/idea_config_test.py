@@ -133,24 +133,27 @@ def test_expansion_expect_contract_defaults_off():
     ).expect_contract_enabled is True
 
 
-def test_expansion_input_output_framing_flags_default_off():
-    # Prompt-hygiene lever + its retry safety net: both OFF from an empty load and from the
-    # shipped JSON, so the expansion prompt bytes are unchanged until an operator arms them.
-    # They are SEPARATE flags on purpose (independent ablation of prompt fix vs safety net).
+def test_expansion_input_output_framing_and_echo_retry_default_state():
+    # Prompt-hygiene lever (live-proven 2026-08-06, default ON since 2026-08-14) vs. its retry
+    # safety net (no measurable benefit shown yet, stays OFF) — SEPARATE flags on purpose
+    # (independent ablation of prompt fix vs safety net). Both from an empty load and from the
+    # shipped JSON, the two flags land on their real defaults, not on each other's.
     from agent.app.idea_policies.config import ExpansionConfig
     empty = ExpansionConfig.from_settings({})
-    assert empty.input_output_framing_enabled is False
+    assert empty.input_output_framing_enabled is True
     assert empty.echo_retry_enabled is False
     prod = ExpansionConfig.from_settings(load_idea_dag_settings())
-    assert prod.input_output_framing_enabled is False
+    assert prod.input_output_framing_enabled is True
     assert prod.echo_retry_enabled is False
-    # Truthy overrides coerce to bool, independently.
-    framing_only = ExpansionConfig.from_settings({"expansion_input_output_framing_enabled": 1})
-    assert framing_only.input_output_framing_enabled is True
-    assert framing_only.echo_retry_enabled is False
+    # Falsy/truthy overrides coerce to bool, independently.
+    framing_off = ExpansionConfig.from_settings({"expansion_input_output_framing_enabled": 0})
+    assert framing_off.input_output_framing_enabled is False
+    retry_only = ExpansionConfig.from_settings({"expansion_echo_retry_enabled": 1})
+    assert retry_only.echo_retry_enabled is True
     retry_only = ExpansionConfig.from_settings({"expansion_echo_retry_enabled": "true"})
     assert retry_only.echo_retry_enabled is True
-    assert retry_only.input_output_framing_enabled is False
+    # Independence: setting echo_retry alone must not touch framing's own default.
+    assert retry_only.input_output_framing_enabled is True
 
 
 def test_native_tiering_flags_default_off():

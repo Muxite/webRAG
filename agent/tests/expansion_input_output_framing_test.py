@@ -136,7 +136,10 @@ def test_flag_off_renders_the_template_byte_for_byte():
     graph = _graph()
     policy = LlmExpansionPolicy(
         io=AsyncMock(), model_name="m",
-        settings={"expansion_user_prompt": "CTX for {parent_id} / {parent_title}"},
+        settings={
+            "expansion_user_prompt": "CTX for {parent_id} / {parent_title}",
+            "expansion_input_output_framing_enabled": False,
+        },
     )
 
     user = policy._build_messages(graph, graph.get_node(graph.root_id()))[1]["content"]
@@ -145,7 +148,12 @@ def test_flag_off_renders_the_template_byte_for_byte():
 
 
 def test_flag_off_shipped_prompt_keeps_its_lead_sentence_and_gains_no_framing():
-    policy = LlmExpansionPolicy(io=AsyncMock(), model_name="m")  # default settings -> flag OFF
+    # Flag explicitly off (the shipped default flipped ON 2026-08-14) — this test exercises
+    # the off path specifically, independent of whatever the default happens to be.
+    policy = LlmExpansionPolicy(
+        io=AsyncMock(), model_name="m",
+        settings={"expansion_input_output_framing_enabled": False},
+    )
 
     user = _user_message(policy)
 
@@ -182,7 +190,10 @@ def test_flag_on_preserves_the_context_payload_byte_for_byte():
     """The framing only adds a label and a restatement; the run's actual context (path,
     event_log, memories, ...) must be unchanged, so nothing an operator tuned is lost."""
     graph = _graph()  # one graph: the node ids inside the context blob must line up
-    off = LlmExpansionPolicy(io=AsyncMock(), model_name="m")
+    off = LlmExpansionPolicy(
+        io=AsyncMock(), model_name="m",
+        settings={"expansion_input_output_framing_enabled": False},
+    )
     on = LlmExpansionPolicy(
         io=AsyncMock(), model_name="m",
         settings={"expansion_input_output_framing_enabled": True},
@@ -221,9 +232,9 @@ async def test_flag_on_unwraps_the_copyable_schema_envelope():
     """``json_instruction_from_response_format`` dumps the whole {"name", "schema"} envelope into
     the system prompt, and one recorded completion returned that envelope verbatim. With the
     framing on, the hint carries the schema BODY only — same constraints, nothing to copy."""
-    off = await _sent_prompt()
+    off = await _sent_prompt(expansion_input_output_framing_enabled=False)
 
-    # The default path still ships the envelope (byte-identical guarantee).
+    # The off path still ships the envelope (byte-identical guarantee when disabled).
     assert '"name": "expansion_result"' in off
 
     on = await _sent_prompt(expansion_input_output_framing_enabled=True)
