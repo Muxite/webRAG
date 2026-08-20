@@ -1,0 +1,136 @@
+# Overnight dev-cycle run: DAG v2 structural fixes + evaluator root cause (2026-08-20)
+
+Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
+$15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 10 cycles
+below are committed; the run continues past this point.
+
+**Spend so far: ~$0.44 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+5309 passed / 18 skipped (zero failures across the whole run).
+
+---
+
+## What shipped
+
+**Cycle 0** — committed last night's ~90-file uncommitted diff into 20 scoped commits (`8c6fadc4`
+through `d8e64472`). Caught a broken import in `testing/runner.py` that only worked by accident
+because of uncommitted files.
+
+**Cycle 1 — the resolved-value channel** (`d47577ec`, `4f88d872`). Completes
+`RESOLVED_VALUE_CHANNEL_DESIGN_2026-08-16.md`: lets a dependent DAG node receive a prior node's
+discovered value (a URL) at dispatch time via a new `requires_data.slot` field, addressing
+`DAG_FORMATION_REVIEW.md` PART 0's headline finding (the graph is a tree with no fan-in edge, so
+chain hop n+1 can't receive hop n's value — this is why `seq_react` beats the graph on chains).
+Two adversarial review passes caught a critical gap before implementation (a third dispatch path,
+the auto-parallel batch route, would have silently never fired); live smoke testing then found a
+*fourth* dispatch route (best-child sequential selection) the reviews missed, fixed by consolidating
+into the shared `_execute_action_guarded` wrapper. Flags: `resolved_value_channel_enabled` +
+`waypoint_enabled`, both default OFF.
+
+**Cycle 2 — visit-action timeout root cause** (`77d2791e`). Live validation of Cycle 1 hit a 20s
+timeout on every visit action. Root-caused (not guessed): a link-dense page's outgoing links were
+all embedded synchronously on the event loop (ChromaDB's default embedding function runs in-process
+CPU-bound), stalling everything for 18+ seconds. Fixed with a capped, batched, relevance-ranked link
+store (18.19s → 2.50s measured). This was silently corrupting *any* future live benchmark, not just
+this one.
+
+**Cycle 1 validation** — two live A/B passes on the design doc's 8-task mixed-shape set
+(`054,085,055,061,146,147,149,122`), `gpt-4.1-nano`. First pass (no fixture parity): mean Δ −0.230,
+confounded by live search non-determinism (most regressed cells never engaged the mechanism at all).
+Second pass (fixture parity, record-then-replay via `scripts/cross_shape_experiment.sh` +
+`scripts/prewarm_fixtures.py`): mean Δ **+0.055**, near-flat, 3 improved/4 regressed/1 tied.
+**Verdict: mechanism confirmed working correctly, but no clear aggregate direction yet at n=1; stays
+default OFF pending a higher-n rerun.** Engagement is stochastic — 4/8 tasks touch the mechanism
+depending on how the LLM's own plan happens to shape out, since only `plan_library.py`'s
+`link_page_visits` and `post_expansion_hooks.py`'s grounding-retry visits currently declare a slot.
+
+**Cycle 4 — E1/E2 backlog items** (`e8d1f365`, `1d39c398`). E2 (offline, 594 batches / 2085
+candidates across 516 stored runs): arrival-position "beam" order does correlate with score
+(+0.141 raw), but ~¾ of that is action-type composition (search-first plans, search scores higher
+for being search), not idea quality — residualized effect collapses to +0.034 (ns). **Surfaced the
+much bigger finding below.** E1: dedup kill-switch (`got_dedup_enabled`) already existed; measured
+firing rate offline (16.5% of expansions, 8.2% of candidates flagged) and wrote a live-A/B readiness
+note for a future cycle.
+
+**Cycle 5 — flat-scoring root cause** (`13f84956`). The E2 analysis found 55.6% of sibling batches
+score every candidate *identically*. Root-caused: 98.2% of flat batches sit on one of three fixed
+values the engine itself assigns (a 0.5 unexecuted-work cap, a `<=0.2` prompt rubric band, or a 0.4
+fallback for judge-omitted candidates) — because evaluation runs *before* execution for nearly every
+candidate by construction (`_expand_or_execute` drops DONE/FAILED/SKIPPED children before scoring).
+**This is a structural explanation for `backtrack` firing 0/261 times ever and the evaluator's
+reported AUC 0.288** — not a judge-quality problem, a scoring-order problem. Genuine judge
+degeneracy on real, already-executed, differentiable candidates: 1.0% of the corpus.
+
+**Cycle 6 — instrumentation + hypothesis test** (`9b710b91`, `8c91f519`). Added `raw_score`/`capped`
+fields recording the judge's pre-clip opinion (found and fixed a real shipped-path bug in the same
+commit: `LlmEvaluationPolicy`'s per-node fallback never set its own logger, so every per-node judge
+call silently crashed and returned 0.0). Tested whether `evaluate_parallel_siblings` (scores after
+execution) collapses the flat rate: **it doesn't** (37.5% off vs 40.0% on, p=1.0, n=31 live) — the
+code-level cap lifts, but the judge's own opinion lands on the same `<=0.2` prompt rubric band
+regardless, because that rubric line is written for unexecuted work and nothing stops it applying
+post-execution too. **The actual lever is the batch prompt's rubric line, not the flag** — a
+promptbench-family question, not yet attempted.
+
+**Cycle 7 — Chroma/vector-DB tier** (`41096efb`, `811625e9`, `e932ba04`). Added a similarity floor
+on memory retrieval (`memory_retrieval_similarity_floor`, default 0.0/off) plus `similarity`
+instrumentation on every retrieved memory for future calibration. Added `final_context_rank_by_similarity`
+(default off) fixing a real relevance-blind bug: `idea_finalize.py`'s pooled context kept results in
+arrival-batch order, so a distance-0.9 hit could displace a distance-0.1 hit. **Killed** the
+chunker-mismatch backlog item as based on a false premise (the two chunkers serve genuinely
+different, non-comparable purposes — "reconciling" them would truncate ~75% of indexed content).
+Confirmed `strategy_library`'s threshold is inert (empty note corpus, never reaches the comparison).
+
+**Cycle 8 — F7/F9** (`fbc4d052`, `833f6789`). F7: tags nodes whose expansion degenerated to a single
+guessed fallback candidate (`fallback_expansion` detail key), logs loudly, counts into
+`degenerate_fallback_count` in the result payload — instrumentation only, no reaction yet. F9:
+non-root nodes can trigger plan-library template substitution from their own possibly-low-quality
+local text (never validated for that use); raised the auto-apply bar for non-root triggers to the
+weakest-correct-positive threshold from the existing (root-only) calibration eval, shipped
+unconditional since non-root auto-apply was never a validated baseline to begin with.
+
+**Cycle 9 — bounded fallback re-expansion** (`a2c9676d`). The first real F6 fix: a parent whose
+*entire* expansion collapsed to one F7-tagged fallback child can now get one bounded retry (flag
+`got_reexpand_fallback_nodes_enabled`, default OFF), reusing the existing reexpand machinery with a
+corrective prompt naming the specific failure. Structurally bounded to exactly one retry per parent
+regardless of `max_iterations` (a second degeneration leaves 2 children, permanently blocking a
+third attempt). Caught and fixed a real infinite-loop bug during implementation (marking the old
+leaf `SKIPPED` without adjusting dispatch routing would have made the step loop re-enter it forever).
+
+**Cycle 10 — finalize leak fix** (`2dfe3384`). Cycle 9's superseded-fallback marking wasn't actually
+excluded from finalize's answer-synthesis context (6 separate selector sites, not the 2 originally
+suspected) — fixed, so a future benchmark of the Cycle 9 flag won't be measuring a bad-guess-polluted
+answer. Deliberately did *not* exclude the superseded node from grounding-evidence checks (it did
+open a real page; excluding it there would make an otherwise-grounded run wrongly fail the gate).
+
+---
+
+## Open threads for the next cycle
+
+1. **Resolved-value channel**: needs a higher-n (3+) fixture-parity rerun before any default-flip
+   decision. Current n=1 result is directionally flat, not conclusive.
+2. **Evaluator rubric line**: the `<=0.2` "no action result" line in `evaluation_batch_system_prompt`
+   applies indiscriminately to executed and unexecuted candidates alike. A promptbench-style offline
+   test of a rewritten, execution-aware rubric is the next step — cheap, high-n, before any engine
+   change or live A/B of `evaluate_parallel_siblings`.
+3. **F6 general case**: still open beyond the narrow fallback-parent MVP — a genuinely multi-child
+   (non-degenerate) plan still can't be revised once formed.
+4. **E1 dedup ablation**: groundwork done (Cycle 4), live A/B not yet run.
+5. **E3 similarity floor value**: lever exists (Cycle 7), needs a histogram of the new `similarity`
+   instrumentation field from a recorded run before picking a threshold — should be free.
+6. **R1 (qwen2.5:7b num_ctx)**: GPU-bound, blocked tonight — Ollama CLI not installed on this host.
+7. **Capability-spectrum re-run** using the LangGraph comparison arm (committed tonight in Cycle 0,
+   `langgraph_solver.py`) against whichever fixes land — not yet attempted.
+
+## Methodology notes (holding from last night, reconfirmed)
+
+- Subagents still don't self-resume on a background monitor firing — the parent must explicitly
+  `SendMessage` back in every time. This cost real overhead again tonight; instruct every dispatched
+  agent up front to block synchronously in a single tool call rather than end its turn on an
+  assumption.
+- Two live A/B smoke attempts tonight were burned entirely on infra (a CRLF-corrupted `SERPER_KEY`
+  in `services/keys.env`, then a shell that didn't export it) before any feature signal was
+  observed — worth a pre-flight check (`source` the whole keys file, verify a direct curl 200)
+  before any live run, every time, not just once.
+- Fixture parity (record-then-replay) materially changed a conclusion this session (Cycle 1
+  validation: −0.230 confounded → +0.055 clean). Don't trust a live A/B without it when search
+  determinism matters to the comparison.
