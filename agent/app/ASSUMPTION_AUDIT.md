@@ -237,12 +237,49 @@ number that carries no ordering in 55.6% of batches, and no prompt change fixes 
 scoring runs before execution. `EVALUATION_SCORE_PREDICTIVE_POWER.md` §4.1 already names the
 prerequisite: **score outcomes, not plans**.
 
-**Blocked on instrumentation.** "Would the judge have discriminated absent the cap?" is
-unanswerable offline: `_evaluate_batch_chunk` writes `details["evaluation"] = {"score": score}`
-*after* clipping and weighting, so the raw score is discarded (0 of 2610 recorded evaluation
-dicts carry a rationale either, unchanged from the 0/767 measured on 2026-08-02). Recording
-the pre-cap value is the cheap enabling step and it is a behaviour-neutral change; it was left
-out of this cycle deliberately to keep the diagnosis from perturbing in-flight arms.
+**Instrumented 2026-08-20** (`9b710b91`). `_evaluate_batch_chunk` used to write
+`details["evaluation"] = {"score": score}` *after* clipping and weighting, so the judge's own
+opinion was discarded (0 of 2610 recorded evaluation dicts carry a rationale either, unchanged
+from the 0/767 measured on 2026-08-02). Every recorded evaluation now also carries `raw_score`
+(the parsed judge value, before cap/fallback) and `capped` (whether a mechanism changed it);
+`score` is byte-identical to before. `raw_score is None` means the judge never scored that
+candidate at all — either it omitted it from the batch response, or the *per-node* path
+returned its fixed base score without an LLM call. Same commit gave `LlmEvaluationPolicy` the
+`_logger` its `__init__` never set: every per-node `evaluate` call was dying on the first log
+line, and the ones inside the `try` returned 0.0 for a node the judge had actually scored.
+
+The per-node path's unreachable `min(score, cap)` block, described above, is now pinned by
+`evaluation_raw_score_instrumentation_test.py` rather than only noted.
+
+#### T1-3b. `evaluate_parallel_siblings` does **not** collapse the flat rate (small-n live, 2026-08-20)
+
+The obvious fix — score siblings *after* they run — was never tested. It is now, twice over.
+
+*No natural experiment exists in the corpus.* Of 2085 recorded candidates, 7 (0.34%) score
+above the cap, in 4 batches; every run in `agent/idea_test_results` had the flag off. There is
+nothing to partition.
+
+*Live smoke, gpt-4.1-nano, 8 tasks-runs then 24, $0.16 total, tasks 052/053/055/059/070/072,
+R=2 per arm, flag flipped via `IDEA_DAG_SETTINGS_PATH`:*
+
+| arm | batches | flat | rate | candidates above cap |
+|---|---|---|---|---|
+| `evaluate_parallel_siblings` off | 16 | 6 | 0.375 | 0 |
+| `evaluate_parallel_siblings` on | 15 | 6 | 0.400 | 4 |
+
+Fisher exact p = 1.0. Restricted to batches where no cap or fallback fired at all, both arms
+sit at 6/12 = 0.500. **The flag does what it says — the cap stops binding, candidates finally
+score above 0.5 — and the flat rate does not move.** The reason is visible in the new
+`raw_score` field: in the on-arm the judge scored six executed siblings of task 052 at exactly
+0.2 each, `capped: false`, `raw_score: 0.2` — its *own* opinion, landing on the rubric band.
+The `<=0.2` sentence in `evaluation_batch_system_prompt` survives execution, so removing the
+code cap just hands the flatness to the prompt.
+
+Small-n and un-fixtured (live searches differ between arms), so this is a direction, not a
+verdict: it is enough to say the flag is not the lever, not enough to say post-execution
+scoring cannot help. **Next step on this thread is the prompt, not the flag**: the rubric line
+is now the binding constraint, and it should be measured against a batch prompt that ranks
+executed work on what the results contain.
 
 **What this settles, and what it does not.** The naming is accidentally defensible: keeping
 the head of the list does beat a coin flip on the shipped score, so arrival-order truncation
