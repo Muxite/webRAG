@@ -597,6 +597,13 @@ class ActionConfig:
     max_links_per_visit: int = 20
     visit_max_sites_per_action: int = 20
     visit_link_query_top_k: int = 15
+    # Links a single visited page may index into Chroma. ChromaDB's default embedding
+    # function runs CLIENT-side (ONNX MiniLM, ~19ms/doc) inside the async client's
+    # `add` coroutine, so an uncapped store of a link-dense page (a Wikipedia article
+    # yields ~990 links after chrome filtering) burns ~19s of on-loop CPU and eats the
+    # whole 20s visit budget. 100 keeps a page's link index at ~2s while still giving
+    # the link query a wide field to choose from.
+    visit_link_store_max: int = 100
     visit_page_concurrency: int = 5
     visit_link_selection_model: Optional[str] = None
     visit_empty_content_retryable: bool = True

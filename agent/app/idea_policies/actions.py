@@ -888,16 +888,57 @@ class VisitLeafAction(LeafAction):
         self._logger.info(f"[VISIT] Using first sibling link as fallback: {unique_links[0][:80]}")
         return unique_links[0]
     
+    def _links_worth_indexing(
+        self,
+        links: List[str],
+        link_contexts: Dict[str, str],
+        link_idea: str,
+        limit: int,
+    ) -> List[str]:
+        """The ``limit`` links of this page worth paying the embedding cost for.
+
+        Every stored link is embedded CLIENT-side by ChromaDB's default function before the
+        add is sent, so the store's price is linear in link count (~19ms each) and is paid on
+        the event loop. A link-dense page (a Wikipedia article yields ~990 links after chrome
+        filtering) therefore costs ~19s -- more than the whole visit budget. Cutting the list
+        by document order alone would bias the index to the lead section, so when the visit
+        names what it is looking for the survivors are ranked by lexical overlap of their
+        anchor+path with that idea (document order breaks ties), which keeps a target link
+        that sits deep in the body.
+        """
+        if limit <= 0 or len(links) <= limit:
+            return links
+        haystack = set(self._URL_WORD_RE.findall((link_idea or "").lower()))
+        if not haystack:
+            return links[:limit]
+        scored: List[Tuple[int, int, str]] = []
+        for index, url in enumerate(links):
+            text = f"{link_contexts.get(url) or ''} {urlparse(url).path or ''}".lower()
+            tokens = set(self._URL_WORD_RE.findall(text)) - self._URL_NOISE_TOKENS
+            scored.append((len(tokens & haystack), -index, url))
+        scored.sort(key=lambda entry: (entry[0], entry[1]), reverse=True)
+        kept = {url for _, _, url in scored[:limit]}
+        return [url for url in links if url in kept]
+
     async def _store_links_in_chroma(
         self,
         base_url: str,
         links: List[str],
         link_contexts: Dict[str, str],
         io: AgentIO,
+        link_idea: str = "",
     ) -> bool:
         if not links or not getattr(io, "connector_chroma", None):
             return False
-        
+
+        limit = self._cfg.action.visit_link_store_max
+        if limit > 0 and len(links) > limit:
+            self._logger.info(
+                f"[VISIT] Page has {len(links)} links; indexing the {limit} most relevant "
+                f"(embedding every one costs ~{len(links) * 0.02:.0f}s of the visit budget)"
+            )
+            links = self._links_worth_indexing(links, link_contexts, link_idea, limit)
+
         try:
             if not base_url or not isinstance(base_url, str):
                 self._logger.warning(f"[VISIT] Invalid base_url for link storage: {base_url}")
@@ -928,7 +969,14 @@ class VisitLeafAction(LeafAction):
                 ids.append(f"link_{idx}_{url_id_hash}")
             
             if docs:
-                success = await io.connector_chroma.add_to_chroma(
+                # Batched (add_to_chroma_parallel falls back to a single add when the set
+                # fits one batch): the client-side embedding inside each add blocks the
+                # event loop for its whole batch, so one op per ~50 docs keeps the stall
+                # near a second and lets `chroma_op_timeout` actually fire between batches.
+                store = getattr(
+                    io.connector_chroma, "add_to_chroma_parallel", io.connector_chroma.add_to_chroma
+                )
+                success = await store(
                     collection=collection_name,
                     ids=ids,
                     metadatas=metadatas,
@@ -1275,7 +1323,12 @@ class VisitLeafAction(LeafAction):
             _lc = 1
         _following_links = _lc > 1 or bool(node.details.get("link_idea"))
         if _following_links:
-            await self._store_links_in_chroma(str(url), cleaned_links, cleaned_link_contexts, io)
+            _idea = str(
+                node.details.get("link_idea") or node.details.get("link_concept") or intent or node.title or ""
+            )
+            await self._store_links_in_chroma(
+                str(url), cleaned_links, cleaned_link_contexts, io, link_idea=_idea
+            )
         else:
             self._logger.debug(f"[VISIT] Single-URL read; skipping Chroma link store for {str(url)[:60]}")
 

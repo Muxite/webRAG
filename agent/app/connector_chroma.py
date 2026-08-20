@@ -190,9 +190,11 @@ class ConnectorChroma(ConnectorBase):
 
         The AsyncHttpClient await can hang forever when the shared SQLite server is
         stuck on a write lock; ``asyncio.wait_for`` bounds it to ``chroma_op_timeout``
-        and cancels the stuck request. (Embedding is computed synchronously before the
-        awaited HTTP call, so the loop is not starved while the timer runs — the timeout
-        genuinely fires on the network hang.)
+        and cancels the stuck request. The bound is real for a NETWORK hang only: the
+        default embedding function runs client-side INSIDE the async client's coroutine,
+        so a large add blocks the loop and the timer cannot fire until it returns (a
+        988-link add measured 18s of loop stall against a 15s bound). Callers must keep
+        the per-op document count small enough that this stays sub-second.
 
         :param awaitable: The raw chroma coroutine.
         :param op: Operation name for logging.

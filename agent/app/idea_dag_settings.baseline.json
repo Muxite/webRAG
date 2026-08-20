@@ -22,6 +22,7 @@
   "max_links_per_visit": 20,
   "visit_link_query_top_k": 15,
   "visit_link_selection_model": "",
+  "visit_link_store_max": 100,
   "visit_max_sites_per_action": 20,
   "visit_page_concurrency": 5,
   "document_chunk_threshold": 200000,
