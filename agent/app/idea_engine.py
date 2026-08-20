@@ -115,10 +115,6 @@ class IdeaDagEngine:
         )
         self._step_index = 0
         self._step_confidences: List[Dict[str, Any]] = []
-        # Additional async observers notified alongside `on_step` (see `_run_loop`), e.g.
-        # the interactive debugger's ThoughtBuffer capture/collect wiring. Registered via
-        # `add_step_observer()`, never replaces the checkpoint-save `on_step` callback.
-        self._step_observers: List[Any] = []
         self._leaf_completion_count = 0
         self._memory_manager: Optional[MemoryManager] = None
         self._got: Optional[GoTOperations] = None
@@ -309,28 +305,6 @@ class IdeaDagEngine:
         self._maybe_log_dag(graph, steps, force=True)
         return final_payload
 
-    def add_step_observer(self, observer) -> None:
-        """Register an additional async ``(graph, current_id, steps)`` hook for `_run_loop`.
-
-        Observers run alongside (not instead of) the `on_step` callback that `run()`
-        wires up for checkpoint saving, so callers like the interactive debugger can
-        subscribe to per-step notifications (e.g. ThoughtBuffer capture/collect) without
-        displacing checkpointing. An observer that raises is logged and skipped; it can
-        never break the run.
-
-        :param observer: async callable ``(graph, current_id, steps) -> None``.
-        :return: None
-        """
-        self._step_observers.append(observer)
-
-    async def _notify_step_observers(self, graph: IdeaDag, current_id: Optional[str], steps: int) -> None:
-        """Invoke every registered step observer, isolating failures per observer."""
-        for observer in self._step_observers:
-            try:
-                await observer(graph, current_id, steps)
-            except Exception as exc:  # noqa: BLE001. An observer must never break the run
-                self._logger.warning(f"[RUN] Step observer failed at step {steps}: {exc}")
-
     async def _run_loop(
         self,
         graph: IdeaDag,
@@ -417,12 +391,10 @@ class IdeaDagEngine:
                 )
                 if on_step is not None:
                     await on_step(graph, current_id, steps)
-                await self._notify_step_observers(graph, current_id, steps)
                 break
 
             if on_step is not None:
                 await on_step(graph, current_id, steps)
-            await self._notify_step_observers(graph, current_id, steps)
 
             if steps == 1:
                 root = graph.get_node(graph.root_id())
