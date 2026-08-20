@@ -295,6 +295,28 @@ def test_aggregate_builds_from_production_settings():
     assert cfg.timeouts.action == 20
 
 
+def test_dead_retrieval_keys_stay_deleted():
+    """ASSUMPTION_AUDIT.md T1-2: ``leaf_chroma_results`` / ``default_semantic_results``
+    were declared in the typed view and shipped in all three settings files with no reader
+    anywhere, in any commit. Deleted 2026-08-20; this stops them drifting back in as
+    surface that looks configurable and is not."""
+    import dataclasses
+    import pathlib
+
+    from agent.app import idea_dag_settings as settings_mod
+    from agent.app.idea_policies.config import MemoryConfig
+
+    dead = {"leaf_chroma_results", "default_semantic_results"}
+    assert dead.isdisjoint({f.name for f in dataclasses.fields(MemoryConfig)})
+    settings_dir = pathlib.Path(settings_mod.__file__).resolve().parent
+    for name in (
+        "idea_dag_settings.json",
+        "idea_dag_settings.baseline.json",
+        "idea_dag_settings.good_adaptive.json",
+    ):
+        assert dead.isdisjoint(load_idea_dag_settings(settings_dir / name)), name
+
+
 def test_timeout_for_action_falls_back_to_generic():
     t = TimeoutConfig.from_settings({})
     assert t.for_action("search") == 15

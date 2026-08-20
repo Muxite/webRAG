@@ -426,10 +426,10 @@ class PlanLibrary:
             )
         except TypeError:
             # A connector/stub without the metadata kwarg: fall back, and let
-            # ``_read_space`` report whatever space that collection actually has.
+            # ``read_collection_space`` report whatever space that collection actually has.
             coll = await connector_chroma.get_or_create_collection(self.collection)
         if coll is not None and self._space is None:
-            self._space = _read_space(coll)
+            self._space = read_collection_space(coll)
         return coll
 
     async def indexed_ids(
@@ -741,8 +741,13 @@ def _first_row(value: Any) -> List[Any]:
     return list(value) if isinstance(value, list) else []
 
 
-def _read_space(collection: Any) -> str:
-    """The distance space a live collection actually uses (best effort, defaults cosine)."""
+def read_collection_space(collection: Any) -> str:
+    """The distance space a live collection actually uses (best effort, defaults cosine).
+
+    Public because :mod:`agent.app.idea_memory` needs the same answer for the ``mem_*``
+    collections, and the pairing with :func:`similarity_from_distance` must not be
+    re-derived per subsystem.
+    """
     try:
         config = getattr(collection, "configuration_json", None)
         if isinstance(config, Mapping):

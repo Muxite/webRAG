@@ -23,7 +23,8 @@ Design notes
   we extract only the short NAME portion (before an em-dash / parenthetical / colon).
 
 * Fuzzy matching reuses no code from ``got_operations.py`` on purpose: that module's
-  dedup similarity is EMBEDDING-based (Chroma cosine distance, ``1.0 - distance``),
+  dedup similarity is EMBEDDING-based (a Chroma distance run through
+  ``plan_library.retrieval.similarity_from_distance``),
   which is unavailable offline and semantically wrong here (it dedups thought nodes,
   not proper-name spellings). We use stdlib ``difflib`` ratio + substring containment.
   We reuse the *value* of ``got_dedup_similarity_threshold`` (0.85) as the fuzzy cutoff

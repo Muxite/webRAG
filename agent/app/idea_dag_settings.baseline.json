@@ -30,8 +30,6 @@
   "max_available_links_for_expansion": 50,
   "grep_context_window": 80,
   "default_search_count": 10,
-  "default_semantic_results": 3,
-  "leaf_chroma_results": 3,
   "expansion_chroma_internal": 5,
   "expansion_chroma_observations": 5,
   "allowed_actions": [

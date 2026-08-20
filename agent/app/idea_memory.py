@@ -3,6 +3,14 @@ import logging
 import uuid
 from typing import List, Dict, Any, Optional
 from agent.app.connector_chroma import ConnectorChroma
+from agent.app.plan_library.retrieval import read_collection_space
+
+#: Creation-time config for a ``mem_*`` collection. Applied only when the collection does
+#: not exist yet; chroma's default would be ``l2`` (SQUARED euclidean), which makes
+#: ``1 - distance`` NOT a cosine similarity. Existing per-mandate collections keep their own
+#: space, which is why :attr:`MemoryManager.distance_space` reports the live one and every
+#: consumer converts through ``plan_library.retrieval.similarity_from_distance``.
+MEMORY_COLLECTION_METADATA: Dict[str, Any] = {"hnsw:space": "cosine"}
 
 
 class MemoryManager:
@@ -34,6 +42,44 @@ class MemoryManager:
         namespace_hash = hashlib.sha256(namespace.encode("utf-8")).hexdigest()[:12]
         self.collection_name = f"mem_{namespace_hash}"
         self._logger = logging.getLogger(__name__)
+        # Distance space of the live collection, learned on first ensure_collection().
+        self._distance_space: Optional[str] = None
+
+    @property
+    def distance_space(self) -> str:
+        """The distance space this manager's collection actually reports.
+
+        ``"cosine"`` until a live collection has been seen: that is what
+        :data:`MEMORY_COLLECTION_METADATA` creates, and it is also the conversion this
+        code shipped with, so an unreadable collection degrades to the old behaviour
+        rather than to a new, differently wrong one.
+        """
+        return self._distance_space or "cosine"
+
+    async def ensure_collection(self) -> Any:
+        """Get (creating it with the cosine space) this namespace's memory collection.
+
+        Called before every read/write: ``query_chroma``/``add_to_chroma`` would otherwise
+        create the collection themselves with chroma's default ``l2`` space, which no later
+        call can change. Also records the space of a collection that already exists (the
+        per-mandate namespace is keyed on mandate text, so pre-existing ``l2`` collections
+        survive across runs) so consumers can convert distances correctly either way.
+        """
+        if not self.connector_chroma:
+            return None
+        try:
+            coll = await self.connector_chroma.get_or_create_collection(
+                self.collection_name, metadata=dict(MEMORY_COLLECTION_METADATA)
+            )
+        except TypeError:
+            # A connector/stub without the metadata kwarg: fall back and read the space.
+            coll = await self.connector_chroma.get_or_create_collection(self.collection_name)
+        except Exception as e:  # noqa: BLE001 — memory degrades, it never breaks a run
+            self._logger.warning(f"Failed to ensure memory collection: {e}")
+            return None
+        if coll is not None and self._distance_space is None:
+            self._distance_space = read_collection_space(coll)
+        return coll
 
     async def retrieve_relevant_memories(
         self,
@@ -66,6 +112,7 @@ class MemoryManager:
                 if parts:
                     query = f"{query} {' '.join(parts)}"
 
+            await self.ensure_collection()
             where = {"memory_type": memory_type} if memory_type else None
             results = await self.connector_chroma.query_chroma(
                 collection=self.collection_name,
@@ -256,6 +303,7 @@ class MemoryManager:
                 metadatas_list.append(chunk_metadata)
                 documents.append(chunk_with_links)
 
+            await self.ensure_collection()
             if len(chunks) > self.PARALLEL_CHUNK_THRESHOLD:
                 success_flag = await self.connector_chroma.add_to_chroma_parallel(
                     collection=self.collection_name,

@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 from agent.app.idea_policies.base import DetailKey, IdeaNodeStatus
 from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.confidence_early_exit import load_rule as load_early_exit_rule
+from agent.app.plan_library.retrieval import similarity_from_distance
 
 _logger = logging.getLogger(__name__)
 
@@ -414,10 +415,18 @@ class GoTOperations:
             if not memories:
                 return False, None
 
+            space = getattr(self.memory_manager, "distance_space", "cosine")
             for mem in memories:
                 distance = mem.get("distance", 1.0)
                 if isinstance(distance, (int, float)):
-                    similarity = 1.0 - distance
+                    # BEHAVIOUR CHANGE (2026-08-20, ASSUMPTION_AUDIT.md T1-1): this used to be
+                    # a bare ``1.0 - distance``. The ``mem_*`` collections were created with no
+                    # metadata, so chroma's default ``l2`` space returned the SQUARED euclidean
+                    # distance (``2 - 2cos`` for unit-norm embeddings) and the computed value was
+                    # ``2s - 1``, not the cosine ``s``: the shipped 0.85 threshold really demanded
+                    # cosine 0.925. Converting correctly makes dedup FIRE MORE OFTEN, so any
+                    # measurement taken through this path before that date is not comparable.
+                    similarity = similarity_from_distance(distance, space)
                     if similarity >= threshold:
                         existing_node_id = (mem.get("metadata") or {}).get("node_id", "unknown")
                         _logger.info(

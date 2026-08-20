@@ -694,8 +694,11 @@ class MemoryConfig:
     document_chunk_overlap: int = 400
     expansion_chroma_internal: int = 5
     expansion_chroma_observations: int = 5
-    leaf_chroma_results: int = 3
-    default_semantic_results: int = 3
+    # ``leaf_chroma_results`` / ``default_semantic_results`` lived here and in all three
+    # settings files with ZERO readers, in every commit since the keys were introduced
+    # (git-archaeology, ASSUMPTION_AUDIT.md T1-2): declared surface that never had a
+    # consumer to lose. Deleted 2026-08-20 rather than wired, since there is no evidence of
+    # an intended call site. Leaf/semantic retrieval keeps using its own explicit top-k.
     max_available_links_for_expansion: int = 50
     grep_context_window: int = 80
 
