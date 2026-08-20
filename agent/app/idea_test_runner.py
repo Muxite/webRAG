@@ -369,6 +369,12 @@ TEST_PRIORITY_ORDER = [
     "147",  # Compound: two-constraint AND-filter -> survivor -> disambiguated chain terminus: Alpine lakes -> Lake Constance -> High Rhine 165 km (10/10) - level=graph, weight=long
     "148",  # Compound: categorical survivor -> conflicting-source reconciliation -> constrained subset-sum: Kara Sea river (Ob) -> 3,700 not 5,410 -> 10,398 km (10/10) - level=graph, weight=long
     "149",  # Compound B: 4 independent 2-hop chains + cross-branch argmax: observatory -> largest telescope -> primary mirror (VLT 8.2 m) (10/10) - level=graph, weight=long
+    # Race-and-merge pair (2026-08-20): ONE value, k REDUNDANT independent routes — any single route
+    # suffices, so the merge is a first-past-the-post pick with corroboration rather than a
+    # combination. Shaped to exercise the DAG v2 race mechanism; mid-tier by design, and NOT part of
+    # the active 59.
+    "150",  # Race-and-merge A: 3 redundant routes to one value: bridge main span (subject page / ranked list / no.wikipedia) (6/10) - level=graph, weight=medium
+    "151",  # Race-and-merge B: 3 redundant routes to one value: medal award year (laureate page / medal page / off-Wikipedia reference) (7/10) - level=graph, weight=medium
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12
