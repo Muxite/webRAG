@@ -105,17 +105,46 @@ def test_auto_injects_branch_eliminate_when_env_unset(monkeypatch):
     assert "before you may name a survivor" in block
 
 
-def test_auto_no_injection_for_chain_shape_no_rule_file(monkeypatch):
-    # chain is classified correctly but has no rule file yet -> no block, no crash.
+def test_auto_injects_chain_when_env_unset(monkeypatch):
     _clear_env(monkeypatch)
     assert classify_shape(_stmt("test_065_tier5_leak_resistant_chain")) == "chain"
-    assert expansion._auto_reasoning_rules(_stmt("test_065_tier5_leak_resistant_chain")) == ""
+    block = expansion._auto_reasoning_rules(_stmt("test_065_tier5_leak_resistant_chain"))
+    assert "Mandatory reasoning rules" in block
+    # A distinctive line from reasoning_rules/chain.md.
+    assert "Propose ONE next hop at a time" in block
 
 
-def test_auto_no_injection_for_parallel_shape_no_rule_file(monkeypatch):
+def test_auto_injects_parallel_merge_when_env_unset(monkeypatch):
     _clear_env(monkeypatch)
     assert classify_shape(_stmt("test_055_tier5_multichain_arithmetic")) == "parallel_merge"
-    assert expansion._auto_reasoning_rules(_stmt("test_055_tier5_multichain_arithmetic")) == ""
+    block = expansion._auto_reasoning_rules(_stmt("test_055_tier5_multichain_arithmetic"))
+    assert "Mandatory reasoning rules" in block
+    # A distinctive line from reasoning_rules/parallel_merge.md.
+    assert "BOTH chains have actually produced their final value" in block
+
+
+def test_auto_falls_back_to_local_text_when_root_unclassified(monkeypatch):
+    # Root mandate doesn't classify; the node-local goal does -> additive fallback
+    # fires. This must never happen the other way around (see the next test).
+    _clear_env(monkeypatch)
+    root = "Find the capital of France and report it."
+    local = _stmt("test_065_tier5_leak_resistant_chain")
+    assert classify_shape(root) is None
+    block = expansion._auto_reasoning_rules(root, local_text=local)
+    assert "Mandatory reasoning rules" in block
+    assert "Propose ONE next hop at a time" in block
+
+
+def test_auto_local_text_never_overrides_a_classified_root(monkeypatch):
+    # Root classifies as branch_eliminate; local text alone would classify as chain.
+    # The root verdict must win -- local text is a fallback for an UNCLASSIFIED root
+    # only, never a competing signal against a root that already resolved.
+    _clear_env(monkeypatch)
+    root = _stmt("test_095_tier5_branch_eliminate_chain")
+    local = _stmt("test_065_tier5_leak_resistant_chain")
+    block = expansion._auto_reasoning_rules(root, local_text=local)
+    assert "before you may name a survivor" in block
+    assert "Propose ONE next hop at a time" not in block
 
 
 def test_auto_no_injection_for_unclassified(monkeypatch):
@@ -127,13 +156,20 @@ def test_manual_env_overrides_auto_classification(monkeypatch):
     # Mandate classifies as branch_eliminate, but the operator explicitly set the env
     # var; the manual selection must win. Here the manual value is a valid name that
     # differs in mechanism (explicit) from auto — confirm _load_reasoning_rules is what
-    # drives the block when the env var is set.
+    # drives the block when the env var is set. All three shapes are now valid manual
+    # names (all three have rule files).
     monkeypatch.setenv("IDEA_TEST_REASONING_RULES", "branch_eliminate")
     manual = expansion._load_reasoning_rules()
     assert "Mandatory reasoning rules" in manual
-    # When the env var is set to a shape that has no file / is invalid, the manual path
-    # returns "" and auto is NOT consulted (the call site only auto-selects when unset).
+    assert "before you may name a survivor" in manual
     monkeypatch.setenv("IDEA_TEST_REASONING_RULES", "chain")
+    manual = expansion._load_reasoning_rules()
+    assert "Mandatory reasoning rules" in manual
+    assert "Propose ONE next hop at a time" in manual
+    # When the env var is set to a name that isn't a recognised shape at all, the
+    # manual path returns "" and auto is NOT consulted (the call site only
+    # auto-selects when unset).
+    monkeypatch.setenv("IDEA_TEST_REASONING_RULES", "not_a_real_shape")
     assert expansion._load_reasoning_rules() == ""
 
 
