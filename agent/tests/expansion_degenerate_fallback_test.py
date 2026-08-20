@@ -205,3 +205,59 @@ async def test_a_healthy_run_keeps_its_exact_payload_shape(monkeypatch):
     payload = await engine.finalize(graph, _MANDATE, pending_check=False)
 
     assert "degenerate_fallback_count" not in payload
+    assert "fallback_reexpand_attempted_count" not in payload
+    assert "fallback_reexpand_recovered_count" not in payload
+
+
+# --------------------------------------------------------------------------------------
+# the F6 repair counters (`got_reexpand_fallback_nodes_enabled`)
+# --------------------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_repair_counters_are_absent_when_no_parent_was_replanned(monkeypatch):
+    engine = _engine(monkeypatch)
+    graph = _graph_with(2)
+
+    payload = await engine.finalize(graph, _MANDATE, pending_check=False)
+
+    assert "fallback_reexpand_attempted_count" not in payload
+    assert "fallback_reexpand_recovered_count" not in payload
+
+
+@pytest.mark.asyncio
+async def test_repair_counters_report_attempts_and_recoveries(monkeypatch):
+    """Two parents were re-planned; only one produced a real plan."""
+    engine = _engine(monkeypatch)
+    graph = IdeaDag(root_title=_MANDATE, root_details={"mandate": _MANDATE})
+    graph.add_child(
+        graph.root_id(), "repaired",
+        details={
+            "_got_fallback_reexpand_attempted": True,
+            "_got_fallback_reexpand_recovered": True,
+        },
+    )
+    graph.add_child(
+        graph.root_id(), "retry degenerated again",
+        details={"_got_fallback_reexpand_attempted": True},
+    )
+
+    payload = await engine.finalize(graph, _MANDATE, pending_check=False)
+
+    assert payload["fallback_reexpand_attempted_count"] == 2
+    assert payload["fallback_reexpand_recovered_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_recovered_counter_is_omitted_when_no_retry_recovered(monkeypatch):
+    engine = _engine(monkeypatch)
+    graph = IdeaDag(root_title=_MANDATE, root_details={"mandate": _MANDATE})
+    graph.add_child(
+        graph.root_id(), "retry degenerated again",
+        details={"_got_fallback_reexpand_attempted": True},
+    )
+
+    payload = await engine.finalize(graph, _MANDATE, pending_check=False)
+
+    assert payload["fallback_reexpand_attempted_count"] == 1
+    assert "fallback_reexpand_recovered_count" not in payload

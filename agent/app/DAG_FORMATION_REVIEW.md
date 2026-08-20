@@ -143,6 +143,34 @@ elsewhere, not repairing the malformed subtree. Pair this with `ENGINE_DESIGN_RE
 (`merge_should_skip` is an irreversible lockout) and a pattern emerges: **the graph is
 append-only in practice, with no repair path at any level.**
 
+**PARTIALLY ADDRESSED (narrow MVP), scoped to the F7 degenerate case only.**
+`got_reexpand_fallback_nodes_enabled` (opt-in, JSON default false) adds
+`_maybe_reexpand_fallback_parent`: when a just-completed leaf carries F7's
+`DetailKey.FALLBACK_EXPANSION` tag AND its parent's **whole** child set is that single leaf,
+the parent is re-planned through the ordinary `_apply_reexpand` path (via its one carve-out,
+`allow_existing_children`) with a corrective hint naming the parse/shape failure. The
+superseded guess is marked `SKIPPED` + `DetailKey.FALLBACK_SUPERSEDED`. The final payload
+carries `fallback_reexpand_attempted_count` / `fallback_reexpand_recovered_count` when
+non-zero. Wired into both the sequential (`_apply_action_result`) and batch dispatch paths.
+(`reexpand_fallback_parent_test.py`.)
+
+Bounds and scope, deliberately:
+* it repairs a parent **at most once** — the guard is structural (the child set is no longer
+  a lone fallback leaf after a retry), so a retry that degenerates again is not retried a
+  third time regardless of `reexpand_max_iterations`;
+* a repaired parent ends with `max_branching + 1` children (the SKIPPED guess still occupies
+  a slot). Accepted soft-cap overshoot, pinned by test;
+* **the general F6 finding remains open.** A node with a genuine multi-child plan that turns
+  out to be wrong still cannot be re-planned. Only the known-degenerate case is covered.
+
+**Known residual gap (not fixed).** `idea_finalize.py`'s context builders
+(`_build_fallback_deliverable`, `_build_node_summary_table`) select on `ACTION_RESULT`
+presence and success, **not** on `node.status`. So the superseded leaf's already-executed
+content still reaches the final synthesis alongside the retry's content. Marking it `SKIPPED`
+stops it driving further work, not its appearance in the answer context. Fixing that means
+changing what every finalize path considers in-scope, which is a wider blast radius than this
+repair; it is noted at the `FALLBACK_SUPERSEDED` stamp site in `idea_engine.py`.
+
 ### F7. Malformed plans collapse to one degenerate node, silently — VERIFIED
 
 `_create_fallback_candidate` (`expansion.py:1479-1536`) fires when `_parse_candidates` returns
@@ -163,9 +191,11 @@ preamble, not an entity — and the run made zero page visits.
 **PARTIALLY ADDRESSED (instrumentation only).** Every fallback branch now stamps
 ``DetailKey.FALLBACK_EXPANSION`` on the candidate it emits, the collapse is logged at WARNING,
 and the final payload carries ``degenerate_fallback_count`` when any fired (absent otherwise, so
-a healthy run's payload shape is unchanged). Nothing reacts to the tag yet: repairing the
-collapsed subtree needs the re-planning path F6 describes, which does not exist.
-(``expansion_degenerate_fallback_test.py``.)
+a healthy run's payload shape is unchanged). The tag is now also the trigger for F6's narrow
+re-planning MVP: with ``got_reexpand_fallback_nodes_enabled`` on, a parent whose whole
+expansion collapsed to one tagged leaf is re-planned once. See F6 for its bounds and its
+residual finalize-context gap. (``expansion_degenerate_fallback_test.py``,
+``reexpand_fallback_parent_test.py``.)
 
 ### F8. Shape classification happens before any information exists, and changes nothing — VERIFIED
 
@@ -211,7 +241,7 @@ the calibrated bar, since there the model asked for a strategy for that node.
 | F1 | No global plan; greedy per-node, sees only ancestors | **Structural** | Large |
 | F5 | Correct dependency builder exists but only for templates | High | Medium |
 | F3 | Dependency edges invented by URL-sniffing, visit-only | High | Medium |
-| F6 | One-shot formation; no re-plan path for expanded nodes | High | Medium |
+| F6 | One-shot formation; no re-plan path for expanded nodes | High | Medium — PARTIAL: degenerate parents only |
 | F7 | Malformed plan collapses to one degenerate node, unflagged | High | **Low** — PARTIAL: now flagged |
 | F2 | Depth never chosen, tracked, or capped | Medium | Low |
 | F9 | Template short-circuit can hijack non-root subtrees | Medium | Low — RESOLVED |

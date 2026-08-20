@@ -112,6 +112,11 @@ class GoTConfig:
     # (applicable=False) the confidence trigger still applies as before.
     contract_reexpand_enabled: bool = False
     reexpand_corrective_context_enabled: bool = False
+    # F6 (narrow MVP): re-plan a parent whose whole expansion collapsed to the single guessed
+    # candidate `_create_fallback_candidate` emits. Only fires when the parent's ENTIRE child
+    # set is that one `FALLBACK_EXPANSION`-tagged leaf, so a parent can be repaired at most
+    # once. Opt-in, default OFF for byte-identity.
+    reexpand_fallback_nodes_enabled: bool = False
     candidate_coverage_enabled: bool = False
     candidate_coverage_budget_extension: int = 10
     adaptive_policies: bool = True

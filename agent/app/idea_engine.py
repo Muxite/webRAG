@@ -506,6 +506,22 @@ class IdeaDagEngine:
                 f"fallback candidate"
             )
 
+        # F6 repair rate: how many of those collapses were re-planned, and how many of those
+        # retries produced a real plan rather than a second fallback. Both attached only when
+        # non-zero, so a run with the trigger off keeps the payload's exact shape.
+        _fallback_attempted = sum(
+            1 for n in graph.iter_depth_first()
+            if n.details.get("_got_fallback_reexpand_attempted")
+        )
+        if _fallback_attempted:
+            final_payload["fallback_reexpand_attempted_count"] = _fallback_attempted
+            _fallback_recovered = sum(
+                1 for n in graph.iter_depth_first()
+                if n.details.get("_got_fallback_reexpand_recovered")
+            )
+            if _fallback_recovered:
+                final_payload["fallback_reexpand_recovered_count"] = _fallback_recovered
+
         if _coverage_incomplete is not None:
             final_payload["candidate_coverage_incomplete"] = True
             final_payload["candidate_coverage_missing"] = list(_coverage_incomplete.missing)
@@ -778,6 +794,16 @@ class IdeaDagEngine:
         # point in `_apply_action_result` above: a leaf that revealed a genuine
         # follow-up is now ACTIVE with children, so it falls through to
         # `return node_id` and the step() escape hatch drives its new children.
+        # A fallback leaf whose parent was re-planned (F6) is terminal but SKIPPED, not
+        # DONE. Hand control back to the parent so the fresh subtree gets driven; falling
+        # through to `return node_id` would re-enter this same superseded leaf forever.
+        # Never fires unless `got.reexpand_fallback_nodes_enabled` stamped the marker.
+        if (
+            node.status == IdeaNodeStatus.SKIPPED
+            and node.details.get(DetailKey.FALLBACK_SUPERSEDED.value)
+            and node.parent_id
+        ):
+            return node.parent_id
         if node.status == IdeaNodeStatus.DONE and node.parent_id:
             return node.parent_id
 
@@ -802,6 +828,91 @@ class IdeaDagEngine:
         if not verdict:
             return False
         return await self._apply_reexpand(graph, node_id, step_index, verdict)
+
+    #: The corrective hint threaded onto a re-planned fallback parent. Names the failure mode
+    #: (a parse/shape failure, not a bad task) so the retry answers with a real decomposition
+    #: in the required shape instead of re-guessing.
+    _FALLBACK_REEXPAND_REASON = (
+        "The previous attempt to plan this node returned no valid candidates (a JSON "
+        "parsing/shape failure) and fell back to a single guessed action instead of a real "
+        "plan. Provide a genuine multi-step decomposition: several well-justified candidates "
+        "in the exact required JSON shape."
+    )
+
+    async def _maybe_reexpand_fallback_parent(
+        self, graph: IdeaDag, node_id: str, step_index: int
+    ) -> bool:
+        """Re-plan the PARENT of a just-completed degenerate fallback leaf (F6, narrow MVP).
+
+        `_create_fallback_candidate` emits ONE guessed candidate when an expansion parsed to
+        nothing. The leaf itself is already eligible for the ordinary re-expansion triggers;
+        the gap is one level up. The parent now "has children" (exactly that one leaf) forever,
+        and every existing gate refuses a node with children, so a collapsed plan could never
+        be supplemented.
+
+        The carve-out is deliberately narrow: it fires only when the parent's WHOLE child set
+        is the single fallback leaf. A retry that degenerates again leaves the parent with two
+        children, which fails that shape check, so the parent is repaired at most once
+        regardless of `reexpand_max_iterations`. No-op unless
+        `got.reexpand_fallback_nodes_enabled` (default off -> byte-identical).
+        """
+        if not self._cfg.got.reexpand_fallback_nodes_enabled or not self._got:
+            return False
+        node = graph.get_node(node_id)
+        if not node or not node.details.get(DetailKey.FALLBACK_EXPANSION.value):
+            return False
+        if node.children:
+            return False
+        parent = graph.get_node(node.parent_id) if node.parent_id else None
+        if not parent or NodeDetailsExtractor.is_merge_action(parent.details):
+            return False
+        if parent.children != [node_id]:
+            return False
+
+        max_iters = self._effective_reexpand_max_iterations()
+        count = int(parent.details.get("_got_reexpand_count", 0))
+        if count >= max_iters:
+            return False
+        if graph.node_count() >= self._cfg.engine.max_total_nodes:
+            return False
+
+        # Written UNCONDITIONALLY, unlike the generic triggers' opt-in corrective context
+        # (`got.reexpand_corrective_context_enabled` gates only their write site; the read in
+        # `ExpansionPolicy._build_messages` is unconditional). A known-degenerate parse failure
+        # is exactly the case where the retry needs to be told what went wrong, so this
+        # trigger always says so. Single-use: the expansion consumes-and-clears it.
+        parent.details[DetailKey.REEXPAND_REASON.value] = self._FALLBACK_REEXPAND_REASON
+        parent.details["_got_fallback_reexpand_attempted"] = True
+        before = len(parent.children)
+        applied = await self._apply_reexpand(
+            graph, parent.node_id, step_index,
+            {"needs_followup": True, "reason": self._FALLBACK_REEXPAND_REASON},
+            allow_existing_children=True,
+        )
+        if not applied:
+            # Defensive: expansion produced nothing (or a guard tripped). Clear the hint so it
+            # cannot leak into a later, unrelated expansion of this same node.
+            parent.details.pop(DetailKey.REEXPAND_REASON.value, None)
+            return False
+
+        # KNOWN RESIDUAL GAP (out of scope): `idea_finalize.py`'s context builders select on
+        # ACTION_RESULT presence/success, not on `node.status`, so this superseded leaf's
+        # already-executed content still reaches the final synthesis alongside the retry's.
+        node.status = IdeaNodeStatus.SKIPPED
+        node.details[DetailKey.FALLBACK_SUPERSEDED.value] = True
+        recovered = not any(
+            (child := graph.get_node(cid)) is not None
+            and child.details.get(DetailKey.FALLBACK_EXPANSION.value)
+            for cid in parent.children[before:]
+        )
+        if recovered:
+            parent.details["_got_fallback_reexpand_recovered"] = True
+        self._logger.info(
+            f"[STEP {step_index}] FALLBACK REEXPAND: re-planned degenerate parent "
+            f"{parent.node_id[:8]} into {len(parent.children) - before} candidate(s) "
+            f"(recovered={recovered})"
+        )
+        return True
 
     def _effective_reexpand_max_iterations(self) -> int:
         """The per-lineage re-expansion budget actually in force: the static
@@ -880,7 +991,10 @@ class IdeaDagEngine:
             return None
         return verdict
 
-    async def _apply_reexpand(self, graph: IdeaDag, node_id: str, step_index: int, verdict: Dict[str, Any]) -> bool:
+    async def _apply_reexpand(
+        self, graph: IdeaDag, node_id: str, step_index: int, verdict: Dict[str, Any],
+        *, allow_existing_children: bool = False,
+    ) -> bool:
         """Mutating expansion given a positive verdict from `_reexpand_check`.
 
         Must be called sequentially (never inside a gather): it re-reads the
@@ -889,11 +1003,16 @@ class IdeaDagEngine:
         allows actually expand. The counter/ceiling accounting stays correct because
         there is no `await` between this ceiling read and the graph-growing expansion
         for any *other* node (each apply runs to completion before the next starts).
+
+        `allow_existing_children` is the single carve-out from the children guard, used
+        only by `_maybe_reexpand_fallback_parent` (whose whole point is re-planning a node
+        that already owns one degenerate child). Every other caller leaves it False, so
+        their behavior is unchanged.
         """
         node = graph.get_node(node_id)
         if not node:
             return False
-        if node.children:
+        if node.children and not allow_existing_children:
             return False
         # Re-check the ceiling here (not only in _reexpand_check): under the batch
         # path multiple siblings may have cleared the read-only gate before any of
@@ -1842,6 +1961,24 @@ class IdeaDagEngine:
                 # gather): each expansion re-reads the shared `max_total_nodes` ceiling.
                 for cid in done_children:
                     await self._maybe_plan_library_reexpand(graph, cid, step_index)
+                    # F6 fallback-parent repair, parity with `_apply_action_result` (which
+                    # this path bypasses). Sequential, never inside a gather: it grows the
+                    # graph and re-reads the shared `max_total_nodes` ceiling. Defensive
+                    # today: auto-parallel needs >1 eligible child while the repair needs
+                    # the parent's whole child set to BE the one fallback leaf, so it
+                    # always declines here. Wired anyway so relaxing either condition
+                    # cannot silently drop the trigger on this path.
+                    await self._maybe_reexpand_fallback_parent(graph, cid, step_index)
+                # A leaf superseded by its parent's re-plan is no longer a live completion:
+                # keep it out of the judge/contract/follow-up triggers below. No-op unless
+                # the F6 trigger actually stamped the marker.
+                done_children = [
+                    cid for cid in done_children
+                    if not (
+                        (_c := graph.get_node(cid))
+                        and _c.details.get(DetailKey.FALLBACK_SUPERSEDED.value)
+                    )
+                ]
                 confidences = await self._maybe_judge_step_confidence_batch(graph, done_children, step_index)
                 # F33 contract->action loop for the batch-completed siblings (no-op unless
                 # got.contract_reexpand_enabled). Free and deterministic, so it runs for every
@@ -2329,6 +2466,11 @@ class IdeaDagEngine:
             # which gates it out of all three below. The retrieved plan wins over an invented
             # follow-up, which is the whole point of having asked for one.
             await self._maybe_plan_library_reexpand(graph, node_id, step_index)
+            # F6: repair a parent whose entire expansion collapsed to this one guessed
+            # fallback leaf (no-op unless got.reexpand_fallback_nodes_enabled). Runs before
+            # the judge/contract/follow-up triggers below: a known-degenerate plan is worth
+            # re-planning ahead of any inference about the leaf's own result quality.
+            await self._maybe_reexpand_fallback_parent(graph, node_id, step_index)
             confidences = await self._maybe_judge_step_confidence(graph, node_id, step_index)
             # F33 contract->action loop: a leaf that did not deliver its contract's required
             # payload/datum/subject re-expands (no-op unless got.contract_reexpand_enabled).

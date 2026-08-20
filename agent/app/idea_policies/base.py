@@ -174,5 +174,11 @@ class DetailKey(str, Enum):
     # have fanned out collapsed to one leaf derived from a regex/keyword guess. Pure
     # instrumentation today: it is counted into the final payload
     # (``degenerate_fallback_count``) so a run's structural starvation is visible without
-    # re-parsing logs. Nothing reacts to it yet.
+    # re-parsing logs, and (opt-in via ``got_reexpand_fallback_nodes_enabled``) it is the
+    # trigger for re-planning the collapsed parent.
     FALLBACK_EXPANSION = "fallback_expansion"
+    # Written onto a fallback leaf whose PARENT was successfully re-planned by
+    # ``_maybe_reexpand_fallback_parent``: the guessed action has been superseded by a real
+    # decomposition, so the leaf is also marked ``SKIPPED``. Absent by default (the trigger
+    # is opt-in).
+    FALLBACK_SUPERSEDED = "fallback_superseded"
