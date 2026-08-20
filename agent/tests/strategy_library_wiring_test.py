@@ -48,7 +48,9 @@ def test_the_group_carries_no_threshold_of_its_own():
     would silently disagree with it (the same rule ``PlanLibraryConfig`` follows)."""
     import dataclasses
 
-    assert [f.name for f in dataclasses.fields(StrategyLibraryConfig)] == ["enabled"]
+    assert [f.name for f in dataclasses.fields(StrategyLibraryConfig)] == [
+        "enabled", "native_expansion_enabled",
+    ]
 
 
 # --------------------------------------------------------------------------------------

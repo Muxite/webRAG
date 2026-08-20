@@ -569,7 +569,12 @@ async def run_test_execution(
     # preserves the harness's long-standing fail-soft contract: a mid-run `step()` exception
     # is logged and the run still finalizes with partial state (production `run()` is
     # fail-fast). No `run_id` is passed, so the checkpointer is never touched.
-    output = await engine.run(mandate, max_steps=max_steps, fail_soft=True)
+    # `task_source` is the harness-only argument: it gives the strategy library's read-time leak
+    # re-check the task module to screen a retrieved note against (production callers have no
+    # benchmark ledger, and pass nothing). `getattr` because the duck-typed stand-ins some tests
+    # pass as `test_module` carry only the accessors used above.
+    output = await engine.run(mandate, max_steps=max_steps, fail_soft=True,
+                              task_source=getattr(test_module, "module", None))
     graph_dict = output.get("graph") if isinstance(output, dict) else None
 
     telemetry.finish(success=output.get("success", False))

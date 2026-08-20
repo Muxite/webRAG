@@ -96,7 +96,7 @@ async def test_run_test_execution_threads_connector_browser(monkeypatch):
         def __init__(self, io, settings, model_name):
             pass
 
-        async def run(self, mandate, max_steps=50, fail_soft=True):
+        async def run(self, mandate, max_steps=50, fail_soft=True, task_source=None):
             return {"final_deliverable": "answer", "success": True, "graph": {"nodes": {}, "edges": []}}
 
     monkeypatch.setattr(ex, "IdeaDagEngine", _FakeEngine)

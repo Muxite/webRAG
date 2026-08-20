@@ -190,6 +190,7 @@
   "plan_library_auto_enabled": false,
   "plan_library_action_enabled": false,
   "strategy_library_enabled": false,
+  "strategy_library_native_expansion_enabled": false,
   "tools_sandbox_pack_enabled": false,
   "tools_sandbox_pack_actions": ["read_file", "write_file", "list_dir", "count_lines", "word_count", "head_file", "disk_usage", "find_files"],
   "tools_calculator_pack_enabled": false,

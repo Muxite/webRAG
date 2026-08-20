@@ -178,6 +178,19 @@ _EXPECT_CONTRACT_ADDENDUM = (
 )
 
 
+# Opt-in expansion addendum (``strategy_library_native_expansion_enabled``): the native
+# counterpart of the compiled path's aggregation splice
+# (``testing/execution_compiled.py::_strategy_advice_addendum``). The retrieved note is generic
+# how-to-approach-this-shape advice authored on OTHER tasks, so the framing has to say so
+# explicitly — a weak model that reads it as a remembered answer would ground on nothing.
+# The advice text is filled in by ``IdeaDagEngine._resolve_native_strategy_advice``.
+_NATIVE_STRATEGY_ADDENDUM_TEMPLATE = (
+    "GENERALIZED STRATEGY NOTE (from a library built on OTHER tasks — it knows nothing about "
+    "this task's entities, values or answer, and it is not a remembered answer; the rules above "
+    "still win on any conflict):\n{advice}"
+)
+
+
 # --- opt-in input/output framing (``expansion_input_output_framing_enabled``) -------------------
 # The shipped expansion USER prompt opens with an OUTPUT instruction immediately followed by an
 # INPUT blob:
@@ -991,6 +1004,14 @@ class LlmExpansionPolicy(ExpansionPolicy):
         # ``expansion_expect_contract_enabled`` is set. Default path is byte-identical.
         if self._cfg.expansion.expect_contract_enabled:
             system = f"{system}\n\n{_EXPECT_CONTRACT_ADDENDUM}" if system else _EXPECT_CONTRACT_ADDENDUM
+        # Opt-in playbook note, written onto this policy once per run by
+        # ``IdeaDagEngine._resolve_native_strategy_advice``. Absent flag, absent attribute or an
+        # empty note all leave the prompt byte-identical.
+        if self._cfg.strategy_library.native_expansion_enabled:
+            advice = " ".join(str(getattr(self, "_native_strategy_advice", "") or "").split())
+            if advice:
+                block = _NATIVE_STRATEGY_ADDENDUM_TEMPLATE.format(advice=advice)
+                system = f"{system}\n\n{block}" if system else block
         # Optional prompt prefixes, ordered top-to-bottom: reasoning exemplar (a
         # narrative demonstration) then the imperative rule checklist, then the existing
         # system template. The two env vars are fully independent. Either may be set alone.
