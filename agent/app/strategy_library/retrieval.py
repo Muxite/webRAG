@@ -63,6 +63,14 @@ MANIFEST_NAME = "_manifest.json"
 #: ``scripts/eval_strategy_library_generalization.py`` before anyone reports a number that
 #: depends on it. Erring high is the safe direction here: a miss costs today's behavior, a
 #: false hit costs an irrelevant paragraph in a prompt.
+#:
+#: Audited 2026-08-20 (ASSUMPTION_AUDIT.md T3-5): still uncalibrated, and still UNREACHABLE.
+#: ``notes/`` holds only its README, so :meth:`StrategyLibrary.retrieve` returns
+#: ``fallthrough_no_match`` on the "no promoted notes" branch before any query is issued and
+#: this constant is never compared against anything. The calibration debt is therefore real
+#: but carries no live risk: no shipped number depends on it, and it cannot be re-fitted
+#: from a corpus that does not exist yet. The eval script needs paid A/B runs of a note that
+#: does, so authoring the first note is the blocking step, not running the script.
 APPLY_THRESHOLD = 0.50
 TOP_K = 1
 
