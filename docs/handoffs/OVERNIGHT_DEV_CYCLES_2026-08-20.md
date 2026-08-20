@@ -2,11 +2,11 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 21 cycles
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 22 cycles
 below are committed; the run continues past this point.
 
 **Spend so far: ~$2.83 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
-5387 passed / 18 skipped (zero failures across the whole run).
+5393 passed / 18 skipped (zero failures across the whole run).
 
 ---
 
@@ -227,6 +227,23 @@ the tally by more than 10 points. **The chain-vs-seq_react gap itself remains ge
 21 cycles of real, verified structural fixes — this appears to be a harder problem than any single
 bug, consistent with Cycle 12's own read that the remaining lever is an architecture change (score
 outcomes, not plans), not another incremental fix.
+
+**Cycle 22 — F37 (chrome-link filter, fixed) + F38 (declared-URL seed, diagnosed only)**
+(`ff22f183`). Checked whether Cycle 20's F36 fix incidentally covered Cycle 13's "hijacked" class —
+it didn't (F36 only fires on a raised exception; hijacked cases involve a fetch that *succeeds* on a
+wrong chrome page). Traced the real mechanism and found it's **far bigger than Cycle 13's original
+4-group estimate**: donation/login/portal chrome pages win URL-selection scoring ties by list order
+and keyword-overlap scoring quirks, affecting **64 of 2134 executed sibling visits (3.0%) across 35
+runs**. Fixed with `action.visit_chrome_link_filter` (default OFF) applying an existing chrome test
+to every URL-selection pool, not just the one path F36 covers. Separately, re-measured Cycle 13's
+"declared" class and found the original estimate over-counted: only 17-39% (not "39.6% of groups")
+are a genuine premature-seed bug; the rest are legitimate repeat-reads of one page for different
+facts. Traced the real bug to `_match_mandate_url`'s single-URL shortcut, but **deliberately did not
+fix it** — the corpus shows chain hops carry no dependency edge yet, so removing the premature seed
+today would just redirect the same blind visit onto the F37 chrome pool or an interlanguage link
+instead of a real target. Documented an explicit fix ordering (F37 → host/language affinity filter →
+a real dependency edge between authored hops → only then withdraw the mandate-URL shortcut) as F38,
+diagnosed not fixed.
 
 ---
 
