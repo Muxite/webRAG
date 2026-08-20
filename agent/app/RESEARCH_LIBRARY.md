@@ -83,7 +83,7 @@ not.
 `execution_compiled.py`) — k-vote extraction with price-aware k (cheap models vote more). Also
 **wired into the native path** (`idea_finalize.py::_vote_finalize_response`, commit `1e7ee2d`, "C1b:
 opt-in native k-vote terminal-answer aggregation (A3c)") — `native_vote_k_enabled`/`native_vote_k` in
-`idea_policies/config.py`'s `FinalConfig`, off by default, `k=3` in `idea_dag_settings.good_adaptive.json`.
+`idea_policies/config.py`'s `FinalConfig`, off by default, `k=3` in the `full`/`kvote_only` arms.
 k independent finalize extractions (anchor at temp-0, rest at temp-0.3), majority vote on the
 approximator-stripped answer value, tie-break to the anchor. Test-covered (5 files, incl.
 `answer_vote_test.py`, `finalize_reconcile_test.py`). Notably skips itself when the separate

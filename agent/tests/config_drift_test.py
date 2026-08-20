@@ -19,8 +19,10 @@ so a *new* undocumented absence also trips this test.
 from __future__ import annotations
 
 import dataclasses
+import pathlib
 
 from agent.app.idea_dag_settings import load_idea_dag_settings
+from agent.app import idea_dag_settings as settings_mod
 from agent.app.idea_policies import config as config_mod
 
 
@@ -125,4 +127,32 @@ def test_no_config_drift():
         "JSON-absent config fields drifted from the documented allow-list. "
         f"unexpected absent: {observed_absent - INTENTIONALLY_JSON_ABSENT}; "
         f"documented-but-now-present: {INTENTIONALLY_JSON_ABSENT - observed_absent}"
+    )
+
+
+def test_no_per_arm_settings_snapshots():
+    """``idea_dag_settings.json`` is the ONLY settings file; arms are overlays in code.
+
+    ``idea_dag_settings.baseline.json`` and ``idea_dag_settings.good_adaptive.json`` existed
+    from the first GoT commit, before ``IDEA_TEST_ARM``/``_GOT_ARM_PROFILES``, as hand-copied
+    full snapshots of the whole settings dict with a handful of arm flags flipped. Nothing
+    loaded them, no gate synced them, and by 2026-08-20 they were 48-51 keys behind the shipped
+    JSON and disagreed with the arm profiles they were named after (both claimed k-vote on,
+    which `good_adaptive` deliberately excludes as net-negative) -- stale enough to have already
+    seeded a false claim in ADAPTIVE_ENGINE.md. Deleted; an arm is
+    ``idea_dag_settings.json`` + ``_GOT_ARM_PROFILES[arm]``, resolved by the test runner.
+
+    A snapshot per arm cannot be kept honest by hand, so re-adding one is the bug: this pins
+    the deletion rather than trying to diff-sync files that would drift again on the next flag.
+    """
+    settings_dir = pathlib.Path(settings_mod.__file__).resolve().parent
+    snapshots = sorted(
+        p.name
+        for p in settings_dir.glob("idea_dag_settings.*.json")
+        if p.name != "idea_dag_settings.json"
+    )
+    assert not snapshots, (
+        "per-arm settings snapshots are back and will silently drift from "
+        f"idea_dag_settings.json: {snapshots}. Express the arm in "
+        "idea_test_runner._GOT_ARM_PROFILES instead."
     )

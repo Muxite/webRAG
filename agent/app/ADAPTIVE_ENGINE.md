@@ -81,7 +81,7 @@ research agenda and measured.
 | `native_reasoning_min_tokens_floor` | `2048` | The anti-starvation token floor | this session |
 | `price_tier_param_tiering_enabled` | `false` | Executor token budgets scale by model price tier (A5) | this session |
 | `native_vote_k_enabled` | `false` | k-vote finalize: k independent extractions, majority vote (A3c) | C1b |
-| `native_vote_k` | `1` | Vote count when the flag above is on (`good_adaptive` uses 3) | C1b |
+| `native_vote_k` | `1` | Vote count when the flag above is on (the `full`/`kvote_only` arms use 3; `good_adaptive` excludes k-vote) | C1b |
 | `native_confidence_early_exit_enabled` | `false` | **Calibrated high-confidence early exit (A6)** — stop expanding and finalize when the accumulated step-confidence prefix clears a *derived* threshold | A6 |
 | `native_confidence_early_exit_margin` | `0.05` | Extra conservatism added on top of the calibrated threshold | A6 |
 | `native_confidence_early_exit_min_judged_steps` | `2` | Hard floor: no rule may stop a run on fewer judged steps than this | A6 |

@@ -360,11 +360,8 @@ def test_no_variant_text_leaks_into_any_settings_file():
         VerifyLeafAction._REASON_FIRST_SYSTEM_PROMPT,
         _FOLLOWUP_REASON_FIRST_SYSTEM_PROMPT,
     )
-    for name in ("idea_dag_settings.json", "idea_dag_settings.baseline.json",
-                 "idea_dag_settings.good_adaptive.json"):
-        path = root / name
-        if not path.exists():
-            continue
+    for path in root.glob("idea_dag_settings*.json"):
+        name = path.name
         raw = path.read_text()
         for variant in variants:
             assert variant not in raw, f"{name} gained a copy of a variant prompt"
