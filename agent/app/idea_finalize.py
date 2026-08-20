@@ -54,6 +54,24 @@ def _compact_action_result(ar: dict, action: str) -> dict:
     return compact
 
 
+def _is_superseded(node: Any) -> bool:
+    """True for a node whose degenerate expansion guess was re-planned away (F6/F7 repair).
+
+    The graph is append-only: `_maybe_reexpand_fallback_parent` marks the bad guess
+    `SKIPPED` + ``FALLBACK_SUPERSEDED`` and adds the real children alongside it rather than
+    removing it. The guess was already EXECUTED, so its action result is present and
+    successful, and every selector below picks content on exactly that basis — which would
+    feed the retried-away output to the final synthesis next to the retry's own. Content
+    selectors therefore skip these nodes.
+
+    Only ``got.reexpand_fallback_nodes_enabled`` ever stamps the marker, so this is a no-op
+    on the default path. Deliberately NOT applied to `_visited_sources` /
+    `_has_grounded_evidence`: the superseded node really did open its page, and dropping it
+    there could make the grounding gate refuse an otherwise-grounded run.
+    """
+    return bool(node.details.get(DetailKey.FALLBACK_SUPERSEDED.value))
+
+
 def _collect_leaf_results_fallback(graph: IdeaDag) -> list:
     from agent.app.idea_policies.base import IdeaNodeStatus, IdeaActionType
     from agent.app.idea_policies.action_constants import ActionResultExtractor
@@ -61,6 +79,8 @@ def _collect_leaf_results_fallback(graph: IdeaDag) -> list:
     results = []
     for node in graph.iter_depth_first():
         if node.node_id == graph.root_id():
+            continue
+        if _is_superseded(node):
             continue
         action = node.details.get(DetailKey.ACTION.value)
         if not action:
@@ -93,6 +113,8 @@ def _collect_all_visit_content(graph: IdeaDag, max_chars_per_visit: int = 15000)
     for node in graph.iter_depth_first():
         action = node.details.get(DetailKey.ACTION.value)
         if action != IdeaActionType.VISIT.value:
+            continue
+        if _is_superseded(node):
             continue
         ar = node.details.get(DetailKey.ACTION_RESULT.value)
         if not ar or not isinstance(ar, dict):
@@ -329,6 +351,8 @@ def _build_fallback_deliverable(graph: IdeaDag, merged: list) -> str:
     for node in graph.iter_depth_first():
         if node.node_id == graph.root_id():
             continue
+        if _is_superseded(node):
+            continue
         action = node.details.get(DetailKey.ACTION.value)
         ar = node.details.get(DetailKey.ACTION_RESULT.value)
         if not ar or not isinstance(ar, dict) or not ActionResultExtractor.is_success(ar):
@@ -367,6 +391,10 @@ def _build_node_summary_table(graph: IdeaDag) -> str:
 
     lines = []
     for node in graph.iter_depth_first():
+        # The row carries the node's OUTCOME (search titles/URLs, visit length, think text),
+        # so a superseded guess leaks its content here as well; drop the row outright.
+        if _is_superseded(node):
+            continue
         action = node.details.get(DetailKey.ACTION.value, "root")
         status = node.status.value
         ar = node.details.get(DetailKey.ACTION_RESULT.value)
@@ -469,6 +497,8 @@ async def _retrieve_final_chroma_context(
     from agent.app.idea_policies.base import IdeaActionType
     merge_queries = []
     for node in graph.iter_depth_first():
+        if _is_superseded(node):
+            continue
         action = node.details.get(DetailKey.ACTION.value)
         if action == IdeaActionType.MERGE.value:
             ar = node.details.get(DetailKey.ACTION_RESULT.value)
@@ -481,7 +511,7 @@ async def _retrieve_final_chroma_context(
 
     titles = []
     for node in graph.iter_depth_first():
-        if node.node_id == graph.root_id():
+        if node.node_id == graph.root_id() or _is_superseded(node):
             continue
         titles.append(node.title)
     if titles:
@@ -490,6 +520,8 @@ async def _retrieve_final_chroma_context(
 
     url_queries = []
     for node in graph.iter_depth_first():
+        if _is_superseded(node):
+            continue
         ar = node.details.get(DetailKey.ACTION_RESULT.value)
         if ar and isinstance(ar, dict):
             url = ar.get("url", "")

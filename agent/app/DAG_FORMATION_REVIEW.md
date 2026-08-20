@@ -163,13 +163,18 @@ Bounds and scope, deliberately:
 * **the general F6 finding remains open.** A node with a genuine multi-child plan that turns
   out to be wrong still cannot be re-planned. Only the known-degenerate case is covered.
 
-**Known residual gap (not fixed).** `idea_finalize.py`'s context builders
-(`_build_fallback_deliverable`, `_build_node_summary_table`) select on `ACTION_RESULT`
-presence and success, **not** on `node.status`. So the superseded leaf's already-executed
-content still reaches the final synthesis alongside the retry's content. Marking it `SKIPPED`
-stops it driving further work, not its appearance in the answer context. Fixing that means
-changing what every finalize path considers in-scope, which is a wider blast radius than this
-repair; it is noted at the `FALLBACK_SUPERSEDED` stamp site in `idea_engine.py`.
+**Finalize leak: FIXED.** `idea_finalize.py`'s context builders selected on `ACTION_RESULT`
+presence and success, so the superseded leaf's already-executed content still reached the
+final synthesis alongside the retry's. `_is_superseded` now gates every finalize CONTEXT
+selector on the `FALLBACK_SUPERSEDED` marker: `_collect_leaf_results_fallback`,
+`_collect_all_visit_content`, `_build_fallback_deliverable`, `_build_node_summary_table`
+(whole row dropped — it carries the node's outcome text) and the three chroma query builders
+in `_retrieve_final_chroma_context`. Scoped to the marker, so unrelated `SKIPPED` nodes are
+selected exactly as before; and deliberately NOT applied to `_visited_sources` /
+`_has_grounded_evidence`, which only assert a page was opened — excluding it there could make
+the grounding gate refuse an otherwise-grounded run. No-op unless
+`got.reexpand_fallback_nodes_enabled` is on, since nothing else stamps the marker.
+(`finalize_fallback_superseded_test.py`.)
 
 ### F7. Malformed plans collapse to one degenerate node, silently — VERIFIED
 

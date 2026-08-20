@@ -895,9 +895,9 @@ class IdeaDagEngine:
             parent.details.pop(DetailKey.REEXPAND_REASON.value, None)
             return False
 
-        # KNOWN RESIDUAL GAP (out of scope): `idea_finalize.py`'s context builders select on
-        # ACTION_RESULT presence/success, not on `node.status`, so this superseded leaf's
-        # already-executed content still reaches the final synthesis alongside the retry's.
+        # `idea_finalize._is_superseded` reads this marker to keep the already-executed guess
+        # out of the final-answer context (it stays in `sources`/the grounding check, which
+        # only assert the page was opened).
         node.status = IdeaNodeStatus.SKIPPED
         node.details[DetailKey.FALLBACK_SUPERSEDED.value] = True
         recovered = not any(
