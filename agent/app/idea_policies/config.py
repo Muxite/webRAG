@@ -525,8 +525,15 @@ class StrategyLibraryConfig:
 
     enabled: bool = False
 
+    #: Second, narrower gate for the native engine's own expansion prompt (idea_engine.py /
+    #: idea_policies/expansion.py). Kept separate from ``enabled`` so turning this on for a
+    #: native arm profile can never silently also turn on retrieval for the ``graph_compiled``
+    #: path — the two consumers must be independently controllable.
+    native_expansion_enabled: bool = False
+
     _KEYS: ClassVar[dict] = {
         "enabled": "strategy_library_enabled",
+        "native_expansion_enabled": "strategy_library_native_expansion_enabled",
     }
 
     @classmethod

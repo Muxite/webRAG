@@ -283,10 +283,60 @@ class IdeaDagEngine:
             self._logger.info(f"[RUN] Created graph with root_id={current_id}")
         return graph, current_id, steps
 
-    async def run(self, mandate: str, max_steps: int = 50, run_id: Optional[str] = None, fail_soft: bool = False) -> Dict[str, Any]:
+    async def _resolve_native_strategy_advice(self, mandate: str, task_source: Any = None) -> None:
+        """Retrieve ONE ``strategy_library`` note for this run's expansion prompt — or nothing.
+
+        Native-engine counterpart to ``testing/execution_compiled.py::_resolve_strategy_advice``
+        (structurally copied: same lazy imports, same fail-open ``try/except``, same
+        ``StrategyLibraryConfig`` gate). Off unless BOTH ``strategy_library_enabled`` and
+        ``strategy_library_native_expansion_enabled`` are set — kept as two flags so arming this
+        for a native arm profile can never silently also arm the ``graph_compiled`` path.
+
+        ``task_source`` should be the benchmark harness's task module (``test_module.module``)
+        when running under the test harness, so ``StrategyLibrary.advice_for_task``'s read-time
+        leak re-check has a ledger to screen against; it is ``None`` for production callers, where
+        there is no benchmark ledger to leak against in the first place.
+
+        Sets ``self._strategy_advice`` and mirrors it onto ``self.expansion`` for
+        ``LlmExpansionPolicy._build_messages`` to read — write-once, before any expansion call,
+        since ``self.expansion`` is constructed once in ``__init__`` and never rebuilt.
+        """
+        self._strategy_advice = ""
+        self._strategy_advice_meta: Dict[str, Any] = {}
+        try:
+            cfg = self._cfg.strategy_library
+            if not (cfg.enabled and cfg.native_expansion_enabled):
+                return
+            # Imported lazily: with the flags off (the default) this path never loads the
+            # package, which keeps the corpus scan and the ledger machinery off every normal run.
+            from agent.app.strategy_library.retrieval import StrategyLibrary
+
+            result = await StrategyLibrary().advice_for_task(
+                self.io.connector_chroma, mandate, task_source
+            )
+        except Exception as exc:  # noqa: BLE001 — advice is additive; it never breaks a run
+            self._logger.warning(f"[STRATEGY_LIBRARY] native retrieval failed: {exc}")
+            self._strategy_advice_meta = {"decision": "error", "reason": str(exc)}
+            return
+        self._strategy_advice_meta = result.as_dict()
+        if result.applied:
+            self._logger.info(
+                f"[STRATEGY_LIBRARY] applying note '{result.note_id}' to native expansion "
+                f"(similarity {result.similarity:.3f})"
+            )
+            self._strategy_advice = result.advice
+        else:
+            self._logger.debug(
+                f"[STRATEGY_LIBRARY] no native advice ({result.decision}: {result.reason})"
+            )
+        self.expansion._native_strategy_advice = self._strategy_advice
+
+    async def run(self, mandate: str, max_steps: int = 50, run_id: Optional[str] = None,
+                   fail_soft: bool = False, task_source: Any = None) -> Dict[str, Any]:
         mandate_short = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate[:100]
         self._logger.info(f"[RUN] Starting idea DAG engine with mandate: {mandate_short}..., max_steps={max_steps}, run_id={run_id}")
         graph, current_id, steps = await self.prepare(mandate, run_id=run_id)
+        await self._resolve_native_strategy_advice(mandate, task_source)
         # Checkpoint save is a run()-only concern (`run_id` is never passed by the benchmark
         # harness). Wire it as the shared loop's per-step hook so `_run_loop` stays generic.
         on_step = None
