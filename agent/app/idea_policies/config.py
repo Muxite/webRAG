@@ -748,6 +748,19 @@ class EngineConfig:
     # OFF pending a live A/B.
     parallel_requires_evidence: bool = False  # absent from JSON
     defer_unresolved_slots: bool = False  # absent from JSON
+    # The resolved-value channel: before dispatching a node that declares
+    # `requires_data.slot`, fill that slot from its NAMED source's structured output --
+    # the source's `waypoint` first, else the contract's own `value_for` reader
+    # (`idea_policies/data_contracts.py`). This is the write-back the deferral mechanism
+    # above lacks: `defer_unresolved_slots` changes WHEN a node runs, never what it
+    # resolves to, so a deferred node came back and hit the same unscoped sibling-URL
+    # scavenging in `VisitLeafAction`. Only nodes whose writer declared a `slot` are
+    # touched, and an unresolvable one is a logged no-op, so the existing fallback still
+    # owns every path this does not fill. Opt-in and default OFF pending a live A/B; see
+    # docs/handoffs/RESOLVED_VALUE_CHANNEL_DESIGN_2026-08-16.md. Wants `waypoint_enabled`
+    # on too (the engine warns once at construction otherwise): with it off there is no
+    # waypoint to read and only the weaker contract fallback remains.
+    resolved_value_channel_enabled: bool = False  # absent from JSON
     # The evaluation-ordering invariant (ENGINE_DESIGN_REVIEW.md PART 3): "a decision that
     # consumes a score must run after that score exists". Two sites violate it, and each gets
     # one opt-in, default-OFF flag here because the fix changes graph shape and token spend,

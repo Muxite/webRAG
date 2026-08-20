@@ -260,6 +260,9 @@ class MandatePhraseEnforcementHook:
                 visit_node.details[DetailKey.REQUIRES_DATA.value] = {
                     "type": URLS_FROM_SEARCH.name,
                     "source_node_id": search_node_id,
+                    # Injected with no URL at all (only a generic `link_idea`), so its `url`
+                    # is exactly the field the resolved-value channel exists to fill.
+                    "slot": DetailKey.URL.value,
                 }
                 logger.info(
                     f"[STEP {step_index}] ENFORCE: Visit node {visit_node.node_id} "
@@ -405,6 +408,9 @@ class GroundingEvidenceEnforcementHook:
                 DetailKey.REQUIRES_DATA.value: {
                     "type": URLS_FROM_SEARCH.name,
                     "source_node_id": search_node_id,
+                    # Same as the enforcement hook above: no URL is authored here, so the
+                    # `url` slot is left for the resolved-value channel to fill at dispatch.
+                    "slot": DetailKey.URL.value,
                 },
             },
         )

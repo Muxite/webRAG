@@ -228,6 +228,7 @@ def test_cue_window_extracts_the_value_on_the_correct_page():
     assert wp.source_url == "https://en.wikipedia.org/wiki/John_A._Roebling_Suspension_Bridge"
     assert "1,057" in wp.evidence
     assert wp.node_id == "n1" and wp.step == 3
+    assert wp.value_url is None, "a number is not a link, so it can never fill a `url` slot"
 
 
 def test_cue_window_end_to_end_nearest_selection_on_real_infobox_text():
@@ -350,6 +351,9 @@ def test_anchor_text_extracts_an_entity_via_link_contexts():
     assert wp.method == "anchor_text"
     assert wp.value == "John A. Roebling"
     assert wp.value_kind == "anchor"
+    # The anchor's own target URL rides along: it is the structurally-reliable half of the
+    # pair (the tool returned it) and is what the resolved-value channel threads downstream.
+    assert wp.value_url == "https://en.wikipedia.org/wiki/John_A._Roebling"
 
 
 def test_anchor_text_gate_can_false_positive_on_an_entity_leaf_that_happens_to_say_died():
@@ -452,7 +456,7 @@ def test_waypoint_as_dict_round_trips_every_field():
     d = wp.as_dict()
     assert set(d) == {
         "hop_goal", "value", "value_kind", "evidence", "source_url", "source_title",
-        "node_id", "step", "method",
+        "node_id", "step", "method", "value_url",
     }
     assert d["node_id"] == "n10" and d["step"] == 5
 

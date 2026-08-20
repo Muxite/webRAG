@@ -235,6 +235,10 @@ def link_dependencies(nodes: Sequence["IdeaNode"]) -> int:
         contract = registry.contract_for_action(
             deepest.details.get(DetailKey.ACTION.value)
         ) or registry.contract_for_action(IdeaActionType.SEARCH.value)
+        # No ``slot`` on purpose: a blueprint dependency is an ORDERING constraint, and the
+        # dependent leaf's own scheduling fields are already filled from the template's text.
+        # There is no unresolved field here for the resolved-value channel to write into, so
+        # completing the pattern would only overwrite an authored value.
         node.details[DetailKey.REQUIRES_DATA.value] = {
             "type": contract.name if contract else "urls_from_search",
             "source_node_id": deepest.node_id,
@@ -326,6 +330,11 @@ def link_page_visits(
             DetailKey.REQUIRES_DATA.value: {
                 "type": contract_name,
                 "source_node_id": node.node_id,
+                # This visit's URL is genuinely unknown at authoring time (the page does not
+                # exist as a URL until its own search runs), so it declares the slot the
+                # resolved-value channel fills at dispatch. No-op while
+                # `resolved_value_channel_enabled` is off.
+                "slot": DetailKey.URL.value,
             },
             PLAN_LIBRARY_TEMPLATE_ID: node.details.get(PLAN_LIBRARY_TEMPLATE_ID),
             PLAN_LIBRARY_ORIGIN: node.details.get(PLAN_LIBRARY_ORIGIN),

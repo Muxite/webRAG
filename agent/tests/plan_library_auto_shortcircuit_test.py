@@ -469,9 +469,12 @@ async def test_every_library_leaf_is_followed_through_into_its_own_page_visit(tm
     assert len(visits) == len(searches) == len(_PEAKS), "one page read per leaf, not one shared"
     for search, visit, peak in zip(searches, visits, _PEAKS):
         # each visit is fed by ITS OWN leaf's search...
+        # ...and declares the `url` slot the resolved-value channel fills at dispatch: this
+        # visit's page has no URL until that search runs, which is the whole point of a slot.
         assert visit.details[DetailKey.REQUIRES_DATA.value] == {
             "type": "urls_from_search",
             "source_node_id": search.node_id,
+            "slot": "url",
         }
         # ...and knows which page it is looking for among that search's results
         assert peak in visit.details["link_idea"]

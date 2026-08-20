@@ -122,6 +122,12 @@ class Waypoint:
     node_id: str
     step: int
     method: str  # "cue_window" | "anchor_text" | "none"
+    # The URL the extracted value was hyperlinked to, when the value came from a hyperlink
+    # anchor (``method="anchor_text"``). This is the one payload that crosses a node boundary
+    # with perfect fidelity -- the tool returned it, no reading comprehension involved -- so it
+    # is what the resolved-value channel threads into a downstream hop's ``url`` slot. Always
+    # None for ``cue_window`` (a number is not a link) and for ``method="none"``.
+    value_url: Optional[str] = None
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -213,7 +219,9 @@ def _extract_cue_window(contract: StepContract, evidence_low: str) -> Tuple[Opti
     return None, None
 
 
-def _extract_anchor_text(evidence_low: str, link_contexts: Dict[str, Any]) -> Optional[str]:
+def _extract_anchor_text(
+    evidence_low: str, link_contexts: Dict[str, Any]
+) -> Tuple[Optional[str], Optional[str]]:
     """The first known hyperlink anchor text (``action_result.link_contexts``) that lands
     within ``_WINDOW`` chars of a role-cue word's first occurrence in the page's own body —
     cross-referencing body-text proximity against confirmed hyperlink structure, which is what
@@ -226,16 +234,20 @@ def _extract_anchor_text(evidence_low: str, link_contexts: Dict[str, Any]) -> Op
     engine's name, a relative's name, a footnote title -- over the actual adjacent value).
     Infobox-style label/value pairs put the value immediately next to its label, so proximity
     is the stronger signal; this is still a heuristic, not a guarantee, on top of the guard.
+
+    :returns: ``(anchor_text, url)`` -- the anchor's own target URL rides along, since that is
+        the structurally-reliable half of the pair (the tool returned it) and is what the
+        resolved-value channel hands to a downstream hop. ``(None, None)`` when nothing lands.
     """
     if not link_contexts:
-        return None
+        return None, None
     anchors = [
         (v.strip(), k)
         for k, v in link_contexts.items()
         if isinstance(v, str) and isinstance(k, str) and len(v.strip()) >= 3
     ]
     if not anchors:
-        return None
+        return None, None
     for cue in _ENTITY_ROLE_CUES:
         match = re.search(re.escape(cue), evidence_low)
         if not match:
@@ -245,18 +257,19 @@ def _extract_anchor_text(evidence_low: str, link_contexts: Dict[str, Any]) -> Op
         window_text = evidence_low[start:end]
         cue_center = (match.start() + match.end()) / 2
         best_value: Optional[str] = None
+        best_url: Optional[str] = None
         best_distance: Optional[float] = None
-        for anchor_text, _url in anchors:
+        for anchor_text, url in anchors:
             idx = window_text.find(anchor_text.lower())
             if idx < 0:
                 continue
             anchor_center = start + idx + len(anchor_text) / 2
             distance = abs(anchor_center - cue_center)
             if best_distance is None or distance < best_distance:
-                best_distance, best_value = distance, anchor_text
+                best_distance, best_value, best_url = distance, anchor_text, url
         if best_value is not None:
-            return best_value
-    return None
+            return best_value, best_url
+    return None, None
 
 
 def _snippet(evidence: str, evidence_low: str, value: str) -> str:
@@ -311,6 +324,7 @@ def build_waypoint(
 
     value, value_kind = _extract_cue_window(own_contract, evidence_low)
     method = "cue_window" if value is not None else None
+    value_url: Optional[str] = None  # a cue-window value is a number, never a link
 
     # anchor-text is an entity/place mechanism: a hyperlink anchor can never legitimately be
     # the answer to a quantity/date ask, so it only runs when the leaf's own contract shows NO
@@ -322,11 +336,12 @@ def build_waypoint(
     # the actual number in evidence; that failure stays silent rather than falling through).
     if value is None and not own_contract.datums:
         link_contexts = result.get("link_contexts")
-        anchor_value = _extract_anchor_text(
+        anchor_value, anchor_url = _extract_anchor_text(
             evidence_low, link_contexts if isinstance(link_contexts, dict) else {}
         )
         if anchor_value is not None:
             value, value_kind, method = anchor_value, "anchor", "anchor_text"
+            value_url = anchor_url
 
     if value is None or method is None:
         return _none()
@@ -335,5 +350,5 @@ def build_waypoint(
         hop_goal=hop_goal, value=value, value_kind=value_kind,
         evidence=_snippet(evidence, evidence_low, value),
         source_url=source_url, source_title=source_title,
-        node_id=node_id, step=step, method=method,
+        node_id=node_id, step=step, method=method, value_url=value_url,
     )

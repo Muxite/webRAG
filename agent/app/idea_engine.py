@@ -96,6 +96,14 @@ class IdeaDagEngine:
         self._logger = logging.getLogger(self.__class__.__name__)
         self.settings = {**load_idea_dag_settings(), **(settings or {})}
         self._cfg = IdeaConfig.from_settings(self.settings)
+        if self._cfg.engine.resolved_value_channel_enabled and not self._cfg.engine.waypoint_enabled:
+            # Once per engine, never per node: the channel still runs (its contract fallback
+            # works), but its PRIMARY source is unreachable, since a waypoint only exists when
+            # `waypoint_enabled` was on as the source leaf executed. Almost always a misconfig.
+            self._logger.warning(
+                "[SLOT_RESOLVE] resolved_value_channel_enabled is on but waypoint_enabled is "
+                "off: slot resolution falls back to DataContract.value_for only"
+            )
         self._apply_tools_config()
         self._patch_allowed_actions()
         self.io = io
@@ -730,7 +738,13 @@ class IdeaDagEngine:
         if not self._has_required_data(graph, node):
             self._logger.warning(f"[STEP {step_index}] Node {node_id} missing required data - cannot execute yet")
             return node.parent_id if node.parent_id else None
-        
+
+        # Sequential dispatch's half of the resolved-value channel (the auto-parallel batch
+        # path never reaches here and wires its own call). No-op unless the flag is on AND
+        # this node's writer declared a slot.
+        self._resolve_slot(graph, node)
+
+
         has_result = node.details.get(DetailKey.ACTION_RESULT.value) is not None
         is_blocked_ready = node.status == IdeaNodeStatus.BLOCKED and self._is_action_ready(node, step_index)
         
@@ -961,7 +975,117 @@ class IdeaDagEngine:
         if not contract:
             return True
         return contract.is_ready(source_result, source_node)
-    
+
+    @staticmethod
+    def _slot_value_is_concrete(slot: str, value: Any) -> bool:
+        """Is this node's slot field ALREADY carrying a real, authored value?
+
+        A `url` slot needs a usable http(s) URL; anything else needs non-empty text with no
+        unfilled template placeholder in it (`dataflow._has_slot`, the same predicate the
+        deferral mechanism uses). Anything concrete is never overwritten.
+        """
+        if not isinstance(value, str) or not value.strip():
+            return False
+        text = value.strip()
+        if slot == DetailKey.URL.value:
+            return text.startswith(("http://", "https://"))
+        from agent.app.idea_policies.dataflow import _has_slot
+        return not _has_slot(text)
+
+    def _resolve_slot(self, graph: IdeaDag, node: IdeaNode) -> Optional[str]:
+        """The resolved-value channel: fill `requires_data.slot` from the NAMED source, at
+        dispatch time (opt-in, `resolved_value_channel_enabled`, default OFF).
+
+        `_has_required_data` above answers "may this node run yet"; this answers "with what".
+        Nothing else in the engine hands a discovered value to a node waiting for it -- a
+        dependent hop today either runs on `VisitLeafAction`'s unscoped BFS-over-siblings
+        scavenging or on nothing at all -- and deferral alone cannot help, since it changes
+        WHEN a node runs, never what its own fields say.
+
+        Resolution order is waypoint first (`idea_policies/waypoint.py`, and therefore only
+        present when `waypoint_enabled` was on as the source executed), then the contract's
+        `value_for` reader. Only structured tool output crosses the boundary: a URL the tool
+        returned, never extracted prose.
+
+        Fails toward silence in every direction -- absent/malformed `requires_data`, no
+        `slot`, an already-concrete field, a missing or not-yet-DONE source, nothing
+        resolvable, or any exception at all -- leaving `node.details` untouched and the node
+        to do exactly what it does today. A resolution logs `[SLOT_RESOLVE]` at INFO and a
+        declared-but-unresolvable slot logs it at WARNING, since `dataflow.unresolved_slots`
+        has no visibility into `slot` and cannot flag the miss for us.
+
+        :returns: the value written, or None for every no-op.
+        """
+        if not self._cfg.engine.resolved_value_channel_enabled:
+            return None
+        try:
+            requires_data = node.details.get(DetailKey.REQUIRES_DATA.value)
+            if not isinstance(requires_data, dict):
+                return None
+            slot = requires_data.get("slot")
+            if not isinstance(slot, str) or not slot.strip():
+                return None
+            slot = slot.strip()
+            if self._slot_value_is_concrete(slot, node.details.get(slot)):
+                return None
+
+            source_node_id = requires_data.get("source_node_id")
+            source_node = graph.get_node(source_node_id) if source_node_id else None
+            if source_node is None:
+                self._logger.warning(
+                    f"[SLOT_RESOLVE] node {node.node_id} declares slot '{slot}' but its source "
+                    f"{source_node_id} is missing"
+                )
+                return None
+            if source_node.status != IdeaNodeStatus.DONE:
+                # Not an error: the source may still run, and this node is re-offered on
+                # every dispatch. `_has_required_data` is the gate; this is not.
+                return None
+
+            value: Optional[str] = None
+            origin = ""
+            waypoint = source_node.details.get(DetailKey.WAYPOINT.value)
+            if isinstance(waypoint, dict):
+                candidate = (
+                    waypoint.get("value_url") if slot == DetailKey.URL.value
+                    else waypoint.get("value")
+                )
+                if isinstance(candidate, str) and candidate.strip():
+                    value, origin = candidate.strip(), "waypoint"
+
+            if value is None:
+                contract = self.contracts.get(requires_data.get("type"))
+                getter = getattr(contract, "value_for", None) if contract else None
+                result = source_node.details.get(DetailKey.ACTION_RESULT.value)
+                if getter is not None and isinstance(result, dict):
+                    candidate = getter(result, source_node, slot)
+                    if isinstance(candidate, str) and candidate.strip():
+                        value, origin = candidate.strip(), "contract"
+
+            if value is None:
+                self._logger.warning(
+                    f"[SLOT_RESOLVE] node {node.node_id} slot '{slot}' unresolved from source "
+                    f"{source_node_id}: no waypoint value and no contract value"
+                )
+                return None
+
+            updates: Dict[str, Any] = {slot: value}
+            if slot == DetailKey.URL.value:
+                # `VisitLeafAction` reads `optional_url` FIRST and only stands its own
+                # scavenging chain down when that field already holds a valid URL, so writing
+                # `url` alone would resolve the slot and then execute on something else.
+                updates["optional_url"] = value
+            graph.update_details(node.node_id, updates)
+            self._logger.info(
+                f"[SLOT_RESOLVE] node {node.node_id} slot '{slot}' <- {origin} of "
+                f"{source_node_id}: {value[:120]}"
+            )
+            return value
+        except Exception as exc:  # noqa: BLE001 -- resolution must never fail a leaf
+            self._logger.warning(f"[SLOT_RESOLVE] failed (node={node.node_id}): {exc}")
+            return None
+
+
     def _plan_library_corpus(self):
         """The plan-library corpus for this engine instance, loaded once, lazily.
 
@@ -1635,6 +1759,11 @@ class IdeaDagEngine:
 
             async def _run_one(cid: str) -> Optional[Dict[str, Any]]:
                 child = graph.get_node(cid)
+                # The batch path dispatches straight into `_execute_action`, bypassing
+                # `_handle_leaf_node` entirely, so the resolved-value channel has to be wired
+                # here too -- and a fan-out of dependent hops IS its core case, not an edge.
+                if child is not None:
+                    self._resolve_slot(graph, child)
                 action_name = NodeDetailsExtractor.get_action(child.details) if child else None
                 timeout_s = self._action_timeout_for(action_name)
                 async with semaphore:
@@ -2582,7 +2711,7 @@ class IdeaDagEngine:
                         from agent.app.idea_policies import waypoint as _waypoint
                         wp = _waypoint.build_waypoint(node, result, action, node_id, step_index)
                         if wp is not None:
-                            node.details["waypoint"] = wp.as_dict()
+                            node.details[DetailKey.WAYPOINT.value] = wp.as_dict()
                     except Exception as exc:  # noqa: BLE001 -- extraction must never fail a leaf
                         self._logger.warning(f"[WAYPOINT] extraction failed (node={node_id}): {exc}")
 

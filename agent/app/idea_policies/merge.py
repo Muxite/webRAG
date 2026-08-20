@@ -175,6 +175,14 @@ class SimpleMergePolicy(MergePolicy):
                     "evaluation": child.details.get(DetailKey.EVALUATION.value),
                     "result": sanitized_result,
                     "is_merge": False,
+                    # The join's half of the resolved-value channel: each branch hands the
+                    # merge the structured datum it discovered, instead of the merge having
+                    # to re-read it out of a concatenated result blob. None whenever the
+                    # channel is off, or the branch produced no waypoint.
+                    "waypoint": (
+                        child.details.get(DetailKey.WAYPOINT.value)
+                        if self._cfg.engine.resolved_value_channel_enabled else None
+                    ),
                 }
             )
         

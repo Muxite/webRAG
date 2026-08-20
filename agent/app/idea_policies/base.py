@@ -136,8 +136,20 @@ class DetailKey(str, Enum):
     JUSTIFICATION = "justification"
     WHY_THIS_NODE = "why_this_node"
     PARENT_JUSTIFICATION = "parent_justification"
+    # A cross-node dependency record, written as a raw dict (no schema class):
+    #   {"type": <DataContract name>, "source_node_id": <str>, "slot": <str | None>}
+    # ``type``/``source_node_id`` are the readiness gate ``_has_required_data`` reads.
+    # ``slot`` is the OPTIONAL resolved-value channel: the name of THIS node's own detail
+    # field ("url" today) that the engine fills from the source's structured output at
+    # dispatch time (``IdeaDagEngine._resolve_slot``, gated by
+    # ``EngineConfig.resolved_value_channel_enabled``). ``slot`` is deliberately absent on
+    # writers whose value is already concrete at authoring time; only a genuinely
+    # unresolved-at-authoring field declares one. Readiness never reads ``slot``.
     REQUIRES_DATA = "requires_data"
     PROVIDES_DATA = "provides_data"
+    # Deterministic value a completed VISIT leaf's page carried, for a downstream hop
+    # (``idea_policies/waypoint.py``; written only when ``waypoint_enabled`` is on).
+    WAYPOINT = "waypoint"
     DATA_SOURCE_NODE = "data_source_node"
     GOAL = "goal"
     GOAL_ACHIEVED = "goal_achieved"

@@ -46,6 +46,7 @@ INTENTIONALLY_JSON_ABSENT = {
     "waypoint_enabled",
     "parallel_requires_evidence",
     "defer_unresolved_slots",
+    "resolved_value_channel_enabled",
     "beam_after_evaluation",
     "evaluate_parallel_siblings",
     # PolicyConfig

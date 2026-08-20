@@ -9,6 +9,11 @@ Each contract owns:
 - `name`: the string written into `REQUIRES_DATA.type` and `PROVIDES_DATA.type`
 - `is_ready`: a predicate over `(source_action_result, source_node)` returning
   True when the downstream consumer can safely run.
+- `value_for`: an optional `(source_action_result, source_node, slot) -> value`
+  reader used by the resolved-value channel when a consumer declares
+  `requires_data.slot` (`IdeaDagEngine._resolve_slot`). Fallback only: the
+  source node's `waypoint` is tried first. `chunk_from_visit` has none - a
+  page's body text carries no value a slot can be filled from deterministically.
 - `default_for_action`: action name whose successful completion implicitly tags
   the node with this contract (e.g. SEARCH success → `urls_from_search`).
   Used by `_handle_action_result`'s auto-tagging path.
@@ -29,6 +34,8 @@ if TYPE_CHECKING:
 
 
 ReadyPredicate = Callable[[Dict[str, Any], "IdeaNode"], bool]
+#: ``(source_action_result, source_node, slot) -> value | None``. See `DataContract.value_for`.
+ValueGetter = Callable[[Dict[str, Any], "IdeaNode", str], Optional[str]]
 
 
 @dataclass(frozen=True)
@@ -39,6 +46,14 @@ class DataContract:
     is_ready: ReadyPredicate
     default_for_action: Optional[str] = None
     consumer_actions: tuple[str, ...] = field(default_factory=tuple)
+    #: The resolved-value channel's FALLBACK reader: the best value this contract's structured
+    #: output offers for a consumer's declared `requires_data.slot`. Only reads what the tool
+    #: itself returned (a result URL, an outgoing link) -- never free text, which the waypoint
+    #: audit showed cannot be extracted deterministically. `IdeaDagEngine._resolve_slot` tries
+    #: the source's `waypoint` first and falls back here; returning None is always safe (the
+    #: consumer then runs exactly as it does today). None means "this contract carries nothing
+    #: a slot can be filled from".
+    value_for: Optional[ValueGetter] = None
 
 
 class ContractRegistry:
@@ -97,11 +112,77 @@ def _chunk_from_visit_is_ready(result: Dict[str, Any], _source_node: "IdeaNode")
     return bool(result.get(ActionResultKey.CONTENT_FULL.value))
 
 
+# The three URL-bearing contracts' value getters. Each answers ONE question -- "what URL did
+# this source actually produce?" -- and every one of them declines any slot but `url`: no
+# contract's structured output carries a query string or a link idea, and inventing one from
+# free text is exactly the extraction that the waypoint audit measured as unreliable.
+
+
+def _http(value: Any) -> Optional[str]:
+    """`value` as a usable http(s) URL, or None. The single admissibility rule for all getters."""
+    if isinstance(value, str) and value.strip().startswith(("http://", "https://")):
+        return value.strip()
+    return None
+
+
+def _urls_from_search_value(result: Dict[str, Any], _source_node: "IdeaNode", slot: str) -> Optional[str]:
+    """The search's first result URL: the same pool ``VisitLeafAction`` scavenges, addressed."""
+    if slot != "url":
+        return None
+    from agent.app.idea_policies.action_constants import ActionResultKey
+
+    results = result.get(ActionResultKey.RESULTS.value) or result.get("results") or []
+    if not isinstance(results, list):
+        return None
+    for item in results:
+        if isinstance(item, dict):
+            url = _http(item.get("url") or item.get("link") or item.get("href")
+                        or item.get("source") or item.get("page_url"))
+        else:
+            url = _http(item)
+        if url:
+            return url
+    return None
+
+
+def _urls_from_visit_value(result: Dict[str, Any], _source_node: "IdeaNode", slot: str) -> Optional[str]:
+    """The visited page's first outgoing link. Deliberately unranked: ranking a link set by
+    node goal text is the design that died three times over (see the resolved-value channel
+    design doc); this is a last-resort fallback behind the waypoint, not a selector."""
+    if slot != "url":
+        return None
+    links = result.get("links") or result.get("links_full") or []
+    if not isinstance(links, list):
+        return None
+    for item in links:
+        if isinstance(item, dict):
+            url = _http(item.get("url") or item.get("href") or item.get("link"))
+        else:
+            url = _http(item)
+        if url:
+            return url
+    return None
+
+
+def _url_from_think_value(result: Dict[str, Any], source_node: "IdeaNode", slot: str) -> Optional[str]:
+    """The URL the think node recorded -- on its result, else on its own details."""
+    if slot != "url":
+        return None
+    from agent.app.idea_policies.action_constants import ActionResultKey, NodeDetailsExtractor
+
+    return (
+        _http(result.get(ActionResultKey.URL.value))
+        or _http(result.get("extracted_url"))
+        or _http(NodeDetailsExtractor.get_url(source_node.details))
+    )
+
+
 URLS_FROM_SEARCH = DataContract(
     name="urls_from_search",
     is_ready=_urls_from_search_is_ready,
     default_for_action="search",
     consumer_actions=("visit", "think"),
+    value_for=_urls_from_search_value,
 )
 
 URLS_FROM_VISIT = DataContract(
@@ -109,6 +190,7 @@ URLS_FROM_VISIT = DataContract(
     is_ready=_urls_from_visit_is_ready,
     default_for_action="visit",
     consumer_actions=("visit", "think"),
+    value_for=_urls_from_visit_value,
 )
 
 URL_FROM_THINK = DataContract(
@@ -116,6 +198,7 @@ URL_FROM_THINK = DataContract(
     is_ready=_url_from_think_is_ready,
     default_for_action=None,
     consumer_actions=("visit",),
+    value_for=_url_from_think_value,
 )
 
 CHUNK_FROM_VISIT = DataContract(
