@@ -41,6 +41,11 @@ def _base():
         "plan_library_action_enabled": False,
         "native_reasoning_effort_discipline_enabled": False,
         "price_tier_param_tiering_enabled": False,
+        # live-proven 2026-08-06, shipped default flipped ON 2026-08-14 — the one exception to
+        # this fixture's "every adaptive mechanism OFF" mirror. `baseline` pins it back to
+        # False explicitly (see test_arm_baseline_matches_shipped_defaults) so the "adaptive
+        # OFF" ladder rung stays byte-identical regardless of this default.
+        "expansion_input_output_framing_enabled": True,
         # finalize grounding gate (a validity gate: every ARM turns it on, but the shipped
         # JSON default — what this fixture mirrors — is OFF)
         "final_require_grounding": False,
@@ -57,6 +62,11 @@ def _base():
         "got_beam_max": 5,
         "max_branching": 5,
         "grounding_max_replans": 2,
+        # reason-first field ordering (reasoning before verdict), see
+        # idea_test_runner_reason_first_flags_test.py for their dedicated coverage.
+        "merge_goal_evaluation_first_enabled": False,
+        "verify_reason_first_enabled": False,
+        "got_reexpand_followup_reason_first_enabled": False,
     }
 
 
@@ -315,7 +325,8 @@ def test_expansion_io_framing_and_echo_retry_are_independent_bool_overrides():
         retry_only, environ={"IDEA_TEST_EXPANSION_ECHO_RETRY": "1"}
     )
     assert retry_only["expansion_echo_retry_enabled"] is True
-    assert "expansion_input_output_framing_enabled" not in retry_only
+    # Independence: arming retry alone must not touch framing's own value either way.
+    assert retry_only["expansion_input_output_framing_enabled"] == _base()["expansion_input_output_framing_enabled"]
 
     both_off = _base()
     _apply_got_experiment_overrides(
@@ -369,12 +380,16 @@ def test_arm_baseline_matches_shipped_defaults():
     settings["native_vote_k_enabled"] = True
     settings["native_vote_k"] = 5
     _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "baseline"})
-    # Every adaptive LEVER is forced back to the shipped default. The one deliberate
-    # exception is the finalize grounding gate, a validity gate every arm carries: an
-    # answer produced with zero opened pages must not be presented as researched in the
-    # control arm either, or the comparison credits one arm's hallucinations.
+    # Every adaptive LEVER is forced back to the shipped default, with two deliberate
+    # exceptions: the finalize grounding gate (a validity gate every arm carries — an answer
+    # produced with zero opened pages must not be presented as researched in the control arm
+    # either, or the comparison credits one arm's hallucinations), and the expansion
+    # input/output framing fix, which the shipped JSON now defaults ON but `baseline` pins
+    # back to False so the "adaptive OFF" rung stays byte-identical to prior behavior
+    # regardless of what the global default becomes.
     expected = _base()
     expected["final_require_grounding"] = True
+    expected["expansion_input_output_framing_enabled"] = False
     assert settings == expected
 
 
