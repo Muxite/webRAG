@@ -491,6 +491,21 @@ class IdeaDagEngine:
         if pending_nodes:
             final_payload["warning"] = f"Finalized with {len(pending_nodes)} pending nodes - execution incomplete"
 
+        # Structural-degeneracy counter (F7): how many expansions collapsed to the single
+        # guessed candidate `_create_fallback_candidate` emits when the model returned nothing
+        # parseable. Attached only when non-zero, so a healthy run's payload keeps its exact
+        # shape, and offline benchmark analysis can see the rate without re-parsing logs.
+        _degenerate_fallbacks = sum(
+            1 for n in graph.iter_depth_first()
+            if n.details.get(DetailKey.FALLBACK_EXPANSION.value)
+        )
+        if _degenerate_fallbacks:
+            final_payload["degenerate_fallback_count"] = _degenerate_fallbacks
+            self._logger.warning(
+                f"[RUN] {_degenerate_fallbacks} expansion(s) collapsed to a degenerate "
+                f"fallback candidate"
+            )
+
         if _coverage_incomplete is not None:
             final_payload["candidate_coverage_incomplete"] = True
             final_payload["candidate_coverage_missing"] = list(_coverage_incomplete.missing)

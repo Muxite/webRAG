@@ -168,3 +168,11 @@ class DetailKey(str, Enum):
     # follow-up), surfaced once in the re-expansion prompt and immediately
     # consumed-and-cleared, mirroring ``HUMAN_FEEDBACK``. Absent by default.
     REEXPAND_REASON = "reexpand_reason"
+    # Structural-degeneracy marker, written by ``ExpansionPolicy._create_fallback_candidate``
+    # onto the ONE candidate it emits when the model returned no usable candidates at all.
+    # That single candidate becomes the parent's entire expansion, so a subtree that should
+    # have fanned out collapsed to one leaf derived from a regex/keyword guess. Pure
+    # instrumentation today: it is counted into the final payload
+    # (``degenerate_fallback_count``) so a run's structural starvation is visible without
+    # re-parsing logs. Nothing reacts to it yet.
+    FALLBACK_EXPANSION = "fallback_expansion"

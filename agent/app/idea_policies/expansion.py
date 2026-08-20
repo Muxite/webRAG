@@ -720,7 +720,11 @@ class LlmExpansionPolicy(ExpansionPolicy):
                 self._logger.error(f"[EXPANSION] LLM response preview: {content[:500] if content else 'None'}")
                 fallback_candidate = self._create_fallback_candidate(node, graph)
                 if fallback_candidate:
-                    self._logger.warning(f"[EXPANSION] Created fallback candidate: {fallback_candidate.get('title', 'Unknown')[:60]}...")
+                    self._logger.warning(
+                        f"[EXPANSION] DEGENERATE FALLBACK: node {node_id} expands to a single "
+                        f"guessed candidate instead of a plan: "
+                        f"{fallback_candidate.get('title', 'Unknown')[:60]}..."
+                    )
                     candidates = [fallback_candidate]
             if meta:
                 node.details[DetailKey.EXPANSION_META.value] = meta
@@ -1477,6 +1481,15 @@ class LlmExpansionPolicy(ExpansionPolicy):
         return cleaned, dict(meta)
     
     def _create_fallback_candidate(self, node: "IdeaNode", graph: Optional["IdeaDag"] = None) -> Optional[Dict[str, Any]]:
+        """The single degenerate candidate emitted when parsing produced none at all.
+
+        Every branch tags its candidate with ``DetailKey.FALLBACK_EXPANSION`` because this
+        one node becomes the parent's WHOLE expansion: a URL regexed out of the title/mandate,
+        a keyword-guessed search whose query is ``title[:100]`` (a character truncation, not a
+        query), or a bare think node. The tag rides onto the created child so the collapse is
+        countable downstream (``degenerate_fallback_count`` in the final payload) instead of
+        being indistinguishable from a genuinely one-step plan.
+        """
         import re
         title = node.title or ""
         mandate = node.details.get("mandate") or ""
@@ -1495,6 +1508,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
                     DetailKey.URL.value: url,
                     "optional_url": url,
                     DetailKey.JUSTIFICATION.value: "Fallback candidate: URL extracted from mandate",
+                    DetailKey.FALLBACK_EXPANSION.value: True,
                 },
                 "score": None,
             }
@@ -1510,6 +1524,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
                         DetailKey.URL.value: url,
                         "optional_url": url,
                         DetailKey.JUSTIFICATION.value: "Fallback candidate: Visit action inferred from mandate",
+                        DetailKey.FALLBACK_EXPANSION.value: True,
                     },
                     "score": None,
                 }
@@ -1522,6 +1537,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
                     DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
                     DetailKey.QUERY.value: query,
                     DetailKey.JUSTIFICATION.value: "Fallback candidate: Search action inferred from mandate",
+                    DetailKey.FALLBACK_EXPANSION.value: True,
                 },
                 "score": None,
             }
@@ -1532,6 +1548,7 @@ class LlmExpansionPolicy(ExpansionPolicy):
             "details": {
                 DetailKey.ACTION.value: IdeaActionType.THINK.value,
                 DetailKey.JUSTIFICATION.value: "Fallback candidate: Generic think node",
+                DetailKey.FALLBACK_EXPANSION.value: True,
             },
             "score": None,
         }
