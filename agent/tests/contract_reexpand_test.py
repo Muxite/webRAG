@@ -235,8 +235,10 @@ class _JudgeStub:
         return {"confidence": self.confidence, "reason": "stub"}
 
 
-def _make_engine(*, contract, conf_reexpand=False, judge_enabled=False, threshold=0.5):
+def _make_engine(*, contract, conf_reexpand=False, judge_enabled=False, threshold=0.5,
+                 veto_requires_datum=False):
     settings = {
+        "got_contract_veto_requires_datum_enabled": veto_requires_datum,
         "allow_unscored_selection": True,
         "min_score_threshold": 0.0,
         "best_first_global": False,
@@ -264,10 +266,11 @@ def _make_engine(*, contract, conf_reexpand=False, judge_enabled=False, threshol
     return engine, expansion
 
 
-def _graph_with_leaf(content, *, goal=_GOAL, url="https://en.wikipedia.org/wiki/Quesnel_Lake"):
+def _graph_with_leaf(content, *, goal=_GOAL, url="https://en.wikipedia.org/wiki/Quesnel_Lake",
+                     mandate=_MANDATE):
     graph = IdeaDag(root_title="root")
     root = graph.get_node(graph.root_id())
-    root.details["mandate"] = _MANDATE
+    root.details["mandate"] = mandate
     parent = graph.add_child(graph.root_id(), "parent goal", details={})
     leaf = graph.add_child(parent.node_id, goal, details={
         DetailKey.ACTION.value: IdeaActionType.VISIT.value,
@@ -379,3 +382,126 @@ async def test_contract_trigger_respects_the_iteration_cap():
     assert leaf.children == []
     assert expansion.calls == 0
     assert leaf.status == IdeaNodeStatus.DONE
+
+
+# --------------------------------------------------------------------------------------
+# F35 — a subject-only contract may not veto the judge
+# --------------------------------------------------------------------------------------
+#
+# Replay of the live premature-termination case (task 136, run chainfix0820_nano_r1): a
+# 3-hop chain expanded to ONE leaf, the leaf opened hop 1's page, the judge scored it 0.20
+# ("does not specify the name of the enormous iron steamship ... or its length"), F33's
+# contract veto silenced that, nothing re-expanded, and the run finalized after hop 1.
+# The leaf's contract came from its own goal and asked for no measurable datum, so
+# "satisfied" only meant "the page mentions Clifton/Suspension/Victorian".
+
+_CHAIN_MANDATE = (
+    "This is a low-context CHAIN: each hop's target is only knowable after you resolve the "
+    "previous hop, and you must recognise EXACTLY when the chain terminates. HOP 1 - the "
+    "Clifton Suspension Bridge was designed by a celebrated Victorian engineer. HOP 2 - that "
+    "engineer designed an enormous iron steamship. HOP 3 - open that ship's page and read her "
+    "length."
+)
+_HOP1_GOAL = "Identify Victorian engineer of Clifton Suspension Bridge"
+_HOP1_PAGE = (
+    "Clifton Suspension Bridge is a suspension bridge spanning the Avon Gorge, a Victorian "
+    "landmark. The bridge is built to a design by William Henry Barlow and John Hawkshaw, "
+    "based on an earlier design by Isambard Kingdom Brunel."
+)
+
+
+def test_subject_only_satisfaction_is_flagged_as_not_datum_verified():
+    verdict = evaluate_step_contract(
+        _visit_node(_HOP1_PAGE, goal=_HOP1_GOAL,
+                    url="https://en.wikipedia.org/wiki/Clifton_Suspension_Bridge"),
+        _CHAIN_MANDATE,
+    )
+    assert verdict.applicable is True
+    assert verdict.satisfied is True
+    assert derive_step_contract(
+        _visit_node(_HOP1_PAGE, goal=_HOP1_GOAL)
+    ).datums == [], "the hop-1 goal asks for no measurable datum"
+    assert verdict.datum_verified is False
+
+
+def test_datum_backed_satisfaction_is_flagged_as_datum_verified():
+    verdict = evaluate_step_contract(_visit_node(_RIGHT_PAGE), _MANDATE)
+    assert verdict.satisfied is True
+    assert verdict.datum_verified is True
+
+
+@pytest.mark.asyncio
+async def test_flag_off_keeps_the_subject_only_veto_byte_identical():
+    engine, expansion = _make_engine(
+        contract=True, conf_reexpand=True, judge_enabled=True, threshold=0.5,
+    )
+    ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
+    ops.judge_step_confidence = _JudgeStub(0.2)  # type: ignore[assignment]
+    engine._got = ops
+    graph, parent, leaf = _graph_with_leaf(
+        _HOP1_PAGE, goal=_HOP1_GOAL, mandate=_CHAIN_MANDATE,
+        url="https://en.wikipedia.org/wiki/Clifton_Suspension_Bridge",
+    )
+
+    result = await engine._handle_leaf_node(graph, leaf.node_id, 0, None)
+
+    assert expansion.calls == 0, "flag off -> the live premature-termination behaviour"
+    assert leaf.children == []
+    assert result == parent.node_id
+
+
+@pytest.mark.asyncio
+async def test_subject_only_contract_no_longer_vetoes_the_distrusting_judge():
+    engine, expansion = _make_engine(
+        contract=True, conf_reexpand=True, judge_enabled=True, threshold=0.5,
+        veto_requires_datum=True,
+    )
+    ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
+    ops.judge_step_confidence = _JudgeStub(0.2)  # type: ignore[assignment]
+    engine._got = ops
+    graph, parent, leaf = _graph_with_leaf(
+        _HOP1_PAGE, goal=_HOP1_GOAL, mandate=_CHAIN_MANDATE,
+        url="https://en.wikipedia.org/wiki/Clifton_Suspension_Bridge",
+    )
+
+    result = await engine._handle_leaf_node(graph, leaf.node_id, 0, None)
+
+    assert expansion.calls == 1, "the chain continues instead of finalizing after hop 1"
+    assert len(leaf.children) == 1
+    assert result == leaf.node_id
+    assert leaf.details.get("_got_reexpand_count") == 1
+
+
+@pytest.mark.asyncio
+async def test_datum_verified_contract_still_vetoes_under_the_flag():
+    """F33's actual finding is preserved: a leaf that DID deliver its measurable datum is
+    still protected from the anti-calibrated judge."""
+    engine, expansion = _make_engine(
+        contract=True, conf_reexpand=True, judge_enabled=True, threshold=0.5,
+        veto_requires_datum=True,
+    )
+    ops = GoTOperations(settings=engine.settings, io=engine.io, memory_manager=None)
+    ops.judge_step_confidence = _JudgeStub(0.1)  # type: ignore[assignment]
+    engine._got = ops
+    graph, parent, leaf = _graph_with_leaf(_RIGHT_PAGE)
+
+    result = await engine._handle_leaf_node(graph, leaf.node_id, 0, None)
+
+    assert expansion.calls == 0
+    assert leaf.children == []
+    assert result == parent.node_id
+
+
+@pytest.mark.asyncio
+async def test_flag_does_not_resurrect_an_unsatisfied_contract_path():
+    """The flag only narrows the VETO. An unsatisfied contract still re-expands through the
+    contract trigger itself, with the same lineage budget."""
+    engine, expansion = _make_engine(contract=True, veto_requires_datum=True)
+    graph, parent, leaf = _graph_with_leaf(
+        _WRONG_PAGE, url="https://en.wikipedia.org/wiki/Quesnel",
+    )
+
+    await engine._handle_leaf_node(graph, leaf.node_id, 0, None)
+
+    assert expansion.calls == 1
+    assert "contract unsatisfied" in leaf.details.get("_got_reexpand_reason", "")

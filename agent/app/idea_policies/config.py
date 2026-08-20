@@ -111,6 +111,15 @@ class GoTConfig:
     # is protected from the judge's low-score trigger. When the check has no verdict
     # (applicable=False) the confidence trigger still applies as before.
     contract_reexpand_enabled: bool = False
+    # F35: narrow F33's VETO half. A satisfied contract silences the judge, but most leaf
+    # contracts are derived from the leaf's own goal and carry no measurable datum, so
+    # "satisfied" degrades to "the page I opened mentions the words in my own goal" -- true
+    # for every hop of a chain that is nonetheless only one hop in. Corpus replay (168 judged
+    # runs, 251 low-confidence visit leaves): F33 vetoes 171 of them and 134 of those vetoes
+    # (78%) rest on a subject-only contract. With this on, only a contract that verified a
+    # DATUM may veto; a subject-only one leaves the decision to the judge, as before F33.
+    # Opt-in, default OFF for byte-identity.
+    contract_veto_requires_datum_enabled: bool = False
     reexpand_corrective_context_enabled: bool = False
     # F6 (narrow MVP): re-plan a parent whose whole expansion collapsed to the single guessed
     # candidate `_create_fallback_candidate` emits. Only fires when the parent's ENTIRE child

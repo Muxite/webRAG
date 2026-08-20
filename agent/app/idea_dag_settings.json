@@ -131,6 +131,7 @@
   "got_step_confidence_reexpand_enabled": false,
   "got_step_confidence_reexpand_threshold": 0.5,
   "got_contract_reexpand_enabled": false,
+  "got_contract_veto_requires_datum_enabled": false,
   "got_reexpand_corrective_context_enabled": false,
   "got_reexpand_fallback_nodes_enabled": false,
   "got_dedup_enabled": true,

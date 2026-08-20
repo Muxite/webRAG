@@ -2644,6 +2644,12 @@ class IdeaDagEngine:
         scores low. So it may not overrule a leaf whose CONTRACT is demonstrably satisfied
         (the required payload/datum/subject is present in the retrieved evidence). Where the
         contract check has no verdict, the judge still decides, exactly as before.
+
+        F35 corrective (no-op unless ``got.contract_veto_requires_datum_enabled``): a
+        satisfied contract that verified no measurable DATUM rests on subject tokens alone,
+        which only proves the leaf opened a page matching the words of its own goal. That is
+        true of every intermediate hop of an unfinished chain, so it may not silence a judge
+        that distrusts the step. Only a datum-verified contract keeps the veto.
         """
         if not self._cfg.got.step_confidence_reexpand_enabled:
             return False
@@ -2652,6 +2658,18 @@ class IdeaDagEngine:
         if not self._reexpand_guards_ok(graph, node_id):
             return False
         verdict = self._contract_verdict(graph, node_id)
+        if (
+            verdict is not None
+            and verdict.satisfied
+            and self._cfg.got.contract_veto_requires_datum_enabled
+            and not verdict.datum_verified
+        ):
+            self._logger.info(
+                f"[CONTRACT] leaf {node_id[:8]} satisfies its contract on subject tokens "
+                f"only (no datum verified); the low step-confidence {confidence:.3f} still "
+                f"drives re-expansion"
+            )
+            return True
         if verdict is not None and verdict.satisfied:
             self._logger.info(
                 f"[CONTRACT] leaf {node_id[:8]} satisfies its contract; ignoring the "

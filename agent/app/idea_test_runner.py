@@ -634,6 +634,15 @@ def _apply_got_experiment_overrides(
     _confthresh_override = env.get("IDEA_TEST_GOT_CONFIDENCE_THRESHOLD", "").strip()
     if _confthresh_override:
         idea_settings["got_step_confidence_reexpand_threshold"] = float(_confthresh_override)
+    # IDEA_TEST_GOT_CONTRACT_VETO_REQUIRES_DATUM: F35. Whether a SATISFIED contract may
+    # veto the confidence->action loop only when it verified a measurable datum
+    # (got_contract_veto_requires_datum_enabled). Subject-only satisfaction proves the leaf
+    # opened a page matching its own goal's words, which every unfinished chain hop does.
+    _contract_veto_override = env.get("IDEA_TEST_GOT_CONTRACT_VETO_REQUIRES_DATUM", "").strip()
+    if _contract_veto_override:
+        idea_settings["got_contract_veto_requires_datum_enabled"] = _is_enabled(
+            _contract_veto_override
+        )
     # IDEA_TEST_GOT_BACKTRACK: whether the graph can backtrack off a dead-end branch
     # (got_backtrack_enabled).
     _backtrack_override = env.get("IDEA_TEST_GOT_BACKTRACK", "").strip()

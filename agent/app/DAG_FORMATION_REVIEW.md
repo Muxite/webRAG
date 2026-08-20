@@ -236,6 +236,83 @@ organic expansion. Non-root matching stays available, at a higher bar; the on-de
 the calibrated bar, since there the model asked for a strategy for that node.
 (`plan_library_auto_shortcircuit_test.py`, `plan_library_search_action_test.py`.)
 
+### F35. F33's contract VETO silences the one signal that notices an unfinished chain — VERIFIED
+
+Live case, run `chainfix0820_nano_r1`, task 136 (Clifton Suspension Bridge -> Brunel ->
+SS Great Eastern length), `graph`/`good_adaptive` on gpt-4.1-nano, score **0.183** against
+`sequential_react`'s 0.75 on the identical mandate. The whole run is **two nodes** and six
+decisions:
+
+```
+expansion  root  -> "1 sub-problems"           (n_candidates: 1)
+evaluation leaf  -> "Identify Victorian engineer of Clifton Suspension Bridge"
+selection  leaf  -> same,  action visit
+action     leaf  -> visit en.wikipedia.org/wiki/Clifton_Suspension_Bridge  success
+grounding  root  -> "grounded"                 (distinct_visits: 1)
+finalize   root  -> "finalized"                (grounded: true, goal_achieved: FALSE)
+```
+
+Four separate mechanisms had to decline before that could happen, and only one of them is
+broken:
+
+1. **Expansion** returned a single candidate covering hop 1 of a mandate that spells out
+   three hops (F1: greedy, no global plan). No `FALLBACK_EXPANSION` tag — a genuine
+   single candidate, not F7's parse collapse.
+2. **The step-confidence judge got it right.** It scored the leaf **0.20** and said so:
+   *"it does not specify the name of the enormous iron steamship designed by Brunel or its
+   length."* Below the 0.5 threshold, so `_maybe_confidence_reexpand_batch` would have
+   re-expanded the leaf into hop 2.
+3. **F33's contract veto discarded that score.** `_confidence_triggers_reexpand`
+   (`idea_engine.py`) refuses to act on a low judge score when `evaluate_step_contract`
+   reports the leaf's contract SATISFIED. Replaying the stored node reproduces it exactly:
+   `ContractSatisfaction(applicable=True, satisfied=True, missing=[])`.
+4. **The follow-up detector** (`GoTOperations.check_needs_followup`) then answered
+   `needs_followup: false`. It DOES receive the mandate (first 1500 chars, so the full
+   HOP 1/2/3 text) and a 3000-char page excerpt that does contain "Brunel" — this one is a
+   plain nano judgement failure, not a missing-context bug.
+
+**The mechanism.** The contract text is the leaf's explicit `expect` detail when the
+expect-contract lever wrote one, **else the leaf's own goal**. That lever is off in every
+shipped arm, so in practice every contract is goal-derived. A goal like *"Identify Victorian
+engineer of Clifton Suspension Bridge"* names no measurable datum, so the check reduces to
+`_subject_present`: does the fetched page mention `suspension`/`victorian`/`clifton`. It does.
+"Satisfied" here means **"I opened a page matching the words of my own goal"** — which is true
+of every intermediate hop of a chain that is nonetheless nowhere near finished. F33 was
+derived from the judge's anti-calibration as a *quality* estimator; the veto it installed also
+suppresses the judge as a *progress* signal, and chains are exactly where those diverge.
+
+**Blast radius, measured offline** (replay of the 400 most recent stored `graph` run JSONs;
+168 of them carry judge scores): of **251** low-confidence completed visit leaves, F33 vetoes
+**171 (68%)**, and **134 of those vetoes (78%) rest on a subject-only contract**. Across all
+applicable visit leaves, 484/566 subject-only contracts come back satisfied.
+
+**What was NOT the cause.** The grounding gate (`_grounding_replan` ->
+`evaluate_grounding`) is deterministic, LLM-free, and has no chain awareness whatsoever: for a
+"do not guess" mandate it asks only `len(successful_visit_urls) >= 1`. It fired
+`chosen: 'grounded'` correctly *by its own contract*. It is a floor ("did this run open any
+page at all"), never a completion test, and nothing upstream gives it an expected-hop count.
+The engine holds no representation of "this mandate implies N more hops" anywhere:
+`MandateRequirements` has no hop/waypoint count, `waypoint.py` extracts a value from a
+completed hop but predicts none, and F8's shape classifier is advisory-only at 19% chain
+recall. Fixing the grounding gate would require that machinery and is **out of scope**.
+
+**FIX (opt-in, default OFF): `got_contract_veto_requires_datum_enabled`.** A satisfied verdict
+now carries `datum_verified` — True only when the contract asked for a measurable datum AND a
+number was found beside that datum's wording. With the flag on, only a datum-verified contract
+may veto the judge; a subject-only one hands the decision back to the judge, i.e. pre-F33
+behaviour for that subset. F33's actual finding is preserved: a leaf that DID deliver its
+datum is still protected from an anti-calibrated low score, and the contract trigger's positive
+half (unsatisfied -> re-expand) is untouched. Flagged rather than unconditional because the
+veto currently suppresses 68% of confidence-trigger firings — flipping that on `good_adaptive`
+is a live-measurable cost/accuracy change, not a bug fix. Bounded as always by
+`reexpand_max_iterations`. Env toggle for A/B:
+`IDEA_TEST_GOT_CONTRACT_VETO_REQUIRES_DATUM=1`. (`contract_reexpand_test.py` F35 section —
+replays this exact leaf/mandate and pins flag-off byte-identity.)
+
+**Still open after this fix** (task 136 needs both to land): expansion's one-candidate plan for
+a three-hop mandate (F1), and the follow-up detector saying "no" with the hop-2 instruction
+in its own prompt.
+
 ---
 
 ## PART 2 — Ranked findings
@@ -248,6 +325,7 @@ the calibrated bar, since there the model asked for a strategy for that node.
 | F3 | Dependency edges invented by URL-sniffing, visit-only | High | Medium |
 | F6 | One-shot formation; no re-plan path for expanded nodes | High | Medium — PARTIAL: degenerate parents only |
 | F7 | Malformed plan collapses to one degenerate node, unflagged | High | **Low** — PARTIAL: now flagged |
+| F35 | F33's contract veto silences the judge on unfinished chains | High | **Low** — fixed behind a flag |
 | F2 | Depth never chosen, tracked, or capped | Medium | Low |
 | F9 | Template short-circuit can hijack non-root subtrees | Medium | Low — RESOLVED |
 | F4 | `execute_all_children` declared before children exist | Medium | Medium |

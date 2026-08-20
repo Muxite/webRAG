@@ -164,6 +164,12 @@ class ContractSatisfaction:
     satisfied: bool
     missing: List[str] = field(default_factory=list)
     reason: str = ""
+    #: True only when the contract text asked for a measurable DATUM and the evidence
+    #: actually carried a number beside that datum's wording. A satisfied verdict without
+    #: it rests on subject tokens alone: it proves "the right PAGE was opened", never "the
+    #: ask was answered". Callers that use a satisfied contract to VETO another signal need
+    #: to tell those two apart (see F35 in DAG_FORMATION_REVIEW.md).
+    datum_verified: bool = False
 
 
 def _contract_text(node: Any) -> Tuple[str, str]:
@@ -400,4 +406,5 @@ def evaluate_step_contract(node: Any, mandate: str = "") -> ContractSatisfaction
     return ContractSatisfaction(
         applicable=True, satisfied=True,
         reason="the retrieved evidence carries the contract's required content",
+        datum_verified=bool(contract.datums),
     )

@@ -27,6 +27,7 @@ def _base():
         "got_step_confidence_reexpand_enabled": False,
         "got_step_confidence_reexpand_threshold": 0.5,
         "got_contract_reexpand_enabled": False,
+        "got_contract_veto_requires_datum_enabled": False,
         "got_reexpand_corrective_context_enabled": False,
         "got_backtrack_enabled": False,
         "native_confidence_early_exit_enabled": False,
@@ -504,3 +505,30 @@ def test_arm_profiles_registry_keys_are_valid_settings_keys():
     for arm_name, profile in _GOT_ARM_PROFILES.items():
         for key in profile:
             assert key in known_keys, f"{arm_name} references unknown key {key}"
+
+
+def test_contract_veto_requires_datum_truthy_enables():
+    """F35: the toggle that stops a subject-only contract vetoing the confidence loop."""
+    for truthy in ("1", "true", "yes", "on", "TRUE"):
+        settings = _base()
+        _apply_got_experiment_overrides(
+            settings, environ={"IDEA_TEST_GOT_CONTRACT_VETO_REQUIRES_DATUM": truthy}
+        )
+        assert settings["got_contract_veto_requires_datum_enabled"] is True, truthy
+
+
+def test_contract_veto_requires_datum_absent_leaves_the_default():
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={})
+    assert settings["got_contract_veto_requires_datum_enabled"] is False
+
+
+def test_contract_veto_requires_datum_explicit_falsey_forces_off():
+    settings = _base()
+    settings["got_contract_veto_requires_datum_enabled"] = True
+    for falsey in ("0", "false", "no", "off"):
+        s = dict(settings)
+        _apply_got_experiment_overrides(
+            s, environ={"IDEA_TEST_GOT_CONTRACT_VETO_REQUIRES_DATUM": falsey}
+        )
+        assert s["got_contract_veto_requires_datum_enabled"] is False, falsey
