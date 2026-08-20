@@ -2,11 +2,11 @@
 
 Continuation of `GPU_NIGHT_CYCLES_2026-08-20.md`. Open-ended, budget-bounded run (12h wall-clock,
 $15 OpenRouter ceiling) dispatching `docs/DEV_CYCLE.md`-structured cycles via subagents, coordinated
-by one low-token main session. **This is an interim checkpoint, written mid-run** — all 10 cycles
+by one low-token main session. **This is an interim checkpoint, written mid-run** — all 13 cycles
 below are committed; the run continues past this point.
 
-**Spend so far: ~$0.44 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
-5309 passed / 18 skipped (zero failures across the whole run).
+**Spend so far: ~$0.95 of $15.** All commits on `comment-cleanup`, clean history, offline suite at
+5352 passed / 18 skipped (zero failures across the whole run).
 
 ---
 
@@ -102,16 +102,54 @@ suspected) — fixed, so a future benchmark of the Cycle 9 flag won't be measuri
 answer. Deliberately did *not* exclude the superseded node from grounding-evidence checks (it did
 open a real page; excluding it there would make an otherwise-grounded run wrongly fail the gate).
 
+**Cycle 11 — execution-aware rubric probe** (`48c37486`). Offline replay test (60 real batches, an
+"anti-tie" rewrite of the evaluator's `<=0.2` rubric line) found the shipped rubric already
+differentiates real executed content reasonably well when replayed cleanly (spread 0.45, spike
+detection beats chance p=0.004) — the rewrite moved every metric in the right direction but nothing
+cleared significance. **More important finding**: replaying recorded live batches offline gave
+scores that *diverged* from what the engine actually recorded for the same nominal content,
+motivating Cycle 12.
+
+**Cycle 12 — detail-truncation bug, root cause + fix** (`64d6eb17`). The live-vs-replay divergence
+turned out to be a probe artifact (different prompt reconstruction, not an engine bug) — but tracing
+it surfaced a real, independent, unconditional bug: candidate `details` were JSON-serialized then
+raw-character-truncated at a 5000-char budget, producing **invalid, unparseable JSON for 2888/4615
+(62.6%) of executed candidates**, silently dropping fields like `visit_url` (100% loss when
+triggered). Fixed with a budget-aware serializer that bisects for the largest per-field allowance
+that keeps output valid — byte-identical under budget, always-parseable over it. Live A/B (40
+batches, $0.09) showed directional improvement on every scoring metric, none significant — ships as
+a correctness fix regardless (garbage JSON reaching a judge is bad on its own terms). **Recommended
+and executed: stop the 5-cycle-deep evaluator-scoring thread here** — cap mechanics, the
+parallel-siblings flag, the rubric text, and the detail budget have each been tested and moved
+metrics the right direction with no result clearing significance; the remaining lever (score
+outcomes via a real architecture change, not another prompt/data probe) is out of scope for a probe
+cycle.
+
+**Cycle 13 — duplicate sibling visit URLs** (`a7a17c96`). A lead surfaced in passing during Cycle 12:
+16.2% (97/598) of sibling visit batches have 2+ children fetch the identical URL, and half of those
+have *every* sibling on the same page (the traced example: 4 siblings meant to visit "Chuck season
+1-4" all fetched the same Croatian Wikipedia page). Root-caused to two distinct mechanisms:
+"fallback" (51.5% — `VisitLeafAction`'s URL-resolution cascade is sibling-blind, so near-identical
+titles rank the same top hit from a shared pool) and "declared" (39.6% — sequential chain plans
+where every hop's URL was written at authoring time before later hops' real target existed).
+Existing dedup (title-based, pre-resolution) structurally cannot catch either, since the collision
+only exists post-URL-resolution. Fixed the fallback half with an opt-in per-parent URL claim map
+(`action.visit_sibling_url_dedup`, default OFF — a real routing change, not a pure efficiency fix,
+so it needs its own live A/B before flipping on). The "declared" half (planner-side, needs
+`requires_data` instead of a premature seed URL) and a smaller "hijacked" class (chrome/sidebar
+links winning a scavenge fallback) are flagged as separate future items, not fixed this cycle.
+
 ---
 
 ## Open threads for the next cycle
 
 1. **Resolved-value channel**: needs a higher-n (3+) fixture-parity rerun before any default-flip
    decision. Current n=1 result is directionally flat, not conclusive.
-2. **Evaluator rubric line**: the `<=0.2` "no action result" line in `evaluation_batch_system_prompt`
-   applies indiscriminately to executed and unexecuted candidates alike. A promptbench-style offline
-   test of a rewritten, execution-aware rubric is the next step — cheap, high-n, before any engine
-   change or live A/B of `evaluate_parallel_siblings`.
+2. **Evaluator-scoring thread: CLOSED for now** (Cycles 4-6, 11-12) — cap mechanics, the
+   `evaluate_parallel_siblings` flag, the rubric text, and the detail-truncation bug have all been
+   tested; the detail-truncation fix shipped as a correctness fix regardless of significance. Next
+   lever, if picked up again, is a real architecture change (score outcomes, not plans), not another
+   prompt/data probe.
 3. **F6 general case**: still open beyond the narrow fallback-parent MVP — a genuinely multi-child
    (non-degenerate) plan still can't be revised once formed.
 4. **E1 dedup ablation**: groundwork done (Cycle 4), live A/B not yet run.
@@ -120,6 +158,21 @@ open a real page; excluding it there would make an otherwise-grounded run wrongl
 6. **R1 (qwen2.5:7b num_ctx)**: GPU-bound, blocked tonight — Ollama CLI not installed on this host.
 7. **Capability-spectrum re-run** using the LangGraph comparison arm (committed tonight in Cycle 0,
    `langgraph_solver.py`) against whichever fixes land — not yet attempted.
+8. **Duplicate sibling visit URLs — declared half** (Cycle 13): sequential chain plans write every
+   hop's URL at authoring time, before later hops' real target exists, causing repeat fetches of the
+   seed URL. Needs a planner-side fix (declare `requires_data` instead), not the dispatch-time
+   dedup Cycle 13 already shipped.
+9. **Duplicate sibling visit URLs — "hijacked" class** (Cycle 13, 4 groups): a declared URL fetch
+   fails and falls into a link-scavenge fallback that ranks sidebar/chrome links (e.g. a donation
+   page) ahead of real content. Chrome-filtering the scavenge pool is the lever.
+10. **Same truncation bug in `expansion.py`** (Cycle 12 finding, not yet fixed): the identical
+    mid-JSON raw-truncation pattern exists at the plan-generation prompt site too; even after
+    existing compaction, 68.7% (3886/5654) of compacted candidate details still exceed the 5000-char
+    budget. Same fix pattern as Cycle 12's evaluation-side fix, but touches plan generation so wants
+    its own cycle/tests.
+11. **`visit_sibling_url_dedup` flag** (Cycle 13): needs a live A/B before flipping on — it's a real
+    routing change (second sibling gets candidate #2 instead of the shared top hit), not a pure
+    efficiency win.
 
 ## Methodology notes (holding from last night, reconfirmed)
 
