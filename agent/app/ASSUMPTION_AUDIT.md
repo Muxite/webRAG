@@ -430,6 +430,70 @@ exists. Any future "we tuned N parameters" claim needs to exclude these.
 
 ---
 
+### T1-4. A sibling visit fan-out reads ONE page 16.2% of the time — **CONFIRMED DEFECT**
+
+`scripts/analyze_sibling_url_collision.py`, $0, every recorded run. Unit: a **sibling visit
+batch** — one parent's children restricted to executed `visit` leaves that recorded a URL.
+**598 batches; 97 (16.2%) contain two or more siblings on the same URL, and 50 of those 97
+(51.5%) have EVERY sibling on one page.** Severity runs 2x:73, 3x:16, 4x:6, 5x:1, 7x:1. The
+cost is paid three times over — fetch, embed, judge — and the merge then reads one page's
+evidence as if it were the several different pages the plan asked for.
+
+The recorded details separate the cause per duplicated URL group (101 groups):
+
+| cause | groups | what happened |
+|---|---|---|
+| `fallback` | 52 (51.5%) | Neither duplicate declared a URL |
+| `declared` | 40 (39.6%) | Both declared the SAME explicit URL |
+| `mixed` | 5 | One declared it, the other resolved onto it |
+| `hijacked` | 4 | The fetched URL is not the declared one at all |
+
+**Root cause of the `fallback` half: the URL cascade in `VisitLeafAction.execute` is
+sibling-blind.** A visit leaf with no URL falls through `_extract_url_from_think_node` →
+`_extract_url_from_parents` → `_extract_url_from_sibling_results` → the Chroma link query.
+Every one of those ranks a pool the siblings SHARE (the parent's search results, the
+parent's page links, one Chroma collection) by a score that depends only on the leaf's own
+title, and then returns the single top hit. Sibling titles in a fan-out differ by one token
+("Chuck season 1/2/3/4"), so the ranking is the same for all of them and each is handed the
+same page. `link_count` defaults to 1, which short-circuits the moment that page fetches, so
+nothing downstream ever reconciles the four leaves against each other. This is the same
+context-blind formation F1 records (`DAG_FORMATION_REVIEW.md`), one layer lower: the
+*executor* is as sibling-blind as the planner.
+
+The traced example is `eps2_on_070` r1: four leaves, all `optional_url: ""`, all resolved to
+`hr.wikipedia.org/wiki/Chuck` — a Croatian page for an English mandate, byte-identical 8199
+characters four times. **The wrong-language part of it is unusual, not the pattern**: 11 of
+1736 sibling-visit URLs are non-English Wikipedia (0.84% of Wikipedia hits), and 4 of those
+11 are this one batch. What generalises is the collapse, not the language. The other tails
+of the duplicate list are the same mechanism with different junk at the top of the pool:
+`donate.wikimedia.org/?wmf_source=...` (22 hits) and `en.wikipedia.org/wiki/Main_Page` (10)
+are sidebar chrome that outranked real content in a link scavenge.
+
+**Root cause of the `declared` half is different and NOT fixed here.** Those are sequential
+chains — task 040's "Nineteen Eighty-Four → author → birth town → district" is 34 of them —
+where the planner wrote every hop's `url` before the data that would name the later pages
+existed, so each hop repeats the only URL it knows: the seed. That is a planner defect, and
+suppressing the fetch would only turn a redundant read into a failed one.
+
+**Existing dedup cannot catch either half.** `got_operations.is_duplicate_thought` runs on
+candidate **title/goal text** at expansion time, and "visit season 1" vs "visit season 2" are
+correctly not duplicates — the collision only exists after resolution. `idea_visit_dedup.
+semantic_dedup_visits` is closer (a pre-execution sibling pass) but folds a URL-**less** leaf
+into a URL-**bearing** sibling whose slug it matches, so a batch where every leaf is URL-less
+is invisible to it. Neither ever sees a resolved URL.
+
+**Fix, opt-in, default OFF: `action.visit_sibling_url_dedup`.** A parent carries a claim map
+(`__visit_url_claims`, dunder like `__semantic_dedup_source`); a visit claims its URLs
+**before** awaiting the fetch, so the concurrent batch path splits too. A URL a sibling
+already claimed is dropped from a leaf's fallback resolution and from its candidate list,
+which makes the selection below pick the NEXT candidate instead of re-picking the pool's top
+hit. Declared URLs are never dropped. When nothing is left the leaf fails with a duplicate
+diagnostic rather than paying for a page the batch already has. Default OFF because this
+changes which pages a run reads: fewer redundant fetches is unambiguously good, but "the
+second sibling gets candidate #2" is a real routing change whose score effect is unmeasured.
+
+---
+
 ## PART 3 — Tier 3: unvalidated retrieval constants
 
 The genuinely unaudited surface. None of these is known wrong; none has any validation

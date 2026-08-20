@@ -633,6 +633,15 @@ class ActionConfig:
     connector_retry_max_attempts: int = 2
     connector_retry_backoff_seconds: float = 0.5
     tool_failure_recovery_enabled: bool = False
+    # Sibling visit-URL dedup (opt-in). A visit leaf that arrives without a URL of its own is
+    # handed one by a sibling-blind cascade (parents/sibling results/Chroma links), which ranks
+    # the same pool the same way for every such sibling -- so a fan-out of per-entity page reads
+    # collapses onto ONE page (16.2% of recorded sibling-visit batches contain a duplicate and
+    # half of those have EVERY sibling on one page; ASSUMPTION_AUDIT.md T1-4). When on, a
+    # fallback-resolved URL a sibling already claimed is dropped and the next candidate is used
+    # instead. An explicitly declared URL is never dropped -- that duplicate is the planner's
+    # own instruction, a different defect. Default OFF -> byte-identical.
+    visit_sibling_url_dedup: bool = False
 
     _KEYS: ClassVar[dict] = {
         "max_retries": "action_max_retries",

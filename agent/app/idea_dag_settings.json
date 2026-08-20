@@ -165,6 +165,7 @@
   "connector_retry_max_attempts": 2,
   "connector_retry_backoff_seconds": 0.5,
   "tool_failure_recovery_enabled": false,
+  "visit_sibling_url_dedup": false,
   "native_vote_k_enabled": false,
   "native_vote_k": 1,
   "native_vote_k_tiered_enabled": false,

@@ -31,6 +31,11 @@ from agent.app.idea_policies.action_constants import (
     is_transient_tool_error,
 )
 
+#: Where a parent records the pages its visit children have already claimed, so a sibling
+#: batch does not fetch one page four times. Dunder-prefixed like ``__semantic_dedup_source``:
+#: engine bookkeeping written onto a node, never a planner-authored detail.
+VISIT_URL_CLAIMS_KEY = "__visit_url_claims"
+
 
 class LeafAction(ABC):
     #: One-line, model-facing summary of what this action does. Left ``None`` on purpose:
@@ -887,7 +892,78 @@ class VisitLeafAction(LeafAction):
         
         self._logger.info(f"[VISIT] Using first sibling link as fallback: {unique_links[0][:80]}")
         return unique_links[0]
-    
+
+    @staticmethod
+    def _normalize_visit_url(url: Optional[str]) -> str:
+        """Compare key for "these two leaves would fetch the same page".
+
+        Scheme/host case and a trailing slash are not a different page; the query string is.
+        The fragment is dropped because the fetch never sends it.
+        """
+        if not url or not isinstance(url, str):
+            return ""
+        try:
+            parsed = urlparse(url.strip())
+        except ValueError:
+            return ""
+        if not parsed.scheme or not parsed.netloc:
+            return ""
+        return urlunparse((
+            parsed.scheme.lower(), parsed.netloc.lower(), (parsed.path or "").rstrip("/"),
+            "", parsed.query, "",
+        ))
+
+    def _first_parent(self, graph: IdeaDag, node: IdeaNode) -> Optional[IdeaNode]:
+        pids = node.parent_ids if node.parent_ids else ([node.parent_id] if node.parent_id else [])
+        for pid in pids:
+            if not pid:
+                continue
+            parent = graph.get_node(pid)
+            if parent:
+                return parent
+        return None
+
+    def _sibling_claimed_urls(self, graph: IdeaDag, node: IdeaNode) -> Set[str]:
+        """Pages a visit sibling under the same parent has already fetched or claimed.
+
+        Two sources, because a sibling batch runs concurrently: what a finished sibling
+        recorded (``visit_url`` / its result's ``url``), and what an in-flight sibling wrote
+        into the parent's claim map before awaiting its own fetch.
+        """
+        parent = self._first_parent(graph, node)
+        if not parent:
+            return set()
+        out: Set[str] = set()
+        claims = parent.details.get(VISIT_URL_CLAIMS_KEY)
+        if isinstance(claims, dict):
+            out.update(key for key, owner in claims.items() if key and owner != node.node_id)
+        for sibling_id in parent.children:
+            if sibling_id == node.node_id:
+                continue
+            sibling = graph.get_node(sibling_id)
+            if not sibling:
+                continue
+            result = sibling.details.get(DetailKey.ACTION_RESULT.value)
+            urls = [sibling.details.get("visit_url")]
+            if isinstance(result, dict) and result.get("action") == IdeaActionType.VISIT.value:
+                urls.append(result.get("url"))
+            out.update(key for key in (self._normalize_visit_url(u) for u in urls) if key)
+        return out
+
+    def _claim_visit_urls(self, graph: IdeaDag, node: IdeaNode, urls: List[str]) -> None:
+        """Record, on the parent, that this leaf is about to fetch these pages."""
+        parent = self._first_parent(graph, node)
+        if not parent:
+            return
+        claims = parent.details.get(VISIT_URL_CLAIMS_KEY)
+        if not isinstance(claims, dict):
+            claims = {}
+            parent.details[VISIT_URL_CLAIMS_KEY] = claims
+        for url in urls:
+            key = self._normalize_visit_url(url)
+            if key:
+                claims.setdefault(key, node.node_id)
+
     def _links_worth_indexing(
         self,
         links: List[str],
@@ -1453,6 +1529,19 @@ class VisitLeafAction(LeafAction):
                                 f"(status: {source_node.status.value})"
                             )
 
+            # A URL this leaf did NOT ask for is one the cascade below handed it, and the
+            # cascade is sibling-blind: `_extract_url_from_parents`, `_extract_url_from_
+            # sibling_results` and the Chroma link query each rank the SAME pool the same way
+            # for every sibling that arrives without a URL, so a fan-out of per-entity page
+            # reads collapses onto one page (52 of 101 duplicate sibling-visit groups in the
+            # recorded corpus resolved this way; ASSUMPTION_AUDIT.md T1-4).
+            sibling_dedup = self._cfg.action.visit_sibling_url_dedup and not has_named_url_source
+            url_was_declared = bool(optional_url and self._is_valid_url(str(optional_url)))
+            claimed_urls: Set[str] = (
+                self._sibling_claimed_urls(graph, node) if sibling_dedup else set()
+            )
+            dropped_duplicate: Optional[str] = None
+
             if not has_named_url_source and (not optional_url or not self._is_valid_url(optional_url)):
                 think_url = self._extract_url_from_think_node(graph, node)
                 if think_url:
@@ -1470,7 +1559,22 @@ class VisitLeafAction(LeafAction):
                             self._logger.info(f"[VISIT] Extracted URL from sibling results: {sibling_url[:80]}")
                         else:
                             self._logger.debug(f"[VISIT] No URL found in node details, think node, parents, or siblings")
-            
+
+            # Only a fallback-resolved URL is dropped. An explicitly declared one is this
+            # leaf's own instruction, so a duplicate there is the planner's call to make.
+            if (
+                sibling_dedup
+                and not url_was_declared
+                and optional_url
+                and self._normalize_visit_url(str(optional_url)) in claimed_urls
+            ):
+                dropped_duplicate = str(optional_url)
+                optional_url = None
+                self._logger.info(
+                    f"[VISIT] Sibling URL dedup: dropped fallback URL already claimed by a "
+                    f"sibling: {dropped_duplicate[:80]}"
+                )
+
             if not link_idea and not (optional_url and self._is_valid_url(optional_url)):
                 link_idea = intent or node.title or ""
                 if link_idea:
@@ -1484,6 +1588,10 @@ class VisitLeafAction(LeafAction):
             optional_success = False
             
             if optional_url and self._is_valid_url(optional_url):
+                # Claimed BEFORE the fetch is awaited: a concurrent sibling that resolves
+                # while this one is in flight has to see the page as taken.
+                if sibling_dedup:
+                    self._claim_visit_urls(graph, node, [optional_url])
                 result, _, _ = await self._visit_single_page(optional_url, graph, node, io, intent)
                 if result and result.get("success"):
                     content_length = result.get("content_total_chars") or len(result.get("content", "") or "")
@@ -1543,7 +1651,25 @@ class VisitLeafAction(LeafAction):
                             if url not in seen:
                                 candidate_urls.append(url)
                                 seen.add(url)
-                
+
+                # Re-read the claims: the extraction above awaited, so a sibling may have
+                # taken a page since this leaf started resolving. Dropping the taken ones
+                # here is what lets the selection below pick the NEXT candidate rather than
+                # re-picking the one every sibling ranks first.
+                if sibling_dedup and candidate_urls:
+                    claimed_urls = self._sibling_claimed_urls(graph, node)
+                    kept = [
+                        u for u in candidate_urls
+                        if self._normalize_visit_url(u) not in claimed_urls
+                    ]
+                    if len(kept) != len(candidate_urls):
+                        self._logger.info(
+                            f"[VISIT] Sibling URL dedup: dropped "
+                            f"{len(candidate_urls) - len(kept)} candidate URL(s) already "
+                            f"claimed by a sibling ({len(kept)} left)"
+                        )
+                        candidate_urls = kept
+
                 if candidate_urls:
                     if link_count > len(urls_to_visit):
                         needed = link_count - len(urls_to_visit)
@@ -1572,6 +1698,12 @@ class VisitLeafAction(LeafAction):
                             f"chroma_urls={chroma_urls_found}. "
                             f"Details should contain 'url'/'optional_url' or 'link_idea' for semantic link discovery."
                         )
+                        if dropped_duplicate:
+                            error_msg += (
+                                f" Every resolvable URL was already claimed by a sibling "
+                                f"(first dropped: {dropped_duplicate}); this leaf would have "
+                                f"re-fetched a page the batch already has."
+                            )
                         self._log_structured(
                         "error",
                         "[VISIT] Visit node missing valid URL or link_idea",
@@ -1642,6 +1774,8 @@ class VisitLeafAction(LeafAction):
             # concurrent requests; a semaphore caps in-flight fetches so a burst
             # of CPU-bound HTML parsing can't starve the event loop.
             unique_urls = list(dict.fromkeys(urls_to_visit))
+            if sibling_dedup:
+                self._claim_visit_urls(graph, node, unique_urls)
             concurrency = max(1, self._cfg.action.visit_page_concurrency)
             semaphore = asyncio.Semaphore(concurrency)
 
