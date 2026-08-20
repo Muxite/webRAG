@@ -25,6 +25,7 @@ Validation always uses gpt-5-mini regardless of execution model.
 """
 
 import asyncio
+import hashlib
 import json
 import os
 import time
@@ -390,6 +391,21 @@ TEST_PRIORITY_ORDER = [
     "023",  # Sequential Data Gathering (6/10) - Priority 29
     "024",  # Research Document Analysis (7/10) - Priority 30
 ]
+
+
+def _settings_fingerprint(settings: Dict[str, Any]) -> str:
+    """Short, stable hash of an effective settings dict, for the result filename.
+
+    Two runs under the same ``run_id``/model/variant/repeat but a different
+    ``IDEA_TEST_ARM`` or ``IDEA_TEST_*`` override combination previously collided on
+    an identical filename (the arm/override choice wasn't in the name at all), so the
+    second run silently overwrote the first's JSON. Hashing the actual settings used
+    disambiguates any override combination, however it was produced, without needing
+    to enumerate every override flag here.
+    :param settings: The effective settings dict for this run (post arm/env overrides).
+    :return: 8 lowercase hex characters.
+    """
+    return hashlib.sha256(json.dumps(settings, sort_keys=True, default=str).encode("utf-8")).hexdigest()[:8]
 
 
 def _is_enabled(value: str) -> bool:
@@ -1194,8 +1210,12 @@ async def run_single_test(
         result = add_graph_visualization(result)
 
         tier_tag = f"_t{effort_tier}" if effort_tier else ""
+        cfg_tag = f"_cfg{_settings_fingerprint(variant_specific_settings)}"
         safe_model = normalized.replace("/", "-")
-        out_path = results_dir / f"{run_id}_{test_id}_{safe_model}_{execution_variant}{tier_tag}_r{repeat_index}.json"
+        out_path = (
+            results_dir
+            / f"{run_id}_{test_id}_{safe_model}_{execution_variant}{tier_tag}{cfg_tag}_r{repeat_index}.json"
+        )
         
         report_verbosity = _env_int("IDEA_TEST_REPORT_VERBOSITY", [], 1)
         reporter = TestReportGenerator(verbosity=report_verbosity)
