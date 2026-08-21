@@ -179,19 +179,31 @@ _EXPECT_CONTRACT_ADDENDUM = (
 
 
 # Opt-in expansion addendum (``expansion_alternative_branch_enabled``): explains the two
-# optional structural fields ``EXPANSION_JSON_SCHEMA_WITH_BRANCHING`` advertises. Framed as
-# two fixed-vocabulary questions with an explicit "most candidates leave both unset" default,
-# because a weak model asked an open-ended "is there another way?" answers yes every time and
-# doubles the plan.
+# optional structural fields ``EXPANSION_JSON_SCHEMA_WITH_BRANCHING`` advertises. Diagnosed
+# 2026-08-21 (see docs/handoffs/DAG_V2_REASONING_DIFF_FINDINGS_2026-08-21.md) as near-zero
+# emission in practice: the original wording closed on "omit both when in doubt" as its last,
+# most-salient line with no comparably forceful positive trigger, and had zero worked example
+# unlike ``_EXPECT_CONTRACT_ADDENDUM`` above (a cheap model pattern-matches on examples far
+# more reliably than an abstract rule, and this field asks for harder CROSS-candidate joint
+# consistency than ``expect``'s per-candidate-only requirement). Rebalanced to state a concrete
+# positive trigger with comparable weight and to add a worked example for each field. Still
+# keeps a bounded opt-out (a weak model asked an open-ended "is there another way?" answers yes
+# every time and doubles the plan) but no longer lets it stand alone as the final word.
 _ALTERNATIVE_BRANCH_ADDENDUM = (
-    "MULTIPLE APPROACHES: when a sub-problem has more than one candidate route, say so with "
-    "one of two OPTIONAL top-level fields on a candidate. Use \"alternative_of\": "
-    "\"<exact title of another candidate>\" when this candidate is a BACKUP that should only "
-    "run if that other candidate does not work out — the backup is held back until then. Use "
-    "\"race_group\": \"<short label>\" on TWO OR MORE candidates that are different ways to "
-    "find the SAME fact and are worth trying at once; put the identical label on every member "
-    "of the group, and use a different label (or none) for candidates that find a DIFFERENT "
-    "fact. Most candidates need neither field. Omit both when in doubt."
+    "MULTIPLE APPROACHES: this is a common pattern, actively look for it. If you notice 2+ "
+    "candidates that could independently answer the same sub-question, or a candidate that is "
+    "a clear fallback for another, tag them with one of two OPTIONAL top-level fields on a "
+    "candidate. Use \"race_group\": \"<short label>\" on TWO OR MORE candidates that are "
+    "different ways to find the SAME fact and are worth trying at once; put the identical "
+    "label on every member of the group, and use a different label (or none) for candidates "
+    "that find a DIFFERENT fact. Example race_group: candidate \"Check the official site for "
+    "the founding year\" and candidate \"Check the archive mirror for the founding year\", both "
+    "tagged \"race_group\": \"founding_year\". Use \"alternative_of\": \"<exact title of "
+    "another candidate>\" when this candidate is a BACKUP that should only run if that other "
+    "candidate does not work out — the backup is held back until then. Example alternative_of: "
+    "candidate \"Search the primary database\" and backup candidate \"Search a secondary "
+    "index\" tagged \"alternative_of\": \"Search the primary database\". If you genuinely see "
+    "no such relationship, leave both fields unset — most candidates still need neither."
 )
 
 

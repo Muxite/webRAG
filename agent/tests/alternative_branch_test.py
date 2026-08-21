@@ -168,6 +168,27 @@ async def _expand_with(settings):
     return candidates, _prompt_text(io)
 
 
+def test_addendum_text_has_worked_examples_and_a_positive_trigger():
+    """2026-08-21 fix: the addendum was near-zero emission in practice because it closed on
+    "omit both when in doubt" with no comparably weighted positive trigger, and had zero
+    worked example (see docs/handoffs/DAG_V2_REASONING_DIFF_FINDINGS_2026-08-21.md, item 3).
+    Assert the rebalanced text is well-formed and actually contains both worked examples and
+    a concrete positive trigger condition, not just the opt-out language.
+    """
+    text = _ALTERNATIVE_BRANCH_ADDENDUM
+    assert isinstance(text, str) and text.strip() == text
+    # a concrete worked example for each field, mirroring _EXPECT_CONTRACT_ADDENDUM's style
+    assert "Example race_group" in text
+    assert "Example alternative_of" in text
+    # a positive trigger stated with weight comparable to the opt-out, not just the opt-out
+    assert "actively look for it" in text
+    assert "If you notice 2+ candidates" in text
+    # the opt-out still exists (bounded, not removed) but is no longer the addendum's only
+    # instruction — both race_group and alternative_of still get taught explicitly.
+    assert "leave both fields unset" in text
+    assert "race_group" in text and "alternative_of" in text
+
+
 @pytest.mark.asyncio
 async def test_flag_off_neither_addendum_nor_parsed_fields():
     candidates, prompt = await _expand_with({})
