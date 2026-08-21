@@ -505,6 +505,16 @@ class MergeConfig:
     # ``SimpleMergePolicy._payload_is_substantive``), so genuine multi-source merges are
     # untouched.
     require_substantive_children_enabled: bool = True
+    # Let a parent whose merge was SKIPPED mint a second merge node once genuinely new
+    # evidence has landed. ``should_create_merge_node``'s dedup check returns False for ANY
+    # existing merge child, skipped or not, so the first skip is an irreversible lockout: a
+    # branch the synthesis judged incomplete can never be re-judged, however much its
+    # remaining siblings go on to find (ENGINE_DESIGN_REVIEW D4). Retry is bounded by the
+    # substantive-child count stamped when the skipped merge was created -- the count must
+    # have GROWN -- so re-running the same evidence is still impossible. Opt-in, default OFF:
+    # unlike the pure bugfixes it composes with, this creates new nodes and new LLM calls on
+    # branches that were previously terminal.
+    retry_after_skip_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",
@@ -512,6 +522,7 @@ class MergeConfig:
         "max_tokens": "merge_max_tokens",
         "max_json_chars": "merge_max_json_chars",
         "require_substantive_children_enabled": "merge_require_substantive_children_enabled",
+        "retry_after_skip_enabled": "merge_retry_after_skip_enabled",
         "goal_evaluation_first_enabled": "merge_goal_evaluation_first_enabled",
         "race_winner_selection_enabled": "merge_race_winner_selection_enabled",
         "race_winner_selection_includes_inferred_groups_enabled": (

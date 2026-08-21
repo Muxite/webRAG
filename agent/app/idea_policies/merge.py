@@ -49,6 +49,11 @@ _ECHOED_RESULT_KEYS = frozenset({
 #: phrase, so a union denominator would drive every real page below any usable threshold.
 _GOAL_RELEVANCE_MIN_OVERLAP = 0.5
 
+#: Substantive-child count stamped onto a merge node when it is minted, so a later retry can
+#: tell "new evidence arrived since that merge was skipped" from "same evidence, same answer".
+#: Only written while ``merge_retry_after_skip_enabled`` is on; absent => no retry.
+SUBSTANTIVE_CHILD_COUNT_AT_CREATION = "substantive_child_count_at_creation"
+
 #: Result-item fields a SEARCH hit carries its finding in. ``description`` is what
 #: ``connector_search`` normalizes every provider's snippet field to; ``snippet`` is the raw
 #: provider spelling, kept for payloads that reach here unnormalized.
@@ -122,16 +127,20 @@ class SimpleMergePolicy(MergePolicy):
         if not node or len(node.children) < 2:
             return False
         
-        # Check if merge node already exists
-        for child_id in node.children:
-            child = graph.get_node(child_id)
-            from agent.app.idea_policies.action_constants import NodeDetailsExtractor
-            if child and NodeDetailsExtractor.is_merge_action(child.details):
-                # If existing merge node indicates skip, don't create another
-                if child.details.get("merge_should_skip", False):
-                    return False
-                return False
-        
+        # An existing merge node under this parent normally settles the question: the
+        # synthesis either already ran or was deliberately skipped, and a second one would
+        # re-pay for the same children. The single exception is a skipped merge that new
+        # evidence has since outdated -- see :meth:`_merge_retry_allowed`.
+        from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+        existing_merges = [
+            child
+            for child in (graph.get_node(child_id) for child_id in node.children)
+            if child and NodeDetailsExtractor.is_merge_action(child.details)
+        ]
+        if existing_merges and not self._merge_retry_allowed(graph, node, existing_merges):
+            return False
+
+
         # Check if all children are ready
         if not self.are_children_ready_to_merge(graph, node_id):
             return False
@@ -144,6 +153,52 @@ class SimpleMergePolicy(MergePolicy):
                     f"but only {substantive} carry content -- nothing to combine"
                 )
                 return False
+        return True
+
+    def _merge_retry_allowed(
+        self, graph: IdeaDag, node: IdeaNode, existing_merges: List[IdeaNode]
+    ) -> bool:
+        """May this parent mint ANOTHER merge node after an earlier one was skipped?
+
+        :meth:`should_create_merge_node` used to answer no unconditionally -- both arms of its
+        ``merge_should_skip`` test returned ``False`` -- so the first merge node a parent ever
+        got locked that parent out of merging for the rest of the run. Including a merge node
+        skipped precisely BECAUSE the goal was judged unmet, which is the one case where the
+        parent has a reason to try again once a sibling brings back more.
+
+        Retry is permitted only when every merge under this parent was skipped AND the
+        substantive-child count has GROWN since the most recent of those skips: re-running the
+        same synthesis over the same evidence can only re-derive the same verdict at the price
+        of another LLM call. The baseline is the count stamped at creation time; a merge node
+        carrying no stamp (anything minted while the flag was off) fails closed and keeps
+        today's lockout, so this never turns into a blanket unconditional retry.
+
+        Nothing here mutates: the skipped node keeps its status and details as the run's audit
+        record of what was tried, and a permitted retry mints a fresh sibling merge node
+        through the ordinary :meth:`create_merge_node` path.
+        """
+        if not self._cfg.merge.retry_after_skip_enabled:
+            return False
+
+        baseline = -1
+        for child in existing_merges:
+            skipped = bool(child.details.get("merge_should_skip", False)) or (
+                child.status == IdeaNodeStatus.SKIPPED
+            )
+            if not skipped:
+                return False
+            recorded = child.details.get(SUBSTANTIVE_CHILD_COUNT_AT_CREATION)
+            if not isinstance(recorded, int) or isinstance(recorded, bool):
+                return False
+            baseline = max(baseline, recorded)
+
+        current = self._substantive_child_count(graph, node)
+        if current <= baseline:
+            return False
+        self._logger.info(
+            f"[MERGE] retrying synthesis for {node.node_id[:8]}: {current} substantive children "
+            f"now vs {baseline} when the skipped merge was created -- new evidence to combine"
+        )
         return True
 
     def _substantive_child_count(self, graph: IdeaDag, node: IdeaNode) -> int:
@@ -216,6 +271,12 @@ class SimpleMergePolicy(MergePolicy):
         merge_details = {
             DetailKey.ACTION.value: IdeaActionType.MERGE.value,
         }
+        # Only stamped while retry is enabled, so a flag-off run's node details stay exactly
+        # as they were and a flag-on run never reads a baseline it did not itself record.
+        if self._cfg.merge.retry_after_skip_enabled:
+            merge_details[SUBSTANTIVE_CHILD_COUNT_AT_CREATION] = self._substantive_child_count(
+                graph, parent
+            )
         if parent_justification:
             merge_details[DetailKey.PARENT_JUSTIFICATION.value] = parent_justification
             merge_details[DetailKey.WHY_THIS_NODE.value] = f"Merge results from children to synthesize findings for: {parent.title}. {parent_justification}"
