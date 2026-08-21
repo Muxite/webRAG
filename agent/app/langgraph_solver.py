@@ -140,7 +140,20 @@ def _msg_text(m: Any) -> str:
     return content if isinstance(content, str) else str(content or "")
 
 
-def _record_io_parity(telemetry: "TelemetrySession", messages: List[Any]) -> None:
+def _msg_role(m: Any) -> str:
+    if isinstance(m, SystemMessage):
+        return "system"
+    if isinstance(m, HumanMessage):
+        return "user"
+    if isinstance(m, AIMessage):
+        return "assistant"
+    if isinstance(m, ToolMessage):
+        return "tool"
+    return str(getattr(m, "type", "") or "unknown")
+
+
+def _record_io_parity(telemetry: "TelemetrySession", messages: List[Any],
+                      full_capture: bool = False) -> None:
     """Emit the ``connector_io`` events ``observability["llm"]`` is actually derived from.
 
     ``summarize_observability`` counts ``llm.calls`` (and the prompt/completion char+word stats)
@@ -152,23 +165,36 @@ def _record_io_parity(telemetry: "TelemetrySession", messages: List[Any]) -> Non
     One "in" + one "out" event per assistant turn, matching ``ConnectorLLM.query_llm``'s own
     request/response pair (``connector_llm.py`` records ``direction="in"`` before the call and
     ``direction="out"`` after), so ``llm.calls`` lands on the SAME scale as every other arm.
+
+    ``full_capture`` additionally records the raw ``prompt_text``/``messages``/``completion_text``
+    under the SAME payload keys ``ConnectorLLM`` uses when its own full capture is on, so a
+    captured run of this arm is diffable against a native-arm run with the same readers. Off by
+    default: the counts-only payload is what every existing consumer expects.
     """
     prior: List[str] = []
+    prior_msgs: List[Dict[str, Any]] = []
     for m in messages or []:
         text = _msg_text(m)
         if isinstance(m, AIMessage):
             prompt_blob = "\n".join(prior)
+            in_payload: Dict[str, Any] = {"prompt_chars": count_chars(prompt_blob),
+                                          "prompt_words": count_words(prompt_blob)}
+            out_payload: Dict[str, Any] = {"completion_chars": count_chars(text),
+                                           "completion_words": count_words(text)}
+            if full_capture:
+                in_payload["prompt_text"] = prompt_blob
+                in_payload["messages"] = list(prior_msgs)
+                out_payload["completion_text"] = text
             telemetry.record_event("connector_io", {
                 "connector": "ConnectorLLM", "direction": "in", "operation": "llm_query",
-                "payload": {"prompt_chars": count_chars(prompt_blob),
-                            "prompt_words": count_words(prompt_blob)},
+                "payload": in_payload,
             })
             telemetry.record_event("connector_io", {
                 "connector": "ConnectorLLM", "direction": "out", "operation": "llm_query",
-                "payload": {"completion_chars": count_chars(text),
-                            "completion_words": count_words(text)},
+                "payload": out_payload,
             })
         prior.append(text)
+        prior_msgs.append({"role": _msg_role(m), "content": text})
 
 
 def _final_answer(messages: List[Any]) -> str:
@@ -207,6 +233,7 @@ class LangGraphSolver:
         collection_name: str = "langgraph_solver",
         search_k: int = 6,
         page_chars: int = 6000,
+        full_capture: bool = False,
     ) -> None:
         self._connector_llm = connector_llm
         self._connector_search = connector_search
@@ -217,6 +244,7 @@ class LangGraphSolver:
         self._collection_name = collection_name
         self._search_k = search_k
         self._page_chars = page_chars
+        self._full_capture = bool(full_capture)
 
     def _build_llm(self) -> ChatOpenAI:
         """Point LangChain's OpenAI-compatible client at whatever provider the run is configured
@@ -311,7 +339,7 @@ class LangGraphSolver:
                     "usage": usage,
                     "duration": 0.0,
                 })
-            _record_io_parity(telemetry, messages)
+            _record_io_parity(telemetry, messages, full_capture=self._full_capture)
             # F17 parity: a provider-side failure must be quarantinable, not scored as a real 0.
             # A recursion/step-budget stop is a genuine agent outcome, NOT infra — never tagged.
             if run_error is not None and not recursion_hit and is_infra_llm_failure(run_error):

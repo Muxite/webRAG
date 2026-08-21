@@ -63,6 +63,9 @@ async def run_offtheshelf_execution(
     telemetry = TelemetrySession(enabled=True, mandate=mandate, correlation_id=correlation_id, trace_path=trace_path)
 
     max_steps = int(os.environ.get("IDEA_TEST_LANGGRAPH_MAX_STEPS", "25"))
+    # Same gate the native arm uses for connector full capture (`execution.py`), so one env var
+    # turns on raw prompt/completion capture for every arm in a run.
+    report_verbosity = int(os.environ.get("IDEA_TEST_REPORT_VERBOSITY", "1"))
     solver = LangGraphSolver(
         connector_llm=connector_llm,
         connector_search=connector_search,
@@ -71,6 +74,7 @@ async def run_offtheshelf_execution(
         connector_browser=connector_browser,
         model_name=model_name,
         collection_name=f"idea_test_{test_id}_{run_stamp}",
+        full_capture=report_verbosity >= 3,
     )
 
     started = time.perf_counter()

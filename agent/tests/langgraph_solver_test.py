@@ -4,9 +4,11 @@ result-mapping logic in isolation.
 """
 import asyncio
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from agent.app.langgraph_solver import LangGraphSolver, _extract_usage, _make_tools
+from agent.app.langgraph_solver import (
+    LangGraphSolver, _extract_usage, _make_tools, _record_io_parity,
+)
 
 
 def test_extract_usage_pulls_tokens_from_ai_messages_only():
@@ -98,3 +100,101 @@ def test_langgraph_solver_name_and_construction():
     )
     assert solver.name == "langgraph_react"
     assert LangGraphSolver.name == "langgraph_react"
+    assert solver._full_capture is False
+
+
+class _FakeTelemetry:
+    """Records `record_event` calls; the only telemetry surface `_record_io_parity` touches."""
+
+    def __init__(self):
+        self.events = []
+
+    def record_event(self, name, payload):
+        self.events.append((name, payload))
+
+
+def _capture_messages():
+    return [
+        SystemMessage(content="sys prompt"),
+        HumanMessage(content="the task"),
+        AIMessage(content="", tool_calls=[{"name": "search", "args": {"query": "x"}, "id": "1"}]),
+        ToolMessage(content="search results", tool_call_id="1"),
+        AIMessage(content="final answer"),
+    ]
+
+
+def test_record_io_parity_full_capture_includes_role_content_pairs():
+    telemetry = _FakeTelemetry()
+    _record_io_parity(telemetry, _capture_messages(), full_capture=True)
+
+    payloads = [payload["payload"] for _name, payload in telemetry.events]
+    assert len(payloads) == 4  # one in/out pair per assistant turn
+
+    first_in = payloads[0]
+    assert first_in["prompt_text"] == "sys prompt\nthe task"
+    assert first_in["messages"] == [
+        {"role": "system", "content": "sys prompt"},
+        {"role": "user", "content": "the task"},
+    ]
+    assert payloads[1]["completion_text"] == ""
+
+    second_in = payloads[2]
+    assert second_in["messages"] == [
+        {"role": "system", "content": "sys prompt"},
+        {"role": "user", "content": "the task"},
+        {"role": "assistant", "content": ""},
+        {"role": "tool", "content": "search results"},
+    ]
+    assert payloads[3]["completion_text"] == "final answer"
+
+
+def test_record_io_parity_default_off_adds_no_new_keys():
+    off, on_default = _FakeTelemetry(), _FakeTelemetry()
+    _record_io_parity(off, _capture_messages(), full_capture=False)
+    _record_io_parity(on_default, _capture_messages())
+
+    assert off.events == on_default.events
+    for _name, payload in off.events:
+        keys = set(payload["payload"])
+        assert keys in ({"prompt_chars", "prompt_words"}, {"completion_chars", "completion_words"})
+
+
+class _StubTestModule:
+    metadata = {"test_id": "999"}
+
+    def get_task_statement(self):
+        return "do the thing"
+
+
+def _run_offtheshelf_capturing_kwargs(monkeypatch, verbosity):
+    from agent.app.testing import execution_langgraph
+
+    captured = {}
+
+    class _StubSolver:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        async def solve(self, mandate, **kwargs):
+            return {"final_deliverable": "answer", "success": True, "observability": {}}
+
+    monkeypatch.setattr(execution_langgraph, "LangGraphSolver", _StubSolver)
+    if verbosity is None:
+        monkeypatch.delenv("IDEA_TEST_REPORT_VERBOSITY", raising=False)
+    else:
+        monkeypatch.setenv("IDEA_TEST_REPORT_VERBOSITY", verbosity)
+    asyncio.run(execution_langgraph.run_offtheshelf_execution(
+        test_module=_StubTestModule(), model_name="openai/gpt-5-mini",
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        run_stamp="teststamp",
+    ))
+    return captured
+
+
+def test_offtheshelf_execution_enables_full_capture_at_verbosity_3(monkeypatch):
+    assert _run_offtheshelf_capturing_kwargs(monkeypatch, "3")["full_capture"] is True
+
+
+def test_offtheshelf_execution_leaves_full_capture_off_by_default(monkeypatch):
+    assert _run_offtheshelf_capturing_kwargs(monkeypatch, None)["full_capture"] is False
+    assert _run_offtheshelf_capturing_kwargs(monkeypatch, "2")["full_capture"] is False
