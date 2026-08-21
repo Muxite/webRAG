@@ -34,7 +34,10 @@ class FakeChroma:
         return True
 
     async def list_collections(self):
-        return ["links_run"] if self._urls else []
+        # Matches the run-scoped naming ``_store_links_in_chroma``/``_query_links_from_chroma``
+        # use: ``links_{io.collection_name}_{url_hash}``. ``FakeIO`` below doesn't set
+        # ``collection_name`` so it falls back to the same default AgentIO uses.
+        return ["links_agent_memory_run"] if self._urls else []
 
     async def query_chroma(self, collection, query_texts, n_results=10):
         return {

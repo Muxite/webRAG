@@ -1145,7 +1145,13 @@ class VisitLeafAction(LeafAction):
             
             import hashlib
             url_hash = hashlib.sha256(base_url.encode("utf-8")).hexdigest()[:12]
-            collection_name = f"links_{url_hash}"
+            # Scoped to this run's collection namespace (``io.collection_name``, e.g.
+            # ``idea_test_{test_id}_{run_stamp}`` or ``agent_visit_{correlation_id}``) so a
+            # page's outbound-link index cannot bleed into an unrelated later run/task whose
+            # link_idea happens to embed close to it -- the read side below only ever matches
+            # collections in this same namespace.
+            run_scope = getattr(io, "collection_name", None) or "agent_memory"
+            collection_name = f"links_{run_scope}_{url_hash}"
             docs: List[str] = []
             metadatas: List[Dict[str, Any]] = []
             ids: List[str] = []
@@ -1207,8 +1213,14 @@ class VisitLeafAction(LeafAction):
                 self._logger.debug(f"[VISIT] No collections found in ChromaDB")
                 return []
             
-            link_collections = [c for c in all_collections if c and c.startswith("links_")]
-            
+            # Scoped to this run's collection namespace -- see the matching comment in
+            # _store_links_in_chroma. Without this prefix a query would match ANY link
+            # index ever written by ANY run/task, including unrelated ones from before or
+            # after this run.
+            run_scope = getattr(io, "collection_name", None) or "agent_memory"
+            run_prefix = f"links_{run_scope}_"
+            link_collections = [c for c in all_collections if c and c.startswith(run_prefix)]
+
             if not link_collections:
                 self._logger.debug(f"[VISIT] No link collections found for query: {link_idea}")
                 return []
@@ -1362,12 +1374,57 @@ class VisitLeafAction(LeafAction):
                         if valid_selected:
                             self._logger.debug(f"[VISIT] LLM selected {len(valid_selected)} links from {len(candidate_urls)} candidates")
                             return valid_selected[:link_count]
+                        # Nothing the model picked was in the (possibly poisoned/off-topic)
+                        # candidate pool. If it still answered with well-formed absolute
+                        # URL(s), prefer those over silently substituting the first
+                        # candidate -- the model's own answer is more likely right than an
+                        # arbitrary index-0 pick, especially when the pool itself is
+                        # off-topic (see the run-scoping fix above). Fall back to
+                        # candidate_urls only when the answer itself is unusable.
+                        off_list_urls = [
+                            url for url in selected
+                            if isinstance(url, str) and self._looks_like_url(url)
+                        ]
+                        if off_list_urls:
+                            self._logger.warning(
+                                f"[VISIT] LLM selected {len(off_list_urls)} URL(s) not in the "
+                                f"{len(candidate_urls)}-candidate pool; using the model's answer "
+                                f"instead of falling back to candidate_urls[0] (selected="
+                                f"{off_list_urls[:link_count]}, pool sample={candidate_urls[:3]})"
+                            )
+                            return off_list_urls[:link_count]
+                        self._logger.warning(
+                            f"[VISIT] LLM link selection returned no usable URL (selected="
+                            f"{selected!r}); falling back to the first {link_count} candidate(s)"
+                        )
+                    else:
+                        self._logger.warning(
+                            f"[VISIT] LLM link selection response had a non-list 'selected' field "
+                            f"(selected={selected!r}); falling back to the first {link_count} candidate(s)"
+                        )
                 except json.JSONDecodeError:
                     self._logger.warning(f"[VISIT] Failed to parse LLM link selection response: {response[:200]}")
         except Exception as exc:
             self._logger.warning(f"[VISIT] LLM link selection failed: {exc}")
-        
+
         return candidate_urls[:link_count]
+
+    @staticmethod
+    def _looks_like_url(value: str) -> bool:
+        """Basic sanity check: absolute http(s) URL with a real host, not garbage.
+
+        Used only to decide whether an off-candidate-list model answer is trustworthy
+        enough to use in place of the ``candidate_urls[:link_count]`` fallback -- not a
+        full RFC validator.
+        """
+        value = value.strip()
+        if not value or not (value.startswith("http://") or value.startswith("https://")):
+            return False
+        try:
+            parsed = urlparse(value)
+        except ValueError:
+            return False
+        return bool(parsed.netloc) and "." in parsed.netloc
     
     def _parse_visit_html(self, raw_html: str, url: str) -> Dict[str, Any]:
         """
