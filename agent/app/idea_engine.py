@@ -1514,6 +1514,20 @@ class IdeaDagEngine:
                     f"behind their primary; registered {raced} racing child(ren)"
                 )
 
+        # Structural race-group inference (opt-in, `expansion_race_group_structural_inference_enabled`),
+        # checked INDEPENDENTLY of the flag above: it recovers the same relationship from plan
+        # SHAPE, so it has to run with the branching schema variant switched off — which is the
+        # only configuration the small local tiers ever produce a usable plan in (the authored
+        # tag is never emitted below 14b). Populates a separate registry; consuming it at merge
+        # time is a further opt-in of its own.
+        if self._cfg.expansion.race_group_structural_inference_enabled and created_children:
+            inferred = _alternative_branch.infer_race_groups(node, created_children)
+            if inferred:
+                self._logger.info(
+                    f"[STEP {step_index}] BRANCHING: inferred {len(inferred)} race group(s) "
+                    f"from plan shape: {inferred}"
+                )
+
         parent_goal = node.details.get(DetailKey.GOAL.value) or node.title
         if not node.details.get(DetailKey.GOAL.value):
             node.details[DetailKey.GOAL.value] = parent_goal

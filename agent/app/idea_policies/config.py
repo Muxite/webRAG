@@ -285,6 +285,16 @@ class ExpansionConfig:
     # addendum; ``idea_policies/alternative_branch.py`` resolves the hints into real node
     # relationships after ``graph.expand()``. Opt-in, default OFF -> byte-identical prompt.
     alternative_branch_enabled: bool = False
+    # Recover the SAME race relationship as ``alternative_branch_enabled``'s ``race_group`` tag
+    # without asking the model for a tag at all: ``alternative_branch.infer_race_groups`` reads
+    # it off plan shape (near-duplicate ``expect`` contracts, or title overlap, AND disjoint
+    # approaches) after ``graph.expand()``. Checked INDEPENDENTLY of the flag above, because
+    # the point is to work with the branching schema variant switched off — the live emission
+    # probe found the authored tag is simply never emitted below the 14b tier. Opt-in, default
+    # OFF; on its own it only populates the ``race_groups_inferred`` registry (instrumentation),
+    # since merge-time consumption is gated separately by
+    # ``merge_race_winner_selection_includes_inferred_groups_enabled``.
+    race_group_structural_inference_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "expansion_model",
@@ -296,6 +306,9 @@ class ExpansionConfig:
         "input_output_framing_enabled": "expansion_input_output_framing_enabled",
         "echo_retry_enabled": "expansion_echo_retry_enabled",
         "alternative_branch_enabled": "expansion_alternative_branch_enabled",
+        "race_group_structural_inference_enabled": (
+            "expansion_race_group_structural_inference_enabled"
+        ),
     }
 
     @classmethod
@@ -466,6 +479,14 @@ class MergeConfig:
     # result. Purely mechanical: status + contract comparisons, never an LLM judgment call.
     # Opt-in, default OFF -> ``merge()`` aggregates everything exactly as today.
     race_winner_selection_enabled: bool = False
+    # Let the flag above also resolve STRUCTURALLY INFERRED groups (``race_groups_inferred``,
+    # from ``expansion_race_group_structural_inference_enabled``), not just authored ones. A
+    # separate flag because the two registries carry different evidence: an authored tag is a
+    # choice the model made, an inferred group is a heuristic that has never been live
+    # validated — and winner selection actively DISCARDS the loser's findings, so a false
+    # positive here silently drops a legitimate independent result. Opt-in, default OFF ->
+    # inferred groups stay pure instrumentation no matter what the expansion flag is set to.
+    race_winner_selection_includes_inferred_groups_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",
@@ -473,6 +494,9 @@ class MergeConfig:
         "max_tokens": "merge_max_tokens",
         "goal_evaluation_first_enabled": "merge_goal_evaluation_first_enabled",
         "race_winner_selection_enabled": "merge_race_winner_selection_enabled",
+        "race_winner_selection_includes_inferred_groups_enabled": (
+            "merge_race_winner_selection_includes_inferred_groups_enabled"
+        ),
     }
 
     @classmethod

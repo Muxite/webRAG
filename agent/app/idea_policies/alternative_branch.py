@@ -59,6 +59,25 @@ ALTERNATIVE_RETIRED = "alternative_retired"
 #: shape (see that method's docstring for the compatibility bug this avoids).
 RACE_GROUPS = "race_groups"
 
+#: Same shape and same ancestor as :data:`RACE_GROUPS` (``{label: [member_node_id, ...]}``),
+#: but produced by :func:`infer_race_groups` from PLAN SHAPE rather than from a model-emitted
+#: tag. Deliberately a second key rather than an update of the first: provenance survives into
+#: every report capture, and merge-time consumption of inferred groups is separately gated
+#: (``merge_race_winner_selection_includes_inferred_groups_enabled``).
+RACE_GROUPS_INFERRED = "race_groups_inferred"
+
+#: Ancestor-side ``{label: 1|2}`` companion to :data:`RACE_GROUPS_INFERRED` recording WHICH
+#: signal registered each group — tier 1 (near-duplicate ``expect`` contracts) or the weaker
+#: tier 2 (title overlap). Kept parallel rather than folded into the registry so the registry
+#: keeps one shape for both producers, and so tier 2's false-positive rate can be measured on
+#: its own before it is ever trusted at merge time.
+RACE_GROUPS_INFERRED_TIERS = "race_groups_inferred_tiers"
+
+#: Member-side marker: the inferred label this node was grouped under. Instrumentation only —
+#: notably NOT :data:`DetailKey.RACE_GROUP`, which would additionally hand the group a
+#: dispatch-independence pass in ``siblings_are_independent`` on heuristic evidence alone.
+RACE_GROUP_INFERRED = "race_group_inferred"
+
 #: Step index at which a race member completed. The only ordering signal available at merge
 #: time — the graph records no per-node completion timestamp — so the winner chain's
 #: "earliest completion" tie-break is (step, declared order).
@@ -179,6 +198,179 @@ def link_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> int:
             parent.details[RACE_GROUPS] = existing
         existing.update(registry)
     return registered
+
+
+#: Two token sets count as the SAME target above this Jaccard similarity. 0.7 is a
+#: near-duplicate bar, not a topical-relatedness one: a pair of n-token sets differing by one
+#: token each way scores ``(n-1)/(n+1)``, so it takes 7+ tokens to clear it by wording alone.
+RACE_INFERENCE_SIMILARITY = 0.7
+
+#: Dropped before every similarity comparison. Function words are boilerplate shared by every
+#: sibling of every plan, so leaving them in inflates the score of unrelated candidates.
+_STOPWORDS = frozenset({
+    "a", "an", "and", "as", "at", "by", "for", "from", "in", "into", "is", "it", "its", "of",
+    "on", "or", "that", "the", "this", "to", "via", "with",
+})
+
+
+def infer_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> Dict[str, int]:
+    """Register race groups read off PLAN SHAPE, with no authored tag of any kind.
+
+    :func:`link_race_groups` can only see a race the model explicitly labelled, and the live
+    emission probe (``scripts/alt_branch_emission_probe.py``, 2026-08-21) found that tag never
+    emitted at the 0.5b/7b tiers this repo targets — prompt text alone had hit its ceiling. So
+    the same relationship is recovered structurally instead, from the module docstring's own
+    definition of a race: **the same target reached by different routes**. Both halves are
+    required, because either half alone is a well-known false positive:
+
+    * different routes alone — :func:`idea_sequencing.disjoint_approach_reason` — is exactly
+      what a six-way breadth fan-out over six unrelated entities also looks like;
+    * the same target alone is what any two steps of one sequential chain look like.
+
+    Same-target evidence comes in two tiers, never mixed inside one group:
+
+    * **tier 1**: near-duplicate ``expect`` contracts (the opt-in
+      ``expansion_expect_contract_enabled`` field). Two leaves promising to return the same
+      measurable datum ARE two routes to one fact, stated by the author for an unrelated
+      reason, which is the strongest signal available here for free. Known limitation: a
+      breadth fan-out whose leaves all promise the same FIELD without naming their differing
+      entity ("the prominence in metres and the source URL", six times) is indistinguishable
+      from a race by this signal alone — which is exactly why merge-time consumption is gated
+      separately and a breadth negative control belongs in the live probe.
+    * **tier 2**: title-token overlap AFTER the parent's own title vocabulary is stripped from
+      both sides, for plans with no ``expect`` at all. Stripping is what stops every sibling of
+      a narrow parent from looking alike, and it makes this tier strict enough that it is
+      expected to fire rarely — hence :data:`RACE_GROUPS_INFERRED_TIERS`, which keeps tier 2's
+      hit rate (and false-positive rate) measurable separately from tier 1's before either is
+      allowed to influence a merge.
+
+    Writes to :data:`RACE_GROUPS_INFERRED`, never to :data:`RACE_GROUPS`, and never to
+    ``DetailKey.RACE_GROUP``: with the merge-side flag off (the default) the whole pass is
+    instrumentation, and ``merge()`` behaves exactly as it does today. Singleton groups are
+    dropped for the same reason :func:`link_race_groups` drops them. Already-tagged, parked
+    and non-leaf candidates are skipped — an authored group is better evidence than this
+    inference, and a parked A->B fallback is sequential by construction.
+
+    Leafness is read as "carries a non-merge action" rather than off ``details.is_leaf``,
+    because the engine stamps ``is_leaf`` in a LATER loop than this pass's call site.
+
+    :returns: ``{label: tier}`` for the groups registered on ``parent`` (empty when none).
+    """
+    from agent.app.idea_sequencing import disjoint_approach_reason
+
+    parent_vocab = _tokens(getattr(parent, "title", ""))
+
+    with_expect: List[Any] = []
+    without_expect: List[Any] = []
+    for node in nodes:
+        details = getattr(node, "details", None)
+        if not isinstance(details, dict) or not _is_leaf_candidate(details):
+            continue
+        if details.get(DetailKey.RACE_GROUP.value) or details.get(ALTERNATIVE_PENDING):
+            continue
+        if details.get(DetailKey.ALTERNATIVE_OF_NODE.value):
+            continue
+        expect = details.get(DetailKey.EXPECT.value)
+        if isinstance(expect, str) and expect.strip():
+            with_expect.append(node)
+        else:
+            without_expect.append(node)
+
+    registry: Dict[str, List[str]] = {}
+    tiers: Dict[str, int] = {}
+    for tier, group_nodes, signature in (
+        (1, with_expect, lambda n: _tokens(n.details.get(DetailKey.EXPECT.value))),
+        (2, without_expect, lambda n: _tokens(n.title) - parent_vocab),
+    ):
+        for members in _cluster_by_similarity(group_nodes, signature):
+            if not disjoint_approach_reason(list(members)):
+                continue
+            label = _inferred_label(members, signature, taken=set(registry))
+            registry[label] = [m.node_id for m in members]
+            tiers[label] = tier
+            for member in members:
+                member.details[RACE_GROUP_INFERRED] = label
+
+    if registry:
+        _merge_into(parent, RACE_GROUPS_INFERRED, registry)
+        _merge_into(parent, RACE_GROUPS_INFERRED_TIERS, tiers)
+    return tiers
+
+
+def _cluster_by_similarity(nodes: Sequence[Any], signature) -> List[List[Any]]:
+    """Greedy seed-and-absorb clustering of ``nodes`` into same-target groups of 2+.
+
+    Each unassigned node in declared order seeds a group and absorbs every later unassigned
+    node similar enough to THAT SEED (not to the growing group), so membership never depends
+    on absorption order and a chain of pairwise-similar-but-collectively-unrelated candidates
+    cannot drift into one group.
+    """
+    signatures = [(node, signature(node)) for node in nodes]
+    assigned: set = set()
+    clusters: List[List[Any]] = []
+    for index, (seed, seed_tokens) in enumerate(signatures):
+        if index in assigned or not seed_tokens:
+            continue
+        members = [seed]
+        taken = [index]
+        for other_index in range(index + 1, len(signatures)):
+            if other_index in assigned:
+                continue
+            other, other_tokens = signatures[other_index]
+            if _jaccard(seed_tokens, other_tokens) >= RACE_INFERENCE_SIMILARITY:
+                members.append(other)
+                taken.append(other_index)
+        if len(members) < 2:
+            continue
+        assigned.update(taken)
+        clusters.append(members)
+    return clusters
+
+
+def _inferred_label(members: Sequence[Any], signature, taken: set) -> str:
+    """A short, human-readable label for a group, from the vocabulary its members share."""
+    shared: set = set()
+    for index, member in enumerate(members):
+        tokens = signature(member)
+        shared = tokens if index == 0 else (shared & tokens)
+    base = "inferred:" + ("-".join(sorted(shared)[:3]) or str(len(taken) + 1))
+    label = base
+    suffix = 2
+    while label in taken:
+        label = f"{base}-{suffix}"
+        suffix += 1
+    return label
+
+
+def _merge_into(parent: "IdeaNode", key: str, values: Dict[str, Any]) -> None:
+    existing = parent.details.get(key)
+    if not isinstance(existing, dict):
+        existing = {}
+        parent.details[key] = existing
+    existing.update(values)
+
+
+def _is_leaf_candidate(details: Dict[str, Any]) -> bool:
+    from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+
+    if NodeDetailsExtractor.is_merge_action(details):
+        return False
+    return bool(NodeDetailsExtractor.get_action(details)) or bool(
+        details.get(DetailKey.IS_LEAF.value)
+    )
+
+
+def _jaccard(left: set, right: set) -> float:
+    if not left or not right:
+        return 0.0
+    union = left | right
+    return len(left & right) / len(union)
+
+
+def _tokens(text: Any) -> set:
+    """Comparable content words of ``text``: lowercased, punctuation-split, stopwords dropped."""
+    raw = "".join(char if char.isalnum() else " " for char in str(text or "").lower())
+    return {token for token in raw.split() if token and token not in _STOPWORDS}
 
 
 def _norm(text: Any) -> str:

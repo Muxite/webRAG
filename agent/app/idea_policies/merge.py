@@ -11,6 +11,7 @@ from agent.app.idea_policies.config import IdeaConfig
 from agent.app.idea_policies.alternative_branch import (
     RACE_COMPLETED_STEP,
     RACE_GROUPS,
+    RACE_GROUPS_INFERRED,
     RACE_LOSER,
     is_alternative_pending,
 )
@@ -127,8 +128,9 @@ class SimpleMergePolicy(MergePolicy):
         """Resolve one race group under ``node_id`` to a single winning member id.
 
         Group membership is read off ``node.details["race_groups"][race_group]`` — the
-        registry ``alternative_branch.link_race_groups`` writes onto the shared ancestor —
-        NOT off graph topology. The alternative was to mint the merge node as a multi-parent
+        registry ``alternative_branch.link_race_groups`` writes onto the shared ancestor (plus
+        the structurally inferred one, only when that second registry is explicitly opted into;
+        see :meth:`_race_registry`) — NOT off graph topology. The alternative was to mint the merge node as a multi-parent
         child of the race leaves via ``IdeaDag.merge_nodes``, and two existing consumers still
         assume single-parent topology: :meth:`merge`'s recursive-upward step reads
         ``node.parent_id`` (``None`` on a ``parent_ids``-only node, so the walk silently
@@ -153,9 +155,7 @@ class SimpleMergePolicy(MergePolicy):
         node = graph.get_node(node_id)
         if not node:
             return None
-        registry = node.details.get(RACE_GROUPS)
-        if not isinstance(registry, dict):
-            return None
+        registry = self._race_registry(node)
         member_ids = registry.get(race_group)
         if not isinstance(member_ids, list) or len(member_ids) < 2:
             return None
@@ -200,6 +200,26 @@ class SimpleMergePolicy(MergePolicy):
             return False
         return bool(verdict.applicable and verdict.satisfied and verdict.datum_verified)
 
+    def _race_registry(self, node: IdeaNode) -> Dict[str, Any]:
+        """Race groups under ``node`` this policy is willing to resolve.
+
+        The authored registry alone unless
+        ``merge_race_winner_selection_includes_inferred_groups_enabled`` is on, in which case
+        the structurally inferred one (``race_groups_inferred``) is unioned in behind it —
+        authored membership wins any label collision, being the better evidence. Default OFF
+        keeps inferred groups pure instrumentation: they are populated, logged and visible in
+        report captures while ``merge()`` stays byte-identical.
+        """
+        registry = node.details.get(RACE_GROUPS)
+        registry = dict(registry) if isinstance(registry, dict) else {}
+        if not self._cfg.merge.race_winner_selection_includes_inferred_groups_enabled:
+            return registry
+        inferred = node.details.get(RACE_GROUPS_INFERRED)
+        if isinstance(inferred, dict):
+            for label, member_ids in inferred.items():
+                registry.setdefault(label, member_ids)
+        return registry
+
     def _race_excluded_ids(self, graph: IdeaDag, node_id: str) -> set:
         """Race-group members under ``node_id`` that lost, so ``merge`` can drop them.
 
@@ -214,8 +234,8 @@ class SimpleMergePolicy(MergePolicy):
         node = graph.get_node(node_id)
         if not node:
             return set()
-        registry = node.details.get(RACE_GROUPS)
-        if not isinstance(registry, dict):
+        registry = self._race_registry(node)
+        if not registry:
             return set()
 
         excluded = set()

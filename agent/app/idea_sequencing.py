@@ -142,7 +142,6 @@ def siblings_are_independent(
     if detect_state_dependencies(graph, candidate_ids, logger):
         return False, "state_dependency"
 
-    from agent.app.idea_policies.base import IdeaActionType
     from agent.app.idea_policies.dataflow import unresolved_slots
 
     nodes: List[IdeaNode] = []
@@ -172,30 +171,56 @@ def siblings_are_independent(
         if len(labels) == 1 and next(iter(labels)):
             return True, "race_group"
 
-    def _concrete_url(details) -> Optional[str]:
-        for key in ("optional_url", DetailKey.URL.value, DetailKey.LINK.value, "url", "link"):
-            value = details.get(key)
-            if isinstance(value, str) and value.startswith(("http://", "https://")):
-                return value
+    reason = disjoint_approach_reason(nodes)
+    if reason:
+        return True, reason
+
+    return False, "no_independence_evidence"
+
+
+def concrete_url(details) -> Optional[str]:
+    """The first http(s) URL this node carries, under any of the five spellings in use."""
+    for key in ("optional_url", DetailKey.URL.value, DetailKey.LINK.value, "url", "link"):
+        value = details.get(key)
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
+            return value
+    return None
+
+
+def disjoint_approach_reason(nodes: List[IdeaNode]) -> Optional[str]:
+    """Do these siblings take demonstrably DIFFERENT approaches? Which evidence says so?
+
+    The three URL/query shape heuristics :func:`siblings_are_independent` ends with, lifted
+    out verbatim so a second consumer can reuse them without a graph or a mandate:
+    ``alternative_branch.infer_race_groups`` needs exactly this "different route" half of
+    the race definition. Necessary-but-not-sufficient for a race on its own — a breadth
+    fan-out over six unrelated entities also has disjoint searches — so that caller pairs it
+    with a same-target check.
+
+    :returns: ``"concrete_urls"`` / ``"mixed_search_visit"`` / ``"disjoint_searches"``, or
+        ``None`` when no heuristic matches.
+    """
+    from agent.app.idea_policies.base import IdeaActionType
+
+    if not nodes:
         return None
 
-    if nodes and all(
+    if all(
         NodeDetailsExtractor.get_action(n.details) == IdeaActionType.VISIT.value
-        and _concrete_url(n.details)
+        and concrete_url(n.details)
         for n in nodes
     ):
-        return True, "concrete_urls"
+        return "concrete_urls"
 
-    if nodes:
-        actions = {NodeDetailsExtractor.get_action(n.details) for n in nodes}
-        if actions == {IdeaActionType.SEARCH.value, IdeaActionType.VISIT.value} and all(
-            _concrete_url(n.details)
-            for n in nodes
-            if NodeDetailsExtractor.get_action(n.details) == IdeaActionType.VISIT.value
-        ):
-            return True, "mixed_search_visit"
+    actions = {NodeDetailsExtractor.get_action(n.details) for n in nodes}
+    if actions == {IdeaActionType.SEARCH.value, IdeaActionType.VISIT.value} and all(
+        concrete_url(n.details)
+        for n in nodes
+        if NodeDetailsExtractor.get_action(n.details) == IdeaActionType.VISIT.value
+    ):
+        return "mixed_search_visit"
 
-    if nodes and all(
+    if all(
         NodeDetailsExtractor.get_action(n.details) == IdeaActionType.SEARCH.value
         for n in nodes
     ):
@@ -205,9 +230,9 @@ def siblings_are_independent(
             if isinstance(query, str) and query.strip():
                 queries.add(" ".join(query.strip().lower().split()))
         if len(queries) >= 2:
-            return True, "disjoint_searches"
+            return "disjoint_searches"
 
-    return False, "no_independence_evidence"
+    return None
 
 
 def defer_unresolved_slot_candidates(
