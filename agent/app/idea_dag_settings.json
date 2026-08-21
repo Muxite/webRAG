@@ -107,6 +107,7 @@
   "merge_model": "",
   "merge_temperature": 0.3,
   "merge_max_tokens": 32768,
+  "merge_max_json_chars": 100000,
   "merge_goal_evaluation_first_enabled": false,
   "merge_race_winner_selection_enabled": false,
   "merge_race_winner_selection_includes_inferred_groups_enabled": false,

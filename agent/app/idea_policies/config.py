@@ -489,11 +489,16 @@ class MergeConfig:
     # Reaches TIER 1 groups only: tier 2 measured 50% precision live, so it is unconsumable
     # regardless of this flag (see ``SimpleMergePolicy._race_registry``).
     race_winner_selection_includes_inferred_groups_enabled: bool = False
+    # Hard ceiling on the serialized ``merged_results`` blob spliced into the merge user
+    # prompt. Truncation here is blind (a mid-JSON chop), so a child past the cap is simply
+    # invisible to synthesis -- the cap is a last resort behind ``_compact_merged_results``.
+    max_json_chars: int = 100000
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",
         "temperature": "merge_temperature",
         "max_tokens": "merge_max_tokens",
+        "max_json_chars": "merge_max_json_chars",
         "goal_evaluation_first_enabled": "merge_goal_evaluation_first_enabled",
         "race_winner_selection_enabled": "merge_race_winner_selection_enabled",
         "race_winner_selection_includes_inferred_groups_enabled": (

@@ -2437,6 +2437,64 @@ class MergeLeafAction(LeafAction):
         "missing_requirements: [string, ...]}}."
     )
 
+    # Page payload keys dropped wholesale before serialization. ``content_full`` and
+    # ``content_with_links`` are near-verbatim copies of ``content``; the link keys are
+    # navigation metadata the synthesis stage never reads.
+    _DROP_KEYS = (
+        "content_full", "content_with_links", "links_full", "link_contexts",
+        "links", "_links_inline",
+    )
+    # Evidence budget per child, in-family with ``_collect_all_visit_content``'s 3000.
+    _CONTENT_CHARS = 2000
+    # Catch-all for any other unexpectedly long string field.
+    _FIELD_CHARS = 5000
+    _MAX_DEPTH = 4
+
+    @classmethod
+    def _compact_payload(cls, value: Any, _depth: int = 0) -> Any:
+        """Recursively strip/truncate page payload inside a merged child's ``result``.
+
+        ``SimpleMergePolicy.merge`` nests the action result one level down, under
+        ``result`` (and ``ACTION_RESULTS`` may nest a list below that), so compaction
+        has to descend rather than inspect only the entry's top-level keys.
+        """
+        if _depth >= cls._MAX_DEPTH:
+            return value
+        if isinstance(value, dict):
+            out: Dict[str, Any] = {}
+            for k, v in value.items():
+                if k in cls._DROP_KEYS:
+                    continue
+                if k == "content" and isinstance(v, str):
+                    out[k] = v[:cls._CONTENT_CHARS] + "..." if len(v) > cls._CONTENT_CHARS else v
+                elif isinstance(v, (dict, list)):
+                    out[k] = cls._compact_payload(v, _depth + 1)
+                elif isinstance(v, str) and len(v) > cls._FIELD_CHARS:
+                    out[k] = v[:cls._FIELD_CHARS] + "..."
+                else:
+                    out[k] = v
+            return out
+        if isinstance(value, list):
+            return [cls._compact_payload(v, _depth + 1) for v in value]
+        if isinstance(value, str) and len(value) > cls._FIELD_CHARS:
+            return value[:cls._FIELD_CHARS] + "..."
+        return value
+
+    @classmethod
+    def _compact_merged_results(cls, merged_results: Any) -> Any:
+        """Compact each merged child, preserving its bookkeeping fields verbatim.
+
+        ``node_id`` / ``title`` / ``status`` / ``score`` / ``evaluation`` / ``is_merge`` /
+        ``waypoint`` survive unchanged; only the nested ``result`` payload shrinks.
+        """
+        compacted = []
+        for mr in merged_results:
+            if not isinstance(mr, dict):
+                compacted.append(mr)
+                continue
+            compacted.append(cls._compact_payload(mr))
+        return compacted
+
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         import json
         node = None
@@ -2444,7 +2502,7 @@ class MergeLeafAction(LeafAction):
             node = graph.get_node(node_id)
             if not node:
                 raise ValueError(f"Unknown node_id: {node_id}")
-            
+
             merged_results = node.details.get(DetailKey.MERGED_RESULTS.value) or []
             if not merged_results:
                 return ActionResultBuilder.failure(
@@ -2491,24 +2549,9 @@ class MergeLeafAction(LeafAction):
                     if not parent_justification:
                         parent_justification = parent.details.get(DetailKey.JUSTIFICATION.value) or parent.details.get(DetailKey.PARENT_JUSTIFICATION.value) or ""
             
-            compacted = []
-            for mr in merged_results:
-                if isinstance(mr, dict):
-                    c = {}
-                    for k, v in mr.items():
-                        if k in ("content", "content_full", "content_with_links", "links_full", "link_contexts", "_links_inline"):
-                            if k == "content" and isinstance(v, str):
-                                c[k] = v[:2000] + "..." if len(v) > 2000 else v
-                            continue
-                        elif isinstance(v, str) and len(v) > 5000:
-                            c[k] = v[:5000] + "..."
-                        else:
-                            c[k] = v
-                    compacted.append(c)
-                else:
-                    compacted.append(mr)
+            compacted = self._compact_merged_results(merged_results)
             merged_json = json.dumps(compacted, ensure_ascii=True)
-            _merge_cap = int(self.settings.get("merge_max_json_chars", 100000))
+            _merge_cap = self._cfg.merge.max_json_chars
             if len(merged_json) > _merge_cap:
                 self._logger.info(f"[MERGE] merged_json {len(merged_json)} chars > cap {_merge_cap}; truncating")
                 merged_json = merged_json[:_merge_cap] + ' ...[truncated]'
