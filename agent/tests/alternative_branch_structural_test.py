@@ -233,6 +233,82 @@ def test_three_way_group_registers_every_member():
     assert parent.details[alt.RACE_GROUPS_INFERRED][label] == [n.node_id for n in nodes]
 
 
+#: The four leaves qwen2.5:14b emitted for ``race_akashi_span`` (struct+expect, replicate 0) in
+#: the 2026-08-21 probe: two searches of DIFFERENT sources plus each one's own follow-up visit,
+#: all four carrying the identical ``expect``. Verbatim from that capture, including the
+#: unresolved URL placeholder the model wrote in place of a real link.
+_AKASHI_EXPECT = (
+    "the exact length of the main span in metres from the Wikipedia page AND the source URL"
+)
+_AKASHI_PLACEHOLDER_URL = "<URL found in search results>"
+
+
+def _akashi_span_cluster(visit_urls=(_AKASHI_PLACEHOLDER_URL, _AKASHI_PLACEHOLDER_URL)):
+    expect = {DetailKey.EXPECT.value: _AKASHI_EXPECT}
+    return _graph_with_children(
+        ("Find Akashi Kaikyo Bridge Wikipedia article", _leaf(**expect)),
+        ("Visit Akashi Kaikyo Bridge Wikipedia article", _visit(visit_urls[0], **expect)),
+        ("Find longest suspension bridge spans list on Wikipedia", _leaf(**expect)),
+        ("Visit longest suspension bridge spans list on Wikipedia",
+         _visit(visit_urls[1], **expect)),
+    )
+
+
+def test_tier1_recovers_the_race_hiding_inside_a_route_rejected_cluster():
+    """Clustering groups by TARGET alone, so the two searches of this real capture arrive in
+    one cluster with the two visits they feed — and ``race_route_evidence`` rejects that
+    foursome, correctly. Before subset recovery the genuine two-search race inside it was
+    discarded along with it and the whole cell registered NOTHING; now the largest valid
+    strict subset is registered instead."""
+    graph, parent, nodes = _akashi_span_cluster()
+    search_a, _visit_a, search_b, _visit_b = nodes
+
+    assert alt.race_route_evidence(nodes) is None  # the cluster as a whole is no race
+    tiers = alt.infer_race_groups(parent, nodes)
+
+    assert list(tiers.values()) == [1]
+    label = next(iter(tiers))
+    assert parent.details[alt.RACE_GROUPS_INFERRED] == {
+        label: [search_a.node_id, search_b.node_id]}
+    # The visits stay out: neither carries a resolved URL, so they are no race of their own.
+    assert alt.RACE_GROUP_INFERRED not in _visit_a.details
+    assert alt.RACE_GROUP_INFERRED not in _visit_b.details
+
+
+def test_recovered_subsets_never_share_a_member():
+    """Same shape with the visits' URLs resolved, which makes the visit pair its own valid
+    race (two sources, one fact). Both disjoint subsets register; no candidate lands in two
+    groups, since one node in two readings would be double-counted at merge time."""
+    graph, parent, nodes = _akashi_span_cluster((
+        "https://en.wikipedia.org/wiki/Akashi_Kaikyo_Bridge",
+        "https://en.wikipedia.org/wiki/List_of_longest_suspension_bridge_spans",
+    ))
+    search_a, visit_a, search_b, visit_b = nodes
+
+    tiers = alt.infer_race_groups(parent, nodes)
+
+    assert sorted(tiers.values()) == [1, 1]
+    registry = parent.details[alt.RACE_GROUPS_INFERRED]
+    assert sorted(registry.values()) == sorted([
+        [search_a.node_id, search_b.node_id], [visit_a.node_id, visit_b.node_id]])
+    members = [node_id for ids in registry.values() for node_id in ids]
+    assert len(members) == len(set(members))
+
+
+def test_subset_recovery_finds_nothing_when_no_subset_is_a_race():
+    """Recovery re-tests subsets against the SAME gate, so a cluster with no race inside it
+    stays rejected: two identical queries are one route, and pairing either with the visit is
+    the chain-step shape ``mixed_search_visit`` exists to refuse."""
+    expect = {DetailKey.EXPECT.value: _EXPECT_SPAN}
+    graph, parent, nodes = _graph_with_children(
+        ("Search the encyclopedia", _search("hardanger bridge main span", **expect)),
+        ("Search the encyclopedia again", _search("hardanger bridge main span", **expect)),
+        ("Read the encyclopedia entry",
+         _visit("https://en.wikipedia.org/wiki/Hardanger_Bridge", **expect)),
+    )
+    assert alt.infer_race_groups(parent, nodes) == {}
+
+
 # --- tier 2 ---------------------------------------------------------------------------
 
 
@@ -282,6 +358,29 @@ def test_tier2_rejects_a_search_and_its_own_following_visit():
          "Wikipedia", _visit("https://en.wikipedia.org/wiki/Hardanger_Bridge")),
     )
     assert alt.infer_race_groups(parent, [a, b]) == {}
+
+
+def test_tier2_recovers_the_race_hiding_inside_a_route_rejected_cluster():
+    """Subset recovery is in the clustering core both tiers share, so the ``race_liskov_turing_year``
+    capture (qwen2.5:7b, replicate 1) recovers too: the ACM-side visit joins the two searches'
+    cluster on target, its concrete URL makes the batch ``mixed_search_visit``, and the two
+    searches alone are the race left when it is dropped."""
+    graph, parent, nodes = _graph_with_children(
+        ("Search for Barbara Liskov's ACM A.M. Turing Award year on Wikipedia",
+         _search("barbara liskov turing award year wikipedia")),
+        ("Visit Barbara Liskov's ACM A.M. Turing Award year on Wikipedia",
+         _visit("https://en.wikipedia.org/wiki/Barbara_Liskov")),
+        ("Search for Barbara Liskov's ACM A.M. Turing Award year on ACM website",
+         _search("barbara liskov turing award year acm")),
+        ("Visit Barbara Liskov's ACM A.M. Turing Award year on ACM website",
+         _visit("https://www.acm.org/awards/turing.html")),
+    )
+    tiers = alt.infer_race_groups(parent, nodes)
+
+    assert list(tiers.values()) == [2]
+    label = next(iter(tiers))
+    assert parent.details[alt.RACE_GROUPS_INFERRED] == {
+        label: [nodes[0].node_id, nodes[2].node_id]}
 
 
 def test_tier2_rejects_two_candidates_naming_the_same_source():

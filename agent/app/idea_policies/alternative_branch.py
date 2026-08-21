@@ -27,6 +27,7 @@ that the "sequential" fallback would simply race its primary the first time both
 
 from __future__ import annotations
 
+from itertools import combinations
 from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence
 
 from agent.app.idea_policies.base import DetailKey, IdeaNodeStatus
@@ -280,6 +281,11 @@ def infer_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> Dict[s
       search and its own visit share a source (that is what makes them one route) and differ in
       target (one seeks a fact, the other seeks "the top search result").
 
+    Either tier's clustering groups by TARGET only, so a cluster can mix a real race with
+    the chain steps feeding it and fail :func:`race_route_evidence` as a batch. Such a cluster
+    is handed to :func:`_recover_subsets` rather than dropped, which registers the largest
+    strict subsets that pass the gate on their own.
+
     Writes to :data:`RACE_GROUPS_INFERRED`, never to :data:`RACE_GROUPS`, and never to
     ``DetailKey.RACE_GROUP``: with the merge-side flag off (the default) the whole pass is
     instrumentation, and ``merge()`` behaves exactly as it does today. Singleton groups are
@@ -310,24 +316,24 @@ def infer_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> Dict[s
 
     registry: Dict[str, List[str]] = {}
     tiers: Dict[str, int] = {}
-    target_of = lambda n: _route_of(n.title).target  # noqa: E731. One-line signature accessor
-    for tier, group_nodes, signature, clusterer in (
-        (
-            1,
-            with_expect,
-            lambda n: _tokens(n.details.get(DetailKey.EXPECT.value)),
-            _cluster_by_similarity,
-        ),
-        (2, _routed_candidates(without_expect), target_of, _cluster_by_route),
+    expect_of = lambda n: _tokens(n.details.get(DetailKey.EXPECT.value))  # noqa: E731
+    route_of = lambda n: _route_of(getattr(n, "title", ""))  # noqa: E731
+    target_of = lambda n: route_of(n).target  # noqa: E731. One-line signature accessor
+    for tier, group_nodes, signature, key, compatible in (
+        (1, with_expect, expect_of, expect_of, _same_target),
+        (2, _routed_candidates(without_expect), target_of, route_of, _same_target_other_source),
     ):
-        for members in clusterer(group_nodes, signature):
-            if not race_route_evidence(list(members)):
-                continue
-            label = _inferred_label(members, signature, taken=set(registry))
-            registry[label] = [m.node_id for m in members]
-            tiers[label] = tier
-            for member in members:
-                member.details[RACE_GROUP_INFERRED] = label
+        for cluster in _cluster(group_nodes, key, compatible):
+            groups = (
+                [list(cluster)] if race_route_evidence(list(cluster))
+                else _recover_subsets(cluster, key, compatible)
+            )
+            for members in groups:
+                label = _inferred_label(members, signature, taken=set(registry))
+                registry[label] = [m.node_id for m in members]
+                tiers[label] = tier
+                for member in members:
+                    member.details[RACE_GROUP_INFERRED] = label
 
     if registry:
         _merge_into(parent, RACE_GROUPS_INFERRED, registry)
@@ -335,27 +341,31 @@ def infer_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> Dict[s
     return tiers
 
 
-def _cluster_by_similarity(nodes: Sequence[Any], signature) -> List[List[Any]]:
+def _cluster(nodes: Sequence[Any], key, compatible) -> List[List[Any]]:
     """Greedy seed-and-absorb clustering of ``nodes`` into same-target groups of 2+.
 
     Each unassigned node in declared order seeds a group and absorbs every later unassigned
-    node similar enough to THAT SEED (not to the growing group), so membership never depends
-    on absorption order and a chain of pairwise-similar-but-collectively-unrelated candidates
-    cannot drift into one group.
+    node ``compatible`` with THAT SEED (not with the growing group), so membership never
+    depends on absorption order and a chain of pairwise-compatible-but-collectively-unrelated
+    candidates cannot drift into one group.
+
+    ``key`` maps a node to whatever ``compatible`` compares — an ``expect`` token set for
+    tier 1, a :class:`_Route` for tier 2 — and a falsy key never seeds (an empty ``expect``
+    is evidence of nothing).
     """
-    signatures = [(node, signature(node)) for node in nodes]
+    keyed = [(node, key(node)) for node in nodes]
     assigned: set = set()
     clusters: List[List[Any]] = []
-    for index, (seed, seed_tokens) in enumerate(signatures):
-        if index in assigned or not seed_tokens:
+    for index, (seed, seed_key) in enumerate(keyed):
+        if index in assigned or not seed_key:
             continue
         members = [seed]
         taken = [index]
-        for other_index in range(index + 1, len(signatures)):
+        for other_index in range(index + 1, len(keyed)):
             if other_index in assigned:
                 continue
-            other, other_tokens = signatures[other_index]
-            if _jaccard(seed_tokens, other_tokens) >= RACE_INFERENCE_SIMILARITY:
+            other, other_key = keyed[other_index]
+            if compatible(seed_key, other_key):
                 members.append(other)
                 taken.append(other_index)
         if len(members) < 2:
@@ -363,6 +373,68 @@ def _cluster_by_similarity(nodes: Sequence[Any], signature) -> List[List[Any]]:
         assigned.update(taken)
         clusters.append(members)
     return clusters
+
+
+def _same_target(seed_key: set, other_key: set) -> bool:
+    """Tier 1 compatibility: two ``expect`` contracts promise the same measurable datum."""
+    return _jaccard(seed_key, other_key) >= RACE_INFERENCE_SIMILARITY
+
+
+def _same_target_other_source(seed_key: "_Route", other_key: "_Route") -> bool:
+    """Tier 2 compatibility: same fact sought, named source demonstrably different.
+
+    The race definition's two halves applied to the two halves of the title decomposition,
+    compared against their own bars instead of mashed into one symmetric score. Requiring
+    both is what excludes a search and its own following visit, which agree on source and
+    disagree on target — the exact false positive that retired the old symmetric signal.
+    """
+    if _jaccard(seed_key.target, other_key.target) < RACE_INFERENCE_SIMILARITY:
+        return False
+    return _jaccard(seed_key.source, other_key.source) < RACE_ROUTE_SOURCE_OVERLAP
+
+
+def _recover_subsets(cluster: Sequence[Any], key, compatible) -> List[List[Any]]:
+    """Rescue the genuine races hiding inside a cluster that failed the route gate whole.
+
+    Clustering groups candidates by TARGET alone, so one cluster routinely mixes a real race
+    with the chain steps that feed it: the 2026-08-21 14b probe emitted four leaves sharing
+    one ``expect`` — two searches of different sources plus each search's own follow-up visit
+    — and :func:`race_route_evidence` rightly rejects that foursome, which used to discard the
+    two-search race sitting inside it as well.
+
+    So a rejected cluster is re-examined subset-wise rather than dropped: the LARGEST strict
+    subset size at which any subset is both internally ``compatible`` (re-checked against the
+    subset's own earliest-declared member, since the seed that vouched for the others may not
+    be in the subset) and passes :func:`race_route_evidence` wins, and every disjoint valid
+    subset of exactly that size is registered. Precedence is therefore size first, then
+    declared order, and a member registered once is never offered to a later subset — two
+    overlapping readings of the same candidates would double-count it at merge time.
+
+    Only rejection triggers this, so the pass can never be less permissive than before, and
+    only sizes strictly below the cluster's own can be registered, so it can never re-admit
+    the batch that was just rejected. Clusters of 2 have no smaller valid subset and return
+    immediately. Enumeration is brute force because observed clusters run to single-digit
+    membership.
+    """
+    if len(cluster) < 3:
+        return []
+    keys = {id(node): key(node) for node in cluster}
+    for size in range(len(cluster) - 1, 1, -1):
+        accepted: List[List[Any]] = []
+        claimed: set = set()
+        for subset in combinations(cluster, size):
+            if claimed.intersection(id(node) for node in subset):
+                continue
+            first = keys[id(subset[0])]
+            if not all(compatible(first, keys[id(other)]) for other in subset[1:]):
+                continue
+            if not race_route_evidence(list(subset)):
+                continue
+            accepted.append(list(subset))
+            claimed.update(id(node) for node in subset)
+        if accepted:
+            return accepted
+    return []
 
 
 class _Route(NamedTuple):
@@ -424,42 +496,6 @@ def _routed_candidates(nodes: Sequence[Any]) -> List[Any]:
         if route.target and route.source:
             routed.append(node)
     return routed
-
-
-def _cluster_by_route(nodes: Sequence[Any], signature) -> List[List[Any]]:
-    """Cluster ``nodes`` into same-target-DIFFERENT-source groups of 2+.
-
-    The same greedy seed-and-absorb shape as :func:`_cluster_by_similarity` (see there for why
-    absorption compares against the seed only), with the race definition's two halves applied
-    to the two halves of the decomposition: a member must match the seed's target above
-    :data:`RACE_INFERENCE_SIMILARITY` *and* differ from the seed's source below
-    :data:`RACE_ROUTE_SOURCE_OVERLAP`. Requiring both is what excludes a search and its own
-    following visit, which agree on source and disagree on target — the exact false positive
-    that retired the old symmetric signal.
-    """
-    routes = [(node, _route_of(getattr(node, "title", ""))) for node in nodes]
-    assigned: set = set()
-    clusters: List[List[Any]] = []
-    for index, (seed, seed_route) in enumerate(routes):
-        if index in assigned:
-            continue
-        members = [seed]
-        taken = [index]
-        for other_index in range(index + 1, len(routes)):
-            if other_index in assigned:
-                continue
-            other, other_route = routes[other_index]
-            if _jaccard(seed_route.target, other_route.target) < RACE_INFERENCE_SIMILARITY:
-                continue
-            if _jaccard(seed_route.source, other_route.source) >= RACE_ROUTE_SOURCE_OVERLAP:
-                continue
-            members.append(other)
-            taken.append(other_index)
-        if len(members) < 2:
-            continue
-        assigned.update(taken)
-        clusters.append(members)
-    return clusters
 
 
 def race_route_evidence(nodes: Sequence[Any]) -> Optional[str]:
