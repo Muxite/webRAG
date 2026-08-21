@@ -28,9 +28,14 @@ def _stmt(module_name: str) -> str:
         ("test_051_tier4_dependent_chain", "chain"),
         ("test_055_tier5_multichain_arithmetic", "parallel_merge"),
         ("test_061_tier5_director_birthyear_arithmetic", "parallel_merge"),
-        # Fan-out / breadth shapes that are none of the three -> fail open to None.
-        ("test_052_tier5_breadth_aggregation", None),
-        ("test_059_tier5_computed_ratio_argmax", None),
+        # Fan-out / breadth: an enumerated roster with an aggregation ask over the set.
+        ("test_052_tier5_breadth_aggregation", "breadth"),
+        ("test_059_tier5_computed_ratio_argmax", "breadth"),
+        ("test_053_tier5_breadth_argmax_depth", "breadth"),
+        # A roster with no aggregation ask in the prose (each item carries its own
+        # question) is NOT breadth -> still fails open.
+        ("test_034_laundry_list_extraction", None),
+        ("test_035_cross_domain_niche_synthesis", None),
     ],
 )
 def test_classify_shape_real_tasks(module_name, expected):
@@ -44,6 +49,58 @@ def test_classify_shape_empty_fails_open():
 
 def test_classify_shape_plain_prose_none():
     assert classify_shape("Find the capital of France and report it.") is None
+
+
+# ---------------------------------------------------------------------------
+# breadth: the fan-out shape that used to classify as None
+# ---------------------------------------------------------------------------
+
+def test_breadth_requires_an_aggregation_ask():
+    roster = (
+        "For EACH of the following three lakes, open its page and read the maximum depth:\n"
+        "  1. 'Lake Baikal'\n"
+        "  2. 'Crater Lake'\n"
+        "  3. 'Lake Tahoe'\n"
+    )
+    # Roster only, no aggregation over the set -> unclassified (fails open).
+    assert classify_shape(roster) is None
+    # Same roster plus an argmax over the whole set -> breadth.
+    assert classify_shape(roster + "\nThen determine which of these three is deepest.") == "breadth"
+    # ... or a count, or a plain "aggregate across all" phrasing.
+    assert classify_shape(roster + "\nThen report how many of them exceed 300 m.") == "breadth"
+    assert classify_shape(roster + "\nThen aggregate across all three and report the total.") == "breadth"
+
+
+def test_breadth_never_steals_a_branch_eliminate():
+    # The 095 roster carries a disposition cue ("Exactly ONE of these four"), so it is an
+    # elimination set, not a fan-out set — branch_eliminate must still win.
+    assert classify_shape(_stmt("test_095_tier5_branch_eliminate_chain")) == "branch_eliminate"
+
+
+def test_breadth_ignores_per_item_aggregation_words():
+    # "how many" lives inside a list ITEM (a per-item question), not in the prose ask.
+    mandate = (
+        "Visit each page and answer the question for each topic:\n"
+        "  1. 'Axolotl' — how many chromosomes does it have?\n"
+        "  2. 'Pando' — in which US state is it located?\n"
+    )
+    assert classify_shape(mandate) is None
+
+
+def test_breadth_is_not_mapped_into_the_answer_shape_classifier():
+    # classify_answer_shape must keep deciding these from its own keyword heuristics
+    # (a breadth task's answer may be an argmax, a count or a sum), so adding the label
+    # changes nothing there.
+    assert classify_shape(_stmt("test_053_tier5_breadth_argmax_depth")) == "breadth"
+    assert classify_answer_shape(_stmt("test_053_tier5_breadth_argmax_depth")) == "argmax"
+    assert classify_answer_shape(_stmt("test_052_tier5_breadth_aggregation")) is None
+
+
+def test_breadth_injects_no_reasoning_rules(monkeypatch):
+    # No reasoning_rules/breadth.md exists and none is wanted: auto-injection must stay
+    # empty for a breadth mandate, exactly as it was when the shape classified as None.
+    _clear_env(monkeypatch)
+    assert expansion._auto_reasoning_rules(_stmt("test_052_tier5_breadth_aggregation")) == ""
 
 
 # ---------------------------------------------------------------------------

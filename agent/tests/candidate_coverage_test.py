@@ -12,6 +12,7 @@ from agent.app.idea_policies.candidate_coverage import (
     CandidateCoverageResult,
     evaluate_candidate_coverage,
     extract_named_candidates,
+    strip_enumerated_items,
 )
 
 # The real test_095 STAGE-1 candidate list (numbered "N. Name — description").
@@ -255,3 +256,61 @@ def test_coverage_fail_open_when_no_candidates():
     assert res.satisfied is True
     assert res.named == []
     assert res.missing == []
+
+
+# ---------------------------------------------------------------------------
+# Scope: the gate is NOT branch-eliminate-only (pins the corrected docstring)
+# ---------------------------------------------------------------------------
+
+def test_gate_engages_for_a_breadth_fanout_roster_not_only_branch_eliminate():
+    """test_052 (canonical 6-way fan-out) enumerates six NOVELS, so the gate fires.
+
+    The docstring used to claim this gate "stays inert for chain / parallel_merge /
+    plain fan-out tasks"; that was false. Pin the real behaviour: an enumerated roster
+    of >= 2 names engages the gate whatever the task shape, and a run that opened a page
+    for only some of them is unsatisfied.
+    """
+    import importlib
+
+    mandate = importlib.import_module(
+        "agent.app.idea_tests.test_052_tier5_breadth_aggregation"
+    ).get_task_statement()
+
+    assert extract_named_candidates(mandate) == [
+        "Pride and Prejudice",
+        "Crime and Punishment",
+        "Mrs Dalloway",
+        "The Great Gatsby",
+        "The Old Man and the Sea",
+        "Beloved",
+    ]
+
+    graph = IdeaDag(root_title="root", root_details={"mandate": mandate})
+    # Two author pages opened; each mentions its own novel, none mentions the other four.
+    _visit_node(graph, "Jane Austen — author of Pride and Prejudice")
+    _visit_node(graph, "Fyodor Dostoevsky — author of Crime and Punishment")
+
+    res = evaluate_candidate_coverage(graph, mandate)
+    assert res.satisfied is False
+    assert res.resolved == ["Pride and Prejudice", "Crime and Punishment"]
+    assert res.missing == [
+        "Mrs Dalloway",
+        "The Great Gatsby",
+        "The Old Man and the Sea",
+        "Beloved",
+    ]
+
+
+def test_gate_still_inert_for_a_chain_mandate():
+    # The half of the old docstring that WAS true: a numbered INSTRUCTION list (chain)
+    # yields no roster, so the gate imposes nothing.
+    graph = _graph_with_visits(["anything"])
+    assert evaluate_candidate_coverage(graph, INSTRUCTION_MANDATE_065).satisfied is True
+
+
+def test_strip_enumerated_items_blanks_list_lines_only():
+    stripped = strip_enumerated_items(AVON_MANDATE)
+    assert "River Avon, Bristol" not in stripped
+    assert "eliminate to one survivor" in stripped
+    assert "empties into the ENGLISH CHANNEL" in stripped
+    assert strip_enumerated_items("") == ""

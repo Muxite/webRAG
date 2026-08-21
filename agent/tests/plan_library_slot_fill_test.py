@@ -208,7 +208,10 @@ def test_shape_hint_on_a_non_operator_slot_is_only_the_archetype_label():
     operator slot it can offer no more than the label retrieval already reranks with."""
     spec = SlotSpec(name="x", kind=SlotKind.FIELD, extraction=ExtractionStrategy.REGEX_SHAPE_HINT)
     assert SF.shape_hint_value(spec, MANDATE_051) == "chain"
-    assert SF.shape_hint_value(spec, MANDATE_062) is None
+    # 062 is a six-mountain fan-out: the label is "breadth" (it classified as None until
+    # the shape classifier learned that shape), still just the label and no parameters.
+    assert SF.shape_hint_value(spec, MANDATE_062) == "breadth"
+    assert SF.shape_hint_value(spec, "Write an essay about lakes.") is None
 
 
 def test_no_seed_template_declares_the_shape_hint_or_derived_strategies():

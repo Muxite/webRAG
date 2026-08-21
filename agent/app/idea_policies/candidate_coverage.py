@@ -13,7 +13,10 @@ Design notes
 ------------
 * ``extract_named_candidates`` must fail OPEN: it returns ``[]`` for any mandate that
   is not an enumerated candidate list (plain prose, numbered INSTRUCTION steps, a
-  single item, etc.), so the gate imposes nothing on non-branch-eliminate shapes.
+  single item, etc.), so the gate imposes nothing on un-enumerated shapes. It does NOT
+  narrow to branch-eliminate: any mandate that enumerates >= 2 names qualifies, which
+  includes breadth / fan-out rosters (test_052's six novels) — see
+  ``evaluate_candidate_coverage``.
 
 * Distinguishing a candidate list ("1. River Avon, Bristol — ...") from an
   instruction list ("1. Identify the POET ...", "2. Open that page ...") is the key
@@ -76,6 +79,17 @@ def _extract_name(body: str) -> str:
     / colon), stripped of surrounding quotes and punctuation."""
     name = _NAME_DELIMS.split(body, maxsplit=1)[0]
     return name.strip().strip("'\"").strip()
+
+
+def strip_enumerated_items(mandate: str) -> str:
+    """``mandate`` with every numbered list line blanked out.
+
+    Lets a caller ask "does the SURROUNDING PROSE say X" without an enumerated item's own
+    wording answering for it (e.g. ``shape_classifier``'s breadth check: task 034's items
+    each carry their own "how many ..." question, which is a per-item ask, not an
+    aggregation over the roster).
+    """
+    return _NUMBERED_LINE.sub(" ", mandate or "")
 
 
 def extract_named_candidates(mandate: str) -> List[str]:
@@ -214,11 +228,15 @@ def evaluate_candidate_coverage(graph, mandate: str) -> CandidateCoverageResult:
 
     Fails OPEN: when the mandate names no enumerable candidates, ``satisfied`` is True.
 
-    Note: no shape-classifier wiring is needed here. Because ``extract_named_candidates``
-    only returns a non-empty list for enumerated candidate mandates (which is exactly
-    the ``branch_eliminate`` shape in ``shape_classifier.classify_shape``), this gate
-    naturally engages ONLY for branch-eliminate-shaped mandates and stays inert
-    (``satisfied=True``) for chain / parallel_merge / plain fan-out tasks.
+    Note on scope: no shape-classifier wiring is needed here, but this gate is NOT
+    branch-eliminate-only. It engages for ANY mandate whose text enumerates >= 2 names,
+    which covers ``branch_eliminate`` AND ``breadth`` (verified: test_052's six novels
+    are all extracted, so a breadth run must have opened a page mentioning each novel
+    before it may finalize). That is the intended reading of the gate — "every
+    enumerated item was actually looked at" is exactly as meaningful for a fan-out
+    roster as for a candidate list. It stays inert (``satisfied=True``) only for
+    mandates with no enumerated name list at all: chains, parallel merges, prose
+    mandates, and numbered INSTRUCTION lists (rejected by the imperative-verb guard).
     """
     named = extract_named_candidates(mandate)
     if not named:
