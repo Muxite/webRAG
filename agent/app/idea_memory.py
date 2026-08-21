@@ -98,6 +98,7 @@ class MemoryManager:
         node_context: Optional[Dict[str, Any]] = None,
         n_results: int = 5,
         memory_type: Optional[str] = None,
+        scope_node_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Retrieve semantically relevant memories.
@@ -105,6 +106,11 @@ class MemoryManager:
         :param node_context: Optional node metadata to augment the query.
         :param n_results: Max results.
         :param memory_type: Filter by ``internal_thought`` or ``observation``.
+        :param scope_node_ids: Optional lineage restriction — only memories written by these
+            node ids are eligible. ``None`` (the default, and what every caller passes unless
+            ``memory.branch_scoped_retrieval_enabled`` is on) leaves the query unscoped, which
+            is the historical behaviour. An EMPTY list is honoured as "nothing is in scope"
+            rather than silently reopening the whole run.
         :returns: List of memory dicts with content, metadata, distance, id.
         """
         if not self.connector_chroma:
@@ -124,7 +130,7 @@ class MemoryManager:
                     query = f"{query} {' '.join(parts)}"
 
             await self.ensure_collection()
-            where = {"memory_type": memory_type} if memory_type else None
+            where = self._build_where(memory_type, scope_node_ids)
             results = await self.connector_chroma.query_chroma(
                 collection=self.collection_name,
                 query_texts=[query],
@@ -157,6 +163,27 @@ class MemoryManager:
         except Exception as e:
             self._logger.warning(f"Failed to retrieve memories: {e}")
             return []
+
+    @staticmethod
+    def _build_where(
+        memory_type: Optional[str], scope_node_ids: Optional[List[str]]
+    ) -> Optional[Dict[str, Any]]:
+        """Compose chroma's metadata filter from the type and lineage restrictions.
+
+        A single restriction stays a bare field expression: chroma rejects an ``$and`` with
+        fewer than two operands, and keeping the one-restriction shape means the unscoped
+        path emits the exact dict it always did (so its query cache keys still match too).
+        """
+        clauses: List[Dict[str, Any]] = []
+        if memory_type:
+            clauses.append({"memory_type": memory_type})
+        if scope_node_ids is not None:
+            clauses.append({"node_id": {"$in": list(scope_node_ids)}})
+        if not clauses:
+            return None
+        if len(clauses) == 1:
+            return clauses[0]
+        return {"$and": clauses}
 
     def _apply_similarity_floor(
         self, memories: List[Dict[str, Any]], query: str
@@ -192,9 +219,12 @@ class MemoryManager:
         node_context: Optional[Dict[str, Any]] = None,
         n_internal: int = 3,
         n_observations: int = 3,
+        scope_node_ids: Optional[List[str]] = None,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Retrieve memories split by type.
+        :param scope_node_ids: Optional lineage restriction, forwarded to both halves —
+            see :meth:`retrieve_relevant_memories`.
         :returns: Dict with ``internal_thoughts`` and ``observations`` lists.
         """
         if not self.connector_chroma:
@@ -214,10 +244,12 @@ class MemoryManager:
         internal_thoughts = await self.retrieve_relevant_memories(
             query=query, node_context=node_context,
             n_results=n_internal, memory_type="internal_thought",
+            scope_node_ids=scope_node_ids,
         )
         observations = await self.retrieve_relevant_memories(
             query=query, node_context=node_context,
             n_results=n_observations, memory_type="observation",
+            scope_node_ids=scope_node_ids,
         )
         return {"internal_thoughts": internal_thoughts, "observations": observations}
 

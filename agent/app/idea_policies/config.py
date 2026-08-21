@@ -797,10 +797,23 @@ class MemoryConfig:
     # final_chroma_results cap, instead of by the order its four query batches were issued
     # (ASSUMPTION_AUDIT.md T3-3). Off = the historical arrival order.
     final_context_rank_by_similarity: bool = False
+    # Restrict expansion's vector retrieval to memories written by the node's OWN lineage
+    # (``graph.path_to_root``), instead of every node in the run. ``write_memory`` has always
+    # stamped ``node_id`` on each chunk, but retrieval only ever filtered on ``memory_type``,
+    # so a node could read a sibling branch's results -- which makes the race-and-merge
+    # premise ("racing branches are independent routes to the same fact") untrue by
+    # construction. ``GoTOperations.hybrid_retrieve`` already scopes its graph-walk half this
+    # exact way; this applies the same scope to the vector half.
+    #
+    # Opt-in, default OFF: narrowing scope can plausibly help (less cross-branch noise, a
+    # genuinely blind race) or hurt (a useful cross-branch precedent -- "that search already
+    # failed elsewhere" -- gets cut off). That is an A/B, not a blind default flip.
+    branch_scoped_retrieval_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "retrieval_similarity_floor": "memory_retrieval_similarity_floor",
         "final_context_rank_by_similarity": "final_context_rank_by_similarity",
+        "branch_scoped_retrieval_enabled": "memory_branch_scoped_retrieval_enabled",
     }
 
     @classmethod

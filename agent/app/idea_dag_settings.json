@@ -30,6 +30,7 @@
   "document_chunk_overlap": 400,
   "memory_retrieval_similarity_floor": 0.0,
   "final_context_rank_by_similarity": false,
+  "memory_branch_scoped_retrieval_enabled": false,
   "max_available_links_for_expansion": 50,
   "grep_context_window": 80,
   "default_search_count": 10,

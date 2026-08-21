@@ -1398,6 +1398,12 @@ class IdeaDagEngine:
 
                 n_internal = self._cfg.memory.expansion_chroma_internal
                 n_observations = self._cfg.memory.expansion_chroma_observations
+                # Lineage includes the node itself: a node may always read back what it wrote.
+                scope_node_ids = (
+                    [n.node_id for n in graph.path_to_root(node_id)]
+                    if self._cfg.memory.branch_scoped_retrieval_enabled
+                    else None
+                )
                 split_memories = await self._memory_manager.retrieve_memories_split(
                     query=query,
                     node_context={
@@ -1408,6 +1414,7 @@ class IdeaDagEngine:
                     },
                     n_internal=n_internal,
                     n_observations=n_observations,
+                    scope_node_ids=scope_node_ids,
                 )
                 memories = split_memories["internal_thoughts"] + split_memories["observations"]
 
