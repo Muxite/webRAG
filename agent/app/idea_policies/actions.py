@@ -2495,6 +2495,81 @@ class MergeLeafAction(LeafAction):
             compacted.append(cls._compact_payload(mr))
         return compacted
 
+    @staticmethod
+    def _authored_goal(node: Any, ignore_self_label: bool = False) -> str:
+        """A node's own GOAL/ORIGINAL_GOAL text, skipping structural merge labels.
+
+        ``ignore_self_label`` is set only for the merge node itself. Every node the engine
+        touches gets a GOAL stamped (``idea_engine`` threads one onto each child, defaulting to
+        the child's own title), so "GOAL echoes the title" is normal and MEANINGFUL for a
+        decompose step -- its title is a real sub-goal description. On a merge node it is
+        meaningless: the title is ``Merge: {parent.title}`` (or whatever label the planner gave
+        its synthesis step), a structural name for the operation rather than a research
+        question.
+        """
+        details = node.details if isinstance(getattr(node, "details", None), dict) else {}
+        title = (getattr(node, "title", "") or "").strip()
+        for key in (DetailKey.GOAL.value, DetailKey.ORIGINAL_GOAL.value):
+            value = details.get(key)
+            if not isinstance(value, str) or not value.strip():
+                continue
+            text = value.strip()
+            if ignore_self_label and (
+                text.lower() == title.lower() or text.lower().startswith("merge:")
+            ):
+                continue
+            return text
+        return ""
+
+    def _resolve_merge_goal(self, graph: IdeaDag, node: Any) -> str:
+        """The task goal this merge synthesizes toward -- never the merge node's own label.
+
+        A merge node carries no research question of its own. Two of the three ways one comes
+        into existence leave it with nothing usable: a planner-authored ``action: merge`` child
+        gets GOAL stamped from its own title ("Synthesize the findings"), and a
+        ``create_merge_node`` node minted outside ``_handle_merge_creation`` gets no GOAL at all,
+        so the old ``GOAL -> ORIGINAL_GOAL -> node.title`` chain always bottomed out at the
+        literal ``Merge: {parent.title}``. The node's non-empty title made the parent fallback
+        below unreachable, so the merge PROMPT's ``{original_goal}`` -- and the goal-relevance
+        checks -- saw a structural label instead of the research question.
+
+        Resolution walks UP to the nearest ancestor carrying real goal text, so a legitimate
+        intermediate sub-goal still wins over the root mandate (a merge under a decompose step
+        synthesizes toward THAT step), and bottoms out at the root's goal/mandate.
+        """
+        from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+
+        own = self._authored_goal(node, ignore_self_label=True)
+        if own:
+            return own
+
+        root_id = graph.root_id()
+        seen = {getattr(node, "node_id", None)}
+        current = graph.get_node(node.parent_id) if node.parent_id else None
+        while current is not None and current.node_id not in seen and current.node_id != root_id:
+            seen.add(current.node_id)
+            ancestor_goal = self._authored_goal(current)
+            if ancestor_goal:
+                return ancestor_goal
+            title = (current.title or "").strip()
+            if title and not NodeDetailsExtractor.is_merge_action(current.details):
+                return title
+            current = graph.get_node(current.parent_id) if current.parent_id else None
+
+        root = graph.get_node(root_id)
+        if root is None:
+            return ""
+        # The root's GOAL is preferred over its raw ``mandate`` detail: the engine stamps it
+        # from ``root_title``, which is the mandate with the harness's "Task Statement" boiler-
+        # plate already stripped off.
+        root_goal = self._authored_goal(root)
+        if root_goal:
+            return root_goal
+        mandate = root.details.get("mandate") if isinstance(root.details, dict) else None
+        if isinstance(mandate, str) and mandate.strip():
+            return mandate.strip()
+        return (root.title or "").strip()
+
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         import json
         node = None
@@ -2535,15 +2610,13 @@ class MergeLeafAction(LeafAction):
                     child_count=len(merged_results),
                 )
             
-            original_goal = node.details.get(DetailKey.GOAL.value) or node.details.get(DetailKey.ORIGINAL_GOAL.value) or node.title
+            original_goal = self._resolve_merge_goal(graph, node)
             parent_intent = node.details.get(DetailKey.INTENT.value) or ""
             parent_justification = node.details.get(DetailKey.PARENT_JUSTIFICATION.value) or node.details.get(DetailKey.JUSTIFICATION.value) or ""
-            
+
             if node.parent_id:
                 parent = graph.get_node(node.parent_id)
                 if parent:
-                    if not original_goal:
-                        original_goal = parent.details.get(DetailKey.GOAL.value) or parent.details.get(DetailKey.ORIGINAL_GOAL.value) or parent.title
                     if not parent_intent:
                         parent_intent = parent.details.get(DetailKey.INTENT.value) or ""
                     if not parent_justification:
@@ -2679,23 +2752,10 @@ class MergeLeafAction(LeafAction):
                     GOAL_EVIDENCE_SNIPPET,
                     goal_evidence_provenance,
                 )
-                # Resolved separately from ``original_goal`` above, which prefers the node's
-                # own TITLE -- and a merge node's title is ``Merge: {parent.title}``, a task
-                # label whose "merge" prefix would only dilute the overlap measurement. This
-                # mirrors ``SimpleMergePolicy._validate_goal_achievement``'s resolution order.
-                goal_text = (
-                    node.details.get(DetailKey.GOAL.value)
-                    or node.details.get(DetailKey.ORIGINAL_GOAL.value)
-                )
-                if not goal_text and node.parent_id:
-                    _parent = graph.get_node(node.parent_id)
-                    if _parent:
-                        goal_text = (
-                            _parent.details.get(DetailKey.GOAL.value)
-                            or _parent.details.get(DetailKey.ORIGINAL_GOAL.value)
-                            or _parent.title
-                        )
-                if goal_evidence_provenance(goal_text or original_goal, merged_results) == GOAL_EVIDENCE_SNIPPET:
+                # The same ``original_goal`` the synthesis prompt was built from: this check
+                # measures overlap against the goal the model was asked about, and the two
+                # diverging is how a merge ends up validated against text it never saw.
+                if goal_evidence_provenance(original_goal, merged_results) == GOAL_EVIDENCE_SNIPPET:
                     node.details["goal_achieved_snippet_only"] = True
                     self._logger.warning(
                         f"[MERGE] {node_id}: goal_achieved=true but every goal-relevant item is an "
