@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import re
 from itertools import combinations
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
 from agent.app.idea_policies.base import DetailKey, IdeaNodeStatus
 
@@ -617,13 +617,16 @@ def race_value_agreement(nodes: Sequence[Any], mandate: str = "") -> str:
     there is nothing to cross-check) and ``unknown`` (none did — insufficient data, which is
     neither confirmation nor contradiction).
 
-    **Scoping is the load-bearing part.** Only the datum the mandate (else the members' own
-    contracts) actually asks for is compared, via ``contract_satisfaction._required_datums``
-    and its ``_find_number_near`` cue-proximity search. Comparing every number found anywhere
-    would fire on incidental drift — the strong-agent trace's own example is a ranked-list
-    position reading 20 on one page and 21 on another while both agree on the keystone figure
-    — and the careful researcher treats that as noise precisely because it is not the thing
-    being asked. Excluding it is therefore structural here, not a special case bolted on.
+    **Scoping is the load-bearing part**, along two axes. Only the datums the mandate (else the
+    members' own contracts) actually asks for are compared, via
+    ``contract_satisfaction._required_datums`` and its ``_find_number_near`` cue-proximity
+    search; comparing every number found anywhere would fire on incidental drift — the
+    strong-agent trace's own example is a ranked-list position reading 20 on one page and 21 on
+    another while both agree on the keystone figure — and the careful researcher treats that as
+    noise precisely because it is not the thing being asked. And the reading is scoped to the
+    TARGET ENTITY's own mention where the page names it (:func:`_member_value`), because "near
+    the word span" is a document-wide test that a 60k-character ranked list answers with some
+    other bridge's row. Both exclusions are structural, not special cases bolted on.
 
     Cue classes with no stable page wording (year/count/price, an empty ``variants`` tuple)
     are deliberately NOT compared: their extractor falls back to "the first number anywhere in
@@ -638,33 +641,186 @@ def race_value_evidence(nodes: Sequence[Any], mandate: str = "") -> RaceValueEvi
 
     Callers that report or log the verdict want to say WHICH quantity disagreed and with what
     readings; the plain-string function above is the predicate view of this same computation.
-    """
-    from agent.app.idea_policies.contract_satisfaction import _find_number_near
 
+    EVERY scoped datum is compared and the verdicts are combined by precedence — ``agree``
+    first, then ``disagree``, then ``single``, then ``unknown`` — rather than reporting whatever
+    the first datum with any value at all happened to say. Both halves are live-driven fixes
+    (2026-08-21 ollama probe, which measured this check killing 7 of 8 CORRECT answers):
+
+    * a mandate routinely names more than one measurable quantity, and the extra one is often
+      the DECOY. Task 150 asks for a bridge's main span and warns in the same breath that its
+      total length is the wrong answer sitting one infobox line above; ``_required_datums``
+      yields ``length`` before ``span``, so the check locked onto the trap and reported the two
+      routes disagreeing (1,380 against the list page's rank number) while both stated 1,310 m
+      for the span they were actually racing for;
+    * precedence is asymmetric on purpose. Agreement on ANY asked-for quantity is
+      cross-confirmation — that is the whole signal this check produces — while a contradiction
+      matters only when NO asked-for quantity agrees. The two error directions are not
+      symmetric either: a missed ``disagree`` leaves the merge exactly as it was before this
+      mechanism existed, a false ``disagree`` destroys a correct, genuinely confirmed answer.
+    """
     members = [node for node in nodes if node is not None]
-    for canonical, variants in _scoped_datums(members, mandate):
+    anchors = _entity_anchors(mandate)
+    best: Optional[RaceValueEvidence] = None
+    for index, (canonical, variants) in enumerate(_scoped_datums(members, mandate)):
         values: Dict[str, _RaceValue] = {}
         for member in members:
             evidence = _member_evidence(member)
             if not evidence:
                 continue
             evidence_low = evidence.lower()
-            match = _find_number_near(evidence_low, variants, _RACE_NUMBER_RE)
-            parsed = _parse_race_value(evidence_low, match)
+            parsed = _member_value(evidence_low, variants, anchors, entity_fallback=index == 0)
             if parsed is not None:
                 values[str(getattr(member, "node_id", len(values)))] = parsed
         if not values:
             continue
-        rendered = {node_id: value.render() for node_id, value in values.items()}
-        if len(values) < 2:
-            return RaceValueEvidence(RACE_VALUE_SINGLE, canonical, rendered)
-        units = {value.unit for value in values.values() if value.unit}
-        if len(units) > 1:
-            return RaceValueEvidence(RACE_VALUE_UNKNOWN, canonical, rendered)
-        distinct = {round(value.value, 6) for value in values.values()}
-        verdict = RACE_VALUE_AGREE if len(distinct) == 1 else RACE_VALUE_DISAGREE
-        return RaceValueEvidence(verdict, canonical, rendered)
-    return RaceValueEvidence(RACE_VALUE_UNKNOWN, "", {})
+        found = RaceValueEvidence(
+            _verdict_for(values), canonical,
+            {node_id: value.render() for node_id, value in values.items()},
+        )
+        if found.verdict == RACE_VALUE_AGREE:
+            return found
+        if best is None or _VERDICT_PRECEDENCE.index(found.verdict) < _VERDICT_PRECEDENCE.index(
+            best.verdict
+        ):
+            best = found
+    return best or RaceValueEvidence(RACE_VALUE_UNKNOWN, "", {})
+
+
+#: Which verdict a multi-datum comparison reports, best first. See :func:`race_value_evidence`.
+_VERDICT_PRECEDENCE = (RACE_VALUE_AGREE, RACE_VALUE_DISAGREE, RACE_VALUE_SINGLE,
+                       RACE_VALUE_UNKNOWN)
+
+
+def _verdict_for(values: Dict[str, _RaceValue]) -> str:
+    """One datum's verdict from the members that returned a value for it."""
+    if len(values) < 2:
+        return RACE_VALUE_SINGLE
+    if len({value.unit for value in values.values() if value.unit}) > 1:
+        return RACE_VALUE_UNKNOWN
+    distinct = {round(value.value, 6) for value in values.values()}
+    return RACE_VALUE_AGREE if len(distinct) == 1 else RACE_VALUE_DISAGREE
+
+
+def _member_value(evidence_low: str, variants: Sequence[str], anchors: Sequence[str],
+                  entity_fallback: bool = False) -> Optional["_RaceValue"]:
+    """This member's reading of one datum, scoped to the target entity where possible.
+
+    Cue proximity first (``length ... 1,380 metres``), narrowed to cue occurrences beside a
+    mention of the entity. When the entity IS named but no cue occurrence sits beside it,
+    ``entity_fallback`` reads the nearest measurement to the entity's own mention instead: a
+    ranked table prints ``Hardanger Bridge | 1,310 m | 2013`` with the quantity named once in a
+    header row thousands of characters away, so demanding a cue beside the row would discard
+    the very route the mandate sent the run down. That fallback accepts only numbers carrying a
+    RECOGNIZED UNIT, which is what keeps it from reading the row's rank, year or footnote
+    marker as the answer.
+
+    The fallback is offered for the mandate's PRIMARY datum only (see :func:`_scoped_datums`),
+    because an unlabelled measurement beside an entity answers the question that was asked and
+    nothing else. Offering it to a secondary datum turns the same figure into an answer for
+    every quantity at once, which manufactures agreement on the decoy datum and hides a real
+    disagreement on the asked-for one.
+
+    Never falls back to the unanchored search once an anchor is present: reading a number from
+    somewhere else on the page is the failure this scoping exists to remove.
+    """
+    from agent.app.idea_policies.contract_satisfaction import _anchor_spans, _find_number_near
+
+    present = _present_anchors(evidence_low, anchors)
+    match = _find_number_near(evidence_low, variants, _RACE_NUMBER_RE, anchors=present)
+    parsed = _parse_race_value(evidence_low, match)
+    if parsed is not None or not entity_fallback:
+        return parsed
+    return _measurement_near_anchor(evidence_low, _anchor_spans(evidence_low, present))
+
+
+def _measurement_near_anchor(evidence_low: str, spans: Sequence[Any]) -> Optional["_RaceValue"]:
+    """The unit-carrying number nearest an entity mention, within the anchor window."""
+    from agent.app.idea_policies.contract_satisfaction import _ANCHOR_WINDOW
+
+    best: Optional[_RaceValue] = None
+    best_distance: Optional[float] = None
+    for start, end in spans:
+        anchor_center = (start + end) / 2
+        win_start = max(0, start - _ANCHOR_WINDOW)
+        win_end = min(len(evidence_low), end + _ANCHOR_WINDOW)
+        for num in _RACE_NUMBER_RE.finditer(evidence_low, win_start, win_end):
+            value = _parse_race_value(evidence_low, num)
+            if value is None or not value.unit:
+                continue
+            distance = abs((num.start() + num.end()) / 2 - anchor_center)
+            if best_distance is None or distance < best_distance:
+                best, best_distance = value, distance
+    return best
+
+
+#: An anchor token shorter than this identifies nothing ("one", "bu"), and one occurring more
+#: often than the hit cap identifies nothing either — "bridge" appears 82 times on the ranked
+#: list of bridge spans, so anchoring on it would scope the search to the whole page.
+_RACE_ANCHOR_MIN_LEN = 5
+_RACE_ANCHOR_MAX_HITS = 12
+
+
+#: A capitalized word right after one of these (or at the very start) is capitalized by
+#: SENTENCE POSITION, which says nothing about it being a name.
+_SENTENCE_END = frozenset(".!?:;—-\n\r•")
+
+
+def _entity_anchors(mandate: str) -> List[str]:
+    """Proper-noun tokens naming what the race is ABOUT, longest (most distinctive) first.
+
+    Reuses ``contract_satisfaction``'s subject vocabulary (capitalized, minus plan boilerplate
+    and quantity words) rather than its ``_subject_tokens``, whose top-3-longest cap is tuned
+    for a one-line sub-goal contract: on task 150's full mandate that cap keeps
+    ``norwegian-language`` and drops ``hardanger``, the one token the target row on the ranked
+    list actually contains.
+
+    Two rejections a sub-goal contract never needs but a full mandate does, because a mandate
+    is prose with its own conventions: ALL-CAPS words are this corpus's EMPHASIS marker
+    ("Three INDEPENDENT routes", "ANY ONE OF THEM IS SUFFICIENT"), and a word capitalized only
+    by sentence position is capitalized by grammar. Both are ordinary English that matches
+    ordinary English anywhere on any page — anchoring on them scopes a search to a random
+    paragraph of whatever page is being read, which is the opposite of scoping.
+    """
+    from agent.app.idea_policies.contract_satisfaction import (
+        _CASED_TOKEN_RE, _NOISE_TOKENS, _QUANTITY_WORDS,
+    )
+
+    text = str(mandate or "")
+    anchors: List[str] = []
+    seen = set()
+    for match in _CASED_TOKEN_RE.finditer(text):
+        raw = match.group()
+        if not raw[:1].isupper() or raw.isupper():
+            continue
+        before = text[:match.start()].rstrip()
+        if not before or before[-1] in _SENTENCE_END:
+            continue
+        token = raw.lower().strip("'’-")
+        if len(token) < _RACE_ANCHOR_MIN_LEN or token in seen:
+            continue
+        if token in _NOISE_TOKENS or token in _QUANTITY_WORDS:
+            continue
+        seen.add(token)
+        anchors.append(token)
+    anchors.sort(key=len, reverse=True)
+    return anchors
+
+
+def _present_anchors(evidence_low: str, anchors: Sequence[str]) -> List[str]:
+    """The anchors this evidence names distinctively enough to scope a search with."""
+    return [a for a in anchors if 0 < evidence_low.count(a) <= _RACE_ANCHOR_MAX_HITS]
+
+
+#: Non-English wordings of a datum, appended to that datum's own cue variants for race value
+#: extraction only. Deliberately NOT a multilingual table: the one cross-language route this
+#: repo's corpus actually contains is task 150's Norwegian Wikipedia article, whose infobox
+#: labels the raced-for quantity ``hovedspenn``/``største spenn``. Without them a genuinely
+#: cross-confirming route contributes nothing and the verdict degrades to ``single`` — quiet
+#: for the wrong reason. Extend from attested corpus wordings, not speculatively.
+_RACE_CUE_ALIASES: Dict[str, Tuple[str, ...]] = {
+    "span": ("hovedspenn", "største spenn"),
+}
 
 
 def _scoped_datums(nodes: Sequence[Any], mandate: str) -> List[Any]:
@@ -675,14 +831,28 @@ def _scoped_datums(nodes: Sequence[Any], mandate: str) -> List[Any]:
     the quantity elsewhere. Either way the empty-``variants`` cue classes are dropped (see
     :func:`race_value_agreement`), so an unscopeable ask yields no datum and the verdict is
     ``unknown`` rather than a comparison of arbitrary numbers.
+
+    The mandate's datums come back ordered by the LONGEST cue phrase that matched, most
+    specific first, so "main span" (9 characters, the ask) is compared before "longest"
+    (7, the decoy the same mandate warns about). Ordering only decides which datum a
+    multi-datum verdict is REPORTED against — :func:`race_value_evidence` compares all of
+    them — but reporting the trap datum as the compared quantity is exactly how the live
+    probe's false disagreements read.
     """
     from agent.app.idea_policies.contract_satisfaction import (
+        _QUANTITY_CUES,
         _required_datums,
         derive_step_contract,
     )
 
-    scoped = [d for d in _required_datums(mandate or "") if d[1]]
+    text = (mandate or "").lower()
+    scoped = [(c, v + _RACE_CUE_ALIASES.get(c, ())) for c, v in _required_datums(text) if v]
     if scoped:
+        specificity = {}
+        for cue, canonical, _variants in _QUANTITY_CUES:
+            if cue in text:
+                specificity[canonical] = max(specificity.get(canonical, 0), len(cue))
+        scoped.sort(key=lambda datum: -specificity.get(datum[0], 0))
         return scoped
     seen = set()
     for node in nodes:
@@ -693,7 +863,7 @@ def _scoped_datums(nodes: Sequence[Any], mandate: str) -> List[Any]:
         for canonical, variants in contract.datums:
             if variants and canonical not in seen:
                 seen.add(canonical)
-                scoped.append((canonical, variants))
+                scoped.append((canonical, variants + _RACE_CUE_ALIASES.get(canonical, ())))
     return scoped
 
 

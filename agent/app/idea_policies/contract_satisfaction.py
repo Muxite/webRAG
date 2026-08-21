@@ -275,10 +275,36 @@ def _search_evidence(result: Dict[str, Any]) -> str:
 _NUMBER_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
 
+#: How far from a mention of the TARGET ENTITY a cue occurrence still counts as describing
+#: that entity (see the ``anchors`` argument of :func:`_find_number_near`). Sized for one row
+#: of a table or one sentence of prose, not for a whole section.
+_ANCHOR_WINDOW = 300
+
+
+def _anchor_spans(evidence_low: str, anchors: Sequence[str]) -> List[Tuple[int, int]]:
+    """Every occurrence of every anchor in ``evidence_low``, as ``(start, end)`` spans."""
+    spans: List[Tuple[int, int]] = []
+    for anchor in anchors:
+        if not anchor:
+            continue
+        for match in re.finditer(re.escape(anchor), evidence_low):
+            spans.append((match.start(), match.end()))
+    return spans
+
+
+def _within_anchor(span: Tuple[int, int], anchor_spans: Sequence[Tuple[int, int]]) -> bool:
+    """Does ``span`` sit within :data:`_ANCHOR_WINDOW` characters of an anchor occurrence?"""
+    return any(
+        start - _ANCHOR_WINDOW <= span[1] and span[0] <= end + _ANCHOR_WINDOW
+        for start, end in anchor_spans
+    )
+
+
 def _find_number_near(
     evidence_low: str,
     variants: Sequence[str],
     pattern: "re.Pattern[str]" = _NUMBER_RE,
+    anchors: Sequence[str] = (),
 ) -> Optional["re.Match[str]"]:
     """The number nearest a datum's own wording, within _NUMBER_WINDOW chars either side.
 
@@ -303,13 +329,25 @@ def _find_number_near(
     exists). _number_near below is the historical bool-only view all existing callers keep using
     unchanged; picking a DIFFERENT (nearer) match among several candidates never changes whether
     a match exists, so its presence-only semantics are unaffected by this.
+
+    ``anchors`` narrows the search to cue occurrences within :data:`_ANCHOR_WINDOW` characters
+    of a mention of the TARGET ENTITY. Cue proximity alone is a document-WIDE test, which the
+    2026-08-21 live probe caught mining "the 28 longest bridges on this list are the 28 longest
+    spans" out of a 60k-character ranked list while the entity's own row sat 6,000 characters
+    away. Off by default (empty), so every existing caller keeps the unanchored behaviour, and
+    ignored when no anchor occurs in the evidence at all: a name the page never says cannot
+    scope anything, and dropping the whole search on its absence would silently stop reading
+    pages that spell the entity differently.
     """
     if not variants:
         return pattern.search(evidence_low)
+    anchor_spans = _anchor_spans(evidence_low, anchors)
     best_match: Optional["re.Match[str]"] = None
     best_distance: Optional[float] = None
     for variant in variants:
         for cue_match in re.finditer(re.escape(variant), evidence_low):
+            if anchor_spans and not _within_anchor(cue_match.span(), anchor_spans):
+                continue
             win_start = max(0, cue_match.start() - _NUMBER_WINDOW)
             win_end = min(len(evidence_low), cue_match.end() + _NUMBER_WINDOW)
             cue_center = (cue_match.start() + cue_match.end()) / 2

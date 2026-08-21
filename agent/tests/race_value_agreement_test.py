@@ -224,6 +224,143 @@ def test_member_contracts_scope_the_comparison_when_the_mandate_cannot():
 
 
 # ======================================================================================
+# the 2026-08-21 live probe's false positives: a decoy datum and a document-wide number
+# ======================================================================================
+
+# Task 150's own mandate shape: it asks for the MAIN SPAN and says in the same breath that the
+# TOTAL LENGTH one infobox line above is the wrong answer. Both are measurable datums, so
+# ``_required_datums`` returns both -- ``length`` first.
+_DECOY_MANDATE = (
+    "ONE value is wanted: the length of the MAIN SPAN, in metres, of the Hardanger Bridge in "
+    "Norway. ROUTE 1 - the bridge's own English Wikipedia article (its infobox also prints the "
+    "bridge's TOTAL length). ROUTE 2 - English Wikipedia's ranked list of the longest "
+    "suspension bridge spans. Careful: the bridge's total length is NOT its main span."
+)
+
+# ROUTE 1 as the real article prints it: the trap and the answer, one line apart.
+_INFOBOX = ("Hardanger Bridge. Characteristics: design suspension bridge, total length 1,380 "
+            "metres (4,530 ft), width 20 metres (66 ft), longest span 1,310 metres (4,300 ft).")
+
+# ROUTE 2 as the real 60k-character ranked list prints it: a cue-proximate number in an
+# unrelated lead sentence, the record-holder's span in another, and the target's own row far
+# below with no cue word anywhere near it.
+_RANKED_LIST = (
+    "List of longest suspension bridge spans. The 1915 Canakkale Bridge in Turkey has the "
+    "longest central span (2,023 m) of any suspension bridge. Therefore, as of October 2025, "
+    "the 28 longest bridges on this list are the 28 longest spans of all bridge types.\n"
+    + "".join(f"{i} Some Other Bridge {1400 + i} m (4,600 ft) 19{i} Somewhere, Elsewhere\n"
+             for i in range(60, 80))
+    + "Tsing Ma Bridge 1,377 m (4,518 ft) 1997 Tsing Yi, Hong Kong\n"
+    "Hardanger Bridge 1,310 m (4,298 ft) 2013 Ulvik - Eidfjord, Vestland\n"
+    "Verrazzano-Narrows Bridge 1,298 m (4,260 ft) 1964 New York City, New York\n"
+)
+
+
+def test_the_mandates_decoy_datum_cannot_veto_agreement_on_the_asked_for_one():
+    """The live false positive: two routes agreeing on the span, reported as disagreeing.
+
+    ``_required_datums`` yields ``length`` before ``span`` for this mandate, and the two pages
+    genuinely differ there -- ROUTE 1 prints the 1,380 m total length the mandate warns about,
+    the ranked list prints no total length at all. Comparing the first datum that yields any
+    value reported ``disagree`` and killed a correct answer.
+    """
+    _g, _p, members = _graph(
+        ("ROUTE 1 - the bridge's own article", _visit("https://en.wikipedia.org/x", _INFOBOX)),
+        ("ROUTE 2 - the ranked list", _visit("https://en.wikipedia.org/y", _RANKED_LIST)),
+        mandate=_DECOY_MANDATE,
+    )
+    evidence = alt.race_value_evidence(members, _DECOY_MANDATE)
+
+    assert [d[0] for d in alt._scoped_datums(members, _DECOY_MANDATE)][0] == "span", (
+        "the mandate's most specific cue ('main span') is the ask, 'longest' is the decoy"
+    )
+    assert evidence.verdict == alt.RACE_VALUE_AGREE
+    assert evidence.datum == "span"
+    assert set(evidence.values.values()) == {"1310 m"}
+
+
+def test_a_number_beside_the_cue_but_nowhere_near_the_entity_is_not_this_entitys_value():
+    """The second live false positive, isolated: on the ranked list the unanchored cue search
+    finds "the 28 longest bridges" and the record holder's 2,023 m span, both thousands of
+    characters from the row being raced for."""
+    from agent.app.idea_policies.alternative_branch import _RACE_NUMBER_RE, _member_value
+    from agent.app.idea_policies.contract_satisfaction import _find_number_near
+
+    page = _RANKED_LIST.lower()
+    unanchored = _find_number_near(page, ("span", "main span"), _RACE_NUMBER_RE)
+    assert unanchored is not None and unanchored.group() == "2,023", (
+        "fixture: without an entity anchor the cue search reads the record holder's span"
+    )
+    assert _find_number_near(page, ("length", "long"), _RACE_NUMBER_RE).group() == "28"
+
+    anchors = alt._entity_anchors(_DECOY_MANDATE)
+    assert "hardanger" in anchors
+    assert _member_value(page, ("span", "main span"), anchors,
+                         entity_fallback=True).render() == "1310 m"
+
+
+def test_a_row_naming_no_datum_cue_at_all_still_yields_the_entitys_measurement():
+    """A table row prints ``Hardanger Bridge | 1,310 m | 2013`` with the quantity named only in
+    a header far above, so cue proximity finds nothing beside the entity. The unit is what
+    separates the measurement from the row's year and rank."""
+    from agent.app.idea_policies.alternative_branch import _member_value
+
+    row = ("tsing ma bridge 1,377 m (4,518 ft) 1997 hong kong [25]\n"
+           "hardanger bridge 1,310 m (4,298 ft) 2013 ulvik - eidfjord [26]\n")
+    value = _member_value(row, ("span", "main span"), ["hardanger"], entity_fallback=True)
+
+    assert value is not None and value.render() == "1310 m"
+
+
+def test_a_genuine_disagreement_survives_when_no_datum_agrees():
+    """Precedence prefers agreement, never manufactures it: the register contradicts the
+    article on the span and carries no total length to agree on either."""
+    _g, _p, members = _graph(
+        ("ROUTE 1 - the bridge's own article", _visit("https://en.wikipedia.org/x", _INFOBOX)),
+        ("ROUTE 2 - the register", _visit(
+            "https://register.example/x", "Hardanger Bridge: main span 1,380 m.")),
+        mandate=_DECOY_MANDATE,
+    )
+    assert alt.race_value_agreement(members, _DECOY_MANDATE) == alt.RACE_VALUE_DISAGREE
+
+
+def test_the_anchor_argument_is_off_by_default_for_every_other_caller():
+    """The shared cue search is unchanged unless a caller asks for entity scoping."""
+    from agent.app.idea_policies.contract_satisfaction import _find_number_near
+
+    page = "widget catalogue: length 512 mm."
+    assert _find_number_near(page, ("length",)).group() == "512"
+    assert _find_number_near(page, ("length",), anchors=("widget",)).group() == "512"
+    assert _find_number_near(page, ("length",), anchors=("sprocket",)).group() == "512", (
+        "an anchor the page never names cannot scope anything, so the search is left alone"
+    )
+
+
+# ======================================================================================
+# a cross-language route
+# ======================================================================================
+
+# The real third route of task 150: the Norwegian article labels the raced-for quantity
+# 'hovedspenn', so an English-only cue vocabulary reads nothing off it at all.
+_NO_ROUTE = ("Hardangerbrua er en bro over Eidfjorden mellom Vallavik og Bu. "
+             "Broen er 1380 meter lang, med et hovedspenn pa 1310 meter.")
+
+
+def test_a_norwegian_route_confirms_the_english_one_instead_of_going_quiet():
+    _g, _p, members = _graph(
+        ("ROUTE 1 - English Wikipedia", _visit("https://en.wikipedia.org/x", _EN_WIKI)),
+        ("ROUTE 3 - Norwegian Wikipedia", _visit("https://no.wikipedia.org/x", _NO_ROUTE)),
+    )
+    assert "span" not in _NO_ROUTE.lower(), (
+        "fixture: no English cue word appears, which is why this route used to report 'single'"
+    )
+    evidence = alt.race_value_evidence(members, _MANDATE)
+
+    assert evidence.verdict == alt.RACE_VALUE_AGREE
+    assert set(evidence.values.values()) == {"1310 m"}
+
+
+# ======================================================================================
 # the reconstructed live case: "all three routes confirm 575 meters"
 # ======================================================================================
 
