@@ -44,6 +44,30 @@ _ECHOED_RESULT_KEYS = frozenset({
 })
 
 
+#: Fraction of the goal's content words a candidate payload must repeat before it counts as
+#: evidence that the goal was addressed. Containment, not Jaccard: page content dwarfs the goal
+#: phrase, so a union denominator would drive every real page below any usable threshold.
+_GOAL_RELEVANCE_MIN_OVERLAP = 0.5
+
+#: Result-item fields a SEARCH hit carries its finding in. ``description`` is what
+#: ``connector_search`` normalizes every provider's snippet field to; ``snippet`` is the raw
+#: provider spelling, kept for payloads that reach here unnormalized.
+_RESULT_ITEM_TEXT_KEYS = ("title", "description", "snippet")
+
+
+def _goal_tokens(text: Any) -> set:
+    """Content words of ``text``, lowercased, punctuation-split, stop-word-ish shorts dropped."""
+    raw = "".join(ch if ch.isalnum() else " " for ch in str(text or "").lower())
+    return {t for t in raw.split() if len(t) > 2}
+
+
+def _relevance_overlap(goal_tokens: set, candidate_tokens: set) -> float:
+    """How much of the goal the candidate covers, in [0, 1]. Empty goal => 0.0."""
+    if not goal_tokens:
+        return 0.0
+    return len(goal_tokens & candidate_tokens) / len(goal_tokens)
+
+
 class SimpleMergePolicy(MergePolicy):
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         super().__init__(settings=settings)
@@ -488,32 +512,71 @@ class SimpleMergePolicy(MergePolicy):
         return {"merged": merged, "summary": merge_summary, "goal_achieved": goal_achieved}
     
     def _validate_goal_achievement(self, graph: IdeaDag, node: IdeaNode, merged_results: List[Dict[str, Any]]) -> bool:
+        """Mechanical pre-check: did the children gather anything that even ADDRESSES the goal?
+
+        This runs before any merge node's own LLM call and, because :meth:`merge` recurses to
+        root, its verdict lands on the ROOT's ``goal_achieved`` -- which ``idea_finalize`` reads
+        FIRST, ahead of the LLM-verified merge verdicts. A false positive here therefore
+        short-circuits finalization for the whole run.
+
+        It used to produce them two ways: ``goal in content`` demanded the page repeat the
+        goal's exact phrasing verbatim (real pages essentially never do, so the check was
+        near-unsatisfiable), while ``len(results) > 0`` accepted ANY non-empty search-result
+        list, off-topic hits included -- a tautology on the far side. Both are now the same
+        containment-overlap test on the goal's content words, so an unrelated payload fails and
+        a paraphrase of the goal passes.
+        """
         original_goal = node.details.get(DetailKey.GOAL.value) or node.details.get(DetailKey.ORIGINAL_GOAL.value) or node.details.get(DetailKey.INTENT.value)
         if not original_goal:
             return True
-        
+
         from agent.app.idea_policies.action_constants import ActionResultKey
-        
+
+        goal_tokens = _goal_tokens(original_goal)
+        if not goal_tokens:
+            # A goal with no content words (punctuation, digits, one-letter tokens) gives the
+            # overlap test nothing to measure; fall back to the old permissive answer rather
+            # than failing every merge under it.
+            return True
+
         has_relevant_content = False
         for result_item in merged_results:
             result = result_item.get("result")
             if not isinstance(result, dict):
                 continue
-            
+
             content = result.get(ActionResultKey.CONTENT.value) or ""
             query = result.get(ActionResultKey.QUERY.value) or ""
             results = result.get(ActionResultKey.RESULTS.value) or []
-            
-            if content and original_goal.lower() in content.lower():
+
+            if self._addresses_goal(goal_tokens, content) or self._addresses_goal(goal_tokens, query):
                 has_relevant_content = True
                 break
-            
-            if query and original_goal.lower() in query.lower():
+
+            if isinstance(results, list) and any(
+                self._result_item_addresses_goal(goal_tokens, item) for item in results
+            ):
                 has_relevant_content = True
                 break
-            
-            if isinstance(results, list) and len(results) > 0:
-                has_relevant_content = True
-                break
-        
+
         return has_relevant_content
+
+    @staticmethod
+    def _addresses_goal(goal_tokens: set, text: Any) -> bool:
+        if not text:
+            return False
+        return _relevance_overlap(goal_tokens, _goal_tokens(text)) >= _GOAL_RELEVANCE_MIN_OVERLAP
+
+    @classmethod
+    def _result_item_addresses_goal(cls, goal_tokens: set, item: Any) -> bool:
+        """One SEARCH hit, held to the same overlap bar as page content.
+
+        :meth:`_payload_is_substantive` is deliberately NOT reused as a pre-gate here: it reads
+        ``title``/``url`` as echoed request parameters, which is right for an action result and
+        wrong for a search hit, where the title IS the finding. An empty hit scores 0 overlap
+        and fails anyway, so the pre-gate would only misclassify.
+        """
+        if not isinstance(item, dict):
+            return cls._addresses_goal(goal_tokens, item)
+        text = " ".join(str(item.get(key) or "") for key in _RESULT_ITEM_TEXT_KEYS)
+        return cls._addresses_goal(goal_tokens, text)

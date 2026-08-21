@@ -2641,7 +2641,19 @@ class MergeLeafAction(LeafAction):
             
             if not isinstance(goal_achieved, bool):
                 goal_achieved = bool(goal_achieved)
-            
+
+            # Internal-consistency guard: one completion cannot both declare the goal met and
+            # list what is still missing. Honouring the ``true`` marks this node AND its parent
+            # DONE, permanently terminating a branch the model's own other field says is
+            # incomplete -- so the contradiction is resolved toward the more specific claim and
+            # falls through to the not-achieved branch below.
+            if goal_achieved and missing_requirements:
+                self._logger.warning(
+                    f"[MERGE] {node_id}: goal_achieved=true but missing_requirements={missing_requirements} "
+                    "in the same completion -- downgrading to not-achieved (internally contradictory verdict)"
+                )
+                goal_achieved = False
+
             node.details[DetailKey.GOAL_ACHIEVED.value] = goal_achieved
             if goal_evaluation:
                 node.details["goal_evaluation"] = goal_evaluation
