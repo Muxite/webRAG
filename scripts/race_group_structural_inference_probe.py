@@ -172,6 +172,7 @@ async def run_cell(model: str, stim: Dict[str, str], arm: str, args) -> Dict[str
         # when its members are not demonstrably disjoint approaches.
         "nodes": [
             {
+                "node_id": c.node_id,
                 "title": c.title,
                 "action": c.details.get("action"),
                 "expect": c.details.get("expect"),
