@@ -99,6 +99,22 @@ _SEARCH_UNAVAILABLE = (
     "actually visited with the visit tool in this conversation; never a remembered or invented one."
 )
 
+#: Prefixed to every visit result. A bare page blob is unattributed: live-observed, a model that
+#: landed on a Wikipedia disambiguation page re-visited the SAME URL, got back byte-identical text
+#: with nothing naming it, decided the tool result was "similar to the previous search result",
+#: and answered from memory instead. ``AgentIO.visit`` returns cleaned text only (no title), so the
+#: URL is the only identity available — one line, no other change to the return shape.
+_VISIT_SOURCE_PREFIX = "SOURCE: "
+
+#: Added ABOVE the source line on a second (or later) visit to the same URL within one ``solve``
+#: call. The content is still returned (re-reading can be deliberate), but the repeat is named so
+#: identical bytes cannot be mistaken for new evidence.
+_VISIT_REPEAT = (
+    "ALREADY VISITED THIS URL IN THIS CONVERSATION — this is the same page you already saw, not "
+    "new content. If it did not answer your question, visit a DIFFERENT URL instead of re-reading "
+    "this one."
+)
+
 _SYNTHESIS_SYSTEM = (
     "Synthesize the FINAL answer using ONLY the gathered evidence. Address every part the task "
     "asks for; for each fact quote the exact value from the page and cite the source URL it came "
@@ -111,6 +127,9 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
                 retry: Optional[ToolRetry] = None):
     """Build the search/visit tools bound to ``agent_io``, with native-arm retry parity."""
     retry = retry or ToolRetry()  # default: retry OFF -> unchanged behavior
+    #: URLs visited by THIS tool instance. ``_make_tools`` is called once per ``solve()``, so the
+    #: set is per-run and cannot leak across benchmark cells sharing a solver or connectors.
+    visited: set[str] = set()
 
     @tool
     async def search(query: str) -> str:
@@ -140,7 +159,11 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
         )
         if error is not None:
             return f"VISIT ERROR for {url}: {error}"
-        return (content or _EMPTY_PAGE)[:page_chars]
+        repeat = url in visited
+        visited.add(url)
+        header = f"{_VISIT_REPEAT}\n{_VISIT_SOURCE_PREFIX}{url}" if repeat else f"{_VISIT_SOURCE_PREFIX}{url}"
+        # Truncate the CONTENT, not the header, so the attribution survives a long page.
+        return f"{header}\n{(content or _EMPTY_PAGE)[:page_chars]}"
 
     return [search, visit]
 

@@ -108,7 +108,8 @@ def test_visit_tool_delegates_to_agent_io_and_truncates():
     _search_tool, visit_tool = _make_tools(fake_io, search_k=6, page_chars=5)
     out = asyncio.run(visit_tool.ainvoke({"url": "https://example.com/page"}))
     assert fake_io.visit_calls == ["https://example.com/page"]
-    assert out == "page "  # truncated to page_chars=5
+    # The header is never truncated; page_chars still bounds the CONTENT.
+    assert out == "SOURCE: https://example.com/page\npage "
 
 
 def test_visit_tool_reports_no_content():
@@ -120,7 +121,51 @@ def test_visit_tool_reports_no_content():
     fake_io = _EmptyVisitIO()
     _search_tool, visit_tool = _make_tools(fake_io, search_k=6, page_chars=6000)
     out = asyncio.run(visit_tool.ainvoke({"url": "https://example.com/dead"}))
-    assert out == "[No main content found]"
+    assert out == "SOURCE: https://example.com/dead\n[No main content found]"
+
+
+def test_visit_tool_labels_the_source_url():
+    """An unattributed blob was live-observed being mistaken for a search result; the URL is the
+    only identity `AgentIO.visit` (text-only, no title) can supply."""
+    _search_tool, visit_tool = _make_tools(_FakeAgentIO(), search_k=6, page_chars=6000)
+    out = asyncio.run(visit_tool.ainvoke({"url": "https://en.wikipedia.org/wiki/Parral"}))
+    assert out.startswith("SOURCE: https://en.wikipedia.org/wiki/Parral\n")
+    assert "page content here" in out
+    assert "ALREADY VISITED" not in out
+
+
+def test_visit_tool_marks_a_repeat_visit_but_still_returns_the_content():
+    fake_io = _FakeAgentIO()
+    _search_tool, visit_tool = _make_tools(fake_io, search_k=6, page_chars=6000)
+    url = "https://en.wikipedia.org/wiki/Parral"
+    first = asyncio.run(visit_tool.ainvoke({"url": url}))
+    second = asyncio.run(visit_tool.ainvoke({"url": url}))
+
+    assert "ALREADY VISITED THIS URL IN THIS CONVERSATION" not in first
+    assert second.startswith("ALREADY VISITED THIS URL IN THIS CONVERSATION")
+    assert f"SOURCE: {url}" in second
+    assert "page content here" in second  # re-reading can be deliberate; content is not withheld
+    assert fake_io.visit_calls == [url, url]
+
+
+def test_visit_tool_does_not_mark_distinct_urls_as_repeats():
+    _search_tool, visit_tool = _make_tools(_FakeAgentIO(), search_k=6, page_chars=6000)
+    first = asyncio.run(visit_tool.ainvoke({"url": "https://example.com/a"}))
+    second = asyncio.run(visit_tool.ainvoke({"url": "https://example.com/b"}))
+    assert "ALREADY VISITED" not in first
+    assert "ALREADY VISITED" not in second
+    assert second.startswith("SOURCE: https://example.com/b\n")
+
+
+def test_visited_urls_do_not_leak_between_tool_builds():
+    """`_make_tools` runs once per `solve()`, so the tracking set must be per-run — a shared set
+    would mark a fresh benchmark cell's FIRST visit as a repeat."""
+    fake_io = _FakeAgentIO()
+    url = "https://example.com/a"
+    _s1, visit_one = _make_tools(fake_io, search_k=6, page_chars=6000)
+    asyncio.run(visit_one.ainvoke({"url": url}))
+    _s2, visit_two = _make_tools(fake_io, search_k=6, page_chars=6000)
+    assert "ALREADY VISITED" not in asyncio.run(visit_two.ainvoke({"url": url}))
 
 
 def test_langgraph_solver_name_and_construction():
