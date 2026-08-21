@@ -18,6 +18,32 @@ from agent.app.idea_policies.alternative_branch import (
 )
 
 
+#: Result fields every action echoes back whatever it found: the request parameters plus
+#: bookkeeping. A child whose result holds only these has produced nothing to synthesize.
+#: ``count`` is SEARCH's *requested* result count (non-zero even when the provider returned
+#: nothing) and ``url``/``query``/``intent`` are the node's own inputs read back, so none of
+#: them is evidence of a finding. Booleans are ignored wholesale for the same reason.
+_ECHOED_RESULT_KEYS = frozenset({
+    "action",
+    "success",
+    "error",
+    "error_type",
+    "retryable",
+    "context",
+    "node_id",
+    "timestamp",
+    "query",
+    "intent",
+    "count",
+    "url",
+    "urls_visited",
+    "link",
+    "title",
+    "content_total_chars",
+    "content_is_truncated",
+})
+
+
 class SimpleMergePolicy(MergePolicy):
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         super().__init__(settings=settings)
@@ -83,7 +109,73 @@ class SimpleMergePolicy(MergePolicy):
                 return False
         
         # Check if all children are ready
-        return self.are_children_ready_to_merge(graph, node_id)
+        if not self.are_children_ready_to_merge(graph, node_id):
+            return False
+
+        if self._cfg.merge.require_substantive_children_enabled:
+            substantive = self._substantive_child_count(graph, node)
+            if substantive < 2:
+                self._logger.info(
+                    f"[MERGE] no synthesis for {node_id[:8]}: {len(node.children)} children "
+                    f"but only {substantive} carry content -- nothing to combine"
+                )
+                return False
+        return True
+
+    def _substantive_child_count(self, graph: IdeaDag, node: IdeaNode) -> int:
+        """How many of ``node``'s children actually produced something to synthesize.
+
+        Structural child count is the wrong question for "is a merge worth an LLM call?".
+        The 2026-08-21 diagnostic found 4 of 7 real merge calls synthesizing a SINGLE
+        content-bearing child, the other "child" being a Serper-403 search the connector
+        recorded as ``success: true, content: "", url: None`` -- success-shaped, empty, and
+        therefore invisible to every status check. Combining one source with nothing is
+        strictly worse than using that source directly, and the merge's ``goal_achieved``
+        can terminate the branch on it.
+
+        A parked A->B fallback is skipped for the same reason :meth:`merge` skips it: it
+        describes work the run deliberately did not do.
+        """
+        from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+
+        count = 0
+        for child_id in node.children:
+            child = graph.get_node(child_id)
+            if not child or is_alternative_pending(child):
+                continue
+            if NodeDetailsExtractor.is_merge_action(child.details):
+                continue
+            result = child.details.get(DetailKey.ACTION_RESULT.value)
+            if result is None:
+                result = child.details.get(DetailKey.ACTION_RESULTS.value)
+            if self._payload_is_substantive(result):
+                count += 1
+        return count
+
+    @classmethod
+    def _payload_is_substantive(cls, result: Any) -> bool:
+        """Does this action result carry any finding, as opposed to only its own inputs?
+
+        Deliberately generous -- it answers "is there ANY non-echoed, non-empty field" rather
+        than naming the finding keys of each action type, so an action shape this gate has
+        never seen (or a future one) counts as substantive and merges exactly as today.
+        """
+        if isinstance(result, (list, tuple)):
+            return any(cls._payload_is_substantive(item) for item in result)
+        if not isinstance(result, dict):
+            return bool(result)
+        for key, value in result.items():
+            if str(key) in _ECHOED_RESULT_KEYS or isinstance(value, bool):
+                continue
+            if isinstance(value, str):
+                if value.strip():
+                    return True
+            elif isinstance(value, (list, tuple, dict, set)):
+                if len(value):
+                    return True
+            elif value:
+                return True
+        return False
 
     def create_merge_node(self, graph: IdeaDag, parent_id: str) -> Optional[str]:
         parent = graph.get_node(parent_id)

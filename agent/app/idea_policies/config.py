@@ -493,12 +493,25 @@ class MergeConfig:
     # prompt. Truncation here is blind (a mid-JSON chop), so a child past the cap is simply
     # invisible to synthesis -- the cap is a last resort behind ``_compact_merged_results``.
     max_json_chars: int = 100000
+    # Only mint a merge node when at least TWO children actually produced something to
+    # synthesize, instead of gating on structural child count alone. The 2026-08-21
+    # diagnostic found 4 of 7 real merge calls "combining" one content-bearing child with a
+    # Serper-403 search the connector had recorded as ``success: true, content: ""`` -- an
+    # LLM call that can only restate its single source, and whose ``goal_achieved`` verdict
+    # then terminates the branch. Default ON with a kill switch: declining routes into the
+    # engine's existing no-merge path (parent marked DONE, children's content still reaches
+    # finalization through the graph-wide collectors), and the check is deliberately
+    # generous -- any non-echoed, non-empty result field counts (see
+    # ``SimpleMergePolicy._payload_is_substantive``), so genuine multi-source merges are
+    # untouched.
+    require_substantive_children_enabled: bool = True
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",
         "temperature": "merge_temperature",
         "max_tokens": "merge_max_tokens",
         "max_json_chars": "merge_max_json_chars",
+        "require_substantive_children_enabled": "merge_require_substantive_children_enabled",
         "goal_evaluation_first_enabled": "merge_goal_evaluation_first_enabled",
         "race_winner_selection_enabled": "merge_race_winner_selection_enabled",
         "race_winner_selection_includes_inferred_groups_enabled": (
