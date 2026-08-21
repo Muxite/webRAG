@@ -75,6 +75,9 @@ async def run_offtheshelf_execution(
         model_name=model_name,
         collection_name=f"idea_test_{test_id}_{run_stamp}",
         full_capture=report_verbosity >= 3,
+        # Opt-in, default off: pass even a NATURAL termination through the solver's synthesis
+        # pass (see `LangGraphSolver.__init__`). Awaiting a live A/B before it becomes default.
+        always_synthesize=os.environ.get("IDEA_TEST_LANGGRAPH_ALWAYS_SYNTHESIZE", "") in ("1", "true", "True"),
     )
 
     started = time.perf_counter()

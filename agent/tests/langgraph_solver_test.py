@@ -7,7 +7,7 @@ import asyncio
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from agent.app.langgraph_solver import (
-    LangGraphSolver, _extract_usage, _make_tools, _record_io_parity,
+    LangGraphSolver, _STEP_EXHAUSTED_TEXT, _extract_usage, _make_tools, _record_io_parity,
 )
 
 
@@ -71,6 +71,20 @@ def test_search_tool_handles_empty_results():
     search_tool, _visit_tool = _make_tools(fake_io, search_k=6, page_chars=6000)
     out = asyncio.run(search_tool.ainvoke({"query": "nothing"}))
     assert out == "No results."
+
+
+def test_search_tool_marks_a_dead_backend_distinguishably_from_no_results():
+    """`query_search` returns None (not raising) when its health probe fails, so a 403'd backend
+    would otherwise read as "No results." and the model rephrases a dead query for turns on end."""
+    class _DeadBackendIO(_FakeAgentIO):
+        async def search(self, query, count=10, timeout_seconds=None):
+            self.search_calls.append((query, count))
+            return None
+
+    search_tool, _visit_tool = _make_tools(_DeadBackendIO(), search_k=6, page_chars=6000)
+    out = asyncio.run(search_tool.ainvoke({"query": "anything"}))
+    assert out.startswith("SEARCH BACKEND UNAVAILABLE")
+    assert out != "No results."
 
 
 def test_visit_tool_delegates_to_agent_io_and_truncates():
@@ -142,10 +156,24 @@ def test_record_io_parity_full_capture_includes_role_content_pairs():
     assert second_in["messages"] == [
         {"role": "system", "content": "sys prompt"},
         {"role": "user", "content": "the task"},
-        {"role": "assistant", "content": ""},
+        {"role": "assistant", "content": "",
+         "tool_calls": [{"name": "search", "args": {"query": "x"}}]},
         {"role": "tool", "content": "search results"},
     ]
     assert payloads[3]["completion_text"] == "final answer"
+
+
+def test_record_io_parity_full_capture_records_tool_calls():
+    """A tool-only AIMessage has empty content, so without this the capture shows `[assistant] ''`
+    and records neither the queries searched nor the URLs visited."""
+    telemetry = _FakeTelemetry()
+    _record_io_parity(telemetry, _capture_messages(), full_capture=True)
+    payloads = [payload["payload"] for _name, payload in telemetry.events]
+
+    assert payloads[1]["completion_tool_calls"] == [{"name": "search", "args": {"query": "x"}}]
+    # Additive only: the prose turn keeps its content and gains no tool-call key.
+    assert payloads[3]["completion_text"] == "final answer"
+    assert "completion_tool_calls" not in payloads[3]
 
 
 def test_record_io_parity_default_off_adds_no_new_keys():
@@ -157,6 +185,112 @@ def test_record_io_parity_default_off_adds_no_new_keys():
     for _name, payload in off.events:
         keys = set(payload["payload"])
         assert keys in ({"prompt_chars", "prompt_words"}, {"completion_chars", "completion_words"})
+
+
+class _StubLLM:
+    """Stand-in for `ChatOpenAI` — only the synthesis pass's `ainvoke` is exercised."""
+
+    def __init__(self, answer="synthesized answer"):
+        self.answer = answer
+        self.calls = []
+
+    def bind_tools(self, *args, **kwargs):
+        return self
+
+    async def ainvoke(self, messages, *args, **kwargs):
+        self.calls.append(messages)
+        return AIMessage(content=self.answer)
+
+
+def _run_solve_with_messages(monkeypatch, messages, llm=None, **solver_kwargs):
+    """Drive `LangGraphSolver.solve` against a stubbed graph that just replays `messages`."""
+    from agent.app import langgraph_solver
+
+    class _StubGraph:
+        async def astream(self, _inputs, config=None, stream_mode=None):
+            yield {"messages": messages}
+
+    llm = llm or _StubLLM()
+    monkeypatch.setattr(langgraph_solver, "create_react_agent", lambda *a, **k: _StubGraph())
+    monkeypatch.setattr(LangGraphSolver, "_build_llm", lambda self: llm)
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", **solver_kwargs,
+    )
+    return asyncio.run(solver.solve("the task", max_steps=4)), llm
+
+
+def _exhausted_messages():
+    return [
+        HumanMessage(content="the task"),
+        AIMessage(content="", tool_calls=[{"name": "search", "args": {"query": "x"}, "id": "1"}]),
+        ToolMessage(content="Evidence: the founding year was 1861.", tool_call_id="1"),
+        # What create_react_agent substitutes for the model's turn on step exhaustion.
+        AIMessage(content=_STEP_EXHAUSTED_TEXT),
+    ]
+
+
+def test_step_exhaustion_canned_message_triggers_forced_synthesis(monkeypatch):
+    result, llm = _run_solve_with_messages(monkeypatch, _exhausted_messages())
+    assert result["final_deliverable"] == "synthesized answer"
+    assert result["success"] is True
+    assert "step budget" in result.get("warning", "")
+    assert len(llm.calls) == 1  # the synthesis pass ran on the gathered evidence
+
+
+def test_step_exhaustion_canned_message_is_never_the_deliverable(monkeypatch):
+    """Even with no evidence to synthesize from, the canned apology must not be returned as an
+    answer (it would score as a genuine attempt and hide the exhausted-budget condition)."""
+    messages = [HumanMessage(content="the task"), AIMessage(content=_STEP_EXHAUSTED_TEXT)]
+    result, _llm = _run_solve_with_messages(monkeypatch, messages)
+    assert result["final_deliverable"] == ""
+    assert result["success"] is False
+    assert "step budget" in result.get("warning", "")
+
+
+def test_canned_step_exhaustion_string_matches_installed_langgraph():
+    """Tripwire: the constant is copied from langgraph's source, so a library-side reword would
+    silently make the fix above inert."""
+    from pathlib import Path
+
+    import langgraph.prebuilt.chat_agent_executor as executor
+
+    assert _STEP_EXHAUSTED_TEXT in Path(executor.__file__).read_text(encoding="utf-8")
+
+
+def test_natural_termination_is_returned_verbatim_by_default(monkeypatch):
+    messages = [
+        HumanMessage(content="the task"),
+        ToolMessage(content="Evidence: 1861.", tool_call_id="1"),
+        AIMessage(content="The answer is 1861."),
+    ]
+    result, llm = _run_solve_with_messages(monkeypatch, messages)
+    assert result["final_deliverable"] == "The answer is 1861."
+    assert llm.calls == []  # no extra synthesis call, no cost change
+
+
+def test_always_synthesize_reworks_a_natural_termination(monkeypatch):
+    messages = [
+        HumanMessage(content="the task"),
+        ToolMessage(content="Evidence: 1861.", tool_call_id="1"),
+        AIMessage(content="Now, I will compute the difference."),
+    ]
+    result, llm = _run_solve_with_messages(monkeypatch, messages, always_synthesize=True)
+    assert result["final_deliverable"] == "synthesized answer"
+    assert len(llm.calls) == 1
+    assert "DRAFT ANSWER" in llm.calls[0][-1].content
+
+
+def test_always_synthesize_keeps_the_original_answer_when_synthesis_is_empty(monkeypatch):
+    messages = [
+        HumanMessage(content="the task"),
+        ToolMessage(content="Evidence: 1861.", tool_call_id="1"),
+        AIMessage(content="The answer is 1861."),
+    ]
+    result, _llm = _run_solve_with_messages(
+        monkeypatch, messages, llm=_StubLLM(answer=""), always_synthesize=True,
+    )
+    assert result["final_deliverable"] == "The answer is 1861."
 
 
 class _StubTestModule:

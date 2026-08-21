@@ -18,7 +18,10 @@ arm would look artificially bad and misrepresent the comparison):
 * **Forced final synthesis.** ``execution_sequential._run_react`` gives its agent a last-turn
   synthesis from gathered evidence when it runs out of steps. LangGraph instead raises
   ``GraphRecursionError`` and would otherwise return NOTHING — scoring a hard 0 on runs that had
-  in fact gathered good evidence. We reproduce the native arm's graceful path.
+  in fact gathered good evidence. We reproduce the native arm's graceful path. Step exhaustion
+  ALSO arrives without an exception, as a canned ``_STEP_EXHAUSTED_TEXT`` apology substituted for
+  the model's turn; that is routed through the same synthesis, since otherwise the apology itself
+  is a perfectly truthy "answer" and every gathered page is discarded silently.
 * **Token accounting survives a crash.** Messages are accumulated via ``astream`` so a run that
   dies mid-way still reports the tokens it really burned. ``ainvoke`` would raise and discard
   them, reporting $0 for a run that spent real money.
@@ -76,6 +79,24 @@ _SYSTEM = (
     "from in your final answer."
 )
 
+#: What ``create_react_agent`` puts in the response INSTEAD of raising when it runs out of steps
+#: (``langgraph.prebuilt.chat_agent_executor``'s ``call_model``/``acall_model``, verified against
+#: langgraph 1.2.9 at lines 689/716). Step exhaustion therefore reaches us as an ordinary, truthy,
+#: tool-call-free assistant turn: no ``GraphRecursionError``, so without this constant the canned
+#: apology becomes the final deliverable and the forced-synthesis invariant above never fires,
+#: silently discarding every page the run had already gathered.
+_STEP_EXHAUSTED_TEXT = "Sorry, need more steps to process this request."
+
+#: What the search tool returns when the backend itself is unavailable (``AgentIO.search`` ->
+#: ``query_search`` returns ``None`` without raising when its health probe fails, e.g. a 403 on the
+#: search key). Distinct from ``"No results."``: an outage is not fixable by rephrasing, and a
+#: model told "No results." burns its remaining turns re-querying a dead backend.
+_SEARCH_UNAVAILABLE = (
+    "SEARCH BACKEND UNAVAILABLE — the search service is down, not your query. Do NOT retry this "
+    "or any other search; use the visit tool on a URL you can name, or answer from the evidence "
+    "you already have."
+)
+
 _SYNTHESIS_SYSTEM = (
     "Synthesize the FINAL answer using ONLY the gathered evidence. Address every part the task "
     "asks for; for each fact quote the exact value from the page and cite the source URL it came "
@@ -98,6 +119,8 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
         )
         if error is not None:
             return f"SEARCH ERROR: {error}"
+        if results is None:
+            return _SEARCH_UNAVAILABLE
         if not results:
             return "No results."
         lines = [
@@ -140,6 +163,22 @@ def _msg_text(m: Any) -> str:
     return content if isinstance(content, str) else str(content or "")
 
 
+def _msg_tool_calls(m: Any) -> List[Dict[str, Any]]:
+    """The message's tool calls as plain JSON-able ``{name, args}`` dicts (empty when there are
+    none). An ``AIMessage`` that ONLY calls tools has empty ``content``, so a capture keyed on
+    content alone records neither the queries searched nor the URLs visited — the run's entire
+    activity has to be reconstructed from payload byte counts."""
+    calls = getattr(m, "tool_calls", None) or []
+    out: List[Dict[str, Any]] = []
+    for call in calls:
+        if isinstance(call, dict):
+            out.append({"name": call.get("name", ""), "args": call.get("args", {})})
+        else:
+            out.append({"name": str(getattr(call, "name", "") or ""),
+                        "args": getattr(call, "args", {}) or {}})
+    return out
+
+
 def _msg_role(m: Any) -> str:
     if isinstance(m, SystemMessage):
         return "system"
@@ -175,6 +214,7 @@ def _record_io_parity(telemetry: "TelemetrySession", messages: List[Any],
     prior_msgs: List[Dict[str, Any]] = []
     for m in messages or []:
         text = _msg_text(m)
+        tool_calls = _msg_tool_calls(m)
         if isinstance(m, AIMessage):
             prompt_blob = "\n".join(prior)
             in_payload: Dict[str, Any] = {"prompt_chars": count_chars(prompt_blob),
@@ -185,6 +225,8 @@ def _record_io_parity(telemetry: "TelemetrySession", messages: List[Any],
                 in_payload["prompt_text"] = prompt_blob
                 in_payload["messages"] = list(prior_msgs)
                 out_payload["completion_text"] = text
+                if tool_calls:
+                    out_payload["completion_tool_calls"] = tool_calls
             telemetry.record_event("connector_io", {
                 "connector": "ConnectorLLM", "direction": "in", "operation": "llm_query",
                 "payload": in_payload,
@@ -194,7 +236,10 @@ def _record_io_parity(telemetry: "TelemetrySession", messages: List[Any],
                 "payload": out_payload,
             })
         prior.append(text)
-        prior_msgs.append({"role": _msg_role(m), "content": text})
+        prior_entry: Dict[str, Any] = {"role": _msg_role(m), "content": text}
+        if tool_calls:
+            prior_entry["tool_calls"] = tool_calls
+        prior_msgs.append(prior_entry)
 
 
 def _final_answer(messages: List[Any]) -> str:
@@ -234,6 +279,7 @@ class LangGraphSolver:
         search_k: int = 6,
         page_chars: int = 6000,
         full_capture: bool = False,
+        always_synthesize: bool = False,
     ) -> None:
         self._connector_llm = connector_llm
         self._connector_search = connector_search
@@ -245,6 +291,14 @@ class LangGraphSolver:
         self._search_k = search_k
         self._page_chars = page_chars
         self._full_capture = bool(full_capture)
+        #: Opt-in (default OFF, behavior unchanged): also run the synthesis pass on a NATURAL
+        #: termination. LangGraph ends any turn that carries no tool call, so a "thinking out
+        #: loud" turn ("Now I will compute the difference…") is returned verbatim as the
+        #: deliverable — ``execution_sequential``'s agent cannot do this because it has an
+        #: explicit ``finish(answer)`` action. Left off by default because it also rewrites turns
+        #: that already ARE complete answers, which costs an extra call and can paraphrase a good
+        #: answer worse; it needs a live A/B before it becomes the default.
+        self._always_synthesize = bool(always_synthesize)
 
     def _build_llm(self) -> ChatOpenAI:
         """Point LangChain's OpenAI-compatible client at whatever provider the run is configured
@@ -316,17 +370,33 @@ class LangGraphSolver:
         usages = _extract_usage(messages)
         final_text = _final_answer(messages)
 
+        # Step exhaustion WITHOUT an exception: create_react_agent swaps the model's tool-calling
+        # turn for a canned apology (_STEP_EXHAUSTED_TEXT) once remaining_steps runs low. Treat it
+        # as the GraphRecursionError case it really is — otherwise the apology is truthy, the
+        # synthesis below is skipped, and the run's evidence is thrown away with no warning.
+        if final_text.strip() == _STEP_EXHAUSTED_TEXT:
+            recursion_hit = True
+            final_text = ""
+            _logger.warning(
+                f"LangGraph exhausted its step budget ({max_steps} steps) without raising; "
+                "synthesizing from gathered evidence instead of returning its canned apology."
+            )
+
         # Native-arm parity: out of steps (or stopped on a tool call) but evidence in hand ->
         # synthesize a best answer rather than scoring a hard 0 on a run that did the work.
-        if not final_text:
+        if not final_text or self._always_synthesize:
             evidence = _evidence_from(messages)
             if evidence:
+                draft = f"\n\nDRAFT ANSWER (the agent's own last turn — may be incomplete):\n{final_text}" if final_text else ""
                 try:
                     synth = await llm.ainvoke([
                         SystemMessage(content=_SYNTHESIS_SYSTEM),
-                        HumanMessage(content=f"TASK:\n{mandate}\n\nEVIDENCE:\n{evidence}"),
+                        HumanMessage(content=f"TASK:\n{mandate}\n\nEVIDENCE:\n{evidence}{draft}"),
                     ])
-                    final_text = synth.content if isinstance(synth.content, str) else str(synth.content or "")
+                    synth_text = synth.content if isinstance(synth.content, str) else str(synth.content or "")
+                    # Only replace on a non-empty synthesis: an empty one must never turn a real
+                    # last-turn answer into a hard 0.
+                    final_text = synth_text if synth_text.strip() else final_text
                     usages.extend(_extract_usage([synth]))
                 except Exception as exc:  # noqa: BLE001
                     run_error = run_error or exc
