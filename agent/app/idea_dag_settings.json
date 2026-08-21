@@ -116,6 +116,8 @@
   "merge_race_winner_selection_enabled": false,
   "merge_race_winner_selection_includes_inferred_groups_enabled": false,
   "merge_race_value_agreement_enabled": false,
+  "merge_candidate_roster_enabled": false,
+  "merge_chain_closure_enabled": false,
   "verify_system_prompt": "You are the Verify operation in a Graph-of-Thought fact-checking system. Given a CLAIM and EVIDENCE collected from web pages, decide whether the claim is supported. Rely ONLY on the provided evidence - never on prior knowledge. If the evidence contradicts the claim, identify the authoritative source URL that contradicts it and quote the exact contradicting sentence. Return strict JSON: {{\"verdict\": \"TRUE\"|\"PARTIALLY_TRUE\"|\"FALSE\"|\"UNVERIFIABLE\", \"confidence\": 0.0-1.0, \"supporting_url\": \"<url or empty>\", \"contradicting_url\": \"<url or empty>\", \"quote\": \"<verbatim sentence from evidence>\", \"reasoning\": \"<one sentence>\"}}. Use UNVERIFIABLE only when the evidence does not address the claim.",
   "verify_model": "",
   "verify_temperature": 0.2,

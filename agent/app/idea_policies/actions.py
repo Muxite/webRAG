@@ -2849,6 +2849,96 @@ class MergeLeafAction(LeafAction):
                         )
                         goal_achieved = False
 
+            # Candidate-roster contract (B6, carrying B7+B8): a mandate that enumerates N
+            # candidates and asks for a per-candidate verdict is not answered by naming a
+            # survivor -- every OTHER candidate needs a reason, attributable to the page opened
+            # for it, saying why it lost. Deterministic and model-independent: the verdicts are
+            # mined from this synthesis and its children's own text, then corroborated against
+            # fetched page text. Detection unconditional, downgrade gated --
+            # ``MergeConfig.candidate_roster_enabled``. Like the race conflict above, gaps are
+            # routed through ``missing_requirements`` so they ride the consistency guard rather
+            # than flipping the verdict behind its back.
+            from agent.app.idea_policies.candidate_roster import (
+                CANDIDATE_ROSTER,
+                ROSTER_MAGNITUDE_MARKER,
+                ROSTER_UNDISPOSED_MARKER,
+                audit_candidate_roster,
+            )
+
+            roster = audit_candidate_roster(
+                graph, original_goal, self._claim_text(synthesized_data), merged_results
+            )
+            if roster.active:
+                root = graph.get_node(graph.root_id())
+                if root is not None and isinstance(root.details, dict):
+                    root.details[CANDIDATE_ROSTER] = roster.as_registry()
+                roster_gaps = roster.missing_requirements()
+                if roster_gaps:
+                    node.details[ROSTER_UNDISPOSED_MARKER] = [
+                        entry.candidate for entry in roster.undisposed
+                    ]
+                    if roster.magnitude_tripwire:
+                        node.details[ROSTER_MAGNITUDE_MARKER] = roster.magnitude_tripwire
+                        self._logger.warning(
+                            f"[MERGE] {node_id}: candidate(s) {roster.magnitude_tripwire} "
+                            "outrank the elected survivor on raw magnitude with no "
+                            "page-attributable disqualifier"
+                        )
+                    self._logger.warning(
+                        f"[MERGE] {node_id}: candidate roster incomplete -- "
+                        f"{[entry.candidate for entry in roster.undisposed]} have no "
+                        "page-attributable disposition"
+                    )
+                    if self._cfg.merge.candidate_roster_enabled:
+                        existing = (
+                            list(missing_requirements)
+                            if isinstance(missing_requirements, (list, tuple)) else []
+                        )
+                        missing_requirements = existing + roster_gaps
+                        if goal_achieved:
+                            self._logger.warning(
+                                f"[MERGE] {node_id}: downgrading to not-achieved "
+                                "(merge_candidate_roster_enabled)"
+                            )
+                        goal_achieved = False
+
+            # Relation-typed chain closure (C1): on a CHAIN-shaped mandate, hop k's own page
+            # must state hop k-1's entity near the relation the mandate hops on ("birthplace").
+            # A wrong entity at hop k is invisible to every other check here -- it produces a
+            # REAL page with a REAL number, so visit grounding, page identity and numeric
+            # provenance all pass; the error is in the RELATION between hops. Live-verified
+            # discrimination: Parral's page reads "is the birthplace of poet Pablo Neruda" and
+            # closes, the Temuco decoy (Neruda "lived in") and the Hidalgo del Parral homonym
+            # (no mention) do not. Detection unconditional, gaps routed through
+            # ``missing_requirements`` under ``MergeConfig.chain_closure_enabled``.
+            from agent.app.idea_policies.chain_closure import (
+                CHAIN_CLOSURE,
+                CHAIN_CLOSURE_OPEN_MARKER,
+                audit_chain_closure,
+            )
+
+            closure = audit_chain_closure(graph)
+            if closure.active:
+                node.details[CHAIN_CLOSURE] = closure.as_dict()
+                if closure.drifted:
+                    node.details[CHAIN_CLOSURE_OPEN_MARKER] = list(closure.pages)
+                    self._logger.warning(
+                        f"[MERGE] {node_id}: chain closure OPEN -- {closure.reason} "
+                        f"(suspected wrong-entity hop)"
+                    )
+                    if self._cfg.merge.chain_closure_enabled:
+                        existing = (
+                            list(missing_requirements)
+                            if isinstance(missing_requirements, (list, tuple)) else []
+                        )
+                        missing_requirements = existing + closure.missing_requirements()
+                        if goal_achieved:
+                            self._logger.warning(
+                                f"[MERGE] {node_id}: downgrading to not-achieved "
+                                "(merge_chain_closure_enabled)"
+                            )
+                        goal_achieved = False
+
             node.details[DetailKey.GOAL_ACHIEVED.value] = goal_achieved
             if goal_achieved_field_missing:
                 node.details["goal_achieved_field_missing"] = True

@@ -561,6 +561,51 @@ class MergeConfig:
     # risk from equivalent-but-differently-derived figures, or one route reading a page updated
     # after the other -- is measurable in report captures before it decides anything.
     race_value_agreement_enabled: bool = False
+    # Require one page-attributable verdict per candidate the mandate ENUMERATES before an
+    # achieved verdict stands (``candidate_roster.audit_candidate_roster``). Targets the
+    # 2026-08-21 diagnosis of task 122: the score gain there came from a config cap that FORCED
+    # all-four coverage, never from the engine deciding to check every candidate, and a
+    # "checked" candidate is recorded as a bare visit -- no field anywhere says WHY it was
+    # eliminated, so a silent skip and a real disqualification are indistinguishable.
+    #
+    # Three findings from the same strong-agent trace ride this one flag, because all three are
+    # the same record: the per-candidate disqualifier quote (B6), the magnitude tripwire that
+    # blocks electing a survivor while a LARGER candidate carries no quotable disqualifier
+    # (B7 -- RATAN-600 is physically bigger than FAST and is still correctly eliminated, on a
+    # geometry predicate pure argmax cannot see), and the year token a time-indexed superlative
+    # demands (B8 -- Arecibo collapsed in December 2020, straddling most training cutoffs).
+    #
+    # Scope is deterministic and narrow: an enumerated NAME list plus an individual-disposition
+    # cue, which over the 165 task modules selects 39 mandates -- every branch-eliminate /
+    # survivor / AND-filter task and no breadth-argmax, question or logic-constraint list.
+    #
+    # Opt-in, default OFF. Residual risk: the corroboration bar is token overlap against the
+    # candidate's own page, so a verdict paraphrased past recognition, or one resting on a page
+    # the run reached under a different title, reads as unsourced. Detection is unconditional
+    # either way -- the audit is stamped on the root (``candidate_roster``) and the gaps on the
+    # merge node -- so the false-positive rate is measurable before the downgrade is used.
+    candidate_roster_enabled: bool = False
+    # Require a CHAIN-shaped mandate's hops to be relation-linked to each other before an
+    # achieved verdict stands (``chain_closure.audit_chain_closure``): some page the run
+    # fetched must state an EARLIER fetched page's entity near the relation the mandate hops
+    # on ("birthplace"), which is the back-reference a careful researcher checks before
+    # trusting a hop hand-off.
+    #
+    # The failure it targets is invisible to every other check in this method: a wrong entity
+    # at hop k produces a REAL page with REAL content, so the visit happens, visit-count
+    # grounding passes, the page-identity guard passes and ``answer_numeric_provenance``
+    # passes -- the 2026-08-21/22 trace's live decoy (Temuco, real infobox elevation 360 m,
+    # described in a search snippet as Neruda's "native town") would satisfy all of them while
+    # answering about the wrong town. The error is in the RELATION between two hops rather
+    # than in either hop's execution.
+    #
+    # Opt-in, default OFF, on a false-positive risk that is genuinely unmeasured rather than
+    # merely residual: a CORRECT hop's page need not mention the entity that led to it at all
+    # (plenty of town pages list no notable residents), and the relation vocabulary is a small
+    # curated list. Detection is unconditional either way -- the audit is stamped on the merge
+    # node (``chain_closure``) and a failed closure marked (``chain_closure_open``) -- so the
+    # rate is countable from report captures before the downgrade is used anywhere.
+    chain_closure_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",
@@ -577,6 +622,8 @@ class MergeConfig:
             "merge_race_winner_selection_includes_inferred_groups_enabled"
         ),
         "race_value_agreement_enabled": "merge_race_value_agreement_enabled",
+        "candidate_roster_enabled": "merge_candidate_roster_enabled",
+        "chain_closure_enabled": "merge_chain_closure_enabled",
     }
 
     @classmethod
