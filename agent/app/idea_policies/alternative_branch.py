@@ -27,7 +27,7 @@ that the "sequential" fallback would simply race its primary the first time both
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Sequence
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence
 
 from agent.app.idea_policies.base import DetailKey, IdeaNodeStatus
 
@@ -205,12 +205,39 @@ def link_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> int:
 #: token each way scores ``(n-1)/(n+1)``, so it takes 7+ tokens to clear it by wording alone.
 RACE_INFERENCE_SIMILARITY = 0.7
 
+#: Two route SOURCES count as different routes below this Jaccard similarity. Deliberately not
+#: "strictly disjoint": the canonical race of the whole mechanism is "English Wikipedia" against
+#: "Norwegian Wikipedia", which shares the generic token ``wikipedia`` and would fail a
+#: zero-overlap bar. 0.5 admits that pair (0.33) while still rejecting identical sources (1.0)
+#: and one-token-different restatements of the same source.
+RACE_ROUTE_SOURCE_OVERLAP = 0.5
+
 #: Dropped before every similarity comparison. Function words are boilerplate shared by every
 #: sibling of every plan, so leaving them in inflates the score of unrelated candidates.
 _STOPWORDS = frozenset({
     "a", "an", "and", "as", "at", "by", "for", "from", "in", "into", "is", "it", "its", "of",
     "on", "or", "that", "the", "this", "to", "via", "with",
 })
+
+#: Leading imperative verbs stripped off a title before it is decomposed into target/source.
+#: Every plan title starts with one and it says which ACTION is taken, never which FACT is
+#: sought — leaving it in makes two routes to one fact look different whenever the author
+#: reached them with different verbs ("Search for X on A" vs "Verify X against B").
+_TITLE_VERBS = frozenset({
+    "aggregate", "browse", "check", "collect", "compare", "compute", "confirm", "consult",
+    "cross", "determine", "extract", "fetch", "find", "gather", "get", "identify", "inspect",
+    "list", "locate", "look", "obtain", "open", "query", "read", "retrieve", "review",
+    "scan", "search", "summarise", "summarize", "verify", "visit",
+})
+
+#: Words that introduce the SOURCE half of a title. Everything before the first one is the
+#: target (the fact being sought), everything after it is the route taken to that fact. Kept
+#: to source-introducing prepositions only: ``for``/``of``/``about`` introduce more target,
+#: not a route, so splitting on them would shred the target instead.
+_SOURCE_PREPOSITIONS = frozenset({"on", "from", "against", "in", "via"})
+
+#: Two-word source introducer, matched before the single-word set.
+_SOURCE_PREPOSITION_PAIRS = (("according", "to"),)
 
 
 def infer_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> Dict[str, int]:
@@ -223,8 +250,8 @@ def infer_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> Dict[s
     definition of a race: **the same target reached by different routes**. Both halves are
     required, because either half alone is a well-known false positive:
 
-    * different routes alone — :func:`idea_sequencing.disjoint_approach_reason` — is exactly
-      what a six-way breadth fan-out over six unrelated entities also looks like;
+    * different routes alone — :func:`race_route_evidence` — is exactly what a six-way breadth
+      fan-out over six unrelated entities also looks like;
     * the same target alone is what any two steps of one sequential chain look like.
 
     Same-target evidence comes in two tiers, never mixed inside one group:
@@ -237,12 +264,21 @@ def infer_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> Dict[s
       entity ("the prominence in metres and the source URL", six times) is indistinguishable
       from a race by this signal alone — which is exactly why merge-time consumption is gated
       separately and a breadth negative control belongs in the live probe.
-    * **tier 2**: title-token overlap AFTER the parent's own title vocabulary is stripped from
-      both sides, for plans with no ``expect`` at all. Stripping is what stops every sibling of
-      a narrow parent from looking alike, and it makes this tier strict enough that it is
-      expected to fire rarely — hence :data:`RACE_GROUPS_INFERRED_TIERS`, which keeps tier 2's
-      hit rate (and false-positive rate) measurable separately from tier 1's before either is
-      allowed to influence a merge.
+    * **tier 2**: asymmetric target/route decomposition of the title
+      (:func:`_route_of`), for plans with no ``expect`` at all. The candidate's title splits
+      into the FACT it seeks and the SOURCE it seeks it in, and a race is same fact + different
+      sources — so the two halves are compared against different bars instead of being mashed
+      into one symmetric similarity score. Tier 2 stays out of merge consumption regardless
+      (see ``SimpleMergePolicy._race_registry``) and keeps its own entry in
+      :data:`RACE_GROUPS_INFERRED_TIERS` so its hit rate is measurable on its own.
+
+      This replaced a symmetric whole-title Jaccard measured at 50% precision live: its two
+      false positives were both a search paired with its OWN following visit, which is a chain
+      step pair, and a threshold sweep found no bar that separated them — same-route chain
+      pairs scored 0.65-0.73, genuine cross-route pairs 0.46-0.50, so the chain pairs ranked
+      ABOVE the races the signal existed to find. Decomposing fixes that by construction: a
+      search and its own visit share a source (that is what makes them one route) and differ in
+      target (one seeks a fact, the other seeks "the top search result").
 
     Writes to :data:`RACE_GROUPS_INFERRED`, never to :data:`RACE_GROUPS`, and never to
     ``DetailKey.RACE_GROUP``: with the merge-side flag off (the default) the whole pass is
@@ -256,10 +292,6 @@ def infer_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> Dict[s
 
     :returns: ``{label: tier}`` for the groups registered on ``parent`` (empty when none).
     """
-    from agent.app.idea_sequencing import disjoint_approach_reason
-
-    parent_vocab = _tokens(getattr(parent, "title", ""))
-
     with_expect: List[Any] = []
     without_expect: List[Any] = []
     for node in nodes:
@@ -278,12 +310,18 @@ def infer_race_groups(parent: "IdeaNode", nodes: Sequence["IdeaNode"]) -> Dict[s
 
     registry: Dict[str, List[str]] = {}
     tiers: Dict[str, int] = {}
-    for tier, group_nodes, signature in (
-        (1, with_expect, lambda n: _tokens(n.details.get(DetailKey.EXPECT.value))),
-        (2, without_expect, lambda n: _tokens(n.title) - parent_vocab),
+    target_of = lambda n: _route_of(n.title).target  # noqa: E731. One-line signature accessor
+    for tier, group_nodes, signature, clusterer in (
+        (
+            1,
+            with_expect,
+            lambda n: _tokens(n.details.get(DetailKey.EXPECT.value)),
+            _cluster_by_similarity,
+        ),
+        (2, _routed_candidates(without_expect), target_of, _cluster_by_route),
     ):
-        for members in _cluster_by_similarity(group_nodes, signature):
-            if not disjoint_approach_reason(list(members)):
+        for members in clusterer(group_nodes, signature):
+            if not race_route_evidence(list(members)):
                 continue
             label = _inferred_label(members, signature, taken=set(registry))
             registry[label] = [m.node_id for m in members]
@@ -325,6 +363,143 @@ def _cluster_by_similarity(nodes: Sequence[Any], signature) -> List[List[Any]]:
         assigned.update(taken)
         clusters.append(members)
     return clusters
+
+
+class _Route(NamedTuple):
+    """A title decomposed into the fact it seeks and the source it seeks it in."""
+
+    target: set
+    source: set
+
+
+def _route_of(title: Any) -> _Route:
+    """Split ``title`` into ``(target, source)`` token sets around its source preposition.
+
+    "Search for Hardanger Bridge main span length on English Wikipedia" becomes target
+    ``{hardanger, bridge, main, span, length}`` and source ``{english, wikipedia}``.
+
+    Two deterministic steps, no classifier and no extra spend:
+
+    1. drop the leading imperative verb (:data:`_TITLE_VERBS`) — it names the ACTION, and two
+       routes to one fact routinely use different verbs;
+    2. split at the FIRST source-introducing preposition (:data:`_SOURCE_PREPOSITIONS`, plus
+       the two-word :data:`_SOURCE_PREPOSITION_PAIRS`). First, not last: later prepositions
+       belong to the source phrase itself ("in the infobox on English Wikipedia").
+
+    A title with no such preposition gets an empty ``source``, which
+    :func:`_routed_candidates` reads as "no route evidence" and drops. That is the intended
+    strictness: a candidate that never says where it is looking cannot be shown to be looking
+    somewhere ELSE than its sibling.
+    """
+    words = "".join(char if char.isalnum() else " " for char in str(title or "").lower()).split()
+    if words and words[0] in _TITLE_VERBS:
+        words = words[1:]
+
+    split_at = len(words)
+    source_start = len(words)
+    for index, word in enumerate(words):
+        pair = next(
+            (p for p in _SOURCE_PREPOSITION_PAIRS
+             if p[0] == word and words[index + 1:index + 2] == [p[1]]),
+            None,
+        )
+        if pair is not None:
+            split_at, source_start = index, index + len(pair)
+            break
+        if word in _SOURCE_PREPOSITIONS:
+            split_at, source_start = index, index + 1
+            break
+
+    return _Route(
+        target=_tokens(" ".join(words[:split_at])),
+        source=_tokens(" ".join(words[source_start:])),
+    )
+
+
+def _routed_candidates(nodes: Sequence[Any]) -> List[Any]:
+    """``nodes`` whose title names both a target and a source, in declared order."""
+    routed = []
+    for node in nodes:
+        route = _route_of(getattr(node, "title", ""))
+        if route.target and route.source:
+            routed.append(node)
+    return routed
+
+
+def _cluster_by_route(nodes: Sequence[Any], signature) -> List[List[Any]]:
+    """Cluster ``nodes`` into same-target-DIFFERENT-source groups of 2+.
+
+    The same greedy seed-and-absorb shape as :func:`_cluster_by_similarity` (see there for why
+    absorption compares against the seed only), with the race definition's two halves applied
+    to the two halves of the decomposition: a member must match the seed's target above
+    :data:`RACE_INFERENCE_SIMILARITY` *and* differ from the seed's source below
+    :data:`RACE_ROUTE_SOURCE_OVERLAP`. Requiring both is what excludes a search and its own
+    following visit, which agree on source and disagree on target — the exact false positive
+    that retired the old symmetric signal.
+    """
+    routes = [(node, _route_of(getattr(node, "title", ""))) for node in nodes]
+    assigned: set = set()
+    clusters: List[List[Any]] = []
+    for index, (seed, seed_route) in enumerate(routes):
+        if index in assigned:
+            continue
+        members = [seed]
+        taken = [index]
+        for other_index in range(index + 1, len(routes)):
+            if other_index in assigned:
+                continue
+            other, other_route = routes[other_index]
+            if _jaccard(seed_route.target, other_route.target) < RACE_INFERENCE_SIMILARITY:
+                continue
+            if _jaccard(seed_route.source, other_route.source) >= RACE_ROUTE_SOURCE_OVERLAP:
+                continue
+            members.append(other)
+            taken.append(other_index)
+        if len(members) < 2:
+            continue
+        assigned.update(taken)
+        clusters.append(members)
+    return clusters
+
+
+def race_route_evidence(nodes: Sequence[Any]) -> Optional[str]:
+    """Do these candidates take different routes *in the sense a RACE needs*? Which evidence?
+
+    A race-specific fork of :func:`idea_sequencing.disjoint_approach_reason`, which that
+    function must not become: its job is dispatch-parallelism safety, other call sites depend
+    on its current verdicts, and a wrong dispatch decision costs a serialized step while a
+    wrong race group costs a discarded correct finding once merge consumption is on. So the
+    stricter rules live here.
+
+    Two additions on top of that function's verdict:
+
+    * ``mixed_search_visit`` is REJECTED. "A search and its own resulting visit" is the
+      definition of a chain step pair, and it was the actual driver of both false positives the
+      2026-08-21 probe audit found. Sound evidence for dispatch (both can be issued at once),
+      no evidence at all for a race.
+    * every VISIT member must carry a concrete URL individually, not merely as part of a batch
+      that happens to pass ``concrete_urls``. The task-122 tier-1 near-miss was only saved
+      because its visit nodes had empty URLs at capture time; filling them in would have
+      registered a false race, so the invariant is stated rather than left to luck.
+
+    :returns: the surviving reason string, or ``None`` when this batch is no race.
+    """
+    from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+    from agent.app.idea_policies.base import IdeaActionType
+    from agent.app.idea_sequencing import concrete_url, disjoint_approach_reason
+
+    reason = disjoint_approach_reason(list(nodes))
+    if not reason or reason == "mixed_search_visit":
+        return None
+    for node in nodes:
+        details = getattr(node, "details", None)
+        if not isinstance(details, dict):
+            return None
+        if NodeDetailsExtractor.get_action(details) != IdeaActionType.VISIT.value:
+            continue
+        if not concrete_url(details):
+            return None
+    return reason
 
 
 def _inferred_label(members: Sequence[Any], signature, taken: set) -> str:

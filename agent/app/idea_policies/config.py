@@ -486,6 +486,8 @@ class MergeConfig:
     # validated — and winner selection actively DISCARDS the loser's findings, so a false
     # positive here silently drops a legitimate independent result. Opt-in, default OFF ->
     # inferred groups stay pure instrumentation no matter what the expansion flag is set to.
+    # Reaches TIER 1 groups only: tier 2 measured 50% precision live, so it is unconsumable
+    # regardless of this flag (see ``SimpleMergePolicy._race_registry``).
     race_winner_selection_includes_inferred_groups_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {

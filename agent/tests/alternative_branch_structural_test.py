@@ -8,12 +8,14 @@ prompt-side fix cannot reach the cheap models this repo exists to boost.
 Layers pinned, in the order they run:
 
   1. ``idea_sequencing.disjoint_approach_reason`` — the "different routes" half, lifted out of
-     ``siblings_are_independent`` so the inference can reuse it without a graph;
-  2. ``alternative_branch.infer_race_groups`` — tier 1 (``expect``), tier 2 (title overlap),
-     and the same-target check that keeps a breadth fan-out out of the registry;
+     ``siblings_are_independent`` so the inference can reuse it without a graph — and
+     ``alternative_branch.race_route_evidence``, the stricter race-only fork of it;
+  2. ``alternative_branch.infer_race_groups`` — tier 1 (``expect``), tier 2 (target/source
+     route decomposition), and the same-target check that keeps a breadth fan-out out;
   3. the engine call site, on and off;
   4. ``SimpleMergePolicy``'s second, independent gate: an inferred group is instrumentation
-     until ``merge_race_winner_selection_includes_inferred_groups_enabled`` says otherwise.
+     until ``merge_race_winner_selection_includes_inferred_groups_enabled`` says otherwise,
+     and a TIER 2 group stays instrumentation even then.
 """
 from __future__ import annotations
 
@@ -234,12 +236,30 @@ def test_three_way_group_registers_every_member():
 # --- tier 2 ---------------------------------------------------------------------------
 
 
-def test_tier2_registers_high_title_overlap_when_no_expect_exists():
+def test_route_decomposition_splits_a_title_into_target_and_source():
+    """The verb names the action and never the fact, so it is dropped; the first
+    source-introducing preposition is the seam between what is sought and where."""
+    route = alt._route_of("Search for Hardanger Bridge main span length on English Wikipedia")
+    assert route.target == {"hardanger", "bridge", "main", "span", "length"}
+    assert route.source == {"english", "wikipedia"}
+
+    # Two-word introducer, and a later preposition belongs to the source phrase itself.
+    assert alt._route_of("Check the span according to the bridge database").source == {
+        "bridge", "database"}
+    assert alt._route_of("Read the figure from the infobox on English Wikipedia").source == {
+        "infobox", "english", "wikipedia"}
+
+    # No source-introducing preposition at all -> no route evidence.
+    assert alt._route_of("Verify Jane Austen's birth year").source == set()
+
+
+def test_tier2_registers_one_target_reached_through_two_sources():
+    """The rep2/150 shape from the live probe: one fact, two named routes to it."""
     graph, parent, (a, b) = _graph_with_children(
-        ("Confirm the published span figure in metres",
-         _visit("https://en.wikipedia.org/wiki/Hardanger_Bridge")),
-        ("Confirm the published span figure in metres",
-         _visit("https://structurae.net/hardanger")),
+        ("Search for Hardanger Bridge main span length on English Wikipedia",
+         _search("hardanger bridge main span english wikipedia")),
+        ("Search for Hardanger Bridge main span length on the ranked list of longest "
+         "suspension bridges", _search("list of longest suspension bridges")),
     )
     tiers = alt.infer_race_groups(parent, [a, b])
 
@@ -247,38 +267,97 @@ def test_tier2_registers_high_title_overlap_when_no_expect_exists():
     label = next(iter(tiers))
     assert parent.details[alt.RACE_GROUPS_INFERRED] == {label: [a.node_id, b.node_id]}
     # The tier is recorded separately from tier 1 precisely so this weaker signal's
-    # false-positive rate can be measured before it is ever trusted at merge time.
+    # false-positive rate stays measurable — and so merge consumption can refuse it outright.
     assert parent.details[alt.RACE_GROUPS_INFERRED_TIERS] == {label: 2}
 
 
-def test_tier2_ignores_low_overlap_titles():
+def test_tier2_rejects_a_search_and_its_own_following_visit():
+    """The false positive that retired the old symmetric title-Jaccard signal. This pair scored
+    ABOVE genuine cross-route pairs on that metric; decomposed, it fails both halves — the two
+    share a source (one route) and differ in target (the fact vs "the top search result")."""
     graph, parent, (a, b) = _graph_with_children(
-        ("Read the Tesla Model 3 specification page", _visit("https://a.example/tesla")),
-        ("Read the Nissan Leaf specification page", _visit("https://b.example/leaf")),
+        ("Search for Hardanger Bridge main span length on English Wikipedia",
+         _search("hardanger bridge main span english wikipedia")),
+        ("Visit the top search result for Hardanger Bridge main span length on English "
+         "Wikipedia", _visit("https://en.wikipedia.org/wiki/Hardanger_Bridge")),
+    )
+    assert alt.infer_race_groups(parent, [a, b]) == {}
+
+
+def test_tier2_rejects_two_candidates_naming_the_same_source():
+    """Same target AND same route is a duplicate step, not a race."""
+    graph, parent, (a, b) = _graph_with_children(
+        ("Read the recorded main span measurement in metres", _visit("https://a.example/x")),
+        ("Read the published main span measurement in metres", _visit("https://b.example/y")),
+    )
+    assert alt.infer_race_groups(parent, [a, b]) == {}
+
+
+def test_tier2_ignores_candidates_that_name_no_source():
+    """Task-052-shaped breadth: six author pages, none of which says WHERE it looks. A
+    candidate that never names a route cannot be shown to take a different one."""
+    graph, parent, (a, b) = _graph_with_children(
+        ("Visit Jane Austen's author page", _visit("https://a.example/austen")),
+        ("Visit Virginia Woolf's author page", _visit("https://b.example/woolf")),
+        parent_title="Find the earliest-born of six novelists",
+    )
+    assert alt.infer_race_groups(parent, [a, b]) == {}
+
+
+def test_tier2_ignores_different_targets_reached_through_different_sources():
+    graph, parent, (a, b) = _graph_with_children(
+        ("Read the Tesla Model 3 range from the manufacturer specification",
+         _visit("https://a.example/tesla")),
+        ("Read the Nissan Leaf range from the EPA database", _visit("https://b.example/leaf")),
         parent_title="Compare the range of several electric cars",
     )
     assert alt.infer_race_groups(parent, [a, b]) == {}
 
 
-def test_tier2_similarity_is_measured_on_what_the_parent_did_not_already_say():
-    """Stripping the parent's own vocabulary is what stops every sibling of a narrow parent
-    from looking alike — and it is also what makes tier 2 strict: a residual pair differing by
-    one token each way scores ``(n-1)/(n+1)``, so short titles cannot clear 0.7 on wording
-    alone. Both halves of that trade-off are pinned here."""
-    identical_but_for_the_parent_words = (
-        ("Read the Hardanger Bridge main span", _visit("https://a.example/x")),
-        ("Read the main span of the Hardanger Bridge", _visit("https://b.example/y")),
+def test_tier2_allows_two_sources_that_share_only_a_generic_token():
+    """"English Wikipedia" against "Norwegian Wikipedia" is the canonical race of the whole
+    mechanism, and a zero-overlap bar on sources would throw it away over the shared word
+    ``wikipedia`` — hence :data:`RACE_ROUTE_SOURCE_OVERLAP` rather than strict disjointness."""
+    graph, parent, (a, b) = _graph_with_children(
+        ("Read the main span figure on English Wikipedia", _visit("https://en.example/x")),
+        ("Read the main span figure on Norwegian Wikipedia", _visit("https://no.example/y")),
     )
-    graph, parent, nodes = _graph_with_children(*identical_but_for_the_parent_words)
-    # Residual on both sides is just {"read"} -> identical -> a group.
-    assert list(alt.infer_race_groups(parent, nodes).values()) == [2]
+    assert list(alt.infer_race_groups(parent, [a, b]).values()) == [2]
 
-    graph, parent, nodes = _graph_with_children(
-        ("Read the recorded main span measurement in metres", _visit("https://a.example/x")),
-        ("Read the recorded main span measurement in feet", _visit("https://b.example/y")),
+
+# --- the race-specific route gate -------------------------------------------------------
+
+
+def test_race_route_evidence_rejects_mixed_search_visit():
+    """``disjoint_approach_reason`` is right to call this pair dispatch-independent and wrong
+    to call it a race: a search and its own resulting visit is the definition of a chain step
+    pair. The fork exists so the dispatch verdict stays byte-identical."""
+    _g, _p, (a, b) = _graph_with_children(
+        ("A", _search("hardanger bridge main span")),
+        ("B", _visit("https://structurae.net/hardanger")),
     )
-    # Residual {read, recorded, measurement, metres} vs {..., feet}: 3/5 = 0.6, under the bar.
-    assert alt.infer_race_groups(parent, nodes) == {}
+    assert disjoint_approach_reason([a, b]) == "mixed_search_visit"
+    assert alt.race_route_evidence([a, b]) is None
+
+
+def test_race_route_evidence_requires_every_visit_member_to_carry_a_url():
+    _g, _p, (a, b) = _graph_with_children(
+        ("A", _visit("https://a.example/x")),
+        ("B", _visit("https://b.example/y")),
+    )
+    assert alt.race_route_evidence([a, b]) == "concrete_urls"
+
+    b.details["optional_url"] = ""
+    assert alt.race_route_evidence([a, b]) is None
+
+
+def test_race_route_evidence_passes_the_remaining_reasons_through():
+    _g, _p, (a, b) = _graph_with_children(
+        ("A", _search("hardanger bridge main span")),
+        ("B", _search("hardanger bru hovedspenn")),
+    )
+    assert alt.race_route_evidence([a, b]) == "disjoint_searches"
+    assert alt.race_route_evidence([]) is None
 
 
 def test_tiers_are_never_mixed_inside_one_group():
@@ -516,6 +595,35 @@ def test_an_authored_group_is_unaffected_by_the_inferred_registry():
 
     merged = _policy().merge(graph, parent.node_id, recursive=False)["merged"]
     assert {item["node_id"] for item in merged} == {b.node_id, plain.node_id}
+
+
+def test_a_tier2_group_is_never_consumable_even_with_both_flags_on():
+    """Tier 2 was measured at 50% live precision, and consuming a wrong group DISCARDS correct
+    findings — so the flag that opens merge consumption to inferred groups opens it to tier 1
+    only. Tier 2 keeps being written for instrumentation and stays unreachable here."""
+    graph, parent, (a, b) = _graph_with_children(
+        ("Read the main span figure on English Wikipedia", _visit(
+            "https://en.example/x", **{
+                DetailKey.GOAL.value: _PARENT_TITLE,
+                DetailKey.ACTION_RESULT.value: _visit_result(_SUBJECT_ONLY_PAGE)})),
+        ("Read the main span figure on Norwegian Wikipedia", _visit(
+            "https://no.example/y", **{
+                DetailKey.GOAL.value: _PARENT_TITLE,
+                DetailKey.ACTION_RESULT.value: _visit_result(_DATUM_PAGE)})),
+    )
+    a.status = b.status = IdeaNodeStatus.DONE
+    tiers = alt.infer_race_groups(parent, [a, b])
+    assert list(tiers.values()) == [2], "fixture precondition: a tier 2 group"
+    label = next(iter(tiers))
+
+    policy = _policy(include_inferred=True)
+    assert policy._race_registry(parent) == {}
+    assert policy.select_winner(graph, parent.node_id, label) is None
+    assert policy._race_excluded_ids(graph, parent.node_id) == set()
+    merged = policy.merge(graph, parent.node_id, recursive=False)["merged"]
+    assert {item["node_id"] for item in merged} == {a.node_id, b.node_id}
+    # Still recorded: the demotion is about consumption, not about losing the observation.
+    assert parent.details[alt.RACE_GROUPS_INFERRED_TIERS] == {label: 2}
 
 
 def test_an_authored_label_wins_a_collision_with_an_inferred_one():

@@ -12,6 +12,7 @@ from agent.app.idea_policies.alternative_branch import (
     RACE_COMPLETED_STEP,
     RACE_GROUPS,
     RACE_GROUPS_INFERRED,
+    RACE_GROUPS_INFERRED_TIERS,
     RACE_LOSER,
     is_alternative_pending,
 )
@@ -209,14 +210,25 @@ class SimpleMergePolicy(MergePolicy):
         authored membership wins any label collision, being the better evidence. Default OFF
         keeps inferred groups pure instrumentation: they are populated, logged and visible in
         report captures while ``merge()`` stays byte-identical.
+
+        **Tier 2 inferred groups are never consumable here**, whatever that flag says. The
+        2026-08-21 probe audit measured tier 2's live precision at 50% — half its registrations
+        were a search and its own following visit, one chain, not a race — and consuming a
+        wrong group DISCARDS correct findings from synthesis. Tier 2 keeps being written to
+        ``race_groups_inferred`` for its instrumentation value; earning merge consumption back
+        is a future cycle's job, gated on a probe that shows precision it has not shown yet.
         """
         registry = node.details.get(RACE_GROUPS)
         registry = dict(registry) if isinstance(registry, dict) else {}
         if not self._cfg.merge.race_winner_selection_includes_inferred_groups_enabled:
             return registry
         inferred = node.details.get(RACE_GROUPS_INFERRED)
+        tiers = node.details.get(RACE_GROUPS_INFERRED_TIERS)
+        tiers = tiers if isinstance(tiers, dict) else {}
         if isinstance(inferred, dict):
             for label, member_ids in inferred.items():
+                if tiers.get(label) != 1:
+                    continue
                 registry.setdefault(label, member_ids)
         return registry
 
