@@ -190,7 +190,7 @@ def _page_identity(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _page_identity_ok(contract: StepContract, result: Dict[str, Any]) -> bool:
+def page_identity_ok(contract: StepContract, result: Dict[str, Any]) -> bool:
     """The page-identity guard: at least one of the hop's expected-subject tokens must appear
     in the fetched page's OWN identity (not its body). Deliberately stricter than
     ``contract_satisfaction._subject_present`` (which treats zero tokens as trivially
@@ -198,6 +198,10 @@ def _page_identity_ok(contract: StepContract, result: Dict[str, Any]) -> bool:
     guard fails CLOSED instead of vacuously passing on exactly the leaves most at risk (a
     boilerplate leaf goal that names no subject can't corroborate ANY page, including the wrong
     one — see the module docstring's precision numbers).
+
+    Public (no leading underscore): also reused by ``grounding.py``'s opt-in
+    ``require_grounding_page_identity`` gate, which needs this exact guard against a different
+    caller shape (a visited node, not a just-completed VISIT result inline in ``build_waypoint``).
     """
     tokens = contract.subject_tokens
     if not tokens:
@@ -317,7 +321,7 @@ def build_waypoint(
         return _none()
 
     contract = _widen_subject_tokens_with_parent_goal(node, own_contract)
-    if not _page_identity_ok(contract, result):
+    if not page_identity_ok(contract, result):
         return _none()
 
     evidence_low = evidence.lower()

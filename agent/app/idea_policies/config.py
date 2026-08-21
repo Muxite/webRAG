@@ -363,6 +363,17 @@ class FinalConfig:
     # as researched. It is banner-flagged as ungrounded, unverifiable URLs are stripped, and
     # success/goal_achieved are forced False rather than laundering parametric memory.
     require_grounding: bool = False
+    # F37: page-identity relevance signal layered onto the grounding gate above (opt-in,
+    # default OFF). `evaluate_grounding` today is pure set arithmetic over visited URLs — any
+    # 2 pages (or 1 followed link) satisfy it, with zero title/URL/content relevance check, so
+    # two completely off-topic visits trivially "ground" the answer. When on, a visit only
+    # counts toward the requirement if it ALSO passes `waypoint.page_identity_ok` (the same
+    # h1/title/url-only guard build_waypoint already uses to reject a wrong-page fetch) against
+    # the subject tokens of the leaf that performed it. Changes pass/fail semantics of a gate
+    # that is on in every arm today (`final_require_grounding: True` everywhere) — needs a live
+    # A/B before flipping the default, since some currently-passing runs could newly fail if
+    # subject-token extraction is noisy on certain task phrasings.
+    require_grounding_page_identity: bool = False
     # C1b: approximator-stripped k-sample vote for terminal answer (opt-in). When
     # native_vote_k_enabled and native_vote_k >= 2, finalize answer is extracted k times
     # (anchor temp-0 + diverse temps), normalized via approximator-stripped vote key, and
@@ -425,6 +436,7 @@ class FinalConfig:
         "max_prompt_chars": "final_max_prompt_chars",
         "allow_partial_success": "final_allow_partial_success",
         "require_grounding": "final_require_grounding",
+        "require_grounding_page_identity": "final_require_grounding_page_identity",
     }
 
     @classmethod

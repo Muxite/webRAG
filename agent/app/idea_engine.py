@@ -604,7 +604,10 @@ class IdeaDagEngine:
         try:
             _req = parse_mandate_requirements(mandate)
             if _req.needs_substantiation:
-                _g = evaluate_grounding(graph, _req)
+                _g = evaluate_grounding(
+                    graph, _req,
+                    require_page_identity=self._cfg.final.require_grounding_page_identity,
+                )
                 final_payload["grounded"] = bool(_g.grounded)
                 final_payload["missing_requirements"] = _g.missing
                 final_payload["grounding_replans"] = int(getattr(self, "_grounding_replans", 0))
@@ -1713,9 +1716,18 @@ class IdeaDagEngine:
                 return False
             # Coverage gate wants another pass even without substantiation needs; use a
             # placeholder grounding result for telemetry/budget bookkeeping below.
-            res = evaluate_grounding(graph, req) if req is not None else None
+            res = (
+                evaluate_grounding(
+                    graph, req,
+                    require_page_identity=self._cfg.final.require_grounding_page_identity,
+                )
+                if req is not None else None
+            )
         else:
-            res = evaluate_grounding(graph, req)
+            res = evaluate_grounding(
+                graph, req,
+                require_page_identity=self._cfg.final.require_grounding_page_identity,
+            )
             if res.grounded and not cov_unsatisfied:
                 _decide("grounded", res, distinct_visits=res.distinct_visits)
                 return False
