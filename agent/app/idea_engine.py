@@ -416,39 +416,10 @@ class IdeaDagEngine:
             self._step_index = steps
             self._maybe_log_dag(graph, steps)
 
-            prune_interval = max(1, self._cfg.engine.got_prune_interval_steps)
-            if self._got and steps % prune_interval == 0:
-                prune_ids = self._got.identify_prune_candidates(graph)
-                if prune_ids:
-                    self._got.prune_nodes(graph, prune_ids)
+            self.maybe_prune(graph, steps)
+            current_id = self.maybe_backtrack(graph, current_id, steps)
 
-            if (
-                self._got
-                and current_id
-                and self._cfg.got.backtrack_enabled
-                and self._got.should_backtrack(graph, current_id)
-            ):
-                target = self._got.find_backtrack_target(graph, current_id)
-                if target and target != current_id:
-                    self._logger.info(
-                        f"[RUN] STEP {steps}: backtrack redirect {current_id[:8]} -> {target[:8]}"
-                    )
-                    current_id = target
-
-            if (
-                self._got
-                and self._cfg.got.confidence_early_exit_enabled
-                and self._got.should_exit_early(graph, self._step_confidences)
-            ):
-                self._record_decision(
-                    "early_exit", node_id=current_id or graph.root_id(), chosen="finalize",
-                    rationale="calibrated high-confidence early exit",
-                    metadata={"judged_steps": len(self._step_confidences), "step": steps},
-                )
-                self._logger.info(
-                    f"[RUN] STEP {steps}: calibrated early exit. Finalizing after "
-                    f"{len(self._step_confidences)} judged step(s)"
-                )
+            if self.maybe_early_exit(graph, current_id, steps):
                 if on_step is not None:
                     await on_step(graph, current_id, steps)
                 break
@@ -497,6 +468,64 @@ class IdeaDagEngine:
                         continue
                     break
         return graph, current_id, steps
+
+    # --- post-step control-loop passes -------------------------------------------------
+    # Extracted verbatim from `_run_loop` so the interactive stepper
+    # (`interactive.session.DebugSession`), which drives `step()` itself rather than running
+    # the loop, can apply the same three passes after each of its own steps. Without them the
+    # debugger showed a graph a real run never has (the periodic prune pass is on by default),
+    # so what you stepped through was not what the benchmark ran. Each is pure control-loop
+    # policy: no loop-control state beyond `(graph, current_id, steps)`.
+
+    def maybe_prune(self, graph: IdeaDag, steps: int) -> None:
+        """Run the periodic GoT prune pass, on the interval-th step only. No-op otherwise."""
+        prune_interval = max(1, self._cfg.engine.got_prune_interval_steps)
+        if self._got and steps % prune_interval == 0:
+            prune_ids = self._got.identify_prune_candidates(graph)
+            if prune_ids:
+                self._got.prune_nodes(graph, prune_ids)
+
+    def maybe_backtrack(self, graph: IdeaDag, current_id: Optional[str], steps: int) -> Optional[str]:
+        """Return the next node id, redirected to a backtrack target when one applies.
+
+        Returns ``current_id`` unchanged when backtracking is off (the default) or no better
+        ancestor exists, so callers can assign the result unconditionally.
+        """
+        if (
+            self._got
+            and current_id
+            and self._cfg.got.backtrack_enabled
+            and self._got.should_backtrack(graph, current_id)
+        ):
+            target = self._got.find_backtrack_target(graph, current_id)
+            if target and target != current_id:
+                self._logger.info(
+                    f"[RUN] STEP {steps}: backtrack redirect {current_id[:8]} -> {target[:8]}"
+                )
+                return target
+        return current_id
+
+    def maybe_early_exit(self, graph: IdeaDag, current_id: Optional[str], steps: int) -> bool:
+        """True when the run has earned a calibrated early exit and should finalize now.
+
+        Records the decision and logs as a side effect, exactly as the loop did inline.
+        """
+        if (
+            self._got
+            and self._cfg.got.confidence_early_exit_enabled
+            and self._got.should_exit_early(graph, self._step_confidences)
+        ):
+            self._record_decision(
+                "early_exit", node_id=current_id or graph.root_id(), chosen="finalize",
+                rationale="calibrated high-confidence early exit",
+                metadata={"judged_steps": len(self._step_confidences), "step": steps},
+            )
+            self._logger.info(
+                f"[RUN] STEP {steps}: calibrated early exit. Finalizing after "
+                f"{len(self._step_confidences)} judged step(s)"
+            )
+            return True
+        return False
 
     async def finalize(self, graph: IdeaDag, mandate: str, pending_check: bool = True) -> Dict[str, Any]:
         """Build the final payload and attach every derived signal.

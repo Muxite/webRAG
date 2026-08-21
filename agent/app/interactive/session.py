@@ -35,6 +35,10 @@ class DebugSession:
         self._max_steps = max_steps
         self._step = 0
         self._quit = False
+        # Set by `_post_step` when the engine's calibrated early exit fires (opt-in, so this
+        # stays False on a default run). Halts the walk WITHOUT setting `_quit`: an early exit
+        # means "finalize with what we have", so `debug_runner` must still print a final answer.
+        self._early_exit = False
         self._stats = StatsTracker(graph)
         self._out = print
 
@@ -205,6 +209,7 @@ class DebugSession:
                 break
             finally:
                 self._record_thought(self._step, current)
+            nxt = self._post_step(nxt)
             if nxt is None:
                 break
 
@@ -349,7 +354,7 @@ class DebugSession:
         return leaves, merges
 
     def _halt(self) -> bool:
-        return self._quit or self._step >= self._max_steps
+        return self._quit or self._early_exit or self._step >= self._max_steps
 
     async def _engine_step(self, node_id: str) -> Optional[str]:
         if self._step >= self._max_steps:
@@ -359,13 +364,40 @@ class DebugSession:
         self._stats.tick()
         self._thoughts.capture(self._step, node_id)
         try:
-            return await self._engine.step(self._graph, node_id, self._step)
+            nxt = await self._engine.step(self._graph, node_id, self._step)
         except Exception as exc:
             self._out(f"  engine error: {exc}")
             _log.error(f"engine step error: {exc}", exc_info=True)
             return None
         finally:
             self._record_thought(self._step, node_id)
+        return self._post_step(nxt)
+
+    def _post_step(self, node_id: Optional[str]) -> Optional[str]:
+        """Apply the engine's post-step control-loop passes, as `_run_loop` does.
+
+        The stepper drives `engine.step()` directly instead of running `_run_loop`, so prune,
+        backtrack and early exit used to be unreachable here and the stepped graph could
+        diverge from a real run's (the prune pass is on by default). Called after every step
+        on both stepping paths, with the same post-increment step counter the loop uses.
+
+        Returns the possibly backtrack-redirected next node id. Only `_autorun` navigates by
+        that value; the single-step callers walk the tree themselves and discard it, so a
+        redirect is inert there — same as it is in the loop when nothing backtracks.
+        """
+        prune = getattr(self._engine, "maybe_prune", None)
+        if prune is None:
+            return node_id  # stub engine (tests): no control-loop passes to apply
+        try:
+            prune(self._graph, self._step)
+            node_id = self._engine.maybe_backtrack(self._graph, node_id, self._step)
+            if self._engine.maybe_early_exit(self._graph, node_id, self._step):
+                self._early_exit = True
+                self._out("  engine signalled a calibrated early exit - finalizing")
+        except Exception as exc:  # noqa: BLE001. A control-loop pass must not kill the session
+            self._out(f"  post-step error: {exc}")
+            _log.error(f"post-step error: {exc}", exc_info=True)
+        return node_id
 
     def _record_thought(self, step: int, node_id: Optional[str]) -> None:
         """Collect the step's Thought off the buffer and append it to the file log, if any.
@@ -391,5 +423,6 @@ class DebugSession:
             "graph": self._graph,
             "steps": self._step,
             "quit_early": self._quit,
+            "early_exit": self._early_exit,
             "stats": self._stats.snapshot(),
         }
