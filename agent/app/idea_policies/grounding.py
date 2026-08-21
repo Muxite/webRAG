@@ -11,6 +11,7 @@ flag if still ungrounded (never hard-block).
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import List, Set
 
@@ -19,6 +20,8 @@ from agent.app.idea_policies.mandate_requirements import (
     MandateRequirements,
     parse_mandate_requirements,
 )
+
+_logger = logging.getLogger(__name__)
 
 
 def _norm(url: str) -> str:
@@ -125,7 +128,14 @@ def requires_grounded_answer(mandate: str, graph=None) -> bool:
     """
     try:
         req = parse_mandate_requirements(mandate)
-    except Exception:  # noqa: BLE001 — the gate must never crash finalize
+    except Exception as e:  # noqa: BLE001 — the gate must never crash finalize
+        # Fail open (grounding not required) so a parser bug can never refuse a whole run,
+        # but say so: silently returning False here made a real parse bug in this SAFETY
+        # gate invisible in production. Behavior unchanged — this is visibility only.
+        _logger.warning(
+            f"[GROUNDING] requires_grounded_answer parse failed, failing open "
+            f"(grounding NOT required): {type(e).__name__}: {e} | mandate={str(mandate)[:200]!r}"
+        )
         return False
     if req.needs_substantiation or req.must_visit or req.must_search or req.named_urls:
         return True

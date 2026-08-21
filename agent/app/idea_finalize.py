@@ -1056,7 +1056,12 @@ async def build_final_payload(
     if not response:
         _logger.warning("[FINALIZE] LLM returned empty response, constructing fallback deliverable")
         fallback = _build_fallback_deliverable(graph, merged)
-        payload = {"final_deliverable": fallback, "action_summary": "Fallback: LLM finalize call failed", "success": bool(fallback.strip()), "sources": sources}
+        # `is_fallback_deliverable` marks the degraded shape structurally: without it a caller
+        # or grader has to string-match `action_summary` to tell a stitched-together fallback
+        # from a real model answer. Set on this path only — absent means a normal finalize,
+        # matching how the other optional detail keys here (`truncated`, `unverified_citations`)
+        # are emitted only when they apply.
+        payload = {"final_deliverable": fallback, "action_summary": "Fallback: LLM finalize call failed", "success": bool(fallback.strip()), "sources": sources, "is_fallback_deliverable": True}
         if cfg.final.require_grounding:
             _apply_grounding_gate(payload, graph, mandate, sources)
         return payload
