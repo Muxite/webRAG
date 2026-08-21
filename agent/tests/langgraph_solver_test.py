@@ -87,6 +87,22 @@ def test_search_tool_marks_a_dead_backend_distinguishably_from_no_results():
     assert out != "No results."
 
 
+def test_dead_backend_marker_forbids_parametric_answers_and_uncited_urls():
+    """Freeing the rephrase-loop turns let the model answer from memory instead of refusing, with
+    fabricated citation URLs; the marker has to spell out both refusals."""
+    class _DeadBackendIO(_FakeAgentIO):
+        async def search(self, query, count=10, timeout_seconds=None):
+            self.search_calls.append((query, count))
+            return None
+
+    search_tool, _visit_tool = _make_tools(_DeadBackendIO(), search_k=6, page_chars=6000)
+    out = asyncio.run(search_tool.ainvoke({"query": "anything"}))
+    assert "do NOT answer from prior knowledge" in out
+    assert "cannot be determined from available sources" in out
+    assert "Cite only URLs you actually visited with the visit tool" in out
+    assert out != "No results."
+
+
 def test_visit_tool_delegates_to_agent_io_and_truncates():
     fake_io = _FakeAgentIO()
     _search_tool, visit_tool = _make_tools(fake_io, search_k=6, page_chars=5)

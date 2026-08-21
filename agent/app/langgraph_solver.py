@@ -94,7 +94,9 @@ _STEP_EXHAUSTED_TEXT = "Sorry, need more steps to process this request."
 _SEARCH_UNAVAILABLE = (
     "SEARCH BACKEND UNAVAILABLE — the search service is down, not your query. Do NOT retry this "
     "or any other search; use the visit tool on a URL you can name, or answer from the evidence "
-    "you already have."
+    "you already have. If you have gathered no evidence, do NOT answer from prior knowledge — "
+    "state that the answer cannot be determined from available sources. Cite only URLs you "
+    "actually visited with the visit tool in this conversation; never a remembered or invented one."
 )
 
 _SYNTHESIS_SYSTEM = (
