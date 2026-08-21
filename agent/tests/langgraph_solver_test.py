@@ -3,6 +3,7 @@ Free, no LLM, no network — mirrors `agent/tests/solver_normalize_test.py`'s pa
 result-mapping logic in isolation.
 """
 import asyncio
+import inspect
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
@@ -101,6 +102,32 @@ def test_dead_backend_marker_forbids_parametric_answers_and_uncited_urls():
     assert "cannot be determined from available sources" in out
     assert "Cite only URLs you actually visited with the visit tool" in out
     assert out != "No results."
+
+
+def test_search_marks_only_the_already_visited_result():
+    """A repeat search re-lists the page just read; it must be named (never filtered) so the model
+    isn't re-tempted, and the OTHER results must stay unmarked."""
+    class _TwoResultIO(_FakeAgentIO):
+        async def search(self, query, count=10, timeout_seconds=None):
+            self.search_calls.append((query, count))
+            return [
+                {"title": "Seen", "url": "https://example.com/a", "description": "desc A"},
+                {"title": "Fresh", "url": "https://example.com/b", "description": "desc B"},
+            ]
+
+    search_tool, visit_tool = _make_tools(_TwoResultIO(), search_k=6, page_chars=6000)
+    before = asyncio.run(search_tool.ainvoke({"query": "q"}))
+    assert "ALREADY VISITED" not in before
+
+    asyncio.run(visit_tool.ainvoke({"url": "https://example.com/a"}))
+    after = asyncio.run(search_tool.ainvoke({"query": "q"}))
+    seen_line = [l for l in after.splitlines() if "example.com/a" in l][0]
+    fresh_line = [l for l in after.splitlines() if "example.com/b" in l][0]
+    assert seen_line.endswith("[ALREADY VISITED]")
+    assert "ALREADY VISITED" not in fresh_line
+    # Annotated, not dropped: revisiting can be deliberate.
+    assert "https://example.com/a" in after
+    assert "desc A" in after
 
 
 def test_visit_tool_delegates_to_agent_io_and_truncates():
@@ -393,3 +420,22 @@ def test_offtheshelf_execution_enables_full_capture_at_verbosity_3(monkeypatch):
 def test_offtheshelf_execution_leaves_full_capture_off_by_default(monkeypatch):
     assert _run_offtheshelf_capturing_kwargs(monkeypatch, None)["full_capture"] is False
     assert _run_offtheshelf_capturing_kwargs(monkeypatch, "2")["full_capture"] is False
+
+
+def test_offtheshelf_execution_passes_context_budget_env_vars(monkeypatch):
+    """Without this wiring the solver's search_k/page_chars were unreachable from a run's env, so
+    this arm could not join a context-budget sweep the other arms take part in."""
+    monkeypatch.setenv("IDEA_TEST_LANGGRAPH_SEARCH_K", "3")
+    monkeypatch.setenv("IDEA_TEST_LANGGRAPH_PAGE_CHARS", "1234")
+    captured = _run_offtheshelf_capturing_kwargs(monkeypatch, None)
+    assert captured["search_k"] == 3
+    assert captured["page_chars"] == 1234
+
+
+def test_offtheshelf_execution_falls_back_to_solver_defaults(monkeypatch):
+    monkeypatch.delenv("IDEA_TEST_LANGGRAPH_SEARCH_K", raising=False)
+    monkeypatch.delenv("IDEA_TEST_LANGGRAPH_PAGE_CHARS", raising=False)
+    captured = _run_offtheshelf_capturing_kwargs(monkeypatch, None)
+    defaults = inspect.signature(LangGraphSolver.__init__).parameters
+    assert captured["search_k"] == defaults["search_k"].default
+    assert captured["page_chars"] == defaults["page_chars"].default

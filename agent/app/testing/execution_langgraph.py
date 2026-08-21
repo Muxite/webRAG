@@ -66,6 +66,11 @@ async def run_offtheshelf_execution(
     # Same gate the native arm uses for connector full capture (`execution.py`), so one env var
     # turns on raw prompt/completion capture for every arm in a run.
     report_verbosity = int(os.environ.get("IDEA_TEST_REPORT_VERBOSITY", "1"))
+    # Context-budget knobs, mirroring `execution_sequential`'s IDEA_TEST_SEQ_* pair. Without them
+    # the solver's defaults were unreachable from a run's environment, so this arm could not join
+    # a context-budget sweep that every other arm takes part in.
+    search_k = int(os.environ.get("IDEA_TEST_LANGGRAPH_SEARCH_K", "6"))
+    page_chars = int(os.environ.get("IDEA_TEST_LANGGRAPH_PAGE_CHARS", "6000"))
     solver = LangGraphSolver(
         connector_llm=connector_llm,
         connector_search=connector_search,
@@ -74,6 +79,8 @@ async def run_offtheshelf_execution(
         connector_browser=connector_browser,
         model_name=model_name,
         collection_name=f"idea_test_{test_id}_{run_stamp}",
+        search_k=search_k,
+        page_chars=page_chars,
         full_capture=report_verbosity >= 3,
         # Opt-in, default off: pass even a NATURAL termination through the solver's synthesis
         # pass (see `LangGraphSolver.__init__`). Awaiting a live A/B before it becomes default.

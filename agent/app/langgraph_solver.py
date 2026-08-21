@@ -115,6 +115,13 @@ _VISIT_REPEAT = (
     "this one."
 )
 
+#: Appended to the title/URL line of a SEARCH result whose URL was already visited in this
+#: ``solve`` call. The same repeat-visit trap fires one step earlier: a re-run search re-lists the
+#: page the model just read, which reads as a fresh lead and tempts a re-fetch. The entry is never
+#: filtered out (re-reading can be deliberate) — only named, from the SAME ``visited`` set the
+#: visit tool maintains.
+_SEARCH_VISITED_MARK = " [ALREADY VISITED]"
+
 _SYNTHESIS_SYSTEM = (
     "Synthesize the FINAL answer using ONLY the gathered evidence. Address every part the task "
     "asks for; for each fact quote the exact value from the page and cite the source URL it came "
@@ -144,10 +151,11 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
             return _SEARCH_UNAVAILABLE
         if not results:
             return "No results."
-        lines = [
-            f"{i}. {r.get('title', '')} — {r.get('url', '')}\n   {r.get('description', '')}"
-            for i, r in enumerate(results[:search_k], 1)
-        ]
+        lines = []
+        for i, r in enumerate(results[:search_k], 1):
+            url = r.get("url", "")
+            mark = _SEARCH_VISITED_MARK if url in visited else ""
+            lines.append(f"{i}. {r.get('title', '')} — {url}{mark}\n   {r.get('description', '')}")
         return "\n".join(lines)
 
     @tool
