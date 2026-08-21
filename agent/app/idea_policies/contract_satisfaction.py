@@ -275,7 +275,11 @@ def _search_evidence(result: Dict[str, Any]) -> str:
 _NUMBER_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
 
-def _find_number_near(evidence_low: str, variants: Sequence[str]) -> Optional["re.Match[str]"]:
+def _find_number_near(
+    evidence_low: str,
+    variants: Sequence[str],
+    pattern: "re.Pattern[str]" = _NUMBER_RE,
+) -> Optional["re.Match[str]"]:
     """The number nearest a datum's own wording, within _NUMBER_WINDOW chars either side.
 
     "Nearest" means globally nearest-by-character-distance to whichever cue OCCURRENCE it sits
@@ -290,13 +294,18 @@ def _find_number_near(evidence_low: str, variants: Sequence[str]) -> Optional["r
 
     An empty variants means the datum has no stable page wording (year, count), so the
     first number anywhere in the evidence counts (no cue occurrence to measure distance from).
+
+    ``pattern`` overrides what counts as a number token. Defaults to :data:`_NUMBER_RE`, so
+    every existing caller is unchanged; ``alternative_branch.race_value_evidence`` passes a
+    wider one that also accepts space-separated thousands groups ("1 310"), because it needs
+    the VALUE rather than merely whether a number is present.
     Returns the re.Match itself (a value extractor wants the digits, not just whether one
     exists). _number_near below is the historical bool-only view all existing callers keep using
     unchanged; picking a DIFFERENT (nearer) match among several candidates never changes whether
     a match exists, so its presence-only semantics are unaffected by this.
     """
     if not variants:
-        return _NUMBER_RE.search(evidence_low)
+        return pattern.search(evidence_low)
     best_match: Optional["re.Match[str]"] = None
     best_distance: Optional[float] = None
     for variant in variants:
@@ -304,7 +313,7 @@ def _find_number_near(evidence_low: str, variants: Sequence[str]) -> Optional["r
             win_start = max(0, cue_match.start() - _NUMBER_WINDOW)
             win_end = min(len(evidence_low), cue_match.end() + _NUMBER_WINDOW)
             cue_center = (cue_match.start() + cue_match.end()) / 2
-            for num_match in _NUMBER_RE.finditer(evidence_low, win_start, win_end):
+            for num_match in pattern.finditer(evidence_low, win_start, win_end):
                 num_center = (num_match.start() + num_match.end()) / 2
                 distance = abs(num_center - cue_center)
                 if best_distance is None or distance < best_distance:

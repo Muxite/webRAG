@@ -2495,6 +2495,27 @@ class MergeLeafAction(LeafAction):
             compacted.append(cls._compact_payload(mr))
         return compacted
 
+    #: Synthesis fields that carry the merge's own assertions, as opposed to its bookkeeping.
+    #: ``missing_requirements`` is excluded deliberately: a figure named there is one the
+    #: completion says it does NOT have, so checking its provenance would be backwards.
+    _CLAIM_FIELDS = ("summary", "key_findings", "goal_evaluation")
+
+    @classmethod
+    def _claim_text(cls, synthesized_data: Any) -> str:
+        """What this merge ASSERTS, flattened to one string for the numeric provenance check."""
+        if isinstance(synthesized_data, str):
+            return synthesized_data
+        if not isinstance(synthesized_data, dict):
+            return ""
+        parts: List[str] = []
+        for key in cls._CLAIM_FIELDS:
+            value = synthesized_data.get(key)
+            if isinstance(value, str):
+                parts.append(value)
+            elif isinstance(value, (list, tuple)):
+                parts.extend(str(v) for v in value if isinstance(v, (str, int, float)))
+        return " ".join(p for p in parts if p)
+
     @staticmethod
     def _authored_goal(node: Any, ignore_self_label: bool = False) -> str:
         """A node's own GOAL/ORIGINAL_GOAL text, skipping structural merge labels.
@@ -2742,6 +2763,40 @@ class MergeLeafAction(LeafAction):
                 )
                 goal_achieved = False
 
+            # Race value-agreement check: the routes of a race group returned DIFFERENT values
+            # for the quantity they were racing for, so whatever this synthesis says about them
+            # agreeing is unsupported ("all three routes confirm 575 meters" was a real 2026-08-21
+            # completion about a number in no fetched page). Detection is unconditional, acting
+            # on it is gated -- see ``MergeConfig.race_value_agreement_enabled``. The conflict is
+            # routed through ``missing_requirements`` rather than flipping the boolean directly,
+            # so it rides the consistency guard above and shows up in the run's own report of
+            # what is still open.
+            from agent.app.idea_policies.merge import race_value_conflicts
+
+            conflicts = race_value_conflicts(graph, node)
+            if conflicts:
+                node.details["race_value_disagreement"] = conflicts
+                self._logger.warning(
+                    f"[MERGE] {node_id}: race group(s) {conflicts} returned conflicting values "
+                    "for the asked-for datum -- the routes do not agree"
+                )
+                if self._cfg.merge.race_value_agreement_enabled:
+                    existing = (
+                        list(missing_requirements)
+                        if isinstance(missing_requirements, (list, tuple)) else []
+                    )
+                    missing_requirements = existing + [
+                        f"independent routes in race group '{label}' returned conflicting "
+                        "values for the asked-for quantity; the conflict is unresolved"
+                        for label in conflicts
+                    ]
+                    if goal_achieved:
+                        self._logger.warning(
+                            f"[MERGE] {node_id}: downgrading to not-achieved "
+                            "(merge_race_value_agreement_enabled)"
+                        )
+                    goal_achieved = False
+
             # Evidence-provenance check: an ACHIEVED verdict backed only by unvisited search
             # snippets names the right answer without ever having obtained it. Detection is
             # unconditional (a silent failure mode nobody could measure otherwise); acting on
@@ -2765,6 +2820,32 @@ class MergeLeafAction(LeafAction):
                         self._logger.warning(
                             f"[MERGE] {node_id}: downgrading to not-achieved "
                             "(merge_require_visited_evidence_enabled)"
+                        )
+                        goal_achieved = False
+
+            # Numeric-token provenance (B1): the narrower sibling of the check above. It asks
+            # nothing of the wording -- only whether the FIGURES the completion asserts appear
+            # in raw text the run actually fetched. Live-observed shape it targets: a merge
+            # completion narrating "all three routes confirm 575 meters", a number in no
+            # fetched page anywhere, achieved, no URLs. Detection unconditional, downgrade
+            # gated -- see ``MergeConfig.require_numeric_provenance_enabled``.
+            if goal_achieved:
+                from agent.app.idea_policies.grounding import answer_numeric_provenance
+
+                numeric = answer_numeric_provenance(
+                    graph, self._claim_text(synthesized_data), merged_results
+                )
+                if numeric.unsupported:
+                    node.details["goal_achieved_numeric_unverified"] = numeric.unverified_values()
+                    self._logger.warning(
+                        f"[MERGE] {node_id}: goal_achieved=true but none of its measurements "
+                        f"{numeric.unverified_values()} appear in any fetched page text -- "
+                        "unsourced numeric claim"
+                    )
+                    if self._cfg.merge.require_numeric_provenance_enabled:
+                        self._logger.warning(
+                            f"[MERGE] {node_id}: downgrading to not-achieved "
+                            "(merge_require_numeric_provenance_enabled)"
                         )
                         goal_achieved = False
 

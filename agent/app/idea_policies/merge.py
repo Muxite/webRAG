@@ -14,7 +14,11 @@ from agent.app.idea_policies.alternative_branch import (
     RACE_GROUPS_INFERRED,
     RACE_GROUPS_INFERRED_TIERS,
     RACE_LOSER,
+    RACE_VALUE_AGREE,
+    RACE_VALUE_AGREEMENT,
+    RACE_VALUE_DISAGREE,
     is_alternative_pending,
+    race_value_evidence,
 )
 
 
@@ -149,6 +153,65 @@ def goal_evidence_provenance(original_goal: Any, merged_results: Any) -> str:
         ):
             found_snippet = True
     return GOAL_EVIDENCE_SNIPPET if found_snippet else GOAL_EVIDENCE_NONE
+
+
+def race_group_value_verdicts(graph: "IdeaDag", node: "IdeaNode") -> Dict[str, str]:
+    """``{label: verdict}`` of :func:`alternative_branch.race_value_agreement` for one ancestor.
+
+    Covers EVERY race group registered under ``node``, authored and inferred alike and
+    whatever tier: this is the detection half, and a group the merge flags decline to consume
+    is exactly the one whose value agreement is most worth measuring. Consumption decisions
+    are made by the callers from this same dict.
+
+    Never raises: a merge-time signal that can crash a run is worse than no signal.
+    """
+    groups: Dict[str, List[str]] = {}
+    for key in (RACE_GROUPS, RACE_GROUPS_INFERRED):
+        registry = node.details.get(key)
+        if not isinstance(registry, dict):
+            continue
+        for label, member_ids in registry.items():
+            if isinstance(member_ids, list) and len(member_ids) >= 2:
+                groups.setdefault(label, member_ids)
+    if not groups:
+        return {}
+
+    root = graph.get_node(graph.root_id())
+    mandate = ""
+    if root and isinstance(root.details, dict):
+        mandate = str(root.details.get("mandate") or "")
+
+    verdicts: Dict[str, str] = {}
+    for label, member_ids in groups.items():
+        members = [graph.get_node(member_id) for member_id in member_ids]
+        members = [member for member in members if member is not None]
+        if len(members) < 2:
+            continue
+        try:
+            verdicts[label] = race_value_evidence(members, mandate).verdict
+        except Exception:  # noqa: BLE001. Detection must never break a merge
+            continue
+    return verdicts
+
+
+def race_value_conflicts(graph: "IdeaDag", merge_node: "IdeaNode") -> List[str]:
+    """Labels of the race groups under ``merge_node``'s PARENT whose routes contradict.
+
+    A merge node is a child of the ancestor that owns the race registry, so the conflict a
+    synthesis is about to paper over ("all three routes confirm X") is one hop away from the
+    node writing that sentence. Empty for a merge node with no race registry above it, which
+    is every merge in every arm that does not use race groups.
+    """
+    parent_id = getattr(merge_node, "parent_id", None)
+    parent = graph.get_node(parent_id) if parent_id else None
+    if parent is None or not isinstance(parent.details, dict):
+        return []
+    verdicts = parent.details.get(RACE_VALUE_AGREEMENT)
+    if not isinstance(verdicts, dict):
+        verdicts = race_group_value_verdicts(graph, parent)
+    return sorted(
+        label for label, verdict in verdicts.items() if verdict == RACE_VALUE_DISAGREE
+    )
 
 
 class SimpleMergePolicy(MergePolicy):
@@ -411,7 +474,7 @@ class SimpleMergePolicy(MergePolicy):
         node = graph.get_node(node_id)
         if not node:
             return None
-        registry = self._race_registry(node)
+        registry = self._race_registry(node, graph)
         member_ids = registry.get(race_group)
         if not isinstance(member_ids, list) or len(member_ids) < 2:
             return None
@@ -456,7 +519,9 @@ class SimpleMergePolicy(MergePolicy):
             return False
         return bool(verdict.applicable and verdict.satisfied and verdict.datum_verified)
 
-    def _race_registry(self, node: IdeaNode) -> Dict[str, Any]:
+    def _race_registry(
+        self, node: IdeaNode, graph: Optional["IdeaDag"] = None
+    ) -> Dict[str, Any]:
         """Race groups under ``node`` this policy is willing to resolve.
 
         The authored registry alone unless
@@ -472,6 +537,13 @@ class SimpleMergePolicy(MergePolicy):
         wrong group DISCARDS correct findings from synthesis. Tier 2 keeps being written to
         ``race_groups_inferred`` for its instrumentation value; earning merge consumption back
         is a future cycle's job, gated on a probe that shows precision it has not shown yet.
+
+        ...with one exception, itself gated behind ``merge_race_value_agreement_enabled`` and
+        requiring ``graph`` to read the members' results: a tier 2 group whose members returned
+        the SAME VALUE for the asked-for datum becomes consumable. That is the positive half of
+        :func:`alternative_branch.race_value_agreement` — a route-independent confirmation the
+        title-overlap signal cannot produce for itself — and it also disarms the objection
+        above, because collapsing routes that agree discards no finding the winner lacks.
         """
         registry = node.details.get(RACE_GROUPS)
         registry = dict(registry) if isinstance(registry, dict) else {}
@@ -480,9 +552,16 @@ class SimpleMergePolicy(MergePolicy):
         inferred = node.details.get(RACE_GROUPS_INFERRED)
         tiers = node.details.get(RACE_GROUPS_INFERRED_TIERS)
         tiers = tiers if isinstance(tiers, dict) else {}
+        value_rescue = (
+            self._cfg.merge.race_value_agreement_enabled and graph is not None
+            and isinstance(inferred, dict)
+            and any(tiers.get(label) == 2 for label in inferred)
+        )
+        verdicts = race_group_value_verdicts(graph, node) if value_rescue else {}
         if isinstance(inferred, dict):
             for label, member_ids in inferred.items():
-                if tiers.get(label) != 1:
+                tier = tiers.get(label)
+                if tier != 1 and not (tier == 2 and verdicts.get(label) == RACE_VALUE_AGREE):
                     continue
                 registry.setdefault(label, member_ids)
         return registry
@@ -495,19 +574,45 @@ class SimpleMergePolicy(MergePolicy):
         Losers are marked SKIPPED here rather than cancelled mid-flight: cancelling would mean
         restructuring the ``asyncio.gather``/``Semaphore`` dispatch loop, so a race cell pays
         for its discarded loser. That cost is real and is reported, not averaged away.
+
+        The value-agreement verdicts are computed and stamped BEFORE that flag check, so
+        detection runs in every arm (including the default one, where no winner is ever
+        selected) and the ``disagree`` rate is measurable before anything acts on it.
         """
-        if not self._cfg.merge.race_winner_selection_enabled:
-            return set()
         node = graph.get_node(node_id)
         if not node:
             return set()
-        registry = self._race_registry(node)
+        verdicts = race_group_value_verdicts(graph, node)
+        if verdicts:
+            node.details[RACE_VALUE_AGREEMENT] = verdicts
+            for label, verdict in verdicts.items():
+                if verdict == RACE_VALUE_DISAGREE:
+                    self._logger.warning(
+                        f"[RACE] group {label!r} under {node_id[:8]}: independent routes "
+                        "returned DIFFERENT values for the asked-for datum"
+                    )
+        if not self._cfg.merge.race_winner_selection_enabled:
+            return set()
+        registry = self._race_registry(node, graph)
         if not registry:
             return set()
 
         excluded = set()
         for label, member_ids in registry.items():
             if not isinstance(member_ids, list):
+                continue
+            # Contradicting routes are the one case where electing a winner is indefensible:
+            # the disagreement IS the finding, and discarding N-1 routes would hide it from
+            # the synthesis that has to report it. Every member reaches merge instead, and
+            # ``race_value_conflicts`` carries the conflict into ``missing_requirements``.
+            if (
+                self._cfg.merge.race_value_agreement_enabled
+                and verdicts.get(label) == RACE_VALUE_DISAGREE
+            ):
+                self._logger.warning(
+                    f"[RACE] group {label!r} under {node_id[:8]}: winner selection skipped, "
+                    "all routes kept for synthesis (merge_race_value_agreement_enabled)"
+                )
                 continue
             winner = self.select_winner(graph, node_id, label)
             if winner is None:

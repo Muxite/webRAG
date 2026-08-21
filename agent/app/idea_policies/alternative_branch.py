@@ -27,6 +27,7 @@ that the "sequential" fallback would simply race its primary the first time both
 
 from __future__ import annotations
 
+import re
 from itertools import combinations
 from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence
 
@@ -536,6 +537,222 @@ def race_route_evidence(nodes: Sequence[Any]) -> Optional[str]:
         if not concrete_url(details):
             return None
     return reason
+
+
+#: :func:`race_value_agreement` verdicts. Four states, not a bool: "no member returned a
+#: comparable value" is emphatically NOT agreement, and treating it as one would turn the
+#: silence of a failed race into positive confirmation, which is the exact hallucination
+#: shape this check exists to catch.
+RACE_VALUE_AGREE = "agree"
+RACE_VALUE_DISAGREE = "disagree"
+RACE_VALUE_SINGLE = "single"
+RACE_VALUE_UNKNOWN = "unknown"
+
+#: Ancestor-side ``{label: verdict}`` record of the value-agreement check, written by
+#: ``SimpleMergePolicy`` for EVERY known race group whatever the merge flags say. Detection is
+#: unconditional so the failure mode is measurable in report captures before it is acted on.
+RACE_VALUE_AGREEMENT = "race_value_agreement"
+
+#: Number tokens for VALUE extraction (as opposed to ``contract_satisfaction._NUMBER_RE``'s
+#: presence test): also accepts space/NBSP-separated thousands groups, because the same figure
+#: is written "1,310", "1310" and "1 310" across the very sources a race compares.
+_RACE_NUMBER_RE = re.compile("\\d{1,3}(?:[ \u00a0\u202f,]\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?")
+
+#: Unit word (lowercased, punctuation-stripped) -> canonical unit. Only the unit token sitting
+#: immediately after the number is read. Two members whose units are BOTH known and different
+#: are not comparable at all (1,310 m against 4,298 ft is one agreeing fact written twice), so
+#: that pair reports ``unknown`` rather than a false ``disagree``; unit-free numbers stay
+#: comparable with anything, since "1310" beside "1,310 m" is the ordinary case.
+_RACE_UNITS: Dict[str, str] = {
+    "m": "m", "metre": "m", "metres": "m", "meter": "m", "meters": "m",
+    "km": "km", "kilometre": "km", "kilometres": "km", "kilometer": "km", "kilometers": "km",
+    "cm": "cm", "centimetre": "cm", "centimetres": "cm", "centimeter": "cm",
+    "mm": "mm", "ft": "ft", "foot": "ft", "feet": "ft",
+    "mi": "mi", "mile": "mi", "miles": "mi",
+    # No bare "in"/"t": both are far commoner as an English preposition and a stray letter
+    # than as inches/tonnes ("1310 in 2013"), and a misread unit is exactly what turns a
+    # comparable pair into a spurious unit mismatch.
+    "inch": "in", "inches": "in",
+    "yd": "yd", "yard": "yd", "yards": "yd",
+    "kg": "kg", "kilogram": "kg", "kilograms": "kg",
+    "tonne": "t", "tonnes": "t", "ton": "t", "tons": "t",
+    "lb": "lb", "lbs": "lb", "pound": "lb", "pounds": "lb",
+    "%": "%", "percent": "%",
+}
+
+#: How far past a number token the unit word is looked for.
+_RACE_UNIT_WINDOW = 16
+
+
+class _RaceValue(NamedTuple):
+    """One member's answer to the asked-for quantity: normalized value plus its unit."""
+
+    value: float
+    unit: str
+
+    def render(self) -> str:
+        text = f"{self.value:.6f}".rstrip("0").rstrip(".")
+        return f"{text} {self.unit}".strip()
+
+
+class RaceValueEvidence(NamedTuple):
+    """Full verdict of :func:`race_value_agreement` — the datum compared and what was found."""
+
+    verdict: str
+    datum: str = ""
+    values: Dict[str, str] = {}
+
+
+def race_value_agreement(nodes: Sequence[Any], mandate: str = "") -> str:
+    """Did these race members' routes return the SAME VALUE for the asked-for quantity?
+
+    The missing half of :func:`race_route_evidence`, which establishes only that the members
+    took DIFFERENT ROUTES and never looks at what those routes came back with. Today "all
+    three routes confirm X" is pure narration by the merge/finalize model — a real 2026-08-21
+    completion asserted exactly that about a number appearing in no fetched page anywhere in
+    the run. Nothing computed it, so nothing could contradict it. This does.
+
+    Deterministic, no LLM call, no network. Four verdicts (see :data:`RACE_VALUE_AGREE` and
+    friends): ``agree``, ``disagree``, ``single`` (one member carried a comparable value, so
+    there is nothing to cross-check) and ``unknown`` (none did — insufficient data, which is
+    neither confirmation nor contradiction).
+
+    **Scoping is the load-bearing part.** Only the datum the mandate (else the members' own
+    contracts) actually asks for is compared, via ``contract_satisfaction._required_datums``
+    and its ``_find_number_near`` cue-proximity search. Comparing every number found anywhere
+    would fire on incidental drift — the strong-agent trace's own example is a ranked-list
+    position reading 20 on one page and 21 on another while both agree on the keystone figure
+    — and the careful researcher treats that as noise precisely because it is not the thing
+    being asked. Excluding it is therefore structural here, not a special case bolted on.
+
+    Cue classes with no stable page wording (year/count/price, an empty ``variants`` tuple)
+    are deliberately NOT compared: their extractor falls back to "the first number anywhere in
+    the evidence", which across two different pages compares two arbitrary numbers and would
+    manufacture disagreement. They fall through to ``unknown``.
+    """
+    return race_value_evidence(nodes, mandate).verdict
+
+
+def race_value_evidence(nodes: Sequence[Any], mandate: str = "") -> RaceValueEvidence:
+    """:func:`race_value_agreement` plus the datum compared and each member's value.
+
+    Callers that report or log the verdict want to say WHICH quantity disagreed and with what
+    readings; the plain-string function above is the predicate view of this same computation.
+    """
+    from agent.app.idea_policies.contract_satisfaction import _find_number_near
+
+    members = [node for node in nodes if node is not None]
+    for canonical, variants in _scoped_datums(members, mandate):
+        values: Dict[str, _RaceValue] = {}
+        for member in members:
+            evidence = _member_evidence(member)
+            if not evidence:
+                continue
+            evidence_low = evidence.lower()
+            match = _find_number_near(evidence_low, variants, _RACE_NUMBER_RE)
+            parsed = _parse_race_value(evidence_low, match)
+            if parsed is not None:
+                values[str(getattr(member, "node_id", len(values)))] = parsed
+        if not values:
+            continue
+        rendered = {node_id: value.render() for node_id, value in values.items()}
+        if len(values) < 2:
+            return RaceValueEvidence(RACE_VALUE_SINGLE, canonical, rendered)
+        units = {value.unit for value in values.values() if value.unit}
+        if len(units) > 1:
+            return RaceValueEvidence(RACE_VALUE_UNKNOWN, canonical, rendered)
+        distinct = {round(value.value, 6) for value in values.values()}
+        verdict = RACE_VALUE_AGREE if len(distinct) == 1 else RACE_VALUE_DISAGREE
+        return RaceValueEvidence(verdict, canonical, rendered)
+    return RaceValueEvidence(RACE_VALUE_UNKNOWN, "", {})
+
+
+def _scoped_datums(nodes: Sequence[Any], mandate: str) -> List[Any]:
+    """The measurable datums worth comparing: the mandate's ask, else the members' contracts.
+
+    The mandate is preferred because it is the ONE thing every member of a race is a route to;
+    a member's own ``expect``/goal is the fallback for a sub-goal whose parent mandate phrases
+    the quantity elsewhere. Either way the empty-``variants`` cue classes are dropped (see
+    :func:`race_value_agreement`), so an unscopeable ask yields no datum and the verdict is
+    ``unknown`` rather than a comparison of arbitrary numbers.
+    """
+    from agent.app.idea_policies.contract_satisfaction import (
+        _required_datums,
+        derive_step_contract,
+    )
+
+    scoped = [d for d in _required_datums(mandate or "") if d[1]]
+    if scoped:
+        return scoped
+    seen = set()
+    for node in nodes:
+        try:
+            contract = derive_step_contract(node)
+        except Exception:  # noqa: BLE001. A merge-time check must never crash a run
+            continue
+        for canonical, variants in contract.datums:
+            if variants and canonical not in seen:
+                seen.add(canonical)
+                scoped.append((canonical, variants))
+    return scoped
+
+
+def _member_evidence(node: Any) -> str:
+    """What this member's route actually RETURNED, as text to read the datum out of.
+
+    A search member's snippets count: a race member is whatever route was run, and refusing to
+    read one member's payload would silently turn a disagreement into ``single``. Model-authored
+    text (a think/merge member's own content) counts too, and deliberately so — an unsourced
+    claim contradicting two fetched pages is the very case this check exists to surface.
+    """
+    from agent.app.idea_policies.base import IdeaActionType
+    from agent.app.idea_policies.contract_satisfaction import _search_evidence, _visit_body
+
+    details = getattr(node, "details", None)
+    if not isinstance(details, dict):
+        return ""
+    result = details.get(DetailKey.ACTION_RESULT.value)
+    if not isinstance(result, dict):
+        return ""
+    if details.get(DetailKey.ACTION.value) == IdeaActionType.SEARCH.value:
+        return _without_urls(_search_evidence(result))
+    body = _visit_body(result)
+    if body:
+        return _without_urls(body)
+    for key in ("summary", "answer", "text"):
+        val = result.get(key)
+        if isinstance(val, str) and val.strip():
+            return _without_urls(val)
+    return ""
+
+
+#: URLs are blanked out of the evidence before any number is read from it. A URL is dense with
+#: digits that are not measurements (ids, years, ``/2023/``, a bare ``e/0``) and it sits right
+#: beside the snippet text carrying the cue, so it routinely wins the nearest-number search
+#: against the figure the snippet actually states.
+_URL_RE = re.compile(r"https?://\S+|www\.\S+")
+
+
+def _without_urls(text: str) -> str:
+    return _URL_RE.sub(" ", text)
+
+
+def _parse_race_value(evidence: str, match: Any) -> Optional[_RaceValue]:
+    """Normalize a matched number plus the unit word that follows it."""
+    if match is None:
+        return None
+    raw = match.group()
+    for separator in (",", " ", " ", " "):
+        raw = raw.replace(separator, "")
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    tail = evidence[match.end():match.end() + _RACE_UNIT_WINDOW].lower()
+    unit = ""
+    for token in "".join(c if (c.isalnum() or c == "%") else " " for c in tail).split()[:1]:
+        unit = _RACE_UNITS.get(token, "")
+    return _RaceValue(value=value, unit=unit)
 
 
 def _inferred_label(members: Sequence[Any], signature, taken: set) -> str:

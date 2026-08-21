@@ -527,6 +527,40 @@ class MergeConfig:
     # unconditional either way: the ``goal_achieved_snippet_only`` marker and its warning are
     # written whatever this flag says, so the failure mode is measurable before it is acted on.
     require_visited_evidence_enabled: bool = False
+    # Refuse a ``goal_achieved: true`` whose asserted MEASUREMENTS appear in nothing the run
+    # fetched (``grounding.answer_numeric_provenance``). Narrower than the flag above and
+    # paraphrase-proof: numbers do not re-word, so "1,310 metres" / "1310 m" / "1 310 metres"
+    # are one fact under normalization. Targets a live-observed completion that narrated "all
+    # three routes confirm 575 meters" -- a figure in no fetched page anywhere -- as achieved,
+    # with zero cited URLs. It fires only when EVERY measurement in the completion is absent
+    # from every visited page's raw text (see ``NumericProvenanceResult.unsupported``), and a
+    # completion asserting no measurement at all is a no-op.
+    #
+    # Opt-in, default OFF for the same reason as the flag above, on a residual risk this check
+    # narrows but cannot eliminate: a page carrying the figure in OTHER units (answer "1.31
+    # km" vs page "1,310 m"), a deliberately rounded restatement, or a value the model
+    # correctly computed from two fetched numbers all normalize to a value no page states.
+    # Detection is unconditional either way -- the ``goal_achieved_numeric_unverified`` marker
+    # records which figures failed -- so the false-positive rate is measurable live before the
+    # downgrade is turned on anywhere.
+    require_numeric_provenance_enabled: bool = False
+    # Act on ``alternative_branch.race_value_agreement``: do the members of a race group
+    # actually agree on the VALUE they raced for? ``race_route_evidence`` establishes only
+    # that the routes are DIFFERENT and never compares what they returned, so "all three
+    # routes confirm X" has until now been narration no mechanism could contradict.
+    #
+    # Two effects when on, both mechanical: a ``disagree`` group is NOT resolved to a winner
+    # (contradicting routes are the one case where discarding N-1 of them is indefensible) and
+    # its conflict is appended to the merge's ``missing_requirements``, which the existing
+    # consistency guard already turns into a not-achieved verdict; an ``agree`` verdict admits
+    # a TIER 2 inferred group into winner selection, since routes that returned the same value
+    # cost nothing to collapse whether or not the group was a genuine race.
+    #
+    # Opt-in, default OFF: the verdict is computed and stamped (``race_value_agreement`` on the
+    # shared ancestor) unconditionally, so its live behaviour -- especially the false-disagree
+    # risk from equivalent-but-differently-derived figures, or one route reading a page updated
+    # after the other -- is measurable in report captures before it decides anything.
+    race_value_agreement_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",
@@ -536,11 +570,13 @@ class MergeConfig:
         "require_substantive_children_enabled": "merge_require_substantive_children_enabled",
         "retry_after_skip_enabled": "merge_retry_after_skip_enabled",
         "require_visited_evidence_enabled": "merge_require_visited_evidence_enabled",
+        "require_numeric_provenance_enabled": "merge_require_numeric_provenance_enabled",
         "goal_evaluation_first_enabled": "merge_goal_evaluation_first_enabled",
         "race_winner_selection_enabled": "merge_race_winner_selection_enabled",
         "race_winner_selection_includes_inferred_groups_enabled": (
             "merge_race_winner_selection_includes_inferred_groups_enabled"
         ),
+        "race_value_agreement_enabled": "merge_race_value_agreement_enabled",
     }
 
     @classmethod
