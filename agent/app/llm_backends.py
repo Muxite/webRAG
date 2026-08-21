@@ -5,10 +5,13 @@ Switch via LLM_PROVIDER (openai_compatible | anthropic) and MODEL_API_URL / keys
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Optional, Tuple
+from urllib.parse import urlparse
 
 import httpx
 from openai import APIError, APIStatusError, AsyncOpenAI
@@ -157,6 +160,37 @@ def json_instruction_from_response_format(rf: Any) -> Optional[str]:
     return None
 
 
+def is_self_hosted_url(url: Optional[str]) -> bool:
+    """True when ``url`` points at a loopback/private-network host.
+
+    Used only to decide whether an ``openai_compatible`` endpoint is worth probing for
+    ollama: the local benchmark scripts run ollama as ``LLM_PROVIDER=openai_compatible`` +
+    ``MODEL_API_URL=http://localhost:11435/v1``, so provider alone cannot identify it.
+    Public hosts (api.openai.com, openrouter.ai, ...) return False and are never probed or
+    otherwise touched by the native path.
+
+    :param url: Base URL or None.
+    :returns: True for loopback / RFC1918 / .local / bare-hostname (docker service) targets.
+    """
+    raw = (url or "").strip()
+    if not raw:
+        return False
+    try:
+        host = (urlparse(raw).hostname or "").lower()
+    except ValueError:
+        return False
+    if not host:
+        return False
+    if host in ("localhost", "host.docker.internal") or host.endswith((".local", ".internal")):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        # A dotless name is a container/service name on a private network (e.g. "ollama");
+        # anything with a public-looking domain is not.
+        return "." not in host
+
+
 def create_llm_backend(config: ConnectorConfig, logger: logging.Logger) -> LLMBackend:
     """
     Factory for LLM backends from ConnectorConfig.llm_provider.
@@ -172,6 +206,10 @@ def create_llm_backend(config: ConnectorConfig, logger: logging.Logger) -> LLMBa
         return OpenRouterBackend(config, logger)
     if provider not in ("openai_compatible", "openai", "ollama", "local"):
         logger.warning("Unknown LLM_PROVIDER=%s; using openai_compatible", provider)
+    if int(getattr(config, "llm_num_ctx", 0) or 0) > 0 and (
+        provider in ("ollama", "local") or is_self_hosted_url(config.llm_api_url)
+    ):
+        return OllamaNativeBackend(config, logger)
     return OpenAICompatibleBackend(config, logger)
 
 
@@ -416,6 +454,190 @@ class OpenRouterBackend(OpenAICompatibleBackend):
             default_headers=default_headers,
             **_sdk_client_kwargs(self.config),
         )
+
+
+@dataclass
+class OllamaUsage:
+    """OpenAI-shaped usage view over ollama's native counters (ConnectorLLM reads attributes)."""
+
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+
+class OllamaNativeBackend(OpenAICompatibleBackend):
+    """Ollama via its NATIVE ``/api/chat`` endpoint so ``options.num_ctx`` is honored.
+
+    Ollama's OpenAI-compatible shim ignores every spelling of a context override
+    (``options.num_ctx``, top-level ``num_ctx``, ``context_length`` — all measured), so a long
+    graph prompt is served at whatever ``OLLAMA_CONTEXT_LENGTH`` the server was started with and
+    the OVERFLOWING HEAD is dropped silently: system prompt + task statement gone, no error, and
+    a ``prompt_eval_count`` that reports the truncated size as if it were the whole prompt. The
+    native endpoint takes the same message list and does honor ``num_ctx``.
+
+    Only the wire call changes: payload construction, normalization, simplification, capping and
+    the ``client`` attribute (preflight checks reach for it) are inherited unchanged, and any
+    endpoint that turns out NOT to be ollama falls back to the inherited shim path for the rest
+    of the process's life.
+    """
+
+    #: Warn when the served prompt is within this many tokens of the requested window — at that
+    #: point the request is at the ceiling and the head may already have been dropped.
+    TRUNCATION_MARGIN = 16
+
+    def __init__(self, config: ConnectorConfig, logger: logging.Logger):
+        """
+        :param config: Shared connector configuration.
+        :param logger: Logger for this backend.
+        """
+        super().__init__(config, logger)
+        self.num_ctx = int(getattr(config, "llm_num_ctx", 0) or 0)
+        provider = (config.llm_provider or "").strip().lower()
+        # An explicit LLM_PROVIDER=ollama|local is taken at its word; a self-hosted
+        # openai_compatible URL is probed once (it may be vLLM / llama.cpp / LM Studio).
+        self._is_ollama: Optional[bool] = True if provider in ("ollama", "local") else None
+        self._http = self._build_http_client()
+
+    def _build_http_client(self) -> httpx.AsyncClient:
+        """
+        Build the raw httpx client for ollama's native API (the openai SDK cannot address it).
+
+        :returns: AsyncClient with the same timeouts as the SDK clients.
+        """
+        return httpx.AsyncClient(
+            timeout=httpx.Timeout(self.config.llm_read_timeout, connect=self.config.llm_connect_timeout)
+        )
+
+    def _api_root(self) -> str:
+        """
+        Base URL of the ollama server, i.e. the configured base URL minus its ``/v1`` suffix.
+
+        :returns: Root URL without a trailing slash.
+        """
+        base = (self.config.llm_api_url or "http://localhost:11434").strip().rstrip("/")
+        if base.endswith("/v1"):
+            base = base[: -len("/v1")]
+        return base
+
+    async def _detect_ollama(self) -> bool:
+        """
+        One-shot probe of ``/api/version`` (an ollama-only endpoint) for self-hosted URLs.
+
+        :returns: True when the endpoint is ollama; False on any error or non-ollama answer.
+        """
+        try:
+            resp = await self._http.get(f"{self._api_root()}/api/version")
+            ok = resp.status_code == 200 and isinstance(resp.json().get("version"), str)
+        except (httpx.HTTPError, ValueError, TypeError) as e:
+            self.logger.debug("ollama probe failed for %s (%s); using the OpenAI-compatible path", self._api_root(), e)
+            return False
+        if not ok:
+            self.logger.debug("endpoint %s is not ollama; using the OpenAI-compatible path", self._api_root())
+        return ok
+
+    def _native_body(self, payload: dict, model_name: str) -> dict:
+        """
+        Translate a simplified OpenAI payload into an ollama ``/api/chat`` body.
+
+        Mirrors what ollama's own shim does with the same fields, then adds ``num_ctx``.
+
+        :param payload: Simplified payload.
+        :param model_name: Resolved model id.
+        :returns: Request body for /api/chat.
+        """
+        options: dict[str, Any] = {"num_ctx": self.num_ctx}
+        if payload.get("temperature") is not None:
+            options["temperature"] = float(payload["temperature"])
+        max_out = payload.get("max_completion_tokens")
+        if max_out is None:
+            max_out = payload.get("max_tokens")
+        if max_out is not None:
+            options["num_predict"] = int(max_out)
+        body: dict[str, Any] = {
+            "model": model_name,
+            "messages": payload.get("messages") or [],
+            "stream": False,
+            "options": options,
+        }
+        rf = payload.get("response_format")
+        if isinstance(rf, dict):
+            if rf.get("type") == "json_schema":
+                schema = (rf.get("json_schema") or {}).get("schema")
+                body["format"] = schema if isinstance(schema, dict) else "json"
+            elif rf.get("type") == "json_object":
+                body["format"] = "json"
+        return body
+
+    def _log_served_context(self, data: dict, model_name: str) -> None:
+        """
+        Log the context ollama actually served so truncation stops being invisible.
+
+        :param data: Decoded /api/chat response.
+        :param model_name: Model id.
+        :returns: None.
+        """
+        served = data.get("prompt_eval_count")
+        if not isinstance(served, int):
+            return
+        if served >= self.num_ctx - self.TRUNCATION_MARGIN:
+            self.logger.warning(
+                "Ollama served %s prompt tokens at num_ctx=%s (model=%s) — prompt likely truncated at the HEAD",
+                served,
+                self.num_ctx,
+                model_name,
+            )
+        else:
+            self.logger.debug(
+                "Ollama served %s prompt tokens at num_ctx=%s (model=%s)", served, self.num_ctx, model_name
+            )
+
+    async def complete(self, payload: dict, model_name: str) -> Tuple[str, Any]:
+        """
+        Call ollama's native /api/chat with ``num_ctx`` set; fall back to the shim if not ollama.
+
+        :param payload: Simplified payload from simplify_payload.
+        :param model_name: Model id.
+        :returns: (content, usage_object).
+        """
+        if self._is_ollama is None:
+            self._is_ollama = await self._detect_ollama()
+        if not self._is_ollama:
+            return await super().complete(payload, model_name)
+        resp = await self._http.post(f"{self._api_root()}/api/chat", json=self._native_body(payload, model_name))
+        resp.raise_for_status()
+        data = resp.json()
+        self._log_served_context(data, model_name)
+        content = (data.get("message") or {}).get("content")
+        done_reason = data.get("done_reason")
+        if not isinstance(content, str) or not content.strip():
+            raise LLMContentError(
+                f"LLM returned empty/whitespace content (model={model_name}, done_reason={done_reason})"
+            )
+        if done_reason == "length":
+            self.logger.warning(
+                "Response truncated (model=%s). Content length: %s.", model_name, len(content.strip())
+            )
+        prompt_tokens = int(data.get("prompt_eval_count") or 0)
+        completion_tokens = int(data.get("eval_count") or 0)
+        usage = OllamaUsage(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+        )
+        return content.strip(), usage
+
+    def reset_client(self) -> None:
+        """
+        Recreate both the native httpx client and the inherited AsyncOpenAI client.
+
+        :returns: None.
+        """
+        stale, self._http = self._http, self._build_http_client()
+        try:
+            asyncio.get_running_loop().create_task(stale.aclose())
+        except RuntimeError:
+            pass
+        super().reset_client()
 
 
 class AnthropicMessagesBackend(LLMBackend):

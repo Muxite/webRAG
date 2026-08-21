@@ -31,6 +31,7 @@ counts on this page were stale because of that gap, now fixed.
 | `MODEL_NAME` | Model id/slug. Default `gpt-5-mini`. OpenRouter slugs look like `openai/gpt-4.1-nano`. |
 | `OPENROUTER_API_KEY` | Required when `LLM_PROVIDER=openrouter`. |
 | `OPENAI_API_KEY` / `LLM_API_KEY` | Required for `openai_compatible`. (`ANTHROPIC_API_KEY` for direct Anthropic.) |
+| `LLM_NUM_CTX` | Context window requested from a self-hosted **ollama** server (default `32768`). Ollama's OpenAI shim ignores context overrides, so such endpoints are served over the native `/api/chat` API; without this the server silently drops the HEAD of any prompt past `OLLAMA_CONTEXT_LENGTH`. `0` disables the native path. Hosted providers ignore this setting entirely. |
 
 ### Web search
 | Variable | Notes |

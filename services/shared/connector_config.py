@@ -53,6 +53,15 @@ class ConnectorConfig:
         # ConnectorLLM.Retry stays the single retry authority (no hidden amplification).
         self.llm_connect_timeout = float(os.environ.get("LLM_CONNECT_TIMEOUT", "10"))
         self.llm_read_timeout = float(os.environ.get("LLM_READ_TIMEOUT", "90"))
+        # Context window to request from a self-hosted ollama server (native /api/chat only;
+        # its OpenAI-compatible shim silently ignores every spelling of the override). Without
+        # it ollama serves long graph prompts at OLLAMA_CONTEXT_LENGTH (16384 on the local
+        # containers) and silently DROPS THE HEAD of anything longer — the system prompt and
+        # task statement — with no error and an under-reported prompt_eval_count. A fixed
+        # generous value is used instead of a per-call token count because ollama clamps to the
+        # model's own architectural ceiling anyway. Set LLM_NUM_CTX=0 to disable the native
+        # path entirely and go back to the shim.
+        self.llm_num_ctx = int(os.environ.get("LLM_NUM_CTX", "32768"))
 
         # --- Chroma client mode + embedding device (added with GPU + isolation) ---
         # "http" (default): shared AsyncHttpClient → the Docker server (production path,
