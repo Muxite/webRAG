@@ -67,8 +67,10 @@ DISPOSED = "disposed"
 UNSOURCED = "unsourced"
 #: The run never said anything about this candidate at all.
 UNRESOLVED = "unresolved"
-#: Corroborated, but the mandate's superlative is time-indexed (B8) and the statement carries
-#: no year -- an undated status claim is exactly what stale parametric memory produces.
+#: Corroborated, but the mandate's superlative is time-indexed (B8) and the statement describes
+#: a dateable EVENT without giving its date -- what stale parametric memory produces ("Arecibo
+#: collapsed", recalled rather than read). An ongoing-state disposition is exempt; see
+#: :func:`_year_required`.
 UNDATED = "undated"
 
 _SATISFIED = frozenset({DISPOSED})
@@ -80,6 +82,33 @@ _SENTENCE_RE = re.compile(r"(?<=[.!?;])\s+|[\n\r]+|\s+\|\s+")
 #: 1500-2099. Narrow on purpose: a 4-digit number outside this window is far more often an
 #: elevation or a capacity than a date.
 _YEAR_RE = re.compile(r"\b(?:1[5-9]\d\d|20\d\d)\b")
+
+#: An ONGOING-STATE disposition: the candidate is simply still doing what it does. Nothing
+#: happened to it on a date, so there is no year to cite (see :func:`_year_required`).
+_STATE_CUE = (
+    r"(?:operational|operating|operates|in\s+operation|in\s+service|in\s+use|active|online|"
+    r"functioning|functional|still\s+(?:running|standing|working|used)|"
+    r"remains?\s+in\s+(?:operation|service|use)|continues?\s+to\s+operate)"
+)
+_ONGOING_STATE_RE = re.compile(r"\b" + _STATE_CUE + r"\b")
+
+#: The same state word turned into a PAST or NEGATED claim -- "no longer operational", "was
+#: active until", "formerly in service". Those are terminal events wearing a state word, and a
+#: date is exactly what they owe.
+_NEGATED_STATE_RE = re.compile(
+    r"\b(?:not|never|no\s+longer|formerly|previously|once|until|ceased\s+being|was|were)\s+"
+    r"(?:\w+\s+){0,2}" + _STATE_CUE + r"\b"
+)
+
+#: A TERMINAL EVENT: something dateable happened to the candidate and knocked it out. This is
+#: the B8 target -- "Arecibo is out because it collapsed" recalled from parametric memory with
+#: no date is indistinguishable from a stale guess, so the year stays load-bearing here.
+_TERMINAL_EVENT_RE = re.compile(
+    r"\b(?:collapse|collapsed|collapsing|closed|closure|shut\s*down|shutdown|"
+    r"cease[sd]?|decommission(?:ed|ing)?|destroyed|demolished|dismantled|"
+    r"retired|superseded|surpassed|replaced|defunct|abandoned|damaged\s+beyond|"
+    r"out\s+of\s+(?:service|operation|commission)|no\s+longer)\b"
+)
 
 #: Cues that a statement ELECTS the candidate it names rather than eliminating it. Used only to
 #: pick out the survivor for the B7 tripwire; a candidate's own status never depends on it.
@@ -325,6 +354,35 @@ def _corroborated(statement: str, candidate: str, page: _Page) -> bool:
     return hits >= 1 and (hits / len(tokens)) >= _CORROBORATION_RATIO
 
 
+def _year_required(statement: str) -> bool:
+    """Does this disposition owe a year token (B8)?
+
+    A time-indexed mandate ("the largest CURRENTLY IN OPERATION") makes a candidate's status a
+    fact about a point in time, and the original B8 finding is that a weak model recalls that
+    status from parametric memory: "Arecibo is the largest" with no date, blind to the December
+    2020 collapse. A year is the cheapest deterministic evidence that a dated event was actually
+    read rather than remembered.
+
+    That reasoning only covers dispositions that ARE events. Live validation on 72 real ollama
+    merge completions (2026-08-21) found the flat rule downgraded 2 of 3 CORRECT answers: models
+    write "RATAN-600: Operational" and "Green Bank Telescope is fully steerable and operational"
+    -- page-corroborated, and with no year available to cite, because a telescope that is simply
+    still running has no terminal date. For those, page corroboration (checked separately, in
+    :func:`_corroborated`) is the whole of the available evidence.
+
+    So the year is required unless the statement is unambiguously ONGOING-STATE shaped: a state
+    cue with neither a terminal-event verb nor a past/negated reading of the state word itself
+    ("no longer operational" is a collapse, not a status). Anything else -- including a bare
+    descriptive claim with no cue either way -- keeps the requirement, which is what preserves
+    the original target: the fix narrows the rule to statements that positively assert an
+    ongoing state, it does not invert the default.
+    """
+    low = statement.lower()
+    if _TERMINAL_EVENT_RE.search(low) or _NEGATED_STATE_RE.search(low):
+        return True
+    return not _ONGOING_STATE_RE.search(low)
+
+
 def _magnitude(text: str) -> Optional[float]:
     """First number-with-unit in ``text``, in metres, or ``None`` when uncomparable."""
     for match in _CLAIM_RE.finditer(str(text or "")):
@@ -459,7 +517,7 @@ def _entry_for(
         )
         if page is None:
             continue
-        dated = bool(_YEAR_RE.search(mention))
+        dated = bool(_YEAR_RE.search(mention)) or not _year_required(mention)
         if not time_indexed or dated:
             best, status = mention, DISPOSED
             if page.url:

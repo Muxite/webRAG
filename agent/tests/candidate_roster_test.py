@@ -304,6 +304,80 @@ def test_the_same_undated_status_passes_when_the_mandate_is_not_time_indexed():
     assert _entry(audit, "Arecibo Telescope").status == DISPOSED
 
 
+#: The live shape (2026-08-21 ollama probe, 2 of 3 correct answers downgraded): all four pages
+#: genuinely opened, the CORRECT answer given, and the two candidates that are simply still
+#: running described by their status with no year to cite -- because there is no dated event to
+#: cite for a telescope nothing happened to.
+_ONGOING_STATE_SUMMARY = (
+    "Arecibo Telescope collapsed on 1 December 2020. "
+    "RATAN-600: Operational, a 576 m ring reflector, not a filled aperture. "
+    "The Green Bank Telescope is a 100 m dish, fully steerable and operational. "
+    "FAST is the survivor: a 500 m filled-aperture dish, operational, of which only a 300 m "
+    "circle is illuminated."
+)
+
+
+def test_an_ongoing_state_disposition_needs_no_year():
+    """The live false positive. "Operational" is page-corroborated and dateless by nature."""
+    from agent.app.idea_policies.candidate_roster import _YEAR_RE
+
+    audit = _audit(_ONGOING_STATE_SUMMARY)
+    for name in ("RATAN-600", "Green Bank Telescope", "FAST"):
+        entry = _entry(audit, name)
+        assert entry.status == DISPOSED, name
+        assert not _YEAR_RE.search(entry.disqualifier_quote), name
+    assert _entry(audit, "Arecibo Telescope").status == DISPOSED   # dated event, dated quote
+    assert audit.complete is True
+    assert audit.missing_requirements() == []
+
+
+def test_the_magnitude_tripwire_accepts_an_ongoing_state_disposition():
+    """B7 inherits roster status, so the false positive propagated: RATAN-600 (576 m) beats the
+    survivor (500 m) on size and is eliminated by geometry, not by a date."""
+    audit = _audit(_ONGOING_STATE_SUMMARY)
+    assert _entry(audit, "RATAN-600").magnitude_m == 576.0
+    assert _entry(audit, "FAST").magnitude_m == 500.0
+    assert audit.magnitude_tripwire == []
+
+
+def test_an_event_shaped_disposition_with_no_year_still_fails():
+    """The ORIGINAL B8 target, unchanged: a collapse recalled without its date is exactly what
+    stale parametric memory produces, so the year stays load-bearing for event-shaped claims."""
+    summary = _ONGOING_STATE_SUMMARY.replace(
+        "collapsed on 1 December 2020", "collapsed after cable failures"
+    )
+    audit = _audit(summary)
+    arecibo = _entry(audit, "Arecibo Telescope")
+    assert arecibo.status == UNDATED
+    assert audit.complete is False
+    assert any("carries no date" in line and "Arecibo" in line
+               for line in audit.missing_requirements())
+
+
+def test_a_past_or_negated_state_word_is_an_event_not_a_state():
+    """"No longer operational" / "was in operation until" are collapses wearing a state word."""
+    from agent.app.idea_policies.candidate_roster import _year_required
+
+    assert _year_required("Arecibo Telescope is no longer operational") is True
+    assert _year_required("Arecibo was operational until the cable failures") is True
+    assert _year_required("The dish is not in service") is True
+    assert _year_required("RATAN-600: Operational") is False
+    assert _year_required("Green Bank Telescope is fully steerable and operational") is False
+    assert _year_required("FAST remains in operation") is False
+
+
+def test_a_dateless_descriptive_claim_still_needs_a_year():
+    """Neither cue fires: the requirement stays, so the fix narrows B8 without inverting it."""
+    from agent.app.idea_policies.candidate_roster import _year_required
+
+    assert _year_required("Arecibo Telescope is the largest single-dish radio telescope") is True
+    summary = _ONGOING_STATE_SUMMARY.replace(
+        "Arecibo Telescope collapsed on 1 December 2020.",
+        "The Arecibo Telescope is a 305 m spherical reflector dish in Puerto Rico.",
+    )
+    assert _entry(_audit(summary), "Arecibo Telescope").status == UNDATED
+
+
 def test_a_dated_statement_elsewhere_in_the_run_satisfies_the_year_requirement():
     """The first mention need not be the dated one; the audit takes the best available."""
     audit = _audit("Arecibo Telescope is no longer operational. " + _COMPLETE_SUMMARY)
