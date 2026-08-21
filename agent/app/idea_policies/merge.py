@@ -73,6 +73,84 @@ def _relevance_overlap(goal_tokens: set, candidate_tokens: set) -> float:
     return len(goal_tokens & candidate_tokens) / len(goal_tokens)
 
 
+#: Where a merge's goal-addressing evidence came from -- see :func:`goal_evidence_provenance`.
+GOAL_EVIDENCE_NONE = "none"
+GOAL_EVIDENCE_SNIPPET = "snippet"
+GOAL_EVIDENCE_DIRECT = "direct"
+
+
+def _direct_text(payload: Any, _depth: int = 0) -> str:
+    """Everything a result says IN ITS OWN VOICE, i.e. minus its SEARCH hit list.
+
+    ``results`` is dropped because a search hit is a third party's snippet about a page this
+    run never opened; the echoed request keys are dropped for the reason
+    :data:`_ECHOED_RESULT_KEYS` documents (they are the node's own inputs read back, so a goal
+    restated in a ``query`` would otherwise self-certify). Everything else -- ``content``, a
+    tool payload, a nested merge's ``summary``/``key_findings`` -- counts.
+    """
+    if _depth > 3:
+        return ""
+    if isinstance(payload, bool):
+        return ""
+    if isinstance(payload, str):
+        return payload
+    if isinstance(payload, (list, tuple)):
+        return " ".join(filter(None, (_direct_text(v, _depth + 1) for v in payload)))
+    if not isinstance(payload, dict):
+        return ""
+    from agent.app.idea_policies.action_constants import ActionResultKey
+
+    parts = []
+    for key, value in payload.items():
+        if str(key) in _ECHOED_RESULT_KEYS or str(key) == ActionResultKey.RESULTS.value:
+            continue
+        parts.append(_direct_text(value, _depth + 1))
+    return " ".join(p for p in parts if p)
+
+
+def goal_evidence_provenance(original_goal: Any, merged_results: Any) -> str:
+    """Was the goal-relevant evidence FETCHED, or only glimpsed in unvisited search snippets?
+
+    The 2026-08-21 A/B watched qwen2.5:14b elect a survivor from search-result snippets alone
+    -- right entity, keystone datum never obtained, ``goal_achieved: true`` anyway, in both
+    prompt-ordering arms. The distinguishing signal already exists in the merged payloads and
+    costs nothing to read: a snippet lives inside a SEARCH result's ``results`` list, while
+    fetched content lives in the result's own fields.
+
+    Three-way, deliberately: ``direct`` (something the run actually obtained addresses the
+    goal), ``snippet`` (only unvisited hits do), ``none`` (nothing clears
+    :data:`_GOAL_RELEVANCE_MIN_OVERLAP`). Only ``snippet`` is a positive detection -- ``none``
+    is equally consistent with a correct paraphrase-only answer that the overlap bar missed,
+    so callers must not read it as a negative verdict.
+
+    Fails open toward ``direct``: a nested merge hands up a synthesis rather than the pages
+    behind it, so its provenance is unknowable here and is credited rather than blamed.
+    """
+    goal_tokens = _goal_tokens(original_goal)
+    if not goal_tokens or not isinstance(merged_results, (list, tuple)):
+        return GOAL_EVIDENCE_NONE
+
+    from agent.app.idea_policies.action_constants import ActionResultKey
+
+    found_snippet = False
+    for item in merged_results:
+        if not isinstance(item, dict):
+            continue
+        result = item.get("result")
+        if not result:
+            continue
+        if SimpleMergePolicy._addresses_goal(goal_tokens, _direct_text(result)):
+            return GOAL_EVIDENCE_DIRECT
+        if not isinstance(result, dict):
+            continue
+        hits = result.get(ActionResultKey.RESULTS.value)
+        if isinstance(hits, (list, tuple)) and any(
+            SimpleMergePolicy._result_item_addresses_goal(goal_tokens, hit) for hit in hits
+        ):
+            found_snippet = True
+    return GOAL_EVIDENCE_SNIPPET if found_snippet else GOAL_EVIDENCE_NONE
+
+
 class SimpleMergePolicy(MergePolicy):
     def __init__(self, settings: Optional[Dict[str, Any]] = None):
         super().__init__(settings=settings)

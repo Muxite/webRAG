@@ -110,6 +110,7 @@
   "merge_max_json_chars": 100000,
   "merge_require_substantive_children_enabled": true,
   "merge_retry_after_skip_enabled": false,
+  "merge_require_visited_evidence_enabled": false,
   "merge_goal_evaluation_first_enabled": false,
   "merge_race_winner_selection_enabled": false,
   "merge_race_winner_selection_includes_inferred_groups_enabled": false,

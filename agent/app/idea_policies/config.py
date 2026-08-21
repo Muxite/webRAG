@@ -515,6 +515,18 @@ class MergeConfig:
     # unlike the pure bugfixes it composes with, this creates new nodes and new LLM calls on
     # branches that were previously terminal.
     retry_after_skip_enabled: bool = False
+    # Refuse a ``goal_achieved: true`` whose only goal-relevant evidence is unvisited
+    # search-result snippets (``goal_evidence_provenance`` == ``snippet``). The 2026-08-21
+    # reason-first A/B caught qwen2.5:14b electing the right entity from snippets alone,
+    # never fetching the keystone datum, and claiming victory in BOTH prompt-ordering arms --
+    # so this is a gap in what counts as achieved, not a prompt problem. Opt-in, default OFF:
+    # unlike the consistency guard (which resolves a contradiction the completion states
+    # itself), this overrules a self-consistent verdict on external grounds, and a goal whose
+    # answer genuinely IS a search snippet -- or one phrased so the fetched page clears the
+    # overlap bar only by paraphrase -- would be wrongly held incomplete. Detection is
+    # unconditional either way: the ``goal_achieved_snippet_only`` marker and its warning are
+    # written whatever this flag says, so the failure mode is measurable before it is acted on.
+    require_visited_evidence_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "model": "merge_model",
@@ -523,6 +535,7 @@ class MergeConfig:
         "max_json_chars": "merge_max_json_chars",
         "require_substantive_children_enabled": "merge_require_substantive_children_enabled",
         "retry_after_skip_enabled": "merge_retry_after_skip_enabled",
+        "require_visited_evidence_enabled": "merge_require_visited_evidence_enabled",
         "goal_evaluation_first_enabled": "merge_goal_evaluation_first_enabled",
         "race_winner_selection_enabled": "merge_race_winner_selection_enabled",
         "race_winner_selection_includes_inferred_groups_enabled": (

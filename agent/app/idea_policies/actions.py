@@ -2636,9 +2636,24 @@ class MergeLeafAction(LeafAction):
                 synthesized_data = {"summary": response, "goal_achieved": False, "goal_evaluation": "Failed to parse LLM response", "missing_requirements": []}
             
             goal_achieved = synthesized_data.get("goal_achieved", False)
+            # "Key absent" and "key present and false" are the same `False` to the caller but
+            # different failures: the second is a verdict, the first is the model never
+            # answering the question (the 2026-08-21 A/B measured this on ~4% of 160 real
+            # completions -- llama3.2:3b echoing the input blob back under the schema's field
+            # names, one 14b `goaled_achieved` typo alongside a goal_evaluation that plainly
+            # said ACHIEVED). Default is unchanged -- not-achieved is the safe direction, and
+            # the unparseable-response fallback above supplies the key itself, so a parse
+            # failure keeps its own distinct diagnosis instead of being relabelled here.
+            goal_achieved_field_missing = "goal_achieved" not in synthesized_data
+            if goal_achieved_field_missing:
+                self._logger.warning(
+                    f"[MERGE] {node_id}: model completion did not include a usable goal_achieved "
+                    "field, defaulting to not-achieved (schema-adherence failure, not a genuine "
+                    "negative verdict)"
+                )
             goal_evaluation = synthesized_data.get("goal_evaluation", "")
             missing_requirements = synthesized_data.get("missing_requirements", [])
-            
+
             if not isinstance(goal_achieved, bool):
                 goal_achieved = bool(goal_achieved)
 
@@ -2654,7 +2669,48 @@ class MergeLeafAction(LeafAction):
                 )
                 goal_achieved = False
 
+            # Evidence-provenance check: an ACHIEVED verdict backed only by unvisited search
+            # snippets names the right answer without ever having obtained it. Detection is
+            # unconditional (a silent failure mode nobody could measure otherwise); acting on
+            # it is gated, because this overrules a self-consistent verdict on external
+            # grounds -- see ``MergeConfig.require_visited_evidence_enabled``.
+            if goal_achieved:
+                from agent.app.idea_policies.merge import (
+                    GOAL_EVIDENCE_SNIPPET,
+                    goal_evidence_provenance,
+                )
+                # Resolved separately from ``original_goal`` above, which prefers the node's
+                # own TITLE -- and a merge node's title is ``Merge: {parent.title}``, a task
+                # label whose "merge" prefix would only dilute the overlap measurement. This
+                # mirrors ``SimpleMergePolicy._validate_goal_achievement``'s resolution order.
+                goal_text = (
+                    node.details.get(DetailKey.GOAL.value)
+                    or node.details.get(DetailKey.ORIGINAL_GOAL.value)
+                )
+                if not goal_text and node.parent_id:
+                    _parent = graph.get_node(node.parent_id)
+                    if _parent:
+                        goal_text = (
+                            _parent.details.get(DetailKey.GOAL.value)
+                            or _parent.details.get(DetailKey.ORIGINAL_GOAL.value)
+                            or _parent.title
+                        )
+                if goal_evidence_provenance(goal_text or original_goal, merged_results) == GOAL_EVIDENCE_SNIPPET:
+                    node.details["goal_achieved_snippet_only"] = True
+                    self._logger.warning(
+                        f"[MERGE] {node_id}: goal_achieved=true but every goal-relevant item is an "
+                        "unvisited search-result snippet -- no fetched content addresses the goal"
+                    )
+                    if self._cfg.merge.require_visited_evidence_enabled:
+                        self._logger.warning(
+                            f"[MERGE] {node_id}: downgrading to not-achieved "
+                            "(merge_require_visited_evidence_enabled)"
+                        )
+                        goal_achieved = False
+
             node.details[DetailKey.GOAL_ACHIEVED.value] = goal_achieved
+            if goal_achieved_field_missing:
+                node.details["goal_achieved_field_missing"] = True
             if goal_evaluation:
                 node.details["goal_evaluation"] = goal_evaluation
             if missing_requirements:
