@@ -440,6 +440,43 @@ exists. Any future "we tuned N parameters" claim needs to exclude these.
 
 ---
 
+### T1-5. Dynamic beam width's spread signal is half evaluation-cap noise — **CONFIRMED DEFECT, FIXED (opt-in)**
+
+`GoTOperations.compute_dynamic_beam_width` (`got_operations.py:488-530`, `got_dynamic_beam_
+enabled` default **True**, `adaptive_policies` default **True** — this runs on every live run
+today) widens the beam when recently-scored siblings' p25/p75 spread is high (uncertain) and
+narrows it when scores cluster (converged-looking). It reads `node.score` for every scored node
+in the graph so far — the SAME field T1-3/T1-3a showed is capped at `evaluation_no_action_
+result_score_cap` (0.5) for any not-yet-executed candidate, 43.3% of the time corpus-wide.
+A pool that clusters on the cap reads as convergence to this metric, indistinguishable from the
+model genuinely agreeing.
+
+**MEASURED 2026-08-22 — the contamination is material and one-directional.**
+`scripts/analyze_beam_spread_contamination.py` replays 506 post-9b710b91 result files (raw_score-
+less files excluded — the counterfactual is trivially identical for them), 1722 pooled scored
+nodes: 45.8% carry a capped score, 44.8% have `raw_score > score` (the engine discarded a
+strictly higher judge opinion). On the actual last-beam-call pool of each run (n=178, ≥4 scores):
+mean spread 0.209→0.410 substituting `raw_score`, mean beam 3.62→4.27, the beam **changes in
+50.6% of pools, all wider, never narrower**, share pinned at `beam_min` drops 19.1%→10.1%. The
+cap systematically halves measured spread and narrows the beam — a live, default-on distortion,
+not a hypothetical.
+
+**FIXED, opt-in (`43a65be4`).** New `GotConfig.beam_spread_uses_raw_score_enabled` (JSON
+`got_beam_spread_uses_raw_score_enabled`, shipped `false`). `compute_dynamic_beam_width` routes
+its pool through `_beam_pool_score`, which prefers `node.details[EVALUATION]["raw_score"]` when
+numeric, falling back to `node.score` for pre-9b710b91 graphs, errored evaluations, and the
+`raw_score: None` base-score-shortcut path. `node.score` itself and every other consumer are
+untouched — this is scoped to the beam-width spread computation only. Pinned by
+`agent/tests/beam_width_raw_score_test.py` (flag-off byte-identical, flag-on uses uncapped
+values, still narrows on a genuinely converged raw pool, `None`-fallback, legacy/errored graphs).
+
+**Not yet done:** live A/B of the flag. Widening the beam trades accuracy for fan-out cost —
+the direction the fix pushes (wider, 90/178 pools) is exactly the tradeoff this session's other
+experiments (E1, T1-4) found mostly buys nothing at the qwen2.5:7b tier, so this should not be
+assumed a free win before measuring it the same way.
+
+---
+
 ### T1-4. A sibling visit fan-out reads ONE page 16.2% of the time — **CONFIRMED DEFECT**
 
 `scripts/analyze_sibling_url_collision.py`, $0, every recorded run. Unit: a **sibling visit
