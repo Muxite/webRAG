@@ -564,6 +564,27 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "final_require_grounding": True,   # validity gate, on in every arm
         "got_beam_spread_uses_raw_score_enabled": True,   # the one axis under test (shipped: False)
     },
+    # T1-6's arm (ASSUMPTION_AUDIT.md PART 1): `good_adaptive` with backtrack turned ON (it is
+    # OFF in `good_adaptive` and every other arm above) AND its dead-end threshold rescaled to
+    # the observed path depth instead of the unreachable absolute constant of 5. Deliberately
+    # bundles both flags rather than isolating the relative-threshold fix alone: backtrack
+    # itself has never been live-validated as True at all, so a run with only the relative
+    # threshold flipped and `got_backtrack_enabled` left off would measure nothing (the whole
+    # mechanism stays inert either way). `backtrack_only` (bare, unrelated to this session)
+    # already exists as the "does backtrack help at all with its unreachable absolute
+    # threshold" control if anyone wants to separate the two questions later.
+    "good_adaptive_backtrackrel": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "got_backtrack_enabled": True,
+        "got_backtrack_dead_end_relative_enabled": True,
+    },
     # The DAG v2 shape-spectrum arm: `good_adaptive` plus the three new axes that let a
     # structured run span parallel breadth, sequential chains, AND the middle ground of
     # "several candidate approaches, some of which fail" — a playbook note in the expansion

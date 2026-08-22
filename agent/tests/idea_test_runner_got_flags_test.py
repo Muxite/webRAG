@@ -99,6 +99,9 @@ def _base():
         # T1-5 beam-width raw-score signal: shipped OFF, the one axis
         # `good_adaptive_beamraw` sets.
         "got_beam_spread_uses_raw_score_enabled": False,
+        # T1-6 backtrack relative dead-end threshold: shipped OFF, one of the two axes
+        # `good_adaptive_backtrackrel` sets (the other, `got_backtrack_enabled`, is above).
+        "got_backtrack_dead_end_relative_enabled": False,
     }
 
 
@@ -768,3 +771,25 @@ def test_arm_good_adaptive_beamraw_isolates_the_beam_spread_signal():
     control = _base()
     _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
     assert control["got_beam_spread_uses_raw_score_enabled"] is False
+
+
+def test_arm_good_adaptive_backtrackrel_isolates_backtrack_and_its_relative_threshold():
+    """T1-6's arm must add only the two backtrack axes over `good_adaptive`."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    arm = _GOT_ARM_PROFILES["good_adaptive_backtrackrel"]
+    added = set(arm) - set(base)
+    assert added == {"got_backtrack_enabled", "got_backtrack_dead_end_relative_enabled"}
+    assert set(base) - set(arm) == set()
+    assert all(arm[k] == v for k, v in base.items())
+    assert all(arm[k] is True for k in added)
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_backtrackrel"})
+    for key in added:
+        assert settings[key] is True
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    for key in added:
+        assert control[key] is False
