@@ -488,11 +488,18 @@ this would move activation from 0 to ~51/664 runs (11 at depth 3, 40 at depth 2)
 flag-on fires on a fully-low depth-3 path, recovered ancestor still stops the walk, floor of 2,
 absolute ceiling, unscored-path fallback, still gated by `backtrack_enabled`).
 
-**Not yet done:** live A/B of the flag. `backtrack_enabled` is itself default OFF, so this is
-doubly gated and *nothing* changes until both are flipped — which is the honest state of the
-evidence: this fix makes a dead mechanism able to fire, and says nothing about whether firing
-helps. Backtracking discards work and re-expands, the same cost direction E1/T1-4 found buys
-little at the qwen2.5:7b tier.
+**RUN 2026-08-22 (`ladder_final_20260822`, docker `ladder-benchmark` profile, qwen2.5:7b,
+core24 x R3, $0).** `good_adaptive_backtrackrel` (both `got_backtrack_enabled` and
+`got_backtrack_dead_end_relative_enabled` True) vs `good_adaptive`: **mean score delta +0.048
+(sd=0.185, n=70 complete pairs, 2 infra-failed), t=2.18, p=0.033** — the only one of the four
+mechanisms benchmarked in this run to clear conventional significance. W/T/L 20/38/12; baseline
+mean 0.180, arm mean 0.229. Unlike the earlier concern above (backtracking discards work at
+E1/T1-4's cost), this run shows the opposite direction: turning ON a mechanism that was
+previously mechanically inert (0 real fires at the old absolute threshold) measurably helped
+once it could actually fire. Caveats stated plainly: one local model, one session, n=70 pairs,
+no second-model confirmation yet (the E1/E3 precedent this session set for a shipped-default
+decision) — **recommend a confirmation run before flipping either default**, not an immediate
+flip; see `docs/handoffs/LADDER_FINAL_20260822_RESULTS.md` for the full multi-arm comparison.
 
 ---
 
@@ -526,10 +533,15 @@ untouched — this is scoped to the beam-width spread computation only. Pinned b
 `agent/tests/beam_width_raw_score_test.py` (flag-off byte-identical, flag-on uses uncapped
 values, still narrows on a genuinely converged raw pool, `None`-fallback, legacy/errored graphs).
 
-**Not yet done:** live A/B of the flag. Widening the beam trades accuracy for fan-out cost —
-the direction the fix pushes (wider, 90/178 pools) is exactly the tradeoff this session's other
-experiments (E1, T1-4) found mostly buys nothing at the qwen2.5:7b tier, so this should not be
-assumed a free win before measuring it the same way.
+**RUN 2026-08-22 (`ladder_final_20260822`, docker `ladder-benchmark` profile, qwen2.5:7b,
+core24 x R3, $0).** `good_adaptive_beamraw` vs `good_adaptive`: **mean score delta +0.005
+(sd=0.188, n=69 complete pairs, 3 infra-failed), t=0.22, p=0.83** — a clean null, exactly the
+outcome flagged as the risk above. W/T/L 15/40/14 (the flattest win/loss split of the four
+mechanisms tested in this run). Widening the beam did not cost anything either (no negative
+signal), but bought nothing measurable at this tier. **Recommend holding the default at
+`False`** — the fix is correct (it does what T1-5 says it does) but the accuracy hypothesis it
+was meant to unblock does not pay off at qwen2.5:7b; see
+`docs/handoffs/LADDER_FINAL_20260822_RESULTS.md` for the full multi-arm comparison.
 
 ---
 
