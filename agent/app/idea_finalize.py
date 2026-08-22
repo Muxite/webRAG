@@ -289,6 +289,27 @@ def _strip_urls(text: str, urls: List[str]) -> str:
     return out
 
 
+def grounding_gate_would_refuse(
+    graph: IdeaDag, mandate: str, sources: Optional[List[Dict[str, str]]] = None
+) -> bool:
+    """True when the run's evidence state fails the grounding gate right now.
+
+    The gate's whole pass/fail decision, extracted so a caller earlier in the run (the
+    engine's early-exit check) can ask the same question without duplicating — and later
+    drifting from — the rule finalize enforces. Never raises: on any internal failure it
+    reports "would not refuse", exactly as the gate itself fails open.
+    """
+    from agent.app.idea_policies.grounding import requires_grounded_answer
+
+    try:
+        if _has_grounded_evidence(graph) or sources:
+            return False
+        return bool(requires_grounded_answer(mandate, graph))
+    except Exception as exc:  # noqa: BLE001 — the gate must never crash finalize
+        _logger.warning(f"[GROUNDING-GATE] check failed: {exc}")
+        return False
+
+
 def _apply_grounding_gate(
     payload: Dict[str, Any], graph: IdeaDag, mandate: str, sources: List[Dict[str, str]]
 ) -> None:
@@ -298,15 +319,7 @@ def _apply_grounding_gate(
     never drops the model's text (a reader can still see what it claimed) — it prefixes the
     refusal banner, strips citations that were never opened, and marks the run unsuccessful.
     """
-    from agent.app.idea_policies.grounding import requires_grounded_answer
-
-    try:
-        if _has_grounded_evidence(graph) or sources:
-            return
-        if not requires_grounded_answer(mandate, graph):
-            return
-    except Exception as exc:  # noqa: BLE001 — the gate must never crash finalize
-        _logger.warning(f"[GROUNDING-GATE] check failed: {exc}")
+    if not grounding_gate_would_refuse(graph, mandate, sources):
         return
 
     deliverable = str(payload.get("final_deliverable", "") or "")

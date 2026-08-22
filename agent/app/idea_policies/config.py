@@ -152,6 +152,19 @@ class GoTConfig:
     beam_min: int = 2
     beam_max: int = 5
     beam_target_spread: float = 0.4
+    # Feed the dynamic beam's score pool (the adaptive p25/p75 spread, and the legacy
+    # average branch that shares it) the judge's PRE-CAP opinion (`raw_score`,
+    # recorded by the evaluation policies since 9b710b91) instead of the recorded `node.score`.
+    # Every candidate is scored while still pending, so `evaluate_batch` clips it at
+    # `evaluation_no_action_result_score_cap` -- 45.8% of pooled nodes in the recorded corpus
+    # sit on a value the engine wrote rather than the judge, which shrinks the measured spread
+    # by construction and reads as "converged". `scripts/analyze_beam_spread_contamination.py`
+    # replays 506 post-9b710b91 runs: mean spread 0.209 -> 0.410 and the beam changes in 50.6%
+    # of end-of-run pools, always WIDER. Nodes whose `raw_score` is None (the base-score
+    # shortcut, which never calls the judge) keep their `node.score`. Only this spread reads
+    # the field; `node.score` and every other consumer are untouched. Opt-in, default OFF for
+    # byte-identity -- the widening is unvalidated live and costs fan-out.
+    beam_spread_uses_raw_score_enabled: bool = False
     beam_score_high: float = 0.7
     beam_score_low: float = 0.3
     prune_enabled: bool = True
@@ -1056,6 +1069,18 @@ class EngineConfig:
     # pre-execution scoring (that one is capped by `no_action_result_score_cap`).
     beam_after_evaluation: bool = False  # absent from JSON
     evaluate_parallel_siblings: bool = False  # absent from JSON
+    # A6's calibrated early exit (`got.confidence_early_exit_enabled`) decides from a
+    # confidence statistic alone, with no awareness of the mandate's substantiation
+    # requirements -- and the hooks that would inject the missing visit only fire during
+    # normal step expansion. So an early exit on a grounded-research mandate can reach
+    # finalize with zero opened pages, where `final_require_grounding` (default OFF) is the
+    # only thing that would catch it (ENGINE_DESIGN_REVIEW.md D6). On: an earned early exit
+    # is DECLINED while `idea_finalize.grounding_gate_would_refuse` still holds, so the run
+    # keeps expanding and the grounding-injection hooks get their chance. Declining is the
+    # whole mechanism -- the engine never forces a visit action itself, which would couple
+    # the control loop to one policy action. Independent of `final_require_grounding`: this
+    # asks the gate's question earlier, it does not turn the gate on.
+    early_exit_respects_grounding_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {}
 

@@ -24,7 +24,7 @@ from agent.app.idea_policies import (
     LeafActionRegistry,
     NodeDetailsExtractor,
 )
-from agent.app.idea_finalize import build_final_payload
+from agent.app.idea_finalize import build_final_payload, grounding_gate_would_refuse
 from agent.app.idea_branch_pair import BranchPair, find_branch_pair, get_completion_path
 from agent.app.got_operations import GoTOperations
 from agent.app.idea_checkpointer import Checkpointer, create_checkpointer_from_env
@@ -419,7 +419,7 @@ class IdeaDagEngine:
             self.maybe_prune(graph, steps)
             current_id = self.maybe_backtrack(graph, current_id, steps)
 
-            if self.maybe_early_exit(graph, current_id, steps):
+            if self.maybe_early_exit(graph, current_id, steps, mandate):
                 if on_step is not None:
                     await on_step(graph, current_id, steps)
                 break
@@ -505,16 +505,35 @@ class IdeaDagEngine:
                 return target
         return current_id
 
-    def maybe_early_exit(self, graph: IdeaDag, current_id: Optional[str], steps: int) -> bool:
+    def maybe_early_exit(
+        self, graph: IdeaDag, current_id: Optional[str], steps: int, mandate: str = "",
+    ) -> bool:
         """True when the run has earned a calibrated early exit and should finalize now.
 
         Records the decision and logs as a side effect, exactly as the loop did inline.
+
+        With `engine.early_exit_respects_grounding_enabled` on, an earned exit is declined
+        while the finalize grounding gate would still refuse this run's answer (D6): the
+        confidence rule knows nothing about substantiation requirements, so stopping here
+        would hand finalize a grounded-research mandate with zero opened pages. Continuing
+        to expand is the entire remedy -- the grounding-injection hooks run on the normal
+        expansion path. `mandate` defaults to empty for callers that do not carry it (the
+        interactive session); `requires_grounded_answer` still infers the requirement from
+        the graph's own planned retrieval in that case.
         """
         if (
             self._got
             and self._cfg.got.confidence_early_exit_enabled
             and self._got.should_exit_early(graph, self._step_confidences)
         ):
+            if self._cfg.engine.early_exit_respects_grounding_enabled and (
+                grounding_gate_would_refuse(graph, mandate)
+            ):
+                self._logger.info(
+                    f"[RUN] STEP {steps}: early exit earned but DECLINED. Grounding is "
+                    f"required and unsatisfied (no successfully opened page); continuing"
+                )
+                return False
             self._record_decision(
                 "early_exit", node_id=current_id or graph.root_id(), chosen="finalize",
                 rationale="calibrated high-confidence early exit",
