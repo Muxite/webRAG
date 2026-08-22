@@ -836,6 +836,24 @@ alone. Anyone wanting the graph-growth control back should take it from the all-
 instead: keeping the batch when *every* candidate is flagged (rather than keeping one) removes the
 58% of firings that do the damage while leaving the partial-batch trims intact.
 
+**UPDATE 2026-08-22 — the recommended fix landed the same day, and a second-model confirmation
+reverses the finding.** Commit `6b092fbd` (2026-08-20, 12:12 UTC — after this A/B, which ran
+11:42–12:0x UTC) implemented exactly the all-filtered-fallback fix recommended above. The 58%
+all-flagged-collapse harm channel this section identifies no longer exists at HEAD. A second-
+model confirmation run (`qwen2.5:7b`, local ollama, $0, same core24 tasks minus 4 lost to a
+mid-run search-API outage — 8 tasks × R=3 × 2 arms) run against post-fix HEAD found the effect
+**reverses sign**: task score **+0.077 ±0.110** (dedup ON minus OFF), not significant
+(p=0.22/0.17), while dedup's stated graph-growth job remains real and significant (−3.08 nodes,
+p=0.031) at no measurable accuracy cost. Mechanism check: only 2 of the run's 20 all-flagged
+batches were larger than size 1 (i.e. would have behaved differently under the pre-`6b092fbd`
+collapse) — qwen2.5:7b mostly emits single-candidate expansions, so this tier barely has a
+surface for the original harm channel to act on. **Recommendation: `got_dedup_enabled` stays
+`True`.** The evidence that motivated a flip was measured against code that no longer ships, and
+the only post-fix replication attempt points the other way. If this is ever revisited, the honest
+prerequisite is a re-run of THIS EXACT A/B (`gpt-4.1-nano`, same task set) at HEAD — that specific
+configuration has never been measured post-fix. Full writeup:
+`/home/muk/.claude/projects/-home-muk-projects-webRAG/memory/project_dedup_ablation_confirmation.md`.
+
 ### E2 — Shuffle candidates before truncation
 
 **Claim under test:** LLM output order carries no quality signal, so
