@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
@@ -609,6 +610,28 @@ class GoTOperations:
             _logger.info(f"[GoT:PRUNE] Pruned {pruned} low-score nodes")
         return pruned
 
+    def _relative_dead_end_limit(self, path: List["IdeaNode"], absolute: int) -> int:
+        """Rescale ``backtrack_dead_end_threshold`` onto the path the walk actually has.
+
+        ``got_backtrack_dead_end_relative_enabled`` only. ``consecutive_low`` counts scored
+        nodes walking up from the current node, so it can never exceed the number of scored
+        nodes on ``path_to_root`` — the root carries no score, so a depth-3 node offers at most
+        3. ASSUMPTION_AUDIT.md T1-6 measures a corpus maximum depth of 3 against an absolute
+        threshold of 5, i.e. a constant that cannot fire on the graphs this engine builds.
+
+        The relative limit asks the same question in a depth-independent way: is (most of) the
+        scored path from here to the root low? The floor of 2 keeps one bad score from
+        triggering a backtrack on a depth-1 node, and the absolute setting stays the ceiling, so
+        turning the flag on can only ever make the trigger reachable, never laxer than the
+        constant on a graph deep enough for the constant to have applied.
+        """
+        scored = sum(1 for node in path if node.score is not None)
+        if scored <= 0:
+            return absolute
+        fraction = self._cfg.got.backtrack_dead_end_path_fraction
+        derived = int(math.ceil(fraction * scored)) if fraction > 0 else scored
+        return max(2, min(absolute, derived))
+
     def should_backtrack(self, graph: IdeaDag, current_id: str) -> bool:
         if not self._cfg.got.backtrack_enabled:
             return False
@@ -627,6 +650,9 @@ class GoTOperations:
                 consecutive_low += 1
             else:
                 break
+
+        if self._cfg.got.backtrack_dead_end_relative_enabled:
+            dead_end_limit = self._relative_dead_end_limit(path, dead_end_limit)
 
         if consecutive_low >= dead_end_limit:
             _logger.info(

@@ -69,7 +69,8 @@ class GoTConfig:
     """Graph-of-Thought optimisation knobs (the ``got_*`` settings keys).
 
     Several of these keys (``adaptive_policies``, ``dedup_threshold_min/max``,
-    ``beam_target_spread``, ``prune_stddev_factor``) are intentionally absent
+    ``beam_target_spread``, ``prune_stddev_factor``, ``backtrack_dead_end_path_fraction``)
+    are intentionally absent
     from ``idea_dag_settings.json`` and rely solely on these defaults.
     """
 
@@ -174,6 +175,19 @@ class GoTConfig:
     backtrack_enabled: bool = False
     backtrack_dead_end_threshold: int = 5
     backtrack_low_score_threshold: float = 0.3
+    # T1-6: `backtrack_dead_end_threshold` is an ABSOLUTE node count compared against the
+    # leading low-score run of `path_to_root`, which is bounded above by the node's depth.
+    # `scripts/analyze_prune_backtrack_deadzone.py` measures that depth over 11121 recorded
+    # non-root nodes: the maximum anywhere in the corpus is 3, so 5 is unreachable by
+    # construction on the graphs this engine actually builds. With this flag on, the limit is
+    # derived from the path the walk just took -- `max(2, ceil(fraction * scored path length))`
+    # -- so it means "the whole scored path from here to the root is low" on a graph of any
+    # depth, instead of a magic number tuned for depths that never occur. The floor of 2 keeps
+    # a single low score from ever triggering a backtrack. `backtrack_enabled` is itself default
+    # OFF, so this is doubly gated; default OFF for byte-identity pending a live A/B.
+    backtrack_dead_end_relative_enabled: bool = False
+    #: Absent from `idea_dag_settings.json` on purpose, like `prune_stddev_factor` above.
+    backtrack_dead_end_path_fraction: float = 0.75
     # A6: the SYMMETRIC counterpart of the step-confidence trigger above. A1 only ever adds
     # compute (a distrusted step re-expands); this stops the loop and finalizes when the
     # accumulated confidence prefix clears a CALIBRATED bar, so an easy mandate does not pay

@@ -39,6 +39,7 @@ INTENTIONALLY_JSON_ABSENT = {
     "got_dedup_threshold_max",
     "got_beam_target_spread",
     "got_prune_stddev_factor",
+    "got_backtrack_dead_end_path_fraction",
     # FinalConfig
     "final_max_prompt_chars",
     # EngineConfig

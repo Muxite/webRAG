@@ -179,6 +179,18 @@ services:
     networks:
       - enet
 
+  # Offline unit/regression suite (the ~5.8k-test pytest run), host-equivalent of
+  #   PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest agent/tests/ -q
+  #
+  #   docker compose --profile test run --rm agent-test              # whole suite
+  #   docker compose --profile test run --rm agent-test pytest -q tests/got_operations_test.py
+  #
+  # TESTS ARE MOUNTED, NOT BAKED, and this is forced rather than chosen: the root
+  # .dockerignore excludes agent/tests/ (and scripts/) from the build context to keep
+  # the ~10 GB runtime image from carrying non-runtime files, so `pytest tests` inside
+  # the baked image found nothing at all. Mounting the two directories the suite needs
+  # (its own tests, plus scripts/ which 10 test modules import via parents[2]/"scripts")
+  # also removes the stale-image failure mode DEV_CYCLE.md lesson 4 records.
   agent-test:
     profiles: ["test"]
     build:
@@ -188,12 +200,15 @@ services:
       - chroma
       - redis
       - rabbitmq
-    command: ["pytest", "-v", "tests"]
+    command: ["pytest", "-q", "tests"]
     env_file:
       - .env
       - keys.env
     environment:
       - AGENT_STATUS_TIME=0.6
+    volumes:
+      - ../agent/tests:/app/agent/tests:ro
+      - ../scripts:/app/scripts:ro
     networks:
       - enet
 

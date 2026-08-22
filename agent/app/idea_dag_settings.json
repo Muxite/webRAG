@@ -166,6 +166,7 @@
   "got_telemetry_routing_generate_model": "",
   "got_backtrack_enabled": false,
   "got_backtrack_dead_end_threshold": 5,
+  "got_backtrack_dead_end_relative_enabled": false,
   "got_backtrack_low_score_threshold": 0.3,
   "native_confidence_early_exit_enabled": false,
   "native_confidence_early_exit_margin": 0.05,

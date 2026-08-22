@@ -51,7 +51,11 @@ try:
 except Exception:  # pragma: no cover - keep the driver runnable even if the import path shifts
     _estimate_cost = None
 
-REPO = "/home/muk/projects/webRAG"
+# Repo root and the interpreter used for cell subprocesses. Both are env-overridable so the
+# driver runs unchanged inside the `ladder-benchmark` compose service, where the repo lives at
+# /app and there is no .venv (the image's system python already has the deps installed).
+REPO = os.environ.get("WEBRAG_REPO") or "/home/muk/projects/webRAG"
+CELL_PYTHON = os.environ.get("WEBRAG_PYTHON") or f"{REPO}/.venv/bin/python"
 RESULTS_DIR = f"{REPO}/agent/idea_test_results"
 # Default ladder: baseline (control), good_adaptive (established), max_burn (productive).
 # The full arm (k-vote + backtrack) was net-negative and dropped; max_burn uses deeper re-expansion.
@@ -100,7 +104,15 @@ TASKS = TASK_SETS["smoke8"]  # default; overridden by --task-set / --tasks
 
 
 def keyval(name):
-    with open(f"{REPO}/services/keys.env") as fh:
+    # An already-exported value wins, and a missing keys.env is not fatal: a $0 local run
+    # (compose `ladder-benchmark`, keyless SearXNG + Ollama) has no paid keys to read.
+    if os.environ.get(name):
+        return os.environ[name]
+    try:
+        fh = open(f"{REPO}/services/keys.env")
+    except OSError:
+        return ""
+    with fh:
         for line in fh:
             if line.startswith(name + "="):
                 return line.split("=", 1)[1].strip().strip('\r\n').strip('"')
@@ -120,7 +132,9 @@ def base_env():
         "SEARCH_PROVIDER": os.environ.get("SEARCH_PROVIDER") or "serper",
         "LLM_PROVIDER": "openrouter",
         "MODEL_API_URL": "https://openrouter.ai/api/v1",
-        "CHROMA_URL": "http://localhost:8001",
+        # Only consulted in --chroma-mode http; overridable so an in-container run can name the
+        # `chroma` compose service instead of a host port publication.
+        "CHROMA_URL": os.environ.get("CHROMA_URL") or "http://localhost:8001",
         # 45s was a dead knob: the outer per-action budget (20s in idea_dag_settings.json) always binds
         # first, making the inner aiohttp timeout ineffective. Using 20s makes the declared and effective
         # caps match; retries still get 2 attempts within the window.
@@ -156,7 +170,12 @@ def cell_env(cell):
     # preflight so genuinely weak models that can't emit clean JSON are observed, not excluded.
     if cell.get("provider"):
         env["LLM_PROVIDER"] = cell["provider"]
-        env["MODEL_API_URL"] = cell.get("api_url") or env["MODEL_API_URL"]
+        # LOCAL_API_URL overrides every axis's hard-coded host endpoint in one place. The axes
+        # below all name http://localhost:11435/v1 (the host publication of badmodel-ollama);
+        # from inside a container that address is the container itself, so the compose service
+        # sets LOCAL_API_URL=http://badmodel-ollama:11434/v1 instead of forking the axis table.
+        env["MODEL_API_URL"] = (os.environ.get("LOCAL_API_URL")
+                                or cell.get("api_url") or env["MODEL_API_URL"])
         env["OPENAI_API_KEY"] = "ollama"
         env["IDEA_TEST_PREFLIGHT_JSON"] = "0"
         # Smoke-test finding: default 90s LLM_READ_TIMEOUT (tuned for cloud API) is insufficient for
@@ -649,7 +668,7 @@ def run_cell(cell):
     # finish. start_new_session=True puts each cell in its OWN process group so a timeout or a
     # hard-abort (repeated SIGINT/SIGTERM) can kill it and any children as a unit.
     proc = subprocess.Popen(
-        [f"{REPO}/.venv/bin/python", "-m", "agent.app.idea_test_runner"],
+        [CELL_PYTHON, "-m", "agent.app.idea_test_runner"],
         cwd=REPO, env=cell_env(cell), stdout=log_fh, stderr=subprocess.STDOUT,
         start_new_session=True,
     )

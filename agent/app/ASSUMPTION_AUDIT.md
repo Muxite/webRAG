@@ -424,8 +424,8 @@ null means "never ran," not "does not help."
 
 | Mechanism | Constant | Status | Source |
 |---|---|---|---|
-| Pruning | `got_prune_score_threshold: 0.15` | **0 nodes pruned across 261 runs** | §1 |
-| Backtrack | `dead_end_threshold: 5` | Max measured `path_to_root` = 2; fired 0/261 | §6 |
+| Pruning | `got_prune_score_threshold: 0.15` | ~~0 nodes pruned across 261 runs~~ **stale — see T1-6, pruning fires** | §1 |
+| Backtrack | `dead_end_threshold: 5` | Max measured `path_to_root` = 2; fired 0/261 — **confirmed+fixed, T1-6** | §6 |
 | Early-exit | `native_confidence_early_exit_margin: 0.05` | Ships with empty calibration `{}`; cannot fire | §5 |
 | Step-confidence judge | `sample_every: 1`, temp 0.0 | Run-level AUC 0.571; **AUC 0.288 on merges** | §4 |
 
@@ -437,6 +437,62 @@ that signal.
 **Planning consequence.** Dead config inflates the system's apparent tunability. A reader
 counting knobs in `idea_dag_settings.json` would estimate a far larger real mechanism than
 exists. Any future "we tuned N parameters" claim needs to exclude these.
+
+---
+
+### T1-6. Prune is alive; backtrack's dead-end constant is unreachable — **ONE NULL, ONE CONFIRMED DEFECT (fixed, opt-in)**
+
+`scripts/analyze_prune_backtrack_deadzone.py`, $0, 1732 recorded runs / 11121 non-root nodes.
+Both rows of the dead-calibration table above were opened with the same two questions T1-5
+asked of the beam: does the evaluation cap poison the signal, and is the constant reachable.
+They answer in opposite directions.
+
+**Pruning — NULL RESULT, and the table row was wrong.** The two live hypotheses were that
+prune candidates are drawn from `has_result is None`, the exact subpopulation floored at
+`no_action_result_base_score` (0.4) and clipped at `evaluation_no_action_result_score_cap`
+(0.5), so either the adaptive `mean - stddev` threshold or the flat 0.15 must sit under the
+whole band. **Both are refuted.** Of the 408 recorded pending scored nodes, **1 (0.2%) carries
+a capped score** — the cap lands on candidates that then get executed, so it has largely washed
+out of the population the pruner reads. Their scores run 0.0–1.0 (p05 0.06, median 0.3) with
+real mass at 0.0/0.1/0.15/0.2, well inside reach: the reconstructed threshold is mean 0.234
+(min 0.000, max 0.500, adaptive branch in 374/664 runs past `min_nodes`), and **107 of those
+408 pending nodes sit under their own run's threshold**. Recomputing the threshold on
+`raw_score` moves it 0.234 → 0.239 — a 0.005 effect, i.e. the T1-5 contamination is simply not
+material here. And the symptom itself does not reproduce: **`_got_pruned` is stamped on 108
+nodes across 75 of 1732 runs (4.3%)**, at scores 0.3/0.2/0.1/0.0/0.4. The pruner fires. The
+"0 nodes pruned across 261 runs" line is stale against the current corpus and is struck above.
+No fix, because there is no defect: `got_prune_score_threshold` is genuinely dead code (the
+adaptive branch wins whenever ≥5 nodes are scored, which is every run past `min_nodes: 6`),
+but the mechanism it is a fallback for works.
+
+**Backtrack — CONFIRMED, the constant cannot fire.** `should_backtrack` counts the leading run
+of sub-`backtrack_low_score_threshold` nodes walking `path_to_root`, so that count is bounded
+above by the number of *scored* nodes on the path — the root has none. **Maximum node depth
+anywhere in 11121 recorded nodes is 3** (histogram 1:6484, 2:2138, 3:2499), and the deepest
+all-low leading path in any run is likewise **3**, reached in 11 of 664 runs (2 in 40 more).
+`backtrack_dead_end_threshold: 5` is therefore unreachable *by construction* on the graphs this
+engine builds, not merely untriggered — it is a constant tuned for a graph shape that does not
+occur.
+
+**FIXED, opt-in.** New `GoTConfig.backtrack_dead_end_relative_enabled` (JSON
+`got_backtrack_dead_end_relative_enabled`, shipped `false`) routes the limit through
+`_relative_dead_end_limit`, which rescales it onto the path the walk just took:
+`max(2, min(absolute, ceil(backtrack_dead_end_path_fraction * scored_path_len)))`, fraction
+0.75, typed-only like `prune_stddev_factor`. That asks a depth-independent question — is the
+whole scored path from here to the root low — instead of a magic absolute count. The floor of 2
+keeps one bad score from triggering a backtrack; the configured absolute stays the ceiling, so
+the flag can only make the trigger *reachable*, never laxer than today on a graph deep enough
+for the constant to have applied; an unscored path falls back to the constant. On the corpus
+this would move activation from 0 to ~51/664 runs (11 at depth 3, 40 at depth 2). Pinned by
+`agent/tests/backtrack_relative_depth_test.py` (flag-off byte-identical at corpus depth,
+flag-on fires on a fully-low depth-3 path, recovered ancestor still stops the walk, floor of 2,
+absolute ceiling, unscored-path fallback, still gated by `backtrack_enabled`).
+
+**Not yet done:** live A/B of the flag. `backtrack_enabled` is itself default OFF, so this is
+doubly gated and *nothing* changes until both are flipped — which is the honest state of the
+evidence: this fix makes a dead mechanism able to fire, and says nothing about whether firing
+helps. Backtracking discards work and re-expands, the same cost direction E1/T1-4 found buys
+little at the qwen2.5:7b tier.
 
 ---
 
