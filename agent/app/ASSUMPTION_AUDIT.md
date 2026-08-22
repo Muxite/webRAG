@@ -513,6 +513,65 @@ diagnostic rather than paying for a page the batch already has. Default OFF beca
 changes which pages a run reads: fewer redundant fetches is unambiguously good, but "the
 second sibling gets candidate #2" is a real routing change whose score effect is unmeasured.
 
+**RUN 2026-08-22 — the A/B exists now. Score-NEUTRAL, mechanism CORRECT but nearly inert at this
+tier; the default stays `False`.**
+
+Arms `good_adaptive` vs `good_adaptive_urldedup` (`idea_test_runner._GOT_ARM_PROFILES`, the same
+one-axis-only construction as E1's `good_adaptive_nodedup` and E3's `good_adaptive_memfloor`,
+pinned by `idea_test_runner_got_flags_test.py`), `qwen2.5:7b` on local ollama, searxng backend,
+embedded per-cell chroma, $0. New axis `t14_urldedup_local` in `scripts/adaptive_ladder_run.py`.
+Two run-ids: `t14dedupA` (8 tasks x R3 = 24 pairs) and `t14dedupB` (a top-up, R3 on the three
+tasks that were observed to fire = 9 more pairs). 33/33 pairs complete, no infra losses.
+
+Task selection was measured, not guessed: `analyze_sibling_url_collision.py` was re-run per task
+over the whole recorded corpus to find the tasks whose sibling visits collide by the `fallback`
+cause (the only class this fix touches), then an R=1 ON-arm probe on 11 candidates confirmed which
+of them still fan out **at this model tier** — 046/070/108/069/062 do, 022/143/150/052/072 mostly
+produce zero-visit floor runs. 122/125 were added as high-fan-out/zero-collision controls.
+
+| metric (dedup ON − OFF), 33 pairs | value | p |
+|---|---|---|
+| task score | **−0.031 ± 0.099** (per-cell); −0.049 ± 0.102 (per-task, n=8) | 0.55 / 0.53 |
+| wasted (duplicate) fetches | −0.18/run (6 → 0) | 0.033 |
+| page fetches | −1.06 (−16.0%) | 0.046 |
+| wall-clock seconds | −18.0 (−15.6%) | 0.007 |
+| LLM calls / tokens / nodes | −16.7% / −17.1% / −16.6% | 0.006 / 0.013 / 0.002 |
+
+**Do not read that cost column as the fix working.** Split by whether the mechanism actually
+fired, the entire "efficiency win" sits in the cells where it provably did nothing: the 26 INERT
+pairs give −25.1% LLM calls (p=0.005) and −20.8% nodes (p=0.005), while the 7 pairs where dedup
+FIRED give −1.5% calls (p=0.84) and +2.3% tokens. Inert pairs run identical code in both arms, so
+that is this benchmark's noise floor, measured directly — and it is large enough to manufacture
+p<0.01 results. The cause is visible in the logs: **7 of the 33 pairs diverge in the very first
+plan** (different child count at step 1, before any visit action exists). Run A alone reported
+score −0.108 (p=0.039); run B, same arms and a subset of the same tasks, reported +0.174 —
+the sign flips with the sample, which is what a variance-dominated measurement looks like.
+
+**Mechanism check: correct, and rarer than the corpus rate suggests.** In the ON arm the claim
+map fired 7 times across 33 cells (21% of cells), every firing a true positive (each dropped URL
+had already been fetched by a sibling), **zero false positives** (no leaf was denied a page its
+own sub-goal needed), zero candidate lists exhausted, zero leaves failed with the duplicate
+diagnostic, and visit failures were 11 vs the control's 10 — the routing change costs nothing
+observable. The OFF arm's own collision rate at this tier is **6 duplicated batches in 79 sibling
+batches (7.6%)**, roughly half the corpus-wide 16.2%, and 6 wasted fetches over 33 runs is 2.7% of
+the 6.6 pages a run reads. The sharpest detail: **all 7 firings dropped the same URL**,
+`donate.wikimedia.org/?wmf_source=donate&wmf_medium=sidebar...`. The duplicate this fix catches
+live is not "four leaves collapsed onto the right page", it is two leaves collapsed onto **sidebar
+chrome**, and the next candidate the freed leaf picked was more chrome from the same pool
+(`donate.wikimedia.org/w/index.php?title=Special:UrlShortener`, 107 chars). The `hijacked`/pool-
+quality problem this entry already flags is the binding one; deduplicating a junk pool yields a
+different junk page.
+
+**Recommendation: hold `visit_sibling_url_dedup` at `False`** — on the grounds that nothing
+justifies the flip, not that the fix is wrong. It does exactly what it claims with no observed
+false positive or added failure, and it is the only paired metric attributable to it
+(wasted fetches −100%, p=0.033). But it buys 2.7% of fetches on one tier, its score effect is
+inside a noise floor an order of magnitude wider than the effect, and the pages it recovers are
+chrome. The honest sequencing is to fix the URL pool first (F36 harvest / the `hijacked` class) and
+re-measure this on top of a pool worth deduplicating. Caveats stated plainly: one local model, one
+session, n=8 tasks/33 pairs, several tasks (052/070) near the score floor contributing nothing,
+and this run cannot separate a real ±0.10 score effect from noise in either direction.
+
 ---
 
 ## PART 3 — Tier 3: unvalidated retrieval constants

@@ -77,6 +77,9 @@ def _base():
         # memory-retrieval similarity floor: shipped OFF (0.0 admits every k-NN row), and the
         # one axis E3's `good_adaptive_memfloor` arm sets.
         "memory_retrieval_similarity_floor": 0.0,
+        # sibling visit-URL claim map: shipped OFF, and the one axis T1-4's
+        # `good_adaptive_urldedup` arm sets.
+        "visit_sibling_url_dedup": False,
         # reason-first field ordering (reasoning before verdict), see
         # idea_test_runner_reason_first_flags_test.py for their dedicated coverage.
         "merge_goal_evaluation_first_enabled": False,
@@ -471,6 +474,28 @@ def test_arm_good_adaptive_memfloor_differs_from_good_adaptive_only_in_the_floor
     _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
     assert control["memory_retrieval_similarity_floor"] == 0.0
     assert settings["got_dedup_enabled"] == control["got_dedup_enabled"]
+
+
+def test_arm_good_adaptive_urldedup_differs_from_good_adaptive_only_in_the_claim_map():
+    """T1-4's arm must isolate the sibling visit-URL dedup, same as the two arms above."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    arm = _GOT_ARM_PROFILES["good_adaptive_urldedup"]
+    assert set(arm) - set(base) == {"visit_sibling_url_dedup"}
+    assert set(base) - set(arm) == set()
+    assert all(arm[k] == v for k, v in base.items())
+    assert arm["visit_sibling_url_dedup"] is True
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_urldedup"})
+    assert settings["visit_sibling_url_dedup"] is True
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    assert control["visit_sibling_url_dedup"] is False
+    # The URL-pool knobs both arms resolve against must be identical.
+    assert settings["visit_link_query_top_k"] == control["visit_link_query_top_k"]
+    assert settings["max_links_per_visit"] == control["max_links_per_visit"]
 
 
 def test_arm_good_adaptive_playbook_is_good_adaptive_plus_exactly_the_new_axes():

@@ -509,6 +509,20 @@ AXES = {
              "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
         ],
     },
+    # 2026-08-22, T1-4 (ASSUMPTION_AUDIT.md PART 2): the sibling visit-URL dedup's live A/B.
+    # The collision RATE was measured offline; what the claim map does to a run was not. Local
+    # model, so $0. Drive with
+    #   --axis t14_urldedup_local --arms good_adaptive,good_adaptive_urldedup --tasks <fan-out set>
+    # so the two arms differ in ``visit_sibling_url_dedup`` and nothing else. Task selection
+    # matters more here than in E1/E3: the mechanism can only fire in a run that actually
+    # produces a sibling visit fan-out whose leaves resolve their URLs from the shared pool.
+    "t14_urldedup_local": {
+        "json_telemetry": True,
+        "ladders": [
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 3, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
+    },
 }
 
 

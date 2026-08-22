@@ -500,6 +500,20 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "final_require_grounding": True,   # validity gate, on in every arm
         "memory_retrieval_similarity_floor": 0.40,   # the one axis under test (shipped: 0.0)
     },
+    # T1-4's arm (ASSUMPTION_AUDIT.md PART 2): `good_adaptive` with the sibling visit-URL claim
+    # map turned on, so a paired run against `good_adaptive` isolates the fan-out dedup and
+    # nothing else. Same profile-not-env-override reasoning as the two arms above.
+    "good_adaptive_urldedup": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "visit_sibling_url_dedup": True,   # the one axis under test (shipped: False)
+    },
     # The DAG v2 shape-spectrum arm: `good_adaptive` plus the three new axes that let a
     # structured run span parallel breadth, sequential chains, AND the middle ground of
     # "several candidate approaches, some of which fail" — a playbook note in the expansion
