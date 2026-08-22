@@ -485,6 +485,25 @@ class GoTOperations:
         )
         return candidates
 
+    @staticmethod
+    def _beam_pool_score(node: "IdeaNode") -> float:
+        """The value the beam's spread should measure for ``node``.
+
+        ``got_beam_spread_uses_raw_score_enabled`` only. ``node.score`` is the post-cap number
+        every other consumer reads and is left alone; here the judge's own ``raw_score`` is
+        preferred where one exists, so a pool that clusters on
+        ``evaluation_no_action_result_score_cap`` does not read as convergence. A graph
+        recorded before 9b710b91, an evaluation that errored, and the base-score shortcut (which
+        returns without calling the judge, so ``raw_score`` is None) all fall back to
+        ``node.score`` rather than inventing an opinion.
+        """
+        evaluation = node.details.get(DetailKey.EVALUATION.value)
+        if isinstance(evaluation, dict):
+            raw = evaluation.get("raw_score")
+            if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+                return float(raw)
+        return float(node.score)
+
     def compute_dynamic_beam_width(self, graph: IdeaDag) -> int:
         if not self._cfg.got.dynamic_beam_enabled:
             return self._cfg.engine.max_branching
@@ -492,10 +511,11 @@ class GoTOperations:
         beam_min = self._cfg.got.beam_min
         beam_max = self._cfg.got.beam_max
 
+        prefer_raw = self._cfg.got.beam_spread_uses_raw_score_enabled
         scores: List[float] = []
         for node in graph.iter_depth_first():
             if node.score is not None and node.parent_id is not None:
-                scores.append(float(node.score))
+                scores.append(self._beam_pool_score(node) if prefer_raw else float(node.score))
 
         if not scores:
             return beam_max
