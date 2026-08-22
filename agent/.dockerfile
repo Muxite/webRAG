@@ -34,6 +34,13 @@ print('ChromaDB ONNX embedding model pre-downloaded')" && \
 
 COPY agent /app/agent
 
+# The benchmark compose services (promptbench, ladder-benchmark) run as the invoking
+# HOST uid so their result files are not root-owned. /root's default 0700 made the
+# pre-downloaded embedding caches above unreachable for that uid, and every cell
+# re-downloaded the 79 MB ONNX model instead. Only the directory bit is relaxed (the
+# caches themselves are already world-readable) and nothing secret lives in /root.
+RUN chmod 755 /root
+
 WORKDIR /app/agent
 
 CMD ["python", "-m", "app.main"]

@@ -345,16 +345,43 @@ client (submit + poll loop, prints the answer + evidence) is in
 
 ### Running Tests
 
+Everything below runs from `services/`. No host virtualenv is required.
+
 ```bash
-# Run specific tests
-IDEA_TEST_IDS=019,025 docker compose run --profile test visit-test
+# Offline unit/regression suite (~5.8k tests, no API keys, no network, no spend)
+docker compose --profile test run --rm agent-test
+# ...or one module
+docker compose --profile test run --rm agent-test pytest -q agent/tests/got_operations_test.py
 
-# Run full test suite
-docker compose run --profile test idea-test
-
-# Benchmark mode (top 8 tests, 3 models, 3 runs each)
-IDEA_TEST_MODE=benchmark docker compose run --profile test idea-test
+# Live task runs against the benchmark suite (these DO use keys.env and spend money)
+IDEA_TEST_IDS=019,025 docker compose --profile test run --rm visit-test
+docker compose --profile test run --rm idea-test
+IDEA_TEST_MODE=benchmark docker compose --profile test run --rm idea-test
 ```
+
+The equivalent host invocation, for a checkout with a `.venv`, is
+`PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests`. The container run
+differs in one respect: `consol` publishes no wheel for the image's Python 3.10, so five
+optional-dependency tests skip there.
+
+### Running Benchmarks
+
+```bash
+# Compute-ladder A/B against the LOCAL Ollama models ($0). No arguments = dry-run cell plan.
+docker compose --profile ladder-benchmark run --rm ladder-benchmark
+docker compose --profile ladder-benchmark run --rm ladder-benchmark \
+    --run-id ladder_local --axis capspec_local --task-set smoke8 \
+    --arms baseline,good_adaptive --jobs 1
+
+# Prompt-shape / calibration micro-eval (also local, also $0)
+docker compose --profile promptbench run --rm promptbench --census
+docker compose --profile promptbench run --rm promptbench-analyze \
+    --runs agent/idea_test_results/promptbench_runs.jsonl
+```
+
+Both benchmark services write results to `agent/idea_test_results/` on the host. Set
+`LADDER_UID`/`LADDER_GID` (or `PROMPTBENCH_UID`/`PROMPTBENCH_GID`) if your host account is not
+uid 1000, so the result files stay writable by a later host-side run.
 
 ### Environment Variables
 

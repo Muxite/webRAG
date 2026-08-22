@@ -185,12 +185,82 @@ services:
   #   docker compose --profile test run --rm agent-test              # whole suite
   #   docker compose --profile test run --rm agent-test pytest -q tests/got_operations_test.py
   #
-  # TESTS ARE MOUNTED, NOT BAKED, and this is forced rather than chosen: the root
-  # .dockerignore excludes agent/tests/ (and scripts/) from the build context to keep
-  # the ~10 GB runtime image from carrying non-runtime files, so `pytest tests` inside
-  # the baked image found nothing at all. Mounting the two directories the suite needs
-  # (its own tests, plus scripts/ which 10 test modules import via parents[2]/"scripts")
-  # also removes the stale-image failure mode DEV_CYCLE.md lesson 4 records.
+  # TESTS ARE MOUNTED, NOT BAKED, and that is forced rather than chosen: the root
+  # .dockerignore excludes agent/tests/ (and scripts/, services/keys.env) from the build
+  # context so the ~10 GB runtime image carries no non-runtime files -- `pytest tests`
+  # in the baked image collected zero tests. Mounting also removes the stale-image
+  # failure mode DEV_CYCLE.md lesson 4 records.
+  #
+  # working_dir is /app (repo root), NOT the image's /app/agent: a dozen test modules
+  # open repo-relative paths (`services/docker-compose.yml`, `agent/app/idea_dag_settings.json`,
+  # `agent/tests/fixtures/...`) and 10 more import scripts/ via parents[2]. PYTHONPATH
+  # mirrors the canonical host invocation's `.:services:agent`, which also means `shared.*`
+  # resolves to the MOUNTED source rather than the copy pip-installed at build time.
+  # ---------------------------------------------------------------------------
+  # ladder-benchmark -- the compute-ladder A/B driver (scripts/adaptive_ladder_run.py)
+  # pointed at the LOCAL Ollama models, i.e. the $0 benchmark path.
+  #
+  #   docker compose --profile ladder-benchmark run --rm ladder-benchmark
+  #       ^ default: dry-run cell plan for one task on the local axis. No LLM calls,
+  #         no network, no spend -- a wiring smoke test.
+  #
+  #   # real local run (overriding the default args; entrypoint is preserved):
+  #   docker compose --profile ladder-benchmark run --rm ladder-benchmark \
+  #       --run-id ladder_local --axis capspec_local --task-set smoke8 \
+  #       --arms baseline,good_adaptive --jobs 1
+  #   # paid-API arm (keys come from keys.env via env_file, same as every other service):
+  #   docker compose --profile ladder-benchmark run --rm ladder-benchmark \
+  #       --run-id ladder_api --model openai/gpt-4.1-nano --no-ref --reps 2 --budget 3
+  #
+  # Same shape as the promptbench block above and for the same reasons: source is
+  # mounted read-only rather than trusted from the image (DEV_CYCLE.md lesson 4), the
+  # process runs as the host user so results/ledgers/locks are not root-owned, and no
+  # GPU is reserved because inference belongs to badmodel-ollama (one loaded model,
+  # 12 GB card) -- reserving here would contend with the thing doing the work.
+  #
+  # LOCAL_API_URL rewrites the axis table's hard-coded http://localhost:11435/v1 (the
+  # HOST publication of badmodel-ollama) to the service name on the shared network, so
+  # the same axis definitions serve both the host and container workflows.
+  #
+  # --chroma-mode stays at the script's `embedded` default rather than pointing at the
+  # `chroma` service: every cell gets its own SQLite file under the results mount, which
+  # is what keeps parallel cells (and a concurrent host run) from contending on one
+  # server, and it keeps a benchmark from writing into the LIVE stack's chroma.
+  ladder-benchmark:
+    profiles: ["ladder-benchmark"]
+    build:
+      context: ..
+      dockerfile: agent/.dockerfile
+    working_dir: /app
+    entrypoint: ["python", "scripts/adaptive_ladder_run.py"]
+    command: ["--run-id", "ladder_smoke", "--axis", "capspec_local", "--tasks", "122",
+              "--arms", "baseline,good_adaptive", "--dry-run"]
+    user: "${LADDER_UID:-1000}:${LADDER_GID:-1000}"
+    volumes:
+      - ../agent:/app/agent:ro
+      - ../scripts:/app/scripts:ro
+      # Nested read-write mount: result JSON, per-cell logs, the attempt ledger and the
+      # embedded per-cell chroma dirs all live under here, and a resumed HOST-side run
+      # must be able to read and extend them.
+      - ../agent/idea_test_results:/app/agent/idea_test_results:rw
+    environment:
+      - PYTHONPATH=/app:/app/agent
+      # The driver hard-codes a host repo path and a .venv interpreter; both are
+      # env-overridable so it runs unchanged here (repo at /app, system python).
+      - WEBRAG_REPO=/app
+      - WEBRAG_PYTHON=python
+      - LOCAL_API_URL=http://badmodel-ollama:11434/v1
+      # Running as a uid with no /etc/passwd entry leaves HOME unset, and chroma resolves
+      # its ONNX embedding cache under Path.home(). Naming /root explicitly (readable since
+      # the dockerfile's `chmod 755 /root`) reuses the baked model instead of re-downloading
+      # 79 MB per cell.
+      - HOME=/root
+    env_file:
+      - .env
+      - keys.env
+    networks:
+      - enet
+
   agent-test:
     profiles: ["test"]
     build:
@@ -200,15 +270,29 @@ services:
       - chroma
       - redis
       - rabbitmq
-    command: ["pytest", "-q", "tests"]
+    working_dir: /app
+    command: ["pytest", "-q", "agent/tests"]
+    # keys.env is deliberately NOT loaded here, and the three live-test switches .env
+    # carries are forced off: this is the OFFLINE suite, matching the canonical host
+    # invocation. With a real key in the environment the suite stops mocking and starts
+    # POSTing to OpenRouter mid-run -- observed, not hypothetical -- which spends money
+    # and makes a unit run network-flaky. The live smoke/preflight paths belong to the
+    # idea-test/visit-test/general-test services below, which do load keys.env.
     env_file:
       - .env
-      - keys.env
     environment:
+      - PYTHONPATH=/app:/app/services:/app/agent
       - AGENT_STATUS_TIME=0.6
+      - CONNECTOR_SMOKE_TESTS=false
+      - LIVE_PREFLIGHT_TESTS=0
+      - LIVE_PREFLIGHT_BROWSER_TESTS=0
     volumes:
       - ../agent/tests:/app/agent/tests:ro
+      - ../agent/app:/app/agent/app:ro
       - ../scripts:/app/scripts:ro
+      - ../services:/app/services:ro
+      # codebench/ holds materialize_task.py, which the c25 task test drives end to end.
+      - ../codebench:/app/codebench:ro
     networks:
       - enet
 

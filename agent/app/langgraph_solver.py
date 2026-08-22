@@ -56,7 +56,7 @@ from agent.app.idea_test_utils import count_chars, count_words
 from agent.app.solver import SolverResult
 from agent.app.testing.execution_sequential import ToolRetry, _EMPTY_PAGE, _call_tool_with_retry
 from agent.app.testing.utils import summarize_observability
-from services.shared.connector_config import ConnectorConfig
+from shared.connector_config import ConnectorConfig
 
 if TYPE_CHECKING:
     from agent.app.telemetry import TelemetrySession

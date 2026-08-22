@@ -7,10 +7,21 @@ Covers the four contract requirements:
   (d) ConSol import failure -> handled gracefully (returns None -> fixed-k fallback).
 """
 import asyncio
+import importlib.util
 
 import pytest
 
 from agent.app.testing import consol_pilot
+
+# Sections (b) and (c) exercise the REAL ConSol confidence model, which is an OPTIONAL
+# dependency: `consol` publishes no wheel for Python < 3.11, so it is absent from the
+# 3.10 agent image the compose `test` profile runs in. Skipping there (rather than
+# failing) keeps the containerized suite honest about what it could not exercise; the
+# fallback-when-absent behavior is covered by section (d), which needs no import.
+_needs_consol = pytest.mark.skipif(
+    importlib.util.find_spec("consol") is None,
+    reason="ConSol not installed (optional dependency, requires Python >= 3.11)",
+)
 
 
 def _key(a: str) -> str:
@@ -55,6 +66,7 @@ def test_disabled_when_flag_not_exactly_one(monkeypatch):
 
 # --- (b) flag ON + convergence: early stop -----------------------------------------------------
 
+@_needs_consol
 def test_converging_sampler_stops_early(monkeypatch):
     monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
     # Allow the cap to exceed k so an early stop below k is unambiguous.
@@ -69,6 +81,7 @@ def test_converging_sampler_stops_early(monkeypatch):
     assert state["calls"] == 3
 
 
+@_needs_consol
 def test_converging_within_fixed_k_uses_fewer_than_k(monkeypatch):
     monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
     monkeypatch.delenv(consol_pilot.MAX_SAMPLES_ENV, raising=False)  # cap defaults to k
@@ -82,6 +95,7 @@ def test_converging_within_fixed_k_uses_fewer_than_k(monkeypatch):
 
 # --- (c) flag ON + no convergence: cap, not infinite -------------------------------------------
 
+@_needs_consol
 def test_never_converging_exhausts_cap(monkeypatch):
     monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
     monkeypatch.delenv(consol_pilot.MAX_SAMPLES_ENV, raising=False)  # cap = k
@@ -96,6 +110,7 @@ def test_never_converging_exhausts_cap(monkeypatch):
     assert result.answer == "answer-0"        # tie -> anchor (first sample)
 
 
+@_needs_consol
 def test_all_unknown_returns_empty(monkeypatch):
     monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
     monkeypatch.delenv(consol_pilot.MAX_SAMPLES_ENV, raising=False)
@@ -107,6 +122,7 @@ def test_all_unknown_returns_empty(monkeypatch):
     assert state["calls"] == 5
 
 
+@_needs_consol
 def test_sample_error_does_not_abort_vote(monkeypatch):
     monkeypatch.setenv(consol_pilot.ENABLE_ENV, "1")
     monkeypatch.setenv(consol_pilot.MAX_SAMPLES_ENV, "10")

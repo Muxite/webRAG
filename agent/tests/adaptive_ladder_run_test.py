@@ -289,3 +289,48 @@ def test_suite59_is_suite50_minus_024_plus_the_ten_additions():
     assert len(suite59) == len(set(suite59)) == 59
     assert "024" in suite50 and "024" not in suite59  # F27 drop (un-gated + LLM-judge-scored)
     assert set(suite59) == (set(suite50) - {"024"}) | set(additions)
+
+
+# ------------------------------------------------------------------- containerized driver ----
+# The driver was written for one host checkout: a hard-coded repo path, a `.venv` interpreter,
+# a keys.env read and an axis table full of `http://localhost:11435/v1`. All four are wrong
+# inside the `ladder-benchmark` compose service (repo at /app, system python, keys arriving as
+# env vars, Ollama reachable only by service name), so each has an env override.
+
+def test_keyval_prefers_an_exported_value_over_the_keys_file(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "from-env-file")
+    assert ladder.keyval("OPENROUTER_API_KEY") == "from-env-file"
+
+
+def test_keyval_is_not_fatal_when_there_is_no_keys_env(monkeypatch, tmp_path):
+    """A $0 local run has no paid keys to read; a missing keys.env must not abort the driver."""
+    monkeypatch.delenv("SERPER_KEY", raising=False)
+    monkeypatch.setattr(ladder, "REPO", str(tmp_path))
+    assert ladder.keyval("SERPER_KEY") == ""
+
+
+def _local_cell():
+    return {"task": "122", "rep": 1, "arm": "baseline", "model": "qwen2.5:7b", "variant": "graph",
+            "burn": None, "run_id": "r", "provider": "openai_compatible",
+            "api_url": "http://localhost:11435/v1"}
+
+
+def test_local_api_url_overrides_the_axis_tables_host_endpoint(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCAL_API_URL", "http://badmodel-ollama:11434/v1")
+    monkeypatch.setitem(ladder.RUN_CFG, "embedded_root", str(tmp_path))
+    assert ladder.cell_env(_local_cell())["MODEL_API_URL"] == "http://badmodel-ollama:11434/v1"
+
+
+def test_without_the_override_the_axis_endpoint_is_used(monkeypatch, tmp_path):
+    monkeypatch.delenv("LOCAL_API_URL", raising=False)
+    monkeypatch.setitem(ladder.RUN_CFG, "embedded_root", str(tmp_path))
+    assert ladder.cell_env(_local_cell())["MODEL_API_URL"] == "http://localhost:11435/v1"
+
+
+def test_the_repo_root_and_cell_interpreter_are_env_overridable():
+    src = (Path(__file__).resolve().parents[2] / "scripts" / "adaptive_ladder_run.py").read_text()
+    assert 'os.environ.get("WEBRAG_REPO")' in src
+    assert 'os.environ.get("WEBRAG_PYTHON")' in src
+    # The cell subprocess must launch CELL_PYTHON, not the hard-coded host venv path.
+    assert "CELL_PYTHON, \"-m\", \"agent.app.idea_test_runner\"" in src
+    assert "/.venv/bin/python\", \"-m\"" not in src
