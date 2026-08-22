@@ -523,6 +523,42 @@ AXES = {
              "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
         ],
     },
+    # 2026-08-22, the strong-agent-trace bundle's end-to-end live A/B (project_strong_agent_
+    # trace_guidance): numeric_provenance + race_value_agreement + chain_closure cleared
+    # capture-replay + isolated live-probe + a combined end-to-end run already, but that run
+    # checked composition (no double-penalty), not whether the bundle actually improves score.
+    # Local model, $0. Drive with
+    #   --axis tracemech_local --arms good_adaptive,good_adaptive_tracemech --tasks <core24>
+    "tracemech_local": {
+        "json_telemetry": True,
+        "ladders": [
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 3, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
+    },
+    # 2026-08-22, the safety-net bundle's live A/B: D4 merge-retry-after-skip + D6 early-exit-
+    # respects-grounding. Both are "decline a premature termination" gates, neither previously
+    # live-validated. Local model, $0. Drive with
+    #   --axis safetynet_local --arms good_adaptive,good_adaptive_safetynet --tasks <core24>
+    "safetynet_local": {
+        "json_telemetry": True,
+        "ladders": [
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 3, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
+    },
+    # 2026-08-22, T1-5's live A/B: does substituting raw_score for the capped score in the
+    # dynamic beam's spread computation actually help, or just widen the beam for no score gain
+    # (the concern noted in ASSUMPTION_AUDIT.md's T1-5 entry, given E1/T1-4 both found wider
+    # fan-out buys little at this tier). Local model, $0. Drive with
+    #   --axis beamraw_local --arms good_adaptive,good_adaptive_beamraw --tasks <core24>
+    "beamraw_local": {
+        "json_telemetry": True,
+        "ladders": [
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 3, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
+    },
 }
 
 
