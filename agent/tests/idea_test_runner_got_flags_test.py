@@ -74,6 +74,9 @@ def _base():
         # memory-based duplicate-candidate filter: shipped default ON, and the one axis E1's
         # `good_adaptive_nodedup` arm ablates.
         "got_dedup_enabled": True,
+        # memory-retrieval similarity floor: shipped OFF (0.0 admits every k-NN row), and the
+        # one axis E3's `good_adaptive_memfloor` arm sets.
+        "memory_retrieval_similarity_floor": 0.0,
         # reason-first field ordering (reasoning before verdict), see
         # idea_test_runner_reason_first_flags_test.py for their dedicated coverage.
         "merge_goal_evaluation_first_enabled": False,
@@ -447,6 +450,27 @@ def test_arm_good_adaptive_nodedup_differs_from_good_adaptive_only_in_dedup():
     assert control["got_dedup_enabled"] is True
     assert settings["max_branching"] == control["max_branching"]
     assert settings["got_beam_max"] == control["got_beam_max"]
+
+
+def test_arm_good_adaptive_memfloor_differs_from_good_adaptive_only_in_the_floor():
+    """E3's arm must isolate the memory-retrieval similarity floor, same as E1's dedup arm."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    arm = _GOT_ARM_PROFILES["good_adaptive_memfloor"]
+    assert set(arm) - set(base) == {"memory_retrieval_similarity_floor"}
+    assert set(base) - set(arm) == set()
+    assert all(arm[k] == v for k, v in base.items())
+    # The calibrated knee (ASSUMPTION_AUDIT.md E3), not one of the pre-registered guesses.
+    assert arm["memory_retrieval_similarity_floor"] == 0.40
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_memfloor"})
+    assert settings["memory_retrieval_similarity_floor"] == 0.40
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    assert control["memory_retrieval_similarity_floor"] == 0.0
+    assert settings["got_dedup_enabled"] == control["got_dedup_enabled"]
 
 
 def test_arm_good_adaptive_playbook_is_good_adaptive_plus_exactly_the_new_axes():

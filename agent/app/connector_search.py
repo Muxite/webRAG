@@ -242,10 +242,13 @@ def create_search_backend(config: ConnectorConfig) -> ConnectorSearch:
     """
     Factory for search backends from ``ConnectorConfig.search_provider``.
 
-    Mirrors ``llm_backends.create_llm_backend``'s dispatch pattern. ``"brave"``/``"serper"`` only —
-    SearXNG stays a manual per-call-site instantiation (``ConnectorSearchXNG``, see that module's
-    own docstring: it exists specifically for codebench's network-isolated sandbox, a deliberate,
-    unrelated choice this factory doesn't touch).
+    Mirrors ``llm_backends.create_llm_backend``'s dispatch pattern. ``"brave"``/``"serper"`` are the
+    paid backends; ``"searxng"`` routes at a self-hosted, keyless SearXNG instance
+    (``SEARXNG_URL``). SearXNG used to be a manual per-call-site instantiation for codebench's
+    network-isolated sandbox only; it is dispatched here as well because it is the only search
+    backend a $0 local-model benchmark can use once the paid keys are exhausted, and an offline
+    experiment that cannot search is not an experiment. Opt-in by env, so nothing routes at it
+    unless asked.
 
     :param config: Connector configuration (``search_provider``/``search_api_key`` already
         resolved by ``ConnectorConfig.__init__``).
@@ -254,6 +257,11 @@ def create_search_backend(config: ConnectorConfig) -> ConnectorSearch:
     provider = (config.search_provider or "serper").strip().lower()
     if provider == "brave":
         return ConnectorSearch(config)
+    if provider == "searxng":
+        # Lazy, same reason as the serper import below: the module imports FROM this one.
+        from agent.app.connector_search_searxng import ConnectorSearchXNG
+
+        return ConnectorSearchXNG(config)
     if provider != "serper":
         config.logger.warning("Unknown SEARCH_PROVIDER=%s; using serper", provider)
     # Lazy import: connector_search_serper.py imports FROM this module (ConnectorSearch, _collect),

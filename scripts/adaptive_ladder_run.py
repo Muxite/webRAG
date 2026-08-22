@@ -114,7 +114,10 @@ def base_env():
         "OPENROUTER_API_KEY": keyval("OPENROUTER_API_KEY"),
         "SEARCH_API_KEY": keyval("SEARCH_API_KEY"),
         "SERPER_KEY": keyval("SERPER_KEY"),
-        "SEARCH_PROVIDER": "serper",
+        # serper by default; an inherited SEARCH_PROVIDER wins so a $0 local run can point at the
+        # keyless self-hosted SearXNG (SEARCH_PROVIDER=searxng SEARXNG_URL=...) when the paid keys
+        # are exhausted. Both arms of a paired A/B always share whichever backend is chosen.
+        "SEARCH_PROVIDER": os.environ.get("SEARCH_PROVIDER") or "serper",
         "LLM_PROVIDER": "openrouter",
         "MODEL_API_URL": "https://openrouter.ai/api/v1",
         "CHROMA_URL": "http://localhost:8001",
@@ -489,6 +492,20 @@ AXES = {
         "json_telemetry": True,
         "ladders": [
             {"model": "qwen2.5:7b", "tag": "q7", "reps": 3, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
+    },
+    # 2026-08-22, E3 (ASSUMPTION_AUDIT.md PART 5): the memory-retrieval similarity floor's live
+    # A/B, at the value the offline histogram calibrated (0.40). Local model, so $0. Drive with
+    #   --axis e3_memfloor_local --arms good_adaptive,good_adaptive_memfloor --tasks <core24 subset>
+    # so the two arms differ in ``memory_retrieval_similarity_floor`` and nothing else.
+    "e3_memfloor_local": {
+        "json_telemetry": True,
+        "ladders": [
+            # R=4 rather than E1's 3: the floor cuts ~6% of retrieved rows, so the expected
+            # effect is smaller than dedup's and the paired test needs the extra rep more than
+            # it needs a wider task set (the mechanism only bites where retrieval happens).
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 4, "burn": None,
              "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
         ],
     },

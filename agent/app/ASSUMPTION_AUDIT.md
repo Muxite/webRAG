@@ -548,6 +548,10 @@ which is the instrumentation E3 needs to pick a value. **The value is not calibr
 this is the lever E3 was blocked on, not its result. Pinned by
 `agent/tests/memory_similarity_floor_test.py`.
 
+*A/B'd 2026-08-22 (E3): a 0.40 floor cuts ~19% of retrieved rows live and moves task score by
++0.017 (p=0.70). The floor stays OFF, and the "far neighbours cost accuracy" premise above is
+unsupported at that tier — see E3 for the numbers and the caveats.*
+
 *Still uncovered:* the link-ranking path. `_query_links_from_chroma` reads chroma directly
 rather than through `MemoryManager`, so the floor does not reach it. Deliberate: it pools
 across `links_*` collections whose distances are not obviously commensurable with `mem_*`
@@ -951,6 +955,60 @@ it cuts was hurting. Two caveats to carry into that run: the persistent collecti
 accumulated across every run sharing a mandate, so they are at least as full as at query time and
 every similarity above is an UPPER bound (a floor picked from it is conservative, which is the
 safe direction); and the corpus skews to `gpt-4.1-nano` graph runs on the chain-heavy task set.
+
+**RUN 2026-08-22 — the A/B exists now. Score-NEUTRAL; the default stays `0.0`.**
+
+Arms `good_adaptive` vs `good_adaptive_memfloor` (`idea_test_runner._GOT_ARM_PROFILES`, the same
+one-axis-only construction as E1's `good_adaptive_nodedup`, pinned by
+`idea_test_runner_got_flags_test.py`), `qwen2.5:7b` on local ollama, R=4, 8 tasks, embedded
+per-cell chroma, $0. Tasks were picked by MEASURED memory activity rather than by shape: the E1
+run's cell logs give expansion-retrieval volume per task, and the floor cannot act where nothing
+is retrieved. 32/32 pairs complete, no infra losses. New axis `e3_memfloor_local` in
+`scripts/adaptive_ladder_run.py`.
+
+| metric (floor − no floor) | value | p |
+|---|---|---|
+| task score | **+0.017 ± 0.083** (per-task, n=8) | 0.70 |
+| task score | +0.017 ± 0.091 (per-cell, n=32) | 0.73 |
+| prompt tokens | −16.7% (−12.5k/run) | 0.12 |
+| completion tokens | −4.9% | ns |
+| graph nodes | −0.50 (−6%) | 0.68 |
+
+Cell-level W/T/L for the floor arm 12/10/10. Restricted to the 20 pairs where the floor actually
+fired: +0.041 ± 0.111 (p=0.49). The 12 pairs where it never fired come back −0.022 ± 0.161, which
+is the run's own noise floor — the two arms are byte-identical in those cells, so that number is
+what "no effect" measures at this n, and the fired-subset effect is inside it.
+
+**Firing rate: the 0.40 calibration does NOT transfer to this corpus.** Live, the floor fired in 97
+retrieval calls across 32 cells, dropped 183 rows of the 391 those calls returned, and emptied 13
+calls outright; expansion prompts received 16.2 memory rows/cell against the control's 23.1. Best
+estimate of the overall row-cut rate is ~19% — **3x the 6.2% the histogram predicted**, with
+~3.7% of calls emptied against a predicted 1.2%. An offline re-histogram on this model's own
+corpora (3 preserved per-cell chromas, 210 rows, same `histogram_memory_similarity.py`) agrees:
+15.2% rows cut at 0.40, 4.5% of calls emptied. The calibration's own stated caveat is the cause and
+it is larger than it looked — it was measured on PERSISTENT collections accumulated across many
+runs sharing a mandate, while a real run queries a corpus that is still filling, so its similarities
+were an upper bound by a wide margin, on a different model's text.
+
+The qwen corpus is also shaped differently: p10=0.258, p25=0.569, i.e. a gap rather than the nano
+corpus's flat shelf, so **every floor in [0.30, 0.45] cuts nearly the same rows** (13.3% → 16.2%)
+and the exact value inside that band does not matter. 0.50 is where it starts eating the mode
+(19.5% rows, 11.4% of calls emptied).
+
+**Recommendation: hold `memory_retrieval_similarity_floor` at `0.0`.** Cutting a fifth of retrieved
+memory changed task score by nothing measurable in either direction, which retires the T3-1 premise
+("far-away neighbours inject noise that costs accuracy") as an accuracy claim at this tier — the
+noise is real and apparently inert. The genuine effect is a −16.7% prompt-token reduction, itself
+not significant at n=32; if a future run wants the floor, that is the outcome to power for, not
+score. Caveats stated plainly: one local model, one session, n=8 tasks/32 pairs, several tasks near
+the score floor contributing nothing (task 130 scores 0 in 3 of 4 control reps; its one large
+negative pair is a zero-visit run in a cell where the floor never fired at all, so it is not the
+mechanism's), and searxng rather than serper as the search backend (both arms alike).
+
+*Infra note:* both paid search keys were exhausted when this ran (serper "Not enough credits",
+brave 402), so `create_search_backend` gained a `searxng` branch pointing at the keyless
+self-hosted instance. Before that, `SEARCH_PROVIDER=searxng` fell through to serper silently — any
+$0 local run set up that way would have had a DEAD search backend and would not have said so.
 
 ### E4 — Chunk size reconciliation — **RETIRED, no run needed**
 

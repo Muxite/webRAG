@@ -155,6 +155,18 @@ def test_factory_picks_brave_explicitly(monkeypatch):
     assert not isinstance(backend, ConnectorSearchSerper)
 
 
+def test_factory_picks_searxng_explicitly(monkeypatch):
+    """The keyless backend is reachable through the factory, not only by hand-instantiation:
+    a $0 local benchmark has no other search surface once the paid keys are exhausted."""
+    from agent.app.connector_search_searxng import ConnectorSearchXNG
+
+    monkeypatch.setenv("SEARCH_PROVIDER", "searxng")
+    monkeypatch.setenv("SEARXNG_URL", "http://searxng.test:8080")
+    backend = create_search_backend(ConnectorConfig())
+    assert isinstance(backend, ConnectorSearchXNG)
+    assert backend.url == "http://searxng.test:8080/search"
+
+
 def test_factory_falls_back_to_serper_on_unknown_provider(monkeypatch):
     monkeypatch.setenv("SEARCH_PROVIDER", "bing")
     assert isinstance(create_search_backend(ConnectorConfig()), ConnectorSearchSerper)

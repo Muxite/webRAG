@@ -485,6 +485,21 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "final_require_grounding": True,   # validity gate, on in every arm
         "got_dedup_enabled": False,        # the one axis under test
     },
+    # E3's arm (ASSUMPTION_AUDIT.md PART 5): `good_adaptive` with the memory-retrieval similarity
+    # floor set to the value the offline histogram calibrated (0.40, the knee of the distribution),
+    # so a paired run against `good_adaptive` isolates the floor and nothing else. Same
+    # profile-not-env-override reasoning as `good_adaptive_nodedup` above.
+    "good_adaptive_memfloor": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "memory_retrieval_similarity_floor": 0.40,   # the one axis under test (shipped: 0.0)
+    },
     # The DAG v2 shape-spectrum arm: `good_adaptive` plus the three new axes that let a
     # structured run span parallel breadth, sequential chains, AND the middle ground of
     # "several candidate approaches, some of which fail" — a playbook note in the expansion
