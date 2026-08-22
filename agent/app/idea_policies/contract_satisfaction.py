@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from agent.app.idea_policies.base import DetailKey, IdeaActionType
 from agent.app.idea_policies.candidate_coverage import _fuzzy_contains as fuzzy_contains
@@ -305,6 +305,7 @@ def _find_number_near(
     variants: Sequence[str],
     pattern: "re.Pattern[str]" = _NUMBER_RE,
     anchors: Sequence[str] = (),
+    reject: Optional[Callable[["re.Match[str]"], bool]] = None,
 ) -> Optional["re.Match[str]"]:
     """The number nearest a datum's own wording, within _NUMBER_WINDOW chars either side.
 
@@ -338,6 +339,14 @@ def _find_number_near(
     ignored when no anchor occurs in the evidence at all: a name the page never says cannot
     scope anything, and dropping the whole search on its absence would silently stop reading
     pages that spell the entity differently.
+
+    ``reject`` vetoes individual NUMBER occurrences, so a caller can rule out a number whose
+    surrounding wording makes it the wrong kind of figure while still letting a different
+    occurrence of the real value win (``alternative_branch._comparative_number`` uses it for
+    comparative clauses). Kept here rather than filtered by the caller because the choice among
+    occurrences happens inside this loop and there is nothing left to choose from afterwards;
+    what a rejected occurrence IS stays the caller's own vocabulary. Default ``None`` => every
+    existing caller, and ``_number_near``'s presence-only semantics, are unchanged.
     """
     if not variants:
         return pattern.search(evidence_low)
@@ -352,6 +361,8 @@ def _find_number_near(
             win_end = min(len(evidence_low), cue_match.end() + _NUMBER_WINDOW)
             cue_center = (cue_match.start() + cue_match.end()) / 2
             for num_match in pattern.finditer(evidence_low, win_start, win_end):
+                if reject is not None and reject(num_match):
+                    continue
                 num_center = (num_match.start() + num_match.end()) / 2
                 distance = abs(num_center - cue_center)
                 if best_distance is None or distance < best_distance:

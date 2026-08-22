@@ -584,6 +584,64 @@ _RACE_UNITS: Dict[str, str] = {
 _RACE_UNIT_WINDOW = 16
 
 
+#: Comparative adjectives whose "<n> <unit> X than ..." shape makes the number a DIFFERENCE,
+#: and whose "X than <n>" shape makes it a BOUND. Neither is the quantity being raced for.
+#: Kept to the measurement comparisons this corpus's bridge/telescope/mountain prose actually
+#: writes, not an exhaustive grammar — extend from attested wordings, as with
+#: :data:`_RACE_CUE_ALIASES`.
+_RACE_COMPARATIVES = (
+    "longer", "shorter", "wider", "narrower", "taller", "higher", "lower", "deeper",
+    "bigger", "smaller", "greater", "more", "less", "fewer",
+)
+
+#: Matched against the text immediately AFTER a number: "30 meters longer than the Golden Gate
+#: Bridge". Only the number's own UNIT word may intervene, which is what separates a stated
+#: difference from a stated VALUE that the same sentence then compares — "1310 metres, which is
+#: longer than the Golden Gate" has "which is" between the two and is correctly left alone. That
+#: distinction is the whole guard: rejecting the second shape would discard the sought figure.
+_RACE_COMPARATIVE_AFTER_RE = re.compile(
+    r"^[\s,]*(?:(?:%s)\.?\s+)?(?:%s)\s+than\b" % (
+        "|".join(re.escape(unit) for unit in sorted(_RACE_UNITS, key=len, reverse=True)),
+        "|".join(_RACE_COMPARATIVES),
+    )
+)
+
+#: Matched against the text immediately BEFORE a number: "more than 1310 m", "compared to 30 m".
+_RACE_COMPARATIVE_BEFORE_RE = re.compile(
+    r"(?:(?:%s)\s+than|compared\s+(?:to|with)|versus|vs\.?)[\s,]*$" % "|".join(_RACE_COMPARATIVES)
+)
+
+#: How much text either side of a number the comparative test reads. One clause's worth.
+_RACE_COMPARATIVE_WINDOW = 32
+
+
+def _comparative_number(evidence_low: str, match: Any) -> bool:
+    """Is this number occurrence part of a comparative clause rather than a stated value?
+
+    The 2026-08-22 fresh-data sweep found the one remaining live-reachable route to a FALSE
+    ``disagree``, the destructive direction :func:`race_value_evidence` is built to avoid. A real
+    task-150 search snippet states the raced-for figure twice — "a main span of 1310 meters" and
+    "With a main span of 1310 metres" — and once compares it: "The main span is 30 meters longer
+    than the Golden Gate Bridge". The comparative clause's own "main span" cue sits about ONE
+    character closer to its 30 than the first sentence's cue sits to its 1310, so entity-anchored
+    cue proximity returned 30 and reported a disagreement against a route that read 1310
+    correctly.
+
+    Used as ``_find_number_near``'s ``reject`` predicate, so a rejected occurrence loses to
+    another occurrence of the real value rather than being replaced by nothing. When EVERY
+    cue-proximate occurrence is comparative the datum yields no value at all and the verdict
+    degrades to ``single``/``unknown``: with no direct statement to read, a missed ``disagree``
+    is this mechanism's established safe failure and the difference figure is not the answer.
+    """
+    if match is None:
+        return False
+    after = evidence_low[match.end():match.end() + _RACE_COMPARATIVE_WINDOW]
+    if _RACE_COMPARATIVE_AFTER_RE.search(after):
+        return True
+    before = evidence_low[max(0, match.start() - _RACE_COMPARATIVE_WINDOW):match.start()]
+    return bool(_RACE_COMPARATIVE_BEFORE_RE.search(before))
+
+
 class _RaceValue(NamedTuple):
     """One member's answer to the asked-for quantity: normalized value plus its unit."""
 
@@ -727,7 +785,10 @@ def _member_value(evidence_low: str, variants: Sequence[str], anchors: Sequence[
     from agent.app.idea_policies.contract_satisfaction import _anchor_spans, _find_number_near
 
     present = _present_anchors(evidence_low, anchors)
-    match = _find_number_near(evidence_low, variants, _RACE_NUMBER_RE, anchors=present)
+    match = _find_number_near(
+        evidence_low, variants, _RACE_NUMBER_RE, anchors=present,
+        reject=lambda num: _comparative_number(evidence_low, num),
+    )
     parsed = _parse_race_value(evidence_low, match)
     if parsed is not None or not entity_fallback:
         return parsed
@@ -735,7 +796,12 @@ def _member_value(evidence_low: str, variants: Sequence[str], anchors: Sequence[
 
 
 def _measurement_near_anchor(evidence_low: str, spans: Sequence[Any]) -> Optional["_RaceValue"]:
-    """The unit-carrying number nearest an entity mention, within the anchor window."""
+    """The unit-carrying number nearest an entity mention, within the anchor window.
+
+    Comparative occurrences are skipped here for the same reason the cue search rejects them
+    (:func:`_comparative_number`): "30 meters longer than" carries a recognized unit, so the
+    unit filter alone does not keep a difference figure out of an unlabelled table row.
+    """
     from agent.app.idea_policies.contract_satisfaction import _ANCHOR_WINDOW
 
     best: Optional[_RaceValue] = None
@@ -747,6 +813,8 @@ def _measurement_near_anchor(evidence_low: str, spans: Sequence[Any]) -> Optiona
         for num in _RACE_NUMBER_RE.finditer(evidence_low, win_start, win_end):
             value = _parse_race_value(evidence_low, num)
             if value is None or not value.unit:
+                continue
+            if _comparative_number(evidence_low, num):
                 continue
             distance = abs((num.start() + num.end()) / 2 - anchor_center)
             if best_distance is None or distance < best_distance:

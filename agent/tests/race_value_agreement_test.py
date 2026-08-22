@@ -337,6 +337,103 @@ def test_the_anchor_argument_is_off_by_default_for_every_other_caller():
 
 
 # ======================================================================================
+# the 2026-08-22 fresh-data false positive: a comparative clause
+# ======================================================================================
+
+# The real Serper snippet block, from the fresh re-validation capture. It states the raced-for
+# figure TWICE and compares it once -- and the comparative clause's own "main span" cue sits
+# about one character closer to its "30" than the first sentence's cue sits to its "1310", so
+# nearest-cue proximity read the DIFFERENCE as the value.
+_COMPARATIVE_SNIPPET = (
+    "The bridge is 1380 meters long with a main span of 1310 meters, which is Norway's "
+    "longest. The main span is 30 meters longer than the Golden Gate Bridge.\n"
+    "The Hardanger Bridge in Norway. With a main span of 1310 metres, it is the 15th longest "
+    "suspension bridge in the world."
+)
+
+
+def test_a_comparative_clauses_difference_is_not_read_as_the_value():
+    """The live false ``disagree``: a search route quoting "30 meters longer than the Golden
+    Gate Bridge" against a route correctly reading 1,310 m. Both state the same span."""
+    _g, _p, members = _graph(
+        ("ROUTE 1 - the bridge's own article", _visit("https://en.wikipedia.org/x", _INFOBOX)),
+        ("ROUTE 2 - a web search", _search("hardanger bridge main span", _COMPARATIVE_SNIPPET)),
+        mandate=_DECOY_MANDATE,
+    )
+    evidence = alt.race_value_evidence(members, _DECOY_MANDATE)
+
+    assert evidence.verdict == alt.RACE_VALUE_AGREE
+    assert set(evidence.values.values()) == {"1310 m"}
+
+
+def test_the_comparative_occurrence_loses_to_the_stated_value_of_the_same_datum():
+    """Isolated: the guard REORDERS occurrences rather than dropping the search. The rejected
+    "30" is replaced by another occurrence of the figure the same text states directly."""
+    from agent.app.idea_policies.alternative_branch import _member_value
+
+    text = _COMPARATIVE_SNIPPET.lower()
+    assert _member_value(text, ("span", "main span"), ["hardanger"]).render() == "1310 m"
+
+
+def test_a_value_that_is_then_compared_is_still_read_as_the_value():
+    """The guard's own precision bar: "1,310 m, which is longer than X" STATES the span and then
+    compares it, unlike "30 m longer than X", which states only the difference. Only the unit
+    word may sit between the number and the comparative, so the two shapes stay separable."""
+    from agent.app.idea_policies.alternative_branch import _member_value
+
+    text = ("hardanger bridge has a main span of 1,310 m, which is longer than the golden "
+            "gate bridge.")
+    assert _member_value(text, ("span", "main span"), ["hardanger"]).render() == "1310 m"
+
+
+def test_a_bound_stated_before_the_number_is_rejected_too():
+    """The other direction of the same construction: "more than"/"compared to" introduce a
+    bound or a foreign entity's figure, not this entity's own value."""
+    from agent.app.idea_policies.alternative_branch import _comparative_number, _RACE_NUMBER_RE
+
+    for text in ("main span of more than 1,200 m",
+                 "main span, compared to 1,280 m for the older crossing"):
+        match = _RACE_NUMBER_RE.search(text)
+        assert _comparative_number(text, match), text
+
+
+def test_an_only_comparative_reading_goes_quiet_instead_of_disagreeing():
+    """When the ONLY cue-proximate number is a difference, no value is read at all and the
+    verdict degrades to ``single``. A missed ``disagree`` is this check's safe failure; using
+    the difference figure anyway is how a correct answer gets destroyed."""
+    _g, _p, members = _graph(
+        ("ROUTE 1 - the bridge's own article", _visit("https://en.wikipedia.org/x", _INFOBOX)),
+        ("ROUTE 2 - a web search", _search(
+            "hardanger bridge main span",
+            "The Hardanger Bridge's main span is 30 metres longer than the Golden Gate Bridge.")),
+        mandate=_DECOY_MANDATE,
+    )
+    evidence = alt.race_value_evidence(members, _DECOY_MANDATE)
+
+    assert evidence.verdict == alt.RACE_VALUE_SINGLE
+    assert set(evidence.values.values()) == {"1310 m"}
+
+
+def test_a_comparative_figure_cannot_answer_a_cue_less_table_row_either():
+    """The anchor fallback accepts any unit-carrying number near the entity, and a difference
+    carries a unit, so it needs the same guard as the cue search."""
+    from agent.app.idea_policies.alternative_branch import _member_value
+
+    row = "hardanger bridge is 30 m longer than the golden gate bridge.\n"
+    assert _member_value(row, ("span", "main span"), ["hardanger"],
+                         entity_fallback=True) is None
+
+
+def test_the_reject_argument_is_off_by_default_for_every_other_caller():
+    """The shared cue search vetoes nothing unless a caller passes a predicate."""
+    from agent.app.idea_policies.contract_satisfaction import _find_number_near
+
+    page = "widget catalogue: length 30 mm longer than the mk i."
+    assert _find_number_near(page, ("length",)).group() == "30"
+    assert _find_number_near(page, ("length",), reject=lambda m: m.group() == "30") is None
+
+
+# ======================================================================================
 # a cross-language route
 # ======================================================================================
 
