@@ -85,6 +85,20 @@ def _base():
         "merge_goal_evaluation_first_enabled": False,
         "verify_reason_first_enabled": False,
         "got_reexpand_followup_reason_first_enabled": False,
+        # strong-agent-trace mechanisms (numeric_provenance/race_value_agreement/chain_closure
+        # READY, candidate_roster has a known accepted residual gap): all shipped OFF, the four
+        # axes `good_adaptive_tracemech` (first three) selects among.
+        "merge_require_numeric_provenance_enabled": False,
+        "merge_race_value_agreement_enabled": False,
+        "merge_candidate_roster_enabled": False,
+        "merge_chain_closure_enabled": False,
+        # D4 retry-after-skip and D6 early-exit-respects-grounding: shipped OFF, the two axes
+        # `good_adaptive_safetynet` sets.
+        "merge_retry_after_skip_enabled": False,
+        "early_exit_respects_grounding_enabled": False,
+        # T1-5 beam-width raw-score signal: shipped OFF, the one axis
+        # `good_adaptive_beamraw` sets.
+        "got_beam_spread_uses_raw_score_enabled": False,
     }
 
 
@@ -685,3 +699,72 @@ def test_contract_veto_requires_datum_explicit_falsey_forces_off():
             s, environ={"IDEA_TEST_GOT_CONTRACT_VETO_REQUIRES_DATUM": falsey}
         )
         assert s["got_contract_veto_requires_datum_enabled"] is False, falsey
+
+
+def test_arm_good_adaptive_tracemech_isolates_exactly_the_three_ready_mechanisms():
+    """The strong-agent-trace bundle must add only numeric_provenance + race_value_agreement +
+    chain_closure over `good_adaptive` -- candidate_roster is deliberately excluded."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    arm = _GOT_ARM_PROFILES["good_adaptive_tracemech"]
+    added = set(arm) - set(base)
+    assert added == {
+        "merge_require_numeric_provenance_enabled",
+        "merge_race_value_agreement_enabled",
+        "merge_chain_closure_enabled",
+    }
+    assert set(base) - set(arm) == set()
+    assert all(arm[k] == v for k, v in base.items())
+    assert all(arm[k] is True for k in added)
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_tracemech"})
+    for key in added:
+        assert settings[key] is True
+    assert settings["merge_candidate_roster_enabled"] is False
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    for key in added:
+        assert control[key] is False
+
+
+def test_arm_good_adaptive_safetynet_isolates_retry_and_early_exit_grounding():
+    """D4's retry-after-skip and D6's early-exit-respects-grounding, bundled because neither
+    shares a code path with the other or with the trace-mechanism bundle above."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    arm = _GOT_ARM_PROFILES["good_adaptive_safetynet"]
+    added = set(arm) - set(base)
+    assert added == {"merge_retry_after_skip_enabled", "early_exit_respects_grounding_enabled"}
+    assert set(base) - set(arm) == set()
+    assert all(arm[k] == v for k, v in base.items())
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_safetynet"})
+    assert settings["merge_retry_after_skip_enabled"] is True
+    assert settings["early_exit_respects_grounding_enabled"] is True
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    assert control["merge_retry_after_skip_enabled"] is False
+    assert control["early_exit_respects_grounding_enabled"] is False
+
+
+def test_arm_good_adaptive_beamraw_isolates_the_beam_spread_signal():
+    """T1-5's arm must isolate `got_beam_spread_uses_raw_score_enabled` and nothing else."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    arm = _GOT_ARM_PROFILES["good_adaptive_beamraw"]
+    assert set(arm) - set(base) == {"got_beam_spread_uses_raw_score_enabled"}
+    assert set(base) - set(arm) == set()
+    assert all(arm[k] == v for k, v in base.items())
+    assert arm["got_beam_spread_uses_raw_score_enabled"] is True
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_beamraw"})
+    assert settings["got_beam_spread_uses_raw_score_enabled"] is True
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    assert control["got_beam_spread_uses_raw_score_enabled"] is False

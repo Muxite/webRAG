@@ -514,6 +514,56 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "final_require_grounding": True,   # validity gate, on in every arm
         "visit_sibling_url_dedup": True,   # the one axis under test (shipped: False)
     },
+    # The strong-agent-trace bundle (project_strong_agent_trace_guidance): the three mechanisms
+    # that cleared capture-replay + isolated live-probe + full end-to-end validation as a set
+    # without double-penalizing the same completion (they share one enforcement path through the
+    # merge consistency guard). `candidate_roster` is deliberately excluded -- it has a known,
+    # accepted-as-safe residual gap that was never re-validated alongside these three, and mixing
+    # a fourth axis into this arm would make a positive/negative result impossible to attribute.
+    "good_adaptive_tracemech": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "merge_require_numeric_provenance_enabled": True,
+        "merge_race_value_agreement_enabled": True,
+        "merge_chain_closure_enabled": True,
+    },
+    # The "safety net" bundle: two mechanisms that each decline a premature/contradictory
+    # termination rather than change what evidence is gathered -- D4's retry-after-skip
+    # (merge.py) and D6's early-exit-respects-grounding (idea_engine.py). Bundled together
+    # because both are pure "don't stop too early" gates with no shared code path and no
+    # plausible interaction, unlike the trace-mechanism bundle above.
+    "good_adaptive_safetynet": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "merge_retry_after_skip_enabled": True,
+        "early_exit_respects_grounding_enabled": True,
+    },
+    # T1-5's arm (ASSUMPTION_AUDIT.md PART 1): `good_adaptive` with the dynamic beam's spread
+    # computation reading the judge's pre-cap `raw_score` instead of the capped `score`, so a
+    # paired run against `good_adaptive` isolates the beam-width signal fix and nothing else.
+    "good_adaptive_beamraw": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "got_beam_spread_uses_raw_score_enabled": True,   # the one axis under test (shipped: False)
+    },
     # The DAG v2 shape-spectrum arm: `good_adaptive` plus the three new axes that let a
     # structured run span parallel breadth, sequential chains, AND the middle ground of
     # "several candidate approaches, some of which fail" — a playbook note in the expansion
