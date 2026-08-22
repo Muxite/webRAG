@@ -478,6 +478,20 @@ AXES = {
              "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
         ],
     },
+    # 2026-08-22, E1 confirmation (ASSUMPTION_AUDIT.md PART 5): the dedup A/B repeated on a
+    # SECOND model tier. The original finding (-0.157, p=0.0007) is one model (gpt-4.1-nano)
+    # on one task set, and it was measured on pre-Cycle-19 code, before the all-flagged batch
+    # stopped collapsing to ``candidates[:1]``. A local model costs $0 in LLM spend, which is
+    # what lets this run at all. Drive with
+    #   --axis e1_dedup_local --arms good_adaptive,good_adaptive_nodedup --tasks <core24 subset>
+    # so the two arms differ in ``got_dedup_enabled`` and nothing else.
+    "e1_dedup_local": {
+        "json_telemetry": True,
+        "ladders": [
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 3, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
+    },
 }
 
 
