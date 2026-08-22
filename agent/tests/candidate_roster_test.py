@@ -385,6 +385,129 @@ def test_a_dated_statement_elsewhere_in_the_run_satisfies_the_year_requirement()
     assert "2020" in _entry(audit, "Arecibo Telescope").disqualifier_quote
 
 
+#: The second live shape (2026-08-22 fresh-completion re-validation): the WHOLE roster in one
+#: sentence, which is how models actually report it. Arecibo's "collapsed" is the only
+#: event-shaped clause in it.
+_ONE_SENTENCE_SUMMARY = (
+    "Arecibo Telescope has collapsed, RATAN-600 is operational, the Green Bank Telescope is "
+    "operational, and FAST is operational with a 300 m illuminated aperture, so FAST is the "
+    "survivor"
+)
+
+
+def _wide_audit(summary):
+    """The real pages cross-reference each other (FAST's page names the telescopes it beat), so
+    a whole-roster sentence corroborates against any one of them -- which is why the live shape
+    reached the year gate at all instead of stopping at ``unsourced``."""
+    graph = _graph()
+    for node in graph.iter_depth_first():
+        result = node.details.get(DetailKey.ACTION_RESULT.value)
+        if isinstance(result, dict) and result.get("content_full"):
+            result["content_full"] += (
+                " Comparison: the Arecibo Telescope collapsed, RATAN-600 is a ring, the Green "
+                "Bank Telescope is steerable and FAST is the largest survivor, operational, "
+                "with a 300 m illuminated aperture circle."
+            )
+    return audit_candidate_roster(graph, MANDATE, summary, _children())
+
+
+def test_one_candidates_terminal_event_does_not_bleed_onto_its_siblings():
+    """Bug A: ``_year_required`` used to read the whole multi-candidate sentence, so one
+    "collapsed" forced a year onto the three ongoing-state clauses that cannot have one."""
+    audit = _wide_audit(_ONE_SENTENCE_SUMMARY)
+    for name in ("RATAN-600", "Green Bank Telescope", "FAST"):
+        assert _entry(audit, name).status == DISPOSED, name
+    # Arecibo's own clause is still event-shaped and still dateless.
+    assert _entry(audit, "Arecibo Telescope").status == UNDATED
+    assert [line for line in audit.missing_requirements() if "Arecibo" in line]
+    assert not any("RATAN-600" in line or "Green Bank" in line
+                   for line in audit.missing_requirements())
+
+
+def test_a_clause_is_scoped_to_its_own_candidate():
+    from agent.app.idea_policies.candidate_roster import _candidate_clause
+
+    others = ["Arecibo Telescope", "Green Bank Telescope", "FAST"]
+    assert _candidate_clause(_ONE_SENTENCE_SUMMARY, ["RATAN-600"], others) == (
+        "RATAN-600 is operational"
+    )
+    assert _candidate_clause(
+        _ONE_SENTENCE_SUMMARY, ["Arecibo Telescope"], ["RATAN-600", "FAST"],
+    ) == "Arecibo Telescope has collapsed"
+    # A continuation clause naming nobody belongs to the candidate before it.
+    assert _candidate_clause(
+        "Arecibo Telescope collapsed in 2020, RATAN-600 uses a ring reflector, not a filled "
+        "aperture",
+        ["RATAN-600"], ["Arecibo Telescope"],
+    ) == "RATAN-600 uses a ring reflector, not a filled aperture"
+    # Nothing to separate: a single-candidate statement is returned untouched.
+    single = "RATAN-600 is a 576 m ring reflector, in operation since 1974"
+    assert _candidate_clause(single, ["RATAN-600"], others) == single
+
+
+def test_a_coordinated_subject_falls_open_instead_of_scoping_to_a_bare_name():
+    """A real live wording: the two candidates SHARE one predicate, so RATAN-600's own clause is
+    just its name. Scoping to a name asserts nothing, so the whole statement is kept."""
+    from agent.app.idea_policies.candidate_roster import _candidate_clause
+
+    shared = ("The RATAN-600 and FAST telescopes are operational but do not meet the criteria "
+              "of being the largest filled-aperture single-dish radio telescope")
+    assert _candidate_clause(shared, ["RATAN-600"], ["FAST"]) == shared
+
+
+def test_a_dated_sibling_clause_does_not_satisfy_this_candidates_year():
+    """The scoping cuts both ways: Arecibo's date is not RATAN-600's evidence."""
+    audit = _wide_audit(
+        "Arecibo Telescope collapsed on 1 December 2020, RATAN-600 is the largest ring "
+        "telescope, the Green Bank Telescope is operational, and FAST is the survivor at 500 m"
+    )
+    assert _entry(audit, "Arecibo Telescope").status == DISPOSED
+    assert _entry(audit, "RATAN-600").status == UNDATED
+
+
+#: The third live shape: the disqualifier the MANDATE ITSELF supplies for RATAN-600 is a
+#: geometry fact. It has no date and never will.
+_STRUCTURAL_SUMMARY = (
+    "Arecibo Telescope collapsed on 1 December 2020. "
+    "RATAN-600 uses a ring reflector, not a filled-aperture dish. "
+    "The Green Bank Telescope is a 100 m fully steerable dish, smaller than the others. "
+    "FAST is the survivor, a 500 m filled-aperture dish with a 300 m illuminated circle."
+)
+
+
+def test_a_structural_disqualifier_needs_no_year():
+    """Bug B: a categorical fact about what KIND of thing a candidate is cannot be dated, and
+    on task 122 it is the elimination the mandate hands the run."""
+    from agent.app.idea_policies.candidate_roster import _YEAR_RE, _year_required
+
+    assert _year_required("RATAN-600 uses a ring reflector, not a filled-aperture dish") is False
+    assert _year_required("Green Bank is a smaller fully steerable dish") is False
+    assert _year_required("It is a ring antenna rather than a continuous dish") is False
+
+    audit = _audit(_STRUCTURAL_SUMMARY)
+    for name in ("RATAN-600", "Green Bank Telescope", "FAST"):
+        entry = _entry(audit, name)
+        assert entry.status == DISPOSED, name
+        assert not _YEAR_RE.search(entry.disqualifier_quote), name
+    assert audit.complete is True
+    assert audit.missing_requirements() == []
+
+
+def test_a_structural_cue_does_not_rescue_a_terminal_event():
+    """The exemption is a third category, not a loosening: a dateable event still owes its
+    date however much geometry the same clause carries."""
+    from agent.app.idea_policies.candidate_roster import _year_required
+
+    assert _year_required(
+        "Arecibo's filled-aperture dish collapsed after cable failures"
+    ) is True
+    audit = _audit(_STRUCTURAL_SUMMARY.replace(
+        "collapsed on 1 December 2020",
+        "collapsed after cable failures and its filled-aperture dish is gone",
+    ))
+    assert _entry(audit, "Arecibo Telescope").status == UNDATED
+
+
 # --- B7: the magnitude tripwire ---------------------------------------------------------
 
 def test_a_larger_undisqualified_candidate_trips_the_wire():

@@ -100,6 +100,24 @@ _NEGATED_STATE_RE = re.compile(
     r"(?:\w+\s+){0,2}" + _STATE_CUE + r"\b"
 )
 
+#: A STRUCTURAL/CATEGORICAL disposition: a fact about what KIND of thing the candidate is. Task
+#: 122's mandate supplies two of these itself ("one is a ring reflector (not a filled aperture),
+#: and one is a smaller fully steerable dish") -- geometry facts that carry no date and never
+#: will, so a year requirement can only ever be a false positive on them. Cues are taken from
+#: what real disqualifiers in this repo's tasks actually say: an explicit category negation
+#: ("not a filled aperture", "rather than a continuous dish") and the named alternative
+#: geometries themselves.
+_STRUCTURAL_RE = re.compile(
+    r"\b(?:"
+    r"(?:not|rather\s+than)\s+(?:a|an)\s+(?:\w+[-\s]){0,3}"
+    r"(?:aperture|dish|reflector|telescope|antenna|array)|"
+    r"ring\s+(?:reflector|antenna|dish)|"
+    r"(?:fully\s+)?steerable|"
+    r"filled[-\s]aperture|"
+    r"phased\s+array|interferometer"
+    r")\b"
+)
+
 #: A TERMINAL EVENT: something dateable happened to the candidate and knocked it out. This is
 #: the B8 target -- "Arecibo is out because it collapsed" recalled from parametric memory with
 #: no date is indistinguishable from a stale guess, so the year stays load-bearing here.
@@ -354,6 +372,67 @@ def _corroborated(statement: str, candidate: str, page: _Page) -> bool:
     return hits >= 1 and (hits / len(tokens)) >= _CORROBORATION_RATIO
 
 
+#: Clause boundaries WITHIN one statement. ``_SENTENCE_RE`` has already cut at terminal
+#: punctuation, so what is left to separate are the coordinated clauses of a single sentence --
+#: which is how a model actually reports a four-candidate roster ("Arecibo has collapsed,
+#: RATAN-600 is operational, and FAST is operational").
+_CLAUSE_RE = re.compile(
+    r",\s*|\s+(?:and|but|while|whereas|however|although|though)\s+", re.IGNORECASE
+)
+
+_MINE, _OTHER, _UNOWNED = 1, -1, 0
+
+
+def _candidate_clause(statement: str, aliases: Sequence[str],
+                      other_aliases: Sequence[str]) -> str:
+    """The portion of ``statement`` that speaks about THIS candidate.
+
+    The 2026-08-22 re-validation found a cross-candidate cue bleed: models routinely put the
+    whole roster in ONE sentence, and :func:`_year_required` read all of it, so Arecibo's
+    "collapsed" forced a year onto the other three candidates' dateless ongoing-state clauses.
+    The scoping is in the spirit of ``alternative_branch``'s entity-anchored number windows
+    (commit ``4bc25c8f``) -- keep only the text the named entity owns -- but clause-based rather
+    than a character window, because a four-candidate sentence fits inside any useful window.
+
+    Clauses naming no candidate are CONTINUATIONS and attach to the nearest named clause,
+    preceding first ("RATAN-600 uses a ring reflector, not a filled aperture" is one
+    disposition). When no OTHER candidate is named at all there is nothing to separate, so the
+    statement is returned untouched -- single-candidate statements behave exactly as before.
+
+    Ownership uses the same ``_fuzzy_contains`` name match the mention list is built from, so a
+    clause that shortens a candidate's name past recognition ("Arecibo" for "Arecibo
+    Telescope") owns nothing and the scoping fails OPEN, back to the whole statement -- the
+    same name that would not have earned a mention of its own either.
+    """
+    pieces = _CLAUSE_RE.split(statement)
+    owners = []
+    for piece in pieces:
+        if any(_fuzzy_contains(alias, piece) for alias in aliases):
+            owners.append(_MINE)
+        elif any(_fuzzy_contains(alias, piece) for alias in other_aliases):
+            owners.append(_OTHER)
+        else:
+            owners.append(_UNOWNED)
+    if _OTHER not in owners or _MINE not in owners:
+        return statement
+    for i, owner in enumerate(owners):
+        if owner != _UNOWNED:
+            continue
+        back = next((o for o in reversed(owners[:i]) if o != _UNOWNED), None)
+        fwd = next((o for o in owners[i + 1:] if o != _UNOWNED), None)
+        owners[i] = back if back is not None else fwd
+    scoped = ", ".join(
+        piece for piece, owner in zip(pieces, owners) if owner == _MINE and piece.strip()
+    )
+    # A COORDINATED SUBJECT ("The RATAN-600 and FAST telescopes are operational", a real live
+    # wording) leaves this candidate holding a bare name with the shared predicate parked in the
+    # sibling's clause. Scoping to a name says nothing, so fall open to the whole statement.
+    drop = {tok for alias in aliases for tok in _norm(alias).split()}
+    if not _content_tokens(scoped, drop):
+        return statement
+    return scoped
+
+
 def _year_required(statement: str) -> bool:
     """Does this disposition owe a year token (B8)?
 
@@ -376,11 +455,19 @@ def _year_required(statement: str) -> bool:
     descriptive claim with no cue either way -- keeps the requirement, which is what preserves
     the original target: the fix narrows the rule to statements that positively assert an
     ongoing state, it does not invert the default.
+
+    A second exemption, from the 2026-08-22 re-validation: a STRUCTURAL/CATEGORICAL disposition
+    ("RATAN-600 uses a ring reflector, not a filled-aperture dish") is a fact about what kind of
+    thing the candidate is. It has no date, it will never acquire one, and on task 122 it is the
+    disqualifier the MANDATE ITSELF hands the run -- so demanding a year for it killed a correct
+    answer outright. Like the ongoing-state exemption this is a THIRD category, not a loosening:
+    a terminal-event or negated-state reading still wins, so "Arecibo collapsed" owes its date
+    whatever else the clause says about geometry.
     """
     low = statement.lower()
     if _TERMINAL_EVENT_RE.search(low) or _NEGATED_STATE_RE.search(low):
         return True
-    return not _ONGOING_STATE_RE.search(low)
+    return not (_ONGOING_STATE_RE.search(low) or _STRUCTURAL_RE.search(low))
 
 
 def _magnitude(text: str) -> Optional[float]:
@@ -473,7 +560,8 @@ def audit_candidate_roster(
 
     for name in req.roster_candidates:
         audit.entries.append(
-            _entry_for(name, pages, statements, req.time_indexed, str(mandate or ""))
+            _entry_for(name, pages, statements, req.time_indexed, str(mandate or ""),
+                       req.roster_candidates)
         )
     _apply_magnitude_tripwire(audit)
     return audit
@@ -485,9 +573,15 @@ def _entry_for(
     statements: Sequence[str],
     time_indexed: bool,
     mandate: str,
+    roster: Sequence[str] = (),
 ) -> RosterEntry:
     entry = RosterEntry(candidate=candidate)
     aliases = _aliases(mandate, candidate)
+    others = [
+        alias
+        for name in roster if _norm(name) != _norm(candidate)
+        for alias in _aliases(mandate, name)
+    ]
     matched = [
         page for page in pages
         if any(_fuzzy_contains(alias, page.identity) for alias in aliases)
@@ -517,7 +611,10 @@ def _entry_for(
         )
         if page is None:
             continue
-        dated = bool(_YEAR_RE.search(mention)) or not _year_required(mention)
+        # Both halves of the date test read the candidate's OWN clause: a sibling's terminal
+        # event must not impose a year here, and a sibling's date must not satisfy one either.
+        clause = _candidate_clause(mention, aliases, others)
+        dated = bool(_YEAR_RE.search(clause)) or not _year_required(clause)
         if not time_indexed or dated:
             best, status = mention, DISPOSED
             if page.url:
