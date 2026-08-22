@@ -545,6 +545,44 @@ def test_a_disqualified_larger_candidate_never_trips_the_wire():
     assert audit.magnitude_tripwire == []
 
 
+def test_a_magnitude_is_read_from_the_candidates_own_clause():
+    """The residual half of Fix A (2026-08-22): ``magnitude_m`` used to read the WHOLE matched
+    statement, so on the one-sentence roster shape every candidate inherited the sentence's FIRST
+    number -- FAST's "300 m" -- as its own size, and the B7 tripwire compared the survivor
+    against three copies of the survivor's own figure. Each clause here owns a different number
+    (or none), so a per-candidate reading and a whole-sentence one disagree on every entry."""
+    summary = (
+        "Arecibo Telescope has collapsed, RATAN-600 is a 576 m ring reflector, the Green Bank "
+        "Telescope is a 100 m steerable dish, and FAST is operational with a 300 m illuminated "
+        "aperture, so FAST is the survivor"
+    )
+    audit = _wide_audit(summary)
+    assert _entry(audit, "RATAN-600").magnitude_m == 576.0
+    assert _entry(audit, "Green Bank Telescope").magnitude_m == 100.0
+    assert _entry(audit, "FAST").magnitude_m == 300.0
+    # Arecibo's own clause carries no figure, so the mandate's own "305 m" stands in -- rather
+    # than a sibling's number arriving as if the run had read it off Arecibo's page.
+    assert _entry(audit, "Arecibo Telescope").magnitude_m == 305.0
+
+
+def test_a_bled_magnitude_no_longer_manufactures_a_tripwire_verdict():
+    """The downstream consequence, on the shape where the bleed HIDES a real gap: reading the
+    whole sentence gave RATAN-600 (really 576 m) the first clause's 100 m, so the candidate that
+    actually dwarfs the elected survivor silently failed to outrank it."""
+    audit = _wide_audit(
+        "The Green Bank Telescope is a 100 m steerable dish, RATAN-600 is a 576 m ring "
+        "telescope, and Arecibo Telescope has collapsed. "
+        "FAST is the survivor, operational with a 300 m illuminated aperture"
+    )
+    ratan = _entry(audit, "RATAN-600")
+    assert ratan.magnitude_m == 576.0
+    assert _entry(audit, "FAST").magnitude_m == 300.0
+    assert ratan.status == UNDATED           # a bare descriptive clause still owes its year
+    assert "RATAN-600" in audit.magnitude_tripwire
+    assert any("RATAN-600" in line and "LARGER than the elected survivor" in line
+               for line in audit.missing_requirements())
+
+
 def test_no_identifiable_survivor_means_no_tripwire():
     """Fail open: with nobody elected there is nothing to outrank."""
     summary = _COMPLETE_SUMMARY.replace("FAST is the survivor:", "FAST is described as")

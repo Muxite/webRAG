@@ -626,7 +626,12 @@ def _entry_for(
                 entry.source_url = page.url
     entry.disqualifier_quote = best
     entry.status = status
-    entry.magnitude_m = _magnitude(best)
+    # The magnitude is read from the candidate's OWN clause for the same reason the date test is
+    # (2026-08-22): on a one-sentence roster ``_magnitude`` takes the first number in the whole
+    # sentence, so every candidate inherits whichever figure was written first and the B7
+    # tripwire compares the survivor against copies of itself. A clause with no figure of its own
+    # falls back to the mandate's, which is what the run cannot have invented.
+    entry.magnitude_m = _magnitude(_candidate_clause(best, aliases, others))
     if entry.magnitude_m is None:
         entry.magnitude_m = _mandate_magnitude(mandate, candidate)
     return entry
