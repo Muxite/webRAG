@@ -434,6 +434,104 @@ def test_the_reject_argument_is_off_by_default_for_every_other_caller():
 
 
 # ======================================================================================
+# the 2026-08-22 end-to-end run's false positive: a unit-free citation number
+# ======================================================================================
+
+# The real shape of the 150-on-rep2 cell: a ranked-list article whose REFERENCE section holds a
+# citation title containing the cue word ("a long span suspension bridge over the Danube") and,
+# right beside it, a journal VOLUME number with no unit. The only anchor the page and the
+# mandate share down there is the weak country name, so the anchored cue search read "17" as
+# this bridge's main span while the entity's own table row -- carrying the real 1,310 m -- was
+# never consulted, because the cue search had already "succeeded".
+_CITED_LIST = (
+    "List of longest suspension bridge spans.\n"
+    + "".join(f"{i} Some Other Bridge {1400 + i} m (4,600 ft) 19{i} Somewhere, Elsewhere\n"
+             for i in range(60, 80))
+    + "Tsing Ma Bridge 1,377 m (4,518 ft) 1997 Tsing Yi, Hong Kong\n"
+    "Hardanger Bridge 1,310 m (4,298 ft) 2013 Ulvik - Eidfjord, Vestland\n"
+    "Verrazzano-Narrows Bridge 1,298 m (4,260 ft) 1964 New York City, New York\n"
+    "References\n"
+    "Anderson, J. Suspension bridge engineering. Building Digest, volume nine, pages ten to "
+    "twenty. Archived from the original on the fourth of July. Retrieved on the same day.\n"
+    "Berg, K. Cable geometry of long crossings. Engineering Notes, volume seven, pages one to "
+    "thirty. Archived from the original. Retrieved in early spring.\n"
+    "Christensen, L. Deck stiffening. Bridge Review, volume five. Archived from the original "
+    "on an unrecorded date. Retrieved much later by a different editor.\n"
+    "Torroja, E. \"A long span suspension bridge over the Danube in Norway\". Informes de la "
+    "Construccion 17 (160). Archived from the original.\n"
+    "Kolstad, P. Cable anchorage practice. Structural Notes, volume four. Archived.\n"
+)
+
+
+def test_a_unit_free_citation_number_does_not_beat_the_entitys_real_measurement():
+    """The live false ``disagree``: a journal volume read as a bridge's main span.
+
+    Both routes genuinely state 1,310 m. Preferring a UNIT-CARRYING reading sends the ranked
+    list through the unit-requiring table-row fallback it should have reached in the first
+    place, so the two routes now confirm each other instead of contradicting.
+    """
+    from agent.app.idea_policies.alternative_branch import _RACE_NUMBER_RE, _member_value
+    from agent.app.idea_policies.contract_satisfaction import _find_number_near
+
+    page = _CITED_LIST.lower()
+    anchors = alt._entity_anchors(_DECOY_MANDATE)
+    present = alt._present_anchors(page, anchors)
+    assert present == ["hardanger", "norway"], "fixture: a weak country anchor is in play"
+    assert _find_number_near(
+        page, ("span", "main span"), _RACE_NUMBER_RE, anchors=present,
+        reject=lambda num: alt._comparative_number(page, num),
+    ).group() == "17", "fixture: cue proximity alone reads the citation's volume number"
+
+    assert _member_value(page, ("span", "main span"), anchors,
+                         entity_fallback=True).render() == "1310 m"
+
+    _g, _p, members = _graph(
+        ("ROUTE 1 - the bridge's own article", _visit("https://en.wikipedia.org/x", _INFOBOX)),
+        ("ROUTE 2 - the ranked list", _visit("https://en.wikipedia.org/y", _CITED_LIST)),
+        mandate=_DECOY_MANDATE,
+    )
+    evidence = alt.race_value_evidence(members, _DECOY_MANDATE)
+
+    assert evidence.verdict == alt.RACE_VALUE_AGREE
+    assert set(evidence.values.values()) == {"1310 m"}
+
+
+def test_a_unit_free_reading_is_never_weighed_against_a_measurement():
+    """The backstop for the datums that get no table-row fallback (secondary datums only get
+    the cue search), so a unit-free reading can still survive extraction there. A bare number
+    is not a contradicting measurement, it is no measurement -- ``unknown``, never
+    ``disagree``, exactly as two DIFFERENT known units already report."""
+    from agent.app.idea_policies.alternative_branch import _member_value, _RaceValue, _verdict_for
+
+    page = _CITED_LIST.lower()
+    unscoped = _member_value(page, ("span", "main span"), alt._entity_anchors(_DECOY_MANDATE))
+    assert unscoped is not None and unscoped.render() == "17", (
+        "fixture: with no fallback offered, the citation number is still what the cues reach"
+    )
+    assert _verdict_for({"a": unscoped, "b": _RaceValue(1310.0, "m")}) == alt.RACE_VALUE_UNKNOWN
+
+
+def test_two_unit_free_readings_still_compare_with_each_other():
+    """The guard is a mismatch test, not a units-required rule: whole datum classes are written
+    with no unit this module recognizes, and two routes reading a population off two pages are
+    comparing the same kind of number as each other."""
+    mandate = "What is the population of Ulvik municipality?"
+    _g, _p, agreeing = _graph(
+        ("Read the census page", _visit("https://a.example/x", "Ulvik: population 1,082 (2023).")),
+        ("Read the almanac", _visit("https://b.example/x", "Ulvik has a population of 1082.")),
+        mandate=mandate,
+    )
+    assert alt.race_value_agreement(agreeing, mandate) == alt.RACE_VALUE_AGREE
+
+    _g2, _p2, differing = _graph(
+        ("Read the census page", _visit("https://a.example/x", "Ulvik: population 1,082 (2023).")),
+        ("Read the almanac", _visit("https://b.example/x", "Ulvik has a population of 2,140.")),
+        mandate=mandate,
+    )
+    assert alt.race_value_agreement(differing, mandate) == alt.RACE_VALUE_DISAGREE
+
+
+# ======================================================================================
 # a cross-language route
 # ======================================================================================
 

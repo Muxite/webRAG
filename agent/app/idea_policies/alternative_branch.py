@@ -559,10 +559,10 @@ RACE_VALUE_AGREEMENT = "race_value_agreement"
 _RACE_NUMBER_RE = re.compile("\\d{1,3}(?:[ \u00a0\u202f,]\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?")
 
 #: Unit word (lowercased, punctuation-stripped) -> canonical unit. Only the unit token sitting
-#: immediately after the number is read. Two members whose units are BOTH known and different
-#: are not comparable at all (1,310 m against 4,298 ft is one agreeing fact written twice), so
-#: that pair reports ``unknown`` rather than a false ``disagree``; unit-free numbers stay
-#: comparable with anything, since "1310" beside "1,310 m" is the ordinary case.
+#: immediately after the number is read. Two members whose units differ are not comparable at
+#: all — 1,310 m against 4,298 ft is one agreeing fact written twice, and 1,310 m against a
+#: bare "17" is a measurement against something that was never shown to be one — so such a pair
+#: reports ``unknown`` rather than a false ``disagree`` (see :func:`_verdict_for`).
 _RACE_UNITS: Dict[str, str] = {
     "m": "m", "metre": "m", "metres": "m", "meter": "m", "meters": "m",
     "km": "km", "kilometre": "km", "kilometres": "km", "kilometer": "km", "kilometers": "km",
@@ -751,10 +751,19 @@ _VERDICT_PRECEDENCE = (RACE_VALUE_AGREE, RACE_VALUE_DISAGREE, RACE_VALUE_SINGLE,
 
 
 def _verdict_for(values: Dict[str, _RaceValue]) -> str:
-    """One datum's verdict from the members that returned a value for it."""
+    """One datum's verdict from the members that returned a value for it.
+
+    Members whose units differ are not comparing the same thing and report ``unknown``. The
+    empty unit counts as a unit here, which is the 2026-08-22 end-to-end run's finding: a
+    member reading a bare "17" out of a reference citation is not contradicting a member
+    reading "1,310 m", it is failing to state a measurement at all, and calling that
+    ``disagree`` destroys a correct answer for the reason this whole check is asymmetric
+    about. Two members that BOTH read a unit-free number (a population, an area written
+    ``km2``) still compare, since neither reading claims a unit the other lacks.
+    """
     if len(values) < 2:
         return RACE_VALUE_SINGLE
-    if len({value.unit for value in values.values() if value.unit}) > 1:
+    if len({value.unit for value in values.values()}) > 1:
         return RACE_VALUE_UNKNOWN
     distinct = {round(value.value, 6) for value in values.values()}
     return RACE_VALUE_AGREE if len(distinct) == 1 else RACE_VALUE_DISAGREE
@@ -781,18 +790,47 @@ def _member_value(evidence_low: str, variants: Sequence[str], anchors: Sequence[
 
     Never falls back to the unanchored search once an anchor is present: reading a number from
     somewhere else on the page is the failure this scoping exists to remove.
+
+    A UNIT-CARRYING reading is preferred over a unit-free one at every step, which is the
+    2026-08-22 end-to-end run's fix. A weak anchor (a country name, three hits) landed beside
+    a reference citation whose title happens to contain the cue word — "a long span suspension
+    bridge over the Danube", *Informes de la Construccion* **17** (160) — so the nearest
+    cue-proximate number was a journal VOLUME, and the entity's real ``1,310 m`` table row
+    never got read because the cue search had already "succeeded". The unit is the same
+    evidence :func:`_measurement_near_anchor` already demands of an unlabelled row; ordering
+    the three readings by it costs nothing and recovers the real value. A unit-free cue
+    reading is still accepted LAST rather than dropped, because whole datum classes are
+    written without any unit this module recognizes (a population, an area written ``km2``)
+    and silencing them would be a capability regression, not a precision gain — the
+    unit-mismatch guard in :func:`_verdict_for` is what keeps such a reading from ever being
+    weighed against a measurement.
     """
     from agent.app.idea_policies.contract_satisfaction import _anchor_spans, _find_number_near
 
     present = _present_anchors(evidence_low, anchors)
-    match = _find_number_near(
-        evidence_low, variants, _RACE_NUMBER_RE, anchors=present,
-        reject=lambda num: _comparative_number(evidence_low, num),
-    )
-    parsed = _parse_race_value(evidence_low, match)
-    if parsed is not None or not entity_fallback:
+
+    def cue_value(require_unit: bool) -> Optional["_RaceValue"]:
+        return _parse_race_value(evidence_low, _find_number_near(
+            evidence_low, variants, _RACE_NUMBER_RE, anchors=present,
+            reject=lambda num: _comparative_number(evidence_low, num) or (
+                require_unit and not _unit_of(evidence_low, num)
+            ),
+        ))
+
+    parsed = cue_value(require_unit=True)
+    if parsed is not None:
         return parsed
-    return _measurement_near_anchor(evidence_low, _anchor_spans(evidence_low, present))
+    if entity_fallback:
+        parsed = _measurement_near_anchor(evidence_low, _anchor_spans(evidence_low, present))
+        if parsed is not None:
+            return parsed
+    return cue_value(require_unit=False)
+
+
+def _unit_of(evidence_low: str, match: Any) -> str:
+    """The canonical unit sitting right after this number occurrence, if any."""
+    parsed = _parse_race_value(evidence_low, match)
+    return parsed.unit if parsed is not None else ""
 
 
 def _measurement_near_anchor(evidence_low: str, spans: Sequence[Any]) -> Optional["_RaceValue"]:
