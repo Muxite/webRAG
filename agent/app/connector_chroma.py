@@ -13,6 +13,7 @@ from chromadb.config import Settings
 from shared.connector_config import ConnectorConfig
 from shared.retry import Retry
 from agent.app.connector_base import ConnectorBase
+from agent.app.connector_llm import is_infra_llm_failure
 
 
 class ConnectorChroma(ConnectorBase):
@@ -311,6 +312,7 @@ class ConnectorChroma(ConnectorBase):
         # client under contention — a self-amplifying storm. A couple of fast attempts
         # is enough: a healthy server answers immediately; a dead one should fail open
         # in ~1s so the run degrades rather than freezing to the cell cap.
+        started_at = time.perf_counter()
         retry = Retry(
             func=self._try_init_chroma,
             max_attempts=self.config.chroma_init_attempts,
@@ -322,6 +324,18 @@ class ConnectorChroma(ConnectorBase):
         success = await retry.run()
         if not success:
             self.logger.error("ChromaDB failed to initialize after retries.")
+            # Every retry attempt only logs+returns False internally (see
+            # _try_init_http/_try_init_embedded) — with no timing at all, an
+            # exhausted init retry was a completely silent no-op: unreachable
+            # ChromaDB was indistinguishable from "the harness never asked". This
+            # is unconditionally a transport/availability failure (heartbeat/connect
+            # never succeeded, or every attempt timed out), never a caller/logic
+            # error, so it is always stamped infra_failed.
+            self._record_timing(
+                name="chroma_init", started_at=started_at, success=False,
+                payload={"infra_failed": True, "attempts": self.config.chroma_init_attempts},
+                error="ChromaDB failed to initialize after retries",
+            )
         return success
 
     async def _ensure_ready(self) -> bool:
@@ -348,6 +362,7 @@ class ConnectorChroma(ConnectorBase):
         if not await self._ensure_ready():
             self.logger.warning("ChromaDB not ready.")
             return None
+        started_at = time.perf_counter()
         try:
             create_kwargs: Dict[str, Any] = {"name": collection}
             if metadata:
@@ -362,6 +377,15 @@ class ConnectorChroma(ConnectorBase):
         except Exception as e:
             self._on_op_failure()
             self.logger.error(f"Failed to create/get collection '{collection}': {e}")
+            # Without this timing, a get_or_create failure was completely silent: the
+            # caller (add_to_chroma/query_chroma) sees `coll is None` and bails out
+            # ABOVE its own _record_timing call, so an infra outage here left zero
+            # telemetry trace and was unclassifiable by the infra gate.
+            self._record_timing(
+                name="chroma_get_or_create", started_at=started_at, success=False,
+                payload={"collection": collection, "infra_failed": is_infra_llm_failure(e)},
+                error=str(e),
+            )
             return None
 
     async def delete_collection(self, collection: str) -> bool:
@@ -447,7 +471,10 @@ class ConnectorChroma(ConnectorBase):
             self.logger.error(f"Failed to add to collection '{collection}': {e}")
             self._record_timing(
                 name="chroma_add", started_at=started_at, success=False,
-                payload={"collection": collection, "count": len(documents)},
+                payload={
+                    "collection": collection, "count": len(documents),
+                    "infra_failed": is_infra_llm_failure(e),
+                },
                 error=str(e),
             )
             self._record_io(
@@ -655,7 +682,10 @@ class ConnectorChroma(ConnectorBase):
             self.logger.error(f"ChromaDB query failed for collection {collection}: {e}")
             self._record_timing(
                 name="chroma_query", started_at=started_at, success=False,
-                payload={"collection": collection, "queries": len(query_texts)},
+                payload={
+                    "collection": collection, "queries": len(query_texts),
+                    "infra_failed": is_infra_llm_failure(e),
+                },
                 error=str(e),
             )
             self._record_io(
