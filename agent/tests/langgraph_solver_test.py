@@ -6,6 +6,7 @@ import asyncio
 import inspect
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.errors import GraphRecursionError
 
 from agent.app.langgraph_solver import (
     LangGraphSolver, _CANDIDATE_COVERAGE_EXTENSION_STEPS, _CANDIDATE_COVERAGE_MAX_EXTENSION_STEPS,
@@ -1024,6 +1025,133 @@ def test_stall_recovery_runs_before_coverage_gate(monkeypatch):
     )
     assert len(stub_graph.calls) == 3
     assert result["final_deliverable"] == "Mont Blanc: 1786. Matterhorn: 1865."
+
+
+# --- characterization tests (pre-refactor, 2026-08-24): pin down two behaviors that are only
+# monotonic today by accident of the flat function's shared local variables, and that a
+# state-threading extraction (`_run_extension`/`_SolveState`) could silently break with zero
+# other test failures. Written and confirmed green BEFORE the extraction. ---
+
+class _RecursionThenCleanGraph:
+    """First `astream` call yields a partial state and then raises `GraphRecursionError` —
+    exactly like the primary run hitting its step budget mid-stream. Every subsequent call
+    (the gate extension) behaves like a normal, error-free pass with no exception at all."""
+
+    def __init__(self, partial_messages, clean_messages):
+        self._partial = partial_messages
+        self._clean = clean_messages
+        self.calls = []
+        self.configs = []
+
+    async def astream(self, inputs, config=None, stream_mode=None):
+        self.calls.append(list(inputs.get("messages", [])))
+        self.configs.append(config)
+        if len(self.calls) == 1:
+            yield {"messages": self._partial}
+            raise GraphRecursionError("primary run hit its step budget")
+        yield {"messages": self._clean}
+
+
+def _run_solve_with_recursion_then_clean(monkeypatch, partial_messages, clean_messages, mandate, **solver_kwargs):
+    from agent.app import langgraph_solver
+
+    stub_graph = _RecursionThenCleanGraph(partial_messages, clean_messages)
+    llm = _StubLLM()
+    monkeypatch.setattr(langgraph_solver, "create_react_agent", lambda *a, **k: stub_graph)
+    monkeypatch.setattr(LangGraphSolver, "_build_llm", lambda self: llm)
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", **solver_kwargs,
+    )
+    result = asyncio.run(solver.solve(mandate, max_steps=4))
+    return result, llm, stub_graph
+
+
+def test_recursion_hit_and_run_error_stay_sticky_through_a_clean_extension(monkeypatch):
+    """CHARACTERIZATION (pre-refactor): the primary run hits `GraphRecursionError`, and the
+    candidate-coverage extension that follows completes CLEANLY (no exception of its own, a real
+    prose answer). `recursion_hit`/`run_error` must still be reported — they are set once by the
+    primary run's except-block and NEVER cleared by anything downstream. `solve` only ever sets
+    these flags, never resets them; a refactor that threaded a fresh per-extension state object
+    (instead of mutating the same locals throughout) could silently drop this with no other test
+    catching it, since every other coverage-gate test uses a graph that never raises at all."""
+    partial_messages = [
+        HumanMessage(content=_TWO_CANDIDATE_MANDATE),
+        AIMessage(content="", tool_calls=[{"name": "search", "args": {"query": "Mont Blanc"}, "id": "1"}],
+                  usage_metadata={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}),
+        ToolMessage(content="1. Mont Blanc — https://en.wikipedia.org/wiki/Mont_Blanc\n   desc",
+                    tool_call_id="1"),
+    ]
+    clean_extension_messages = partial_messages + [
+        AIMessage(content="", tool_calls=[{"name": "visit", "args": {"url": "https://en.wikipedia.org/wiki/Mont_Blanc"}, "id": "2"}]),
+        ToolMessage(content="SOURCE: https://en.wikipedia.org/wiki/Mont_Blanc\nMont Blanc first ascent 1786.",
+                    tool_call_id="2"),
+        AIMessage(content="", tool_calls=[{"name": "visit", "args": {"url": "https://en.wikipedia.org/wiki/Matterhorn"}, "id": "3"}]),
+        ToolMessage(content="SOURCE: https://en.wikipedia.org/wiki/Matterhorn\nMatterhorn first ascent 1865.",
+                    tool_call_id="3"),
+        AIMessage(content="Mont Blanc: 1786 (visited). Matterhorn: 1865 (visited)."),
+    ]
+    result, llm, stub_graph = _run_solve_with_recursion_then_clean(
+        monkeypatch, partial_messages, clean_extension_messages, _TWO_CANDIDATE_MANDATE,
+        candidate_coverage_gate=True,
+    )
+    assert len(stub_graph.calls) == 2  # primary (crashed) + one clean coverage extension
+    assert result["final_deliverable"] == "Mont Blanc: 1786 (visited). Matterhorn: 1865 (visited)."
+    # Sticky: the warning still names the step-budget outcome despite the clean extension.
+    assert "step budget" in result.get("warning", "")
+    assert llm.calls == []  # extension produced a real prose answer -> forced synthesis never ran
+
+
+def test_usages_are_recomputed_not_accumulated_across_stall_episodes(monkeypatch):
+    """CHARACTERIZATION (pre-refactor): `usages = _extract_usage(messages)` REPLACES the prior
+    value after every extension pass; it is never `.extend()`-ed episode-over-episode (only the
+    final forced-synthesis usage is ever `.extend()`-ed, once, at the very end). Because each
+    stall-recovery episode's returned message list already contains every earlier turn (the stub,
+    like the real graph, threads full history), a naive accumulate-refactor
+    (`usages.extend(_extract_usage(messages))` inside the loop) would double- and triple-count
+    the same AIMessage turns across episodes. This drives two full stall-recovery episodes (the
+    max, `_STALL_MAX_EPISODES == 2`) with a distinct `usage_metadata` on every AI turn and pins
+    the exact final count, which is only correct under recompute-not-accumulate semantics."""
+    mandate = "find the fact"
+
+    def _ai(call_id, usage_i):
+        return AIMessage(
+            content="", tool_calls=[{"name": "search", "args": {"query": call_id}, "id": call_id}],
+            usage_metadata={"input_tokens": usage_i, "output_tokens": usage_i, "total_tokens": usage_i * 2},
+        )
+
+    primary_messages = [
+        HumanMessage(content=mandate),
+        _ai("1", 1), ToolMessage(content="No results.", tool_call_id="1"),
+        _ai("2", 2), ToolMessage(content="No results.", tool_call_id="2"),
+        _ai("3", 3), ToolMessage(content="SEARCH ERROR: timeout", tool_call_id="3"),
+    ]
+    assert _trailing_stall_run(primary_messages) == _STALL_WINDOW  # sanity: triggers episode 1
+
+    episode_1_messages = primary_messages + [
+        _ai("4", 4), ToolMessage(content="No results.", tool_call_id="4"),
+        _ai("5", 5), ToolMessage(content="No results.", tool_call_id="5"),
+        _ai("6", 6), ToolMessage(content="SEARCH ERROR: timeout", tool_call_id="6"),
+    ]
+    assert _trailing_stall_run(episode_1_messages) >= _STALL_WINDOW  # sanity: triggers episode 2 (the max)
+
+    episode_2_messages = episode_1_messages + [
+        ToolMessage(content="SOURCE: https://en.wikipedia.org/wiki/X\nthe answer is 42", tool_call_id="7"),
+        AIMessage(content="The answer is 42.",
+                  usage_metadata={"input_tokens": 7, "output_tokens": 7, "total_tokens": 14}),
+    ]
+
+    result, llm, stub_graph = _run_solve_with_sequenced_graph(
+        monkeypatch, [primary_messages, episode_1_messages, episode_2_messages], mandate,
+        stall_recovery_gate=True,
+    )
+    assert len(stub_graph.calls) == 3  # primary + 2 stall-recovery episodes (the configured max)
+    assert result["final_deliverable"] == "The answer is 42."
+    # 7 AI turns carry usage_metadata across the FINAL full message list (1..6 from the stall
+    # episodes, +1 from the recovered final turn) -> recompute-from-scratch must land on exactly
+    # 7, never double-counted (e.g. 3+6+7=16) by an accumulate-refactor across the 3 astream calls.
+    assert result["llm_calls"] == 7
+    assert llm.calls == []  # a real prose answer landed -> forced synthesis never ran, no +1
 
 
 # --- require_finish_tool (2026-08-23): imitates sequential_react's explicit finish(answer)

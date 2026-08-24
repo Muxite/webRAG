@@ -40,6 +40,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -511,6 +512,62 @@ def _final_answer(messages: List[Any]) -> str:
     return ""
 
 
+@dataclass
+class _SolveState:
+    """Mutable run state threaded through `solve()`'s primary pass and its corrective extensions
+    (stall-recovery, candidate-coverage). `messages`/`usages`/`final_text` are REPLACED, not
+    accumulated, by each pass — `astream` yields the FULL conversation each time (every earlier
+    turn is already included), so recomputing `usages`/`final_text` from the latest `messages` is
+    the correct behavior; accumulating them across passes would double-count already-counted
+    turns. `recursion_hit`/`run_error` are STICKY: this class and `_run_extension` below only
+    ever SET them (via `or`/direct assignment on a failure), never clear a previously-set value —
+    a run that hit its step budget once must keep reporting that, even if a later extension pass
+    completes cleanly."""
+    messages: List[Any]
+    usages: List[Dict[str, Any]] = field(default_factory=list)
+    final_text: str = ""
+    recursion_hit: bool = False
+    run_error: Optional[BaseException] = None
+
+
+async def _run_extension(
+    graph: Any, state: _SolveState, corrective_content: str, extension_steps: int, *, label: str,
+) -> bool:
+    """Run one corrective `astream` pass: append `corrective_content` as a fresh `HumanMessage`
+    to `state.messages`, replay the graph, and refresh `state.messages`/`usages`/`final_text` in
+    place from the result — same step-exhaustion-without-exception rewrite the primary pass
+    applies. Returns True if the pass raised (recursion or otherwise), so a caller looping over
+    multiple episodes (stall-recovery) can stop; a caller applying this at most once
+    (candidate-coverage) can ignore the return value and fall through either way. Never clears
+    `recursion_hit`/`run_error` — only ever sets them, mirroring the primary pass's own
+    except-blocks verbatim (same log wording, same exception handling)."""
+    ext_messages = list(state.messages) + [HumanMessage(content=corrective_content)]
+    try:
+        async for graph_state in graph.astream(
+            {"messages": ext_messages},
+            config={"recursion_limit": max(4, extension_steps * 2)},
+            stream_mode="values",
+        ):
+            if isinstance(graph_state, dict) and graph_state.get("messages"):
+                state.messages = graph_state["messages"]
+    except GraphRecursionError as exc:
+        state.recursion_hit = True
+        state.run_error = exc
+        _logger.warning(f"LangGraph {label} extension hit its step budget: {exc}")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        state.run_error = exc
+        _logger.error(f"LangGraph {label} extension failed: {exc}", exc_info=True)
+        return True
+
+    state.usages = _extract_usage(state.messages)
+    state.final_text = _final_answer(state.messages)
+    if state.final_text.strip() == _STEP_EXHAUSTED_TEXT:
+        state.recursion_hit = True
+        state.final_text = ""
+    return False
+
+
 def _evidence_from(messages: List[Any], limit: int = 12000) -> str:
     """Tool outputs gathered so far — the input to the forced final synthesis."""
     chunks = [
@@ -771,39 +828,37 @@ class LangGraphSolver:
         )
 
         started = time.perf_counter()
-        messages: List[Any] = []
-        run_error: Optional[BaseException] = None
-        recursion_hit = False
+        state = _SolveState(messages=[])
 
         # astream (not ainvoke) so a mid-run crash still leaves us the messages — and therefore
         # the token usage — accumulated so far. ainvoke would raise and discard the whole state,
         # reporting $0 for a run that really did spend money.
         try:
-            async for state in graph.astream(
+            async for graph_state in graph.astream(
                 {"messages": [HumanMessage(content=mandate)]},
                 config={"recursion_limit": max(4, int(max_steps) * 2)},
                 stream_mode="values",
             ):
-                if isinstance(state, dict) and state.get("messages"):
-                    messages = state["messages"]
+                if isinstance(graph_state, dict) and graph_state.get("messages"):
+                    state.messages = graph_state["messages"]
         except GraphRecursionError as exc:
-            recursion_hit = True
-            run_error = exc
+            state.recursion_hit = True
+            state.run_error = exc
             _logger.warning(f"LangGraph hit its step budget ({max_steps} steps): {exc}")
         except Exception as exc:  # noqa: BLE001
-            run_error = exc
+            state.run_error = exc
             _logger.error(f"LangGraph run failed: {exc}", exc_info=True)
 
-        usages = _extract_usage(messages)
-        final_text = _final_answer(messages)
+        state.usages = _extract_usage(state.messages)
+        state.final_text = _final_answer(state.messages)
 
         # Step exhaustion WITHOUT an exception: create_react_agent swaps the model's tool-calling
         # turn for a canned apology (_STEP_EXHAUSTED_TEXT) once remaining_steps runs low. Treat it
         # as the GraphRecursionError case it really is — otherwise the apology is truthy, the
         # synthesis below is skipped, and the run's evidence is thrown away with no warning.
-        if final_text.strip() == _STEP_EXHAUSTED_TEXT:
-            recursion_hit = True
-            final_text = ""
+        if state.final_text.strip() == _STEP_EXHAUSTED_TEXT:
+            state.recursion_hit = True
+            state.final_text = ""
             _logger.warning(
                 f"LangGraph exhausted its step budget ({max_steps} steps) without raising; "
                 "synthesizing from gathered evidence instead of returning its canned apology."
@@ -815,35 +870,18 @@ class LangGraphSolver:
         # that's merely stuck (not missing a whole candidate) gets a chance to recover first.
         if self._stall_recovery_gate:
             episodes = 0
-            while episodes < _STALL_MAX_EPISODES and _trailing_stall_run(messages) >= _STALL_WINDOW:
+            while episodes < _STALL_MAX_EPISODES and _trailing_stall_run(state.messages) >= _STALL_WINDOW:
                 episodes += 1
                 _logger.info(
-                    f"[STALL_RECOVERY] {_trailing_stall_run(messages)} consecutive non-progress "
+                    f"[STALL_RECOVERY] {_trailing_stall_run(state.messages)} consecutive non-progress "
                     f"tool result(s); corrective pass {episodes}/{_STALL_MAX_EPISODES}"
                 )
-                ext_messages = list(messages) + [HumanMessage(content=_STALL_CORRECTIVE_MESSAGE)]
-                try:
-                    async for state in graph.astream(
-                        {"messages": ext_messages},
-                        config={"recursion_limit": max(4, _STALL_EXTENSION_STEPS * 2)},
-                        stream_mode="values",
-                    ):
-                        if isinstance(state, dict) and state.get("messages"):
-                            messages = state["messages"]
-                except GraphRecursionError as exc:
-                    recursion_hit = True
-                    run_error = exc
-                    _logger.warning(f"LangGraph stall-recovery extension hit its step budget: {exc}")
+                hard_failed = await _run_extension(
+                    graph, state, _STALL_CORRECTIVE_MESSAGE, _STALL_EXTENSION_STEPS,
+                    label="stall-recovery",
+                )
+                if hard_failed:
                     break
-                except Exception as exc:  # noqa: BLE001
-                    run_error = exc
-                    _logger.error(f"LangGraph stall-recovery extension failed: {exc}", exc_info=True)
-                    break
-                usages = _extract_usage(messages)
-                final_text = _final_answer(messages)
-                if final_text.strip() == _STEP_EXHAUSTED_TEXT:
-                    recursion_hit = True
-                    final_text = ""
 
         # Candidate-coverage gate: refuse to accept an answer (natural termination OR step
         # exhaustion) while the mandate names candidates that were never actually visited.
@@ -856,7 +894,7 @@ class LangGraphSolver:
         if self._candidate_coverage_gate:
             named = extract_named_candidates(mandate)
             if named:
-                cov = evaluate_candidate_coverage_from_haystacks(_visit_haystacks(messages), mandate)
+                cov = evaluate_candidate_coverage_from_haystacks(_visit_haystacks(state.messages), mandate)
                 if not cov.satisfied:
                     extension_steps = _candidate_coverage_extension_steps(len(cov.missing))
                     _logger.info(
@@ -864,31 +902,10 @@ class LangGraphSolver:
                         f"never visited; granting one-time +{extension_steps}-step "
                         "extension before finalizing"
                     )
-                    ext_messages = list(messages) + [
-                        HumanMessage(content=_coverage_corrective_message(cov.missing))
-                    ]
-                    try:
-                        async for state in graph.astream(
-                            {"messages": ext_messages},
-                            config={"recursion_limit": max(4, extension_steps * 2)},
-                            stream_mode="values",
-                        ):
-                            if isinstance(state, dict) and state.get("messages"):
-                                messages = state["messages"]
-                    except GraphRecursionError as exc:
-                        recursion_hit = True
-                        run_error = exc
-                        _logger.warning(
-                            f"LangGraph candidate-coverage extension hit its step budget: {exc}"
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        run_error = exc
-                        _logger.error(f"LangGraph candidate-coverage extension failed: {exc}", exc_info=True)
-                    usages = _extract_usage(messages)
-                    final_text = _final_answer(messages)
-                    if final_text.strip() == _STEP_EXHAUSTED_TEXT:
-                        recursion_hit = True
-                        final_text = ""
+                    await _run_extension(
+                        graph, state, _coverage_corrective_message(cov.missing), extension_steps,
+                        label="candidate-coverage",
+                    )
 
         # Imitate sequential_react's explicit finish(answer) discipline: once all extensions
         # above have run, a `finish` call (if any) is the ONLY trusted source of the final
@@ -896,14 +913,14 @@ class LangGraphSolver:
         # deliberate) and falls through to forced synthesis below, exactly like an empty
         # final_text always has. A real `finish` call's text is used verbatim, never rewritten.
         if self._require_finish_tool:
-            final_text = _finish_answer(messages) or ""
+            state.final_text = _finish_answer(state.messages) or ""
 
         # Native-arm parity: out of steps (or stopped on a tool call) but evidence in hand ->
         # synthesize a best answer rather than scoring a hard 0 on a run that did the work.
-        if not final_text or self._always_synthesize:
-            evidence = _evidence_from(messages)
+        if not state.final_text or self._always_synthesize:
+            evidence = _evidence_from(state.messages)
             if evidence:
-                draft = f"\n\nDRAFT ANSWER (the agent's own last turn — may be incomplete):\n{final_text}" if final_text else ""
+                draft = f"\n\nDRAFT ANSWER (the agent's own last turn — may be incomplete):\n{state.final_text}" if state.final_text else ""
                 try:
                     synth = await llm.ainvoke([
                         SystemMessage(content=_SYNTHESIS_SYSTEM),
@@ -912,30 +929,31 @@ class LangGraphSolver:
                     synth_text = synth.content if isinstance(synth.content, str) else str(synth.content or "")
                     # Only replace on a non-empty synthesis: an empty one must never turn a real
                     # last-turn answer into a hard 0.
-                    final_text = synth_text if synth_text.strip() else final_text
-                    usages.extend(_extract_usage([synth]))
+                    state.final_text = synth_text if synth_text.strip() else state.final_text
+                    state.usages.extend(_extract_usage([synth]))
                 except Exception as exc:  # noqa: BLE001
-                    run_error = run_error or exc
+                    state.run_error = state.run_error or exc
                     _logger.error(f"LangGraph forced synthesis failed: {exc}", exc_info=True)
 
         if telemetry is not None:
-            for usage in usages:
+            for usage in state.usages:
                 telemetry.record_llm_usage({
                     "model": self._model_name,
                     "usage": usage,
                     "duration": 0.0,
                 })
-            _record_io_parity(telemetry, messages, full_capture=self._full_capture)
+            _record_io_parity(telemetry, state.messages, full_capture=self._full_capture)
             # F17 parity: a provider-side failure must be quarantinable, not scored as a real 0.
             # A recursion/step-budget stop is a genuine agent outcome, NOT infra — never tagged.
-            if run_error is not None and not recursion_hit and is_infra_llm_failure(run_error):
+            if state.run_error is not None and not state.recursion_hit and is_infra_llm_failure(state.run_error):
                 telemetry.record_timing(
                     name="llm_call", started_at=time.perf_counter(), success=False,
                     payload={"model": self._model_name, "infra_failed": True},
-                    error=str(run_error),
+                    error=str(state.run_error),
                 )
 
         wall_time_s = round(max(0.0, time.perf_counter() - started), 2)
+        final_text = state.final_text
         output = {"final_deliverable": final_text, "success": bool(final_text.strip())}
         observability = (
             summarize_observability({"output": output}, telemetry, self._model_name)
@@ -947,15 +965,15 @@ class LangGraphSolver:
             "success": bool(final_text.strip()),
             "observability": observability,
             "wall_time_s": wall_time_s,
-            "llm_calls": len(usages),
+            "llm_calls": len(state.usages),
             "search_calls": int(observability.get("search", {}).get("count", 0) or 0),
             "visit_calls": int(observability.get("visit", {}).get("count", 0) or 0),
         }
         cost_usd = observability.get("cost", {}).get("usd")
         if cost_usd is not None:
             result_out["cost_usd"] = cost_usd
-        if recursion_hit:
+        if state.recursion_hit:
             result_out["warning"] = f"step budget ({max_steps}) exhausted; answer synthesized from gathered evidence"
-        elif run_error is not None:
-            result_out["warning"] = f"langgraph run error: {type(run_error).__name__}: {run_error}"
+        elif state.run_error is not None:
+            result_out["warning"] = f"langgraph run error: {type(state.run_error).__name__}: {state.run_error}"
         return result_out
