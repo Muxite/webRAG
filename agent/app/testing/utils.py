@@ -14,6 +14,24 @@ _CHARS_PER_TOKEN = 4.0
 _INFRA_STATUS_CODES = frozenset({402, 422, 429, 500, 502, 503, 504})
 _INFRA_TIMING_NAMES = frozenset({"http_request", "search_query", "visit"})
 
+# Bug A: infra.failed severity threshold. Occasional transient fetch hiccups are normal
+# operating condition on a web-research run, not a corrupt cell — a bare "any single failed
+# op" OR (the old behavior) flagged cells with e.g. 14/16 http_request successes that went on
+# to produce a perfectly valid score. `failed` now fires only when a per-op infra-classified
+# failure rate is a MATERIAL FRACTION of that op's attempts (> 50%), or the op produced zero
+# successes outright (a total outage, which is the rate==1.0 case of the same rule for any
+# sample size >= 1). failure_count/ops still report every classified failure regardless of
+# this gate — nothing is hidden, only the boolean stops being a silent exclusion trigger.
+#
+# Threshold basis (empirical, not intuition): replayed this rule against the 80 cells of
+# agent/idea_test_results/paid_wide_sweep_20260823_rep1_*_r1.json, of which 11 were flagged
+# infra_failed=true under the old any-op-OR rule and ALL 80 produced valid scores. The worst
+# observed per-op rate among those 11 was exactly 8/16 (0.5) on http_request; every other op
+# in every flagged cell was well below that. A strictly-greater-than-0.5 threshold clears all
+# 11 while still catching a majority-failed op. See scratch replay script referenced in the
+# handoff for this change.
+_INFRA_FAILURE_RATE_THRESHOLD = 0.5
+
 
 def _is_infra_timing(timing: Dict[str, Any]) -> bool:
     """Classify a failed telemetry timing as infra failure or task/model failure."""
@@ -33,12 +51,41 @@ def _is_infra_timing(timing: Dict[str, Any]) -> bool:
 
 
 def _summarize_infra(timings: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Roll up infra-classified failures for the result JSON."""
-    infra_timings = [t for t in timings if _is_infra_timing(t)]
+    """Roll up infra-classified failures for the result JSON.
+
+    `failed` is gated by severity, not by the mere presence of any single failed op — see
+    _INFRA_FAILURE_RATE_THRESHOLD above for the rationale and empirical basis. `failure_count`
+    and `ops` are unaffected: they report every infra-classified failure regardless of rate.
+    `rates` additionally exposes the observed per-op failure rate so a consumer can apply its
+    own cutoff instead of trusting this one.
+    """
+    per_op: Dict[str, Dict[str, int]] = {}
+    for t in timings:
+        name = t.get("name", "unknown")
+        entry = per_op.setdefault(name, {"total": 0, "success": 0, "infra_fail": 0})
+        entry["total"] += 1
+        if t.get("success"):
+            entry["success"] += 1
+        if _is_infra_timing(t):
+            entry["infra_fail"] += 1
+
+    failure_count = sum(e["infra_fail"] for e in per_op.values())
+    ops = sorted(name for name, e in per_op.items() if e["infra_fail"] > 0)
+
+    rates = {}
+    failed = False
+    for name in ops:
+        e = per_op[name]
+        rate = e["infra_fail"] / e["total"] if e["total"] else 0.0
+        rates[name] = round(rate, 4)
+        if rate > _INFRA_FAILURE_RATE_THRESHOLD or e["success"] == 0:
+            failed = True
+
     return {
-        "failed": bool(infra_timings),
-        "failure_count": len(infra_timings),
-        "ops": sorted({t.get("name", "unknown") for t in infra_timings}),
+        "failed": failed,
+        "failure_count": failure_count,
+        "ops": ops,
+        "rates": rates,
     }
 
 

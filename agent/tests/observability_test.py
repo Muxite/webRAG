@@ -157,7 +157,7 @@ class _TelemetryWithTimings(_EmptyTelemetry):
 def test_summarize_observability_reports_no_infra_failure_when_clean():
     telemetry = _TelemetryWithTimings([_timing("http_request", success=True, status=200)])
     obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
-    assert obs["infra"] == {"failed": False, "failure_count": 0, "ops": []}
+    assert obs["infra"] == {"failed": False, "failure_count": 0, "ops": [], "rates": {}}
 
 
 def test_summarize_observability_flags_infra_failure_and_counts_ops():
@@ -168,9 +168,114 @@ def test_summarize_observability_flags_infra_failure_and_counts_ops():
         _timing("visit", success=False, status=403, error="HTTP visit failed"),  # NOT infra
     ])
     obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    # Each of llm_call and search_query has a single attempt that failed outright (rate 1.0),
+    # which is a total outage for that op regardless of the severity threshold.
     assert obs["infra"]["failed"] is True
     assert obs["infra"]["failure_count"] == 2
     assert obs["infra"]["ops"] == ["llm_call", "search_query"]
+
+
+# --- Bug A: infra.failed severity threshold (material fraction / total outage, not any-op OR) ---
+
+
+def test_summarize_observability_not_failed_on_partial_http_and_visit_failures():
+    """14/16 http_request successes and 10/11 visit successes: occasional transient fetch
+    hiccups are normal operating condition on a web-research run, not a corrupt cell."""
+    timings = (
+        [_timing("http_request", success=True, status=200) for _ in range(14)]
+        + [_timing("http_request", success=False, status=None) for _ in range(2)]
+        + [_timing("visit", success=True, status=200) for _ in range(10)]
+        + [_timing("visit", success=False, status=None) for _ in range(1)]
+    )
+    telemetry = _TelemetryWithTimings(timings)
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["infra"]["failed"] is False
+    # Visibility is preserved even though the boolean gate no longer fires.
+    assert obs["infra"]["failure_count"] == 3
+    assert obs["infra"]["ops"] == ["http_request", "visit"]
+
+
+def test_summarize_observability_failed_on_total_outage_for_an_op():
+    """0/5 successes on an op is a total outage even though the failure count (5) alone
+    wouldn't necessarily clear a naive rate threshold on a tiny sample elsewhere."""
+    timings = [_timing("search_query", success=False, status=503) for _ in range(5)]
+    telemetry = _TelemetryWithTimings(timings)
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["infra"]["failed"] is True
+    assert obs["infra"]["failure_count"] == 5
+
+
+def test_summarize_observability_not_failed_on_exact_half_failure_rate():
+    """8/16 http_request successes (rate == 0.5) is the worst observed rate in the
+    2026-08-23 80-cell paid_wide_sweep replay among cells that still produced valid scores;
+    it sits exactly at the threshold and must NOT flag (threshold is strictly-greater-than)."""
+    timings = (
+        [_timing("http_request", success=True, status=200) for _ in range(8)]
+        + [_timing("http_request", success=False, status=500) for _ in range(8)]
+    )
+    telemetry = _TelemetryWithTimings(timings)
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["infra"]["failed"] is False
+    assert obs["infra"]["failure_count"] == 8
+
+
+def test_summarize_observability_failed_just_above_half_failure_rate():
+    """9/17 failures (rate > 0.5) crosses the threshold and must flag."""
+    timings = (
+        [_timing("http_request", success=True, status=200) for _ in range(8)]
+        + [_timing("http_request", success=False, status=500) for _ in range(9)]
+    )
+    telemetry = _TelemetryWithTimings(timings)
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["infra"]["failed"] is True
+
+
+def test_summarize_observability_lone_infra_flag_among_many_successes_is_not_failed():
+    """The per-timing classification for payload.infra_failed=True is unchanged (still infra,
+    see test_is_infra_timing_honors_explicit_infra_flag_from_connector_llm) and is still
+    counted in failure_count/ops. But the cell-level `failed` gate is now severity-based: one
+    flagged llm_call out of 21 (rate ~0.048) is the same kind of transient hiccup a single
+    failed http_request would be, so it must NOT alone flip the cell to infra-failed."""
+    timings = (
+        [_timing("llm_call", success=True) for _ in range(20)]
+        + [_timing("llm_call", success=False, infra_failed=True, error="status 402")]
+    )
+    telemetry = _TelemetryWithTimings(timings)
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["infra"]["failed"] is False
+    assert obs["infra"]["failure_count"] == 1
+    assert obs["infra"]["ops"] == ["llm_call"]
+
+
+def test_summarize_observability_sole_infra_flagged_call_is_total_outage():
+    """When the flagged call IS the only attempt at that op, it's a total outage (0
+    successes) and still fails — this is the unchanged single-attempt case."""
+    timings = [_timing("llm_call", success=False, infra_failed=True, error="status 402")]
+    telemetry = _TelemetryWithTimings(timings)
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["infra"]["failed"] is True
+    assert obs["infra"]["failure_count"] == 1
+
+
+def test_summarize_observability_no_failure_when_no_timings():
+    telemetry = _TelemetryWithTimings([])
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["infra"]["failed"] is False
+    assert obs["infra"]["failure_count"] == 0
+    assert obs["infra"]["ops"] == []
+
+
+def test_summarize_observability_infra_exposes_failure_rate_for_consumer_judgement():
+    """Full visibility: failure_count and ops report every classified failure unchanged;
+    a rate field exposes the underlying severity so consumers can apply their own cutoff."""
+    timings = (
+        [_timing("http_request", success=True, status=200) for _ in range(14)]
+        + [_timing("http_request", success=False, status=None) for _ in range(2)]
+    )
+    telemetry = _TelemetryWithTimings(timings)
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert "rates" in obs["infra"]
+    assert obs["infra"]["rates"]["http_request"] == pytest.approx(2 / 16)
 
 
 @pytest.mark.asyncio
