@@ -259,6 +259,92 @@ def test_coverage_fail_open_when_no_candidates():
 
 
 # ---------------------------------------------------------------------------
+# Identity-priority matching (2026-08-23): a candidate's name appearing INCIDENTALLY
+# in a DIFFERENT visited page's body must not count as "its own page was opened" — the
+# live-observed false-positive (visit_count scoring lower than coverage on several
+# breadth-suite cells; a full-capture confirmation rerun on task 152 traced the actual
+# cause to a different mechanism — a too-small corrective-extension budget, not this
+# — but this remains a real, worth-closing gap in its own right).
+# ---------------------------------------------------------------------------
+
+def test_incidental_mention_deep_in_another_pages_body_does_not_resolve():
+    graph = IdeaDag(root_title="root", root_details={"mandate": AVON_MANDATE})
+    for name in ("River Avon, Warwickshire", "River Avon, Hampshire", "River Avon, Strathspey"):
+        _visit_node(graph, name)
+    # A visited page ABOUT a different candidate, whose body mentions the missing one only
+    # deep in a "See also"-style section, far past the lede — must NOT resolve it.
+    graph.add_child(
+        graph.root_id(),
+        title="visit node",
+        details={
+            DetailKey.ACTION_RESULT.value: {
+                "action": IdeaActionType.VISIT.value,
+                "success": True,
+                "page_title": "River Avon, Warwickshire - Wikipedia",
+                "url": "https://en.wikipedia.org/wiki/River_Avon,_Warwickshire",
+                "content": (
+                    "x" * 1200 + "\n\nSee also: other rivers named Avon include "
+                    "River Avon, Bristol, which flows through Bath."
+                ),
+            }
+        },
+    )
+    res = evaluate_candidate_coverage(graph, AVON_MANDATE)
+    assert res.satisfied is False
+    assert "River Avon, Bristol" in res.missing
+
+
+def test_own_page_still_resolves_via_identity_even_with_a_short_title():
+    # The precedent case (test_coverage_matches_against_visited_page_title) already covers
+    # exact title matches; this pins that identity matching is still the PRIMARY path, not a
+    # side effect of the body fallback (title match must resolve even if content is empty).
+    graph = IdeaDag(root_title="root", root_details={"mandate": AVON_MANDATE})
+    for name in ("River Avon, Warwickshire", "River Avon, Hampshire", "River Avon, Strathspey"):
+        _visit_node(graph, name)
+    graph.add_child(
+        graph.root_id(),
+        title="visit node",
+        details={
+            DetailKey.ACTION_RESULT.value: {
+                "action": IdeaActionType.VISIT.value,
+                "success": True,
+                "page_title": "River Avon, Bristol - Wikipedia",
+                "url": "https://en.wikipedia.org/wiki/River_Avon,_Bristol",
+                "content": "",
+            }
+        },
+    )
+    res = evaluate_candidate_coverage(graph, AVON_MANDATE)
+    assert res.satisfied is True
+    assert res.resolved_via["River Avon, Bristol"] == "identity"
+
+
+def test_mention_within_the_lede_of_a_different_page_resolves_as_body_lede_fallback():
+    # A candidate mentioned near the TOP of a different (but related) visited page's body —
+    # e.g. a disambiguation-style opening sentence — is a narrower, intentional fallback, not
+    # the false-positive this fix closes (that one required a DEEP, incidental mention).
+    graph = IdeaDag(root_title="root", root_details={"mandate": AVON_MANDATE})
+    for name in ("River Avon, Warwickshire", "River Avon, Hampshire", "River Avon, Strathspey"):
+        _visit_node(graph, name)
+    graph.add_child(
+        graph.root_id(),
+        title="visit node",
+        details={
+            DetailKey.ACTION_RESULT.value: {
+                "action": IdeaActionType.VISIT.value,
+                "success": True,
+                "page_title": "Rivers named Avon - Wikipedia",
+                "url": "https://en.wikipedia.org/wiki/Rivers_named_Avon",
+                "content": "River Avon, Bristol is one of four British rivers named Avon.",
+            }
+        },
+    )
+    res = evaluate_candidate_coverage(graph, AVON_MANDATE)
+    assert res.satisfied is True
+    assert res.resolved_via["River Avon, Bristol"] == "body_lede"
+
+
+# ---------------------------------------------------------------------------
 # Scope: the gate is NOT branch-eliminate-only (pins the corrected docstring)
 # ---------------------------------------------------------------------------
 

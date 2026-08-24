@@ -1995,6 +1995,12 @@ class IdeaDagEngine:
                         f"[STEP {step_index}] AUTO-PARALLEL: {len(eligible)} independent "
                         f"leaf siblings, executing concurrently"
                     )
+                    # Instrumentation only (no scheduling effect): dump the batch so a
+                    # missed chain dependency -- a hop whose query needed the previous
+                    # hop's answer -- is visible in the logs afterward.
+                    idea_sequencing.log_parallel_batch_diagnostic(
+                        graph, eligible, node, has_dependencies, step_index, self._logger,
+                    )
                     execute_all = True
                 elif reason is not None:
                     self._logger.info(

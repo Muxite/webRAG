@@ -38,6 +38,7 @@ identical observability shape (cost, tokens, search/visit counts) with no bespok
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -52,9 +53,16 @@ from agent.app.connector_llm import ConnectorLLM, is_infra_llm_failure
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
+from agent.app.idea_policies.candidate_coverage import (
+    Haystack,
+    evaluate_candidate_coverage_from_haystacks,
+    extract_named_candidates,
+)
 from agent.app.idea_test_utils import count_chars, count_words
 from agent.app.solver import SolverResult
-from agent.app.testing.execution_sequential import ToolRetry, _EMPTY_PAGE, _call_tool_with_retry
+from agent.app.testing.execution_sequential import (
+    ToolRetry, _EMPTY_PAGE, _call_search_with_retry, _call_tool_with_retry,
+)
 from agent.app.testing.utils import summarize_observability
 from shared.connector_config import ConnectorConfig
 
@@ -67,6 +75,38 @@ _logger = logging.getLogger(__name__)
 #: arms are told about (LADDER_PREREGISTRATION's fairness rule: no arm may be handicapped by a
 #: 422 storm on over-long queries). Tool CONTRACT wording is deliberately left to LangGraph's own
 #: function-calling schema — that is the third-party behavior under test.
+#: Unit-normalization guidance, appended to both `_SYSTEM` and `_SYNTHESIS_SYSTEM` (2026-08-23).
+#: A live diagnosis of task 154 (2-arm dam-height comparison) found qwen2.5:7b correctly
+#: retrieves BOTH compared values in every single run (no hallucination, no misattribution) but
+#: flips the final VERDICT in 10/12 sampled cells via two consistent failure modes: comparing a
+#: raw feet figure against a meters figure without converting first ("726.4 meters - 285 meters
+#: = 441.4 meters"), or computing the correct negative delta but flipping the sign in the stated
+#: conclusion. This is a direct, cheap mitigation for both — a structured
+#: "normalize-then-compare" step is the escalation if this doesn't move the needle, but a
+#: fixed-model reasoning gap should be tried cheaply first.
+_UNIT_NORMALIZATION_GUIDANCE = (
+    "When comparing two or more numeric values (e.g. deciding which is larger/taller/longer): "
+    "FIRST convert every value to the SAME unit and state each converted value explicitly, THEN "
+    "compare them. Never subtract or compare raw values that are in different units (e.g. one in "
+    "feet, the other in meters) without converting first — this is a common source of a flipped "
+    "conclusion. Double-check which value is actually larger before stating your verdict."
+)
+
+#: Explicit per-item classification guidance (2026-08-23). A live forensic pass found tasks
+#: 156/157's `item_classification`/`classification` check never reached 1.0 in 0/12 sampled
+#: cells even at the best available config (all facts correctly gathered, every page visited) —
+#: the model reliably drops or garbles 1-3 of 7 per-item PASS/FAIL verdicts against a stated
+#: numeric threshold. Cheap prompt-level mitigation, tried before building a new dedicated gate
+#: mechanism (mirroring the same "try the cheap fix first" discipline as the unit-normalization
+#: guidance above).
+_CLASSIFICATION_GUIDANCE = (
+    "When a task asks you to classify multiple items against a stated threshold or condition "
+    "(e.g. \"how many exceed X\"): state an explicit PASS or FAIL verdict for EVERY SINGLE named "
+    "item, one line each, even if some items are already obviously above or below the threshold. "
+    "Do not skip or summarize past any item — an incomplete per-item verdict list is an incomplete "
+    "answer."
+)
+
 _SYSTEM = (
     "You are a web-research agent solving a TASK with tools. Use the search and visit tools to "
     "gather evidence before answering — never answer from memory.\n"
@@ -76,7 +116,9 @@ _SYSTEM = (
     "Strategy: break a multi-part task into its sub-facts and resolve EACH one by searching and "
     "then visiting its authoritative page (e.g. Wikipedia) before you finish — do not stop after "
     "the first fact. Read each value directly off the page and cite the exact source URL it came "
-    "from in your final answer."
+    "from in your final answer.\n"
+    f"{_UNIT_NORMALIZATION_GUIDANCE}\n"
+    f"{_CLASSIFICATION_GUIDANCE}"
 )
 
 #: What ``create_react_agent`` puts in the response INSTEAD of raising when it runs out of steps
@@ -122,28 +164,203 @@ _VISIT_REPEAT = (
 #: visit tool maintains.
 _SEARCH_VISITED_MARK = " [ALREADY VISITED]"
 
+#: Returned by the search tool INSTEAD of re-running an identical (normalized) query. Mirrors
+#: `execution_sequential.py`'s ``seen_queries`` guard — this arm had the mirror-image gap (it
+#: dedups repeat VISITs but had nothing stopping a repeat SEARCH), which let a stuck run loop the
+#: same query indefinitely instead of trying a different one or moving on. Unconditional (not an
+#: opt-in flag): mirrors how the existing visit/search "ALREADY VISITED" markers above already
+#: ship unconditionally — this is arm-fairness hygiene (never worse, only prevents a wasted call),
+#: not a scored experiment.
+def _already_searched_message(query: str) -> str:
+    return (
+        f"ALREADY SEARCHED '{query[:80]}'. Its results are in an earlier tool message above — "
+        "visit one of those result URLs, or search something DIFFERENT. Do not repeat a search "
+        "you have already run."
+    )
+
 _SYNTHESIS_SYSTEM = (
     "Synthesize the FINAL answer using ONLY the gathered evidence. Address every part the task "
     "asks for; for each fact quote the exact value from the page and cite the source URL it came "
     "from. Do not add facts that are not in the evidence — if a required fact is missing, say so "
-    "explicitly rather than guessing."
+    "explicitly rather than guessing.\n"
+    f"{_UNIT_NORMALIZATION_GUIDANCE}\n"
+    f"{_CLASSIFICATION_GUIDANCE}"
+)
+
+#: Substrings marking a tool result as NON-PROGRESS: an error, an empty result, or a repeat of
+#: something already tried. Neither this arm nor ``sequential_react`` has any dead-end detection
+#: (confirmed by a 2026-08-23 capability survey) — both rely entirely on the model's own judgment
+#: plus the raw step budget. The native GoT engine's real backtrack machinery
+#: (``should_backtrack``/``backtrack_dead_end_threshold``) is tied to its scored DAG node
+#: structure and not portable to a linear message list; this is the realistic portable analog.
+_STALL_SIGNATURES = (
+    "No results.",
+    "SEARCH ERROR",
+    "VISIT ERROR",
+    "SEARCH BACKEND UNAVAILABLE",
+    "ALREADY VISITED",
+    "ALREADY SEARCHED",
+)
+
+#: Consecutive non-progress tool results (at the END of the transcript) that trigger one
+#: corrective pass. Deliberately conservative (not 1-2) so a single blip doesn't over-trigger —
+#: mirrors the native engine's ``backtrack_dead_end_threshold`` philosophy of requiring a real
+#: run of bad signal, not a lone miss.
+_STALL_WINDOW = 3
+#: Hard cap on corrective episodes per run — a persistently-stuck run must eventually fall
+#: through to forced synthesis (or an honest empty answer) rather than looping this indefinitely.
+_STALL_MAX_EPISODES = 2
+#: Fixed extra recursion budget per corrective episode. Same value/rationale as
+#: ``_CANDIDATE_COVERAGE_EXTENSION_STEPS`` — fixed, not scaled, to avoid an under-resolve
+#: incentive.
+_STALL_EXTENSION_STEPS = 10
+
+_STALL_CORRECTIVE_MESSAGE = (
+    "Your last few tool calls made NO progress (errors, empty results, or repeats of something "
+    "you already tried). Stop repeating the same approach. Try a search with DIFFERENT keywords, "
+    "or visit a DIFFERENT URL you have not tried yet, or — if you already have enough evidence "
+    "for some sub-parts of the task — move on to a different sub-task instead of retrying this one."
 )
 
 
+def _is_stall_tool_message(content: str) -> bool:
+    return any(sig in content for sig in _STALL_SIGNATURES)
+
+
+def _trailing_stall_run(messages: List[Any]) -> int:
+    """Count consecutive non-progress ``ToolMessage``s at the END of ``messages`` (the model's
+    most recent activity), skipping over interleaved ``AIMessage`` tool-call requests — those
+    don't break the run of bad signal, only a GOOD tool result does."""
+    count = 0
+    for m in reversed(messages or []):
+        if not isinstance(m, ToolMessage):
+            continue
+        content = m.content if isinstance(m.content, str) else ""
+        if _is_stall_tool_message(content):
+            count += 1
+        else:
+            break
+    return count
+
+#: A ONE-TIME extra recursion budget (in graph "steps", i.e. LLM-turn + tool-execution pairs)
+#: granted when the candidate-coverage gate finds missing visits — SCALED to how many
+#: candidates are actually missing (floor/ceiling below), revised 2026-08-23 from a fixed size
+#: after two independent full-capture confirmation runs on task 152 (7-way fan-out) both showed
+#: the fixed +10 budget (-> recursion_limit=20) was too small: rep1 completed only 6/7 visits
+#: before running out (the model then guessed the 7th fact correctly from memory — lucky, not
+#: reliable); rep2 (task 156, also 7-way, 0 initial visits) hit `GraphRecursionError` inside the
+#: extension itself, producing a COMPLETELY EMPTY final answer. A 7-way fan-out starting from 0
+#: visits needs ~14 tool calls (7 search + 7 visit) minimum — a fixed 10-step budget can't fit
+#: that regardless of how well-behaved the model is. Applied AT MOST ONCE per run regardless of
+#: size (this scaling is not the "repeatable extension" anti-gaming concern the original fixed
+#: design was guarding against — that was about training a model to deliberately under-resolve
+#: ACROSS repeated grants; a single grant sized to THIS run's actual gap doesn't create that
+#: incentive, since under-resolving still costs real steps/tokens first and risks the exact
+#: total-failure mode rep2 hit). The floor keeps small-gap cases (e.g. 1-2 missing) unchanged
+#: from the original fixed value.
+_CANDIDATE_COVERAGE_EXTENSION_STEPS = 10
+#: Extra steps granted per missing candidate, roughly covering one search + one visit + a
+#: little reasoning overhead each.
+_CANDIDATE_COVERAGE_STEPS_PER_MISSING = 3
+#: Hard ceiling so a many-candidate run can't runaway the extension indefinitely.
+_CANDIDATE_COVERAGE_MAX_EXTENSION_STEPS = 40
+
+
+def _candidate_coverage_extension_steps(missing_count: int) -> int:
+    return min(
+        _CANDIDATE_COVERAGE_MAX_EXTENSION_STEPS,
+        max(_CANDIDATE_COVERAGE_EXTENSION_STEPS, missing_count * _CANDIDATE_COVERAGE_STEPS_PER_MISSING),
+    )
+
+#: Fed back to the agent as a corrective turn when the gate finds missing visits. Names
+#: the exact candidates so the model doesn't have to re-derive the roster from the
+#: original mandate, and states the requirement as a hard constraint (not a suggestion —
+#: the original ``_SYSTEM`` prompt's "before you finish" phrasing is advisory only, which
+#: is exactly what let task 152 rep1 answer from search snippets with zero visits).
+def _coverage_corrective_message(missing: List[str]) -> str:
+    roster = "\n".join(f"- {name}" for name in missing)
+    return (
+        "You have NOT yet visited a page for the following item(s), so your answer cannot "
+        "be finalized:\n"
+        f"{roster}\n\n"
+        "You MUST call the visit tool on each of these before answering. Do not answer from "
+        "search snippets or memory for these items — open their pages and read the exact "
+        "value directly."
+    )
+
+
+#: Instruction appended to `_SYSTEM` when `require_finish_tool` is on. `sequential_react`
+#: (`execution_sequential.py`) never suffers the "narration accepted as the final answer" bug
+#: (see `_finish_answer`'s docstring) because it has an explicit `finish(answer)` action — the
+#: model must deliberately choose to submit, not just happen to write a tool-call-free turn.
+#: `create_react_agent` has no native equivalent (any tool-call-free turn ends the run), so this
+#: imitates `sequential_react`'s discipline at the prompt level, backed by `_finish_answer`'s
+#: code-level enforcement (a natural termination that never called `finish` is NOT trusted as a
+#: deliberate answer — it falls through to the existing forced-synthesis safety net instead).
+_FINISH_TOOL_GUIDANCE = (
+    "You MUST submit your final answer by calling the finish tool with your complete answer "
+    "(including every fact and every cited source URL the task asks for) as its argument. Do "
+    "NOT just write your final answer as a plain message — a plain message is not treated as "
+    "your submitted answer. Call finish only when you are completely done."
+)
+
+
+def _finish_answer(messages: List[Any]) -> Optional[str]:
+    """The ``answer`` argument of the LAST ``finish`` tool call in ``messages``, or ``None`` if
+    the model never called it.
+
+    This is the code-level half of imitating ``sequential_react``'s explicit ``finish(answer)``
+    action (see `_FINISH_TOOL_GUIDANCE`). Unlike `_final_answer` (which trusts ANY tool-call-free
+    AI turn — including an accidental mid-plan narration, the exact bug behind task 156 rep1's
+    empty-evidence 0.0 score despite 5 real visits sitting unused), a `finish` call is a
+    deliberate, unambiguous submission act, and its text is used VERBATIM — never rewritten,
+    unlike a forced-synthesis rewrite.
+
+    LIVE-TESTED 2026-08-23 (paid A/B, `openai/gpt-5-mini`, n=3/task, tasks 152/153/155/156/157):
+    the mechanism's OWN logic is sound, but adding a new tool to the action space measurably
+    REDUCED step efficiency on already step-constrained tasks — task 156 (7-way, needs the most
+    tool calls) regressed sharply (mean 0.516 vs 0.960 with the flag off), hitting the fixed
+    `max_steps=25` ceiling more often; task 155 also regressed (0.75 vs 1.0); 152/153/157
+    (already near-ceiling or less step-constrained) were unaffected. Net: a real, unexpected
+    efficiency cost outweighs the correctness benefit as currently scoped — stays opt-in, default
+    OFF, not recommended without also addressing the step-budget interaction (e.g. a larger or
+    scaled `max_steps` for this flag, mirroring how the coverage-extension budget itself needed
+    scaling). See `docs/handoffs/BREADTH_SUITE_WEAKNESS_SWEEP_20260823.md`.
+    """
+    for m in reversed(messages or []):
+        if not isinstance(m, AIMessage):
+            continue
+        for call in (getattr(m, "tool_calls", None) or []):
+            name = call.get("name") if isinstance(call, dict) else getattr(call, "name", None)
+            if name == "finish":
+                args = call.get("args") if isinstance(call, dict) else getattr(call, "args", None)
+                answer = (args or {}).get("answer") if isinstance(args, dict) else None
+                if isinstance(answer, str) and answer.strip():
+                    return answer
+    return None
+
+
 def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
-                retry: Optional[ToolRetry] = None):
+                retry: Optional[ToolRetry] = None, require_finish_tool: bool = False):
     """Build the search/visit tools bound to ``agent_io``, with native-arm retry parity."""
     retry = retry or ToolRetry()  # default: retry OFF -> unchanged behavior
     #: URLs visited by THIS tool instance. ``_make_tools`` is called once per ``solve()``, so the
     #: set is per-run and cannot leak across benchmark cells sharing a solver or connectors.
     visited: set[str] = set()
+    #: Normalized queries already searched THIS run — see ``_already_searched_message``.
+    seen_queries: set[str] = set()
 
     @tool
     async def search(query: str) -> str:
         """Web search. Returns titles, URLs, and snippets for the query."""
-        results, error = await _call_tool_with_retry(
-            lambda: agent_io.search(query, count=search_k, timeout_seconds=20),
-            lambda r: not r, retry,
+        norm = re.sub(r"\s+", " ", query).strip().lower()
+        if norm and norm in seen_queries:
+            return _already_searched_message(query)
+        if norm:
+            seen_queries.add(norm)
+        results, error, _used_query = await _call_search_with_retry(
+            lambda q: agent_io.search(q, count=search_k, timeout_seconds=20),
+            query, lambda r: not r, retry,
         )
         if error is not None:
             return f"SEARCH ERROR: {error}"
@@ -173,7 +390,15 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
         # Truncate the CONTENT, not the header, so the attribution survives a long page.
         return f"{header}\n{(content or _EMPTY_PAGE)[:page_chars]}"
 
-    return [search, visit]
+    tools = [search, visit]
+    if require_finish_tool:
+        @tool
+        async def finish(answer: str) -> str:
+            """Submit your COMPLETE final answer. Call this ONLY when you are done — it ends
+            the task. The full text you pass here becomes the submitted answer."""
+            return "Answer submitted."
+        tools.append(finish)
+    return tools
 
 
 def _extract_usage(messages: List[Any]) -> List[Dict[str, Any]]:
@@ -295,6 +520,125 @@ def _evidence_from(messages: List[Any], limit: int = 12000) -> str:
     return "\n\n".join(c for c in chunks if c.strip())[:limit]
 
 
+def _visit_haystacks(messages: List[Any]) -> List["Haystack"]:
+    """One ``Haystack`` per page actually OPENED via the ``visit`` tool (not search snippets).
+
+    Mirrors ``idea_policies.candidate_coverage._node_haystacks``'s intent for this arm's
+    message-based state: a candidate is only credited as "resolved" when a real page was
+    fetched for it. Search-result ToolMessages are deliberately excluded — a search
+    snippet mentioning a candidate's name (without ever reading its page) is exactly the
+    short-circuit this gate exists to prevent (see task 152 rep1: 42 searches, 0 visits,
+    a fabricated answer citing URLs pulled straight from search snippets).
+
+    Splits ``identity`` (the visited URL — this arm's ``AgentIO.visit`` returns cleaned text
+    only, no page title, so the URL is the only identity signal available) from ``body`` (the
+    page content after the ``SOURCE:`` header), so ``evaluate_candidate_coverage_from_haystacks``
+    can require a candidate's OWN page to have been opened, not just an incidental mention on a
+    DIFFERENT visited page's body (e.g. a "List of Seven Summits" cross-reference table) — a
+    real gap live-observed in this session's data (visit_count scoring lower than coverage).
+    """
+    haystacks: List[Haystack] = []
+    for m in (messages or []):
+        if not (isinstance(m, ToolMessage) and isinstance(m.content, str)
+                and _VISIT_SOURCE_PREFIX in m.content):
+            continue
+        idx = m.content.find(_VISIT_SOURCE_PREFIX)
+        rest = m.content[idx + len(_VISIT_SOURCE_PREFIX):]
+        url, _, body = rest.partition("\n")
+        haystacks.append(Haystack(identity=url.strip(), body=body))
+    return haystacks
+
+
+#: `_trim_for_model`'s truncation scheme — mirrors `execution_sequential.py`'s scratchpad bounds
+#: (last-12-entries / obs[:1500] / synthesis-evidence-capped-at-12000) at a comparable ratio.
+_TRIM_RECENT_TOOL_MESSAGES = 3
+_TRIM_TOOL_CHARS = 1500
+_TRIM_TOTAL_TOOL_CHARS = 18000
+
+
+def _trim_for_model(state: Dict[str, Any]) -> Dict[str, Any]:
+    """`create_react_agent`'s `pre_model_hook`: bounds what the MODEL sees per turn, without
+    touching `state["messages"]` (returns `llm_input_messages`, never `messages`/`RemoveMessage`).
+
+    Built from live evidence (2026-08-23): a 7-way fan-out task accumulated 316,990 chars of raw
+    visited-page text across only 18 LLM calls, and even with every page actually visited (the
+    `candidate_coverage_gate` fix), the final answer still only surfaced 3/7 facts — "the model
+    had the data but couldn't locate/use it under load." `sequential_react` never hits this: its
+    scratchpad caps each observation to 1500 chars and keeps only the last 12 entries.
+
+    Returning `llm_input_messages` (not mutating `state`) is load-bearing: `_extract_usage`,
+    `_final_answer`, `_evidence_from`, and `_visit_haystacks`/`candidate_coverage_gate` all scan
+    the FULL untouched message list returned by `astream()` — the coverage gate in particular
+    depends on seeing every visit's content to verify a candidate was actually read. A
+    state-mutating trim would risk silently breaking that gate's correctness for zero benefit
+    here; `llm_input_messages` gets the context-bloat fix with no interaction risk.
+
+    Scheme: the most recent `_TRIM_RECENT_TOOL_MESSAGES` tool results are PROTECTED — always
+    kept, always unclipped (up to their existing `page_chars` cap), and never counted against the
+    budget below, so the model always has full detail on what it just fetched. Older tool results
+    are clipped to `_TRIM_TOOL_CHARS` each; if THEIR total still exceeds `_TRIM_TOTAL_TOOL_CHARS`,
+    the OLDEST of them are dropped entirely (from the model's view only) until under budget.
+    System/Human/AI messages are never touched — the bloat is exclusively in tool payloads.
+
+    Dropping a ``ToolMessage`` also strips the matching entry from whichever ``AIMessage``
+    requested it (see :func:`_drop_tool_messages_and_matching_calls`) — every ``tool_call`` on an
+    ``AIMessage`` MUST have a corresponding ``ToolMessage`` or the provider rejects the whole chat
+    history (live-caught: a bare drop produced ``ValueError: Found AIMessages with tool_calls
+    that do not have a corresponding ToolMessage``, an infra failure on a real benchmark cell).
+    """
+    messages = list(state.get("messages") or [])
+    tool_indices = [i for i, m in enumerate(messages) if isinstance(m, ToolMessage)]
+    recent = set(tool_indices[-_TRIM_RECENT_TOOL_MESSAGES:]) if tool_indices else set()
+
+    trimmed: List[Any] = []
+    for i, m in enumerate(messages):
+        if isinstance(m, ToolMessage) and i not in recent and isinstance(m.content, str):
+            if len(m.content) > _TRIM_TOOL_CHARS:
+                m = m.model_copy(update={"content": m.content[:_TRIM_TOOL_CHARS]})
+        trimmed.append(m)
+
+    # Budget governs only the OLDER (already-clipped) tool messages — the protected recent
+    # window is exempt, both from clipping above and from counting against this budget.
+    older_total = sum(
+        len(m.content) for i, m in enumerate(trimmed)
+        if isinstance(m, ToolMessage) and i not in recent and isinstance(m.content, str)
+    )
+    if older_total > _TRIM_TOTAL_TOOL_CHARS:
+        drop_order = [i for i, m in enumerate(trimmed) if isinstance(m, ToolMessage) and i not in recent]
+        to_drop_ids = set()
+        for i in drop_order:
+            if older_total <= _TRIM_TOTAL_TOOL_CHARS:
+                break
+            m = trimmed[i]
+            older_total -= len(m.content) if isinstance(m.content, str) else 0
+            to_drop_ids.add(getattr(m, "tool_call_id", None))
+        if to_drop_ids:
+            trimmed = _drop_tool_messages_and_matching_calls(trimmed, to_drop_ids)
+
+    return {"llm_input_messages": trimmed}
+
+
+def _drop_tool_messages_and_matching_calls(messages: List[Any], tool_call_ids: set) -> List[Any]:
+    """Remove every ``ToolMessage`` whose ``tool_call_id`` is in ``tool_call_ids``, AND strip the
+    matching ``tool_call`` entry from whichever ``AIMessage`` requested it. An ``AIMessage`` that
+    ends up with no remaining tool calls AND no prose content is dropped entirely — an empty,
+    tool-call-free AIMessage mid-transcript would otherwise look like an (empty) attempted final
+    answer to whatever reads the message list next.
+    """
+    out: List[Any] = []
+    for m in messages:
+        if isinstance(m, ToolMessage) and getattr(m, "tool_call_id", None) in tool_call_ids:
+            continue
+        if isinstance(m, AIMessage) and getattr(m, "tool_calls", None):
+            remaining = [tc for tc in m.tool_calls if tc.get("id") not in tool_call_ids]
+            if len(remaining) != len(m.tool_calls):
+                if not remaining and not (m.content or "").strip():
+                    continue
+                m = m.model_copy(update={"tool_calls": remaining})
+        out.append(m)
+    return out
+
+
 class LangGraphSolver:
     """Wraps `langgraph.prebuilt.create_react_agent` in the `Solver` interface."""
 
@@ -313,6 +657,10 @@ class LangGraphSolver:
         page_chars: int = 6000,
         full_capture: bool = False,
         always_synthesize: bool = False,
+        candidate_coverage_gate: bool = False,
+        context_trim: bool = False,
+        stall_recovery_gate: bool = False,
+        require_finish_tool: bool = False,
     ) -> None:
         self._connector_llm = connector_llm
         self._connector_search = connector_search
@@ -332,6 +680,47 @@ class LangGraphSolver:
         #: that already ARE complete answers, which costs an extra call and can paraphrase a good
         #: answer worse; it needs a live A/B before it becomes the default.
         self._always_synthesize = bool(always_synthesize)
+        #: Constructor default stays OFF (library/direct-construction callers get the
+        #: conservative original behavior); the benchmark harness (`execution_langgraph.py`)
+        #: defaults its env var ON as of 2026-08-23 — LIVE-CONFIRMED via a paired 2-rep A/B
+        #: (n=12): +0.227 mean score, t=2.56, W/T/L 7/5/0, never lost a paired cell. Before
+        #: accepting a naturally-terminated or step-exhausted answer, checks whether every
+        #: candidate named in the mandate (breadth/fan-out rosters, branch-eliminate lists — see
+        #: ``idea_policies.candidate_coverage``) has an actual ``visit`` tool result behind it.
+        #: If any are missing, feeds the agent a corrective turn and grants a ONE-TIME fixed
+        #: extra recursion budget to go visit them, THEN finalizes. Built from the 2026-08-23
+        #: breadth-pilot fabrication case (task 152 rep1: 42 searches, 0 visits, a fully-cited
+        #: answer with a wrong keystone fact) — `create_react_agent` accepts any tool-call-free
+        #: AI turn as final, so nothing upstream of this enforces the prompt's advisory "visit
+        #: before you finish" instruction. See docs/handoffs/BREADTH_STALL_ROOT_CAUSE_20260823.md.
+        self._candidate_coverage_gate = bool(candidate_coverage_gate)
+        #: Constructor default stays OFF (see rationale above); the benchmark harness defaults
+        #: its env var ON as of 2026-08-23 — LIVE-CONFIRMED via a paired 2-rep A/B (n=12, both
+        #: conditions with candidate_coverage_gate=1): +0.216 mean score, t=2.23, W/T/L 6/3/3.
+        #: Bounds what the model sees per turn via `_trim_for_model` (see its docstring).
+        self._context_trim = bool(context_trim)
+        #: Opt-in (default OFF, behavior unchanged): after the run ends (naturally or by step
+        #: exhaustion), if the LAST few tool results made no progress (see `_STALL_SIGNATURES`),
+        #: feed one corrective turn telling the model to try something different, with a bounded
+        #: extra recursion budget — at most `_STALL_MAX_EPISODES` times per run. Neither this arm
+        #: nor `sequential_react` has any dead-end detection (2026-08-23 capability survey); the
+        #: native engine's real backtrack machinery is tied to its scored DAG structure and not
+        #: portable here. Needs a live A/B before it becomes the default — unlike the coverage
+        #: gate and the (unconditional) dedup guard, this changes strategy on a hunch, not a
+        #: deterministic "you missed something named" check, so its effect on score is genuinely
+        #: uncertain.
+        self._stall_recovery_gate = bool(stall_recovery_gate)
+        #: Opt-in (default OFF, behavior unchanged): imitate `sequential_react`'s explicit
+        #: `finish(answer)` action (see `_FINISH_TOOL_GUIDANCE` / `_finish_answer`). Adds a
+        #: `finish` tool the model must call to submit its answer; a natural termination that
+        #: never called it is NOT trusted as a deliberate answer and falls through to the
+        #: existing forced-synthesis safety net instead of being accepted verbatim.
+        #: LIVE-TESTED 2026-08-23: the mechanism's own logic is sound, but adding a new tool to
+        #: the action space measurably hurt step-constrained tasks (mean -0.44 on a 7-way task)
+        #: by making the model less step-efficient, more often hitting `max_steps`. Net negative
+        #: as currently scoped — see `_finish_answer`'s docstring for the full result and stays
+        #: opt-in; do not flip this default without also addressing the step-budget interaction.
+        self._require_finish_tool = bool(require_finish_tool)
 
     def _build_llm(self) -> ChatOpenAI:
         """Point LangChain's OpenAI-compatible client at whatever provider the run is configured
@@ -372,9 +761,14 @@ class LangGraphSolver:
         )
         # F16 parity: same three connector_retry_* keys the graph and sequential arms read.
         retry = ToolRetry.from_settings(settings)
-        tools = _make_tools(agent_io, self._search_k, self._page_chars, retry)
+        tools = _make_tools(agent_io, self._search_k, self._page_chars, retry,
+                             require_finish_tool=self._require_finish_tool)
         llm = self._build_llm()
-        graph = create_react_agent(llm, tools, prompt=_SYSTEM)
+        system_prompt = f"{_SYSTEM}\n{_FINISH_TOOL_GUIDANCE}" if self._require_finish_tool else _SYSTEM
+        graph = create_react_agent(
+            llm, tools, prompt=system_prompt,
+            pre_model_hook=(_trim_for_model if self._context_trim else None),
+        )
 
         started = time.perf_counter()
         messages: List[Any] = []
@@ -414,6 +808,95 @@ class LangGraphSolver:
                 f"LangGraph exhausted its step budget ({max_steps} steps) without raising; "
                 "synthesizing from gathered evidence instead of returning its canned apology."
             )
+
+        # Stall-recovery: if the run ended (naturally or by exhaustion) on a run of non-progress
+        # tool results, nudge toward a different approach instead of accepting/synthesizing from
+        # a transcript whose tail is pure noise. Runs BEFORE the coverage gate below so a run
+        # that's merely stuck (not missing a whole candidate) gets a chance to recover first.
+        if self._stall_recovery_gate:
+            episodes = 0
+            while episodes < _STALL_MAX_EPISODES and _trailing_stall_run(messages) >= _STALL_WINDOW:
+                episodes += 1
+                _logger.info(
+                    f"[STALL_RECOVERY] {_trailing_stall_run(messages)} consecutive non-progress "
+                    f"tool result(s); corrective pass {episodes}/{_STALL_MAX_EPISODES}"
+                )
+                ext_messages = list(messages) + [HumanMessage(content=_STALL_CORRECTIVE_MESSAGE)]
+                try:
+                    async for state in graph.astream(
+                        {"messages": ext_messages},
+                        config={"recursion_limit": max(4, _STALL_EXTENSION_STEPS * 2)},
+                        stream_mode="values",
+                    ):
+                        if isinstance(state, dict) and state.get("messages"):
+                            messages = state["messages"]
+                except GraphRecursionError as exc:
+                    recursion_hit = True
+                    run_error = exc
+                    _logger.warning(f"LangGraph stall-recovery extension hit its step budget: {exc}")
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    run_error = exc
+                    _logger.error(f"LangGraph stall-recovery extension failed: {exc}", exc_info=True)
+                    break
+                usages = _extract_usage(messages)
+                final_text = _final_answer(messages)
+                if final_text.strip() == _STEP_EXHAUSTED_TEXT:
+                    recursion_hit = True
+                    final_text = ""
+
+        # Candidate-coverage gate: refuse to accept an answer (natural termination OR step
+        # exhaustion) while the mandate names candidates that were never actually visited.
+        # Applied AT MOST ONCE per run, with a budget SCALED to how many candidates are
+        # missing (see ``_candidate_coverage_extension_steps``) — a fixed size was too small
+        # for wide fan-outs (live-confirmed twice, see that function's docstring). Runs before
+        # the forced-synthesis block below so that block still sees the corrective pass's
+        # newly-visited evidence if the extension ALSO runs out of budget without a clean
+        # final answer.
+        if self._candidate_coverage_gate:
+            named = extract_named_candidates(mandate)
+            if named:
+                cov = evaluate_candidate_coverage_from_haystacks(_visit_haystacks(messages), mandate)
+                if not cov.satisfied:
+                    extension_steps = _candidate_coverage_extension_steps(len(cov.missing))
+                    _logger.info(
+                        f"[CANDIDATE_COVERAGE] {len(cov.missing)}/{len(named)} named candidate(s) "
+                        f"never visited; granting one-time +{extension_steps}-step "
+                        "extension before finalizing"
+                    )
+                    ext_messages = list(messages) + [
+                        HumanMessage(content=_coverage_corrective_message(cov.missing))
+                    ]
+                    try:
+                        async for state in graph.astream(
+                            {"messages": ext_messages},
+                            config={"recursion_limit": max(4, extension_steps * 2)},
+                            stream_mode="values",
+                        ):
+                            if isinstance(state, dict) and state.get("messages"):
+                                messages = state["messages"]
+                    except GraphRecursionError as exc:
+                        recursion_hit = True
+                        run_error = exc
+                        _logger.warning(
+                            f"LangGraph candidate-coverage extension hit its step budget: {exc}"
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        run_error = exc
+                        _logger.error(f"LangGraph candidate-coverage extension failed: {exc}", exc_info=True)
+                    usages = _extract_usage(messages)
+                    final_text = _final_answer(messages)
+                    if final_text.strip() == _STEP_EXHAUSTED_TEXT:
+                        recursion_hit = True
+                        final_text = ""
+
+        # Imitate sequential_react's explicit finish(answer) discipline: once all extensions
+        # above have run, a `finish` call (if any) is the ONLY trusted source of the final
+        # answer — a natural termination that never called it is discarded (not trusted as
+        # deliberate) and falls through to forced synthesis below, exactly like an empty
+        # final_text always has. A real `finish` call's text is used verbatim, never rewritten.
+        if self._require_finish_tool:
+            final_text = _finish_answer(messages) or ""
 
         # Native-arm parity: out of steps (or stopped on a tool call) but evidence in hand ->
         # synthesize a best answer rather than scoring a hard 0 on a run that did the work.

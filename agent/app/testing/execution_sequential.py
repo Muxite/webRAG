@@ -114,6 +114,73 @@ async def _call_tool_with_retry(call, is_empty, retry: ToolRetry):
             await asyncio.sleep(retry.backoff_seconds * attempt)
 
 
+#: A quoted phrase in a search query, e.g. `"Erie Canal"`.
+_QUOTED_PHRASE_RE = re.compile(r'"([^"]+)"')
+
+
+def _reformulate_multi_entity_query(query: Optional[str]) -> Optional[str]:
+    """OR-join a query's quoted phrases when it bundles 2+ distinct entity names.
+
+    Ported from ``idea_engine.py``'s identically-named function (kept as a local pure-function
+    duplicate rather than a cross-module import — no graph dependency either way). Multiple
+    quoted names AND together and rarely appear on one page; OR-joining asks for any of them,
+    which a per-entity lookup needs. Returns ``None`` (no-op) when fewer than two phrases, or the
+    query is already OR-joined.
+
+    :param query: Query string that produced zero results.
+    :return: OR-joined reformulation, or ``None`` if there's nothing to reformulate.
+    """
+    if not query or " OR " in query:
+        return None
+    phrases = _QUOTED_PHRASE_RE.findall(query)
+    if len(phrases) < 2:
+        return None
+    remainder = _QUOTED_PHRASE_RE.sub("", query)
+    remainder = re.sub(r"\s+", " ", remainder).strip()
+    or_joined = " OR ".join(f'"{p}"' for p in phrases)
+    return f"{or_joined} {remainder}" if remainder else or_joined
+
+
+async def _call_search_with_retry(search_fn, query: str, is_empty, retry: ToolRetry):
+    """Like :func:`_call_tool_with_retry`, specialized for SEARCH: on a transient/empty retry,
+    OR-joins a multi-quoted-entity query in place before resending (see
+    :func:`_reformulate_multi_entity_query`) — mirrors ``idea_engine.py``'s
+    ``_reformulate_search_query_if_multi_entity``. Resending an identical AND-shaped query that
+    already returned nothing just fails again; this gives the retry budget a real second attempt
+    instead of a wasted repeat. Only engages when ``retry.enabled`` (same gate as every other
+    retry behavior — no new flag), and only reformulates when the query is actually multi-entity
+    shaped; a normal single-entity query is retried unchanged, exactly as before.
+
+    :param search_fn: ``async (query: str) -> results`` — called fresh each attempt so a
+        reformulated query is actually used.
+    :param query: The original query.
+    :param is_empty: Predicate marking a successful-but-empty payload.
+    :param retry: The arm's retry policy.
+    :returns: ``(result, error, query_used)`` — the last query actually sent, so a caller can
+        report what was searched.
+    """
+    attempt = 0
+    current_query = query
+    while True:
+        try:
+            result, error = await search_fn(current_query), None
+        except Exception as exc:  # noqa: BLE001
+            result, error = None, exc
+        transient = is_transient_tool_error(error) if error is not None else is_empty(result)
+        if not (retry.enabled and transient and attempt < retry.max_attempts):
+            return result, error, current_query
+        attempt += 1
+        _logger.info(f"[TOOL-RETRY] search failure; retrying "
+                     f"(attempt {attempt}/{retry.max_attempts})")
+        if retry.backoff_seconds > 0:
+            await asyncio.sleep(retry.backoff_seconds * attempt)
+        reformulated = _reformulate_multi_entity_query(current_query)
+        if reformulated:
+            _logger.info(f"[TOOL-RETRY] reformulating multi-entity query: "
+                         f"{current_query!r} -> {reformulated!r}")
+            current_query = reformulated
+
+
 def _fmt_search(results: List[Dict[str, str]], k: int) -> str:
     lines = []
     for i, item in enumerate((results or [])[:k], 1):
@@ -205,9 +272,9 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
             else:
                 if norm:
                     seen_queries.add(norm)
-                results, error = await _call_tool_with_retry(
-                    lambda: agent_io.search(query, count=search_k, timeout_seconds=20),
-                    lambda r: not r, retry,
+                results, error, _used_query = await _call_search_with_retry(
+                    lambda q: agent_io.search(q, count=search_k, timeout_seconds=20),
+                    query, lambda r: not r, retry,
                 )
                 obs = f"SEARCH ERROR: {error}" if error is not None else _fmt_search(results or [], search_k)
         elif action == "visit":

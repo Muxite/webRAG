@@ -85,6 +85,24 @@ async def run_offtheshelf_execution(
         # Opt-in, default off: pass even a NATURAL termination through the solver's synthesis
         # pass (see `LangGraphSolver.__init__`). Awaiting a live A/B before it becomes default.
         always_synthesize=os.environ.get("IDEA_TEST_LANGGRAPH_ALWAYS_SYNTHESIZE", "") in ("1", "true", "True"),
+        # DEFAULT ON as of 2026-08-23: refuse to finalize while a named candidate was never
+        # visited (see `LangGraphSolver.__init__`). Live-confirmed twice (single-rep spot check +
+        # a paired 2-rep A/B, n=12: +0.227 mean score, t=2.56, W/T/L 7/5/0, never lost a paired
+        # cell) — see docs/handoffs/BREADTH_STALL_ROOT_CAUSE_20260823.md. Opt OUT with
+        # IDEA_TEST_LANGGRAPH_CANDIDATE_COVERAGE_GATE=0.
+        candidate_coverage_gate=os.environ.get("IDEA_TEST_LANGGRAPH_CANDIDATE_COVERAGE_GATE", "1") not in ("0", "false", "False"),
+        # DEFAULT ON as of 2026-08-23: bound what the model sees per turn (see
+        # `LangGraphSolver.__init__` / `_trim_for_model`). Live-confirmed via a paired 2-rep A/B
+        # (n=12, both conditions with candidate_coverage_gate=1): +0.216 mean score, t=2.23,
+        # W/T/L 6/3/3 — see docs/handoffs/BREADTH_STALL_ROOT_CAUSE_20260823.md. Opt OUT with
+        # IDEA_TEST_LANGGRAPH_CONTEXT_TRIM=0.
+        context_trim=os.environ.get("IDEA_TEST_LANGGRAPH_CONTEXT_TRIM", "1") not in ("0", "false", "False"),
+        # Opt-in, default off: nudge toward a different approach after a run of non-progress tool
+        # results (see `LangGraphSolver.__init__`). Awaiting a live A/B before it becomes default.
+        stall_recovery_gate=os.environ.get("IDEA_TEST_LANGGRAPH_STALL_RECOVERY_GATE", "") in ("1", "true", "True"),
+        # Opt-in, default off: imitate sequential_react's explicit finish(answer) action (see
+        # `LangGraphSolver.__init__`). Awaiting a live A/B before it becomes default.
+        require_finish_tool=os.environ.get("IDEA_TEST_LANGGRAPH_REQUIRE_FINISH_TOOL", "") in ("1", "true", "True"),
     )
 
     started = time.perf_counter()

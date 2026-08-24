@@ -375,6 +375,15 @@ TEST_PRIORITY_ORDER = [
     # the active 59.
     "150",  # Race-and-merge A: 3 redundant routes to one value: bridge main span (subject page / ranked list / no.wikipedia) (6/10) - level=graph, weight=medium
     "151",  # Race-and-merge B: 3 redundant routes to one value: medal award year (laureate page / medal page / off-Wikipedia reference) (7/10) - level=graph, weight=medium
+    # Breadth fan-out re-balance (2026-08-22): the suite had exactly ONE breadth-shaped task (052),
+    # which made the graph engine's parallel fan-out + merge machinery structurally unmeasurable.
+    # 152 is a second, genuinely-independent 7-arm fan-out (no cross-entity dependency at all).
+    "152",  # Breadth B: 7 independent one-hop page reads + argmax: mountain -> first-ascent year (latest = Vinson Massif, 1966) (8/10) - level=graph, weight=long
+    "156",  # Breadth F: 7 independent one-hop page reads + count-with-condition: dams taller than 220 m (8/10) - level=graph, weight=long
+    "153",  # Breadth C: 5 independent one-hop page reads + argmin: ship canal -> completion year (earliest = Erie Canal, 1825) (8/10) - level=graph, weight=long
+    "154",  # Breadth D: 2 independent one-hop page reads + comparison: dam -> structural height (taller = Grande Dixence, 285 m vs Hoover 221.4 m) (7/10) - level=graph, weight=medium
+    "155",  # Breadth E: 2 independent one-hop page reads + comparison: aircraft -> wingspan (wider = Hughes H-4 Hercules, 97.51 m vs An-225 88.4 m) (6/10) - level=graph, weight=medium
+    "157",  # Breadth G: 7 independent one-hop page reads + count-with-condition: bridges with a main span > 1,200 m (8/10) - level=graph, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12

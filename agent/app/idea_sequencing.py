@@ -8,6 +8,7 @@ siblings to decide between parallel and sequential execution.
 from __future__ import annotations
 
 import logging
+import re
 from typing import List, Optional, Tuple
 
 from agent.app.idea_dag import IdeaDag, IdeaNode
@@ -123,6 +124,107 @@ def detect_state_dependencies(
         return True
 
     return False
+
+
+_DIAGNOSTIC_TOKEN_STOPWORDS = frozenset(
+    {
+        "about", "after", "against", "among", "based", "before", "being", "between",
+        "could", "current", "details", "during", "every", "field", "find", "first",
+        "focus", "information", "instruction", "identify", "latest", "least",
+        "might", "other", "provide", "recent", "related", "report", "research",
+        "result", "results", "return", "search", "should", "since", "source",
+        "sources", "specific", "their", "there", "these", "those", "through",
+        "using", "visit", "where", "which", "while", "whose", "would",
+    }
+)
+
+
+def _diagnostic_tokens(text: str) -> set:
+    """Coarse "entity-like" token bag: lowercased alphanumeric words longer than 4 chars."""
+    if not isinstance(text, str):
+        return set()
+    tokens = set()
+    for raw in re.split(r"[^0-9A-Za-z]+", text):
+        if len(raw) > 4 and not raw.isdigit():
+            lowered = raw.lower()
+            if lowered not in _DIAGNOSTIC_TOKEN_STOPWORDS:
+                tokens.add(lowered)
+    return tokens
+
+
+def _candidate_text(node: IdeaNode) -> str:
+    parts = [node.title or ""]
+    for key in ("query", DetailKey.QUERY.value, "instruction", "description", "link_idea"):
+        value = node.details.get(key)
+        if isinstance(value, str):
+            parts.append(value)
+    return " ".join(parts)
+
+
+def log_parallel_batch_diagnostic(
+    graph: IdeaDag,
+    candidate_ids: List[str],
+    parent: IdeaNode,
+    has_dependencies: bool,
+    step_index: int,
+    logger: logging.Logger,
+) -> None:
+    """Log every auto-parallelized sibling batch for offline chain-dependency inspection.
+
+    Pure instrumentation: no caller reads the result, nothing here changes scheduling.
+    Exists to test the hypothesis that :func:`detect_state_dependencies`' two narrow rules
+    miss a chain hop whose QUERY CONTENT depends on the previous hop's answer. The
+    "novel token" heuristic below is deliberately coarse -- a word that shows up in a
+    candidate but nowhere in the parent/root context MAY have come from a resolved prior
+    hop, or may just be phrasing the planner invented. It surfaces candidates for a human
+    to read in the logs; it must not be used to auto-classify anything.
+    """
+    try:
+        nodes = [n for n in (graph.get_node(cid) for cid in candidate_ids) if n is not None]
+        if len(nodes) < 2:
+            return
+
+        root = graph.get_node(graph.root_id())
+        context_text = " ".join(
+            [
+                parent.title or "",
+                str(parent.details.get("description") or ""),
+                str(parent.details.get("instruction") or ""),
+                (root.title or "") if root else "",
+                str(root.details.get("description") or "") if root else "",
+            ]
+        )
+        context_tokens = _diagnostic_tokens(context_text)
+
+        novel_by_node = {}
+        for node in nodes:
+            novel_by_node[node.node_id] = _diagnostic_tokens(_candidate_text(node)) - context_tokens
+
+        shared_novel = sorted(
+            {
+                token
+                for i, a in enumerate(nodes)
+                for b in nodes[i + 1:]
+                for token in (novel_by_node[a.node_id] & novel_by_node[b.node_id])
+            }
+        )
+
+        logger.info(
+            f"[STEP {step_index}] PARALLEL BATCH DIAGNOSTIC: {len(nodes)} candidates, "
+            f"detect_state_dependencies={has_dependencies}, "
+            f"shared_novel_tokens={shared_novel[:8] or 'none'} "
+            f"(coarse diagnostic, not a detector)"
+        )
+        for node in nodes:
+            action = NodeDetailsExtractor.get_action(node.details) or "?"
+            query = NodeDetailsExtractor.get_query(node.details, fallback_title=node.title) or ""
+            logger.info(
+                f"[STEP {step_index}] PARALLEL BATCH DIAGNOSTIC:   {node.node_id[:8]} "
+                f"action={action} title={(node.title or '')[:120]!r} query={query[:200]!r} "
+                f"novel_tokens={sorted(novel_by_node[node.node_id])[:8]}"
+            )
+    except Exception as exc:  # instrumentation must never affect execution
+        logger.debug(f"[STEP {step_index}] PARALLEL BATCH DIAGNOSTIC failed: {exc}")
 
 
 def siblings_are_independent(

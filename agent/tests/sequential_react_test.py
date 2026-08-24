@@ -210,6 +210,68 @@ def test_transient_visit_failure_is_retried_and_recovers_evidence():
     assert "REAL PAGE TEXT" in _observation(io)
 
 
+# --- query reformulation on retry (ported from idea_engine.py's
+# _reformulate_search_query_if_multi_entity: an AND-shaped multi-quoted-entity query that
+# returned nothing just fails again if resent unchanged) ---
+
+def test_reformulate_multi_entity_query_or_joins_quoted_phrases():
+    out = seq._reformulate_multi_entity_query('"Erie Canal" "Suez Canal" opening year')
+    assert out == '"Erie Canal" OR "Suez Canal" opening year'
+
+
+def test_reformulate_multi_entity_query_none_for_single_phrase():
+    assert seq._reformulate_multi_entity_query('"Erie Canal" opening year') is None
+
+
+def test_reformulate_multi_entity_query_none_for_no_quotes():
+    assert seq._reformulate_multi_entity_query("Erie Canal opening year") is None
+
+
+def test_reformulate_multi_entity_query_none_when_already_or_joined():
+    assert seq._reformulate_multi_entity_query('"Erie Canal" OR "Suez Canal"') is None
+
+
+def test_reformulate_multi_entity_query_none_for_empty():
+    assert seq._reformulate_multi_entity_query("") is None
+    assert seq._reformulate_multi_entity_query(None) is None
+
+
+def test_search_retry_reformulates_a_multi_entity_query_that_returned_nothing():
+    decisions = [
+        {"thought": "look", "action": "search", "args": {"query": '"Erie Canal" "Suez Canal"'}},
+        {"thought": "done", "action": "finish", "args": {"answer": "A"}},
+    ]
+    io = _agent_io(decisions)
+    io.search = AsyncMock(side_effect=[
+        [],  # first attempt: the AND-shaped query returns nothing
+        [{"title": "T", "url": "https://en.wikipedia.org/wiki/X", "description": "d"}],
+    ])
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, retry=_RETRY_ON))
+    assert io.search.await_count == 2
+    second_call_query = io.search.await_args_list[1].args[0]
+    assert second_call_query == '"Erie Canal" OR "Suez Canal"'
+
+
+def test_search_retry_does_not_reformulate_a_single_entity_query():
+    """A normal (non-multi-entity) query is retried UNCHANGED, exactly as before this fix."""
+    io = _agent_io(_SEARCH_THEN_FINISH)
+    io.search = AsyncMock(side_effect=[[], [{"title": "T", "url": "u", "description": "d"}]])
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, retry=_RETRY_ON))
+    assert io.search.await_args_list[0].args[0] == "q"
+    assert io.search.await_args_list[1].args[0] == "q"
+
+
+def test_search_retry_reformulation_is_inert_when_retry_flag_off():
+    decisions = [
+        {"thought": "look", "action": "search", "args": {"query": '"Erie Canal" "Suez Canal"'}},
+        {"thought": "done", "action": "finish", "args": {"answer": "A"}},
+    ]
+    io = _agent_io(decisions)
+    io.search = AsyncMock(return_value=[])
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512))  # retry defaults off
+    assert io.search.await_count == 1  # no retry at all -> no reformulation attempted either
+
+
 def test_permanent_visit_failure_is_not_retried():
     # 403 bot-block: re-running it only burns budget — the graph arm doesn't retry it either.
     io = _agent_io(_VISIT_THEN_FINISH)

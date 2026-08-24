@@ -179,8 +179,30 @@ def _fuzzy_contains(candidate: str, haystack: str) -> bool:
     return False
 
 
-def _node_haystacks(graph) -> List[str]:
-    """One searchable text blob per SUCCESSFULLY-VISITED page in the graph.
+#: A visited page's own body, past this many chars, no longer counts as its "lede" for the
+#: body-fallback match below — a comparison table or "See also" section deep in a LONG page
+#: mentioning a DIFFERENT candidate by name must not count as evidence that page is ABOUT that
+#: candidate. Roughly one infobox + opening paragraph's worth of text.
+_BODY_LEDE_CHARS = 1000
+
+
+@dataclass
+class Haystack:
+    """One visited page's searchable text, split so coverage matching can tell "this page IS
+    about the candidate" (``identity`` — title/h1/url) from "the candidate's name merely
+    appears somewhere in the page" (``body``). See :func:`evaluate_candidate_coverage_from_haystacks`
+    for why the distinction matters — matching only against a merged blob let a candidate
+    resolve off an INCIDENTAL mention on a DIFFERENT visited page (e.g. a "List of Seven
+    Summits" cross-reference table on an unrelated mountain's article), live-observed as
+    ``visit_count`` scoring lower than ``coverage`` on several 2026-08-23 breadth-suite cells.
+    """
+
+    identity: str
+    body: str = ""
+
+
+def _node_haystacks(graph) -> List[Haystack]:
+    """One searchable ``Haystack`` per SUCCESSFULLY-VISITED page in the graph.
 
     A candidate is only credited as "resolved" when a real page was OPENED for it —
     i.e. a node carries a successful ``visit`` action_result. We deliberately ignore
@@ -188,11 +210,9 @@ def _node_haystacks(graph) -> List[str]:
     candidate name, so matching against it would trivially "resolve" all candidates
     with zero navigation) and search-action results (search returns only engine
     snippets that mention a candidate's NAME without ever reading its criterion, which
-    is exactly the short-circuit this gate exists to prevent). The disambiguating fact
-    (e.g. a river's mouth in the infobox) lives on the page body, so we match against
-    the visited page's title, url, and content only.
+    is exactly the short-circuit this gate exists to prevent).
     """
-    blobs: List[str] = []
+    blobs: List[Haystack] = []
     for node in graph.iter_depth_first():
         details = getattr(node, "details", {}) or {}
         ar = details.get(DetailKey.ACTION_RESULT.value)
@@ -202,13 +222,15 @@ def _node_haystacks(graph) -> List[str]:
             and ar.get("success")
         ):
             continue
-        parts: List[str] = []
-        for key in ("page_title", "h1_text", "title", "url", "source_url", "content"):
+        identity_parts: List[str] = []
+        for key in ("page_title", "h1_text", "title", "url", "source_url"):
             val = ar.get(key)
             if isinstance(val, str) and val:
-                parts.append(val)
-        if parts:
-            blobs.append(" | ".join(parts))
+                identity_parts.append(val)
+        content = ar.get("content")
+        body = content if isinstance(content, str) else ""
+        if identity_parts or body:
+            blobs.append(Haystack(identity=" | ".join(identity_parts), body=body))
     return blobs
 
 
@@ -220,6 +242,59 @@ class CandidateCoverageResult:
     named: List[str] = field(default_factory=list)
     resolved: List[str] = field(default_factory=list)
     missing: List[str] = field(default_factory=list)
+    #: name -> "identity" | "body_lede", for whichever candidates resolved. Lets a forensic
+    #: pass tell "a page ABOUT this candidate was visited" from "the name showed up in some
+    #: other visited page's lede" without needing a full message-capture rerun.
+    resolved_via: dict = field(default_factory=dict)
+
+
+def evaluate_candidate_coverage_from_haystacks(
+    haystacks: List[Haystack], mandate: str
+) -> CandidateCoverageResult:
+    """Report whether every enumerated candidate named in ``mandate`` resolves against at
+    least one of ``haystacks`` (pages actually opened).
+
+    The graph-independent core of :func:`evaluate_candidate_coverage`, split out so any
+    executor with its own notion of "a page I actually opened" (e.g. an arm built on a
+    linear message history instead of an ``IdeaDag``) can reuse the same deterministic
+    coverage check without depending on the native engine's graph type.
+
+    Matching is IDENTITY-PRIORITY: a candidate resolves if its name fuzzy-matches a visited
+    page's ``identity`` (title/h1/url — "this page IS about the candidate") first; only if no
+    page's identity matches does an incidental mention in the first ``_BODY_LEDE_CHARS`` of
+    some page's ``body`` count (a narrow fallback for pages whose title doesn't literally
+    repeat the candidate's name, e.g. a disambiguated or renamed subject) — never a mention
+    anywhere deeper in a page's body, which is exactly the false-positive this split exists to
+    close (live-observed: a fan-out candidate credited as "covered" via a comparison table on
+    a DIFFERENT visited page, without its own page ever being opened).
+
+    Fails OPEN: when the mandate names no enumerable candidates, ``satisfied`` is True.
+    """
+    named = extract_named_candidates(mandate)
+    if not named:
+        return CandidateCoverageResult(satisfied=True, named=[], resolved=[], missing=[])
+
+    resolved: List[str] = []
+    missing: List[str] = []
+    resolved_via: dict = {}
+    for name in named:
+        via = None
+        if any(_fuzzy_contains(name, hs.identity) for hs in haystacks):
+            via = "identity"
+        elif any(_fuzzy_contains(name, hs.body[:_BODY_LEDE_CHARS]) for hs in haystacks if hs.body):
+            via = "body_lede"
+        if via:
+            resolved.append(name)
+            resolved_via[name] = via
+        else:
+            missing.append(name)
+    return CandidateCoverageResult(
+        satisfied=len(missing) == 0,
+        named=named,
+        resolved=resolved,
+        missing=missing,
+        resolved_via=resolved_via,
+    )
 
 
 def evaluate_candidate_coverage(graph, mandate: str) -> CandidateCoverageResult:
@@ -238,21 +313,4 @@ def evaluate_candidate_coverage(graph, mandate: str) -> CandidateCoverageResult:
     mandates with no enumerated name list at all: chains, parallel merges, prose
     mandates, and numbered INSTRUCTION lists (rejected by the imperative-verb guard).
     """
-    named = extract_named_candidates(mandate)
-    if not named:
-        return CandidateCoverageResult(satisfied=True, named=[], resolved=[], missing=[])
-
-    haystacks = _node_haystacks(graph)
-    resolved: List[str] = []
-    missing: List[str] = []
-    for name in named:
-        if any(_fuzzy_contains(name, hay) for hay in haystacks):
-            resolved.append(name)
-        else:
-            missing.append(name)
-    return CandidateCoverageResult(
-        satisfied=len(missing) == 0,
-        named=named,
-        resolved=resolved,
-        missing=missing,
-    )
+    return evaluate_candidate_coverage_from_haystacks(_node_haystacks(graph), mandate)

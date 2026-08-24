@@ -34,6 +34,7 @@ from agent.app.idea_policies.base import DetailKey, IdeaActionType
 from agent.app.idea_sequencing import (
     defer_unresolved_slot_candidates,
     detect_state_dependencies,
+    log_parallel_batch_diagnostic,
     siblings_are_independent,
 )
 
@@ -460,3 +461,59 @@ def test_no_slot_bearing_candidates_returns_ready_children_unchanged():
     assert kept == ready
     assert "__dataflow_deferred_step" not in a.details
     assert "__dataflow_deferred_step" not in c.details
+
+
+# --- log_parallel_batch_diagnostic (pure instrumentation, no behavior) -------------
+
+
+def test_parallel_batch_diagnostic_surfaces_shared_novel_token(caplog):
+    # Two siblings both mention an entity ("Zephyrus") absent from the parent/root
+    # context -- the coarse cue that a hop's query content came from a prior answer.
+    graph = IdeaDag(root_title="Compare two cloud vendors", root_details={})
+    root_node = graph.get_node(graph.root_id())
+    a = graph.add_child(graph.root_id(), "search A", {
+        DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+        DetailKey.QUERY.value: "Zephyrus pricing tiers",
+    })
+    b = graph.add_child(graph.root_id(), "search B", {
+        DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+        DetailKey.QUERY.value: "Zephyrus uptime record",
+    })
+
+    with caplog.at_level(logging.INFO):
+        log_parallel_batch_diagnostic(
+            graph, [a.node_id, b.node_id], root_node, False, 3, _LOGGER,
+        )
+
+    text = caplog.text
+    assert "PARALLEL BATCH DIAGNOSTIC" in text
+    assert "detect_state_dependencies=False" in text
+    assert "zephyrus" in text
+    assert "Zephyrus pricing tiers" in text
+
+
+def test_parallel_batch_diagnostic_ignores_tokens_from_parent_context(caplog):
+    graph = IdeaDag(root_title="Compare Zephyrus and Borealis", root_details={})
+    root_node = graph.get_node(graph.root_id())
+    a = graph.add_child(graph.root_id(), "search A", {
+        DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+        DetailKey.QUERY.value: "Zephyrus pricing",
+    })
+    b = graph.add_child(graph.root_id(), "search B", {
+        DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+        DetailKey.QUERY.value: "Borealis headcount",
+    })
+
+    with caplog.at_level(logging.INFO):
+        log_parallel_batch_diagnostic(
+            graph, [a.node_id, b.node_id], root_node, False, 1, _LOGGER,
+        )
+
+    assert "shared_novel_tokens=none" in caplog.text
+
+
+def test_parallel_batch_diagnostic_never_raises_on_bad_input(caplog):
+    graph = _graph()
+    with caplog.at_level(logging.INFO):
+        log_parallel_batch_diagnostic(graph, ["missing-a", "missing-b"], None, False, 0, _LOGGER)
+    assert "PARALLEL BATCH DIAGNOSTIC:" not in caplog.text
