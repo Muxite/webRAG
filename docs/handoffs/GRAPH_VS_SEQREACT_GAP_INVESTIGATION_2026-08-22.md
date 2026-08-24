@@ -215,3 +215,286 @@ it.
 - Whether `race_value_agreement`-style correctness niches generalize beyond the specific
   contradictory-source shape, or whether that's the ONLY defensible niche once breadth is
   properly tested and (possibly) also fails to show an advantage.
+
+---
+
+## Cycle 0 addendum: partial post-compaction-fix token re-measurement (script-only, $0)
+
+The `ladder_langgraph_20260822`/`ladder_seqreact_20260822` runs referenced above as "in-flight"
+were hard-killed (SIGTERM) before finishing: 40/72 `langgraph_react` cells and 21/72
+`sequential_react` cells landed (`core24`, `good_adaptive`, qwen2.5:7b, 3 reps). A new script,
+`scripts/analyze_ladder_langgraph_vs_seqreact_20260822.py` (adapted from
+`analyze_ladder_final_20260822.py`), pairs strictly on `(task_id, rep)` present in BOTH engines
+— all 19 unmatched `langgraph_react`-only cells were dropped, not compared.
+
+**Paired n = 20** (of 21 matched keys; 1 dropped for `infra_failed`). This is far below the 144
+cells (72/engine) originally planned — treat everything below as directional, not confirmatory.
+
+- **Score delta (graph − seq_react): −0.008** (langgraph_react mean 0.625 vs sequential_react
+  0.633), sd=0.406, t=−0.08. Statistically indistinguishable from zero; W/T/L = 13/1/6 in raw
+  counts is misleadingly graph-favorable given the near-zero mean — the wins and losses are
+  large and cancel.
+- **Prompt-token delta (graph − seq_react): +3,106** (langgraph_react mean 35,464 vs
+  sequential_react 32,357 prompt tokens), sd=34,359, t=0.40 — also statistically indistinguishable
+  from zero.
+- **Total-token delta: +2,613** (36,140 vs 33,528), same story.
+
+**The headline finding: the previously-reported ~58k/19k (roughly 3x) token gap between graph
+and seq_react is NOT visible in this partial re-measurement.** Both engines now cluster around
+32-36k prompt tokens on this partial `core24` sample — the gap, if it still exists, is at most
+~10% here, not 3x. This is consistent with (though does not prove) the merge-compaction fix
+landed earlier this session having closed most of the previously-measured gap, since that fix
+directly targeted the runaway prompt-token growth in merge steps. It could equally be sampling
+noise from the specific 20 surviving task/rep cells (sd is ~10x the mean on both score and
+token deltas) — n=20 cannot distinguish "gap closed" from "gap unchanged, got unlucky sampling."
+
+**Recommendation: queue a full clean 144-cell re-run before drawing any conclusion.** This
+partial result is intriguing enough (a 3x gap apparently vanishing) to be worth the $0 local
+compute to confirm properly, but it is not evidence on its own — the SD relative to the mean is
+too large, and the sample is neither the full task set nor evenly split across reps. Do not
+update the "58k/19k" figure anywhere else in this document or in MEMORY.md based on this
+partial run; only a completed, non-killed 144-cell run should be treated as authoritative.
+
+---
+
+## 2026-08-23 addendum: FULL 144-cell post-compaction-fix re-measurement (script-only, $0)
+
+> **RETRACTED 2026-08-23 (later same day).** This addendum's `ladder_langgraph_full_20260823`/
+> `ladder_seqreact_full_20260823` runs were later discovered to have executed against a DEAD
+> Serper search key (403 Unauthorized on every call) -- verified via
+> `grep -c "Setup failed\|Serper health probe failed" .../cell_logs/*.log` showing hits in all
+> 72/72 cell logs for both run-ids, zero successful searches anywhere in the run. Every number
+> below is therefore an artifact of a fully-ungrounded search backend, not a measurement of the
+> graph vs sequential_react comparison. Do not cite the +0.167/p≈0.0003 score result or the
+> -12,291/p≈0.0013 token result anywhere as current state. See the "2026-08-23 REDUCED-SCOPE
+> re-run (grounding restored)" section at the end of this document for the corrected,
+> properly-grounded replacement measurement.
+
+
+The full clean re-run recommended in the Cycle 0 addendum above has now completed both halves:
+`ladder_langgraph_full_20260823` (72/72 `langgraph_react` cells) and
+`ladder_seqreact_full_20260823` (72/72 `sequential_react` cells) — `core24`, `good_adaptive`,
+qwen2.5:7b, 3 reps/task, the full 144-cell matrix originally planned, no kills this time. A new
+script, `scripts/analyze_ladder_langgraph_vs_seqreact_full_20260823.py` (adapted from the
+Cycle 0 script, same paired-on-`(task_id, rep)` methodology), was run against both.
+
+**Paired n = 70** (of 72 matched keys; 2 dropped for `infra_failed`, 0 missing scores, 0 unmatched
+task/rep — both engines finished every planned cell). This is an adequately-powered result, not
+the underpowered n=20 partial sample from Cycle 0.
+
+- **Score delta (graph − seq_react): +0.167** (langgraph_react mean 0.645 vs sequential_react
+  mean 0.479), sd=0.365, t=3.83, df=69, **p≈0.0003 — significant.** W/T/L = 44/15/11, graph-favorable
+  and consistent with the mean this time (not cancelling large opposite swings as in Cycle 0).
+- **Prompt-token delta (graph − seq_react): −12,291** (langgraph_react mean 20,577 vs
+  sequential_react mean 32,868 prompt tokens), sd=30,706, t=−3.35, df=69, **p≈0.0013 —
+  significant.**
+- **Total-token delta: −13,162** (21,007 vs 34,169), t=−3.52, df=69, **p≈0.0008 — significant.**
+
+**Updated verdict: the previously-reported ~58k/19k (≈3x) token gap does NOT hold up at full
+power, and the direction has reversed from the original claim.** The graph engine
+(`langgraph_react`) now uses *fewer* prompt tokens than `sequential_react` (20.6k vs 32.9k, a
+~1.6x gap in the OPPOSITE direction from the original 58k/19k figure, which had graph as the
+expensive engine), and scores significantly higher on `core24` under `good_adaptive`
+(qwen2.5:7b) at the same time — i.e. this result is not "cheaper but worse," it's cheaper AND
+better. This corroborates the Cycle 0 partial finding that the merge-compaction fix closed the
+original token gap, and goes further: with full statistical power, what remains is a
+significant score win and a significant token win for the graph engine, not a wash. The
+original 58k/19k figure predates the merge-compaction fix and should now be treated as
+superseded, not merely "unconfirmed" — do not cite it as current state anywhere in this
+document, MEMORY.md, or elsewhere without this addendum attached.
+
+**Caveats before generalizing:** this is one task set (`core24`), one model (qwen2.5:7b), one
+strategy arm (`good_adaptive`) — it does not by itself settle the Section-3/breadth-shaped-task
+open question above (that still requires the dedicated breadth-task authoring work), and 2
+cells were dropped for infra failure rather than retried. But as a same-conditions,
+same-script, fully-powered re-run of exactly the comparison Cycle 0 flagged as noise-limited,
+this is now confirmatory: post-compaction-fix, the graph engine is not merely at token parity
+with `sequential_react` on `core24` — it is both cheaper and higher-scoring.
+
+---
+
+## 2026-08-23 Cycle 2 addendum: dependency-detection-gap diagnostic on `diag_parallel_dep_20260823` (log-analysis-only, $0)
+
+> **RETRACTED 2026-08-23 (later same day).** The `diag_parallel_dep_20260823` run analyzed
+> below also executed against the same dead Serper key as the FULL 144-cell re-run above (same
+> root cause, same day). The 18 cells' search calls all failed setup; any batch that appeared
+> to reach `detect_state_dependencies` did so with zero real page content available, which may
+> or may not have affected which batches were even reachable. Treat this diagnostic's "RULED
+> OUT" verdict as unconfirmed pending a re-run under a live search backend -- it has NOT been
+> re-run as part of the 2026-08-23 reduced-scope grounding-restored re-run (that re-run covers
+> only the langgraph_react vs sequential_react score/token comparison, not this diagnostic).
+
+
+The `diag_parallel_dep_20260823` run (18 cells: 9 `core24` chain-shaped tasks x ~2 reps, native
+graph engine, `auto_parallel_siblings` instrumented) was analyzed via
+`cell_logs/*.log` under `agent/idea_test_results/_diag_parallel_dep_20260823/`. Grepping for
+`[STEP N] PARALLEL BATCH DIAGNOSTIC: <n> candidates, detect_state_dependencies=...` summary
+lines (excluding the per-candidate breakdown lines that follow each summary) found **5 fired
+diagnostic events** across the 18 cells — only 5 of 18 cells actually produced a sibling batch
+that reached the parallelization check; the rest either had no parallel-eligible siblings or
+never reached this step. All 21 raw grep matches (5 summaries + 16 per-candidate breakdown
+lines) are accounted for.
+
+**All 5 summary events had `detect_state_dependencies=False`** (0 had `True`) — i.e. the
+existing detector never flagged a dependency on this sample, consistent with these being chain
+tasks where the detector is expected to be exercised. Of those 5, **only 1 had a non-empty
+`shared_novel_tokens`**: task 138 (`rep1_138`), `shared_novel_tokens=['contains']`, from two
+candidates — `"Visit the page that contains information about Mount Everest name proposal"`
+and `"Visit the page that contains information about the Great Trigonometrical Survey"`. This
+is a **false positive**: `'contains'` is generic templated phrasing shared by both leaf
+prompts' boilerplate ("Visit the page that contains information about..."), not a proper
+noun/entity resolved from a prior hop. Judged against the task: the two candidates are
+independently-answerable sub-facts (Everest's proposer, the Survey), not a real chain
+dependency — correctly left unparallelized-safe by the existing detector.
+
+The other 4 non-empty-token-adjacent findings across all 5 cells were `novel_tokens=['identified']`
+on individual candidates (e.g. "Visit the identified bridge's page", "Visit the identified
+steamship page") — but critically these never appeared as *shared* across 2+ candidates in the
+same batch (`shared_novel_tokens=none` for those batches), because in each case only one
+candidate in the pair referenced "the identified X" while its sibling used the concrete name
+directly. No batch showed a shared entity-bearing token across candidates that the detector
+missed.
+
+**Verdict: RULED OUT.** Zero genuine dependency-detection-gap hits found in this sample — the
+one qualifying hit (task 138) is a templated-phrasing false positive, not a real missed
+dependency. This does not prove the detector is complete (n=5 fired events is small and 13/18
+cells never exercised the parallel path at all), but it gives no evidence for a companion
+scheduling/detection fix. **Recommendation: a future chain-deficit fix cycle should focus on
+extraction-step work alone; do not budget scope for a parallel-dependency-detection fix
+alongside it** unless a larger/differently-sampled diagnostic run surfaces a genuine hit.
+
+---
+
+## 2026-08-23 REDUCED-SCOPE re-run (grounding restored) — SUPERSEDES the retracted 2026-08-23 addenda above
+
+**Why this exists**: the full 144-cell re-run and the Cycle 2 dependency-detection diagnostic
+above were both discovered to have run against a DEAD Serper search key (403 Unauthorized) —
+`grep -c "Setup failed\|Serper health probe failed"` hit in all 72/72 cell logs of
+`ladder_langgraph_full_20260823`/`ladder_seqreact_full_20260823`, zero successful searches
+anywhere. Both addenda are now marked RETRACTED in place above. The root cause was an env-var
+mixup: `SEARCH_API_KEY` (an old, separately-exhausted Brave key still present in
+`services/keys.env`) was live in the shell instead of `SERPER_KEY`, the key
+`services/shared/connector_config.py` actually prefers when set. The user confirmed Serper
+credits are restored and `SERPER_KEY` returns HTTP 200 with real results.
+
+**Scope reduction**: rather than repeat the full 144-cell matrix, this re-run uses an 8-task
+subset of `core24` (fewer tasks, same 3 reps/task) to get back to a grounded, statistically
+usable result faster.
+
+### 1. Grounding fix verified BEFORE spending any run time
+
+A single smoke-test cell (`smoke_serper_check_20260823`, task 134, `good_adaptive`,
+qwen2.5:7b, `langgraph_react`, rep1) was run first and its cell log inspected directly:
+
+- `grep -c "Setup failed\|Serper health probe failed"` → **0** across all 3 smoke cell logs.
+- The log shows `ConnectorSearchSerper: Probing Serper search API...` immediately followed by
+  `ConnectorSearchSerper: Serper search API OPERATIONAL`.
+- The resulting deliverable cited a real, resolved URL with real content: *"The total length of
+  the Garabit viaduct, which was engineered by Gustave Eiffel and spans the Truyère river gorge
+  in the Massif Central of France, is 565 metres (1,854 ft). Sources: - Wikipedia: [Garabit
+  viaduct](https://en.wikipedia.org/wiki/Garabit_viaduct)"* — a real URL, not a leaf-id echo,
+  score 0.65, `infra_failed: false`, visit count 1.
+
+Only after this passed did the full 8-task run launch.
+
+### 2. Task selection — 8 of `core24`, 2 per shape family
+
+`core24` (`agent/app/BENCHMARK_SUITE_50.md` line 35-38) splits cleanly into 4 shape families of
+6 tasks each: **A survivor/branch-eliminate** (122-127), **B conflicting-source** (128-133),
+**C stop/continue chain** (134-139), **D re-expansion trigger** (140-145). Picked 2 per family,
+spanning distinct domains within each family rather than adjacent task IDs:
+
+- **122** (radio-telescopes/FAST) and **126** (handhelds/Microvision) — survivor family, two
+  unrelated domains (astronomy vs consumer electronics).
+- **128** (Pluto diameter) and **132** (MLB batting leader) — conflicting-source family, a
+  physical-measurement conflict vs a sports-record conflict (different conflict mechanics).
+- **134** (Eiffel→Garabit) and **137** (Telford→Pontcysyllte) — stop/continue chain family, two
+  different engineer→structure chains.
+- **141** (Curium density) and **144** (RRS Sir David Attenborough length) — re-expansion
+  trigger family; both of these also carry the suite's "un-gated breadth diagnostic" secondary
+  signal (`BENCHMARK_SUITE_50.md` line 119), so this pair gets a small amount of breadth-signal
+  coverage as a bonus, on top of being the primary re-expansion shape.
+
+This spans all 4 core24 shape families (not just the first 8 task IDs, which would have been
+122-129 — all survivor + conflicting-source, missing chain and re-expansion entirely) while
+keeping the run small enough to finish in under an hour of GPU-serialized local compute.
+
+### 3. Run configuration
+
+```
+PYTHONPATH=.:services:agent ./.venv/bin/python scripts/adaptive_ladder_run.py \
+  --run-id ladder_reduced_20260823_graph --axis e1_dedup_local \
+  --tasks 122,126,128,132,134,137,141,144 \
+  --arms good_adaptive --variant langgraph_react --jobs 4
+
+PYTHONPATH=.:services:agent ./.venv/bin/python scripts/adaptive_ladder_run.py \
+  --run-id ladder_reduced_20260823_seqreact --axis e1_dedup_local \
+  --tasks 122,126,128,132,134,137,141,144 \
+  --arms good_adaptive --variant sequential_react --jobs 4
+```
+
+`e1_dedup_local` is reused purely for its ladder table (qwen2.5:7b via `badmodel-ollama`,
+reps=3 baked into the axis) — `--arms good_adaptive` selects the single arm needed, matching
+the retracted run's config. `langgraph_react` is confirmed (VERIFIED, `agent/app/
+langgraph_solver.py:301`, `agent/app/idea_test_runner.py:1076-1078`) as this repo's own native
+graph engine registered under that execution-variant label, the same variant the retracted
+`ladder_langgraph_full_20260823` used — not off-the-shelf LangGraph's `create_react_agent`. Both
+drivers ran concurrently (isolated run-ids, embedded per-cell Chroma, GPU-serialized by
+`badmodel-ollama`'s single-loaded-model slot) — 24 cells/engine, 48 total, all completed with no
+kills.
+
+### 4. Grounding verification for the WHOLE run (not just the smoke cell)
+
+```
+grep -c "Setup failed\|Serper health probe failed" \
+  agent/idea_test_results/_ladder_reduced_20260823_graph/cell_logs/*.log      → 0 across all 24 logs
+grep -c "Setup failed\|Serper health probe failed" \
+  agent/idea_test_results/_ladder_reduced_20260823_seqreact/cell_logs/*.log   → 0 across all 24 logs
+```
+
+All 48 cell logs (24 + 24) show `Serper search API OPERATIONAL`. `infra_failed` count: 0/24 on
+both engines. This is a clean, fully-grounded run — no repeat of the earlier dead-key failure
+mode anywhere in the 48-cell matrix.
+
+### 5. Paired results
+
+`scripts/analyze_ladder_reduced_20260823.py` (adapted from `analyze_ladder_langgraph_vs_
+seqreact_full_20260823.py`, same paired-on-`(task_id, rep)` methodology, restricted to the
+8-task subset):
+
+- **Paired n = 24** (of 24 matched keys; 0 missing score, 0 infra-failed — every planned cell on
+  both engines parsed cleanly and paired).
+- **SCORE mean delta (graph − seq_react): +0.142** (langgraph_react mean 0.673 vs
+  sequential_react mean 0.531), sd=0.286, t=2.43, df=23, **p≈0.023 — significant.** W/T/L =
+  18/0/6, graph-favorable and directionally consistent with the retracted full-144-cell run's
+  +0.167 (though this is a different, smaller task set and cannot be treated as confirming that
+  exact magnitude).
+- **PROMPT TOKENS mean delta (graph − seq_react): −4,448.8** (langgraph_react mean 12,043 vs
+  sequential_react mean 16,492 prompt tokens), sd=19,918.0, t=−1.09, df=23, **p≈0.287 — not
+  significant.**
+- **TOTAL TOKENS mean delta: −4,673.3** (12,359 vs 17,033), t=−1.13, **p≈0.28 — not
+  significant.**
+
+### 6. Reading the result
+
+The score result reproduces the qualitative direction of the retracted full-144-cell finding —
+graph beats sequential_react, not the other way around — under a properly grounded search
+backend, on a different (smaller, shape-balanced) 8-task subset with independent randomness.
+This is corroborating, not confirmatory: n=24 here vs n=70 in the retracted run, a different
+task mix, and the retracted run's own numbers cannot be cited as a magnitude reference since
+they were measured with zero working searches. The token result, unlike the retracted run's
+significant −12,291 finding, is NOT significant here (p≈0.29) — both engines cluster closer
+together on prompt tokens on this smaller task set (12.0k vs 16.5k, a real but noisy ~27%
+difference, not the ~1.6x/p<0.01 result claimed in the now-retracted addendum). Given the
+retracted run's token numbers were themselves collected under total search failure (every
+search call short-circuited to a "Setup failed" error rather than doing real work), that
+prior number cannot be trusted as a token-cost baseline either — this reduced-scope run is the
+first grounded token measurement available for this comparison.
+
+**Recommendation**: this reduced-scope result is adequate to restore confidence that "graph
+beats sequential_react on core24 under good_adaptive/qwen2.5:7b" is real (not an artifact of the
+earlier dead-key run, since it reproduces under a live search backend on an independent task
+sample) but is underpowered relative to the original 144-cell plan for the token-cost claim
+specifically. If the token-cost magnitude matters for a downstream decision, re-run the
+remaining 16 `core24` tasks (not yet covered by this 8-task subset) under the same grounded
+conditions before citing a specific token-savings number.
