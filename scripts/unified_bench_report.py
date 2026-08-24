@@ -95,6 +95,15 @@ try:
 except Exception:  # noqa: BLE001
     _is_local_row_impl = None
 
+# Same convention: the one shared "/" -> "-" (":" untouched) result-filename rule, also used by
+# idea_test_runner.py (composing) and eval_strategy_library_generalization.py (parsing), instead
+# of a fourth hand-rolled .replace("/", "-").
+try:
+    from agent.app.trace_recorder import sanitize_model_component as _sanitize_model_component
+except Exception:  # noqa: BLE001
+    def _sanitize_model_component(value: str) -> str:  # type: ignore[misc]
+        return (value or "").replace("/", "-")
+
 DEFAULT_CELLS = _ROOT / "badmodel-lab" / "results" / "cells.jsonl"
 DEFAULT_CODE_RUNS = _ROOT / "codebench" / "results" / "runs.jsonl"
 
@@ -186,7 +195,8 @@ def _run_id_from_filename(name: str, *, model: Optional[str], variant: Optional[
     """
     stem = name[: -len(".json")] if name.endswith(".json") else name
     stem = _RUN_IDX_SUFFIX_RX.sub("", stem)
-    for part in (variant, (model or "").replace("/", "-"), task_id):
+    safe_model = _sanitize_model_component(model) if model else ""
+    for part in (variant, safe_model, task_id):
         if part and stem.endswith("_" + str(part)):
             stem = stem[: -(len(str(part)) + 1)]
     return stem

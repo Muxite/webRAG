@@ -57,6 +57,7 @@ from agent.app.testing.utils import summarize_observability
 from agent.app.testing.tooling import profile_for_variant
 from agent.app.idea_graph_analyzer import add_graph_visualization
 from agent.app.testing.report import TestReportGenerator, Verbosity
+from agent.app.trace_recorder import sanitize_model_component
 
 
 def _browser_fallback_enabled() -> bool:
@@ -1449,7 +1450,12 @@ async def run_single_test(
 
         tier_tag = f"_t{effort_tier}" if effort_tier else ""
         cfg_tag = f"_cfg{_settings_fingerprint(variant_specific_settings)}"
-        safe_model = normalized.replace("/", "-")
+        # Shared with scripts/eval_strategy_library_generalization.py and
+        # scripts/unified_bench_report.py via agent.app.trace_recorder.sanitize_model_component
+        # so the one "/" -> "-" (":" untouched) convention can't drift into three copies again.
+        # Output must stay byte-identical to the old `normalized.replace("/", "-")` for every
+        # real model id -- see agent/tests/idea_test_runner_result_filename_test.py.
+        safe_model = sanitize_model_component(normalized)
         out_path = (
             results_dir
             / f"{run_id}_{test_id}_{safe_model}_{execution_variant}{tier_tag}{cfg_tag}_r{repeat_index}.json"

@@ -49,6 +49,7 @@ for _p in (_ROOT, _ROOT / "services", _ROOT / "agent"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+from agent.app.trace_recorder import sanitize_model_component  # noqa: E402
 from agent.app.strategy_library.authoring import record_evaluation  # noqa: E402
 from agent.app.strategy_library.retrieval import (  # noqa: E402
     ENV_INCLUDE_UNPROMOTED,
@@ -100,7 +101,10 @@ def load_arm(
     variant: str = DEFAULT_VARIANT,
 ) -> List[Dict[str, Any]]:
     """Every result JSON of one (run, task) cell, in repeat order."""
-    safe_model = (model or "").replace("/", "-")
+    # Shared with idea_test_runner.py's result-filename convention (and
+    # scripts/unified_bench_report.py's inverse parse) via
+    # agent.app.trace_recorder.sanitize_model_component: "/" -> "-", ":" untouched.
+    safe_model = sanitize_model_component(model) if model else ""
     pattern = f"{run_id}_{task_id}_{safe_model or '*'}_{variant}*_r*.json"
     out: List[Dict[str, Any]] = []
     for path in sorted(results_dir.glob(pattern)):

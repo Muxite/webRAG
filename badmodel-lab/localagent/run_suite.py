@@ -56,7 +56,15 @@ def main() -> int:
         tools = build_default_tools(web_tool=web_tool)
         for task in tasks:
             for rep in range(1, args.reps + 1):
-                wd = workroot / model.replace(":", "-") / task.id / str(rep)
+                # Sanitize BOTH filesystem-hostile chars in a model id: the OpenRouter "/"
+                # (e.g. "openai/gpt-4.1-nano") as well as the Ollama-tag ":" (e.g.
+                # "qwen2.5:7b") -- "/" alone would still create an unintended nested
+                # directory for OpenRouter-style ids. Mirrors
+                # agent.app.trace_recorder.sanitize_path_component(preserve_colon=False),
+                # duplicated in place (not imported) because this entry point's sys.path
+                # setup (badmodel-lab/ only) doesn't reliably put the repo root -- and hence
+                # the `agent` package -- on PYTHONPATH.
+                wd = workroot / model.replace(":", "-").replace("/", "-") / task.id / str(rep)
                 mem = FileMemoryStore(wd.parent / "mem.jsonl", identity=f"{model}:{task.id}:{rep}")
                 if mem.path.exists():
                     mem.path.unlink()  # fresh memory per rep
