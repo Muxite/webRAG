@@ -217,3 +217,18 @@ $3.432 of a $5 authorized budget spent across 189 paid cells (`openai/gpt-5-mini
 30-cell breadth sweep ($0.585), 48-cell core24 sweep ($0.397), 30-cell finish-tool A/B ($0.702),
 80-cell wide sweep ($1.351), plus one initial cost-probe cell. Zero true infra failures across
 all of it (the 11 flagged in the wide sweep were the false-positive described in Part 5).
+
+## CORRECTION (2026-08-24)
+
+Open item 6 above (and Part 5's "root cause") states the 11/80 `infra_failed` cells in the wide
+sweep were caused by **ChromaDB init contention tainting `langgraph_react` cells that never use
+Chroma**. This diagnosis was never checked against the actual stored artifacts and turned out to
+be **wrong**. Reading `agent/idea_test_results/paid_wide_sweep_20260823_rep1_*_r1.json` for all
+11 flagged cells shows `infra.ops` of `["http_request", "visit"]` or `["http_request"]` only —
+zero Chroma ops anywhere. The real trigger was ordinary outbound web-fetch failures at
+concurrency, and the real defect was `_summarize_infra`'s `any-single-failed-op` OR gate, not a
+Chroma-specific issue. This history is left as-written above; do not edit it. Full corrected
+diagnosis, the fix, an audit of every downstream analysis this bug could have affected (none of
+their conclusions changed), and two related bugs found and fixed in the same pass (Chroma
+failures were separately under-flagged; trace file paths broke on model ids with slashes) are in
+`docs/handoffs/INFRA_FAILED_CLASSIFICATION_FIX_20260824.md`.
