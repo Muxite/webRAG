@@ -48,7 +48,7 @@ from agent.app.idea_engine import IdeaDagEngine
 from agent.app.idea_policies.base import DetailKey
 from agent.app.idea_policies.expansion import core_actions_menu_lines
 from agent.app.telemetry import TelemetrySession
-from agent.app.trace_recorder import TraceRecorder
+from agent.app.trace_recorder import TraceRecorder, sanitize_path_component
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.testing import json_telemetry as _json_telemetry
@@ -261,7 +261,7 @@ async def run_naive_discretion_execution(
 
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = results_dir / f"{run_stamp}_{test_id}_{model_name}_{VARIANT}.jsonl"
+    trace_path = results_dir / f"{run_stamp}_{test_id}_{sanitize_path_component(model_name)}_{VARIANT}.jsonl"
     tracer = TraceRecorder(trace_path)
 
     mandate = test_module.get_task_statement()

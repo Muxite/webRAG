@@ -35,7 +35,7 @@ from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
-from agent.app.trace_recorder import TraceRecorder
+from agent.app.trace_recorder import TraceRecorder, sanitize_path_component
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.testing.execution import _empty_graph
@@ -2038,7 +2038,7 @@ async def run_compiled_execution(
 
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = results_dir / f"{run_stamp}_{test_id}_{model_name}_graph_compiled.jsonl"
+    trace_path = results_dir / f"{run_stamp}_{test_id}_{sanitize_path_component(model_name)}_graph_compiled.jsonl"
     tracer = TraceRecorder(trace_path)
 
     mandate = test_module.get_task_statement()

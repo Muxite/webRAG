@@ -20,7 +20,7 @@ from agent.app.connector_chroma import ConnectorChroma
 from agent.app.idea_engine import IdeaDagEngine
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
-from agent.app.trace_recorder import TraceRecorder
+from agent.app.trace_recorder import TraceRecorder, sanitize_path_component
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 
@@ -74,7 +74,7 @@ async def run_baseline_execution(
 
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = results_dir / f"{run_stamp}_{test_id}_{model_name}_{variant}.jsonl"
+    trace_path = results_dir / f"{run_stamp}_{test_id}_{sanitize_path_component(model_name)}_{variant}.jsonl"
     tracer = TraceRecorder(trace_path)
 
     mandate = test_module.get_task_statement()
@@ -525,7 +525,7 @@ async def run_test_execution(
     
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = results_dir / f"{run_stamp}_{test_id}_{model_name}.jsonl"
+    trace_path = results_dir / f"{run_stamp}_{test_id}_{sanitize_path_component(model_name)}.jsonl"
     tracer = TraceRecorder(trace_path)
     
     telemetry = TelemetrySession(

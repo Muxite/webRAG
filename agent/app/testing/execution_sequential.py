@@ -25,7 +25,7 @@ from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
-from agent.app.trace_recorder import TraceRecorder
+from agent.app.trace_recorder import TraceRecorder, sanitize_path_component
 from agent.app.idea_policies.action_constants import is_transient_tool_error
 from agent.app.idea_policies.config import ActionConfig
 from agent.app.testing.test_module import IdeaTestModule
@@ -331,7 +331,7 @@ async def run_sequential_execution(
 
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = results_dir / f"{run_stamp}_{test_id}_{model_name}_sequential_react.jsonl"
+    trace_path = results_dir / f"{run_stamp}_{test_id}_{sanitize_path_component(model_name)}_sequential_react.jsonl"
     tracer = TraceRecorder(trace_path)
 
     mandate = test_module.get_task_statement()
