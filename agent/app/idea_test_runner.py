@@ -44,7 +44,12 @@ from agent.app.connector_browser import ConnectorBrowser
 from shared.connector_config import ConnectorConfig
 from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.testing.test_module import IdeaTestModule
-from agent.app.testing.runner import run_complete_test, discover_test_modules
+from agent.app.testing.runner import (
+    run_complete_test,
+    discover_test_modules,
+    BASELINE_VARIANTS,
+    OFFTHESHELF_VARIANTS,
+)
 from agent.app.testing.config import (
     MODEL_CANDIDATES,
     normalize_model_name,
@@ -67,6 +72,34 @@ def _browser_fallback_enabled() -> bool:
     """
     raw = os.environ.get("IDEA_TEST_BROWSER_FALLBACK", "1").strip().lower()
     return raw not in ("0", "false", "no", "off")
+
+
+# Execution variants that structurally never touch ChromaDB, derived from
+# testing/runner.py's own dispatch tuples (the single source of truth for which
+# execution function a variant reaches) rather than a fresh hand-maintained list here:
+#   - BASELINE_VARIANTS ("parametric", "naive_rag", "minimal") -> run_baseline_execution,
+#     whose connector_chroma param is documented "unused; kept for signature parity"
+#     (testing/execution.py).
+#   - OFFTHESHELF_VARIANTS ("langgraph_react") -> run_offtheshelf_execution /
+#     langgraph_solver.py, which holds a connector_chroma reference but never calls
+#     store_chroma/retrieve_chroma on it.
+# Every other registered variant (graph, sequential_react, naive_discretion,
+# graph_compiled, graph_compiled_code, ...) DOES reach real store_chroma/retrieve_chroma
+# calls (directly or via MemoryManager), so it stays in the "needs chroma" bucket.
+# This is deliberately a NO-CHROMA allowlist, not a needs-chroma list: any new variant
+# added to testing/runner.py (a new *_VARIANTS tuple + dispatch branch in
+# run_complete_test) is "needs chroma" by default unless someone explicitly adds it
+# here, so an unrecognized/future variant never silently loses its memory.
+_NO_CHROMA_VARIANTS = frozenset(BASELINE_VARIANTS) | frozenset(OFFTHESHELF_VARIANTS)
+
+
+def _execution_variants_need_chroma(execution_variants: List[str]) -> bool:
+    """Whether ANY requested execution variant needs ChromaDB init/warmup.
+
+    A mixed matrix (some Chroma arms, some not) must still initialize Chroma, so this
+    is an ``any()`` gate, not ``all()``.
+    """
+    return any(variant not in _NO_CHROMA_VARIANTS for variant in execution_variants)
 
 
 def _make_connector_set(config: ConnectorConfig) -> Dict[str, Any]:
@@ -1831,13 +1864,27 @@ async def main() -> None:
         f"{'ENABLED for every arm' if browser_fallback_enabled else 'DISABLED (IDEA_TEST_BROWSER_FALLBACK=0)'}"
     )
 
+    # Chroma's init/warmup is the dominant per-cell setup cost (SentenceTransformer/CUDA cold
+    # load, ~5s) and runs unconditionally even for arms that never touch ChromaDB (parametric,
+    # naive_rag, minimal, langgraph_react). The requested execution arm(s) are already known
+    # here (execution_variants, parsed above), so skip the init/warmup calls entirely when none
+    # of them need Chroma. The ConnectorChroma object itself is still constructed in every pool
+    # slot (_make_connector_set) unconditionally, for signature parity across the pool.
+    chroma_needed = _execution_variants_need_chroma(execution_variants)
+    if not chroma_needed:
+        logging.info(
+            "ChromaDB init/warmup SKIPPED: none of the requested execution variants "
+            f"({', '.join(execution_variants)}) use ChromaDB."
+        )
+
     async with AsyncExitStack() as stack:
         for cset in connector_pool:
             await stack.enter_async_context(cset["search"])
             await stack.enter_async_context(cset["http"])
             await stack.enter_async_context(cset["llm"])
             await cset["search"].init_search_api()
-            await cset["chroma"].init_chroma()
+            if chroma_needed:
+                await cset["chroma"].init_chroma()
             # Registered unconditionally (safe no-op if the browser never launched) so toggling
             # IDEA_TEST_BROWSER_FALLBACK never needs a teardown-logic change too.
             stack.push_async_callback(cset["browser"].close)
@@ -1851,9 +1898,12 @@ async def main() -> None:
         # Overlap the ChromaDB warmup with preflight (both are fixed setup latency), and fan
         # preflight out across the pooled connector slots. At concurrency=1 the pool has one
         # slot so preflight stays serial (byte-identical); the warmup still just runs alongside.
-        warmup_task = asyncio.create_task(_warmup_chroma(connector_chroma))
+        # Skipped entirely when chroma_needed is False (see above): no arm in this run touches
+        # ChromaDB, so there is nothing to warm.
+        warmup_task = asyncio.create_task(_warmup_chroma(connector_chroma)) if chroma_needed else None
         preflight_passed = await _run_preflight_parallel(connector_pool, preflight_models)
-        await warmup_task
+        if warmup_task is not None:
+            await warmup_task
 
         execution_models = [model for model in execution_models_requested if preflight_passed.get(model, False)]
         if not execution_models:
