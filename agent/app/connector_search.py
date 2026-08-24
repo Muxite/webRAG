@@ -123,25 +123,32 @@ class ConnectorSearch(ConnectorHttp):
         with every OTHER http call in the same benchmark cell (page visits, etc.); inflating it
         with probe failures can push THAT bucket's rate past the 0.5 severity threshold on its
         own and taint an unrelated fetch failure's diagnosis. Suppressing the probe's own
-        ``http_request`` timing (by detaching telemetry for just this one call) keeps the two
-        signals cleanly separated: ``search_init`` names the outage precisely, and the
-        ``http_request`` bucket stays uncontaminated by init-probe noise. The alternative
-        (emit both, accept the double-count) was rejected because it reintroduces exactly the
-        cross-contamination this fix is meant to remove; "name only, drop http_request
-        entirely for this call" is what's implemented, since a probe is never itself evidence
-        gathering the task benefits from re-litigating in the generic bucket.
+        ``http_request`` timing keeps the two signals cleanly separated: ``search_init`` names
+        the outage precisely, and the ``http_request`` bucket stays uncontaminated by
+        init-probe noise. The alternative (emit both, accept the double-count) was rejected
+        because it reintroduces exactly the cross-contamination this fix is meant to remove;
+        "name only, drop http_request entirely for this call" is what's implemented, since a
+        probe is never itself evidence gathering the task benefits from re-litigating in the
+        generic bucket.
+
+        Suppression is threaded via ``ConnectorHttp.request``'s ``suppress_timing`` KEYWORD
+        ARGUMENT (a value local to this one call's stack frame), not by toggling
+        ``self._telemetry`` around the call. An earlier version did the latter
+        (save/set-None/restore), which is a shared-mutable-state race: this connector is
+        reused concurrently (the graph engine fans sibling leaves out via ``asyncio.gather``,
+        and ``search_api_ready`` only flips True AFTER the probe returns, so two siblings'
+        first searches both reach this method on the SAME instance). Two interleaved
+        save/restore pairs across the internal ``await`` can leave ``self._telemetry``
+        permanently ``None`` for the rest of the cell — silently and totally disabling
+        telemetry, which is strictly worse than the double-counting problem being solved. A
+        per-call parameter has no shared state to race.
 
         :param method: HTTP method (``"GET"``/``"POST"``).
         :param url: Probe URL.
         :param kwargs: Forwarded to ``ConnectorHttp.request`` (headers/params/json/retries/...).
         :returns: The probe's ``RequestResult``.
         """
-        saved_telemetry = self._telemetry
-        self._telemetry = None
-        try:
-            return await self.request(method, url, **kwargs)
-        finally:
-            self._telemetry = saved_telemetry
+        return await self.request(method, url, suppress_timing=True, **kwargs)
 
     def _record_search_init(
         self,

@@ -19,8 +19,17 @@ This locks in the fix (see ``agent/app/connector_search.py``'s ``_probe_search_i
    this one call, emitting ONLY the named ``search_init`` signal — is asserted directly: a dead
    backend must produce a ``search_init`` failure and ZERO ``http_request`` timings.
 
-No live network is used; ``request()`` is monkeypatched per connector.
+4. Concurrency safety: two sibling ``init_search_api()`` calls racing on the SAME connector
+   instance (the live graph-engine fan-out shape) must not permanently wipe telemetry for the
+   rest of the cell — see ``test_concurrent_init_search_api_does_not_permanently_wipe_telemetry``.
+
+No live network is used; ``request()`` is monkeypatched per connector for tests 1-3. Test 4
+drives real concurrency through ``ConnectorHttp.request``'s actual body via a fake aiohttp
+session, since the race it targets only manifests across a genuine interleaved ``await``.
 """
+import asyncio
+import time
+
 import pytest
 
 from agent.app.connector_search import ConnectorSearch
@@ -79,11 +88,13 @@ BACKENDS = [
 
 
 def _wire_dead_probe(monkeypatch, connector, status=503):
-    """Stand in a failing health probe. Also asserts telemetry is genuinely detached during
-    the probe call — proving `_probe_search_init` really suppresses the underlying
-    `http_request` signal rather than merely not-emitting-it-in-this-test."""
+    """Stand in a failing health probe. Also asserts suppression is requested via the
+    per-call ``suppress_timing`` kwarg — proving `_probe_search_init` asks
+    `ConnectorHttp.request` to suppress the underlying `http_request` signal for this one
+    call, rather than mutating shared connector state (the old, racy approach)."""
     async def fake_request(method, url, retries=2, **kwargs):
-        assert connector._telemetry is None, "probe call must run with telemetry detached"
+        assert kwargs.get("suppress_timing") is True, "probe call must request timing suppression"
+        assert connector._telemetry is not None, "telemetry must stay attached during the probe"
         return RequestResult(status=status, error=True, data="boom")
 
     monkeypatch.setattr(connector, "request", fake_request)
@@ -91,7 +102,8 @@ def _wire_dead_probe(monkeypatch, connector, status=503):
 
 def _wire_healthy_probe(monkeypatch, connector):
     async def fake_request(method, url, retries=2, **kwargs):
-        assert connector._telemetry is None, "probe call must run with telemetry detached"
+        assert kwargs.get("suppress_timing") is True, "probe call must request timing suppression"
+        assert connector._telemetry is not None, "telemetry must stay attached during the probe"
         return RequestResult(status=200, error=False, data={"web": {"results": []}, "organic": []})
 
     monkeypatch.setattr(connector, "request", fake_request)
@@ -248,3 +260,90 @@ async def test_permanent_http_error_not_stamped_infra():
     timing = _last_timing(telemetry, "search_init")
     assert timing["payload"]["infra_failed"] is False
     assert _is_infra_timing(timing) is False
+
+
+# ---------------------------------------------------------------------------------------
+# 4. Concurrency race: two sibling init_search_api() calls on the SAME connector instance
+#    must not permanently disable telemetry. See module docstring point 4.
+# ---------------------------------------------------------------------------------------
+
+class _FakeResponse:
+    def __init__(self, status=200, json_data=None):
+        self.status = status
+        self.headers = {"Content-Type": "application/json"}
+        self._json = json_data if json_data is not None else {}
+
+    async def json(self):
+        return self._json
+
+    async def text(self):
+        return ""
+
+
+class _FakeRequestCM:
+    """Stands in for aiohttp's ``session.request(...)`` async context manager. The
+    ``await asyncio.sleep`` inside ``__aenter__`` is the actual interleave point: it yields
+    control back to the event loop mid-``ConnectorHttp.request`` body, so two concurrent
+    ``init_search_api()`` calls genuinely race inside ``_probe_search_init`` rather than
+    running to completion one at a time."""
+
+    def __init__(self, delay: float):
+        self._delay = delay
+
+    async def __aenter__(self):
+        await asyncio.sleep(self._delay)
+        return _FakeResponse(status=200, json_data={"web": {"results": []}, "organic": []})
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _FakeSession:
+    """Minimal aiohttp.ClientSession stand-in wired directly onto the connector, so calls
+    run through the REAL `ConnectorHttp.request` body (including its internal `await`)
+    instead of a single-coroutine mock that can't reproduce an interleaving race."""
+
+    def __init__(self, delay: float = 0.02):
+        self.closed = False
+        self._delay = delay
+
+    def request(self, method, url, timeout=None, **kwargs):
+        return _FakeRequestCM(self._delay)
+
+    async def close(self):
+        self.closed = True
+
+
+@pytest.mark.asyncio
+async def test_concurrent_init_search_api_does_not_permanently_wipe_telemetry():
+    """Reproduces the live shape: sibling graph leaves share one search connector and both
+    reach `init_search_api()` before `search_api_ready` flips True (it only flips AFTER the
+    probe returns), so both enter `_probe_search_init` on the SAME instance concurrently.
+
+    An earlier `_probe_search_init` implementation suppressed the probe's own `http_request`
+    timing by save/clear/restore-ing `self._telemetry` — shared MUTABLE instance state across
+    an `await`. Under real interleaving: A saves T, clears to None, awaits; B saves
+    saved_telemetry_B = None (A's clear is visible), awaits; A's `finally` restores T
+    correctly; B's `finally` then sets `self._telemetry = None` — permanently wiping telemetry
+    for the rest of the cell, with no exception raised (ConnectorBase quietly no-ops on
+    `_telemetry is None`).
+
+    The fix threads a per-call `suppress_timing` kwarg through `ConnectorHttp.request` instead
+    (see connector_http.py), which has no shared state to race.
+    """
+    cs = ConnectorSearch(ConnectorConfig())
+    cs.search_api_key = "k"
+    telemetry = _RecordingTelemetry()
+    cs.set_telemetry(telemetry)
+    cs.session = _FakeSession(delay=0.02)
+
+    results = await asyncio.gather(cs.init_search_api(), cs.init_search_api())
+
+    assert all(results), f"both concurrent inits should succeed: {results}"
+    assert cs._telemetry is telemetry, "telemetry must not be wiped by a racing sibling call"
+
+    # Functional check, not just attribute presence: telemetry recorded AFTER both concurrent
+    # calls finish must actually land — proves it is live, not merely non-None by accident.
+    before = len(telemetry.timings)
+    cs._record_timing(name="post_race_probe", started_at=time.perf_counter(), success=True, payload={})
+    assert len(telemetry.timings) == before + 1, "telemetry must still be functional after the race"

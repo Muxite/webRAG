@@ -103,9 +103,23 @@ class ConnectorHttp(ConnectorBase):
             except Exception:
                 self.session = None
 
-    async def request(self, method: str, url: str, retries: int = 2, **kwargs) -> RequestResult:
+    async def request(
+        self, method: str, url: str, retries: int = 2, suppress_timing: bool = False, **kwargs
+    ) -> RequestResult:
         """
         Generic request using shared Retry with exponential backoff.
+
+        :param suppress_timing: When True, this call's own ``http_request`` timing/IO events
+            are not recorded (the ``connector_search.py`` health-probe callers use this so a
+            probe surfaces only as their own named ``search_init`` signal, not also as a
+            generic ``http_request`` bucket hit). Default False — every existing caller's
+            behavior is unchanged. Deliberately a per-call PARAMETER, not connector instance
+            state: an earlier version toggled ``self._telemetry`` around the call, which was
+            not reentrancy-safe — two concurrent calls on the same shared connector (e.g. two
+            sibling graph leaves racing ``init_search_api`` on one connector instance) could
+            interleave across the internal ``await`` and leave telemetry permanently ``None``
+            for the rest of the cell. A local parameter threaded down to the exact recording
+            sites below has no shared mutable state to race.
         :return: RequestResult
         """
         # Record/replay fixtures: serve cached web evidence so cross-model
@@ -117,18 +131,20 @@ class ConnectorHttp(ConnectorBase):
             if fixture_mode in ("replay", "replay_strict"):
                 cached = web_fixtures.load(fixture_key)
                 if cached is not None:
+                    if not suppress_timing:
+                        self._record_io(
+                            direction="out",
+                            operation="http_request",
+                            payload={"method": method, "url": url, "status": cached.status, "fixture": "hit"},
+                        )
+                    return cached
+                # Cache miss: record it so asymmetry is measurable.
+                if not suppress_timing:
                     self._record_io(
                         direction="out",
                         operation="http_request",
-                        payload={"method": method, "url": url, "status": cached.status, "fixture": "hit"},
+                        payload={"method": method, "url": url, "status": None, "fixture": "miss"},
                     )
-                    return cached
-                # Cache miss: record it so asymmetry is measurable.
-                self._record_io(
-                    direction="out",
-                    operation="http_request",
-                    payload={"method": method, "url": url, "status": None, "fixture": "miss"},
-                )
                 if fixture_mode == "replay_strict":
                     # Locked run: never go live on a miss.
                     return RequestResult(
@@ -184,11 +200,12 @@ class ConnectorHttp(ConnectorBase):
         try:
             started_at = time.perf_counter()
             timeout_value = kwargs.get("timeout", self.config.default_timeout)
-            self._record_io(
-                direction="in",
-                operation="http_request",
-                payload={"method": method, "url": url, "retries": retries, "timeout": timeout_value},
-            )
+            if not suppress_timing:
+                self._record_io(
+                    direction="in",
+                    operation="http_request",
+                    payload={"method": method, "url": url, "retries": retries, "timeout": timeout_value},
+                )
             result: RequestResult = await Retry(
                 func=do_request,
                 max_attempts=retries,
@@ -201,35 +218,37 @@ class ConnectorHttp(ConnectorBase):
                 should_retry=should_retry,
                 raise_on_fail=True,
             ).run()
-            self._record_timing(
-                name="http_request",
-                started_at=started_at,
-                success=not result.error,
-                payload={"method": method, "url": url, "status": result.status},
-            )
-            self._record_io(
-                direction="out",
-                operation="http_request",
-                payload={"method": method, "url": url, "status": result.status, "error": result.error},
-            )
+            if not suppress_timing:
+                self._record_timing(
+                    name="http_request",
+                    started_at=started_at,
+                    success=not result.error,
+                    payload={"method": method, "url": url, "status": result.status},
+                )
+                self._record_io(
+                    direction="out",
+                    operation="http_request",
+                    payload={"method": method, "url": url, "status": result.status, "error": result.error},
+                )
             if fixture_key is not None and not result.error:
                 web_fixtures.save(fixture_key, method, url, kwargs.get("params"), result, kwargs.get("json"))
             return result
         except Exception as e:
             status = e.status if hasattr(e, "status") else None
-            self._record_timing(
-                name="http_request",
-                started_at=started_at,
-                success=False,
-                payload={"method": method, "url": url, "status": status},
-                error=str(e),
-            )
-            self._record_io(
-                direction="out",
-                operation="http_request",
-                payload={"method": method, "url": url, "status": status},
-                error=str(e),
-            )
+            if not suppress_timing:
+                self._record_timing(
+                    name="http_request",
+                    started_at=started_at,
+                    success=False,
+                    payload={"method": method, "url": url, "status": status},
+                    error=str(e),
+                )
+                self._record_io(
+                    direction="out",
+                    operation="http_request",
+                    payload={"method": method, "url": url, "status": status},
+                    error=str(e),
+                )
             return RequestResult(
                 status=status,
                 error=True,

@@ -69,7 +69,7 @@ async def test_health_probe_posts_json_with_api_key_header(monkeypatch):
     cs.search_api_key = "k"
     captured = {}
 
-    async def fake_request(method, url, retries=2, headers=None, json=None):
+    async def fake_request(method, url, retries=2, headers=None, json=None, **kwargs):
         captured.update({"method": method, "url": url, "headers": headers, "json": json})
         return types.SimpleNamespace(error=False, status=200, data={"organic": []})
 
