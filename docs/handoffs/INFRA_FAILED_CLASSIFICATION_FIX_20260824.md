@@ -185,3 +185,19 @@ Offline suite: 6040 → 6070 passed, 18 skipped, 0 failures.
   `require_finish_tool` needs `max_steps` scaling before re-test; task 155's over-exploration
   pattern; task 045's validator strictness.
 - ~$1.57 remains of the prior $5 OpenRouter authorization. This cycle spent $0.
+
+## CORRECTION / FOLLOW-UP (2026-08-24, later cycle)
+
+Bug B's fix, as shipped here, introduced a regression: `chroma_get_or_create`/`chroma_init`
+emitted timings **only on failure**, with no paired success timing. Because the severity gate
+this same cycle introduced (`rate > 0.5 or e["success"] == 0`) treats an op with zero recorded
+successes as permanently failed, a single transient `get_or_create` blip would flag a cell
+forever — reintroducing the exact over-flagging hazard this cycle's Bug A fix was written to
+remove, in the very next commit that touched the code. Caught in the immediately following
+cycle, not by any test failing here.
+
+Fixed in `58826f49` by moving Chroma instrumentation into the shared `_op` wrapper so all 8 ops
+emit on both success and failure. Full write-up, plus two further defects found and fixed in the
+same later cycle (a search-init instrumentation gap, and a telemetry-suppression race introduced
+while fixing it), in
+`docs/handoffs/CONNECTOR_INSTRUMENTATION_UNIFICATION_20260824.md`.
