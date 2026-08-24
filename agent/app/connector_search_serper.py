@@ -48,17 +48,20 @@ class ConnectorSearchSerper(ConnectorSearch):
             "X-API-KEY": self.search_api_key,
             "Content-Type": "application/json",
         }
-        result = await self.request(
+        started_at = time.perf_counter()
+        result = await self._probe_search_init(
             "POST", self.url, retries=2, headers=headers, json={"q": "health check"}
         )
 
         if result.error or result.status != 200:
             self.logger.warning(f"Serper health probe failed with status {result.status}: {result.data}")
             self.search_api_ready = False
+            self._record_search_init("serper", started_at, success=False, result=result)
             return False
 
         self.logger.info("Serper search API OPERATIONAL")
         self.search_api_ready = True
+        self._record_search_init("serper", started_at, success=True)
         return True
 
     async def query_search(self, query: str, count: int = 10) -> Optional[List[Dict[str, str]]]:

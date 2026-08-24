@@ -46,7 +46,8 @@ class ConnectorSearchXNG(ConnectorSearch):
             return True
 
         self.logger.info("Probing SearXNG search API...")
-        result = await self.request(
+        started_at = time.perf_counter()
+        result = await self._probe_search_init(
             "GET", self.url, retries=2, params={"q": "health check", "format": "json"}
         )
         if result.error or result.status != 200:
@@ -54,10 +55,12 @@ class ConnectorSearchXNG(ConnectorSearch):
                 f"SearXNG health probe failed with status {result.status}: {result.data}"
             )
             self.search_api_ready = False
+            self._record_search_init("searxng", started_at, success=False, result=result)
             return False
 
         self.logger.info("SearXNG search API OPERATIONAL")
         self.search_api_ready = True
+        self._record_search_init("searxng", started_at, success=True)
         return True
 
     async def query_search(self, query: str, count: int = 10) -> Optional[List[Dict[str, str]]]:

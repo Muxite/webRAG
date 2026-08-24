@@ -1,6 +1,8 @@
 import time
 from agent.app.connector_http import ConnectorHttp
+from agent.app.connector_llm import is_infra_llm_failure
 from shared.connector_config import ConnectorConfig
+from shared.request_result import RequestResult
 from typing import Optional, Dict, List
 
 # Brave Web Search hard limits: the `q` param is capped at 400 chars / 50 words and count at 20.
@@ -68,6 +70,37 @@ def _sanitize_brave_query(query: str) -> str:
     return q.strip()
 
 
+def _probe_infra_failed(result: RequestResult) -> bool:
+    """Classify a failed search-init health-probe ``RequestResult`` as infra vs caller error.
+
+    Reuses ``is_infra_llm_failure``'s transport-vs-caller-error test (see connector_llm.py,
+    F17) rather than reimplementing it here. A *permanent* HTTP error
+    (``ConnectorHttp.PERMANENT_ERROR_CODES`` — 401/403/404/405/422, e.g. a bad/expired API key)
+    is a caller/config problem, not something the infra severity gate should quarantine a cell
+    for; a missing status (connection refused/timed out before any response ever came back) or
+    a retryable 4xx/5xx (402/408/429/5xx) is genuinely infra. ``is_infra_llm_failure`` expects
+    an exception carrying a ``status_code`` attribute, so the RequestResult's status is wrapped
+    in a tiny throwaway shim to reuse its classification instead of re-deriving the status-code
+    list a second time.
+
+    :param result: The failed probe's ``RequestResult`` (``result.error`` is truthy or
+        ``result.status != 200``).
+    :returns: True if this looks like an infra/transport failure rather than a caller error.
+    """
+    if result.status is None:
+        # No HTTP response at all (connect/timeout failure never reached the server) — the
+        # same case ``is_infra_llm_failure`` treats as infra via its Connect/Timeout name
+        # check, just without an exception object to inspect here.
+        return True
+
+    class _ProbeStatusError(Exception):
+        def __init__(self, status_code: int):
+            super().__init__(f"probe status={status_code}")
+            self.status_code = status_code
+
+    return is_infra_llm_failure(_ProbeStatusError(result.status))
+
+
 class ConnectorSearch(ConnectorHttp):
     """Manage an searching api session for a connector."""
     def __init__(self, connector_config: ConnectorConfig):
@@ -76,6 +109,78 @@ class ConnectorSearch(ConnectorHttp):
         self.search_api_key = self.config.search_api_key
         self.search_api_ready = False
         self.url = "https://api.search.brave.com/res/v1/web/search"
+
+    async def _probe_search_init(self, method: str, url: str, **kwargs) -> RequestResult:
+        """Run the search-init health-probe HTTP call with THIS call's own ``http_request``
+        telemetry suppressed, so the probe surfaces exactly once, as the named ``search_init``
+        signal recorded by ``_record_search_init`` right after this returns.
+
+        Double-counting tradeoff (decided here, applies to all 3 search backends): without
+        this, a dead search backend would emit BOTH a generic ``http_request`` failure (from
+        ``ConnectorHttp.request``, which the probe goes through) AND the new named
+        ``search_init`` failure — turning one outage into two independent severity-gate
+        signals from a single root cause. Worse, the generic ``http_request`` bucket is shared
+        with every OTHER http call in the same benchmark cell (page visits, etc.); inflating it
+        with probe failures can push THAT bucket's rate past the 0.5 severity threshold on its
+        own and taint an unrelated fetch failure's diagnosis. Suppressing the probe's own
+        ``http_request`` timing (by detaching telemetry for just this one call) keeps the two
+        signals cleanly separated: ``search_init`` names the outage precisely, and the
+        ``http_request`` bucket stays uncontaminated by init-probe noise. The alternative
+        (emit both, accept the double-count) was rejected because it reintroduces exactly the
+        cross-contamination this fix is meant to remove; "name only, drop http_request
+        entirely for this call" is what's implemented, since a probe is never itself evidence
+        gathering the task benefits from re-litigating in the generic bucket.
+
+        :param method: HTTP method (``"GET"``/``"POST"``).
+        :param url: Probe URL.
+        :param kwargs: Forwarded to ``ConnectorHttp.request`` (headers/params/json/retries/...).
+        :returns: The probe's ``RequestResult``.
+        """
+        saved_telemetry = self._telemetry
+        self._telemetry = None
+        try:
+            return await self.request(method, url, **kwargs)
+        finally:
+            self._telemetry = saved_telemetry
+
+    def _record_search_init(
+        self,
+        provider: str,
+        started_at: float,
+        success: bool,
+        result: Optional[RequestResult] = None,
+    ) -> None:
+        """Emit the named ``search_init`` timing for a health-probe attempt.
+
+        Recorded on BOTH success and failure (symmetric), not failure-only. A failure-only
+        signal would mean this op's per-op bucket in the severity gate NEVER contains a
+        success, so ``success == 0`` would be permanently true and a single transient init
+        failure would flag the whole cell — the exact zero-success regression being fixed
+        concurrently in ``connector_chroma.py``'s ``chroma_init`` (where failure-only is
+        correct only because an EXHAUSTED-RETRY chroma init really is a total outage by
+        construction; a search-init health probe has no such guarantee and can legitimately
+        recover between calls). Emitting on success too gives the bucket real denominators, so
+        a lone transient failure shows up as a healthy-majority rate rather than a 100%-failed
+        one.
+
+        :param provider: ``"brave"``/``"serper"``/``"searxng"`` — kept in the payload rather
+            than the timing name so all three backends share one ``search_init`` bucket in the
+            severity gate (matching the single-name ``chroma_init`` convention), while still
+            being distinguishable in the raw telemetry.
+        :param started_at: ``time.perf_counter()`` at probe start.
+        :param success: Whether the probe succeeded (status 200).
+        :param result: The probe's ``RequestResult`` on failure, used to classify
+            infra-vs-caller-error via ``_probe_infra_failed``; omit for success.
+        """
+        payload: Dict[str, object] = {"provider": provider}
+        error = None
+        if not success:
+            payload["infra_failed"] = _probe_infra_failed(result) if result is not None else True
+            if result is not None:
+                error = str(result.data)
+        self._record_timing(
+            name="search_init", started_at=started_at, success=success, payload=payload, error=error
+        )
 
     async def init_search_api(self) -> bool:
         """
@@ -96,17 +201,20 @@ class ConnectorSearch(ConnectorHttp):
         }
         params = {"q": "health check", "count": 1}
 
-        result = await self.request(
+        started_at = time.perf_counter()
+        result = await self._probe_search_init(
             "GET", self.url, retries=2, headers=headers, params=params
         )
 
         if result.error or result.status != 200:
             self.logger.warning(f"Search API health probe failed with status {result.status}: {result.data}")
             self.search_api_ready = False
+            self._record_search_init("brave", started_at, success=False, result=result)
             return False
 
         self.logger.info("Search API OPERATIONAL")
         self.search_api_ready = True
+        self._record_search_init("brave", started_at, success=True)
         return True
 
     async def query_search(self, query: str, count: int = 10) -> Optional[List[Dict[str, str]]]:
