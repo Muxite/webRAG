@@ -204,17 +204,62 @@ class ConnectorChroma(ConnectorBase):
         """
         return await asyncio.wait_for(awaitable, timeout=self.config.chroma_op_timeout)
 
-    async def _op(self, method: Any, *args: Any, **kwargs: Any) -> Any:
-        """Run a client/collection method under the op timeout, dispatching by client
-        kind: async HttpClient methods are awaited directly; sync PersistentClient
-        methods run in a worker thread (``asyncio.to_thread``) so the CPU-bound embedding
-        happens OFF the event loop. Both are bounded by ``chroma_op_timeout``.
+    async def _op(
+        self,
+        op_name: str,
+        method: Any,
+        *args: Any,
+        op_payload: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Run a client/collection method under the op timeout and record ONE timing on
+        BOTH success and failure, dispatching by client kind: async HttpClient methods
+        are awaited directly; sync PersistentClient methods run in a worker thread
+        (``asyncio.to_thread``) so the CPU-bound embedding happens OFF the event loop.
+        Both are bounded by ``chroma_op_timeout``.
+
+        This is every Chroma round-trip's single funnel, so centralizing telemetry here
+        (mirroring ``connector_sandbox.py``'s ``_done``) is what keeps success/failure
+        coverage symmetric per op. Before this, several ops recorded a timing on failure
+        only (or not at all) — a bucket that only ever sees failures has ``success == 0``
+        forever, which trips the infra severity gate in ``agent/app/testing/utils.py``
+        (``rate > 0.5 or success == 0``) on a single transient error, flagging the whole
+        cell as an infra outage. ``_on_op_success``/``_on_op_failure`` (the consecutive-
+        failure teardown counter) are folded in here too, replacing the copy at every call
+        site.
+
+        Uses ``op_name``/``op_payload`` (not ``name``/``payload``) because several wrapped
+        Chroma methods themselves take a ``name=`` kwarg (e.g. ``get_or_create_collection``,
+        ``delete_collection``) which would otherwise collide via ``**kwargs``.
+
+        :param op_name: Timing name to record (e.g. "chroma_add").
+        :param method: The bound client/collection method to call.
+        :param op_payload: Extra timing payload fields (e.g. collection, count).
+        :returns: The method's result.
+        :raises Exception: Whatever the underlying call raised, after recording the
+            failure — callers keep their own logging/return-None handling.
         """
-        if self._is_async_client:
-            awaitable = method(*args, **kwargs)
-        else:
-            awaitable = asyncio.to_thread(lambda: method(*args, **kwargs))
-        return await asyncio.wait_for(awaitable, timeout=self.config.chroma_op_timeout)
+        started_at = time.perf_counter()
+        try:
+            if self._is_async_client:
+                awaitable = method(*args, **kwargs)
+            else:
+                awaitable = asyncio.to_thread(lambda: method(*args, **kwargs))
+            result = await asyncio.wait_for(awaitable, timeout=self.config.chroma_op_timeout)
+            self._on_op_success()
+            self._record_timing(
+                name=op_name, started_at=started_at, success=True,
+                payload=dict(op_payload or {}),
+            )
+            return result
+        except Exception as e:
+            self._on_op_failure()
+            self._record_timing(
+                name=op_name, started_at=started_at, success=False,
+                payload={**(op_payload or {}), "infra_failed": is_infra_llm_failure(e)},
+                error=str(e),
+            )
+            raise
 
     def _on_op_success(self) -> None:
         """Reset the consecutive-failure counter after any successful op."""
@@ -362,7 +407,6 @@ class ConnectorChroma(ConnectorBase):
         if not await self._ensure_ready():
             self.logger.warning("ChromaDB not ready.")
             return None
-        started_at = time.perf_counter()
         try:
             create_kwargs: Dict[str, Any] = {"name": collection}
             if metadata:
@@ -370,22 +414,16 @@ class ConnectorChroma(ConnectorBase):
             embed_fn = self._embedding_function_or_none()
             if embed_fn is not None:
                 create_kwargs["embedding_function"] = embed_fn
-            coll = await self._op(self._chroma.get_or_create_collection, **create_kwargs)
+            coll = await self._op(
+                "chroma_get_or_create", self._chroma.get_or_create_collection,
+                op_payload={"collection": collection}, **create_kwargs,
+            )
             self._collections[collection] = coll
-            self._on_op_success()
             return coll
         except Exception as e:
-            self._on_op_failure()
+            # _op already recorded the timing (success and failure symmetric) and bumped
+            # the consecutive-failure counter; this is just caller-side logging.
             self.logger.error(f"Failed to create/get collection '{collection}': {e}")
-            # Without this timing, a get_or_create failure was completely silent: the
-            # caller (add_to_chroma/query_chroma) sees `coll is None` and bails out
-            # ABOVE its own _record_timing call, so an infra outage here left zero
-            # telemetry trace and was unclassifiable by the infra gate.
-            self._record_timing(
-                name="chroma_get_or_create", started_at=started_at, success=False,
-                payload={"collection": collection, "infra_failed": is_infra_llm_failure(e)},
-                error=str(e),
-            )
             return None
 
     async def delete_collection(self, collection: str) -> bool:
@@ -399,7 +437,10 @@ class ConnectorChroma(ConnectorBase):
         try:
             if self._chroma is None:
                 return False
-            await self._op(self._chroma.delete_collection, name=collection)
+            await self._op(
+                "chroma_delete_collection", self._chroma.delete_collection,
+                op_payload={"collection": collection}, name=collection,
+            )
             self._collections.pop(collection, None)
             self._invalidate_query_cache(collection)
             return True
@@ -417,7 +458,7 @@ class ConnectorChroma(ConnectorBase):
         try:
             if self._chroma is None:
                 return []
-            collections = await self._op(self._chroma.list_collections)
+            collections = await self._op("chroma_list_collections", self._chroma.list_collections)
             return [col.name for col in collections] if collections else []
         except Exception as e:
             self.logger.warning(f"Failed to list collections: {e}")
@@ -440,7 +481,6 @@ class ConnectorChroma(ConnectorBase):
         """
         if not await self._ensure_ready():
             return False
-        started_at = time.perf_counter()
         try:
             coll = await self.get_or_create_collection(collection)
             if coll is None:
@@ -451,13 +491,12 @@ class ConnectorChroma(ConnectorBase):
                 operation="chroma_add",
                 payload={"collection": collection, "count": len(documents)},
             )
-            await self._op(coll.add, ids=ids, metadatas=sanitized_metadatas, documents=documents)
-            self._invalidate_query_cache(collection)
-            self._on_op_success()
-            self._record_timing(
-                name="chroma_add", started_at=started_at, success=True,
-                payload={"collection": collection, "count": len(documents)},
+            await self._op(
+                "chroma_add", coll.add,
+                op_payload={"collection": collection, "count": len(documents)},
+                ids=ids, metadatas=sanitized_metadatas, documents=documents,
             )
+            self._invalidate_query_cache(collection)
             self._record_io(
                 direction="out", operation="chroma_add",
                 payload={"collection": collection, "count": len(documents), "success": True},
@@ -467,16 +506,7 @@ class ConnectorChroma(ConnectorBase):
             # A failed add may still have landed rows (timeout on the response, not the write),
             # so the cached answers for this collection are no longer trustworthy either.
             self._invalidate_query_cache(collection)
-            self._on_op_failure()
             self.logger.error(f"Failed to add to collection '{collection}': {e}")
-            self._record_timing(
-                name="chroma_add", started_at=started_at, success=False,
-                payload={
-                    "collection": collection, "count": len(documents),
-                    "infra_failed": is_infra_llm_failure(e),
-                },
-                error=str(e),
-            )
             self._record_io(
                 direction="out", operation="chroma_add",
                 payload={"collection": collection, "count": len(documents), "success": False},
@@ -557,13 +587,14 @@ class ConnectorChroma(ConnectorBase):
             coll = await self.get_or_create_collection(collection)
             if coll is None:
                 return False
-            await self._op(coll.delete, ids=list(ids))
+            await self._op(
+                "chroma_delete", coll.delete,
+                op_payload={"collection": collection, "count": len(ids)}, ids=list(ids),
+            )
             self._invalidate_query_cache(collection)
-            self._on_op_success()
             return True
         except Exception as e:
             self._invalidate_query_cache(collection)
-            self._on_op_failure()
             self.logger.error(f"Failed to delete from collection '{collection}': {e}")
             return False
 
@@ -593,12 +624,12 @@ class ConnectorChroma(ConnectorBase):
             if coll is None:
                 return None
             result = await self._op(
-                coll.get, ids=list(ids), include=list(include) if include else []
+                "chroma_get", coll.get,
+                op_payload={"collection": collection, "count": len(ids)},
+                ids=list(ids), include=list(include) if include else [],
             )
-            self._on_op_success()
             return result
         except Exception as e:
-            self._on_op_failure()
             self.logger.error(f"Failed to get from collection '{collection}': {e}")
             return None
 
@@ -621,6 +652,16 @@ class ConnectorChroma(ConnectorBase):
         ``_query_cache_key``) that is dropped whenever this connector writes to the collection,
         so a hit is the same answer the server would give. Telemetry is still recorded on a hit,
         flagged ``cached``: the trace must keep showing that the engine asked.
+
+        DECISION: a cache hit deliberately still records a ``chroma_query`` success timing
+        (below, ahead of the ``_op``-wrapped network path) rather than being silent. It does
+        NOT go through ``_op`` since it never touches the network. This inflates the
+        ``chroma_query`` success count in ``_summarize_infra``'s rate denominator, which only
+        ever makes the op's observed failure rate LOWER — the same direction as the bug this
+        change fixes, never the opposite — so it cannot cause a spurious ``infra.failed``. The
+        alternative (skip telemetry on a hit) would just make the denominator smaller and
+        noisier for a well-cached run without changing the failure numerator, so it was not
+        worth the divergence from the existing recorded behavior.
         """
         if not await self._ensure_ready():
             return None
@@ -664,30 +705,20 @@ class ConnectorChroma(ConnectorBase):
             query_kwargs: Dict[str, Any] = {"query_texts": query_texts, "n_results": n_results}
             if where:
                 query_kwargs["where"] = where
-            results = await self._op(coll.query, **query_kwargs)
-            self._on_op_success()
+            results = await self._op(
+                "chroma_query", coll.query,
+                op_payload={"collection": collection, "queries": len(query_texts)},
+                **query_kwargs,
+            )
             if cache_enabled and results is not None:
                 self._query_cache_put(cache_key, collection, results)
-            self._record_timing(
-                name="chroma_query", started_at=started_at, success=True,
-                payload={"collection": collection, "queries": len(query_texts)},
-            )
             self._record_io(
                 direction="out", operation="chroma_query",
                 payload={"collection": collection, "queries": len(query_texts), "success": True},
             )
             return results
         except Exception as e:
-            self._on_op_failure()
             self.logger.error(f"ChromaDB query failed for collection {collection}: {e}")
-            self._record_timing(
-                name="chroma_query", started_at=started_at, success=False,
-                payload={
-                    "collection": collection, "queries": len(query_texts),
-                    "infra_failed": is_infra_llm_failure(e),
-                },
-                error=str(e),
-            )
             self._record_io(
                 direction="out", operation="chroma_query",
                 payload={"collection": collection, "queries": len(query_texts), "success": False},
