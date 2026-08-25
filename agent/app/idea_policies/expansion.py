@@ -284,6 +284,66 @@ def _build_ledger_delta_block(ledger: Any) -> str:
     return block
 
 
+# --- opt-in sibling EVIDENCE digest (``run_policy_sibling_evidence_digest_enabled``) ------------
+# Phase 0's `graph_shared_context` ablation (docs/DAG_V3_LEDGER_MASTER_PLAN_2026-08-25.md section
+# 3), which falsifies "branch isolation is the main failure".
+#
+# The ledger delta above is a ROSTER view: which enumerated entities some branch resolved. That is
+# the right signal for a coverage gate and the wrong one for churn, which is what task 123 actually
+# showed (43 visits, the same sub-goals re-issued 5-8 times). A node re-issues a sibling's search
+# because it cannot see the SEARCH ITSELF -- expansion context is root-ward only
+# (``IdeaDag.path_to_root``), so a sibling's queries, URLs and outcomes are invisible no matter how
+# many entities the roster says are done. This block is the evidence-level companion: the concrete
+# actions other branches already executed, with their outcomes.
+#
+# It is deliberately a SEPARATE flag from ``sibling_context_delta``: that one is a rendering of the
+# ledger and so is inert without ``ledger_mode == "observe"``, and an ablation that cannot separate
+# "the branch could see its siblings" from "the run also paid for a ledger" measures two things.
+# This digest reads the graph directly and needs no ledger.
+#
+# Bounded twice, both by WHOLE entries (a half-truncated URL or query reads as a different one and
+# is worse than an honest omission — same reasoning as ``_LEDGER_DELTA_MAX_ENTITIES`` above): a max
+# entry count, then the same per-ancestor character budget the rest of expansion context respects
+# (``expansion.ancestor_content_chars``, default 1000). Over budget, the OLDEST entries are dropped
+# first — the most recent sibling work is the work this node is most likely to duplicate.
+_SIBLING_EVIDENCE_MAX_ENTRIES = 8
+_SIBLING_EVIDENCE_LABEL_CHARS = 120
+_SIBLING_EVIDENCE_OUTCOME_CHARS = 160
+_SIBLING_EVIDENCE_HEADER = (
+    "WHAT OTHER BRANCHES OF THIS RUN ALREADY DID (they ran in parallel; you cannot see their "
+    "sub-trees any other way). Treat this as work already spent: do not re-issue an identical "
+    "search, do not re-visit an identical URL. Continue from where they stopped, or take a step "
+    "none of them covered."
+)
+
+
+def _format_sibling_evidence_entries(entries: List[str], budget: int) -> str:
+    """Render already-formatted sibling entry lines under both caps, or ``""``.
+
+    Split out from the collection pass so the truncation discipline is testable without a graph.
+    ``entries`` is oldest-first; both caps drop from the FRONT (oldest), and any drop is declared
+    with the same ``... [truncated]`` marker the ancestor-content path uses.
+    """
+    kept = [line for line in entries if line.strip()]
+    if not kept:
+        return ""
+    dropped = 0
+    if len(kept) > _SIBLING_EVIDENCE_MAX_ENTRIES:
+        dropped = len(kept) - _SIBLING_EVIDENCE_MAX_ENTRIES
+        kept = kept[-_SIBLING_EVIDENCE_MAX_ENTRIES:]
+    budget = max(0, int(budget))
+    if budget:
+        while kept and sum(len(line) + 1 for line in kept) > budget:
+            kept.pop(0)
+            dropped += 1
+    if not kept:
+        return ""
+    block = f"{_SIBLING_EVIDENCE_HEADER}\n" + "\n".join(kept)
+    if dropped:
+        block += f"\n... [truncated] ({dropped} earlier step(s) omitted)"
+    return block
+
+
 # --- opt-in input/output framing (``expansion_input_output_framing_enabled``) -------------------
 # The shipped expansion USER prompt opens with an OUTPUT instruction immediately followed by an
 # INPUT blob:
@@ -1010,6 +1070,74 @@ class LlmExpansionPolicy(ExpansionPolicy):
             return "Internal reasoning completed"
         return None
 
+    def _sibling_evidence_label(self, node: IdeaNode) -> str:
+        """The concrete thing a node's action addressed: its query, its URL, else its title.
+
+        Deliberately the ARGUMENT rather than the title, because the churn this block exists to
+        stop is argument-level (the same query re-issued under a freshly-worded sub-goal).
+        """
+        from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+
+        details = node.details if isinstance(node.details, dict) else {}
+        action = details.get(DetailKey.ACTION.value, "")
+        label = ""
+        if action == IdeaActionType.SEARCH.value:
+            label = str(details.get(DetailKey.QUERY.value) or details.get(DetailKey.PROMPT.value) or "")
+        elif action == IdeaActionType.VISIT.value:
+            label = str(NodeDetailsExtractor.get_url(details) or "")
+        if not label.strip():
+            label = str(node.title or "")
+        label = " ".join(label.split())
+        return label[:_SIBLING_EVIDENCE_LABEL_CHARS]
+
+    def _build_sibling_evidence_block(self, graph: Optional["IdeaDag"], node: IdeaNode) -> str:
+        """A bounded digest of the executed actions on branches this node cannot otherwise see.
+
+        Everything root-ward of ``node`` (its ancestors and itself) is already in the expansion
+        context verbatim, so only NON-ancestor nodes with a recorded action result contribute.
+        Returns ``""`` when there is nothing to say — no graph, no executed siblings, a first
+        expansion — so the caller can append unconditionally and leave the prompt byte-identical.
+        """
+        from agent.app.idea_policies.action_constants import ActionResultKey
+
+        if graph is None:
+            return ""
+        try:
+            rootward = {entry.node_id for entry in graph.path_to_root(node.node_id)}
+        except Exception:
+            return ""
+        rootward.add(node.node_id)
+        entries: List[str] = []
+        seen: set = set()
+        try:
+            walk = list(graph.iter_breadth_first())
+        except Exception:
+            return ""
+        for entry in walk:
+            if entry.node_id in rootward:
+                continue
+            details = entry.details if isinstance(entry.details, dict) else {}
+            result = details.get(DetailKey.ACTION_RESULT.value)
+            if not isinstance(result, dict):
+                continue
+            action = str(details.get(DetailKey.ACTION.value, "") or "action")
+            label = self._sibling_evidence_label(entry)
+            outcome = self._extract_key_outcome(entry)
+            if not outcome:
+                outcome = (
+                    "ok" if result.get(ActionResultKey.SUCCESS.value, False) else "FAILED"
+                )
+            outcome = " ".join(str(outcome).split())[:_SIBLING_EVIDENCE_OUTCOME_CHARS]
+            line = f"- [{action}] {label} -> {outcome}"
+            key = (action, label.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append(line)
+        return _format_sibling_evidence_entries(
+            entries, self._cfg.expansion.ancestor_content_chars
+        )
+
     def _build_messages(self, graph: IdeaDag, node: IdeaNode, memories: Optional[List[Dict[str, Any]]] = None,
                         max_children: Optional[int] = None,
                         exclude: Optional[List[str]] = None) -> List[Dict[str, str]]:
@@ -1147,6 +1275,15 @@ class LlmExpansionPolicy(ExpansionPolicy):
             ledger_block = _build_ledger_delta_block(self._read_task_ledger(graph))
             if ledger_block:
                 system = f"{system}\n\n{ledger_block}" if system else ledger_block
+        # Opt-in sibling EVIDENCE digest (``run_policy_sibling_evidence_digest_enabled``), the
+        # evidence-level companion to the roster block above and INDEPENDENT of it: it reads the
+        # graph, not the ledger, so `graph_shared_context` can isolate context visibility from
+        # ledger-observe mode. Off flag, no graph or no executed sibling all leave the prompt
+        # byte-identical.
+        if self._cfg.run_policy.sibling_evidence_digest_enabled:
+            sibling_block = self._build_sibling_evidence_block(graph, node)
+            if sibling_block:
+                system = f"{system}\n\n{sibling_block}" if system else sibling_block
         # Optional prompt prefixes, ordered top-to-bottom: reasoning exemplar (a
         # narrative demonstration) then the imperative rule checklist, then the existing
         # system template. The two env vars are fully independent. Either may be set alone.

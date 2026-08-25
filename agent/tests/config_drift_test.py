@@ -91,6 +91,9 @@ INTENTIONALLY_JSON_ABSENT = {
     # schema-constrained decoding on a confirmed local-Ollama backend: absent means every
     # repair re-ask behaves exactly as it does today (plain json_object, no schema).
     "run_policy_constrained_decoding_enabled",
+    # And for the sibling evidence digest, which only ADDS a bounded block to the expansion
+    # system prompt: absent means that prompt is byte-identical to today's.
+    "run_policy_sibling_evidence_digest_enabled",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

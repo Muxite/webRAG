@@ -418,6 +418,17 @@ TEST_PRIORITY_ORDER = [
     "154",  # Breadth D: 2 independent one-hop page reads + comparison: dam -> structural height (taller = Grande Dixence, 285 m vs Hoover 221.4 m) (7/10) - level=graph, weight=medium
     "155",  # Breadth E: 2 independent one-hop page reads + comparison: aircraft -> wingspan (wider = Hughes H-4 Hercules, 97.51 m vs An-225 88.4 m) (6/10) - level=graph, weight=medium
     "157",  # Breadth G: 7 independent one-hop page reads + count-with-condition: bridges with a main span > 1,200 m (8/10) - level=graph, weight=long
+    # Mechanism suite (DAG v3 "Ledger", §8.3): 159 is the genuine NARROW-SEQUENTIAL shape — the
+    # deliberate pair to the suite's wide-fan-out task. Width-1 chain: nothing is parallelisable,
+    # so a breadth-oriented engine can only add cost (priced by the un-gated path_efficiency check).
+    "159",  # Narrow-sequential: 4-hop dependent chain, leak-resistant terminus (lighthouse engineer -> novelist grandson -> burial mountain elevation) (9/10) - level=graph, weight=long
+    # Mechanism suite (2026-08-25, DAG v3 ledger plan Sec 8.3): purpose-built tasks that make the
+    # ledger/deficit-injector null result interpretable — each isolates ONE failure mechanism the
+    # core24 suite never exercises.
+    "303",  # Mechanism: ENTITY COLLISION — near-duplicate names on one page: Tay rail bridge length vs Tay Road Bridge (9/10) - level=navigation, weight=medium
+    # Mechanism suite (DAG v3 ledger plan §8.3): one mechanism per task, purpose-built to make the
+    # ledger/deficit-injector null result interpretable.
+    "158",  # Mechanism: stale-vs-current page-vs-page source conflict; a supplied confident page must be VERIFIED against an independent source (8/10) - level=integration, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12
@@ -847,6 +858,29 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "tool_failure_recovery_enabled": True,
         "final_require_grounding": True,   # validity gate, on in every arm
         "run_policy_constrained_decoding_enabled": True,   # the axis under test (shipped: False)
+    },
+    # Phase 0 ablation `graph_shared_context` (same plan, section 3): falsifies "branch isolation
+    # is the main failure", and it is the plan's KILL GATE -- if this arm alone closes most of the
+    # gap to `sequential_react`, DAG v2's context projection gets fixed and no new engine is built.
+    #
+    # The axis is `run_policy_sibling_evidence_digest_enabled`, which renders
+    # `LlmExpansionPolicy._build_sibling_evidence_block` (idea_policies/expansion.py) into the
+    # expansion system prompt: the executed actions of every NON-ancestor node (query/URL plus its
+    # key outcome), which root-ward-only expansion context otherwise hides. That hiding is the
+    # diagnosed cause of task 123's churn (43 visits, the same sub-goals re-issued 5-8 times).
+    # It deliberately does NOT set `run_policy_sibling_context_delta`/`run_policy_ledger_mode`:
+    # that pair renders the LEDGER ROSTER and would conflate context visibility with the ledger's
+    # own per-completion cost.
+    "good_adaptive_sharedcontext": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "run_policy_sibling_evidence_digest_enabled": True,   # the axis under test (shipped: False)
     },
 }
 

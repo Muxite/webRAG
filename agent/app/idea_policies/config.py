@@ -1279,6 +1279,17 @@ class RunPolicy:
     ``create_llm_backend`` itself uses to select ``OllamaNativeBackend``) -- every other backend
     keeps today's plain-text repair re-ask, unchanged. Off by default and absent from the shipped
     settings, same as the ten above.
+
+    ``sibling_evidence_digest_enabled`` renders a bounded digest of the executed actions on
+    branches the node being expanded cannot otherwise see (expansion context is root-ward only)
+    into its system prompt -- ``LlmExpansionPolicy._build_sibling_evidence_block``. It is
+    INDEPENDENT of ``sibling_context_delta`` on purpose: that flag renders the task LEDGER's
+    roster ("which enumerated entities are resolved") and is therefore inert unless
+    ``ledger_mode == "observe"``, while this one reads the graph directly and needs no ledger --
+    so the ``graph_shared_context`` ablation can isolate context visibility from the ledger's own
+    cost. Bounded by WHOLE entries twice (a max entry count, then
+    ``expansion.ancestor_content_chars``), because a half-truncated URL or query reads as a
+    different one. Off by default and absent from the shipped settings, same as the ten above.
     """
 
     ledger_mode: str = "off"
@@ -1292,6 +1303,7 @@ class RunPolicy:
     sequencing_identity_guard: bool = False
     coverage_entity_conflict_check: bool = False
     constrained_decoding_enabled: bool = False
+    sibling_evidence_digest_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1305,6 +1317,7 @@ class RunPolicy:
         "sequencing_identity_guard": "run_policy_sequencing_identity_guard",
         "coverage_entity_conflict_check": "run_policy_coverage_entity_conflict_check",
         "constrained_decoding_enabled": "run_policy_constrained_decoding_enabled",
+        "sibling_evidence_digest_enabled": "run_policy_sibling_evidence_digest_enabled",
     }
 
     @classmethod

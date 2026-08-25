@@ -110,6 +110,9 @@ def _base():
         # constrained decoding on the malformed-JSON repair re-ask: shipped OFF, the one axis
         # `good_adaptive_constrained` sets.
         "run_policy_constrained_decoding_enabled": False,
+        # sibling evidence digest in the expansion prompt: shipped OFF, the one axis
+        # `good_adaptive_sharedcontext` sets.
+        "run_policy_sibling_evidence_digest_enabled": False,
     }
 
 
@@ -802,6 +805,29 @@ def test_arm_good_adaptive_constrained_isolates_the_repair_path_codec():
     # It must not smuggle the ledger axes in with it (both live in the same RunPolicy group).
     assert settings["run_policy_ledger_mode"] == control["run_policy_ledger_mode"]
     assert settings["run_policy_deficit_driven_injection"] is False
+
+
+def test_arm_good_adaptive_sharedcontext_isolates_the_sibling_digest_from_the_ledger():
+    """Phase 0's kill-gate arm: `good_adaptive` plus the sibling-evidence digest and NOTHING
+    else — in particular not the ledger, whose roster block is the confound this arm avoids."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    arm = _GOT_ARM_PROFILES["good_adaptive_sharedcontext"]
+    assert set(arm) - set(base) == {"run_policy_sibling_evidence_digest_enabled"}
+    assert set(base) - set(arm) == set()
+    assert all(arm[k] == v for k, v in base.items())
+    assert arm["run_policy_sibling_evidence_digest_enabled"] is True
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_sharedcontext"})
+    assert settings["run_policy_sibling_evidence_digest_enabled"] is True
+    # The ledger axes must stay at the shipped default, or the arm measures two things.
+    assert settings["run_policy_ledger_mode"] == "off"
+    assert settings["run_policy_deficit_driven_injection"] is False
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    assert control["run_policy_sibling_evidence_digest_enabled"] is False
 
 
 def test_arm_good_adaptive_backtrackrel_isolates_backtrack_and_its_relative_threshold():
