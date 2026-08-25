@@ -230,6 +230,60 @@ _NATIVE_STRATEGY_ADDENDUM_TEMPLATE = (
 )
 
 
+# --- opt-in sibling-context ledger delta (``run_policy_sibling_context_delta``) -----------------
+# Expansion context is root-ward only (``IdeaDag.path_to_root``), so a node being expanded has
+# no way to see that a SIBLING branch already resolved part of the roster and will happily mint
+# a candidate for it again. This block is the one-line repair: a rendering of the run's task
+# ledger snapshot (``root.details["task_ledger_v1"]``), which already knows the enumerated
+# requirements and which of them a successfully-visited page backs.
+#
+# The cap is a MAX ENTITY COUNT rather than a raw character budget, because these are candidate
+# NAMES: a mid-name character cut ("Anders" for "Andersonville") reads as a different entity and
+# is worse than an honest omission. The truncation suffix matches the ancestor-content pattern
+# in ``_compact_details_for_expansion``.
+_LEDGER_DELTA_MAX_ENTITIES = 10
+
+
+def _format_ledger_entities(names: List[str]) -> str:
+    """``", "``-joined names, capped at :data:`_LEDGER_DELTA_MAX_ENTITIES` whole names."""
+    shown = names[:_LEDGER_DELTA_MAX_ENTITIES]
+    text = ", ".join(shown)
+    if len(names) > len(shown):
+        text += "... [truncated]"
+    return text
+
+
+def _build_ledger_delta_block(ledger: Any) -> str:
+    """Render ``ledger`` (a ``TaskLedger.to_dict()`` snapshot) as a bounded prompt line.
+
+    Returns ``""`` for anything that is not a usable snapshot — absent key, wrong type, or a
+    mandate that enumerated no requirements — so the caller can append unconditionally and
+    still leave the prompt byte-identical when there is nothing to say.
+    """
+    if not isinstance(ledger, dict):
+        return ""
+    raw_entities = ledger.get("entities")
+    if not isinstance(raw_entities, list):
+        return ""
+    entities = [str(item) for item in raw_entities if str(item).strip()]
+    if not entities:
+        return ""
+    raw_unresolved = ledger.get("unresolved_entities")
+    unresolved_set = {
+        str(item) for item in (raw_unresolved if isinstance(raw_unresolved, list) else [])
+    }
+    # Mandate order, both lists, so the two halves read as one roster split in place.
+    unresolved = [name for name in entities if name in unresolved_set]
+    supported = [name for name in entities if name not in unresolved_set]
+    block = f"[Ledger] {len(supported)}/{len(entities)} requirements resolved by other branches"
+    if supported:
+        block += f": {_format_ledger_entities(supported)}"
+    block += "."
+    if unresolved:
+        block += f" Still open: {_format_ledger_entities(unresolved)}."
+    return block
+
+
 # --- opt-in input/output framing (``expansion_input_output_framing_enabled``) -------------------
 # The shipped expansion USER prompt opens with an OUTPUT instruction immediately followed by an
 # INPUT blob:
@@ -1083,6 +1137,16 @@ class LlmExpansionPolicy(ExpansionPolicy):
             if advice:
                 block = _NATIVE_STRATEGY_ADDENDUM_TEMPLATE.format(advice=advice)
                 system = f"{system}\n\n{block}" if system else block
+        # Opt-in cross-branch awareness (``run_policy_sibling_context_delta``), which REQUIRES
+        # the observe-mode task ledger: the block is a rendering of that ledger's snapshot, so
+        # with the ledger off there is nothing to render. Read passively, exactly as the ledger
+        # is written — the snapshot may be one refresh stale, and a stale "already resolved"
+        # line is a hint, not a gate. Either flag off, an uncompiled ledger and an
+        # un-enumerated mandate all leave the prompt byte-identical.
+        if self._cfg.run_policy.sibling_context_delta and self._cfg.run_policy.ledger_mode == "observe":
+            ledger_block = _build_ledger_delta_block(self._read_task_ledger(graph))
+            if ledger_block:
+                system = f"{system}\n\n{ledger_block}" if system else ledger_block
         # Optional prompt prefixes, ordered top-to-bottom: reasoning exemplar (a
         # narrative demonstration) then the imperative rule checklist, then the existing
         # system template. The two env vars are fully independent. Either may be set alone.
@@ -1190,6 +1254,23 @@ class LlmExpansionPolicy(ExpansionPolicy):
         
         return None
     
+    def _read_task_ledger(self, graph: Optional["IdeaDag"]) -> Optional[Dict[str, Any]]:
+        """The run's task-ledger snapshot from the root node, or ``None`` if there isn't one.
+
+        Absent whenever ``RunPolicy.ledger_mode`` is ``"off"`` (nothing ever writes the detail)
+        and also before ``prepare()`` has compiled it, so every caller has to tolerate ``None``.
+        """
+        if graph is None:
+            return None
+        try:
+            root = graph.get_node(graph.root_id())
+        except Exception:
+            return None
+        if root is None or not isinstance(root.details, dict):
+            return None
+        ledger = root.details.get(DetailKey.TASK_LEDGER.value)
+        return ledger if isinstance(ledger, dict) else None
+
     def _root_mandate(self, graph: Optional["IdeaDag"]) -> str:
         """The root node's mandate text (the task statement), or "" if unavailable."""
         if graph is None:

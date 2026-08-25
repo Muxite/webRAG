@@ -47,6 +47,22 @@ def test_shipped_settings_leave_the_empty_search_remediation_off():
     assert RunPolicy.from_settings(settings).search_must_yield_visit is False
 
 
+def test_sibling_context_delta_defaults_to_false_when_the_key_is_absent():
+    assert RunPolicy.from_settings({}).sibling_context_delta is False
+
+
+def test_sibling_context_delta_resolves_from_settings():
+    resolved = RunPolicy.from_settings({"run_policy_sibling_context_delta": True})
+    assert resolved.sibling_context_delta is True
+
+
+def test_shipped_settings_leave_the_sibling_context_delta_off():
+    """Absent by design; the expansion prompt is byte-identical without it."""
+    settings = load_idea_dag_settings()
+    assert "run_policy_sibling_context_delta" not in settings
+    assert RunPolicy.from_settings(settings).sibling_context_delta is False
+
+
 def test_idea_config_exposes_the_group():
     cfg = IdeaConfig.from_settings({})
     assert isinstance(cfg.run_policy, RunPolicy)
@@ -59,6 +75,10 @@ def test_idea_config_exposes_the_group():
 
     armed = IdeaConfig.from_settings({"run_policy_search_must_yield_visit": True})
     assert armed.run_policy.search_must_yield_visit is True
+
+    assert cfg.run_policy.sibling_context_delta is False
+    delta = IdeaConfig.from_settings({"run_policy_sibling_context_delta": True})
+    assert delta.run_policy.sibling_context_delta is True
 
 
 def test_group_follows_the_frozen_dataclass_convention():

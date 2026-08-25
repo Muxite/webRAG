@@ -1175,14 +1175,24 @@ class RunPolicy:
     ``post_expansion_hooks.inject_empty_search_followup`` mints one broadened search plus a
     visit that depends on it. Off by default and absent from the shipped settings for the same
     reason as above: flag-off behaviour is byte-identical to not having the mechanism.
+
+    ``sibling_context_delta`` lets an expansion prompt see, in one bounded line, which of the
+    run's requirements OTHER branches have already resolved. Expansion context is root-ward
+    only (``IdeaDag.path_to_root``), so today a node being expanded cannot tell that a sibling
+    already covered half the roster. DEPENDS ON ``ledger_mode == "observe"``: the block is a
+    rendering of the task ledger snapshot at ``root.details["task_ledger_v1"]``, so with the
+    ledger off there is nothing to render and the flag is inert on its own. Off by default and
+    absent from the shipped settings, same as the two above.
     """
 
     ledger_mode: str = "off"
     search_must_yield_visit: bool = False
+    sibling_context_delta: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
         "search_must_yield_visit": "run_policy_search_must_yield_visit",
+        "sibling_context_delta": "run_policy_sibling_context_delta",
     }
 
     @classmethod
