@@ -65,6 +65,8 @@ INTENTIONALLY_JSON_ABSENT = {
     # And for the evidence store, whose "observe" mode buys one extra LLM call per visit:
     # absent means the shipped settings cost exactly what they cost today.
     "run_policy_evidence_store_mode",
+    # And for the deterministic merge view, which is inert without that store anyway.
+    "run_policy_deterministic_merge_view",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

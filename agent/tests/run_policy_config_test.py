@@ -79,6 +79,22 @@ def test_shipped_settings_leave_the_evidence_store_off():
     assert RunPolicy.from_settings(settings).evidence_store_mode == "off"
 
 
+def test_deterministic_merge_view_defaults_to_false_when_the_key_is_absent():
+    assert RunPolicy.from_settings({}).deterministic_merge_view is False
+
+
+def test_deterministic_merge_view_resolves_from_settings():
+    resolved = RunPolicy.from_settings({"run_policy_deterministic_merge_view": True})
+    assert resolved.deterministic_merge_view is True
+
+
+def test_shipped_settings_leave_the_deterministic_merge_view_off():
+    """Absent by design; the view also needs ``evidence_store_mode == "observe"`` to do anything."""
+    settings = load_idea_dag_settings()
+    assert "run_policy_deterministic_merge_view" not in settings
+    assert RunPolicy.from_settings(settings).deterministic_merge_view is False
+
+
 def test_idea_config_exposes_the_group():
     cfg = IdeaConfig.from_settings({})
     assert isinstance(cfg.run_policy, RunPolicy)
@@ -99,6 +115,10 @@ def test_idea_config_exposes_the_group():
     assert cfg.run_policy.evidence_store_mode == "off"
     store = IdeaConfig.from_settings({"run_policy_evidence_store_mode": "observe"})
     assert store.run_policy.evidence_store_mode == "observe"
+
+    assert cfg.run_policy.deterministic_merge_view is False
+    view = IdeaConfig.from_settings({"run_policy_deterministic_merge_view": True})
+    assert view.run_policy.deterministic_merge_view is True
 
 
 def test_group_follows_the_frozen_dataclass_convention():

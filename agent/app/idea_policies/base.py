@@ -221,3 +221,11 @@ class DetailKey(str, Enum):
     # both keys are absent on every default run.
     EVIDENCE = "evidence_v1"
     CLAIMS = "claims_v1"
+    # Observe-only deterministic aggregation of the claim sidecars above, written onto a MERGE
+    # node once its own synthesis has run (opt-in, gated by
+    # ``RunPolicy.deterministic_merge_view`` AND ``evidence_store_mode == "observe"``):
+    # ``agent.app.evidence_store.aggregate_claims_for_merge``'s subject-grouped view of what the
+    # merged sources actually claimed. It exists to be COMPARED against the LLM synthesis, never
+    # to replace it -- the merge's ``action_result``, deliverable, ``goal_achieved`` and prompts
+    # are identical with the flag on. Versioned for the same reason as the keys above.
+    DETERMINISTIC_MERGE_VIEW = "deterministic_merge_view_v1"

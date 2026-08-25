@@ -37,6 +37,11 @@ Judgment calls made here rather than guessed silently past
   not cost a fraction of an expansion prompt, let alone a multiple of one.
 * ``MAX_CLAIMS`` is 8, enforced after parsing rather than via the JSON schema (nothing in
   ``idea_dag_schemas`` uses ``maxItems``; see the note on ``CLAIM_EXTRACTION_JSON_SCHEMA``).
+* :func:`aggregate_claims_for_merge` groups by the claim's ``subject`` string, whitespace-
+  stripped and otherwise VERBATIM. "Pablo Neruda" and "Neruda" stay two subjects. Entity
+  resolution is a real problem with real false merges, and a casefold-plus-alias heuristic
+  smuggled into a telemetry view would silently decide it; this view reports what the
+  extractor said, and the resolver is later work that has to earn its own measurement.
 """
 
 from __future__ import annotations
@@ -361,3 +366,128 @@ async def extract_claims(
     except Exception as exc:  # noqa: BLE001 - a weird payload is not a failed visit
         _logger.warning(f"[EVIDENCE] claim payload was unusable: {exc}")
         return []
+
+
+def _merge_source_ids(merge_node: Any) -> List[str]:
+    """The node ids whose subtrees a merge synthesizes, reusing the merge's own traversal.
+
+    ``SimpleMergePolicy.merge`` has already walked the children once, applying race-winner
+    exclusion and the alternative-pending filter, and left the surviving ids in
+    ``merged_results``. Reading them back is that traversal, not a second one that could
+    disagree with it. Falls back to the raw child list only when a merge node carries no
+    ``merged_results`` at all.
+    """
+    from agent.app.idea_policies.base import DetailKey
+
+    details = getattr(merge_node, "details", None)
+    details = details if isinstance(details, dict) else {}
+    merged = details.get(DetailKey.MERGED_RESULTS.value)
+    ids: List[str] = []
+    if isinstance(merged, list):
+        for item in merged:
+            if not isinstance(item, dict):
+                continue
+            node_id = _as_text(item.get("node_id")).strip()
+            if node_id:
+                ids.append(node_id)
+    if ids:
+        return ids
+    return [_as_text(child) for child in (getattr(merge_node, "children", None) or [])]
+
+
+def _subtree_nodes(graph: Any, root_ids: List[str], skip_id: str) -> List[Any]:
+    """Every reachable node under ``root_ids``, breadth-first, each visited once."""
+    seen = {skip_id} if skip_id else set()
+    nodes: List[Any] = []
+    queue = list(root_ids)
+    while queue:
+        node_id = queue.pop(0)
+        if not node_id or node_id in seen:
+            continue
+        seen.add(node_id)
+        node = graph.get_node(node_id)
+        if node is None:
+            continue
+        nodes.append(node)
+        queue.extend(getattr(node, "children", None) or [])
+    return nodes
+
+
+def aggregate_claims_for_merge(merge_node: Any, graph: Any) -> Dict[str, Any]:
+    """Group the claim sidecars under a merge node by subject. Deterministic, free, read-only.
+
+    Walks the subtrees of the nodes this merge aggregates (see :func:`_merge_source_ids`) and
+    collects the ``Evidence`` / ``Claim`` sidecars left there by
+    :func:`extract_evidence` / :func:`extract_claims`. Both are absent unless
+    ``RunPolicy.evidence_store_mode`` was ``"observe"`` for the run, which is why this returns
+    an empty-but-well-formed view rather than raising when there is nothing to aggregate::
+
+        {"subjects": {}, "unclaimed_evidence_count": 0, "total_claims": 0}
+
+    ``source_count`` counts DISTINCT source pages behind a subject's claims (evidence ids
+    resolved to their ``canonical_url``, so one page read by two nodes is one source, and an
+    evidence id whose record is missing counts as itself). Two claims off the same page are one
+    source; that is the whole question this number is meant to answer.
+
+    Non-authoritative by construction: nothing here is written back to a node other than the
+    single sidecar key the caller attaches, and no LLM is involved.
+    """
+    from agent.app.idea_policies.base import DetailKey
+
+    subjects: Dict[str, Dict[str, Any]] = {}
+    source_by_evidence: Dict[str, str] = {}
+    evidence_ids: List[str] = []
+    claimed_evidence_ids = set()
+    total_claims = 0
+
+    nodes = _subtree_nodes(
+        graph,
+        _merge_source_ids(merge_node),
+        _as_text(getattr(merge_node, "node_id", None) or getattr(merge_node, "id", "") or ""),
+    )
+    for node in nodes:
+        details = getattr(node, "details", None)
+        if not isinstance(details, dict):
+            continue
+
+        evidence = details.get(DetailKey.EVIDENCE.value)
+        if isinstance(evidence, dict):
+            evidence_id = _as_text(evidence.get("id")).strip()
+            if evidence_id and evidence_id not in source_by_evidence:
+                evidence_ids.append(evidence_id)
+                source_by_evidence[evidence_id] = (
+                    _as_text(evidence.get("canonical_url")).strip() or evidence_id
+                )
+
+        raw_claims = details.get(DetailKey.CLAIMS.value)
+        if not isinstance(raw_claims, list):
+            continue
+        for claim in raw_claims:
+            if not isinstance(claim, dict):
+                continue
+            subject = _as_text(claim.get("subject")).strip()
+            if not subject:
+                continue
+            total_claims += 1
+            claim_evidence_id = _as_text(claim.get("evidence_id")).strip()
+            if claim_evidence_id:
+                claimed_evidence_ids.add(claim_evidence_id)
+            entry = subjects.setdefault(
+                subject, {"claims": [], "evidence_ids": [], "source_count": 0}
+            )
+            entry["claims"].append(dict(claim))
+            if claim_evidence_id and claim_evidence_id not in entry["evidence_ids"]:
+                entry["evidence_ids"].append(claim_evidence_id)
+
+    for entry in subjects.values():
+        entry["source_count"] = len(
+            {source_by_evidence.get(ev_id, ev_id) for ev_id in entry["evidence_ids"]}
+        )
+
+    return {
+        "subjects": subjects,
+        "unclaimed_evidence_count": sum(
+            1 for ev_id in evidence_ids if ev_id not in claimed_evidence_ids
+        ),
+        "total_claims": total_claims,
+    }

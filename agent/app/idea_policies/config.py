@@ -1191,18 +1191,29 @@ class RunPolicy:
     claims are verified and consumed. ``"observe"`` costs one extra LLM call per successful
     visit and changes no decision. Off by default and absent from the shipped settings, same as
     the three above.
+
+    ``deterministic_merge_view`` records, ALONGSIDE the LLM merge synthesis and without
+    touching it, what the merge node's sources actually claimed: the descendants' ``Claim``
+    triples grouped by subject — see ``evidence_store.aggregate_claims_for_merge``. DEPENDS ON
+    ``evidence_store_mode == "observe"``: the view is an aggregation of claim sidecars, so with
+    the store off there is nothing to aggregate and the flag is inert on its own (same
+    dependency shape as ``sibling_context_delta`` on ``ledger_mode``). The merge's
+    ``action_result``, deliverable, ``goal_achieved`` and prompts are untouched either way. Off
+    by default and absent from the shipped settings, same as the four above.
     """
 
     ledger_mode: str = "off"
     search_must_yield_visit: bool = False
     sibling_context_delta: bool = False
     evidence_store_mode: str = "off"
+    deterministic_merge_view: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
         "search_must_yield_visit": "run_policy_search_must_yield_visit",
         "sibling_context_delta": "run_policy_sibling_context_delta",
         "evidence_store_mode": "run_policy_evidence_store_mode",
+        "deterministic_merge_view": "run_policy_deterministic_merge_view",
     }
 
     @classmethod

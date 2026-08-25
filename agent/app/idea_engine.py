@@ -2983,6 +2983,12 @@ class IdeaDagEngine:
         status = self._handle_action_result(graph, node_id, step_index)
         node = graph.get_node(node_id)
         self._record_race_completion(node, step_index)
+        # Observe-only deterministic merge view (no-op unless BOTH
+        # run_policy.deterministic_merge_view and evidence_store_mode == "observe").
+        # Deliberately OUTSIDE the DONE gate below: a merge whose synthesis came back
+        # not-achieved keeps a non-DONE status, and that is exactly the case the view is
+        # meant to be compared against.
+        self._maybe_record_merge_view(graph, node_id)
         # Sequential A->B fallback, call site 1 of 2. Deliberately OUTSIDE the DONE gate
         # below: the FAILED case is this mechanism's primary trigger and the existing
         # follow-up chain never fires for FAILED at all. Checked before F6/confidence-
@@ -3075,6 +3081,35 @@ class IdeaDagEngine:
             node.details[DetailKey.CLAIMS.value] = [c.to_dict() for c in claims]
         except Exception as exc:  # noqa: BLE001. Telemetry must never fail a completed visit
             self._logger.warning(f"[EVIDENCE] record failed (node={node_id}): {exc}")
+
+    def _maybe_record_merge_view(self, graph: IdeaDag, node_id: str) -> None:
+        """Attach the deterministic claim aggregation to a completed MERGE node, or do nothing.
+
+        Off by default and inert on its own: it needs ``run_policy_deterministic_merge_view``
+        AND ``run_policy_evidence_store_mode == "observe"``, because the view is an aggregation
+        of the claim sidecars that mode records (see ``evidence_store``). With either half off
+        no aggregation is computed and no key is written, so the node's details keep their exact
+        shape. Failing open with no view, rather than erroring, matches the sibling-context
+        delta's dependency on the task ledger.
+
+        Strictly additive: the merge's own ``action_result``, deliverable text, ``goal_achieved``
+        and status are already decided by ``MergeLeafAction`` before this runs, and this writes
+        exactly one new details key. No LLM call, no network.
+        """
+        run_policy = self._cfg.run_policy
+        if not run_policy.deterministic_merge_view or run_policy.evidence_store_mode != "observe":
+            return
+        node = graph.get_node(node_id)
+        if node is None or not NodeDetailsExtractor.is_merge_action(node.details):
+            return
+        try:
+            from agent.app import evidence_store as _evidence_store
+
+            node.details[DetailKey.DETERMINISTIC_MERGE_VIEW.value] = (
+                _evidence_store.aggregate_claims_for_merge(node, graph)
+            )
+        except Exception as exc:  # noqa: BLE001. An observer must never fail its merge
+            self._logger.warning(f"[EVIDENCE] merge view failed (node={node_id}): {exc}")
 
     async def _maybe_judge_step_confidence(
         self, graph: IdeaDag, node_id: str, step_index: int
