@@ -293,7 +293,30 @@ class IdeaDagEngine:
             graph = IdeaDag(root_title=root_title, root_details={"mandate": mandate, "memo_namespace": namespace})
             current_id = graph.root_id()
             self._logger.info(f"[RUN] Created graph with root_id={current_id}")
+
+        self._maybe_compile_task_ledger(graph, mandate)
         return graph, current_id, steps
+
+    def _maybe_compile_task_ledger(self, graph: IdeaDag, mandate: str) -> None:
+        """Stamp the observe-only task ledger onto the root, or do nothing at all.
+
+        Off by default (``run_policy_ledger_mode`` is ``"off"``): no ledger is compiled, no
+        coverage check runs, and the root's details keep their exact shape. In ``"observe"``
+        mode the ledger is telemetry only — see ``agent/app/task_ledger.py``.
+        """
+        self._task_ledger = None
+        if self._cfg.run_policy.ledger_mode != "observe":
+            return
+        try:
+            from agent.app.task_ledger import TaskLedger
+
+            self._task_ledger = TaskLedger.compile(mandate, None, graph)
+            root = graph.get_node(graph.root_id())
+            if root is not None:
+                root.details[DetailKey.TASK_LEDGER.value] = self._task_ledger.to_dict()
+        except Exception as exc:  # noqa: BLE001. Telemetry must never crash a run
+            self._logger.warning(f"[LEDGER] compile failed: {exc}")
+            self._task_ledger = None
 
     async def _resolve_native_strategy_advice(self, mandate: str, task_source: Any = None) -> None:
         """Retrieve ONE ``strategy_library`` note for this run's expansion prompt — or nothing.
@@ -692,6 +715,16 @@ class IdeaDagEngine:
                 self._record_decision("finalize", node_id=graph.root_id(), chosen="finalized")
         except Exception as exc:  # noqa: BLE001. Never crash finalize on grounding
             self._logger.warning(f"[GROUNDING] final grounding check failed: {exc}")
+
+        # Observe-only ledger refresh. Attached LAST and read by nothing above it: `success`,
+        # `finalization_status` and `coverage_ratio` stay driven solely by the coverage gate and
+        # `derive_completion_fields`. Absent entirely when the mode is `"off"` (the default).
+        _ledger = getattr(self, "_task_ledger", None)
+        if _ledger is not None and self._cfg.run_policy.ledger_mode == "observe":
+            try:
+                final_payload["task_ledger"] = _ledger.refresh(graph).to_dict()
+            except Exception as exc:  # noqa: BLE001. Telemetry must never crash finalize
+                self._logger.warning(f"[LEDGER] finalize refresh failed: {exc}")
 
         self._logger.info(f"[RUN] Final payload created, graph has {graph.node_count()} nodes, {len(pending_nodes) if pending_nodes else 0} pending")
         return final_payload

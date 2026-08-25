@@ -205,3 +205,10 @@ class DetailKey(str, Enum):
     # to dispatch the group concurrently and by ``SimpleMergePolicy.select_winner`` to resolve
     # one winner at the merge point. Absent by default.
     RACE_GROUP = "race_group"
+    # Observe-only run ledger (opt-in, gated by ``RunPolicy.ledger_mode == "observe"``), written
+    # ONCE onto the ROOT by ``IdeaDagEngine.prepare``: ``agent.app.task_ledger.TaskLedger``'s
+    # serialized view of the mandate's enumerated requirements and how many are visit-backed.
+    # Versioned in the key itself because the enforce-mode successor will carry a different
+    # shape and both may need to coexist in one stored graph. Pure telemetry: nothing gates on
+    # it, and its absence (every default run) is what keeps the root's details byte-identical.
+    TASK_LEDGER = "task_ledger_v1"
