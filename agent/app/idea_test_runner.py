@@ -1251,6 +1251,11 @@ def _parse_execution_variants(raw: str) -> List[str]:
         "langgraph_react": "langgraph_react",
         "langgraph": "langgraph_react",
         "offtheshelf": "langgraph_react",
+        # Phase 0's deterministic evidence-queue arm -- a harness stub, no scheduler and no typed
+        # state yet (testing/execution_evidence_queue.py).
+        "evidence_queue_deterministic": "evidence_queue_deterministic",
+        "evidence_queue": "evidence_queue_deterministic",
+        "queue": "evidence_queue_deterministic",
     }
     out: List[str] = []
     seen = set()

@@ -23,6 +23,7 @@ from agent.app.testing.execution_naive_discretion import run_naive_discretion_ex
 from agent.app.testing.execution_compiled import run_compiled_execution
 from agent.app.testing.execution_compiled_code import run_compiled_code_execution
 from agent.app.testing.execution_langgraph import run_offtheshelf_execution
+from agent.app.testing.execution_evidence_queue import run_evidence_queue_execution
 from agent.app.testing.validation import ValidationRunner
 from agent.app.testing.utils import build_validation_evidence
 from agent.app.testing import json_telemetry as _json_telemetry
@@ -39,6 +40,11 @@ OFFTHESHELF_VARIANTS = ("langgraph_react",)
 #: a separate execution module -- so both are named here explicitly rather than
 #: reached implicitly via a bare fallthrough.
 DAG_ENGINE_VARIANTS = ("graph", "sequential")
+#: Phase 0's deterministic evidence-queue arm (docs/DAG_V3_LEDGER_MASTER_PLAN_2026-08-25.md).
+#: A HARNESS STUB -- one search/visit/extract per enumerated requirement, no scheduler and no
+#: typed state (see ``testing/execution_evidence_queue.py``). Registered as its own group so the
+#: real Phase B implementation replaces a module, not the dispatch.
+EVIDENCE_QUEUE_VARIANTS = ("evidence_queue_deterministic",)
 
 #: Every execution_variant value this module knows how to dispatch. Anything else is
 #: a typo/unknown value and must raise rather than silently running the DAG engine
@@ -51,6 +57,7 @@ KNOWN_EXECUTION_VARIANTS = frozenset(
     + COMPILED_AGENT_VARIANTS
     + COMPILED_CODE_AGENT_VARIANTS
     + OFFTHESHELF_VARIANTS
+    + EVIDENCE_QUEUE_VARIANTS
     + BASELINE_VARIANTS
 )
 
@@ -100,8 +107,8 @@ async def run_complete_test(
     :param summarize_observability_func: Function to summarize observability.
     :param validation_model: Model name for validation.
     :param execution_variant: graph / sequential / sequential_react / naive_discretion /
-        graph_compiled / graph_compiled_code / langgraph_react (agents) or parametric /
-        naive_rag / minimal (baseline). Must be one of KNOWN_EXECUTION_VARIANTS -- an
+        graph_compiled / graph_compiled_code / langgraph_react /
+        evidence_queue_deterministic (agents) or parametric / naive_rag / minimal (baseline). Must be one of KNOWN_EXECUTION_VARIANTS -- an
         unrecognized value raises ValueError instead of silently running the DAG engine.
     :param cell_tag: Disambiguating suffix shared with the result JSON's filename (effort
         tier / settings fingerprint / repeat index). Threaded into the trace path so repeats
@@ -170,6 +177,20 @@ async def run_complete_test(
         )
     elif execution_variant in OFFTHESHELF_VARIANTS:
         execution_result = await run_offtheshelf_execution(
+            test_module=test_module,
+            model_name=model_name,
+            connector_llm=connector_llm,
+            connector_search=connector_search,
+            connector_http=connector_http,
+            connector_chroma=connector_chroma,
+            connector_browser=connector_browser,
+            idea_settings=idea_settings,
+            run_stamp=run_stamp,
+            cell_tag=cell_tag,
+            summarize_observability_func=summarize_observability_func,
+        )
+    elif execution_variant in EVIDENCE_QUEUE_VARIANTS:
+        execution_result = await run_evidence_queue_execution(
             test_module=test_module,
             model_name=model_name,
             connector_llm=connector_llm,

@@ -66,6 +66,7 @@ def _execution_result() -> Dict[str, Any]:
         ("graph_compiled", "run_compiled_execution"),
         ("graph_compiled_code", "run_compiled_code_execution"),
         ("langgraph_react", "run_offtheshelf_execution"),
+        ("evidence_queue_deterministic", "run_evidence_queue_execution"),
         ("parametric", "run_baseline_execution"),
         ("naive_rag", "run_baseline_execution"),
         ("minimal", "run_baseline_execution"),
@@ -135,3 +136,7 @@ def test_known_execution_variants_covers_the_nine_documented_names_plus_sequenti
     }
     assert documented <= harness_runner.KNOWN_EXECUTION_VARIANTS
     assert "sequential" in harness_runner.KNOWN_EXECUTION_VARIANTS
+    # Phase 0's deterministic evidence-queue stub is registered as its own family, so the real
+    # Phase B implementation replaces a module rather than the dispatch.
+    assert harness_runner.EVIDENCE_QUEUE_VARIANTS == ("evidence_queue_deterministic",)
+    assert "evidence_queue_deterministic" in harness_runner.KNOWN_EXECUTION_VARIANTS
