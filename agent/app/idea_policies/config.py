@@ -1200,6 +1200,18 @@ class RunPolicy:
     dependency shape as ``sibling_context_delta`` on ``ledger_mode``). The merge's
     ``action_result``, deliverable, ``goal_achieved`` and prompts are untouched either way. Off
     by default and absent from the shipped settings, same as the four above.
+
+    ``merge_uses_evidence_view`` is the first flag in this group that CONSUMES rather than
+    observes: it appends one bounded ``[Evidence]`` block — subjects with their claim and
+    distinct-source counts, no raw claim text — to the merge synthesis system prompt, so the
+    model aggregating the branches can see what its own sources actually recorded. DEPENDS ON
+    BOTH ``deterministic_merge_view`` AND ``evidence_store_mode == "observe"``, a three-flag
+    chain that reads bottom-up: the store records the ``Claim`` sidecars, the view is their
+    per-subject aggregation, and this flag renders that aggregation into the prompt. With any
+    link off, no block is built and the merge prompt is byte-identical to today's. The LLM
+    stays the decision-maker — nothing here overrides ``goal_achieved`` or the deliverable, it
+    only changes what the model is shown. Off by default and absent from the shipped settings,
+    same as the five above.
     """
 
     ledger_mode: str = "off"
@@ -1207,6 +1219,7 @@ class RunPolicy:
     sibling_context_delta: bool = False
     evidence_store_mode: str = "off"
     deterministic_merge_view: bool = False
+    merge_uses_evidence_view: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1214,6 +1227,7 @@ class RunPolicy:
         "sibling_context_delta": "run_policy_sibling_context_delta",
         "evidence_store_mode": "run_policy_evidence_store_mode",
         "deterministic_merge_view": "run_policy_deterministic_merge_view",
+        "merge_uses_evidence_view": "run_policy_merge_uses_evidence_view",
     }
 
     @classmethod

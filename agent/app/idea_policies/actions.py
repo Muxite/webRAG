@@ -2482,6 +2482,65 @@ class PlanLibrarySearchLeafAction(LeafAction):
             )
 
 
+# --- opt-in structured-evidence block for the merge prompt (``run_policy_merge_uses_evidence_view``)
+# Whole subjects, never a character budget: a subject name cut mid-word is worse than an honest
+# omission, and the truncation suffix matches the ledger-delta block in ``expansion``.
+_MERGE_EVIDENCE_MAX_SUBJECTS = 10
+
+
+def _build_evidence_view_block(view: Any) -> str:
+    """Render an ``aggregate_claims_for_merge`` view as one bounded prompt block.
+
+    Counts only — how many claims a subject has and how many DISTINCT pages they came off —
+    never the claim text itself. The merged results already carry the page evidence; what this
+    block adds is the structured shape of it (which subjects are thin, which are unsourced),
+    at a size that cannot grow with the amount of evidence gathered.
+
+    Returns ``""`` for anything that is not a usable view — wrong type, no subjects at all — so
+    the caller can append unconditionally and still leave the prompt byte-identical when there
+    is nothing to say.
+    """
+    if not isinstance(view, dict):
+        return ""
+    subjects = view.get("subjects")
+    if not isinstance(subjects, dict) or not subjects:
+        return ""
+    entries: List[str] = []
+    for name, raw_entry in subjects.items():
+        label = str(name).strip()
+        if not label:
+            continue
+        entry = raw_entry if isinstance(raw_entry, dict) else {}
+        claims = entry.get("claims")
+        claim_count = len(claims) if isinstance(claims, list) else 0
+        try:
+            source_count = int(entry.get("source_count") or 0)
+        except (TypeError, ValueError):
+            source_count = 0
+        text = f"{label}: {claim_count} claim{'' if claim_count == 1 else 's'}"
+        if source_count > 0:
+            text += f" from {source_count} source{'' if source_count == 1 else 's'}."
+        else:
+            text += " (0 sources) -- unresolved."
+        entries.append(text)
+    if not entries:
+        return ""
+    shown = entries[:_MERGE_EVIDENCE_MAX_SUBJECTS]
+    block = (
+        "[Evidence] Structured claims recorded by the branches this merge aggregates, "
+        "grouped by subject. " + " ".join(shown)
+    )
+    if len(entries) > len(shown):
+        block += " ... [truncated]"
+    try:
+        unclaimed = int(view.get("unclaimed_evidence_count") or 0)
+    except (TypeError, ValueError):
+        unclaimed = 0
+    if unclaimed > 0:
+        block += f" {unclaimed} page{'' if unclaimed == 1 else 's'} yielded no claims."
+    return block
+
+
 class MergeLeafAction(LeafAction):
     name = "merge"
 
@@ -2660,6 +2719,38 @@ class MergeLeafAction(LeafAction):
             return mandate.strip()
         return (root.title or "").strip()
 
+    def _evidence_view_block(self, graph: IdeaDag, node: Any) -> str:
+        """The ``[Evidence]`` prompt block for this merge, or ``""`` when the chain is not armed.
+
+        Needs all three of ``run_policy.merge_uses_evidence_view``,
+        ``run_policy.deterministic_merge_view`` and ``run_policy.evidence_store_mode ==
+        "observe"``: the store writes the claim sidecars, the view aggregates them, and this
+        flag renders the aggregation. With any link off there is nothing to render and the
+        prompt stays byte-identical — failing open silently, like the sibling-context delta's
+        dependency on the task ledger.
+
+        The aggregation is computed HERE rather than read from
+        ``details["deterministic_merge_view_v1"]``: the engine attaches that sidecar in
+        ``_apply_action_result``, i.e. strictly AFTER this action has already run its LLM call,
+        so at prompt-build time this merge's key either does not exist yet or (on a
+        re-execution) holds the previous attempt's aggregation. Recomputing is free,
+        deterministic and read-only.
+        """
+        run_policy = self._cfg.run_policy
+        if not run_policy.merge_uses_evidence_view:
+            return ""
+        if not run_policy.deterministic_merge_view or run_policy.evidence_store_mode != "observe":
+            return ""
+        try:
+            from agent.app import evidence_store as _evidence_store
+
+            return _build_evidence_view_block(
+                _evidence_store.aggregate_claims_for_merge(node, graph)
+            )
+        except Exception as exc:  # noqa: BLE001. A prompt garnish must never fail the merge
+            self._logger.warning(f"[MERGE] evidence view block failed: {exc}")
+            return ""
+
     async def execute(self, graph: IdeaDag, node_id: str, io: AgentIO) -> Dict[str, Any]:
         import json
         node = None
@@ -2725,6 +2816,16 @@ class MergeLeafAction(LeafAction):
                 parent_justification=parent_justification
             )
             
+            # Opt-in structured-evidence summary of what the merged branches recorded
+            # (no-op, and byte-identical prompt, unless the three-flag chain in
+            # `_evidence_view_block` is armed). Placed before the schema hint so the
+            # output-shape instruction keeps the last word in the system message.
+            evidence_block = self._evidence_view_block(graph, node)
+            if evidence_block:
+                system_template = (
+                    f"{system_template}\n\n{evidence_block}" if system_template else evidence_block
+                )
+
             # The merge schema declares optional fields (goal_evaluation,
             # missing_requirements) that are not in ``required``. OpenAI/Azure strict
             # structured output requires ``required`` to enumerate every property, so

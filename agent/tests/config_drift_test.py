@@ -67,6 +67,10 @@ INTENTIONALLY_JSON_ABSENT = {
     "run_policy_evidence_store_mode",
     # And for the deterministic merge view, which is inert without that store anyway.
     "run_policy_deterministic_merge_view",
+    # And for the flag that renders that view into the merge prompt, which is the first
+    # of these that can change an answer: absent means the shipped merge prompt is
+    # byte-identical to today's.
+    "run_policy_merge_uses_evidence_view",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented
