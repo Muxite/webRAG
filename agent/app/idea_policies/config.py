@@ -1299,6 +1299,16 @@ class RunPolicy:
     arm simply seeing an order of magnitude more evidence at decision time. Off by default and
     absent from the shipped settings, so that arm's prompt is byte-identical unless a benchmark
     asks for the matched variant.
+
+    ``novelty_guard_enabled`` arms the churn cap (``agent/app/novelty_guard.py``, vetoed in
+    ``IdeaEngine._maybe_block_repeated_action``): an action whose novelty key -- normalized
+    ``(action_type, canonical_target, unresolved_requirement_ids)`` -- has already been attempted
+    ``novelty_guard_max_attempts`` times with the run's evidence watermark unmoved is refused
+    before it spends a tool call, and fails the node instead. ``IdeaDag.has_executed_action``
+    does NOT cover this: it records an action only once it succeeded, so a repeated-failure loop
+    is invisible to it. The threshold defaults to 2 (the third fruitless identical attempt is
+    blocked) and is an unmeasured first guess -- see that module's docstring for what should
+    revise it. Off by default and absent from the shipped settings, same as the eleven above.
     """
 
     ledger_mode: str = "off"
@@ -1314,6 +1324,8 @@ class RunPolicy:
     constrained_decoding_enabled: bool = False
     sibling_evidence_digest_enabled: bool = False
     sequential_context_cap_enabled: bool = False
+    novelty_guard_enabled: bool = False
+    novelty_guard_max_attempts: int = 2
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1329,6 +1341,8 @@ class RunPolicy:
         "constrained_decoding_enabled": "run_policy_constrained_decoding_enabled",
         "sibling_evidence_digest_enabled": "run_policy_sibling_evidence_digest_enabled",
         "sequential_context_cap_enabled": "run_policy_sequential_context_cap_enabled",
+        "novelty_guard_enabled": "run_policy_novelty_guard_enabled",
+        "novelty_guard_max_attempts": "run_policy_novelty_guard_max_attempts",
     }
 
     @classmethod

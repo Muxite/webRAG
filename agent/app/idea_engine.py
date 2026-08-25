@@ -264,6 +264,10 @@ class IdeaDagEngine:
         # Reset per-run step-confidence instrumentation (opt-in; empty when the flag is off).
         self._step_confidences = []
         self._leaf_completion_count = 0
+        # Reset the per-run novelty/churn counters (opt-in; None until the first guarded
+        # dispatch). An engine instance can be reused across runs, and a key attempted in a
+        # PREVIOUS run must never count against this one's budget.
+        self._novelty_guard = None
         root_title = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate
 
         graph: Optional[IdeaDag] = None
@@ -2858,6 +2862,15 @@ class IdeaDagEngine:
                     node.status = IdeaNodeStatus.DONE
                     return existing_result
         
+        # Novelty / churn guard (no-op unless run_policy.novelty_guard_enabled). Placed with the
+        # duplicate-action and blocked-site checks because it is the same kind of pre-dispatch
+        # veto, and because this is the single choke point every execution path funnels through
+        # -- the re-expansion trigger cluster in `_handle_node_completion` mints the repeats, but
+        # only here can one be stopped before it spends a tool call.
+        blocked_result = self._maybe_block_repeated_action(graph, node_id)
+        if blocked_result is not None:
+            return blocked_result
+
         from agent.app.idea_policies.base import IdeaActionType
         if action_type == IdeaActionType.VISIT.value:
             from agent.app.idea_policies.action_constants import NodeDetailsExtractor
@@ -2935,6 +2948,84 @@ class IdeaDagEngine:
             graph.mark_action_executed(node_id, str(action_type), node.details)
 
         return result
+
+    def _novelty_unresolved_requirements(self, graph: IdeaDag) -> List[str]:
+        """The run's still-open requirement ids from the task ledger, or ``[]``.
+
+        Empty whenever the ledger is off (its default), which only makes the novelty key coarser
+        -- see ``novelty_guard.novelty_key``.
+        """
+        try:
+            root = graph.get_node(graph.root_id())
+        except Exception:  # noqa: BLE001
+            return []
+        details = root.details if root is not None and isinstance(root.details, dict) else {}
+        ledger = details.get(DetailKey.TASK_LEDGER.value)
+        if not isinstance(ledger, dict):
+            return []
+        unresolved = ledger.get("unresolved_entities")
+        return [str(item) for item in unresolved] if isinstance(unresolved, list) else []
+
+    def _maybe_block_repeated_action(self, graph: IdeaDag, node_id: str) -> Optional[Dict[str, Any]]:
+        """Veto an action that has already been tried twice with nothing to show for it.
+
+        Off by default (``run_policy_novelty_guard_enabled``): returns ``None`` without computing
+        a key, so dispatch is byte-identical. Armed, it counts attempts per
+        ``novelty_guard.novelty_key`` and blocks the next one once a key has spent
+        ``run_policy_novelty_guard_max_attempts`` attempts WITHOUT the run's evidence watermark
+        moving (see ``novelty_guard.evidence_watermark``); any new evidence resets that key.
+
+        A blocked node FAILS rather than silently succeeding, which is the honest outcome and the
+        one that routes the run elsewhere: FAILED is what the alternative-branch promotion and the
+        tool-failure recovery paths already listen for. The failure is marked non-retryable, so
+        the in-place retry cannot immediately re-spend what was just refused.
+        """
+        if not self._cfg.run_policy.novelty_guard_enabled:
+            return None
+        node = graph.get_node(node_id)
+        if node is None:
+            return None
+        action_type = node.details.get(DetailKey.ACTION.value)
+        if not action_type:
+            return None
+        from agent.app import novelty_guard as _novelty
+
+        guard = getattr(self, "_novelty_guard", None)
+        if guard is None:
+            guard = _novelty.NoveltyGuard(
+                max_attempts=max(0, int(self._cfg.run_policy.novelty_guard_max_attempts))
+            )
+            self._novelty_guard = guard
+        key = _novelty.novelty_key(
+            str(action_type), node.details, self._novelty_unresolved_requirements(graph)
+        )
+        watermark = _novelty.evidence_watermark(graph)
+        if guard.is_blocked(key, watermark):
+            self._logger.info(
+                f"[NOVELTY] Blocking repeated no-progress action (node={node_id}, key={key!r}, "
+                f"attempts={guard.attempts(key)})"
+            )
+            result = {
+                "action": action_type,
+                "success": False,
+                "error": (
+                    "Blocked by the novelty guard: this exact step was already attempted "
+                    f"{guard.attempts(key)} times and produced no new evidence. Try a different "
+                    "source, a different query, or a different sub-goal."
+                ),
+                "retryable": False,
+                "novelty_blocked": True,
+                "novelty_key": key,
+            }
+            graph.update_details(node_id, {DetailKey.ACTION_RESULT.value: result})
+            node.status = IdeaNodeStatus.FAILED
+            self._record_decision(
+                "novelty_block", node_id=node_id, chosen=str(action_type),
+                metadata={"novelty_key": key, "attempts": guard.attempts(key)},
+            )
+            return result
+        guard.record_attempt(key, watermark)
+        return None
 
     async def _maybe_retry_tool_failure(self, graph: IdeaDag, node_id: str, action, result):
         """Bounded in-place retry of a TOOL failure (opt-in; no-op unless

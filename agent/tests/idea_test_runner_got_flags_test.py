@@ -116,6 +116,10 @@ def _base():
         # sequential_react per-turn context cap: shipped OFF, the one axis
         # `sequential_react_context_matched` sets (the only non-graph arm profile).
         "run_policy_sequential_context_cap_enabled": False,
+        # novelty/churn guard and its threshold: shipped OFF/2, the one axis
+        # `good_adaptive_noreexpand` sets (it leaves the threshold at the default).
+        "run_policy_novelty_guard_enabled": False,
+        "run_policy_novelty_guard_max_attempts": 2,
     }
 
 
@@ -848,6 +852,27 @@ def test_arm_sequential_react_context_matched_sets_only_the_cap():
     expected = _base()
     expected["run_policy_sequential_context_cap_enabled"] = True
     assert settings == expected
+
+
+def test_arm_good_adaptive_noreexpand_isolates_the_novelty_guard():
+    """Phase 0's churn arm: `good_adaptive` plus the novelty guard, at the shipped threshold."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    arm = _GOT_ARM_PROFILES["good_adaptive_noreexpand"]
+    assert set(arm) - set(base) == {"run_policy_novelty_guard_enabled"}
+    assert set(base) - set(arm) == set()
+    assert all(arm[k] == v for k, v in base.items())
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_noreexpand"})
+    assert settings["run_policy_novelty_guard_enabled"] is True
+    # The threshold is NOT part of the arm: it stays at the shipped first guess so the A/B
+    # measures the mechanism, not a tuned constant.
+    assert settings["run_policy_novelty_guard_max_attempts"] == 2
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    assert control["run_policy_novelty_guard_enabled"] is False
 
 
 def test_arm_good_adaptive_backtrackrel_isolates_backtrack_and_its_relative_threshold():

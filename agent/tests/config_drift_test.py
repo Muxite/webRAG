@@ -97,6 +97,10 @@ INTENTIONALLY_JSON_ABSENT = {
     # And for the sequential_react context cap, which only ever REMOVES context from a
     # non-DAG arm: absent means that arm's scratchpad is assembled exactly as it is today.
     "run_policy_sequential_context_cap_enabled",
+    # And for the novelty/churn guard plus its threshold, the only one of these that can
+    # REFUSE an action outright: absent means every dispatch runs exactly as it does today.
+    "run_policy_novelty_guard_enabled",
+    "run_policy_novelty_guard_max_attempts",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented
