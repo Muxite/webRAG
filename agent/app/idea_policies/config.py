@@ -294,6 +294,13 @@ class ExpansionConfig:
     max_tokens: Optional[int] = 8192
     max_context_nodes: int = 5
     max_detail_chars: int = 5000
+    # Per-ancestor page content the planner may see. Was a bare literal `1000` with no knob,
+    # against `sequential_react`'s 6000 chars per page for EVERY page in its linear history --
+    # a 6x per-page and much larger aggregate disadvantage in evidence visible at decision
+    # time. The DAG's problem on the baseline was starvation, not context overload (it visited
+    # 1.3 pages to the flat arms' 3.8), so this exists to be raised and measured, not trimmed.
+    # Default preserves the historical value exactly.
+    ancestor_content_chars: int = 1000
     expect_contract_enabled: bool = False
     # Prompt hygiene for weak models: label the context blob as read-only INPUT and restate the
     # {candidates: [...]} output shape right after it. Live-proven 2026-08-06 (eliminated 5/8
@@ -329,6 +336,7 @@ class ExpansionConfig:
         "max_tokens": "expansion_max_tokens",
         "max_context_nodes": "expansion_max_context_nodes",
         "max_detail_chars": "expansion_max_detail_chars",
+        "ancestor_content_chars": "expansion_ancestor_content_chars",
         "expect_contract_enabled": "expansion_expect_contract_enabled",
         "input_output_framing_enabled": "expansion_input_output_framing_enabled",
         "echo_retry_enabled": "expansion_echo_retry_enabled",
@@ -1016,6 +1024,33 @@ class EngineConfig:
     """Execution / graph-shape / parallelism / logging knobs read by the engine."""
 
     max_branching: int = 5
+    # Demand-driven root fan-out. ``max_branching`` is a GLOBAL budget shared by every task
+    # shape, and at 5 it capped the whole graph below the size of a 7-candidate question --
+    # the four-way baseline's mean node count was 4.6, i.e. the cap WAS the graph. Raising the
+    # constant would hand chain and narrow tasks a width they have no use for, so instead the
+    # ROOT (only) may widen to the number of candidates the mandate actually enumerates, via
+    # the same parser ``candidate_coverage`` uses. Off by default so it can be A/B'd.
+    breadth_aware_branching_enabled: bool = False
+    #: Hard ceiling on the widened root fan-out, so a pathological enumeration cannot mint an
+    #: unbounded number of children.
+    breadth_branching_max: int = 8
+    # Let a remediation path re-expand a node that already has children. ``step()`` gated
+    # expansion on ``not node.children``, so the root expanded exactly once per run -- and
+    # every remediation path (coverage extension, grounding replan, budget extension) ends by
+    # re-activating the root, which then fell through to the intermediate handler and could
+    # only pick among nodes that already existed. The engine could detect incompleteness and
+    # was structurally unable to act on it. Off by default.
+    root_reexpansion_enabled: bool = False
+    #: How many times one node may be re-expanded in a run. Bounds the remediation loop.
+    root_reexpansion_max: int = 2
+    # Make coverage remediation create VISITS. The gate counts only successful visits, but the
+    # only remediation it could reach was the mandate-phrase/navigation hooks, which decline on
+    # an ordinary enumerated mandate -- so a detected gap produced more SEARCHING. Measured: 46
+    # searches / 1 visit (n=24 A/B, null result), and 55 searches / 2 visits once the structural
+    # caps were lifted. Off by default.
+    coverage_visit_injection_enabled: bool = False
+    #: Ceiling on candidate visit-pairs minted per remediation pass.
+    coverage_visit_injection_max: int = 8
     max_total_nodes: int = 500
     grounding_max_replans: int = 2
     best_first_global: bool = True

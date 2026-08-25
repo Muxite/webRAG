@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -6,6 +7,7 @@ from typing import Any, Dict, Optional
 
 _UNSAFE_WITH_COLON = re.compile(r"[\\/:\s]+")
 _UNSAFE_NO_COLON = re.compile(r"[\\/\s]+")
+_TRUTHY = {"1", "true", "yes", "on"}
 
 
 def sanitize_path_component(
@@ -57,6 +59,66 @@ def sanitize_model_component(value: str) -> str:
     remember the ``replacement``/``preserve_colon`` argument shape.
     """
     return sanitize_path_component(value, replacement="-", preserve_colon=True)
+
+
+def traces_retained() -> bool:
+    """Whether per-cell JSONL traces survive a successful run.
+
+    Every execution variant used to end with an unconditional ``trace_path.unlink()`` on the
+    success path, so a trace existed only when the run had *crashed*. That is why a 96-cell
+    baseline yielded 0 recoverable traces and its forensics had to be reconstructed from
+    result-graph topology. Retention is opt-in rather than default-on so ordinary runs keep
+    their current disk footprint.
+
+    :returns: True when ``IDEA_TEST_KEEP_TRACES`` is set to a truthy value.
+    """
+    return os.environ.get("IDEA_TEST_KEEP_TRACES", "").strip().lower() in _TRUTHY
+
+
+def llm_io_capture_enabled(report_verbosity: int = 1) -> bool:
+    """Whether connectors capture raw prompt/completion text.
+
+    Full capture already existed but was welded to ``IDEA_TEST_REPORT_VERBOSITY >= 3``, which
+    also inflates every other artifact -- so getting replayable LLM I/O meant paying for
+    maximum verbosity everywhere. ``IDEA_TEST_CAPTURE_LLM_IO`` turns capture on by itself; the
+    text lands in the JSONL trace, while ``testing.utils.slim_telemetry_raw`` keeps it out of
+    the result JSON.
+
+    :param report_verbosity: The effective ``IDEA_TEST_REPORT_VERBOSITY``, still honoured so
+        existing verbosity-3 workflows are unchanged.
+    :returns: True when raw text should be captured.
+    """
+    if os.environ.get("IDEA_TEST_CAPTURE_LLM_IO", "").strip().lower() in _TRUTHY:
+        return True
+    return report_verbosity >= 3
+
+
+def build_trace_path(
+    results_dir: Path,
+    run_stamp: str,
+    test_id: str,
+    model_name: str,
+    variant: str,
+    cell_tag: str = "",
+) -> Path:
+    """Build the JSONL trace path for one benchmark cell.
+
+    ``cell_tag`` carries the effort tier / settings fingerprint / repeat index that the result
+    JSON's own filename carries (``idea_test_runner``). Without it, repeats and A/B conditions
+    of the same cell collided on one path -- and since :class:`TraceRecorder` opens in APPEND
+    mode, retaining traces under colliding names would interleave concurrent cells into a
+    single corrupt file. Naming and retention therefore have to change together.
+
+    :param results_dir: Directory the trace is written into.
+    :param run_stamp: Run identifier, shared with the result JSON.
+    :param test_id: Benchmark task id.
+    :param model_name: Execution model id (may embed ``/`` or ``:``).
+    :param variant: Execution variant name.
+    :param cell_tag: Disambiguating suffix, e.g. ``"_t2_cfgef66f4d7_r3"``.
+    :returns: The trace path.
+    """
+    safe_model = sanitize_path_component(model_name)
+    return results_dir / f"{run_stamp}_{test_id}_{safe_model}_{variant}{cell_tag}.jsonl"
 
 
 class TraceRecorder:

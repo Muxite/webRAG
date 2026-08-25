@@ -58,7 +58,7 @@ from agent.app.testing.config import (
     extract_test_id,
     filter_test_files_by_priority,
 )
-from agent.app.testing.utils import summarize_observability
+from agent.app.testing.utils import slim_telemetry_raw, summarize_observability
 from agent.app.testing.tooling import profile_for_variant
 from agent.app.idea_graph_analyzer import add_graph_visualization
 from agent.app.testing.report import TestReportGenerator, Verbosity
@@ -1459,6 +1459,14 @@ async def run_single_test(
         variant_specific_settings = _variant_settings(idea_settings, execution_variant)
         variant_specific_settings = _apply_effort_tier(variant_specific_settings, effort_tier)
         variant_specific_settings = _apply_lean_overlay(variant_specific_settings, metadata)
+
+        # Computed BEFORE the run so the trace path can carry the same disambiguating suffix
+        # as the result JSON below. Without it, repeats and A/B conditions of one cell shared
+        # a trace path -- and TraceRecorder appends, so retained traces would interleave.
+        tier_tag = f"_t{effort_tier}" if effort_tier else ""
+        cfg_tag = f"_cfg{_settings_fingerprint(variant_specific_settings)}"
+        cell_tag = f"{tier_tag}{cfg_tag}_r{repeat_index}"
+
         result = await run_complete_test(
             test_module=test_module,
             model_name=normalized,
@@ -1472,6 +1480,7 @@ async def run_single_test(
             summarize_observability_func=summarize_observability,
             validation_model=validation_model,
             execution_variant=execution_variant,
+            cell_tag=cell_tag,
         )
 
         result["execution_variant"] = execution_variant
@@ -1481,8 +1490,6 @@ async def run_single_test(
 
         result = add_graph_visualization(result)
 
-        tier_tag = f"_t{effort_tier}" if effort_tier else ""
-        cfg_tag = f"_cfg{_settings_fingerprint(variant_specific_settings)}"
         # Shared with scripts/eval_strategy_library_generalization.py and
         # scripts/unified_bench_report.py via agent.app.trace_recorder.sanitize_model_component
         # so the one "/" -> "-" (":" untouched) convention can't drift into three copies again.
@@ -1503,8 +1510,15 @@ async def run_single_test(
             reporter.save(report, out_path)
         
         if report_verbosity < Verbosity.FULL:
+            # Slim rather than drop. Popping the whole block below FULL, combined with every
+            # variant unlinking its JSONL trace on success, left a default run with NO
+            # per-step record in either place -- 0 of 96 cells in the four-way baseline had
+            # one. The size that motivated the pop lives in the page bodies and embeddings
+            # that `slim_telemetry_raw` removes, not in the timings/decisions/events that
+            # offline forensics actually reads.
             execution = result.get("execution", {})
-            execution.pop("telemetry_raw", None)
+            if "telemetry_raw" in execution:
+                execution["telemetry_raw"] = slim_telemetry_raw(execution["telemetry_raw"])
         
         # Atomic write: a crash mid-write (Ctrl-C, OOM, the driver's 1800s timeout kill) must never
         # leave a truncated/partial result JSON on disk. A partial file there would still satisfy a

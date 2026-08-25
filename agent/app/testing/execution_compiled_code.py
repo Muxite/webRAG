@@ -487,6 +487,10 @@ async def run_compiled_code_execution(
     connector_http,
     connector_chroma,
     run_stamp: str,
+    # Accepted for dispatch parity with every other variant (``testing/runner.py`` passes it
+    # uniformly). Unused here: this arm records no JSONL trace of its own -- the sandboxed
+    # run's per-leaf record lands in ``.codebench_run_summary.json`` instead.
+    cell_tag: str = "",
     summarize_observability_func=summarize_observability,
     connector_browser=None,
 ) -> Dict[str, Any]:

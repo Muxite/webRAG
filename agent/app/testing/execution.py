@@ -20,7 +20,13 @@ from agent.app.connector_chroma import ConnectorChroma
 from agent.app.idea_engine import IdeaDagEngine
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
-from agent.app.trace_recorder import TraceRecorder, sanitize_path_component
+from agent.app.trace_recorder import (
+    TraceRecorder,
+    build_trace_path,
+    llm_io_capture_enabled,
+    sanitize_path_component,
+    traces_retained,
+)
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 
@@ -43,6 +49,7 @@ async def run_baseline_execution(
     connector_http: ConnectorHttp,
     connector_chroma: ConnectorChroma,
     run_stamp: str,
+    cell_tag: str = "",
     summarize_observability_func=summarize_observability,
     connector_browser=None,
 ) -> Dict[str, Any]:
@@ -74,7 +81,7 @@ async def run_baseline_execution(
 
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = results_dir / f"{run_stamp}_{test_id}_{sanitize_path_component(model_name)}_{variant}.jsonl"
+    trace_path = build_trace_path(results_dir, run_stamp, test_id, model_name, variant, cell_tag)
     tracer = TraceRecorder(trace_path)
 
     mandate = test_module.get_task_statement()
@@ -125,11 +132,12 @@ async def run_baseline_execution(
     telemetry_summary = telemetry.summary()
     ended = time.perf_counter()
 
-    try:
-        if trace_path.exists():
-            trace_path.unlink()
-    except Exception as exc:
-        _logger.warning(f"Failed to delete trace file {trace_path}: {exc}")
+    if not traces_retained():
+        try:
+            if trace_path.exists():
+                trace_path.unlink()
+        except Exception as exc:
+            _logger.warning(f"Failed to delete trace file {trace_path}: {exc}")
 
     return {
         "output": output,
@@ -494,6 +502,8 @@ async def run_test_execution(
     connector_chroma: ConnectorChroma,
     idea_settings: Dict[str, Any],
     run_stamp: str,
+    cell_tag: str = "",
+    variant: str = "graph",
     summarize_observability_func=summarize_observability,
     connector_browser=None,
 ) -> Dict[str, Any]:
@@ -517,7 +527,7 @@ async def run_test_execution(
     correlation_id = f"idea_test_{test_id}_{model_name}_{run_stamp}"
     
     report_verbosity = int(os.environ.get("IDEA_TEST_REPORT_VERBOSITY", "1"))
-    if report_verbosity >= 3:
+    if llm_io_capture_enabled(report_verbosity):
         connector_llm.set_full_capture(True)
         connector_search.set_full_capture(True)
         connector_http.set_full_capture(True)
@@ -525,7 +535,10 @@ async def run_test_execution(
     
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = results_dir / f"{run_stamp}_{test_id}_{sanitize_path_component(model_name)}.jsonl"
+    trace_path = build_trace_path(
+        results_dir, run_stamp, test_id, model_name,
+        variant, cell_tag,
+    )
     tracer = TraceRecorder(trace_path)
     
     telemetry = TelemetrySession(
@@ -580,7 +593,7 @@ async def run_test_execution(
     telemetry.finish(success=output.get("success", False))
     tracer.close()
     
-    if report_verbosity >= 3:
+    if llm_io_capture_enabled(report_verbosity):
         connector_llm.set_full_capture(False)
         connector_search.set_full_capture(False)
         connector_http.set_full_capture(False)
@@ -591,11 +604,12 @@ async def run_test_execution(
     
     ended = time.perf_counter()
     
-    try:
-        if trace_path.exists():
-            trace_path.unlink()
-    except Exception as exc:
-        _logger.warning(f"Failed to delete trace file {trace_path}: {exc}")
+    if not traces_retained():
+        try:
+            if trace_path.exists():
+                trace_path.unlink()
+        except Exception as exc:
+            _logger.warning(f"Failed to delete trace file {trace_path}: {exc}")
     
     return {
         "output": output,

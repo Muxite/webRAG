@@ -119,6 +119,17 @@ class TelemetrySession:
         if self._trace:
             self._trace.record(event, payload or {})
 
+    def elapsed(self) -> float:
+        """Seconds since this session's ``perf_counter`` anchor.
+
+        The same anchor ``record_timing`` stamps its ``t_start``/``t_end`` against, so callers
+        outside the connectors (the engine's per-node interval stamps) can place their own
+        events on one shared, monotonic, skew-free timeline.
+
+        :returns: Session-relative elapsed seconds.
+        """
+        return max(0.0, time.perf_counter() - self._perf_start)
+
     def record_timing(
         self,
         name: str,
@@ -138,10 +149,23 @@ class TelemetrySession:
         """
         if not self.enabled:
             return
-        duration = max(0.0, time.perf_counter() - started_at)
+        ended_at = time.perf_counter()
+        duration = max(0.0, ended_at - started_at)
+        # ``started_at`` used to be consumed for its difference and thrown away, which left no
+        # artifact anywhere carrying a call START time -- so whether a fan-out actually ran
+        # concurrently could only be inferred from suspiciously-equal durations. Keeping the
+        # interval makes overlap a direct read. Offsets are relative to the session's own
+        # ``perf_counter`` anchor, not wall clock: monotonic, skew-free, and small enough to
+        # stay legible in the persisted JSON.
+        # ``t_start`` is derived from ``t_end`` rather than clamped independently, so the pair
+        # is self-consistent by construction: ``duration`` is already floored at 0, hence
+        # ``t_start <= t_end`` always holds, even if a caller hands in a nonsense ``started_at``.
+        t_end = max(0.0, ended_at - self._perf_start)
         entry = {
             "name": name,
             "duration": duration,
+            "t_start": max(0.0, t_end - duration),
+            "t_end": t_end,
             "success": bool(success),
             "payload": payload or {},
         }

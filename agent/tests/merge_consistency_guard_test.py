@@ -96,7 +96,9 @@ def test_the_downgrade_leaves_neither_node_force_marked_done():
     parent = graph.get_node(parent_id)
     assert graph.get_node(merge_id).status != IdeaNodeStatus.DONE
     assert parent.status == IdeaNodeStatus.ACTIVE
-    assert DetailKey.GOAL_ACHIEVED.value not in parent.details
+    # The downgrade now propagates explicitly rather than leaving the parent unwritten, so a
+    # stale optimistic stamp cannot survive it (see merge_negative_verdict_propagation_test).
+    assert parent.details[DetailKey.GOAL_ACHIEVED.value] is False
 
 
 def test_the_downgrade_routes_through_the_existing_not_achieved_branch():

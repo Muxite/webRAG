@@ -5,6 +5,7 @@ import asyncio
 import hashlib
 import logging
 import re
+import time
 
 from agent.app.idea_dag import IdeaDag, IdeaNode
 from agent.app.idea_policies.base import IdeaNodeStatus
@@ -34,6 +35,7 @@ from agent.app.idea_policies.post_expansion_hooks import (
     PostExpansionHook,
     default_post_expansion_hooks,
     extract_mandate,
+    inject_coverage_visits,
 )
 from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
 from agent.app.idea_policies.grounding import evaluate_grounding
@@ -55,6 +57,11 @@ _QUOTED_PHRASE_RE = re.compile(r'"([^"]+)"')
 #: (`engine.beam_after_evaluation`). Written by `_handle_expansion_node`, read and popped by
 #: `_apply_beam_after_evaluation` a step later. Never present with the flag off.
 _PENDING_BEAM_KEY = "__pending_beam_width"
+#: Single-use marker asking a node with existing children to expand again (additively).
+#: Consumed on read, mirroring ``HUMAN_FEEDBACK``/``REEXPAND_REASON``.
+_WIDEN_REQUESTED_KEY = "__widen_requested"
+#: How many re-expansions a node has already been granted, against ``root_reexpansion_max``.
+_REEXPAND_COUNT_KEY = "__reexpand_count"
 #: Marks a child the post-evaluation beam dropped (kept, SKIPPED, and attributable, exactly
 #: like `__sequential_pruned`, rather than deleted from the graph).
 _BEAM_PRUNED_KEY = "__beam_pruned"
@@ -714,8 +721,17 @@ class IdeaDagEngine:
             self._logger.info(f"[STEP {step_index}] Node is leaf node (is_leaf={is_leaf}, has_action={has_action}, action={action}), executing action")
             return await self._handle_leaf_node(graph, current_id, step_index, None)
         
-        if not node.children:
-            self._logger.info(f"[STEP {step_index}] Node has no children, expanding into sub-problems")
+        # A pending widen request lets a node that ALREADY has children expand again, which is
+        # the one thing every remediation path needed and none of them could do: they all ended
+        # at `root.status = ACTIVE`, and a re-activated root with children fell straight through
+        # to `_handle_intermediate_node`, which only picks among nodes that already exist.
+        widen_requested = self._consume_widen_request(node)
+        if not node.children or widen_requested:
+            self._logger.info(
+                f"[STEP {step_index}] "
+                + ("Widen requested, re-expanding node" if widen_requested
+                   else "Node has no children, expanding into sub-problems")
+            )
             result = await self._handle_expansion_node(graph, current_id, step_index, None)
             if result is None:
                 self._logger.warning(f"[STEP {step_index}] Expansion returned None for node {current_id}")
@@ -1488,7 +1504,25 @@ class IdeaDagEngine:
 
             self._logger.info(f"[STEP {step_index}] EXPANSION: Calling expansion policy for node '{node.title[:60]}...'")
             try:
-                candidates = await self.expansion.expand(graph, node_id, memories=memories)
+                # The prompt's own "emit 2-N children" instruction has to agree with the
+                # slice applied below, or the model is asked for children that get
+                # silently truncated -- which is what a widened root would otherwise do.
+                prompt_width = self._effective_branching(
+                    graph, node_id, self._cfg.engine.max_branching,
+                )
+                # Both extras are passed ONLY when they carry information, so with both flags
+                # off this is the exact call it has always been -- which also keeps duck-typed
+                # expansion policies that predate these parameters working untouched.
+                extra: Dict[str, Any] = {}
+                if prompt_width != self._cfg.engine.max_branching:
+                    extra["max_children"] = prompt_width
+                if self._cfg.engine.root_reexpansion_enabled:
+                    exclusions = self._reexpansion_exclusions(graph, node_id)
+                    if exclusions:
+                        extra["exclude"] = exclusions
+                candidates = await self.expansion.expand(
+                    graph, node_id, memories=memories, **extra,
+                )
                 self._logger.info(f"[STEP {step_index}] EXPANSION: Policy returned {len(candidates) if candidates else 0} candidates")
                 if not candidates:
                     self._logger.error(f"[STEP {step_index}] EXPANSION FAILED: Expansion policy returned no candidates!")
@@ -1520,6 +1554,9 @@ class IdeaDagEngine:
             max_branching = self._cfg.engine.max_branching
         hard_cap = self._cfg.engine.max_branching
         max_branching = min(max_branching, hard_cap)
+        # Demand-driven widening of the ROOT only, AFTER the flat hard cap -- the cap is the
+        # thing being relaxed, so applying it first and then widening is the whole point.
+        max_branching = self._effective_branching(graph, node_id, max_branching)
         # `beam_after_evaluation` off (default): unchanged -- the beam cuts the candidate list
         # HERE, before a single candidate has been scored, so it selects by the model's
         # emission order. On: every candidate becomes a node so the batch evaluator can score
@@ -1731,9 +1768,19 @@ class IdeaDagEngine:
         self._candidate_coverage_extension_applied = True
         # Re-activate the root so the extended budget re-expands and re-checks the missing
         # candidates (mirrors `_grounding_replan`'s forced-pass behavior).
+        #
+        # Re-activation ALONE could never do that: `step()` gated expansion on
+        # `not node.children`, so an ACTIVE root with children fell through to the intermediate
+        # handler and the extra budget was spent re-walking existing nodes. Live evidence: with
+        # this gate on, wide-breadth cells ran 46 searches and made 1 visit, and the A/B came
+        # back null (n=24, +0.019, p=0.70). `_request_root_widen` is what makes the extension
+        # able to act on what the gate detected; it is a no-op unless
+        # `root_reexpansion_enabled` is set.
         root = graph.get_node(graph.root_id())
         if root is not None:
             root.status = IdeaNodeStatus.ACTIVE
+        self._inject_coverage_visits(graph, mandate, 0)
+        self._request_root_widen(graph, "candidate-coverage extension")
         return ext
 
     def _grounding_replan(self, graph: IdeaDag, mandate: str, steps: int, max_steps: int) -> bool:
@@ -1826,6 +1873,15 @@ class IdeaDagEngine:
         root = graph.get_node(root_id)
         if root:
             root.status = IdeaNodeStatus.ACTIVE
+        # When coverage is what is unsatisfied, the deterministic injectors frequently add
+        # nothing (each early-returns unless the mandate carries a `must_visit` phrase or nav
+        # targets), so re-activation on its own leaves the replan with no new work to do. Ask
+        # for a real re-expansion in that case. No-op unless `root_reexpansion_enabled`.
+        if cov_unsatisfied:
+            # Deterministic visits FIRST: they are the thing the gate actually measures, and
+            # they do not depend on a weak model choosing `visit` when asked to re-plan.
+            self._inject_coverage_visits(graph, mandate, steps)
+            self._request_root_widen(graph, "grounding replan (coverage unsatisfied)")
         _decide("replan", res, attempt=self._grounding_replans, injected=injected,
                 missing=res_missing)
         self._logger.info(
@@ -2432,14 +2488,212 @@ class IdeaDagEngine:
                 timed_out.details["action_error"] = f"timeout after {timeout_s}s"
             return None
 
+    def _inject_coverage_visits(self, graph: IdeaDag, mandate: str, step_index: int) -> int:
+        """Mint a VISIT per uncovered candidate. No-op unless the flag is on.
+
+        :param graph: Graph being remediated.
+        :param mandate: The run's mandate.
+        :param step_index: Current step, for logging.
+        :returns: Number of visits injected.
+        """
+        if not self._cfg.engine.coverage_visit_injection_enabled:
+            return 0
+        try:
+            return inject_coverage_visits(
+                graph, graph.root_id(), step_index, mandate, self._logger,
+                telemetry=getattr(self.io, "telemetry", None),
+                max_injections=self._cfg.engine.coverage_visit_injection_max,
+            )
+        except Exception as exc:  # noqa: BLE001 - remediation must never crash a run
+            self._logger.warning(f"[COVERAGE INJECT] failed: {exc}")
+            return 0
+
+    def _request_root_widen(self, graph: IdeaDag, reason: str) -> bool:
+        """Ask for the root to be expanded again, additively.
+
+        Remediation used to be expressed purely as ``root.status = ACTIVE``, which cannot widen
+        a graph whose root already has children -- control falls to
+        :meth:`_handle_intermediate_node`, which only chooses among existing nodes. So the
+        coverage gate could correctly report "four candidates were never researched" and the
+        engine had no way to go get them; the extended budget was spent re-walking a frozen
+        structure. Bounded by ``root_reexpansion_max`` so remediation cannot loop.
+
+        :param graph: The graph being executed.
+        :param reason: What asked for the widening, for the log.
+        :returns: True if a re-expansion was granted.
+        """
+        if not self._cfg.engine.root_reexpansion_enabled:
+            return False
+        root = graph.get_node(graph.root_id())
+        if root is None:
+            return False
+        used = int(root.details.get(_REEXPAND_COUNT_KEY, 0) or 0)
+        if used >= max(0, self._cfg.engine.root_reexpansion_max):
+            self._logger.info(
+                f"[WIDEN] Refused ({reason}): root re-expansion budget spent ({used})"
+            )
+            return False
+        root.details[_REEXPAND_COUNT_KEY] = used + 1
+        root.details[_WIDEN_REQUESTED_KEY] = True
+        root.status = IdeaNodeStatus.ACTIVE
+        self._logger.info(f"[WIDEN] Root re-expansion granted ({reason}), pass {used + 1}")
+        return True
+
+    def _consume_widen_request(self, node: Optional[IdeaNode]) -> bool:
+        """Read and clear a pending widen request. Single-use, like ``HUMAN_FEEDBACK``.
+
+        :param node: Node about to be routed, or ``None``.
+        :returns: True if this node was asked to re-expand.
+        """
+        if node is None:
+            return False
+        return bool(node.details.pop(_WIDEN_REQUESTED_KEY, False))
+
+    def _reexpansion_exclusions(self, graph: IdeaDag, node_id: str) -> List[str]:
+        """Titles of the children this node already has.
+
+        Handed to the expansion prompt so a re-expansion produces NEW work. Without it the
+        model, seeing the same goal and the same context, simply re-emits its first answer.
+
+        :param graph: The graph being expanded.
+        :param node_id: Node being re-expanded.
+        :returns: Existing child titles.
+        """
+        node = graph.get_node(node_id)
+        if node is None:
+            return []
+        titles = []
+        for child_id in node.children:
+            child = graph.get_node(child_id)
+            if child is not None and child.title:
+                titles.append(child.title)
+        return titles
+
+    def _effective_branching(self, graph: IdeaDag, node_id: Optional[str], width: int) -> int:
+        """Widen the ROOT's fan-out to the number of candidates the mandate enumerates.
+
+        ``max_branching`` is one global budget for every task shape. At its default of 5 it
+        bounded the entire graph below the size of a 7-candidate question -- and since a
+        candidate typically costs two nodes (search, then visit), only two or three of the
+        seven were ever reachable. Raising the constant would give chain and narrow tasks a
+        width they have no use for, so the widening is demand-driven and root-only, keyed off
+        the same enumeration parser the coverage gate uses (which fails open below two names,
+        so an unenumerated mandate is untouched).
+
+        Never narrows: an incoming width from the dynamic beam is returned unchanged if it is
+        already wider.
+
+        :param graph: The graph being expanded.
+        :param node_id: Node about to expand.
+        :param width: The width computed so far (dynamic beam, already hard-capped).
+        :returns: The width to use.
+        """
+        if not self._cfg.engine.breadth_aware_branching_enabled:
+            return width
+        if node_id is None or node_id != graph.root_id():
+            return width
+        root = graph.get_node(node_id)
+        if root is None:
+            return width
+        mandate = (
+            root.details.get(DetailKey.ORIGINAL_GOAL.value)
+            or root.details.get(DetailKey.GOAL.value)
+            or ""
+        )
+        if not mandate:
+            return width
+        try:
+            from agent.app.idea_policies.candidate_coverage import extract_named_candidates
+            named = extract_named_candidates(str(mandate))
+        except Exception as exc:  # pragma: no cover - parser must never break expansion
+            self._logger.warning(f"[BRANCHING] candidate enumeration failed: {exc}")
+            return width
+        if len(named) < 2:
+            return width
+        widened = min(len(named), max(1, self._cfg.engine.breadth_branching_max))
+        if widened <= width:
+            return width
+        self._logger.info(
+            f"[BRANCHING] Root fan-out widened {width} -> {widened} "
+            f"({len(named)} enumerated candidates)"
+        )
+        return widened
+
+    def _run_elapsed(self) -> float:
+        """Session-relative seconds on the telemetry timeline.
+
+        Prefers the telemetry session's anchor so per-node intervals and ``timings_per_call``
+        intervals are directly comparable. Falls back to an engine-local anchor when telemetry
+        is off (the interactive debugger), so a run is never silently untimed.
+
+        :returns: Elapsed seconds since the run's anchor.
+        """
+        telemetry = getattr(self.io, "telemetry", None)
+        elapsed = getattr(telemetry, "elapsed", None)
+        if callable(elapsed):
+            return float(elapsed())
+        anchor = getattr(self, "_node_clock_start", None)
+        if anchor is None:
+            anchor = time.perf_counter()
+            self._node_clock_start = anchor
+        return max(0.0, time.perf_counter() - anchor)
+
+    def _stamp_node_start(self, graph: IdeaDag, node_id: str) -> Optional[float]:
+        """Record when a node's action was dispatched.
+
+        :param graph: The graph being executed.
+        :param node_id: Node being dispatched.
+        :returns: The stamped start offset, or ``None`` if the node is gone.
+        """
+        node = graph.get_node(node_id)
+        if node is None:
+            return None
+        started = self._run_elapsed()
+        node.started_at = started
+        return started
+
+    def _stamp_node_end(self, graph: IdeaDag, node_id: str, started: Optional[float]) -> None:
+        """Close the interval opened by :meth:`_stamp_node_start`.
+
+        :param graph: The graph being executed.
+        :param node_id: Node that finished.
+        :param started: The offset returned by the matching start stamp.
+        :returns: None
+        """
+        if started is None:
+            return
+        node = graph.get_node(node_id)
+        if node is None:
+            return
+        node.ended_at = max(started, self._run_elapsed())
+
     async def _execute_action(self, graph: IdeaDag, parent_id: str, node_id: str) -> Optional[Dict[str, Any]]:
+        """Dispatch a node's action, bracketed by its wall-clock interval.
+
+        The stamps live here rather than on each routing path because this is the single choke
+        point every path funnels through -- the auto-parallel ``gather``, the leaf handler, merge
+        creation and best-child selection all arrive here. ``finally`` so a raising or
+        timed-out action still closes its interval.
+        """
+        node = graph.get_node(node_id)
+        if node is None or not node.details.get(DetailKey.ACTION.value):
+            # Nothing will be dispatched, so opening an interval here would stamp a
+            # zero-width span on a node that never ran.
+            return None
+        started = self._stamp_node_start(graph, node_id)
+        try:
+            return await self._execute_action_inner(graph, parent_id, node_id)
+        finally:
+            self._stamp_node_end(graph, node_id, started)
+
+    async def _execute_action_inner(self, graph: IdeaDag, parent_id: str, node_id: str) -> Optional[Dict[str, Any]]:
         node = graph.get_node(node_id)
         if not node:
             return None
         action_type = node.details.get(DetailKey.ACTION.value)
         if not action_type:
             return None
-        
+
         existing_node_id = graph.has_executed_action(str(action_type), node.details)
         if existing_node_id and existing_node_id != node_id:
             existing_node = graph.get_node(existing_node_id)

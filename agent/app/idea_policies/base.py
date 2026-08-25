@@ -152,7 +152,16 @@ class DetailKey(str, Enum):
     WAYPOINT = "waypoint"
     DATA_SOURCE_NODE = "data_source_node"
     GOAL = "goal"
+    # The AUTHORITATIVE verdict. Written only by ``MergeLeafAction`` (which demotes it on
+    # missing requirements, snippet-only provenance and unverified numerics) and by the
+    # upward propagation that follows it. ``idea_finalize.resolve_goal_achieved`` trusts it.
     GOAL_ACHIEVED = "goal_achieved"
+    # ``SimpleMergePolicy._validate_goal_achievement``'s cheap keyword-overlap pre-check.
+    # Deliberately a SEPARATE key: ``merge()`` recurses to root, so writing this one to
+    # ``GOAL_ACHIEVED`` stamped an optimistic verdict on the ROOT before any merge node's LLM
+    # call ran, and finalize's root-first read could never retract it -- a run covering 2 of 7
+    # candidates still reported success. Diagnostic only; nothing gates on it.
+    GOAL_ACHIEVED_PROVISIONAL = "goal_achieved_provisional"
     CHUNK_INDEX = "chunk_index"
     TOTAL_CHUNKS = "total_chunks"
     CHUNK_CONTENT = "chunk_content"

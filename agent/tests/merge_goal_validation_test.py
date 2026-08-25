@@ -191,16 +191,18 @@ def _root_with_action_children(results: list) -> IdeaDag:
 
 
 def test_an_off_topic_result_no_longer_marks_the_root_goal_achieved():
-    """The amplification case: this root flag is what ``idea_finalize`` reads first."""
+    """The amplification case. The pre-check now writes the PROVISIONAL key -- finalize
+    reads the authoritative ``goal_achieved``, which only ``MergeLeafAction`` writes -- but
+    the overlap verdict itself still has to come out False here."""
     graph = _root_with_action_children([_search([_OFF_TOPIC_HIT]), _visit(_OFF_TOPIC)])
     _policy().merge(graph, graph.root_id(), recursive=True)
-    assert graph.get_node(graph.root_id()).details[DetailKey.GOAL_ACHIEVED.value] is False
+    assert graph.get_node(graph.root_id()).details[DetailKey.GOAL_ACHIEVED_PROVISIONAL.value] is False
 
 
 def test_a_genuinely_on_topic_result_still_marks_the_root_goal_achieved():
     graph = _root_with_action_children([_search([_ON_TOPIC_HIT]), _visit(_PARAPHRASE)])
     _policy().merge(graph, graph.root_id(), recursive=True)
-    assert graph.get_node(graph.root_id()).details[DetailKey.GOAL_ACHIEVED.value] is True
+    assert graph.get_node(graph.root_id()).details[DetailKey.GOAL_ACHIEVED_PROVISIONAL.value] is True
 
 
 def test_the_recursion_carries_the_verdict_up_from_a_child_level_merge():
@@ -212,5 +214,5 @@ def test_the_recursion_carries_the_verdict_up_from_a_child_level_merge():
     leaf = graph.add_child(sub.node_id, "leaf", status=IdeaNodeStatus.DONE)
     leaf.details[DetailKey.ACTION_RESULT.value] = _search([_OFF_TOPIC_HIT])
     _policy().merge(graph, sub.node_id, recursive=True)
-    assert sub.details[DetailKey.GOAL_ACHIEVED.value] is False
-    assert graph.get_node(root_id).details[DetailKey.GOAL_ACHIEVED.value] is False
+    assert sub.details[DetailKey.GOAL_ACHIEVED_PROVISIONAL.value] is False
+    assert graph.get_node(root_id).details[DetailKey.GOAL_ACHIEVED_PROVISIONAL.value] is False

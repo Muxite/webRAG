@@ -468,3 +468,149 @@ WEB_POST_EXPANSION_HOOKS: tuple[PostExpansionHook, ...] = (
 def default_post_expansion_hooks() -> List[PostExpansionHook]:
     """The in-tree default: web-research mandate enforcement."""
     return list(WEB_POST_EXPANSION_HOOKS)
+
+
+#: Default ceiling on how many candidate-visit pairs one remediation pass may mint. Bounds the
+#: node count a pathological enumeration could otherwise create.
+_COVERAGE_INJECTION_LIMIT = 8
+
+
+def _search_node_for(graph: "IdeaDag", parent_id: str, candidate: str) -> Optional[str]:
+    """Find a COMPLETED search whose query mentions ``candidate``.
+
+    Reusing one avoids paying for a second search for a candidate the run already searched --
+    which is the common case by the time coverage remediation fires, since the widened budget
+    tends to be spent on searches.
+
+    :returns: The search node id, or ``None``.
+    """
+    needle = candidate.lower()
+    parent = graph.get_node(parent_id)
+    if parent is None:
+        return None
+    for node in graph.iter_depth_first():
+        if NodeDetailsExtractor.get_action(node.details) != IdeaActionType.SEARCH.value:
+            continue
+        if not node.details.get(DetailKey.ACTION_RESULT.value):
+            continue
+        query = str(node.details.get(DetailKey.QUERY.value) or "").lower()
+        if needle and needle in query:
+            return node.node_id
+    return None
+
+
+def _already_targeted(graph: "IdeaDag", candidate: str) -> bool:
+    """Whether some visit node in the graph is already aimed at ``candidate``.
+
+    Remediation can fire more than once in a run (budget extension, then grounding replan), and
+    without this the second pass mints a duplicate set.
+    """
+    needle = candidate.lower()
+    for node in graph.iter_depth_first():
+        if NodeDetailsExtractor.get_action(node.details) != IdeaActionType.VISIT.value:
+            continue
+        if needle in str(node.title or "").lower():
+            return True
+    return False
+
+
+def inject_coverage_visits(
+    graph: "IdeaDag",
+    node_id: str,
+    step_index: int,
+    mandate: str,
+    logger: logging.Logger,
+    telemetry: Optional[Any] = None,
+    max_injections: int = _COVERAGE_INJECTION_LIMIT,
+) -> int:
+    """Mint a VISIT for every enumerated candidate the coverage gate reports missing.
+
+    The gate counts only successful VISITS, but nothing it could trigger created one: the
+    visit-injecting hooks above each early-return unless the mandate carries a ``must visit``
+    phrase or navigation targets, which an ordinary "for each of the following, find X" mandate
+    does not. So the gate detected the gap and the engine answered it with more searching --
+    46 searches and 1 visit on the n=24 A/B, 55 searches and 2 visits once the structural caps
+    were lifted.
+
+    Deterministic on purpose: this is the same reasoning as the gate itself, which ignores what
+    the model *says* about its own progress. A weak model asked to "go visit the ones you
+    missed" tends to search again instead.
+
+    :param graph: Graph being remediated.
+    :param node_id: Parent to attach the new work to (normally the root).
+    :param step_index: Current step, for logging.
+    :param mandate: The run's mandate, parsed for its enumeration.
+    :param logger: Engine logger.
+    :param telemetry: Optional telemetry session for the enforcement record.
+    :param max_injections: Ceiling on candidates handled in one pass.
+    :returns: How many visits were injected.
+    """
+    parent = graph.get_node(node_id)
+    if parent is None or not mandate:
+        return 0
+
+    from agent.app.idea_policies.candidate_coverage import evaluate_candidate_coverage
+
+    try:
+        cov = evaluate_candidate_coverage(graph, mandate)
+    except Exception as exc:  # noqa: BLE001 - remediation must never crash a run
+        logger.warning(f"[STEP {step_index}] COVERAGE INJECT: gate failed: {exc}")
+        return 0
+    if cov.satisfied or not cov.missing:
+        return 0
+
+    injected = 0
+    for candidate in cov.missing:
+        if injected >= max_injections:
+            break
+        if _already_targeted(graph, candidate):
+            continue
+
+        source_id = _search_node_for(graph, node_id, candidate)
+        if source_id is None:
+            search_node = graph.add_child(
+                parent_id=node_id,
+                title=f"Search {candidate}",
+                details={
+                    DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+                    DetailKey.QUERY.value: f"{candidate} {mandate[:80]}",
+                    DetailKey.IS_LEAF.value: True,
+                    DetailKey.JUSTIFICATION.value: (
+                        f"Coverage gate: '{candidate}' was never researched."
+                    ),
+                    DetailKey.GOAL.value: f"Find a source page about {candidate}",
+                },
+            )
+            source_id = search_node.node_id
+            _record_enforce(telemetry, step_index, source_id,
+                            "search", f"coverage: {candidate} unsearched")
+
+        visit_node = graph.add_child(
+            parent_id=node_id,
+            title=f"Visit a page about {candidate}",
+            details={
+                DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+                DetailKey.IS_LEAF.value: True,
+                DetailKey.JUSTIFICATION.value: (
+                    f"Coverage gate: no visited page is about '{candidate}', so the answer "
+                    "for it would be ungrounded."
+                ),
+                DetailKey.GOAL.value: f"Visit a page about {candidate}",
+                "link_idea": f"URL for {candidate} from search results",
+                "link_count": 1,
+                DetailKey.REQUIRES_DATA.value: {
+                    "type": URLS_FROM_SEARCH.name,
+                    "source_node_id": source_id,
+                },
+            },
+        )
+        _record_enforce(telemetry, step_index, visit_node.node_id,
+                        "visit", f"coverage: {candidate} unvisited")
+        injected += 1
+
+    if injected:
+        logger.warning(
+            f"[STEP {step_index}] COVERAGE INJECT: {injected} visit(s) for uncovered "
+            f"candidate(s): {', '.join(cov.missing[:max_injections])}"
+        )
+    return injected

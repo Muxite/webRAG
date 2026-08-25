@@ -168,7 +168,9 @@ def test_the_flag_downgrades_a_snippet_only_verdict(caplog):
     assert details["merge_incomplete"] is True
     assert details["merge_should_skip"] is True
     assert graph.get_node(parent_id).status == IdeaNodeStatus.ACTIVE
-    assert DetailKey.GOAL_ACHIEVED.value not in graph.get_node(parent_id).details
+    # The downgrade now propagates explicitly rather than leaving the parent unwritten, so a
+    # stale optimistic stamp cannot survive it (see merge_negative_verdict_propagation_test).
+    assert graph.get_node(parent_id).details[DetailKey.GOAL_ACHIEVED.value] is False
     assert any("downgrading to not-achieved" in r.message for r in caplog.records)
 
 

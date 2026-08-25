@@ -2962,6 +2962,16 @@ class MergeLeafAction(LeafAction):
                 self._logger.warning(f"[MERGE] Goal NOT achieved for node {node_id}: {original_goal or 'N/A'}. Missing: {missing_requirements}")
                 node.details["merge_incomplete"] = True
                 node.details["merge_should_skip"] = True
+
+                # Symmetric with the success branch above. Without this the negative verdict
+                # stayed on the merge node while any earlier optimistic stamp survived on the
+                # parent -- the root included -- which is how a 3-of-7-coverage run used to
+                # finalize as a success. Status is deliberately NOT touched: only success may
+                # terminate the parent branch.
+                if node.parent_id:
+                    parent = graph.get_node(node.parent_id)
+                    if parent:
+                        parent.details[DetailKey.GOAL_ACHIEVED.value] = False
             
             return ActionResultBuilder.success(
                 action=IdeaActionType.MERGE.value,

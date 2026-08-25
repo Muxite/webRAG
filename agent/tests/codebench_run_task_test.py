@@ -133,7 +133,8 @@ def test_main_exits_zero_on_success_and_drops_the_run_summary(tmp_path, monkeypa
     work = tmp_path / "w"
     work.mkdir()
 
-    async def fake_run(model, task_dir, workdir):
+    async def fake_run(model, task_dir, workdir, arm="compiled"):
+        assert arm == "compiled"  # the default must stay the historical behaviour
         return {"leaves": {"impl": {"finished": True, "actions": 1, "outcome": "ok"}},
                 "submit_check": {"summary": "1/1 declared files present"}, "actions_count": 1}
 
@@ -176,3 +177,41 @@ def test_entrypoint_never_imports_canonical_test_packages():
             imported.add(node.module or "")
     assert not [m for m in imported if "idea_code_tests" in m or "idea_tests" in m]
     assert "importlib" not in imported  # no dynamic escape hatch either
+
+
+def test_the_container_can_run_every_comparable_arm():
+    """A closed-environment task measurable on ONE arm cannot support a DAG-vs-linear claim.
+
+    The container historically ran only the compiled scaffold, so a sandbox task had no
+    opponent. These are the arms a comparison needs, all driven against the same workdir and
+    the same prompt -- only ``compiled`` is additionally handed ``plan.json``, which is exactly
+    the difference being measured.
+    """
+    assert set(crt.CONTAINER_ARMS) == {
+        "compiled", "graph", "sequential", "sequential_react", "langgraph_react",
+    }
+
+
+def test_compiled_remains_the_default_arm():
+    import inspect
+
+    assert inspect.signature(crt.run_task).parameters["arm"].default == "compiled"
+
+
+def test_the_native_arms_arm_the_sandbox_pack():
+    """Without this the DAG arms run in a container they cannot touch."""
+    settings = crt._engine_settings("graph")
+    assert settings["tools_sandbox_pack_enabled"] is True
+
+
+def test_the_sequential_arm_is_the_chain_forced_control():
+    assert crt._engine_settings("sequential")["allow_execute_all_children"] is False
+    assert crt._engine_settings("graph").get("allow_execute_all_children") is not False
+
+
+def test_an_unknown_arm_is_rejected_by_the_cli(capsys):
+    import pytest as _pytest
+
+    with _pytest.raises(SystemExit):
+        crt.main(["--model", "m", "--task-dir", "/task", "--workdir", "/work",
+                  "--arm", "not-an-arm"])

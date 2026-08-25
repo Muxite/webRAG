@@ -19,7 +19,13 @@ from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.langgraph_solver import LangGraphSolver
 from agent.app.telemetry import TelemetrySession
-from agent.app.trace_recorder import TraceRecorder, sanitize_path_component
+from agent.app.trace_recorder import (
+    TraceRecorder,
+    build_trace_path,
+    llm_io_capture_enabled,
+    sanitize_path_component,
+    traces_retained,
+)
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.testing.execution import _empty_graph
@@ -35,6 +41,7 @@ async def run_offtheshelf_execution(
     connector_http: ConnectorHttp,
     connector_chroma: ConnectorChroma,
     run_stamp: str,
+    cell_tag: str = "",
     summarize_observability_func=summarize_observability,
     connector_browser=None,
     idea_settings: Optional[Dict[str, Any]] = None,
@@ -52,7 +59,7 @@ async def run_offtheshelf_execution(
 
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = results_dir / f"{run_stamp}_{test_id}_{sanitize_path_component(model_name)}_langgraph_react.jsonl"
+    trace_path = build_trace_path(results_dir, run_stamp, test_id, model_name, "langgraph_react", cell_tag)
     tracer = TraceRecorder(trace_path)
 
     mandate = test_module.get_task_statement()
@@ -81,7 +88,7 @@ async def run_offtheshelf_execution(
         collection_name=f"idea_test_{test_id}_{run_stamp}",
         search_k=search_k,
         page_chars=page_chars,
-        full_capture=report_verbosity >= 3,
+        full_capture=llm_io_capture_enabled(report_verbosity),
         # Opt-in, default off: pass even a NATURAL termination through the solver's synthesis
         # pass (see `LangGraphSolver.__init__`). Awaiting a live A/B before it becomes default.
         always_synthesize=os.environ.get("IDEA_TEST_LANGGRAPH_ALWAYS_SYNTHESIZE", "") in ("1", "true", "True"),
@@ -133,11 +140,12 @@ async def run_offtheshelf_execution(
     telemetry_summary = telemetry.summary()
     ended = time.perf_counter()
 
-    try:
-        if trace_path.exists():
-            trace_path.unlink()
-    except Exception as exc:
-        _logger.warning(f"Failed to delete trace file {trace_path}: {exc}")
+    if not traces_retained():
+        try:
+            if trace_path.exists():
+                trace_path.unlink()
+        except Exception as exc:
+            _logger.warning(f"Failed to delete trace file {trace_path}: {exc}")
 
     return {
         "output": output,

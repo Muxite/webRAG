@@ -2,6 +2,24 @@ import logging
 import os
 
 
+def _clean_secret(value: "str | None") -> "str | None":
+    """Trim whitespace and surrounding quotes off a credential read from the environment.
+
+    Credentials reach us via `keys.env`, which is CRLF-terminated, so a value arrives with a
+    trailing `\\r` (and sometimes wrapping quotes). Providers reject the result with 403, and
+    the search connector turns that into "no results" rather than an error -- so the run
+    finishes, scores badly, and reads as a MODEL failure in the artifact. Silent degradation
+    of exactly the kind that makes a benchmark lie.
+
+    :param value: Raw environment value, or ``None``.
+    :returns: The cleaned secret, or ``None`` when unset/empty after cleaning.
+    """
+    if value is None:
+        return None
+    cleaned = value.strip().strip('"').strip("'").strip()
+    return cleaned or None
+
+
 class ConnectorConfig:
     """
     Holds shared configuration for all connectors.
@@ -22,7 +40,12 @@ class ConnectorConfig:
         # SEARCH_PROVIDER selects both the key and connector class via create_search_backend().
         # To switch back to Brave, set SEARCH_PROVIDER=brave (key unchanged in SEARCH_API_KEY).
         self.search_provider = (os.environ.get("SEARCH_PROVIDER") or "serper").strip().lower()
-        self.search_api_key = (
+        # Stripped, because an unstripped key fails SILENTLY. `keys.env` is CRLF-terminated,
+        # so the value arrives with a trailing `\r`; Serper answers 403 Unauthorized, the
+        # connector reports zero results rather than an error, and the run completes and
+        # scores badly as though the MODEL had failed to find anything. Observed live: a
+        # 42-character read of a 40-character key produced exactly that.
+        self.search_api_key = _clean_secret(
             os.environ.get("SERPER_KEY") or os.environ.get("SEARCH_API_KEY")
             if self.search_provider == "serper"
             else os.environ.get("SEARCH_API_KEY")

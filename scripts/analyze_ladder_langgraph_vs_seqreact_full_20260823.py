@@ -17,12 +17,41 @@ complete n should be at or near the full 72.
 
 Usage: PYTHONPATH=.:services:agent ./.venv/bin/python \
     scripts/analyze_ladder_langgraph_vs_seqreact_full_20260823.py
+
+--- RETRACTED 2026-08-23 ---
+This dataset is RETRACTED. Both `ladder_langgraph_full_20260823` and
+`ladder_seqreact_full_20260823` ran against a DEAD Serper search key (403 Unauthorized), so
+all 144 cells (72/72 in both arms) did ZERO real searches -- every "search" call failed silently
+and the model answered ungrounded. The numbers this script prints (+0.167 score delta,
+p~=0.0003, and the token comparison) describe two engines failing to search identically, not a
+graph-vs-seq_react difference. See the "RETRACTED 2026-08-23" addendum in
+docs/handoffs/GRAPH_VS_SEQREACT_GAP_INVESTIGATION_2026-08-22.md for the full writeup, and
+scripts/analyze_ladder_reduced_20260823.py for the grounding-restored re-run that supersedes
+this one.
+
+This script refuses to run by default. Pass --i-know-this-is-retracted to print the retracted
+numbers anyway (e.g. to inspect exactly what a dead-search-key run looks like).
 """
 import glob
 import json
 import re
 import statistics
 import sys
+
+RETRACTION_NOTICE = """\
+REFUSING TO RUN: this dataset is RETRACTED.
+
+`ladder_langgraph_full_20260823` / `ladder_seqreact_full_20260823` ran against a DEAD Serper
+search key (403 Unauthorized). All 144 cells (72/72 per arm) performed ZERO real searches --
+both engines answered ungrounded. Any score/token delta measured here reflects two engines
+failing to search in the same way, not a real graph-vs-seq_react comparison.
+
+See: docs/handoffs/GRAPH_VS_SEQREACT_GAP_INVESTIGATION_2026-08-22.md
+     (search for "RETRACTED 2026-08-23")
+Superseding re-run: scripts/analyze_ladder_reduced_20260823.py (grounding restored)
+
+To print the retracted numbers anyway, re-run with --i-know-this-is-retracted.
+"""
 
 RESULTS_DIR = "agent/idea_test_results"
 RUN_IDS = {
@@ -96,6 +125,10 @@ def paired_stats(deltas):
 
 
 def main():
+    if "--i-know-this-is-retracted" not in sys.argv:
+        print(RETRACTION_NOTICE, file=sys.stderr)
+        return 1
+
     graph_rows, n_graph_files = load_engine("langgraph_react", RUN_IDS["langgraph_react"])
     seq_rows, n_seq_files = load_engine("sequential_react", RUN_IDS["sequential_react"])
 

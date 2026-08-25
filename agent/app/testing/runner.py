@@ -33,6 +33,26 @@ NAIVE_DISCRETION_VARIANTS = ("naive_discretion",)
 COMPILED_AGENT_VARIANTS = ("graph_compiled",)
 COMPILED_CODE_AGENT_VARIANTS = ("graph_compiled_code",)
 OFFTHESHELF_VARIANTS = ("langgraph_react",)
+#: The native Graph-of-Thoughts engine (``testing/execution.py::run_test_execution``).
+#: ``graph`` is the full engine; ``sequential`` is the SAME engine run with settings
+#: tuned toward sequential behavior (see ``idea_test_runner._variant_settings``), not
+#: a separate execution module -- so both are named here explicitly rather than
+#: reached implicitly via a bare fallthrough.
+DAG_ENGINE_VARIANTS = ("graph", "sequential")
+
+#: Every execution_variant value this module knows how to dispatch. Anything else is
+#: a typo/unknown value and must raise rather than silently running the DAG engine
+#: (see docs/handoffs -- a misspelled variant used to fall through to
+#: run_test_execution and get written verbatim into the result JSON).
+KNOWN_EXECUTION_VARIANTS = frozenset(
+    DAG_ENGINE_VARIANTS
+    + LINEAR_AGENT_VARIANTS
+    + NAIVE_DISCRETION_VARIANTS
+    + COMPILED_AGENT_VARIANTS
+    + COMPILED_CODE_AGENT_VARIANTS
+    + OFFTHESHELF_VARIANTS
+    + BASELINE_VARIANTS
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -65,6 +85,7 @@ async def run_complete_test(
     validation_model: str = VALIDATION_MODEL,
     execution_variant: str = "graph",
     connector_browser: Optional[ConnectorBrowser] = None,
+    cell_tag: str = "",
 ) -> Dict[str, Any]:
     """
     Run complete test: execution + validation.
@@ -78,9 +99,14 @@ async def run_complete_test(
     :param run_stamp: Run timestamp.
     :param summarize_observability_func: Function to summarize observability.
     :param validation_model: Model name for validation.
-    :param execution_variant: graph / sequential_react / naive_discretion / graph_compiled /
-        graph_compiled_code / langgraph_react (agents) or parametric / naive_rag / minimal
-        (baseline).
+    :param execution_variant: graph / sequential / sequential_react / naive_discretion /
+        graph_compiled / graph_compiled_code / langgraph_react (agents) or parametric /
+        naive_rag / minimal (baseline). Must be one of KNOWN_EXECUTION_VARIANTS -- an
+        unrecognized value raises ValueError instead of silently running the DAG engine.
+    :param cell_tag: Disambiguating suffix shared with the result JSON's filename (effort
+        tier / settings fingerprint / repeat index). Threaded into the trace path so repeats
+        and A/B conditions of one cell stop colliding -- ``TraceRecorder`` appends, so
+        colliding names silently interleave concurrent cells into one corrupt file.
     :param connector_browser: Optional headless-Chrome fallback connector. Passed to EVERY
         execution variant uniformly (F18) so no arm is structurally handicapped relative to
         another just because it happened to hit a bot-blocked site.
@@ -98,6 +124,7 @@ async def run_complete_test(
             connector_browser=connector_browser,
             idea_settings=idea_settings,
             run_stamp=run_stamp,
+            cell_tag=cell_tag,
             summarize_observability_func=summarize_observability_func,
         )
     elif execution_variant in NAIVE_DISCRETION_VARIANTS:
@@ -111,6 +138,7 @@ async def run_complete_test(
             connector_browser=connector_browser,
             idea_settings=idea_settings,
             run_stamp=run_stamp,
+            cell_tag=cell_tag,
             summarize_observability_func=summarize_observability_func,
         )
     elif execution_variant in COMPILED_AGENT_VARIANTS:
@@ -124,6 +152,7 @@ async def run_complete_test(
             connector_browser=connector_browser,
             idea_settings=idea_settings,
             run_stamp=run_stamp,
+            cell_tag=cell_tag,
             summarize_observability_func=summarize_observability_func,
         )
     elif execution_variant in COMPILED_CODE_AGENT_VARIANTS:
@@ -136,6 +165,7 @@ async def run_complete_test(
             connector_chroma=connector_chroma,
             connector_browser=connector_browser,
             run_stamp=run_stamp,
+            cell_tag=cell_tag,
             summarize_observability_func=summarize_observability_func,
         )
     elif execution_variant in OFFTHESHELF_VARIANTS:
@@ -149,6 +179,7 @@ async def run_complete_test(
             connector_browser=connector_browser,
             idea_settings=idea_settings,
             run_stamp=run_stamp,
+            cell_tag=cell_tag,
             summarize_observability_func=summarize_observability_func,
         )
     elif execution_variant in BASELINE_VARIANTS:
@@ -162,9 +193,10 @@ async def run_complete_test(
             connector_chroma=connector_chroma,
             connector_browser=connector_browser,
             run_stamp=run_stamp,
+            cell_tag=cell_tag,
             summarize_observability_func=summarize_observability_func,
         )
-    else:
+    elif execution_variant in DAG_ENGINE_VARIANTS:
         execution_result = await run_test_execution(
             test_module=test_module,
             model_name=model_name,
@@ -175,7 +207,14 @@ async def run_complete_test(
             connector_browser=connector_browser,
             idea_settings=idea_settings,
             run_stamp=run_stamp,
+            cell_tag=cell_tag,
+            variant=execution_variant,
             summarize_observability_func=summarize_observability_func,
+        )
+    else:
+        raise ValueError(
+            f"Unknown execution_variant {execution_variant!r}; expected one of "
+            f"{sorted(KNOWN_EXECUTION_VARIANTS)}"
         )
 
     validation_runner = test_module.validation_runner

@@ -734,9 +734,13 @@ class SimpleMergePolicy(MergePolicy):
         node.details[DetailKey.MERGED_RESULTS.value] = self._sanitize_data(merged)
         node.details[DetailKey.MERGE_SUMMARY.value] = merge_summary
         
-        # Validate goal achievement if this is a merge node
+        # Validate goal achievement if this is a merge node.
+        # Writes the PROVISIONAL key, never the authoritative one: this call recurses to root
+        # (below), so writing ``goal_achieved`` here stamped a keyword-overlap verdict on the
+        # ROOT before ``MergeLeafAction`` had run, and finalize's root-first read could never
+        # retract it. ``MergeLeafAction`` owns ``GOAL_ACHIEVED``.
         goal_achieved = self._validate_goal_achievement(graph, node, merged)
-        node.details[DetailKey.GOAL_ACHIEVED.value] = goal_achieved
+        node.details[DetailKey.GOAL_ACHIEVED_PROVISIONAL.value] = goal_achieved
         
         if not goal_achieved and success_count > 0:
             self._logger.warning(f"[MERGE] Goal not fully achieved for node {node_id} - may need additional work")

@@ -50,6 +50,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import create_react_agent
 
 from agent.app.agent_io import AgentIO
+from agent.app.sandbox_tool_surface import run_sandbox_action
 from agent.app.connector_llm import ConnectorLLM, is_infra_llm_failure
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
@@ -392,6 +393,11 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
         return f"{header}\n{(content or _EMPTY_PAGE)[:page_chars]}"
 
     tools = [search, visit]
+    # Same eight file verbs the native engine gets, and only when the run actually carries a
+    # workdir. Without this the arms could not be compared on a closed-environment task at all:
+    # the native engine had a sandbox surface and this one had none, so any measured difference
+    # would be a difference in TOOLS rather than in reasoning.
+    tools.extend(_make_sandbox_tools(agent_io))
     if require_finish_tool:
         @tool
         async def finish(answer: str) -> str:
@@ -400,6 +406,66 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
             return "Answer submitted."
         tools.append(finish)
     return tools
+
+
+def _make_sandbox_tools(agent_io: AgentIO) -> List[Any]:
+    """Bind the shared sandbox surface as LangChain tools, or return nothing.
+
+    One thin ``@tool`` per verb rather than a single ``sandbox(action, args)`` dispatcher,
+    because a named tool with typed parameters is what a weak model can actually call --
+    the same narrow-intent discipline the native pack keeps (the model never authors a
+    command string or an ``op`` argument).
+
+    :param agent_io: The run's IO; its ``connector_sandbox`` is ``None`` on a web-research run.
+    :returns: The tool list, empty when this run has no workdir.
+    """
+    sandbox = getattr(agent_io, "connector_sandbox", None)
+    if sandbox is None:
+        return []
+
+    @tool
+    async def read_file(path: str) -> str:
+        """Read a text file from the working directory."""
+        return await run_sandbox_action(sandbox, "read_file", {"path": path})
+
+    @tool
+    async def write_file(path: str, content: str) -> str:
+        """Create or OVERWRITE a file in the working directory with the given content.
+        There is no partial patch — write the whole file."""
+        return await run_sandbox_action(sandbox, "write_file", {"path": path, "content": content})
+
+    @tool
+    async def list_dir(path: str = ".") -> str:
+        """List the entries of a directory in the working directory."""
+        return await run_sandbox_action(sandbox, "list_dir", {"path": path})
+
+    @tool
+    async def count_lines(path: str) -> str:
+        """Count the lines in a file."""
+        return await run_sandbox_action(sandbox, "count_lines", {"path": path})
+
+    @tool
+    async def word_count(path: str) -> str:
+        """Count the words in a file."""
+        return await run_sandbox_action(sandbox, "word_count", {"path": path})
+
+    @tool
+    async def head_file(path: str, lines: int = 10) -> str:
+        """Read the first N lines of a file."""
+        return await run_sandbox_action(sandbox, "head_file", {"path": path, "lines": lines})
+
+    @tool
+    async def disk_usage(path: str = ".") -> str:
+        """Report the size on disk of a path."""
+        return await run_sandbox_action(sandbox, "disk_usage", {"path": path})
+
+    @tool
+    async def find_files(name: str) -> str:
+        """Find files by name pattern, e.g. "*.txt"."""
+        return await run_sandbox_action(sandbox, "find_files", {"name": name})
+
+    return [read_file, write_file, list_dir, count_lines, word_count,
+            head_file, disk_usage, find_files]
 
 
 def _extract_usage(messages: List[Any]) -> List[Dict[str, Any]]:
@@ -486,12 +552,20 @@ def _record_io_parity(telemetry: "TelemetrySession", messages: List[Any],
                 out_payload["completion_text"] = text
                 if tool_calls:
                     out_payload["completion_tool_calls"] = tool_calls
+            # SYNTHESIZED, and marked so. These events are reconstructed by replaying the
+            # final message list at end-of-run, so every one of them carries an end-of-run
+            # timestamp rather than its real call time. The counts are sound; the ORDERING is
+            # not, and analysis that reasons about when calls happened (or whether they
+            # overlapped) has to exclude this arm rather than silently draw a conclusion from
+            # a column of identical timestamps.
             telemetry.record_event("connector_io", {
                 "connector": "ConnectorLLM", "direction": "in", "operation": "llm_query",
+                "synthesized": True,
                 "payload": in_payload,
             })
             telemetry.record_event("connector_io", {
                 "connector": "ConnectorLLM", "direction": "out", "operation": "llm_query",
+                "synthesized": True,
                 "payload": out_payload,
             })
         prior.append(text)
@@ -806,7 +880,15 @@ class LangGraphSolver:
         settings: Optional[Dict[str, Any]] = None,
         telemetry: Optional["TelemetrySession"] = None,
         run_id: Optional[str] = None,
+        connector_sandbox: Optional[Any] = None,
     ) -> SolverResult:
+        """
+        :param connector_sandbox: Workdir connector for closed-environment tasks. ``None`` on a
+            web-research run, which leaves the tool list exactly as it was. When present, this
+            arm gets the same eight file verbs the native engine gets -- without it a sandbox
+            task would compare an arm that can touch the filesystem against one that cannot,
+            measuring the tool surface instead of the reasoning.
+        """
         agent_io = AgentIO(
             connector_llm=self._connector_llm,
             connector_search=self._connector_search,
@@ -815,6 +897,7 @@ class LangGraphSolver:
             connector_browser=self._connector_browser,
             telemetry=telemetry,
             collection_name=self._collection_name,
+            connector_sandbox=connector_sandbox,
         )
         # F16 parity: same three connector_retry_* keys the graph and sequential arms read.
         retry = ToolRetry.from_settings(settings)

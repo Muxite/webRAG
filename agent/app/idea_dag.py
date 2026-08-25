@@ -18,6 +18,13 @@ class IdeaNode:
     children: List[str] = field(default_factory=list)
     score: Optional[float] = None
     memo_key: Optional[str] = None
+    # Session-relative seconds, sharing the telemetry session's ``perf_counter`` anchor so node
+    # intervals and ``timings_per_call`` intervals land on ONE timeline. ``None`` until the node
+    # is actually dispatched -- the graph previously kept no per-node time at all, which left
+    # ``_record_race_completion``'s step INDEX as the only ordering signal anywhere, and made
+    # "did this fan-out run concurrently?" unanswerable from the persisted result JSON.
+    started_at: Optional[float] = None
+    ended_at: Optional[float] = None
 
     def is_leaf(self) -> bool:
         return len(self.children) == 0
@@ -293,6 +300,8 @@ class IdeaDag:
                     "children": list(node.children),
                     "score": node.score,
                     "memo_key": node.memo_key,
+                    "started_at": node.started_at,
+                    "ended_at": node.ended_at,
                 }
                 for node_id, node in self._nodes.items()
             },
@@ -324,6 +333,10 @@ class IdeaDag:
                 children=list(data.get("children") or []),
                 score=data.get("score"),
                 memo_key=data.get("memo_key"),
+                # Absent on artifacts written before these fields existed; the analysis
+                # scripts read those back, so a missing key must load as "untimed", not raise.
+                started_at=data.get("started_at"),
+                ended_at=data.get("ended_at"),
             )
             graph._nodes[node_id] = node
             

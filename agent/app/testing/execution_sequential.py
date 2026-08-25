@@ -25,11 +25,17 @@ from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_chroma import ConnectorChroma
 from agent.app.agent_io import AgentIO
 from agent.app.telemetry import TelemetrySession
-from agent.app.trace_recorder import TraceRecorder, sanitize_path_component
+from agent.app.trace_recorder import (
+    TraceRecorder,
+    build_trace_path,
+    sanitize_path_component,
+    traces_retained,
+)
 from agent.app.idea_policies.action_constants import is_transient_tool_error
 from agent.app.idea_policies.config import ActionConfig
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
+from agent.app.sandbox_tool_surface import PARITY_ACTIONS, run_sandbox_action, sandbox_menu
 from agent.app.testing.execution import _empty_graph
 from agent.app.testing import json_telemetry as _json_telemetry
 
@@ -56,6 +62,26 @@ _SYSTEM = (
     "Each step, return ONLY JSON: {\"thought\": \"...\", \"action\": \"search|visit|verify|finish\", "
     "\"args\": {\"query|url|claim|answer\": \"...\"}}."
 )
+
+
+def _system_prompt(has_sandbox: bool) -> str:
+    """The step prompt, extended with the file surface when the run carries a workdir.
+
+    Kept byte-identical to ``_SYSTEM`` when there is no sandbox, so every existing web-research
+    cell is unaffected. The sandbox block is added only for closed-environment tasks, where this
+    arm needs the SAME capability surface as the native engine or an arm comparison measures the
+    tool surface rather than the reasoning (see :mod:`agent.app.sandbox_tool_surface`).
+    """
+    if not has_sandbox:
+        return _SYSTEM
+    verbs = "|".join(PARITY_ACTIONS)
+    return (
+        _SYSTEM
+        + "\n\n" + sandbox_menu()
+        + "\nFor a file action, use the same JSON shape with the action name and its slots, e.g. "
+        + '{"thought": "...", "action": "write_file", "args": {"path": "out.txt", "content": "..."}}.'
+        + f"\nValid actions this run: search|visit|verify|finish|{verbs}."
+    )
 
 
 class ToolRetry(NamedTuple):
@@ -208,6 +234,9 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
     # decisions. Default to a reasoning-adequate floor (matches the 4096 preflight-JSON
     # convention); overridable via env so the runner can raise it per model.
     step_max_tokens = int(os.environ.get("IDEA_TEST_SEQ_STEP_MAX_TOKENS", "4096"))
+    #: The run's workdir connector, or None on a plain web-research run. Resolved once: whether
+    #: this arm advertises file actions has to match whether it can actually perform them.
+    sandbox = getattr(agent_io, "connector_sandbox", None)
     scratchpad: List[str] = []          # in-context working memory
     evidence: List[str] = []            # visited-page text, for verify
     seen_queries: set = set()           # normalized queries already searched (breadth-loop guard)
@@ -216,7 +245,7 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
     for step in range(max_steps):
         history = "\n\n".join(scratchpad[-12:]) if scratchpad else "(no actions yet)"
         messages = [
-            {"role": "system", "content": _SYSTEM},
+            {"role": "system", "content": _system_prompt(sandbox is not None)},
             {"role": "user", "content": f"TASK:\n{mandate}\n\nSCRATCHPAD (your prior steps):\n{history}\n\nReturn the next step as JSON."},
         ]
         payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name, temperature=0.1, max_tokens=step_max_tokens)
@@ -293,8 +322,13 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
             claim = str(args.get("claim", ""))
             verdict = await _verify_claim(agent_io, claim, "\n\n".join(evidence), model_name)
             obs = f"VERIFY '{claim[:80]}': {verdict}"
+        elif action in PARITY_ACTIONS:
+            obs = await run_sandbox_action(sandbox, action, args)
         else:
-            obs = "INVALID ACTION. Use search/visit/verify/finish."
+            available = "search/visit/verify/finish"
+            if sandbox is not None:
+                available += "/" + "/".join(PARITY_ACTIONS)
+            obs = f"INVALID ACTION. Use {available}."
 
         scratchpad.append(f"STEP {step+1}: thought={thought}\naction={action} args={json.dumps(args)[:200]}\nobservation={obs[:1500]}")
 
@@ -309,6 +343,7 @@ async def run_sequential_execution(
     connector_http: ConnectorHttp,
     connector_chroma: ConnectorChroma,
     run_stamp: str,
+    cell_tag: str = "",
     summarize_observability_func=summarize_observability,
     connector_browser=None,
     idea_settings: Optional[Dict[str, Any]] = None,
@@ -331,7 +366,7 @@ async def run_sequential_execution(
 
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = results_dir / f"{run_stamp}_{test_id}_{sanitize_path_component(model_name)}_sequential_react.jsonl"
+    trace_path = build_trace_path(results_dir, run_stamp, test_id, model_name, "sequential_react", cell_tag)
     tracer = TraceRecorder(trace_path)
 
     mandate = test_module.get_task_statement()
@@ -375,11 +410,12 @@ async def run_sequential_execution(
     telemetry_summary = telemetry.summary()
     ended = time.perf_counter()
 
-    try:
-        if trace_path.exists():
-            trace_path.unlink()
-    except Exception as exc:
-        _logger.warning(f"Failed to delete trace file {trace_path}: {exc}")
+    if not traces_retained():
+        try:
+            if trace_path.exists():
+                trace_path.unlink()
+        except Exception as exc:
+            _logger.warning(f"Failed to delete trace file {trace_path}: {exc}")
 
     return {
         "output": output,

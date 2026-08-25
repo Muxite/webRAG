@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from agent.app.answer_vote import vote_key, majority_vote
 from agent.app.model_tiers import (
@@ -14,7 +14,7 @@ from agent.app.model_tiers import (
     tier_value,
 )
 
-from agent.app.idea_dag import IdeaDag
+from agent.app.idea_dag import IdeaDag, IdeaNode
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import DetailKey
 from agent.app.idea_policies.config import IdeaConfig
@@ -854,6 +854,51 @@ async def _reconcile_finalize_response(
     return response
 
 
+def resolve_goal_achieved(graph: IdeaDag, root: Optional[IdeaNode]) -> bool:
+    """Decide the run's ``goal_achieved`` from the merge that actually aggregated it.
+
+    This used to be a root-first read with a *disjunction* fallback over merge nodes -- a
+    shape that can raise False to True but can never lower True to False. Combined with
+    :meth:`SimpleMergePolicy.merge` recursing its cheap keyword-overlap pre-check up to the
+    root, that meant a run whose merge found 3-of-7 coverage, set ``merge_should_skip`` and
+    went SKIPPED still finalized as a success. The ``merge.py`` docstring warned about
+    exactly this; nothing acted on the warning.
+
+    Precedence now runs the other way. The run's answer is whatever its *top-level*
+    aggregation concluded, so the merge nodes closest to the root win, and
+    ``merge_should_skip`` is a veto rather than a detail. The root's own flag is consulted
+    only when no merge node expressed a verdict at all (a run that never built one).
+
+    :param graph: The executed graph.
+    :param root: The root node, or ``None`` when the graph has none.
+    :returns: Whether the goal was achieved, per the authoritative merge verdicts.
+    """
+    if root is None:
+        return False
+
+    # A merge node holds an opinion once it has either run (``GOAL_ACHIEVED`` present) or been
+    # refused (``merge_should_skip``). One that is merely PENDING carries none, and must not
+    # be read as a False.
+    opinionated: List[Tuple[int, bool]] = []
+    for node in graph.iter_depth_first():
+        if not NodeDetailsExtractor.is_merge_action(node.details):
+            continue
+        skipped = bool(node.details.get("merge_should_skip", False))
+        has_verdict = DetailKey.GOAL_ACHIEVED.value in node.details
+        if not skipped and not has_verdict:
+            continue
+        verdict = bool(node.details.get(DetailKey.GOAL_ACHIEVED.value, False)) and not skipped
+        opinionated.append((graph.depth(node.node_id), verdict))
+
+    if not opinionated:
+        return bool(root.details.get(DetailKey.GOAL_ACHIEVED.value, False))
+
+    # Siblings at the same level are conjunctive: every top-level aggregation has to hold for
+    # the run's answer to hold.
+    top_depth = min(depth for depth, _ in opinionated)
+    return all(verdict for depth, verdict in opinionated if depth == top_depth)
+
+
 async def build_final_payload(
     io: AgentIO,
     settings: Dict[str, Any],
@@ -1110,18 +1155,7 @@ async def build_final_payload(
         deliverable = data.get("deliverable", "")
         action_summary = data.get("summary", "")
 
-        goal_achieved = False
-        if root:
-            goal_achieved = root.details.get(DetailKey.GOAL_ACHIEVED.value, False)
-            if not goal_achieved:
-                merge_nodes = [
-                    n for n in graph.iter_depth_first()
-                    if NodeDetailsExtractor.is_merge_action(n.details)
-                ]
-                for merge_node in merge_nodes:
-                    if merge_node.details.get(DetailKey.GOAL_ACHIEVED.value, False):
-                        goal_achieved = True
-                        break
+        goal_achieved = resolve_goal_achieved(graph, root)
 
         from agent.app.idea_policies.base import IdeaActionType
         critical_actions = {IdeaActionType.SEARCH.value, IdeaActionType.VISIT.value, IdeaActionType.MERGE.value}

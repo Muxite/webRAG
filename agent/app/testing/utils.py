@@ -280,11 +280,19 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
             entry["success_count"] += 1
         else:
             entry["error_count"] += 1
-        timings_per_call.append({
+        # ``t_start``/``t_end`` are session-relative seconds (see TelemetrySession.record_timing).
+        # They are what makes "did these calls overlap?" answerable from the persisted result
+        # JSON alone; absent on entries recorded before the field existed, so this stays a
+        # conditional widening rather than a schema break for old artifacts.
+        call_entry = {
             "name": name,
             "duration": round(duration, 4),
             "success": success,
-        })
+        }
+        for bound in ("t_start", "t_end"):
+            if bound in timing:
+                call_entry[bound] = round(float(timing[bound]), 4)
+        timings_per_call.append(call_entry)
     for entry in timings_summary.values():
         if entry["min_duration"] == float("inf"):
             entry["min_duration"] = 0.0
@@ -383,3 +391,54 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
         "step_confidence": step_confidence,
         "events_count": len(telemetry.events),
     }
+
+
+# Size drivers, and the reason ``telemetry_raw`` used to be dropped wholesale: page bodies and
+# embedding vectors. None of them is needed to reconstruct what a run DID.
+_TELEMETRY_BULK_FIELDS = ("documents_seen", "chroma_stored", "chroma_retrieved")
+
+# Raw prompt/completion text, present on connector_io events only when LLM I/O capture is on.
+# It belongs in the JSONL trace, not multiplied into every result JSON -- keeping it here would
+# reintroduce exactly the bloat the old wholesale pop was defending against.
+_TELEMETRY_RAW_TEXT_FIELDS = ("prompt_text", "completion_text", "messages")
+
+
+def _strip_raw_text(event):
+    """Drop captured prompt/completion text from one telemetry event."""
+    if not isinstance(event, dict):
+        return event
+    payload = event.get("payload")
+    if not isinstance(payload, dict):
+        return event
+    inner = payload.get("payload")
+    if not isinstance(inner, dict):
+        return event
+    if not any(field in inner for field in _TELEMETRY_RAW_TEXT_FIELDS):
+        return event
+    trimmed = {k: v for k, v in inner.items() if k not in _TELEMETRY_RAW_TEXT_FIELDS}
+    return {**event, "payload": {**payload, "payload": trimmed}}
+
+
+def slim_telemetry_raw(telemetry_raw):
+    """Strip the bulk from a telemetry summary while keeping its forensic content.
+
+    ``idea_test_runner`` popped the whole ``telemetry_raw`` block below verbosity 3, and every
+    execution variant separately unlinked its JSONL trace on success -- so a default run kept
+    no per-step record at all, in either place. That is what left a 96-cell baseline with zero
+    recoverable traces.
+
+    The size concern behind the pop was legitimate; it just applied to the wrong scope. Page
+    bodies and embeddings live in :data:`_TELEMETRY_BULK_FIELDS`, while ``timings`` (carrying
+    the call intervals that make concurrency provable), ``decisions`` and ``events`` are small
+    and are exactly what offline analysis reads.
+
+    :param telemetry_raw: The session summary, or ``None``.
+    :returns: A slimmed copy, or the input unchanged when it is not a dict.
+    """
+    if not isinstance(telemetry_raw, dict):
+        return telemetry_raw
+    slim = {k: v for k, v in telemetry_raw.items() if k not in _TELEMETRY_BULK_FIELDS}
+    events = slim.get("events")
+    if isinstance(events, list):
+        slim["events"] = [_strip_raw_text(event) for event in events]
+    return slim

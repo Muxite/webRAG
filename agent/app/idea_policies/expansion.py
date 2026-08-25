@@ -168,6 +168,16 @@ def _repair_json_object(content: str, required_key: Optional[str] = None) -> Opt
 # path's leaf discipline. One atomic fact per leaf, read off an authoritative page (never
 # guessed from memory), reported as an EXACT value alongside its source URL. Injected into
 # the expansion system prompt only when the flag is on (default path is byte-identical).
+#: Appended when a node is expanded again after already producing children. Naming the prior
+#: work is what makes the second pass ADDITIVE -- the model otherwise sees an unchanged goal
+#: and unchanged context and re-emits the same candidates, so the extra budget buys nothing.
+_REEXPANSION_EXCLUSION_TEMPLATE = (
+    "IMPORTANT — this is a follow-up expansion. The following sub-tasks have already been "
+    "covered and MUST NOT be repeated: {already}.\n"
+    "Produce only NEW sub-tasks that target what is still missing. If the goal enumerates "
+    "candidates, work on the ones not listed above."
+)
+
 _EXPECT_CONTRACT_ADDENDUM = (
     "MEASURABLE OUTPUT CONTRACT: for every LEAF candidate (a concrete search/visit/think "
     "sub-task that resolves ONE fact), add an \"expect\" field at the candidate's top level: "
@@ -608,11 +618,21 @@ class LlmExpansionPolicy(ExpansionPolicy):
             self._logger.warning(f"[EXPANSION] Could not build the extra-actions menu: {exc}")
             return ""
 
-    async def expand(self, graph: IdeaDag, node_id: str, memories: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    async def expand(self, graph: IdeaDag, node_id: str, memories: Optional[List[Dict[str, Any]]] = None,
+                     max_children: Optional[int] = None,
+                     exclude: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Ask the model for this node's children.
+
+        :param max_children: Overrides ``EngineConfig.max_branching`` in the prompt's
+            child-count instruction. The engine passes its own effective width so the
+            prompt and the beam slice cannot disagree -- a wider slice than the prompt
+            asks for simply never gets filled, and a narrower one truncates silently.
+        """
         node = graph.get_node(node_id)
         if not node:
             return []
-        messages = self._build_messages(graph, node, memories=memories)
+        messages = self._build_messages(graph, node, memories=memories,
+                                        max_children=max_children, exclude=exclude)
 
         # The expansion schema's candidate ``details`` is a free-form, per-action
         # object. Strict structured output (OpenAI/Azure) rejects any object lacking
@@ -885,10 +905,11 @@ class LlmExpansionPolicy(ExpansionPolicy):
             if field in compact_result:
                 del compact_result[field]
         
-        if ActionResultKey.CONTENT.value in compact_result:
+        cap = max(0, int(self._cfg.expansion.ancestor_content_chars))
+        if cap and ActionResultKey.CONTENT.value in compact_result:
             content = compact_result[ActionResultKey.CONTENT.value]
-            if isinstance(content, str) and len(content) > 1000:
-                compact_result[ActionResultKey.CONTENT.value] = content[:1000] + "... [truncated]"
+            if isinstance(content, str) and len(content) > cap:
+                compact_result[ActionResultKey.CONTENT.value] = content[:cap] + "... [truncated]"
         
         if "links_full" in compact_result:
             links_full = compact_result.get("links_full", [])
@@ -935,10 +956,13 @@ class LlmExpansionPolicy(ExpansionPolicy):
             return "Internal reasoning completed"
         return None
 
-    def _build_messages(self, graph: IdeaDag, node: IdeaNode, memories: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, str]]:
+    def _build_messages(self, graph: IdeaDag, node: IdeaNode, memories: Optional[List[Dict[str, Any]]] = None,
+                        max_children: Optional[int] = None,
+                        exclude: Optional[List[str]] = None) -> List[Dict[str, str]]:
         max_nodes = self._cfg.expansion.max_context_nodes
         max_detail_chars = self._cfg.expansion.max_detail_chars
-        max_children = self._cfg.engine.max_branching
+        if max_children is None:
+            max_children = self._cfg.engine.max_branching
         if max_children <= 1:
             max_children = 1
         path = graph.path_to_root(node.node_id)
@@ -1036,6 +1060,15 @@ class LlmExpansionPolicy(ExpansionPolicy):
             system = f"{system}\n\n{planning_addendum}" if system else planning_addendum
         # Opt-in measurable-output contract: append the leaf ``expect`` discipline only when
         # ``expansion_expect_contract_enabled`` is set. Default path is byte-identical.
+        # Re-expansion exclusions. A node being expanded a SECOND time sees the same goal and
+        # the same ancestor context as the first time, so without naming what already exists
+        # the model reliably re-emits its original children and the widened budget buys
+        # nothing. Absent on a first expansion, so the default path is byte-identical.
+        if exclude:
+            already = "; ".join(str(item) for item in exclude if str(item).strip())
+            if already:
+                block = _REEXPANSION_EXCLUSION_TEMPLATE.format(already=already)
+                system = f"{system}\n\n{block}" if system else block
         if self._cfg.expansion.expect_contract_enabled:
             system = f"{system}\n\n{_EXPECT_CONTRACT_ADDENDUM}" if system else _EXPECT_CONTRACT_ADDENDUM
         # Opt-in multiple-approaches fields (fallback / concurrent race). Default path is

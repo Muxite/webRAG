@@ -134,15 +134,82 @@ def build_context(model: str, workdir: Path, mandate: str):
     return sandbox, agent_io, limits, telemetry
 
 
-async def run_task(model: str, task_dir: Path, workdir: Path) -> Dict[str, Any]:
-    """Copy the fixture, load the plan, and execute it against ``workdir``."""
+
+
+#: Arms that can be driven inside the codebench container. ``compiled`` is the historical one;
+#: the rest exist so a closed-environment task can be compared ACROSS arms. Before this the
+#: container ran only the compiled scaffold, so a sandbox task was measurable on one arm and
+#: could not support any claim about the DAG versus a linear agent.
+CONTAINER_ARMS = ("compiled", "graph", "sequential", "sequential_react", "langgraph_react")
+
+
+def _engine_settings(arm: str) -> Dict[str, Any]:
+    """Settings for the native-DAG arms, with the sandbox pack armed.
+
+    The pack is opt-in by design (``proximity is not authorization``); a container whose entire
+    purpose is manipulating its own workdir is the case it was built for. ``sequential`` is the
+    chain-forced control: same engine, siblings never run concurrently.
+    """
+    from agent.app.idea_dag_settings import load_idea_dag_settings
+
+    settings = dict(load_idea_dag_settings())
+    settings["tools_sandbox_pack_enabled"] = True
+    if arm == "sequential":
+        settings["allow_execute_all_children"] = False
+    return settings
+
+
+async def _run_native(arm: str, mandate: str, model: str, agent_io: Any) -> Dict[str, Any]:
+    """Drive the native DAG engine against the workdir."""
+    from agent.app.idea_engine import IdeaDagEngine
+
+    settings = _engine_settings(arm)
+    engine = IdeaDagEngine(io=agent_io, settings=settings, model_name=model)
+    output = await engine.run(mandate, max_steps=int(settings.get("max_steps") or 25),
+                              fail_soft=True)
+    return {"arm": arm, "answer": str(output.get("final_deliverable") or ""),
+            "success": bool(output.get("success")), "graph": output.get("graph")}
+
+
+async def _run_flat(arm: str, mandate: str, model: str, agent_io: Any) -> Dict[str, Any]:
+    """Drive one of the linear arms against the workdir."""
+    if arm == "sequential_react":
+        from agent.app.testing.execution_sequential import _run_react
+
+        answer = await _run_react(agent_io, mandate, model, max_steps=25, max_tokens=4096)
+    else:
+        from agent.app.langgraph_solver import LangGraphSolver
+
+        solver = LangGraphSolver(
+            connector_llm=agent_io.connector_llm, connector_search=agent_io.connector_search,
+            connector_http=agent_io.connector_http, connector_chroma=None,
+            connector_browser=None, model_name=model, collection_name="codebench",
+        )
+        # The solver builds its own AgentIO; hand it the workdir this container was given, or the
+        # arm advertises no file actions and the comparison is against a crippled opponent.
+        solved = await solver.solve(mandate, connector_sandbox=agent_io.connector_sandbox)
+        answer = str(solved.get("final_deliverable") or "") if isinstance(solved, dict) else str(solved)
+    return {"arm": arm, "answer": answer, "success": bool(answer)}
+
+
+async def run_task(model: str, task_dir: Path, workdir: Path, arm: str = "compiled") -> Dict[str, Any]:
+    """Copy the fixture, load the plan, and execute it against ``workdir``.
+
+    :param arm: One of :data:`CONTAINER_ARMS`. Only ``compiled`` consumes ``plan.json``; the
+        other arms are handed the same prompt and the same workdir and must plan for themselves,
+        which is the whole point of comparing them.
+    """
     copied = copy_starter_fixture(task_dir, workdir)
     plan = load_plan(task_dir)
     mandate = read_prompt(task_dir) or plan.get("aggregation", "")
     sandbox, agent_io, limits, telemetry = build_context(model, workdir, mandate)
-    _logger.info(f"codebench: model={model} task_dir={task_dir} workdir={workdir} "
+    _logger.info(f"codebench: arm={arm} model={model} task_dir={task_dir} workdir={workdir} "
                  f"starter_files={copied} leaves={len(plan.get('leaves') or [])}")
     try:
+        if arm in ("graph", "sequential"):
+            return await _run_native(arm, mandate, model, agent_io)
+        if arm in ("sequential_react", "langgraph_react"):
+            return await _run_flat(arm, mandate, model, agent_io)
         return await run_compiled_code_plan(plan, model, sandbox, agent_io, config=limits)
     finally:
         telemetry.finish(success=True)
@@ -182,10 +249,12 @@ def main(argv=None) -> int:
     ap.add_argument("--model", required=True, help="runtime (cheap) model name, e.g. gemma2:2b")
     ap.add_argument("--task-dir", required=True, type=Path, help="read-only task fixture (/task)")
     ap.add_argument("--workdir", required=True, type=Path, help="writable sandbox workdir (/work)")
+    ap.add_argument("--arm", default="compiled", choices=CONTAINER_ARMS,
+                    help="which agent architecture to run against the workdir")
     args = ap.parse_args(argv)
 
     try:
-        result = asyncio.run(run_task(args.model, args.task_dir, args.workdir))
+        result = asyncio.run(run_task(args.model, args.task_dir, args.workdir, arm=args.arm))
     except Exception as exc:  # noqa: BLE001
         # Exit 0 regardless: the harness grades the extracted /work, and a non-zero exit here would
         # be indistinguishable from the outer 900s timeout's own failure code.
@@ -195,7 +264,13 @@ def main(argv=None) -> int:
 
     write_run_summary(args.workdir, result)
     print("codebench: run complete")
-    print(summarize_run(result))
+    # ``summarize_run`` reads the compiled loop's own result shape; the other arms return an
+    # answer/success pair, so only the compiled arm gets its detailed summary.
+    if args.arm == "compiled":
+        print(summarize_run(result))
+    else:
+        print(f"arm={result.get('arm')} success={result.get('success')} "
+              f"answer_chars={len(str(result.get('answer') or ''))}")
     return 0
 
 
