@@ -18,7 +18,7 @@ This module supplies the two pieces that were missing:
 
 The threshold (``max_attempts=2``, i.e. the THIRD identical no-progress attempt is blocked) is a
 FIRST GUESS, not a measured value. It should be revisited against the mechanism suite's dead-end
-retry-cap task (``agent/app/idea_tests/test_3XX_mech_dead_end_retry_cap.py``), which is the first
+retry-cap task (``agent/app/idea_tests/test_305_mech_dead_end_retry_cap.py``), which is the first
 fixture able to say whether it is too tight (killing a legitimate second look at a flaky page) or
 too loose (still paying for 5-8 repeats).
 """
