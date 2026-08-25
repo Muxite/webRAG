@@ -418,6 +418,11 @@ TEST_PRIORITY_ORDER = [
     "154",  # Breadth D: 2 independent one-hop page reads + comparison: dam -> structural height (taller = Grande Dixence, 285 m vs Hoover 221.4 m) (7/10) - level=graph, weight=medium
     "155",  # Breadth E: 2 independent one-hop page reads + comparison: aircraft -> wingspan (wider = Hughes H-4 Hercules, 97.51 m vs An-225 88.4 m) (6/10) - level=graph, weight=medium
     "157",  # Breadth G: 7 independent one-hop page reads + count-with-condition: bridges with a main span > 1,200 m (8/10) - level=graph, weight=long
+    # Mechanism suite (2026-08-25, DAG_V3_LEDGER_MASTER_PLAN §8.3): the wide-fan-out HOLDOUT.
+    # Naturally-phrased eligibility question, 7 genuinely independent airport lookups, keystone is
+    # an EXCLUSIVE claim ("the only island to drop") resting on >= 5/7 gathered figures. Kept out of
+    # scheduler/prompt/codec tuning on purpose.
+    "158",  # Breadth H: 7 independent search+visit arms + eligibility fit: island -> airport runway length; the only island under the 1,300 m minimum (Naxos, 901 m) (8/10) - level=graph, weight=long
     # Mechanism suite (DAG_V3_LEDGER_MASTER_PLAN_2026-08-25.md §8.3): purpose-built tasks that make
     # the ledger/deficit-injector null result interpretable. 160 is the plausible-but-unsupported
     # numeric mechanism — the live-benchmark sibling of the Phase A "insufficient evidence, then
@@ -434,6 +439,11 @@ TEST_PRIORITY_ORDER = [
     "302",  # Mechanism: DUPLICATED/SYNDICATED URLs — three domains republishing one Wikipedia article must count as ONE independent source; the independent authority (nps.gov) prints a different figure (9/10) - level=integration, weight=long
     "303",  # Mechanism: ENTITY COLLISION — near-duplicate names on one page: Tay rail bridge length vs Tay Road Bridge (9/10) - level=navigation, weight=medium
     "304",  # Mechanism: SOURCE CONFLICT requiring VERIFY — stale-vs-current page-vs-page temporal conflict; a supplied confident page must be checked against an independent source (8/10) - level=integration, weight=long
+    # 305 is the DEAD-END RETRY-CAP proof for the `graph_no_reexpand` novelty/churn guard: one
+    # deliberately unanswerable sub-question (with two same-name attractive-nuisance traps) beside
+    # three ordinary ones, so over-blocking (starved keystone) and under-blocking (repeat churn)
+    # are separable in the same run.
+    "305",  # Mechanism: dead-end retry cap — 3 resolvable dam heights + 1 unanswerable sub-question; honest UNRESOLVED beats a trap figure, churn measured as repeat visits (9/10) - level=graph, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12
@@ -886,6 +896,22 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "tool_failure_recovery_enabled": True,
         "final_require_grounding": True,   # validity gate, on in every arm
         "run_policy_sibling_evidence_digest_enabled": True,   # the axis under test (shipped: False)
+    },
+    # Phase 0 ablation `sequential_react_context_matched` (same plan, section 3): falsifies "the
+    # graph's loss is mostly a context-budget artifact".
+    #
+    # The ONLY arm here that is not a graph arm -- it is meant to be run with
+    # IDEA_TEST_EXECUTION_VARIANTS=sequential_react, and it deliberately carries no
+    # `good_adaptive` graph flags, because none of them reach the linear executor. Its single
+    # axis, `run_policy_sequential_context_cap_enabled`, makes
+    # `testing/execution_sequential.SequentialContextCap` trim that arm's per-turn scratchpad to
+    # the DAG's OWN budget (`expansion_ancestor_content_chars` x `expansion_max_context_nodes`,
+    # read from those keys rather than restated), by dropping WHOLE oldest steps. Without it the
+    # linear arm sees roughly 12 x 1500 observation characters per turn against the planner's
+    # 5 x 1000 -- so any DAG-vs-sequential number is confounded by evidence volume at decision
+    # time, not just topology. On any other variant this profile is inert.
+    "sequential_react_context_matched": {
+        "run_policy_sequential_context_cap_enabled": True,   # the axis under test (shipped: False)
     },
 }
 

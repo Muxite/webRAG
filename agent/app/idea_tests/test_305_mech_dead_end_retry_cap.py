@@ -1,5 +1,5 @@
 """
-Test 158: Tier 5 (mechanism) — Dead-end retry cap: 3 resolvable dams + 1 deliberate dead end
+Test 305: Mechanism suite — Dead-end retry cap: 3 resolvable dams + 1 deliberate dead end
 Level: graph   Weight: long   Difficulty: 9/10
 
 MECHANISM UNDER TEST (DAG v3 "Ledger" master plan, §8.3 "dead-end retry-cap proof"):
@@ -122,10 +122,16 @@ def _all_text(result: Dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-# A sentence-ending period is one NOT followed by a digit, so "145.5 m" never reads as a
-# sentence boundary.
-_SENT_END_RX = re.compile(r"\.(?!\d)")
-_WINDOW = 160
+_WINDOW = 240
+
+# All four sub-entity names: the boundary set used to scope one entity's attribution window,
+# so a figure can only be credited to an entity when NO OTHER named entity stands between the
+# name and the figure.
+_ALL_NAME_RXS = [e["name_rx"] for e in RESOLVABLE] + [DEAD_END["name_rx"]]
+
+
+def _boundary_rx(name_rx: str) -> str:
+    return "|".join(f"(?:{rx})" for rx in _ALL_NAME_RXS if rx != name_rx)
 
 
 def _attributed(text: str, name_rx: str, value_rx: str) -> bool:
@@ -133,21 +139,27 @@ def _attributed(text: str, name_rx: str, value_rx: str) -> bool:
 
     The entity's OWN LINE decides first — a table row or "Gariep Dam: 88 m" bullet is the
     overwhelmingly common report layout, and line scoping makes cross-crediting between
-    adjacent rows impossible. Only when the name's line carries no matching value does the
-    search widen to a sentence-clipped +/- 160-char window, which covers the prose layout
-    ("Gariep Dam, on the Orange River, is an arch-gravity dam standing 88 m high") and the
-    heading-above-value layout where a newline separates label from figure.
+    adjacent rows impossible.
+
+    When the name's line carries no matching value, the search widens to a +/- 240-char window
+    that is CLIPPED AT THE NEAREST OTHER DAM NAME rather than at a sentence boundary. Clipping
+    on sibling names (instead of on '.') is what keeps the prose layout scorable — "The Gariep
+    Dam impounds the Orange River in South Africa. Reading the infobox, the dam wall reaches
+    88 m" spans a sentence break, and a period-clipped window would false-fail that correct,
+    grounded answer — while still making cross-crediting impossible: a figure that belongs to
+    another dam always has that dam's own name standing between it and this one.
     """
     name_pat = re.compile(name_rx, re.IGNORECASE)
     value_pat = re.compile(value_rx, re.IGNORECASE)
+    other_pat = re.compile(_boundary_rx(name_rx), re.IGNORECASE)
     for line in text.splitlines():
         if name_pat.search(line) and value_pat.search(line):
             return True
     for m in name_pat.finditer(text):
         s, e = m.span()
-        lo = max((x.end() for x in _SENT_END_RX.finditer(text, 0, s)), default=0)
+        lo = max((x.end() for x in other_pat.finditer(text, 0, s)), default=0)
         lo = max(lo, s - _WINDOW)
-        nxt = _SENT_END_RX.search(text, e)
+        nxt = other_pat.search(text, e)
         hi = min(nxt.start() if nxt else len(text), e + _WINDOW)
         if value_pat.search(text[lo:s]) or value_pat.search(text[e:hi]):
             return True
@@ -215,9 +227,9 @@ def _distinct_visits(result: Dict[str, Any], observability: Optional[Dict[str, A
 
 def get_test_metadata() -> Dict[str, Any]:
     return {
-        "test_id":          "158",
+        "test_id":          "305",
         "test_name": (
-            "Tier 5: Dead-end retry cap — 3 resolvable dam heights + 1 unanswerable sub-question"
+            "Mechanism: Dead-end retry cap — 3 resolvable dam heights + 1 unanswerable sub-question"
         ),
         "difficulty_level": "9/10",
         "category":         "Dead-end Retry-cap & Churn Guard",
