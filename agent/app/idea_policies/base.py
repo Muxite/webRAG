@@ -212,3 +212,12 @@ class DetailKey(str, Enum):
     # shape and both may need to coexist in one stored graph. Pure telemetry: nothing gates on
     # it, and its absence (every default run) is what keeps the root's details byte-identical.
     TASK_LEDGER = "task_ledger_v1"
+    # Observe-only structured view of ONE completed VISIT (opt-in, gated by
+    # ``RunPolicy.evidence_store_mode == "observe"``), written onto the VISIT node itself:
+    # ``agent.app.evidence_store.Evidence``'s record of which page was fetched, and
+    # ``Claim``'s (subject, predicate, value) triples read off its excerpt. Versioned in the
+    # key for the same reason as ``TASK_LEDGER``: the verifying successor carries a different
+    # shape. Pure sidecar -- ``action_result``, scoring and every prompt are untouched, and
+    # both keys are absent on every default run.
+    EVIDENCE = "evidence_v1"
+    CLAIMS = "claims_v1"

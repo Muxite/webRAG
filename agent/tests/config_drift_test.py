@@ -62,6 +62,9 @@ INTENTIONALLY_JSON_ABSENT = {
     "run_policy_search_must_yield_visit",
     # And for the sibling-context ledger delta, which is inert without the ledger anyway.
     "run_policy_sibling_context_delta",
+    # And for the evidence store, whose "observe" mode buys one extra LLM call per visit:
+    # absent means the shipped settings cost exactly what they cost today.
+    "run_policy_evidence_store_mode",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

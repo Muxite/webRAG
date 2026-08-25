@@ -2986,6 +2986,11 @@ class IdeaDagEngine:
                     graph, node, self._evaluate_contract(graph, node_id),
                     step_index=step_index,
                 )
+            # Observe-only evidence/claim sidecar (no-op unless
+            # run_policy.evidence_store_mode == "observe"). FIRST among the completion
+            # triggers so it records the result exactly as the action produced it, before
+            # any of the re-expansion paths below can grow children off this node.
+            await self._maybe_record_evidence(graph, node_id)
             # On-demand plan library: an ADOPTED template search becomes real children here
             # (no-op unless both plan-library flags are armed and this node IS such a search).
             # Runs FIRST among the re-expansion triggers: a node it expands then has children,
@@ -3014,6 +3019,48 @@ class IdeaDagEngine:
             # into a real follow-up, and a node with children is not a dead end to remediate.
             self._maybe_inject_empty_search_followup(graph, node_id, step_index)
         return status
+
+    async def _maybe_record_evidence(self, graph: IdeaDag, node_id: str) -> None:
+        """Attach the structured Evidence/Claim sidecar to a completed VISIT, or do nothing.
+
+        Off by default (``run_policy_evidence_store_mode`` is ``"off"``): no record is built,
+        no LLM call is made, and the node's details keep their exact shape. In ``"observe"``
+        mode both keys are pure telemetry -- see ``agent/app/evidence_store.py``.
+
+        Stateless on purpose (nothing to reset between runs): every record is derived from the
+        node it hangs off, so a restored checkpoint or a re-executed node needs no bookkeeping.
+
+        Failure isolation: the deterministic half cannot raise, and the LLM half fails closed to
+        an empty claim list. Wrapped anyway, because a VISIT that already succeeded must never
+        be broken by its own observer.
+        """
+        if self._cfg.run_policy.evidence_store_mode != "observe":
+            return
+        node = graph.get_node(node_id)
+        if node is None:
+            return
+        if NodeDetailsExtractor.get_action(node.details) != IdeaActionType.VISIT.value:
+            return
+        from agent.app.idea_policies.action_constants import ActionResultExtractor
+
+        result = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not isinstance(result, dict) or not ActionResultExtractor.is_success(result):
+            return
+        try:
+            from agent.app import evidence_store as _evidence_store
+
+            evidence = _evidence_store.extract_evidence(node, result)
+            claims = await _evidence_store.extract_claims(
+                evidence,
+                self.io,
+                model_name=self.model_name,
+                timeout_seconds=self._cfg.timeouts.llm,
+                fallback_model=self._cfg.generation.fallback_model,
+            )
+            node.details[DetailKey.EVIDENCE.value] = evidence.to_dict()
+            node.details[DetailKey.CLAIMS.value] = [c.to_dict() for c in claims]
+        except Exception as exc:  # noqa: BLE001. Telemetry must never fail a completed visit
+            self._logger.warning(f"[EVIDENCE] record failed (node={node_id}): {exc}")
 
     async def _maybe_judge_step_confidence(
         self, graph: IdeaDag, node_id: str, step_index: int

@@ -63,6 +63,22 @@ def test_shipped_settings_leave_the_sibling_context_delta_off():
     assert RunPolicy.from_settings(settings).sibling_context_delta is False
 
 
+def test_evidence_store_mode_defaults_to_off_when_the_key_is_absent():
+    assert RunPolicy.from_settings({}).evidence_store_mode == "off"
+
+
+def test_evidence_store_mode_resolves_from_settings():
+    resolved = RunPolicy.from_settings({"run_policy_evidence_store_mode": "observe"})
+    assert resolved.evidence_store_mode == "observe"
+
+
+def test_shipped_settings_leave_the_evidence_store_off():
+    """Absent by design; "observe" costs one extra LLM call per successful visit."""
+    settings = load_idea_dag_settings()
+    assert "run_policy_evidence_store_mode" not in settings
+    assert RunPolicy.from_settings(settings).evidence_store_mode == "off"
+
+
 def test_idea_config_exposes_the_group():
     cfg = IdeaConfig.from_settings({})
     assert isinstance(cfg.run_policy, RunPolicy)
@@ -79,6 +95,10 @@ def test_idea_config_exposes_the_group():
     assert cfg.run_policy.sibling_context_delta is False
     delta = IdeaConfig.from_settings({"run_policy_sibling_context_delta": True})
     assert delta.run_policy.sibling_context_delta is True
+
+    assert cfg.run_policy.evidence_store_mode == "off"
+    store = IdeaConfig.from_settings({"run_policy_evidence_store_mode": "observe"})
+    assert store.run_policy.evidence_store_mode == "observe"
 
 
 def test_group_follows_the_frozen_dataclass_convention():

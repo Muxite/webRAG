@@ -1183,16 +1183,26 @@ class RunPolicy:
     rendering of the task ledger snapshot at ``root.details["task_ledger_v1"]``, so with the
     ledger off there is nothing to render and the flag is inert on its own. Off by default and
     absent from the shipped settings, same as the two above.
+
+    ``evidence_store_mode`` decides whether a completed VISIT also records a structured
+    ``Evidence`` (free, deterministic) and its extracted ``Claim`` triples (ONE cheap LLM call
+    per visited page) as sidecar node details — see ``agent/app/evidence_store.py``. A mode
+    string for the same reason as ``ledger_mode``: off -> observe -> (later) a mode where the
+    claims are verified and consumed. ``"observe"`` costs one extra LLM call per successful
+    visit and changes no decision. Off by default and absent from the shipped settings, same as
+    the three above.
     """
 
     ledger_mode: str = "off"
     search_must_yield_visit: bool = False
     sibling_context_delta: bool = False
+    evidence_store_mode: str = "off"
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
         "search_must_yield_visit": "run_policy_search_must_yield_visit",
         "sibling_context_delta": "run_policy_sibling_context_delta",
+        "evidence_store_mode": "run_policy_evidence_store_mode",
     }
 
     @classmethod

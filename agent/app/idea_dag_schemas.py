@@ -367,6 +367,55 @@ MERGE_JSON_SCHEMA_GOAL_EVAL_FIRST: Dict[str, Any] = {
 }
 
 
+# Claim extraction from ONE visited page's excerpt (see ``agent/app/evidence_store.py``).
+# Deliberately NOT registered in ``DEFAULT_JSON_SCHEMAS``: it is not a settings-overridable
+# stage schema, it belongs to a single opt-in observer, and registering it would change the
+# shipped settings dict for every run including the ones with the observer off.
+#
+# No ``maxItems``: nothing else in this file constrains array length (several providers
+# ignore it, and a rejected/degraded structured-output request is worse than a long list),
+# so the cap of ``evidence_store.MAX_CLAIMS`` is stated in the prompt and ENFORCED in code
+# after parsing.
+CLAIM_EXTRACTION_JSON_SCHEMA: Dict[str, Any] = {
+    "name": "claim_extraction_result",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "claims": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "subject": {
+                            "type": "string",
+                            "description": "What the fact is about, as named on the page."
+                        },
+                        "predicate": {
+                            "type": "string",
+                            "description": "The relation or property, e.g. 'length' or 'flows into'."
+                        },
+                        "value": {
+                            "type": "string",
+                            "description": "The value of that property, copied from the page."
+                        }
+                    },
+                    "required": [
+                        "subject",
+                        "predicate",
+                        "value"
+                    ],
+                    "additionalProperties": False
+                }
+            }
+        },
+        "required": [
+            "claims"
+        ],
+        "additionalProperties": False
+    }
+}
+
+
 DEFAULT_JSON_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "expansion_json_schema": EXPANSION_JSON_SCHEMA,
     "evaluation_json_schema": EVALUATION_JSON_SCHEMA,
