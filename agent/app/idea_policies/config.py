@@ -1263,6 +1263,22 @@ class RunPolicy:
     ``coverage_entity_conflict_count`` on the final payload -- ``coverage_ratio``,
     ``finalization_status`` and ``deliverable_complete`` are NEVER touched by this flag. Off by
     default and absent from the shipped settings, same as the nine above.
+
+    ``constrained_decoding_enabled`` upgrades the repair path for a malformed action-JSON
+    response (``json_repair.repair_malformed_json``, called from three ``LeafAction`` sites --
+    link selection, merge synthesis, verify) from a plain ``json_object`` re-ask to real
+    JSON-schema-constrained decoding, when doing so is safe. The wire mechanism itself already
+    exists and is already used elsewhere (``build_llm_payload``'s ``json_schema=`` becomes
+    ``response_format={"type":"json_schema",...}``, and ``OllamaNativeBackend`` already
+    translates that into Ollama's native ``format`` field) -- what's missing is the REPAIR call
+    passing a schema at all. Gated additionally by
+    ``llm_backends.supports_optional_field_json_schema``: several of these repair schemas have
+    OPTIONAL fields (mirroring what each site's primary response already allows), and OpenAI/Azure
+    strict structured-output mode requires ``required`` to enumerate every property, so a schema
+    is only ever attached when the active backend is confirmed local-Ollama (the same condition
+    ``create_llm_backend`` itself uses to select ``OllamaNativeBackend``) -- every other backend
+    keeps today's plain-text repair re-ask, unchanged. Off by default and absent from the shipped
+    settings, same as the ten above.
     """
 
     ledger_mode: str = "off"
@@ -1275,6 +1291,7 @@ class RunPolicy:
     visit_url_identity_guard: bool = False
     sequencing_identity_guard: bool = False
     coverage_entity_conflict_check: bool = False
+    constrained_decoding_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1287,6 +1304,7 @@ class RunPolicy:
         "visit_url_identity_guard": "run_policy_visit_url_identity_guard",
         "sequencing_identity_guard": "run_policy_sequencing_identity_guard",
         "coverage_entity_conflict_check": "run_policy_coverage_entity_conflict_check",
+        "constrained_decoding_enabled": "run_policy_constrained_decoding_enabled",
     }
 
     @classmethod

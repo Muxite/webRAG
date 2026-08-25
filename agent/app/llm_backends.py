@@ -191,6 +191,27 @@ def is_self_hosted_url(url: Optional[str]) -> bool:
         return "." not in host
 
 
+def supports_optional_field_json_schema(config: ConnectorConfig) -> bool:
+    """True when the active backend is the local ``OllamaNativeBackend`` -- the one place a
+    JSON schema with OPTIONAL (not-required) properties is safe to send as real
+    ``response_format`` structured output.
+
+    Mirrors :func:`create_llm_backend`'s own local-Ollama selection condition exactly, so this
+    predicate is true if and only if that factory would hand back an ``OllamaNativeBackend`` for
+    the same config. OpenAI/Azure's strict structured-output mode requires ``required`` to
+    enumerate every property in the schema (see the merge schema's own comment in
+    ``actions.py`` for why this project already avoids raw ``json_schema=`` there for schemas
+    with optional fields) -- Ollama's native ``/api/chat`` ``format`` field has no such
+    restriction, so a caller with an optional-field schema may safely request constrained
+    decoding only when this returns True, and must fall back to a text-instruction hint (or no
+    schema at all) otherwise.
+    """
+    provider = (config.llm_provider or "").strip().lower()
+    return int(getattr(config, "llm_num_ctx", 0) or 0) > 0 and (
+        provider in ("ollama", "local") or is_self_hosted_url(config.llm_api_url)
+    )
+
+
 def create_llm_backend(config: ConnectorConfig, logger: logging.Logger) -> LLMBackend:
     """
     Factory for LLM backends from ConnectorConfig.llm_provider.

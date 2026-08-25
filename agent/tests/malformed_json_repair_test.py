@@ -16,10 +16,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+from types import SimpleNamespace
 
 from agent.app.idea_dag import IdeaDag
 from agent.app.idea_dag_settings import load_idea_dag_settings
-from agent.app.idea_policies.actions import MergeLeafAction, VerifyLeafAction, VisitLeafAction
+from agent.app.idea_policies.actions import (
+    _LINK_SELECTION_REPAIR_SCHEMA,
+    MergeLeafAction,
+    VerifyLeafAction,
+    VisitLeafAction,
+)
 from agent.app.idea_policies.base import DetailKey, IdeaActionType, IdeaNodeStatus
 from agent.app.telemetry import TelemetrySession
 
@@ -44,14 +50,25 @@ VERIFY_OK = json.dumps({
 })
 
 
+def _connector_config(*, provider="openai_compatible", api_url="https://api.openai.com/v1", num_ctx=0):
+    """Minimal stand-in for ``ConnectorConfig`` -- only the three fields
+    ``llm_backends.supports_optional_field_json_schema`` reads."""
+    return SimpleNamespace(llm_provider=provider, llm_api_url=api_url, llm_num_ctx=num_ctx)
+
+
 class _ScriptedIO:
     """Returns the scripted replies in order, recording every prompt it was handed."""
 
-    def __init__(self, *responses):
+    def __init__(self, *responses, connector_config=None):
         self._responses = list(responses)
         self.calls = []
         self.collection_name = "agent_memory"
         self.telemetry = TelemetrySession(enabled=True)
+        # Absent by default, matching real engine IO stand-ins that predate the
+        # constrained-decoding lookup -- ``_repair_malformed_json`` must degrade to
+        # ``json_schema=None`` rather than raise when this attribute doesn't exist.
+        if connector_config is not None:
+            self.connector_llm = SimpleNamespace(config=connector_config)
 
     def build_llm_payload(self, messages=None, **kw):
         return {"messages": messages, **kw}
@@ -79,9 +96,9 @@ def _merge_graph():
     return g, node.node_id
 
 
-def _run_merge(io):
+def _run_merge(io, settings=None):
     g, node_id = _merge_graph()
-    return asyncio.run(MergeLeafAction(settings=load_idea_dag_settings()).execute(g, node_id, io))
+    return asyncio.run(MergeLeafAction(settings=settings or load_idea_dag_settings()).execute(g, node_id, io))
 
 
 def _verify_graph():
@@ -105,13 +122,13 @@ def _verify_graph():
     return g, node.node_id
 
 
-def _run_verify(io):
+def _run_verify(io, settings=None):
     g, node_id = _verify_graph()
-    return asyncio.run(VerifyLeafAction(settings=load_idea_dag_settings()).execute(g, node_id, io))
+    return asyncio.run(VerifyLeafAction(settings=settings or load_idea_dag_settings()).execute(g, node_id, io))
 
 
-def _run_selection(io, link_count=2):
-    action = VisitLeafAction(settings=load_idea_dag_settings())
+def _run_selection(io, link_count=2, settings=None):
+    action = VisitLeafAction(settings=settings or load_idea_dag_settings())
     return asyncio.run(action._select_links_with_llm("the bridge", CANDIDATES, link_count, io))
 
 
@@ -235,3 +252,85 @@ def test_repair_works_without_any_telemetry_session_attached():
     io.telemetry = None
     assert _run_selection(io, link_count=1) == [CANDIDATES[0]]
     assert len(io.calls) == 2
+
+
+# ---------------------------------------------------------------------------
+# run_policy_constrained_decoding_enabled -- the repair call's json_schema kwarg.
+# Off by default (regression fence); on ONLY attaches a schema when the backend is
+# confirmed local-Ollama (supports_optional_field_json_schema).
+# ---------------------------------------------------------------------------
+
+_LOCAL_OLLAMA_CONFIG = _connector_config(provider="ollama", num_ctx=8192)
+_CLOUD_CONFIG = _connector_config(provider="openai_compatible", api_url="https://api.openai.com/v1", num_ctx=0)
+
+
+def test_constrained_decoding_off_by_default_repair_schema_stays_none():
+    io = _ScriptedIO(
+        MALFORMED, json.dumps({"selected": [CANDIDATES[1]]}),
+        connector_config=_LOCAL_OLLAMA_CONFIG,
+    )
+    assert _run_selection(io, link_count=1) == [CANDIDATES[1]]
+    # Two calls made; the repair call (second) must carry json_schema=None -- byte-identical
+    # to this file's pre-existing repair tests, even though the backend IS local-Ollama here.
+    assert io.calls[1]["json_schema"] is None
+
+
+def test_constrained_decoding_attaches_schema_on_a_local_ollama_backend():
+    settings = {**load_idea_dag_settings(), "run_policy_constrained_decoding_enabled": True}
+    io = _ScriptedIO(
+        MALFORMED, json.dumps({"selected": [CANDIDATES[1]]}),
+        connector_config=_LOCAL_OLLAMA_CONFIG,
+    )
+    assert _run_selection(io, link_count=1, settings=settings) == [CANDIDATES[1]]
+    assert io.calls[1]["json_schema"] is _LINK_SELECTION_REPAIR_SCHEMA
+
+
+def test_constrained_decoding_flag_on_but_cloud_backend_stays_none():
+    """Flag on is not enough -- a non-local-Ollama backend keeps today's plain repair."""
+    settings = {**load_idea_dag_settings(), "run_policy_constrained_decoding_enabled": True}
+    io = _ScriptedIO(
+        MALFORMED, json.dumps({"selected": [CANDIDATES[1]]}),
+        connector_config=_CLOUD_CONFIG,
+    )
+    assert _run_selection(io, link_count=1, settings=settings) == [CANDIDATES[1]]
+    assert io.calls[1]["json_schema"] is None
+
+
+def test_constrained_decoding_flag_on_but_io_has_no_connector_llm_stays_none():
+    """The real engine's IO always has connector_llm, but the wrapper must degrade safely
+    (not raise) if a caller's stand-in doesn't -- e.g. this file's OTHER _ScriptedIO
+    instances, constructed with no connector_config at all."""
+    settings = {**load_idea_dag_settings(), "run_policy_constrained_decoding_enabled": True}
+    io = _ScriptedIO(MALFORMED, json.dumps({"selected": [CANDIDATES[1]]}))
+    assert not hasattr(io, "connector_llm")
+    assert _run_selection(io, link_count=1, settings=settings) == [CANDIDATES[1]]
+    assert io.calls[1]["json_schema"] is None
+
+
+def test_constrained_decoding_attaches_the_verify_schema_too():
+    settings = {**load_idea_dag_settings(), "run_policy_constrained_decoding_enabled": True}
+    io = _ScriptedIO(
+        "VERDICT: TRUE (sorry, no JSON)", VERIFY_OK,
+        connector_config=_LOCAL_OLLAMA_CONFIG,
+    )
+    result = _run_verify(io, settings=settings)
+    assert result["verdict"] == "TRUE"
+    assert io.calls[1]["json_schema"]["name"] == "verify_verdict"
+
+
+def test_constrained_decoding_attaches_merge_schema_when_one_is_configured():
+    """The merge repair schema is whatever json_schema the PRIMARY call computed (None when
+    neither merge_json_schema nor goal_evaluation_first_enabled is set) -- confirm it
+    propagates through to the repair call when goal_evaluation_first_enabled turns it on."""
+    settings = {
+        **load_idea_dag_settings(),
+        "run_policy_constrained_decoding_enabled": True,
+        "merge_goal_evaluation_first_enabled": True,
+    }
+    io = _ScriptedIO(
+        "not json at all {", MERGE_OK,
+        connector_config=_LOCAL_OLLAMA_CONFIG,
+    )
+    result = _run_merge(io, settings=settings)
+    assert result["synthesized"]["summary"] == "repaired summary"
+    assert io.calls[1]["json_schema"]["name"] == "merge_result"

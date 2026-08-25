@@ -70,6 +70,7 @@ async def repair_malformed_json(
     temperature: float = 0.0,
     timeout_seconds: Optional[float] = None,
     logger: Optional[logging.Logger] = None,
+    json_schema: Optional[Dict[str, Any]] = None,
 ) -> Optional[Any]:
     """One bounded re-prompt when an LLM response that had to be JSON is not JSON.
 
@@ -78,6 +79,12 @@ async def repair_malformed_json(
     to fix its own formatting. This makes ONE extra call carrying the original
     instruction, the malformed text, and the parse error, and returns the corrected
     object.
+
+    ``json_schema``, when given, is passed straight through to ``build_llm_payload`` as real
+    JSON-schema-constrained decoding (``run_policy_constrained_decoding_enabled``'s effect,
+    already gated by the caller to configs where this is safe -- see that flag's docstring in
+    ``idea_policies/config.py``) instead of leaving the repair call's shape to a plain
+    ``json_object`` hint. ``None`` (the default) is today's exact behaviour.
 
     Returns ``None`` when the repair call is empty/unparseable/raises, so every caller
     falls through to exactly the fallback it used before. Always on: the worst case is
@@ -111,6 +118,7 @@ async def repair_malformed_json(
             model_name=model_name,
             temperature=temperature,
             max_tokens=max_tokens,
+            json_schema=json_schema,
         )
         response = await io.query_llm_with_fallback(
             payload,

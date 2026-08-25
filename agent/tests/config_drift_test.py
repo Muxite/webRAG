@@ -87,6 +87,10 @@ INTENTIONALLY_JSON_ABSENT = {
     # means no coverage_entity_conflicts field is ever attached to the final payload, and
     # coverage_ratio/finalization_status are untouched either way.
     "run_policy_coverage_entity_conflict_check",
+    # And for constrained decoding, which only upgrades a malformed-JSON REPAIR call to real
+    # schema-constrained decoding on a confirmed local-Ollama backend: absent means every
+    # repair re-ask behaves exactly as it does today (plain json_object, no schema).
+    "run_policy_constrained_decoding_enabled",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

@@ -16,7 +16,11 @@ if TYPE_CHECKING:
 
 from agent.app.agent_io import AgentIO
 from agent.app.observation import clean_operation
-from agent.app.llm_backends import json_instruction_from_response_format, accepts_reasoning_effort
+from agent.app.llm_backends import (
+    json_instruction_from_response_format,
+    accepts_reasoning_effort,
+    supports_optional_field_json_schema,
+)
 from agent.app.model_tiers import tier_token_multiplier, is_reasoning_model
 from agent.app.idea_dag_schemas import MERGE_JSON_SCHEMA_GOAL_EVAL_FIRST
 from agent.app.idea_policies.base import IdeaActionType, DetailKey, IdeaNodeStatus
@@ -235,6 +239,7 @@ class LeafAction(ABC):
         max_tokens: Optional[int] = None,
         temperature: float = 0.0,
         timeout_seconds: Optional[float] = None,
+        repair_schema: Optional[Dict[str, Any]] = None,
     ) -> Optional[Any]:
         """One bounded re-prompt when an action's LLM response is not valid JSON.
 
@@ -242,7 +247,22 @@ class LeafAction(ABC):
         supplies this action's logger and configured fallback model, and is otherwise
         that function. Three action sites (link selection, merge synthesis, verify) call
         it; see the shared module for the behaviour and the fail-open contract.
+
+        ``repair_schema`` is gated here (not by the caller) so every site shares one rule:
+        attached ONLY when ``run_policy.constrained_decoding_enabled`` is on AND the active
+        backend is confirmed local-Ollama (``llm_backends.supports_optional_field_json_schema``)
+        -- see that flag's docstring in ``idea_policies/config.py`` for why the second check is
+        required (several repair schemas have optional fields; only Ollama's native structured
+        output tolerates that). ``None`` otherwise, matching today's behaviour exactly.
         """
+        json_schema = None
+        if repair_schema is not None and self._cfg.run_policy.constrained_decoding_enabled:
+            try:
+                connector_config = io.connector_llm.config
+            except AttributeError:
+                connector_config = None
+            if connector_config is not None and supports_optional_field_json_schema(connector_config):
+                json_schema = repair_schema
         return await repair_malformed_json(
             io,
             site=site,
@@ -255,6 +275,7 @@ class LeafAction(ABC):
             temperature=temperature,
             timeout_seconds=timeout_seconds,
             logger=self._logger,
+            json_schema=json_schema,
         )
 
     def _is_retryable(self, error: Exception) -> bool:
@@ -433,6 +454,22 @@ class SearchLeafAction(LeafAction):
             })
         
         return matches[:max_results]
+
+
+#: Repair-path schema for the link-selection micro-prompt (run_policy_constrained_decoding_enabled).
+#: Every field required -- no optional-field restriction here, but the flag+backend gate still
+#: applies uniformly across all three repair sites; see that flag's docstring in config.py.
+_LINK_SELECTION_REPAIR_SCHEMA: Dict[str, Any] = {
+    "name": "link_selection",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "selected": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["selected"],
+        "additionalProperties": False,
+    },
+}
 
 
 class VisitLeafAction(LeafAction):
@@ -1471,6 +1508,7 @@ class VisitLeafAction(LeafAction):
                         max_tokens=self._executor_max_tokens(_effective_model, 500),
                         temperature=0.2,
                         timeout_seconds=timeout_seconds,
+                        repair_schema=_LINK_SELECTION_REPAIR_SCHEMA,
                     )
                 if data is not None:
                     selected = data.get("selected", [])
@@ -2943,6 +2981,12 @@ class MergeLeafAction(LeafAction):
                     max_tokens=self._executor_max_tokens(
                         self._effective_model(io, model_name), self._cfg.merge.max_tokens, price_tier=False
                     ),
+                    # `json_schema` here is the same schema (possibly with optional fields --
+                    # goal_evaluation/missing_requirements) the primary call deliberately does
+                    # NOT pass as response_format=json_schema (see the comment above where it's
+                    # computed): _repair_malformed_json's own gate only attaches it when the
+                    # backend is confirmed local-Ollama, where optional fields are safe.
+                    repair_schema=json_schema,
                     temperature=self._cfg.merge.temperature,
                     timeout_seconds=timeout_seconds,
                 )
@@ -3206,6 +3250,27 @@ class MergeLeafAction(LeafAction):
             return self._failure(action=IdeaActionType.MERGE, node_id=node_id, error=exc)
 
 
+#: Repair-path schema for the verify verdict (run_policy_constrained_decoding_enabled).
+#: verdict/confidence required; the rest optional, matching the primary prompt's own shape
+#: (every field is read via `.get(..., default)` at the call site) -- so this is only ever
+#: attached when the backend is confirmed local-Ollama, same as the merge schema above.
+_VERIFY_VERDICT_REPAIR_SCHEMA: Dict[str, Any] = {
+    "name": "verify_verdict",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "verdict": {"type": "string", "enum": ["TRUE", "PARTIALLY_TRUE", "FALSE", "UNVERIFIABLE"]},
+            "confidence": {"type": "number"},
+            "supporting_url": {"type": "string"},
+            "contradicting_url": {"type": "string"},
+            "quote": {"type": "string"},
+            "reasoning": {"type": "string"},
+        },
+        "required": ["verdict", "confidence"],
+    },
+}
+
+
 class VerifyLeafAction(LeafAction):
     """Cross-check a claim against gathered evidence.
 
@@ -3404,6 +3469,7 @@ class VerifyLeafAction(LeafAction):
                     max_tokens=self._executor_max_tokens(
                         self._effective_model(io, model_name), self._cfg.verify.max_tokens, price_tier=False
                     ),
+                    repair_schema=_VERIFY_VERDICT_REPAIR_SCHEMA,
                     temperature=self._cfg.verify.temperature,
                     timeout_seconds=timeout_seconds,
                 )
