@@ -32,7 +32,7 @@ from agent.app.trace_recorder import (
     traces_retained,
 )
 from agent.app.idea_policies.action_constants import is_transient_tool_error
-from agent.app.idea_policies.config import ActionConfig
+from agent.app.idea_policies.config import ActionConfig, ExpansionConfig, RunPolicy
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.sandbox_tool_surface import PARITY_ACTIONS, run_sandbox_action, sandbox_menu
@@ -108,6 +108,66 @@ class ToolRetry(NamedTuple):
             max_attempts=max(0, int(cfg.connector_retry_max_attempts)),
             backoff_seconds=max(0.0, float(cfg.connector_retry_backoff_seconds)),
         )
+
+
+#: Scratchpad window this arm has always shown the model (most recent N steps).
+_SCRATCHPAD_WINDOW = 12
+#: Per-step observation cap this arm has always applied when appending to the scratchpad.
+_UNCAPPED_OBSERVATION_CHARS = 1500
+
+
+class SequentialContextCap(NamedTuple):
+    """Opt-in cap matching this arm's per-turn context to the DAG's own budget (Phase 0).
+
+    Phase 0's ``sequential_react_context_matched`` ablation
+    (docs/DAG_V3_LEDGER_MASTER_PLAN_2026-08-25.md section 3) falsifies "the graph's loss is
+    mostly a context-budget artifact". The two arms are NOT matched today: the graph planner sees
+    at most ``expansion.max_context_nodes`` ancestors x ``expansion.ancestor_content_chars`` of
+    page content (5 x 1000 by default), while this arm shows the last twelve steps with up to
+    1500 observation characters each — an order of magnitude more evidence at decision time.
+
+    The caps are READ FROM the DAG's own two config keys rather than restated as literals, so the
+    "matched" arm cannot drift away from what it is supposed to match: ``per_step_chars`` is
+    ``ancestor_content_chars`` (the per-source budget) and ``total_chars`` is that times
+    ``max_context_nodes`` (the per-turn budget). Off by default -> the scratchpad is assembled
+    exactly as it always was.
+    """
+
+    enabled: bool = False
+    per_step_chars: int = 1000
+    total_chars: int = 5000
+
+    @classmethod
+    def from_settings(cls, settings: Optional[Dict[str, Any]]) -> "SequentialContextCap":
+        settings = settings or {}
+        if not RunPolicy.from_settings(settings).sequential_context_cap_enabled:
+            return cls()
+        expansion = ExpansionConfig.from_settings(settings)
+        per_step = max(1, int(expansion.ancestor_content_chars))
+        nodes = max(1, int(expansion.max_context_nodes))
+        return cls(enabled=True, per_step_chars=per_step, total_chars=per_step * nodes)
+
+    def observation_chars(self) -> int:
+        """Per-step observation budget for a new scratchpad entry."""
+        return self.per_step_chars if self.enabled else _UNCAPPED_OBSERVATION_CHARS
+
+
+def _build_history(scratchpad: List[str], cap: SequentialContextCap) -> str:
+    """The SCRATCHPAD block for one turn: the last steps, under ``cap`` when it is armed.
+
+    Uncapped (the default) this is the historical ``"\\n\\n".join(scratchpad[-12:])``, byte for
+    byte. Capped, the same window is additionally trimmed to ``cap.total_chars`` by dropping
+    WHOLE oldest steps — never by cutting one mid-observation, which would hand the model a
+    truncated URL or value that reads as a different one.
+    """
+    if not scratchpad:
+        return "(no actions yet)"
+    window = scratchpad[-_SCRATCHPAD_WINDOW:]
+    if cap.enabled:
+        budget = max(0, int(cap.total_chars))
+        while len(window) > 1 and sum(len(entry) + 2 for entry in window) > budget:
+            window.pop(0)
+    return "\n\n".join(window)
 
 
 async def _call_tool_with_retry(call, is_empty, retry: ToolRetry):
@@ -224,8 +284,10 @@ async def _verify_claim(agent_io: AgentIO, claim: str, evidence: str, model_name
 
 
 async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps: int,
-                     max_tokens: int, retry: Optional[ToolRetry] = None) -> str:
+                     max_tokens: int, retry: Optional[ToolRetry] = None,
+                     context_cap: Optional[SequentialContextCap] = None) -> str:
     retry = retry or ToolRetry()  # default: retry OFF -> unchanged behavior
+    context_cap = context_cap or SequentialContextCap()  # default: uncapped -> unchanged prompt
     page_chars = int(os.environ.get("IDEA_TEST_SEQ_PAGE_CHARS", "6000"))
     search_k = int(os.environ.get("IDEA_TEST_SEQ_SEARCH_K", "6"))
     dedup_search = os.environ.get("IDEA_TEST_SEQ_DEDUP_SEARCH", "1") not in ("0", "false", "False")
@@ -243,7 +305,7 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
     last_answer = ""
 
     for step in range(max_steps):
-        history = "\n\n".join(scratchpad[-12:]) if scratchpad else "(no actions yet)"
+        history = _build_history(scratchpad, context_cap)
         messages = [
             {"role": "system", "content": _system_prompt(sandbox is not None)},
             {"role": "user", "content": f"TASK:\n{mandate}\n\nSCRATCHPAD (your prior steps):\n{history}\n\nReturn the next step as JSON."},
@@ -330,7 +392,7 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
                 available += "/" + "/".join(PARITY_ACTIONS)
             obs = f"INVALID ACTION. Use {available}."
 
-        scratchpad.append(f"STEP {step+1}: thought={thought}\naction={action} args={json.dumps(args)[:200]}\nobservation={obs[:1500]}")
+        scratchpad.append(f"STEP {step+1}: thought={thought}\naction={action} args={json.dumps(args)[:200]}\nobservation={obs[:context_cap.observation_chars()]}")
 
     return last_answer
 
@@ -389,11 +451,12 @@ async def run_sequential_execution(
     max_steps = int(os.environ.get("IDEA_TEST_SEQUENTIAL_MAX_STEPS", "25"))
     max_tokens = int(os.environ.get("IDEA_TEST_BASELINE_MAX_TOKENS", "8192"))
     retry = ToolRetry.from_settings(idea_settings)
+    context_cap = SequentialContextCap.from_settings(idea_settings)
     started = time.perf_counter()
     deliverable = ""
     try:
         deliverable = await _run_react(agent_io, mandate, model_name, max_steps, max_tokens,
-                                       retry=retry)
+                                       retry=retry, context_cap=context_cap)
     except Exception as exc:
         _logger.error(f"Sequential ReAct failed: {exc}", exc_info=True)
 

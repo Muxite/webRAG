@@ -296,8 +296,10 @@ async def test_run_sequential_execution_threads_the_retry_flag_from_settings(mon
     must reach the react loop as a ToolRetry, or the flag would be silently inert."""
     captured = {}
 
-    async def _fake_run_react(agent_io, mandate, model_name, max_steps, max_tokens, retry=None):
+    async def _fake_run_react(agent_io, mandate, model_name, max_steps, max_tokens, retry=None,
+                              context_cap=None):
         captured["retry"] = retry
+        captured["context_cap"] = context_cap
         return "answer"
 
     monkeypatch.setattr(seq, "_run_react", _fake_run_react)
@@ -313,6 +315,40 @@ async def test_run_sequential_execution_threads_the_retry_flag_from_settings(mon
         idea_settings={"connector_retry_on_failure_enabled": True},
     )
     assert captured["retry"].enabled is True
+    # The Phase 0 context cap threads the same way, and is OFF unless its own flag is set.
+    assert captured["context_cap"].enabled is False
+
+
+@pytest.mark.asyncio
+async def test_run_sequential_execution_threads_the_context_cap_from_settings(monkeypatch):
+    """Phase 0's `sequential_react_context_matched` axis must reach the react loop as a resolved
+    SequentialContextCap carrying the DAG's own budget, or the arm would be silently inert."""
+    captured = {}
+
+    async def _fake_run_react(agent_io, mandate, model_name, max_steps, max_tokens, retry=None,
+                              context_cap=None):
+        captured["context_cap"] = context_cap
+        return "answer"
+
+    monkeypatch.setattr(seq, "_run_react", _fake_run_react)
+    tm = MagicMock()
+    tm.metadata = {"test_id": "999"}
+    tm.get_task_statement.return_value = "Do the thing."
+    await seq.run_sequential_execution(
+        test_module=tm, model_name="m",
+        connector_llm=MagicMock(), connector_search=MagicMock(),
+        connector_http=MagicMock(), connector_chroma=MagicMock(),
+        run_stamp="r1",
+        summarize_observability_func=lambda *a, **kw: {},
+        idea_settings={
+            "run_policy_sequential_context_cap_enabled": True,
+            "expansion_ancestor_content_chars": 1000,
+            "expansion_max_context_nodes": 5,
+        },
+    )
+    cap = captured["context_cap"]
+    assert cap.enabled is True
+    assert (cap.per_step_chars, cap.total_chars) == (1000, 5000)
 
 
 @pytest.mark.asyncio

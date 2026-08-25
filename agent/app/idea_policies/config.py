@@ -1290,6 +1290,15 @@ class RunPolicy:
     cost. Bounded by WHOLE entries twice (a max entry count, then
     ``expansion.ancestor_content_chars``), because a half-truncated URL or query reads as a
     different one. Off by default and absent from the shipped settings, same as the ten above.
+
+    ``sequential_context_cap_enabled`` is the only one of these that does not touch the DAG engine
+    at all: it caps the ``sequential_react`` arm's per-turn scratchpad to the DAG's OWN context
+    budget (``testing/execution_sequential.SequentialContextCap``, which reads
+    ``expansion.ancestor_content_chars`` and ``expansion.max_context_nodes`` rather than restating
+    them). It exists so a DAG-vs-``sequential_react`` comparison is not confounded by the linear
+    arm simply seeing an order of magnitude more evidence at decision time. Off by default and
+    absent from the shipped settings, so that arm's prompt is byte-identical unless a benchmark
+    asks for the matched variant.
     """
 
     ledger_mode: str = "off"
@@ -1304,6 +1313,7 @@ class RunPolicy:
     coverage_entity_conflict_check: bool = False
     constrained_decoding_enabled: bool = False
     sibling_evidence_digest_enabled: bool = False
+    sequential_context_cap_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1318,6 +1328,7 @@ class RunPolicy:
         "coverage_entity_conflict_check": "run_policy_coverage_entity_conflict_check",
         "constrained_decoding_enabled": "run_policy_constrained_decoding_enabled",
         "sibling_evidence_digest_enabled": "run_policy_sibling_evidence_digest_enabled",
+        "sequential_context_cap_enabled": "run_policy_sequential_context_cap_enabled",
     }
 
     @classmethod

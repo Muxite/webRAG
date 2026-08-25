@@ -113,6 +113,9 @@ def _base():
         # sibling evidence digest in the expansion prompt: shipped OFF, the one axis
         # `good_adaptive_sharedcontext` sets.
         "run_policy_sibling_evidence_digest_enabled": False,
+        # sequential_react per-turn context cap: shipped OFF, the one axis
+        # `sequential_react_context_matched` sets (the only non-graph arm profile).
+        "run_policy_sequential_context_cap_enabled": False,
     }
 
 
@@ -828,6 +831,23 @@ def test_arm_good_adaptive_sharedcontext_isolates_the_sibling_digest_from_the_le
     control = _base()
     _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
     assert control["run_policy_sibling_evidence_digest_enabled"] is False
+
+
+def test_arm_sequential_react_context_matched_sets_only_the_cap():
+    """The one non-graph arm: it must carry NO graph levers, or the linear comparator would be
+    silently reconfigured by flags its executor never reads."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    arm = _GOT_ARM_PROFILES["sequential_react_context_matched"]
+    assert arm == {"run_policy_sequential_context_cap_enabled": True}
+
+    settings = _base()
+    _apply_got_experiment_overrides(
+        settings, environ={"IDEA_TEST_ARM": "sequential_react_context_matched"}
+    )
+    expected = _base()
+    expected["run_policy_sequential_context_cap_enabled"] = True
+    assert settings == expected
 
 
 def test_arm_good_adaptive_backtrackrel_isolates_backtrack_and_its_relative_threshold():

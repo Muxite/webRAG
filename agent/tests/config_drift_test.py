@@ -94,6 +94,9 @@ INTENTIONALLY_JSON_ABSENT = {
     # And for the sibling evidence digest, which only ADDS a bounded block to the expansion
     # system prompt: absent means that prompt is byte-identical to today's.
     "run_policy_sibling_evidence_digest_enabled",
+    # And for the sequential_react context cap, which only ever REMOVES context from a
+    # non-DAG arm: absent means that arm's scratchpad is assembled exactly as it is today.
+    "run_policy_sequential_context_cap_enabled",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented
