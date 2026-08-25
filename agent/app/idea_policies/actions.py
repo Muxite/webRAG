@@ -30,6 +30,12 @@ from agent.app.idea_policies.action_constants import (
     ContextBuilder,
     is_transient_tool_error,
 )
+from agent.app.idea_policies.json_repair import (
+    JSON_REPAIR_INSTRUCTION_CHARS,
+    JSON_REPAIR_RESPONSE_CHARS,
+    record_malformed_llm_action,
+    repair_malformed_json,
+)
 
 #: Where a parent records the pages its visit children have already claimed, so a sibling
 #: batch does not fetch one page four times. Dunder-prefixed like ``__semantic_dedup_source``:
@@ -200,36 +206,21 @@ class LeafAction(ABC):
         except (TypeError, ValueError):
             return None
 
-    #: Caps for the strings echoed back into a JSON-repair prompt. Both are generous
-    #: enough to carry the real shape/instruction and small enough that the repair call
-    #: can never cost more than the original one.
-    _JSON_REPAIR_INSTRUCTION_CHARS: ClassVar[int] = 4000
-    _JSON_REPAIR_RESPONSE_CHARS: ClassVar[int] = 4000
+    #: Caps for the strings echoed back into a JSON-repair prompt. Kept as class
+    #: attributes for callers that introspect them; the values live with the shared
+    #: implementation in ``idea_policies/json_repair.py``.
+    _JSON_REPAIR_INSTRUCTION_CHARS: ClassVar[int] = JSON_REPAIR_INSTRUCTION_CHARS
+    _JSON_REPAIR_RESPONSE_CHARS: ClassVar[int] = JSON_REPAIR_RESPONSE_CHARS
 
     def _record_malformed_llm_action(
         self, io: AgentIO, site: str, parse_error: Exception, repaired: Optional[bool] = None
     ) -> None:
         """Count one malformed-JSON action response on the telemetry event stream.
 
-        ``malformed_llm_action`` fires once per detected parse failure regardless of what
-        the repair attempt does (it measures how often the bug happens);
-        ``malformed_llm_action_repaired`` fires once per repair outcome so the recovery
-        rate is a division of two event counts.
+        Delegates to the shared implementation so the non-action caller (the evidence
+        store's claim extraction) emits the SAME two events from the same code.
         """
-        telemetry = getattr(io, "telemetry", None)
-        if not telemetry:
-            return
-        try:
-            if repaired is None:
-                telemetry.record_event(
-                    "malformed_llm_action", {"site": site, "error": str(parse_error)[:200]}
-                )
-            else:
-                telemetry.record_event(
-                    "malformed_llm_action_repaired", {"site": site, "repaired": bool(repaired)}
-                )
-        except Exception as exc:  # noqa: BLE001 - telemetry must never break an action
-            self._logger.debug(f"[REPAIR] telemetry record failed at {site}: {exc}")
+        record_malformed_llm_action(io, site, parse_error, repaired, logger=self._logger)
 
     async def _repair_malformed_json(
         self,
@@ -246,71 +237,24 @@ class LeafAction(ABC):
     ) -> Optional[Any]:
         """One bounded re-prompt when an action's LLM response is not valid JSON.
 
-        Three action sites (link selection, merge synthesis, verify) used to fail OPEN
-        straight to a heuristic default the moment ``json.loads`` raised -- the model's
-        answer was thrown away without ever being asked to fix its own formatting. This
-        makes ONE extra call carrying the original instruction, the malformed text, and
-        the parse error, and returns the corrected object.
-
-        Returns ``None`` when the repair call is empty/unparseable/raises, so every caller
-        falls through to exactly the fallback it used before. Always on: the worst case is
-        one extra call and the same fallback as today.
+        Action-side binding of :func:`idea_policies.json_repair.repair_malformed_json`:
+        supplies this action's logger and configured fallback model, and is otherwise
+        that function. Three action sites (link selection, merge synthesis, verify) call
+        it; see the shared module for the behaviour and the fail-open contract.
         """
-        self._record_malformed_llm_action(io, site, parse_error)
-        repaired = False
-        try:
-            original_instruction = "\n\n".join(
-                str(m.get("content") or "") for m in (messages or []) if m.get("content")
-            )[: self._JSON_REPAIR_INSTRUCTION_CHARS]
-            repair_messages = PromptBuilder.build_messages(
-                system_content=(
-                    "You are a JSON repair function. The previous response to the request below "
-                    "was not valid JSON. Return the SAME content as a single valid JSON object "
-                    "matching the shape the original request asked for. Output JSON only -- no "
-                    "prose, no markdown fences, no explanation. Invent nothing: preserve the "
-                    "original response's content and only fix its structure."
-                ),
-                user_content=(
-                    f"ORIGINAL REQUEST:\n{original_instruction}\n\n"
-                    f"MALFORMED RESPONSE:\n{malformed_text[: self._JSON_REPAIR_RESPONSE_CHARS]}\n\n"
-                    f"JSON PARSE ERROR:\n{parse_error}\n\n"
-                    "Corrected JSON:"
-                ),
-            )
-            payload = io.build_llm_payload(
-                messages=repair_messages,
-                json_mode=True,
-                model_name=model_name,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            response = await io.query_llm_with_fallback(
-                payload,
-                model_name=model_name,
-                fallback_model=self._cfg.generation.fallback_model,
-                timeout_seconds=timeout_seconds,
-            )
-            if response:
-                data = json.loads(response)
-                # All three call sites read a JSON OBJECT; valid JSON of any other shape
-                # is no more usable than the malformed text, so it counts as a failed
-                # repair rather than a recovery the caller then quietly discards.
-                if isinstance(data, dict):
-                    repaired = True
-                    self._logger.info(f"[REPAIR] Recovered a malformed JSON response at {site}")
-                    return data
-                self._logger.warning(
-                    f"[REPAIR] JSON repair call at {site} returned a non-object ({type(data).__name__})"
-                )
-            else:
-                self._logger.warning(f"[REPAIR] JSON repair call at {site} returned nothing")
-        except json.JSONDecodeError as exc:
-            self._logger.warning(f"[REPAIR] JSON repair call at {site} was also unparseable: {exc}")
-        except Exception as exc:  # noqa: BLE001 - repair is best-effort; fall back as before
-            self._logger.warning(f"[REPAIR] JSON repair call at {site} failed: {exc}")
-        finally:
-            self._record_malformed_llm_action(io, site, parse_error, repaired=repaired)
-        return None
+        return await repair_malformed_json(
+            io,
+            site=site,
+            messages=messages,
+            malformed_text=malformed_text,
+            parse_error=parse_error,
+            fallback_model=self._cfg.generation.fallback_model,
+            model_name=model_name,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout_seconds=timeout_seconds,
+            logger=self._logger,
+        )
 
     def _is_retryable(self, error: Exception) -> bool:
         # Shared with the sequential arm's tool retry so both arms agree on what "transient"
