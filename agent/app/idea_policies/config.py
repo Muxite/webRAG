@@ -1168,12 +1168,21 @@ class RunPolicy:
     would have to be replaced the moment a third state exists. Absent from
     ``idea_dag_settings.json`` on purpose: nothing reads it yet, so the dataclass default is
     the only source of truth and the shipped settings stay byte-identical.
+
+    ``search_must_yield_visit`` states the run-level contract that a completed SEARCH has to
+    hand the run at least one page worth opening. When it does not (empty results, or every
+    result already visited elsewhere), the empty-search remediation in
+    ``post_expansion_hooks.inject_empty_search_followup`` mints one broadened search plus a
+    visit that depends on it. Off by default and absent from the shipped settings for the same
+    reason as above: flag-off behaviour is byte-identical to not having the mechanism.
     """
 
     ledger_mode: str = "off"
+    search_must_yield_visit: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
+        "search_must_yield_visit": "run_policy_search_must_yield_visit",
     }
 
     @classmethod

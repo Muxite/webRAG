@@ -40,6 +40,7 @@ from agent.app.idea_policies.post_expansion_hooks import (
     default_post_expansion_hooks,
     extract_mandate,
     inject_coverage_visits,
+    inject_empty_search_followup,
 )
 from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
 from agent.app.idea_policies.grounding import evaluate_grounding
@@ -2557,6 +2558,38 @@ class IdeaDagEngine:
             self._logger.warning(f"[COVERAGE INJECT] failed: {exc}")
             return 0
 
+    def _maybe_inject_empty_search_followup(
+        self, graph: IdeaDag, node_id: str, step_index: int
+    ) -> int:
+        """Give a completed-but-empty search a broadened retry plus a dependent visit.
+
+        No-op unless ``run_policy.search_must_yield_visit``. The task ledger is consulted when
+        it happens to be running (its unresolved entities make the alternate query better), but
+        the mechanism does not depend on it: with ``ledger_mode`` off the dead search node is
+        signal enough.
+
+        :param graph: Graph being remediated.
+        :param node_id: The just-completed leaf.
+        :param step_index: Current step, for logging.
+        :returns: Number of corrective pairs injected (0 or 1).
+        """
+        if not self._cfg.run_policy.search_must_yield_visit:
+            return 0
+        try:
+            unresolved: Optional[List[str]] = None
+            ledger = getattr(self, "_task_ledger", None)
+            if ledger is not None:
+                unresolved = list(ledger.refresh(graph).unresolved_entities)
+            return inject_empty_search_followup(
+                graph, node_id, step_index, self._logger,
+                telemetry=getattr(self.io, "telemetry", None),
+                unresolved_entities=unresolved,
+                max_injections=self._cfg.engine.coverage_visit_injection_max,
+            )
+        except Exception as exc:  # noqa: BLE001 - remediation must never crash a run
+            self._logger.warning(f"[EMPTY SEARCH INJECT] failed: {exc}")
+            return 0
+
     def _request_root_widen(self, graph: IdeaDag, reason: str) -> bool:
         """Ask for the root to be expanded again, additively.
 
@@ -2976,6 +3009,10 @@ class IdeaDagEngine:
             # (which skips nodes that already have children).
             await self._maybe_confidence_reexpand_batch(graph, confidences, step_index)
             await self._maybe_reexpand_leaf(graph, node_id, step_index)
+            # Empty-search remediation (no-op unless run_policy.search_must_yield_visit). Last
+            # of the completion triggers on purpose: the ones above may re-expand this leaf
+            # into a real follow-up, and a node with children is not a dead end to remediate.
+            self._maybe_inject_empty_search_followup(graph, node_id, step_index)
         return status
 
     async def _maybe_judge_step_confidence(

@@ -57,6 +57,9 @@ INTENTIONALLY_JSON_ABSENT = {
     # RunPolicy: nothing reads the ledger mode yet, so the dataclass default is its
     # only source of truth (documented in the group's own docstring).
     "run_policy_ledger_mode",
+    # Same reasoning for the empty-search remediation switch: absent means the shipped
+    # settings describe exactly today's behaviour.
+    "run_policy_search_must_yield_visit",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

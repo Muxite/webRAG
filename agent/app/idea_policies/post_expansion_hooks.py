@@ -22,7 +22,7 @@ import re
 from typing import TYPE_CHECKING, Any, List, Optional, Protocol
 
 from agent.app.idea_policies.base import DetailKey, IdeaActionType
-from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+from agent.app.idea_policies.action_constants import ActionResultKey, NodeDetailsExtractor
 from agent.app.idea_policies.data_contracts import URLS_FROM_SEARCH
 from agent.app.idea_policies.mandate_requirements import (
     MandateRequirements,
@@ -614,3 +614,236 @@ def inject_coverage_visits(
             f"candidate(s): {', '.join(cov.missing[:max_injections])}"
         )
     return injected
+
+
+#: Marker written on the empty search that was remediated, so one search is remediated once.
+_EMPTY_SEARCH_MARKER = "_empty_search_followup"
+#: Run-scoped counter, kept on the root. The trigger here is per completed search, so a
+#: per-call cap would bound nothing: a branch searching into a dead pool would earn fresh
+#: budget on every attempt. The budget is spent for the whole run instead.
+_EMPTY_SEARCH_BUDGET_KEY = "_empty_search_followups"
+#: Back-reference from a corrective search to the empty one that caused it (telemetry/debug).
+_CORRECTIVE_FOR_SEARCH = "_corrective_for_search"
+#: How many leading tokens of the original query survive broadening. A query that returned
+#: nothing is usually over-qualified ("X first ascent year official record"), so the cheapest
+#: deterministic broadening is to keep its head and drop the qualifiers.
+_BROADENED_QUERY_TOKENS = 4
+
+
+def _search_result_urls(node) -> List[str]:
+    """Every http(s) URL a completed SEARCH node's result offers, in result order.
+
+    Deliberately the same key set and validity rule as
+    ``VisitLeafAction._extract_urls_from_parent_search_results``: that consumer defines what a
+    search actually handed the run, and a second opinion here would call a search "empty" that
+    the visit path can use (or the reverse).
+    """
+    details = node.details or {}
+    result = details.get(DetailKey.ACTION_RESULT.value)
+    if not isinstance(result, dict):
+        return []
+    action = result.get(ActionResultKey.ACTION.value) or result.get("action")
+    if action != IdeaActionType.SEARCH.value:
+        return []
+    results = result.get(ActionResultKey.RESULTS.value) or result.get("results") or []
+    if not isinstance(results, list):
+        return []
+    urls: List[str] = []
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        candidate = (
+            item.get("url") or item.get("link") or item.get("href")
+            or item.get("source") or item.get("page_url")
+        )
+        if not candidate:
+            continue
+        candidate = str(candidate).strip()
+        if candidate.startswith(("http://", "https://")) and candidate not in urls:
+            urls.append(candidate)
+    return urls
+
+
+def _claimed_urls(graph: "IdeaDag") -> set:
+    """Normalized URLs that some visit node already opened or is already aimed at."""
+    claimed = set()
+    for node in graph.iter_depth_first():
+        details = node.details or {}
+        result = details.get(DetailKey.ACTION_RESULT.value)
+        if isinstance(result, dict) and result.get(ActionResultKey.ACTION.value) == IdeaActionType.VISIT.value:
+            url = result.get(ActionResultKey.URL.value) or ""
+            if url:
+                claimed.add(str(url).strip().rstrip("/"))
+        if NodeDetailsExtractor.get_action(details) == IdeaActionType.VISIT.value:
+            for key in (DetailKey.URL.value, "optional_url"):
+                url = details.get(key) or ""
+                if url:
+                    claimed.add(str(url).strip().rstrip("/"))
+    return claimed
+
+
+def search_yielded_no_visit(graph: "IdeaDag", node) -> bool:
+    """Whether a COMPLETED search left the run with no page worth opening.
+
+    True for both shapes of the same gap: the results list is empty (or unparseable), and the
+    results list is non-empty but every URL in it is already visited or already claimed by
+    another visit node.
+    """
+    urls = _search_result_urls(node)
+    if not urls:
+        return True
+    claimed = _claimed_urls(graph)
+    return all(u.rstrip("/") in claimed for u in urls)
+
+
+def _broadened_query(
+    query: str,
+    unresolved_entities: Optional[List[str]] = None,
+    existing_queries: Optional[List[str]] = None,
+) -> Optional[str]:
+    """A deterministic alternate query for a search that came back with nothing.
+
+    Two sources, in order: the ledger's unresolved entity that this query was chasing (searching
+    the bare entity name drops whatever qualifier starved the result set), then the query's own
+    leading tokens. Returns ``None`` when neither yields something genuinely different from the
+    original or from a query the run already ran -- re-issuing an identical search is how a
+    remediation loop starts.
+    """
+    normalized = " ".join(str(query or "").split())
+    if not normalized:
+        return None
+    lowered = normalized.lower()
+
+    candidates: List[str] = []
+    for entity in unresolved_entities or ():
+        name = " ".join(str(entity or "").split())
+        if name and name.lower() in lowered:
+            candidates.append(name)
+    head = " ".join(re.sub(r"[\"'“”]", " ", normalized).split()[:_BROADENED_QUERY_TOKENS])
+    candidates.append(head)
+
+    seen = {" ".join(str(q or "").split()).lower() for q in (existing_queries or ())}
+    for candidate in candidates:
+        cand = " ".join(candidate.split())
+        if not cand or cand.lower() == lowered or cand.lower() in seen:
+            continue
+        return cand
+    return None
+
+
+def inject_empty_search_followup(
+    graph: "IdeaDag",
+    node_id: str,
+    step_index: int,
+    logger: logging.Logger,
+    telemetry: Optional[Any] = None,
+    unresolved_entities: Optional[List[str]] = None,
+    max_injections: int = _COVERAGE_INJECTION_LIMIT,
+) -> int:
+    """Remediate ONE completed search that yielded no page worth visiting.
+
+    Same shape of remediation as :func:`inject_coverage_visits` -- deterministic gap detection
+    followed by a targeted search/visit pair -- against the other half of the gap. That function
+    fires on "this enumerated candidate has no visit ANYWHERE" and injects off the root; this one
+    fires on "THIS search handed the run nothing to open" and injects as a sibling of the dead
+    search, so the pooled sibling URL resolution the visit path already does can see the new
+    results.
+
+    The visit is wired with ``REQUIRES_DATA`` onto the corrective search, so the pair expresses
+    exactly the contract the flag is named for: a search must yield a visit.
+
+    Idempotent per search node (marker in its details) and bounded per RUN (counter on the root),
+    so repeated dead searches on one branch cannot spawn unbounded remediation.
+
+    :param graph: Graph being remediated.
+    :param node_id: The completed search node to inspect.
+    :param step_index: Current step, for logging.
+    :param logger: Engine logger.
+    :param telemetry: Optional telemetry session for the enforcement record.
+    :param unresolved_entities: Task-ledger entities still without evidence, used to pick the
+        alternate query. Optional: the mechanism works from the dead search alone.
+    :param max_injections: Run-scoped ceiling on corrective pairs.
+    :returns: 1 if a corrective pair was injected, else 0.
+    """
+    node = graph.get_node(node_id)
+    if node is None:
+        return 0
+    details = node.details or {}
+    if NodeDetailsExtractor.get_action(details) != IdeaActionType.SEARCH.value:
+        return 0
+    if not details.get(DetailKey.ACTION_RESULT.value):
+        return 0  # never ran; nothing to call empty
+    if details.get(_EMPTY_SEARCH_MARKER):
+        return 0
+    if node.children:
+        return 0  # a re-expansion already gave this search a real follow-up
+    if not search_yielded_no_visit(graph, node):
+        return 0
+
+    root = graph.get_node(graph.root_id())
+    used = int((root.details.get(_EMPTY_SEARCH_BUDGET_KEY) or 0) if root is not None else 0)
+    if used >= max_injections:
+        logger.info(
+            f"[STEP {step_index}] EMPTY SEARCH: budget spent ({used}/{max_injections}); "
+            f"no follow-up for {node_id[:8]}"
+        )
+        return 0
+
+    existing = [
+        str(n.details.get(DetailKey.QUERY.value) or "")
+        for n in graph.iter_depth_first()
+        if NodeDetailsExtractor.get_action(n.details) == IdeaActionType.SEARCH.value
+    ]
+    query = str(details.get(DetailKey.QUERY.value) or node.title or "")
+    broadened = _broadened_query(query, unresolved_entities, existing)
+    if not broadened:
+        return 0
+
+    parent_id = node.parent_id or graph.root_id()
+    search_node = graph.add_child(
+        parent_id=parent_id,
+        title=f"Search {broadened}",
+        details={
+            DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+            DetailKey.QUERY.value: broadened,
+            DetailKey.IS_LEAF.value: True,
+            DetailKey.JUSTIFICATION.value: (
+                f"The search '{query[:80]}' returned no page worth visiting; retrying with a "
+                "broader query."
+            ),
+            DetailKey.GOAL.value: f"Find a source page for: {broadened}",
+            _CORRECTIVE_FOR_SEARCH: node_id,
+        },
+    )
+    visit_node = graph.add_child(
+        parent_id=parent_id,
+        title=f"Visit a page about {broadened}",
+        details={
+            DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+            DetailKey.IS_LEAF.value: True,
+            DetailKey.JUSTIFICATION.value: (
+                "A search must yield a visited page; the previous search yielded none."
+            ),
+            DetailKey.GOAL.value: f"Visit a page about {broadened}",
+            "link_idea": f"URL for {broadened} from search results",
+            "link_count": 1,
+            DetailKey.REQUIRES_DATA.value: {
+                "type": URLS_FROM_SEARCH.name,
+                "source_node_id": search_node.node_id,
+            },
+        },
+    )
+
+    node.details[_EMPTY_SEARCH_MARKER] = search_node.node_id
+    if root is not None:
+        root.details[_EMPTY_SEARCH_BUDGET_KEY] = used + 1
+    logger.warning(
+        f"[STEP {step_index}] EMPTY SEARCH: '{query[:60]}' yielded no visitable URL; injected "
+        f"search {search_node.node_id[:8]} ('{broadened}') + dependent visit "
+        f"{visit_node.node_id[:8]} ({used + 1}/{max_injections})"
+    )
+    _record_enforce(telemetry, step_index, search_node.node_id,
+                    f"search {broadened[:60]}", "empty search: no visitable URL")
+    _record_enforce(telemetry, step_index, visit_node.node_id,
+                    "visit", "empty search: a search must yield a visit")
+    return 1

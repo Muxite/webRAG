@@ -31,13 +31,34 @@ def test_shipped_settings_leave_the_ledger_off():
     assert RunPolicy.from_settings(settings).ledger_mode == "off"
 
 
+def test_search_must_yield_visit_defaults_to_false_when_the_key_is_absent():
+    assert RunPolicy.from_settings({}).search_must_yield_visit is False
+
+
+def test_search_must_yield_visit_resolves_from_settings():
+    resolved = RunPolicy.from_settings({"run_policy_search_must_yield_visit": True})
+    assert resolved.search_must_yield_visit is True
+
+
+def test_shipped_settings_leave_the_empty_search_remediation_off():
+    """Absent by design, like ``ledger_mode``: flag-off is the byte-identical baseline."""
+    settings = load_idea_dag_settings()
+    assert "run_policy_search_must_yield_visit" not in settings
+    assert RunPolicy.from_settings(settings).search_must_yield_visit is False
+
+
 def test_idea_config_exposes_the_group():
     cfg = IdeaConfig.from_settings({})
     assert isinstance(cfg.run_policy, RunPolicy)
     assert cfg.run_policy.ledger_mode == "off"
 
+    assert cfg.run_policy.search_must_yield_visit is False
+
     observed = IdeaConfig.from_settings({"run_policy_ledger_mode": "observe"})
     assert observed.run_policy.ledger_mode == "observe"
+
+    armed = IdeaConfig.from_settings({"run_policy_search_must_yield_visit": True})
+    assert armed.run_policy.search_must_yield_visit is True
 
 
 def test_group_follows_the_frozen_dataclass_convention():
