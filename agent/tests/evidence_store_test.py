@@ -31,7 +31,7 @@ from agent.app.evidence_store import (
     extract_evidence,
 )
 from agent.app.idea_dag import IdeaDag
-from agent.app.idea_policies.base import DetailKey, IdeaActionType
+from agent.app.idea_policies.base import DetailKey, IdeaActionType, IdeaNodeStatus
 
 
 # ---------------------------------------------------------------------------
@@ -425,8 +425,6 @@ async def test_observe_attaches_both_sidecars_to_the_visit_node(monkeypatch):
 @pytest.mark.asyncio
 async def test_observe_survives_a_claim_call_that_explodes(monkeypatch):
     """The VISIT stays DONE with an empty claim list — the whole point of the isolation."""
-    from agent.app.idea_policies.base import IdeaNodeStatus
-
     _graph, node, _payload, _io = await _run_one_visit(
         monkeypatch,
         {"run_policy_evidence_store_mode": "observe"},
@@ -457,6 +455,156 @@ async def test_observing_does_not_move_any_completion_signal(monkeypatch):
         DetailKey.EVIDENCE.value, DetailKey.CLAIMS.value,
     }
     assert on_node.details[DetailKey.ACTION_RESULT.value] == off_node.details[DetailKey.ACTION_RESULT.value]
+
+
+# ---------------------------------------------------------------------------
+# The auto-parallel-siblings path
+#
+# It dispatches straight into `_execute_action` and completes its children with the
+# synchronous `_handle_action_result`, bypassing `_apply_action_result` (where the
+# sequential path's completion triggers live). So every gate above has to be pinned on
+# this path too, or a VISIT executed as a parallel sibling -- a fan-out of pages, the
+# sidecar's core case -- is silently unobserved.
+# ---------------------------------------------------------------------------
+
+
+PARALLEL_SETTINGS = {
+    "auto_parallel_siblings": True,
+    "allow_execute_all_children": True,
+    "got_dedup_enabled": False,
+    "got_embed_on_create": False,
+    "got_reexpand_enabled": False,
+}
+
+
+async def _run_parallel_visits(settings, *, claims_responses=(), n=2):
+    """Complete ``n`` sibling VISITs through the auto-parallel batch, not the leaf path."""
+    engine = _engine(dict(PARALLEL_SETTINGS, **settings))
+    stub_io = _StubIO(list(claims_responses))
+    engine.io.build_llm_payload = stub_io.build_llm_payload
+    engine.io.query_llm_with_fallback = stub_io.query_llm_with_fallback
+
+    graph = IdeaDag(root_title="root", root_details={"mandate": MANDATE})
+    parent = graph.add_child(graph.root_id(), "visit the candidate pages", details={})
+    leaves = [
+        graph.add_child(
+            parent.node_id,
+            f"visit candidate {i}",
+            details={
+                DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+                DetailKey.IS_LEAF.value: True,
+            },
+        )
+        for i in range(n)
+    ]
+
+    async def _fake_execute_action(g, parent_id, node_id):
+        # Keyed on the title, not the (random) node id, so two runs of this fixture
+        # produce byte-identical results and the flag-off/flag-on diff below is real.
+        index = g.get_node(node_id).title.rsplit(" ", 1)[-1]
+        result = _visit_result(url=f"https://en.wikipedia.org/wiki/Avon_{index}")
+        g.update_details(node_id, {DetailKey.ACTION_RESULT.value: result})
+        return result
+
+    engine._execute_action = _fake_execute_action  # type: ignore[assignment]
+
+    await engine._handle_intermediate_node(graph, parent.node_id, 0, None)
+    nodes = [graph.get_node(leaf.node_id) for leaf in leaves]
+    assert all(n_.status == IdeaNodeStatus.DONE for n_ in nodes), (
+        "the fixture must actually drive the auto-parallel batch to completion"
+    )
+    return graph, nodes, stub_io
+
+
+@pytest.mark.asyncio
+async def test_parallel_siblings_off_is_a_true_no_op():
+    _graph, nodes, io = await _run_parallel_visits({})
+    for node in nodes:
+        assert DetailKey.EVIDENCE.value not in node.details
+        assert DetailKey.CLAIMS.value not in node.details
+    assert io.call_count == 0, "the default path must attempt no claim call"
+
+
+@pytest.mark.asyncio
+async def test_parallel_siblings_off_never_calls_the_extractors(monkeypatch):
+    import agent.app.evidence_store as store_mod
+
+    def _boom(*a, **k):
+        raise AssertionError("extract_evidence must not run with evidence_store_mode=off")
+
+    async def _async_boom(*a, **k):
+        raise AssertionError("extract_claims must not run with evidence_store_mode=off")
+
+    monkeypatch.setattr(store_mod, "extract_evidence", _boom)
+    monkeypatch.setattr(store_mod, "extract_claims", _async_boom)
+    await _run_parallel_visits({})
+
+
+@pytest.mark.asyncio
+async def test_parallel_siblings_observe_attaches_the_sidecar_to_every_sibling():
+    _graph, nodes, io = await _run_parallel_visits(
+        {"run_policy_evidence_store_mode": "observe"},
+        claims_responses=[_well_formed(2), _well_formed(2)],
+    )
+    assert io.call_count == 2, "one claim call per completed sibling"
+    for node in nodes:
+        evidence = node.details[DetailKey.EVIDENCE.value]
+        assert evidence["node_id"] == node.node_id
+        assert evidence["source_type"] == "reference"
+        claims = node.details[DetailKey.CLAIMS.value]
+        assert len(claims) == 2
+        assert {c["evidence_id"] for c in claims} == {evidence["id"]}
+        assert {c["verification_state"] for c in claims} == {"unverified"}
+
+
+@pytest.mark.asyncio
+async def test_parallel_sidecar_is_shaped_like_the_sequential_one(monkeypatch):
+    """Same node, same result, two execution paths -> the same sidecar keys and shape."""
+    _sg, seq_node, _payload, _sio = await _run_one_visit(
+        monkeypatch,
+        {"run_policy_evidence_store_mode": "observe"},
+        claims_response=_well_formed(2),
+    )
+    _pg, par_nodes, _pio = await _run_parallel_visits(
+        {"run_policy_evidence_store_mode": "observe"},
+        claims_responses=[_well_formed(2), _well_formed(2)],
+    )
+    seq_ev = seq_node.details[DetailKey.EVIDENCE.value]
+    par_ev = par_nodes[0].details[DetailKey.EVIDENCE.value]
+    assert set(par_ev) == set(seq_ev)
+    assert set(par_nodes[0].details[DetailKey.CLAIMS.value][0]) == set(
+        seq_node.details[DetailKey.CLAIMS.value][0]
+    )
+
+
+@pytest.mark.asyncio
+async def test_parallel_siblings_survive_a_claim_call_that_explodes():
+    _graph, nodes, _io = await _run_parallel_visits(
+        {"run_policy_evidence_store_mode": "observe"},
+        claims_responses=[RuntimeError("connector exploded"), RuntimeError("boom again")],
+    )
+    for node in nodes:
+        assert node.status == IdeaNodeStatus.DONE
+        assert node.details[DetailKey.CLAIMS.value] == []
+        assert node.details[DetailKey.EVIDENCE.value]["url"]
+
+
+@pytest.mark.asyncio
+async def test_parallel_observing_moves_no_completion_signal():
+    _og, off_nodes, _oio = await _run_parallel_visits({})
+    _ng, on_nodes, _nio = await _run_parallel_visits(
+        {"run_policy_evidence_store_mode": "observe"},
+        claims_responses=[_well_formed(1), _well_formed(1)],
+    )
+    for off_node, on_node in zip(off_nodes, on_nodes):
+        assert on_node.status == off_node.status
+        assert set(on_node.details) - set(off_node.details) == {
+            DetailKey.EVIDENCE.value, DetailKey.CLAIMS.value,
+        }
+        assert (
+            on_node.details[DetailKey.ACTION_RESULT.value]
+            == off_node.details[DetailKey.ACTION_RESULT.value]
+        )
 
 
 @pytest.mark.asyncio

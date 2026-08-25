@@ -2239,6 +2239,20 @@ class IdeaDagEngine:
             # the same coverage requirement the re-expansion check has). No-op when the flag
             # is off; per-sibling judge calls run concurrently inside the batch helper.
             if done_children:
+                # Observe-only evidence/claim sidecar for the batch-completed siblings (no-op
+                # unless run_policy.evidence_store_mode == "observe"). This path bypasses
+                # `_apply_action_result`, so without this a VISIT executed as a parallel
+                # sibling -- the common case for a fan-out of pages -- would never be
+                # observed. FIRST among the completion triggers here, same reason as there:
+                # it records the result exactly as the action produced it, before any of the
+                # re-expansion paths below can grow children off these nodes. After the batch
+                # evaluation above on purpose, so what the evaluator sees is unchanged. The
+                # per-sibling claim calls are independent LLM calls against distinct nodes and
+                # grow no graph nodes, so they run concurrently (mirrors the judge batch);
+                # `_maybe_record_evidence` swallows its own failures and never raises.
+                await asyncio.gather(
+                    *[self._maybe_record_evidence(graph, cid) for cid in done_children]
+                )
                 # On-demand plan library for the batch-completed siblings: this path bypasses
                 # `_apply_action_result`, so without this an adopted template retrieved by a
                 # parallel sibling would never become children. Sequential (never inside a
