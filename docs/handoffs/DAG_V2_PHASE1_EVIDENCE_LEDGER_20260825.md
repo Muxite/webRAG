@@ -59,6 +59,32 @@ engine's step sequencing, not a one-off artifact. Worth its own investigation
 enough rate to matter for anything downstream that assumes SEARCH-before-VISIT ordering holds.
 Not chased in this cycle per explicit instruction — filing only.
 
+## 4b. Phase 2 slices 1-3 and their live A/B (2026-08-25, later same day)
+
+Landed on top of the six Phase 1 items: typed Evidence/Claim extraction from VISIT output
+(`agent/app/evidence_store.py`, `evidence_store_mode`), a deterministic claim-aggregation view
+alongside merge (`deterministic_merge_view`), and feeding that view into the merge synthesis
+prompt (`merge_uses_evidence_view`) — all default-off, all offline-tested with byte-identical
+flag-off differential tests (7 commits, 6547 tests passing).
+
+**Live A/B, small run (n=30/arm, 6 breadth tasks, nano)**: pooled score +0.095 (0.481→0.576),
+pass rate +4 (11→15), 5/6 tasks improved. Looked like real signal — the mechanism fired
+(evidence/claims sidecars non-empty), unlike item 3's untriggered null result.
+
+**Live A/B, confirmatory run (n=72/arm, same tasks/model)**: pooled score dropped to +0.033,
+pass rate *reversed* (22→19, i.e. treatment now passes fewer), only 3/6 tasks improved. Task 153,
+which had suspicious σ=0.000 (identical score across all 5 reps) in the small run, reverted to
+normal variance and a negative delta at n=12/task. **Verdict: the small run was a false positive.**
+No reliable evidence `merge_uses_evidence_view` helps on nano/these tasks. The mechanism itself is
+safe and correctly built (default off, zero regressions, byte-identical when off) — the result is
+about efficacy, not correctness. Total spend across both A/Bs: ~$0.47 (session cumulative $0.61 of
+$5 budget).
+
+**Lesson for future live validation on this branch**: an n=30/arm directional result is not
+enough to trust, even with 5/6 tasks agreeing — always run a confirmatory pass at higher n before
+treating a live A/B as a positive result, especially when any single task shows suspiciously low
+variance (σ near 0 across reps is a flag to re-check, not a sign of robustness).
+
 ## 5. Status / next steps
 
 Branch stays unmerged. Per instruction: continue development on `dagv2-evidence-ledger`
