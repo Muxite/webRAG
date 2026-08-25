@@ -1249,6 +1249,20 @@ class RunPolicy:
     starved) node -- so an empty identity-restricted pool falls back to the FULL candidate list
     (today's behaviour) rather than returning ``None``. Off by default and absent from the
     shipped settings, same as the eight above.
+
+    ``coverage_entity_conflict_check`` is STRICTLY OBSERVE-ONLY, and DEPENDS ON
+    ``got.candidate_coverage_enabled`` (a different config group): with that off, this flag is
+    inert. ``candidate_coverage.evaluate_candidate_coverage`` matches each named candidate
+    against a POOLED haystack of every visited page's text -- it never asks WHICH arm's page
+    resolved a candidate, so on a fan-out, one wrong page whose body happens to mention several
+    OTHER candidates can make ``coverage_ratio`` read 1.0 even though no arm ever opened its own
+    correct page. With this flag on, ``candidate_coverage.detect_candidate_coverage_entity_conflicts``
+    runs a SEPARATE check: for each candidate ``evaluate_candidate_coverage`` reports resolved,
+    was it resolved by a page whose own arm actually intended that candidate (or whose own page
+    identity corroborates it)? A mismatch is appended as ``coverage_entity_conflicts`` /
+    ``coverage_entity_conflict_count`` on the final payload -- ``coverage_ratio``,
+    ``finalization_status`` and ``deliverable_complete`` are NEVER touched by this flag. Off by
+    default and absent from the shipped settings, same as the nine above.
     """
 
     ledger_mode: str = "off"
@@ -1260,6 +1274,7 @@ class RunPolicy:
     deficit_driven_injection: bool = False
     visit_url_identity_guard: bool = False
     sequencing_identity_guard: bool = False
+    coverage_entity_conflict_check: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1271,6 +1286,7 @@ class RunPolicy:
         "deficit_driven_injection": "run_policy_deficit_driven_injection",
         "visit_url_identity_guard": "run_policy_visit_url_identity_guard",
         "sequencing_identity_guard": "run_policy_sequencing_identity_guard",
+        "coverage_entity_conflict_check": "run_policy_coverage_entity_conflict_check",
     }
 
     @classmethod

@@ -257,6 +257,56 @@ async def test_incomplete_candidate_coverage_lands_a_real_ratio(monkeypatch):
     assert payload["finalization_status"] == "partial"
 
 
+_CANAL_MANDATE = "1. Suez Canal\n2. Erie Canal"
+
+
+def _canal_collision_graph():
+    """One arm (Erie's own) opens a page whose body ALSO mentions Suez -- the pooled-haystack
+    gate is fooled into reporting Suez resolved, exactly the false positive
+    ``run_policy_coverage_entity_conflict_check`` exists to surface."""
+    graph = IdeaDag(root_title="root", root_details={"mandate": _CANAL_MANDATE})
+    graph.add_child(
+        graph.root_id(),
+        title="Visit the Erie Canal page",
+        details={
+            DetailKey.ACTION_RESULT.value: {
+                "action": IdeaActionType.VISIT.value,
+                "success": True,
+                "page_title": "Erie Canal",
+                "url": "https://example.com/erie",
+                "content": "The Erie Canal is a canal. See also: list of canals including Suez Canal.",
+            }
+        },
+    )
+    return graph
+
+
+@pytest.mark.asyncio
+async def test_coverage_entity_conflict_check_is_additive_and_non_gating(monkeypatch):
+    """Flag on populates coverage_entity_conflicts; every OTHER completion signal on the same
+    graph is byte-identical to the flag-off run -- proof this mechanism is observe-only."""
+    import agent.app.idea_engine as engine_mod
+
+    async def _fake_final_payload(*args, **kwargs):
+        return {"final_deliverable": "both canals", "goal_achieved": True, "has_failures": False}
+
+    monkeypatch.setattr(engine_mod, "build_final_payload", _fake_final_payload)
+
+    base_settings = {"got_candidate_coverage_enabled": True}
+    payload_off = await _engine(base_settings).finalize(_canal_collision_graph(), _CANAL_MANDATE)
+    payload_on = await _engine(
+        {**base_settings, "run_policy_coverage_entity_conflict_check": True}
+    ).finalize(_canal_collision_graph(), _CANAL_MANDATE)
+
+    assert "coverage_entity_conflicts" not in payload_off
+
+    assert [c["candidate"] for c in payload_on["coverage_entity_conflicts"]] == ["Suez Canal"]
+    assert payload_on["coverage_entity_conflict_count"] == 1
+
+    for key in ("coverage_ratio", "finalization_status", "deliverable_complete", "success"):
+        assert payload_on.get(key) == payload_off.get(key), key
+
+
 @pytest.mark.asyncio
 async def test_grounding_gates_refusal_survives_the_engines_second_write(monkeypatch):
     """The engine's own `evaluate_grounding` pass must never upgrade the gate's refusal."""

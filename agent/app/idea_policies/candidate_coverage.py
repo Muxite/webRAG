@@ -314,3 +314,154 @@ def evaluate_candidate_coverage(graph, mandate: str) -> CandidateCoverageResult:
     mandates, and numbered INSTRUCTION lists (rejected by the imperative-verb guard).
     """
     return evaluate_candidate_coverage_from_haystacks(_node_haystacks(graph), mandate)
+
+
+# ---------------------------------------------------------------------------
+# OBSERVE-ONLY: cross-arm entity-conflict detection (run_policy_coverage_entity_conflict_check)
+# ---------------------------------------------------------------------------
+#
+# `evaluate_candidate_coverage_from_haystacks` above matches a candidate against a POOLED
+# haystack of every visited page -- it never asks WHICH arm's page resolved a candidate, or
+# whether that arm's own goal named the same candidate. On a fan-out, a wrong page opened by
+# one arm can textually mention several OTHER candidates too (a "list of ..." comparison
+# page, a disambiguation page), letting every one of them register as "resolved" even though
+# no arm ever opened ITS OWN correct page -- `coverage_ratio` then reads 1.0 falsely. See
+# `run_policy_coverage_entity_conflict_check`'s docstring in config.py.
+#
+# The functions below add a SEPARATE, additive signal for this -- they never change
+# `evaluate_candidate_coverage`'s own verdict (`satisfied`/`resolved`/`missing`), never touch
+# the graph, and are always safe to skip: a caller that never calls them sees no difference.
+
+
+@dataclass
+class _NodeHaystack:
+    """Same successful-VISIT scan as :class:`Haystack`, but additionally carries the OWNING
+    NODE's own subject tokens -- the per-node link :func:`_node_haystacks` deliberately omits,
+    needed here to ask "did the arm that opened THIS page actually intend this candidate", not
+    just "does this page mention it somewhere".
+    """
+
+    node_id: str
+    identity: str
+    body: str
+    own_subject_tokens: List[str]
+
+
+def _node_haystacks_for_conflicts(graph) -> List["_NodeHaystack"]:
+    from agent.app.idea_policies.contract_satisfaction import derive_step_contract
+
+    blobs: List[_NodeHaystack] = []
+    for node in graph.iter_depth_first():
+        details = getattr(node, "details", {}) or {}
+        ar = details.get(DetailKey.ACTION_RESULT.value)
+        if not (
+            isinstance(ar, dict)
+            and ar.get("action") == IdeaActionType.VISIT.value
+            and ar.get("success")
+        ):
+            continue
+        identity_parts: List[str] = []
+        for key in ("page_title", "h1_text", "title", "url", "source_url"):
+            val = ar.get(key)
+            if isinstance(val, str) and val:
+                identity_parts.append(val)
+        content = ar.get("content")
+        body = content if isinstance(content, str) else ""
+        if not (identity_parts or body):
+            continue
+        try:
+            own_subject_tokens = derive_step_contract(node).subject_tokens
+        except Exception:
+            own_subject_tokens = []
+        blobs.append(
+            _NodeHaystack(
+                node_id=getattr(node, "node_id", ""),
+                identity=" | ".join(identity_parts),
+                body=body,
+                own_subject_tokens=own_subject_tokens,
+            )
+        )
+    return blobs
+
+
+def _candidate_named_by_subject_tokens(name: str, own_subject_tokens: List[str]) -> bool:
+    """True if every substantial word of ``name`` matches one of ``own_subject_tokens``.
+
+    ``own_subject_tokens`` (``contract_satisfaction._subject_tokens``) is sorted LONGEST-FIRST,
+    not in the order the words appeared in the arm's own goal text -- so joining them into one
+    string and doing an ORDERED n-gram match (as :func:`_fuzzy_contains` does, correctly, for
+    page text) produces false results purely from word reordering ("Erie Canal" vs the token
+    list ``["canal", "erie"]`` scores a 0.5 ratio, well under the match threshold, despite being
+    the exact same two words). A set-membership check per candidate word is order-independent
+    and the correct comparison against this specific, already-tokenized, already-lowercased
+    field.
+    """
+    cand_tokens = [t for t in _norm(name).split() if len(t) >= 3]
+    if not cand_tokens or not own_subject_tokens:
+        return False
+    subject_set = {t.lower() for t in own_subject_tokens}
+    for tok in cand_tokens:
+        if tok in subject_set:
+            continue
+        if any(SequenceMatcher(None, tok, s).ratio() >= _MATCH_THRESHOLD for s in subject_set):
+            continue
+        return False
+    return True
+
+
+def detect_candidate_coverage_entity_conflicts(graph, mandate: str) -> List[dict]:
+    """OBSERVE-ONLY. For each candidate that :func:`evaluate_candidate_coverage_from_haystacks`
+    would report RESOLVED, checks whether the page(s) that resolve it were opened by an arm
+    whose OWN goal (:func:`contract_satisfaction.derive_step_contract`'s ``subject_tokens``)
+    actually named that candidate. Flags a conflict only when NONE of the resolving pages were
+    intended for this candidate -- the strongest signal available, short of a live rerun, that
+    the candidate's "resolved" status came from a pooled cross-arm text collision (one wrong
+    page whose body -- or even, per the sibling-link fallback bug this mechanism follows up on,
+    whose own title -- happens to name a candidate its own arm never intended) rather than a
+    real per-arm page-open.
+
+    Deliberately does NOT treat ``resolved_via == "identity"`` as automatically safe: a page's
+    OWN identity matching the candidate is exactly what the (now-fixed) sibling-link fallback
+    bug could produce for the WRONG arm ("Visit the Suez Canal page" grounding on
+    ``/wiki/Erie_Canal``, whose title literally says "Erie Canal") -- only whether the arm's
+    own stated goal named this candidate is evidence of genuine intent.
+
+    Never mutates the graph, never raises (a malformed ``action_result`` degrades to "no
+    conflict" for that node rather than propagating), and never changes
+    ``evaluate_candidate_coverage``'s own verdict -- this is a second, independent read over
+    the same graph, not a modification of the first.
+
+    Returns ``[]`` when the mandate names no candidates, or when no conflict is found.
+    """
+    named = extract_named_candidates(mandate)
+    if not named:
+        return []
+
+    haystacks = _node_haystacks_for_conflicts(graph)
+    conflicts: List[dict] = []
+    for name in named:
+        resolving: List[tuple] = []  # (haystack, "identity"|"body_lede")
+        for nh in haystacks:
+            if _fuzzy_contains(name, nh.identity):
+                resolving.append((nh, "identity"))
+            elif nh.body and _fuzzy_contains(name, nh.body[:_BODY_LEDE_CHARS]):
+                resolving.append((nh, "body_lede"))
+        if not resolving:
+            continue  # not resolved at all -- candidate_coverage's own "missing", not a conflict
+
+        if any(_candidate_named_by_subject_tokens(name, nh.own_subject_tokens) for nh, _via in resolving):
+            continue  # at least one resolving page was genuinely intended for this candidate
+
+        # Every page that resolved this candidate was unintended by its own arm -- a candidate
+        # with even one genuinely-intended resolution is not a conflict, regardless of any
+        # other page it happens to also be mentioned on.
+        for nh, via in resolving:
+            conflicts.append(
+                {
+                    "candidate": name,
+                    "resolved_via": via,
+                    "resolving_node_id": nh.node_id,
+                    "resolving_page_identity": nh.identity,
+                }
+            )
+    return conflicts

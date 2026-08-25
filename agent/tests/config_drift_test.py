@@ -83,6 +83,10 @@ INTENTIONALLY_JSON_ABSENT = {
     # twin in idea_sequencing.reorder_for_sequential: absent means candidate reordering
     # behaves exactly as it does today (highest-scored/first candidate, no identity check).
     "run_policy_sequencing_identity_guard",
+    # And for the coverage entity-conflict check, which is strictly observe-only: absent
+    # means no coverage_entity_conflicts field is ever attached to the final payload, and
+    # coverage_ratio/finalization_status are untouched either way.
+    "run_policy_coverage_entity_conflict_check",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

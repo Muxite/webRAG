@@ -45,7 +45,10 @@ from agent.app.idea_policies.post_expansion_hooks import (
 )
 from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
 from agent.app.idea_policies.grounding import evaluate_grounding
-from agent.app.idea_policies.candidate_coverage import evaluate_candidate_coverage
+from agent.app.idea_policies.candidate_coverage import (
+    detect_candidate_coverage_entity_conflicts,
+    evaluate_candidate_coverage,
+)
 from agent.app.idea_policies import plan_library as _plan_library
 from agent.app.idea_policies import alternative_branch as _alternative_branch
 from agent.app.idea_policies import plan_library_search as _plan_search
@@ -609,6 +612,7 @@ class IdeaDagEngine:
         # when named candidates remain unchecked rather than finalizing as if grounded.
         # Byte-identical when `got_candidate_coverage_enabled` is off.
         _coverage_incomplete = None
+        _coverage_conflicts = None
         if self._cfg.got.candidate_coverage_enabled:
             try:
                 _cov = evaluate_candidate_coverage(graph, mandate)
@@ -616,6 +620,15 @@ class IdeaDagEngine:
                     _coverage_incomplete = _cov
             except Exception as exc:  # noqa: BLE001. The gate must never crash finalize
                 self._logger.warning(f"[COVERAGE] pre-finalize check failed: {exc}")
+
+            # OBSERVE-ONLY (run_policy_coverage_entity_conflict_check, default off): a second,
+            # independent read over the same graph. Never assigned to coverage_ratio/
+            # finalization_status/deliverable_complete -- see its own config.py docstring.
+            if self._cfg.run_policy.coverage_entity_conflict_check:
+                try:
+                    _coverage_conflicts = detect_candidate_coverage_entity_conflicts(graph, mandate)
+                except Exception as exc:  # noqa: BLE001. Observe-only, must never affect finalize
+                    self._logger.warning(f"[COVERAGE] entity-conflict check failed: {exc}")
 
         final_payload = await build_final_payload(
             self.io, self.settings, graph, mandate, self.model_name,
@@ -669,6 +682,14 @@ class IdeaDagEngine:
                 derive_completion_fields(final_payload)
             self._logger.warning(
                 f"[COVERAGE] Finalizing with unchecked candidates: {_coverage_incomplete.missing}"
+            )
+
+        if _coverage_conflicts:
+            final_payload["coverage_entity_conflicts"] = _coverage_conflicts
+            final_payload["coverage_entity_conflict_count"] = len(_coverage_conflicts)
+            self._logger.warning(
+                f"[COVERAGE] {len(_coverage_conflicts)} candidate(s) may have resolved via a "
+                f"cross-arm page collision: {[c['candidate'] for c in _coverage_conflicts]}"
             )
 
         if self._got:
