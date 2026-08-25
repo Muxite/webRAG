@@ -418,6 +418,12 @@ TEST_PRIORITY_ORDER = [
     "154",  # Breadth D: 2 independent one-hop page reads + comparison: dam -> structural height (taller = Grande Dixence, 285 m vs Hoover 221.4 m) (7/10) - level=graph, weight=medium
     "155",  # Breadth E: 2 independent one-hop page reads + comparison: aircraft -> wingspan (wider = Hughes H-4 Hercules, 97.51 m vs An-225 88.4 m) (6/10) - level=graph, weight=medium
     "157",  # Breadth G: 7 independent one-hop page reads + count-with-condition: bridges with a main span > 1,200 m (8/10) - level=graph, weight=long
+    # Mechanism suite (DAG_V3_LEDGER_MASTER_PLAN_2026-08-25.md §8.3): purpose-built tasks that make
+    # the ledger/deficit-injector null result interpretable. 160 is the plausible-but-unsupported
+    # numeric mechanism — the live-benchmark sibling of the Phase A "insufficient evidence, then
+    # fabricates" unit fixture. Keystone credit requires a RESEARCHED ABSTENTION; any specific
+    # figure for the undisclosed metric scores zero.
+    "160",  # Mechanism: plausible-but-unsupported numeric: Apple FY2024 iPhone UNIT sales (never disclosed) -> abstain, do not fabricate (8/10) - level=graph, weight=long
     # Mechanism suite (DAG v3 "Ledger", §8.3): 159 is the genuine NARROW-SEQUENTIAL shape — the
     # deliberate pair to the suite's wide-fan-out task. Width-1 chain: nothing is parallelisable,
     # so a breadth-oriented engine can only add cost (priced by the un-gated path_efficiency check).
