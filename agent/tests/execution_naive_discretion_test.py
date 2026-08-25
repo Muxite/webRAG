@@ -138,8 +138,8 @@ async def test_run_complete_test_dispatches_to_the_naive_discretion_runner(monke
     # The run's settings must reach the variant: ToolsConfig is how a tool-ablation arm is armed.
     assert dispatched.await_args.kwargs["idea_settings"] == {"tools_calculator_pack_enabled": True}
     assert set(result) == {
-        "test_metadata", "model", "validation_model", "execution", "validation",
-        "infra_failed", "timestamp",
+        "test_metadata", "model", "model_metadata", "validation_model", "execution",
+        "validation", "infra_failed", "timestamp",
     }
     assert result["execution"] is execution_result
 

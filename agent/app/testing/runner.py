@@ -24,6 +24,7 @@ from agent.app.testing.execution_compiled import run_compiled_execution
 from agent.app.testing.execution_compiled_code import run_compiled_code_execution
 from agent.app.testing.execution_langgraph import run_offtheshelf_execution
 from agent.app.testing.execution_evidence_queue import run_evidence_queue_execution
+from agent.app.testing.model_metadata import collect_model_metadata
 from agent.app.testing.validation import ValidationRunner
 from agent.app.testing.utils import build_validation_evidence
 from agent.app.testing import json_telemetry as _json_telemetry
@@ -273,6 +274,10 @@ async def run_complete_test(
     return {
         "test_metadata": test_module.metadata,
         "model": model_name,
+        # Plan §8's fairness floor: the model TAG alone cannot tell two arms apart when one
+        # was served a different digest/quantization/context window. Telemetry only — nothing
+        # reads it back, it just makes a confounded pair detectable after the fact.
+        "model_metadata": await collect_model_metadata(connector_llm, model_name),
         "validation_model": validation_model,
         "execution": execution_result,
         "validation": validation_result,
