@@ -589,15 +589,18 @@ AXES = {
     # with --axis ledger_deficit_local --arms
     # good_adaptive,good_adaptive_ledgerobserve,good_adaptive_ledgerdeficit --tasks <core24>
     #
-    # reps=1 (not the other *_local axes' 3): a live smoke check measured this cell's actual
-    # wall-clock on this host at ~145s, well above the ~89s/cell historical estimate. Per
-    # `capspec_chain`'s own precedent above ("this session measured that task count, not rep
-    # count, is what resolves arm ranking"), core24 x 3 arms x 1 rep spends the time budget on
-    # breadth across tasks rather than repeats of few.
+    # reps=2 (not the other *_local axes' 3): a live smoke check measured this cell's actual
+    # wall-clock on this host at ~145s, well above the ~89s/cell historical estimate, so R=1
+    # ran first (core24 x 3 arms, ~2h54m) to get task-breadth signal fast. Bumped to 2 after
+    # R=1 finished in under 3 wall-clock hours -- both the ledger 3-arm comparison and the
+    # native-graph-vs-langgraph/seqreact secondary comparison came back underpowered/borderline
+    # (p_holm ~0.07-0.08 on the graph-loses-to-both-alternatives finding) with real budget left
+    # in the night; a second rep (resumed under the same run-id, R=1's cells skip as
+    # already-done) is spent narrowing that instead of leaving it inconclusive.
     "ledger_deficit_local": {
         "json_telemetry": True,
         "ladders": [
-            {"model": "qwen2.5:7b", "tag": "q7", "reps": 1, "burn": None,
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 2, "burn": None,
              "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
         ],
     },
