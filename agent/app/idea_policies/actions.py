@@ -21,6 +21,7 @@ from agent.app.model_tiers import tier_token_multiplier, is_reasoning_model
 from agent.app.idea_dag_schemas import MERGE_JSON_SCHEMA_GOAL_EVAL_FIRST
 from agent.app.idea_policies.base import IdeaActionType, DetailKey, IdeaNodeStatus
 from agent.app.idea_policies.config import IdeaConfig
+from agent.app.idea_policies import entity_names
 from agent.app.idea_policies.action_constants import (
     ActionResultKey,
     PromptKey,
@@ -988,63 +989,16 @@ class VisitLeafAction(LeafAction):
         
         return None
     
-    #: Capitalised words that describe the ACT of visiting rather than WHICH page — the leading
-    #: verb of nearly every planner-written visit title, plus the page-type nouns.
-    _GENERIC_TITLE_WORDS = frozenset({
-        "Visit", "Open", "Read", "Fetch", "Retrieve", "Extract", "Check", "Find", "Search",
-        "Page", "Pages", "Site", "Website", "Article", "Wikipedia", "Wiki", "Source", "Sources",
-    })
-    _CAPITALISED_WORD_RE = re.compile(r"\b[A-Z][A-Za-z0-9]{2,}\b")
-
     @classmethod
     def _named_entities(cls, *texts: Optional[str]) -> List[str]:
-        """The things a visit leaf NAMES, as written: capitalised words minus the visit verbs.
-
-        Deliberately shallow — capitalisation is the one signal available without a model, and
-        the only question asked of it is "does this leaf name anything at all". A leaf that
-        names Suez Canal is one whose grounding can be checked against a URL; a leaf titled
-        "visit a source page" names nothing and no check is possible. Never used to decide which
-        page is RIGHT, only to reject pages that mention none of the leaf's own names.
-        """
-        names: List[str] = []
-        for text in texts:
-            if not isinstance(text, str):
-                continue
-            for word in cls._CAPITALISED_WORD_RE.findall(text):
-                if word not in cls._GENERIC_TITLE_WORDS and word not in names:
-                    names.append(word)
-        return names
+        """Delegates to :mod:`entity_names`; kept as a wrapper since tests call it on this class."""
+        return entity_names.named_entities(*texts)
 
     def _distinguishing_names(
         self, graph: IdeaDag, node: IdeaNode, parent: Optional[IdeaNode]
     ) -> List[str]:
-        """The names that tell THIS leaf apart from its siblings — its own, minus the shared ones.
-
-        A breadth fan-out names one entity per arm and repeats the category word in every title
-        ("the Suez Canal page", "the Erie Canal page"), so "does this URL mention a name the leaf
-        uses" is satisfied by ``/wiki/Erie_Canal`` for the Suez leaf — the exact confusion the
-        guard exists to catch. Dropping the names the siblings ALSO use leaves ``Suez``, which
-        the wrong page does not mention.
-
-        Empty when the leaf names nothing, and empty when nothing separates it from a sibling
-        (two identically-titled leaves): both mean the leaf cannot be told apart this way, and
-        the guard declines to judge rather than guessing in the other direction.
-        """
-        named = self._named_entities(node.title, node.details.get(DetailKey.INTENT.value))
-        if not named or parent is None:
-            return named
-        shared = set()
-        for sibling_id in parent.children:
-            if sibling_id == node.node_id:
-                continue
-            sibling = graph.get_node(sibling_id)
-            if sibling is None:
-                continue
-            for name in self._named_entities(
-                sibling.title, sibling.details.get(DetailKey.INTENT.value)
-            ):
-                shared.add(name.lower())
-        return [name for name in named if name.lower() not in shared]
+        """Delegates to :mod:`entity_names`; kept as a wrapper since tests call it on this class."""
+        return entity_names.distinguishing_names(graph, node, parent)
 
     def _extract_url_from_sibling_results(self, graph: IdeaDag, node: IdeaNode) -> Optional[str]:
         import re
