@@ -102,6 +102,11 @@ def _base():
         # T1-6 backtrack relative dead-end threshold: shipped OFF, one of the two axes
         # `good_adaptive_backtrackrel` sets (the other, `got_backtrack_enabled`, is above).
         "got_backtrack_dead_end_relative_enabled": False,
+        # task ledger / deficit-driven injector: shipped OFF, the two axes
+        # `good_adaptive_ledgerobserve` (first only) and `good_adaptive_ledgerdeficit`
+        # (both) set.
+        "run_policy_ledger_mode": "off",
+        "run_policy_deficit_driven_injection": False,
     }
 
 

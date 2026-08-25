@@ -792,6 +792,39 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "native_reasoning_effort_discipline_enabled": False,
         "price_tier_param_tiering_enabled": False,
     },
+    # The deficit-driven ledger scheduler pair, never live-validated (see
+    # docs/handoffs -- `task_ledger.py`/`run_policy_ledger_mode` and
+    # `run_policy_deficit_driven_injection` in idea_policies/config.py; the injector is
+    # `_maybe_inject_ledger_deficit_followup` in idea_engine.py, a generalization of the
+    # older root-only `inject_coverage_visits` to ANY completing node). `ledgerobserve`
+    # isolates the passive ledger's own overhead (computed every completion, changes
+    # nothing); `ledgerdeficit` adds the actual mechanism -- a targeted SEARCH+VISIT pair
+    # minted in-branch wherever the ledger still reports an unresolved named entity. Both
+    # are `good_adaptive` plus exactly the ledger axis under test, same single-axis-ablation
+    # pattern as `good_adaptive_nodedup` above.
+    "good_adaptive_ledgerobserve": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "run_policy_ledger_mode": "observe",   # the one axis under test (shipped: "off")
+    },
+    "good_adaptive_ledgerdeficit": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "run_policy_ledger_mode": "observe",   # required: the injector reads the ledger
+        "run_policy_deficit_driven_injection": True,   # the axis under test (shipped: False)
+    },
 }
 
 
