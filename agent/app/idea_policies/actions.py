@@ -200,6 +200,118 @@ class LeafAction(ABC):
         except (TypeError, ValueError):
             return None
 
+    #: Caps for the strings echoed back into a JSON-repair prompt. Both are generous
+    #: enough to carry the real shape/instruction and small enough that the repair call
+    #: can never cost more than the original one.
+    _JSON_REPAIR_INSTRUCTION_CHARS: ClassVar[int] = 4000
+    _JSON_REPAIR_RESPONSE_CHARS: ClassVar[int] = 4000
+
+    def _record_malformed_llm_action(
+        self, io: AgentIO, site: str, parse_error: Exception, repaired: Optional[bool] = None
+    ) -> None:
+        """Count one malformed-JSON action response on the telemetry event stream.
+
+        ``malformed_llm_action`` fires once per detected parse failure regardless of what
+        the repair attempt does (it measures how often the bug happens);
+        ``malformed_llm_action_repaired`` fires once per repair outcome so the recovery
+        rate is a division of two event counts.
+        """
+        telemetry = getattr(io, "telemetry", None)
+        if not telemetry:
+            return
+        try:
+            if repaired is None:
+                telemetry.record_event(
+                    "malformed_llm_action", {"site": site, "error": str(parse_error)[:200]}
+                )
+            else:
+                telemetry.record_event(
+                    "malformed_llm_action_repaired", {"site": site, "repaired": bool(repaired)}
+                )
+        except Exception as exc:  # noqa: BLE001 - telemetry must never break an action
+            self._logger.debug(f"[REPAIR] telemetry record failed at {site}: {exc}")
+
+    async def _repair_malformed_json(
+        self,
+        io: AgentIO,
+        *,
+        site: str,
+        messages: List[Dict[str, str]],
+        malformed_text: str,
+        parse_error: Exception,
+        model_name: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+        temperature: float = 0.0,
+        timeout_seconds: Optional[float] = None,
+    ) -> Optional[Any]:
+        """One bounded re-prompt when an action's LLM response is not valid JSON.
+
+        Three action sites (link selection, merge synthesis, verify) used to fail OPEN
+        straight to a heuristic default the moment ``json.loads`` raised -- the model's
+        answer was thrown away without ever being asked to fix its own formatting. This
+        makes ONE extra call carrying the original instruction, the malformed text, and
+        the parse error, and returns the corrected object.
+
+        Returns ``None`` when the repair call is empty/unparseable/raises, so every caller
+        falls through to exactly the fallback it used before. Always on: the worst case is
+        one extra call and the same fallback as today.
+        """
+        self._record_malformed_llm_action(io, site, parse_error)
+        repaired = False
+        try:
+            original_instruction = "\n\n".join(
+                str(m.get("content") or "") for m in (messages or []) if m.get("content")
+            )[: self._JSON_REPAIR_INSTRUCTION_CHARS]
+            repair_messages = PromptBuilder.build_messages(
+                system_content=(
+                    "You are a JSON repair function. The previous response to the request below "
+                    "was not valid JSON. Return the SAME content as a single valid JSON object "
+                    "matching the shape the original request asked for. Output JSON only -- no "
+                    "prose, no markdown fences, no explanation. Invent nothing: preserve the "
+                    "original response's content and only fix its structure."
+                ),
+                user_content=(
+                    f"ORIGINAL REQUEST:\n{original_instruction}\n\n"
+                    f"MALFORMED RESPONSE:\n{malformed_text[: self._JSON_REPAIR_RESPONSE_CHARS]}\n\n"
+                    f"JSON PARSE ERROR:\n{parse_error}\n\n"
+                    "Corrected JSON:"
+                ),
+            )
+            payload = io.build_llm_payload(
+                messages=repair_messages,
+                json_mode=True,
+                model_name=model_name,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            response = await io.query_llm_with_fallback(
+                payload,
+                model_name=model_name,
+                fallback_model=self._cfg.generation.fallback_model,
+                timeout_seconds=timeout_seconds,
+            )
+            if response:
+                data = json.loads(response)
+                # All three call sites read a JSON OBJECT; valid JSON of any other shape
+                # is no more usable than the malformed text, so it counts as a failed
+                # repair rather than a recovery the caller then quietly discards.
+                if isinstance(data, dict):
+                    repaired = True
+                    self._logger.info(f"[REPAIR] Recovered a malformed JSON response at {site}")
+                    return data
+                self._logger.warning(
+                    f"[REPAIR] JSON repair call at {site} returned a non-object ({type(data).__name__})"
+                )
+            else:
+                self._logger.warning(f"[REPAIR] JSON repair call at {site} returned nothing")
+        except json.JSONDecodeError as exc:
+            self._logger.warning(f"[REPAIR] JSON repair call at {site} was also unparseable: {exc}")
+        except Exception as exc:  # noqa: BLE001 - repair is best-effort; fall back as before
+            self._logger.warning(f"[REPAIR] JSON repair call at {site} failed: {exc}")
+        finally:
+            self._record_malformed_llm_action(io, site, parse_error, repaired=repaired)
+        return None
+
     def _is_retryable(self, error: Exception) -> bool:
         # Shared with the sequential arm's tool retry so both arms agree on what "transient"
         # means — see action_constants.is_transient_tool_error.
@@ -1368,6 +1480,21 @@ class VisitLeafAction(LeafAction):
             if response:
                 try:
                     data = json.loads(response)
+                except json.JSONDecodeError as exc:
+                    self._logger.warning(f"[VISIT] Failed to parse LLM link selection response: {response[:200]}")
+                    # One bounded re-prompt before the candidate_urls[:link_count] fallback.
+                    data = await self._repair_malformed_json(
+                        io,
+                        site="visit_link_selection",
+                        messages=messages,
+                        malformed_text=response,
+                        parse_error=exc,
+                        model_name=model_name,
+                        max_tokens=self._executor_max_tokens(_effective_model, 500),
+                        temperature=0.2,
+                        timeout_seconds=timeout_seconds,
+                    )
+                if data is not None:
                     selected = data.get("selected", [])
                     if isinstance(selected, list):
                         valid_selected = [url for url in selected if url in candidate_urls]
@@ -1402,8 +1529,6 @@ class VisitLeafAction(LeafAction):
                             f"[VISIT] LLM link selection response had a non-list 'selected' field "
                             f"(selected={selected!r}); falling back to the first {link_count} candidate(s)"
                         )
-                except json.JSONDecodeError:
-                    self._logger.warning(f"[VISIT] Failed to parse LLM link selection response: {response[:200]}")
         except Exception as exc:
             self._logger.warning(f"[VISIT] LLM link selection failed: {exc}")
 
@@ -2726,8 +2851,24 @@ class MergeLeafAction(LeafAction):
             
             try:
                 synthesized_data = json.loads(response)
-            except json.JSONDecodeError:
-                synthesized_data = {"summary": response, "goal_achieved": False, "goal_evaluation": "Failed to parse LLM response", "missing_requirements": []}
+            except json.JSONDecodeError as exc:
+                # One bounded re-prompt before the "unparseable" fallback below, which
+                # discards the whole synthesis and permanently marks the goal unmet.
+                synthesized_data = await self._repair_malformed_json(
+                    io,
+                    site="merge_synthesis",
+                    messages=messages,
+                    malformed_text=response,
+                    parse_error=exc,
+                    model_name=model_name,
+                    max_tokens=self._executor_max_tokens(
+                        self._effective_model(io, model_name), self._cfg.merge.max_tokens, price_tier=False
+                    ),
+                    temperature=self._cfg.merge.temperature,
+                    timeout_seconds=timeout_seconds,
+                )
+                if not isinstance(synthesized_data, dict):
+                    synthesized_data = {"summary": response, "goal_achieved": False, "goal_evaluation": "Failed to parse LLM response", "missing_requirements": []}
             
             goal_achieved = synthesized_data.get("goal_achieved", False)
             # "Key absent" and "key present and false" are the same `False` to the caller but
@@ -3171,12 +3312,28 @@ class VerifyLeafAction(LeafAction):
 
             try:
                 verdict_data = json.loads(response)
-            except json.JSONDecodeError:
-                verdict_data = {
-                    "verdict": "UNVERIFIABLE",
-                    "confidence": 0.0,
-                    "reasoning": "Failed to parse verify response",
-                }
+            except json.JSONDecodeError as exc:
+                # One bounded re-prompt before the UNVERIFIABLE fallback, which throws away
+                # a verdict the model may well have reached and only mis-formatted.
+                verdict_data = await self._repair_malformed_json(
+                    io,
+                    site="verify_verdict",
+                    messages=messages,
+                    malformed_text=response,
+                    parse_error=exc,
+                    model_name=model_name,
+                    max_tokens=self._executor_max_tokens(
+                        self._effective_model(io, model_name), self._cfg.verify.max_tokens, price_tier=False
+                    ),
+                    temperature=self._cfg.verify.temperature,
+                    timeout_seconds=timeout_seconds,
+                )
+                if not isinstance(verdict_data, dict):
+                    verdict_data = {
+                        "verdict": "UNVERIFIABLE",
+                        "confidence": 0.0,
+                        "reasoning": "Failed to parse verify response",
+                    }
 
             return ActionResultBuilder.success(
                 action=IdeaActionType.VERIFY.value,
