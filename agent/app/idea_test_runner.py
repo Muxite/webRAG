@@ -825,6 +825,29 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "run_policy_ledger_mode": "observe",   # required: the injector reads the ledger
         "run_policy_deficit_driven_injection": True,   # the axis under test (shipped: False)
     },
+    # Phase 0 ablation `graph_constrained_actions` (docs/DAG_V3_LEDGER_MASTER_PLAN_2026-08-25.md
+    # section 3): falsifies "malformed-action instability is the main failure".
+    #
+    # What this arm actually turns on, precisely: `run_policy_constrained_decoding_enabled`
+    # (idea_policies/config.py) gates ONE thing today -- `ActionPolicy._repair_malformed_json`
+    # (idea_policies/actions.py:259) attaching a JSON schema to the bounded REPAIR re-ask that
+    # fires only AFTER a response failed to parse. Three sites pass a schema: link selection
+    # (`_LINK_SELECTION_REPAIR_SCHEMA`), merge synthesis, and the verify verdict. It does NOT
+    # constrain the primary action/job-selection call, and it is additionally gated on
+    # `supports_optional_field_json_schema` (confirmed local-Ollama backends only) -- on any
+    # other backend this arm is a literal no-op. So a null result here falsifies only the
+    # "repair-path decoding" slice of the malformed-action hypothesis, not the whole of it.
+    "good_adaptive_constrained": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "run_policy_constrained_decoding_enabled": True,   # the axis under test (shipped: False)
+    },
 }
 
 

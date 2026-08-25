@@ -107,6 +107,9 @@ def _base():
         # (both) set.
         "run_policy_ledger_mode": "off",
         "run_policy_deficit_driven_injection": False,
+        # constrained decoding on the malformed-JSON repair re-ask: shipped OFF, the one axis
+        # `good_adaptive_constrained` sets.
+        "run_policy_constrained_decoding_enabled": False,
     }
 
 
@@ -776,6 +779,29 @@ def test_arm_good_adaptive_beamraw_isolates_the_beam_spread_signal():
     control = _base()
     _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
     assert control["got_beam_spread_uses_raw_score_enabled"] is False
+
+
+def test_arm_good_adaptive_constrained_isolates_the_repair_path_codec():
+    """Phase 0's `graph_constrained_actions` arm: `good_adaptive` plus exactly the
+    constrained-decoding axis (which today gates only the malformed-JSON repair re-ask)."""
+    from agent.app.idea_test_runner import _GOT_ARM_PROFILES
+
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    arm = _GOT_ARM_PROFILES["good_adaptive_constrained"]
+    assert set(arm) - set(base) == {"run_policy_constrained_decoding_enabled"}
+    assert set(base) - set(arm) == set()
+    assert all(arm[k] == v for k, v in base.items())
+    assert arm["run_policy_constrained_decoding_enabled"] is True
+
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_constrained"})
+    assert settings["run_policy_constrained_decoding_enabled"] is True
+    control = _base()
+    _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
+    assert control["run_policy_constrained_decoding_enabled"] is False
+    # It must not smuggle the ledger axes in with it (both live in the same RunPolicy group).
+    assert settings["run_policy_ledger_mode"] == control["run_policy_ledger_mode"]
+    assert settings["run_policy_deficit_driven_injection"] is False
 
 
 def test_arm_good_adaptive_backtrackrel_isolates_backtrack_and_its_relative_threshold():
