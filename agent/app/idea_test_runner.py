@@ -425,6 +425,7 @@ TEST_PRIORITY_ORDER = [
     # Mechanism suite (2026-08-25, DAG v3 ledger plan Sec 8.3): purpose-built tasks that make the
     # ledger/deficit-injector null result interpretable — each isolates ONE failure mechanism the
     # core24 suite never exercises.
+    "302",  # Mechanism: DUPLICATED/SYNDICATED URLs — three domains republishing one Wikipedia article must count as ONE independent source; the independent authority (nps.gov) prints a different figure (9/10) - level=integration, weight=long
     "303",  # Mechanism: ENTITY COLLISION — near-duplicate names on one page: Tay rail bridge length vs Tay Road Bridge (9/10) - level=navigation, weight=medium
     "304",  # Mechanism: SOURCE CONFLICT requiring VERIFY — stale-vs-current page-vs-page temporal conflict; a supplied confident page must be checked against an independent source (8/10) - level=integration, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12

@@ -187,8 +187,12 @@ def test_compiled_plan_validates_and_leaks_nothing():
     # (The en.wikipedia.org URL itself is a GIVEN from the mandate, so it is not a leak; the
     # plan must never say those pages are *copies* of it.)
     for leak in ("1,943", "1943", "1,949", "1949", "594", "592", "mirror", "syndicat",
-                 " 47 ", "duplicat", "copy", "copies", "republish", "not independent"):
+                 " 47 ", "duplicat"):
         assert leak not in blob, f"compiled plan leaks {leak!r}"
+    # The merge recipe restates the mandate's own counting rule (a given), but must never
+    # pre-assign WHICH page is a copy of which origin - that is the answer.
+    agg = plan["aggregation"].lower()
+    assert "alchetron" not in agg and "dbpedia" not in agg and "wikipedia" not in agg
     ids = [l["id"] for l in plan["leaves"]]
     assert len(ids) == len(set(ids))
     # The dependent leaves chain off the discovered agency URL via {dep_id} templating.
