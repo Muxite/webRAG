@@ -207,6 +207,7 @@
   "native_vote_k_local_large": 1,
   "final_require_grounding": false,
   "final_require_grounding_page_identity": false,
+  "final_answer_contract_enabled": true,
   "final_recompute_enabled": false,
   "final_verify_enabled": false,
   "final_variations_enabled": false,

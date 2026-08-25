@@ -422,6 +422,16 @@ class FinalConfig:
     # A/B before flipping the default, since some currently-passing runs could newly fail if
     # subject-token extraction is noisy on certain task phrasings.
     require_grounding_page_identity: bool = False
+    # DAG v3 plan §4A: the final-answer contract. The grounding gate above only covers a run
+    # with ZERO opened pages; a run that opened one and then wrote "insufficient evidence to
+    # determine X" *and* "X is 511" in the same deliverable passes every existing check. When
+    # on, that self-contradicting shape is replaced by a deterministic abstention rendered
+    # from the draft's own hedge sentences (never a new model call), with goal_achieved and
+    # grounding_satisfied forced False. Default ON: the trigger requires an answer-shaped
+    # mandate, an explicit abstention marker, AND a committed value in a non-hedging sentence,
+    # so a confident answer, a pure abstention and any narrative task are byte-identical. The
+    # flag exists so an arm can turn the contract OFF for an A/B, not to keep it dormant.
+    answer_contract_enabled: bool = True
     # C1b: approximator-stripped k-sample vote for terminal answer (opt-in). When
     # native_vote_k_enabled and native_vote_k >= 2, finalize answer is extracted k times
     # (anchor temp-0 + diverse temps), normalized via approximator-stripped vote key, and
@@ -485,6 +495,7 @@ class FinalConfig:
         "allow_partial_success": "final_allow_partial_success",
         "require_grounding": "final_require_grounding",
         "require_grounding_page_identity": "final_require_grounding_page_identity",
+        "answer_contract_enabled": "final_answer_contract_enabled",
     }
 
     @classmethod

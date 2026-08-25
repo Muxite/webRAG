@@ -342,6 +342,151 @@ def _apply_grounding_gate(
     )
 
 
+# ---------------------------------------------------------------------------
+# Final-answer contract: no committed value after an abstention (DAG v3 plan §4A)
+# ---------------------------------------------------------------------------
+#
+# The grounding gate above only fires on a run that opened ZERO pages. A run that DID open
+# a page and whose finalizer then wrote "there is insufficient evidence to determine X"
+# *and* "X is 511 m" in the same deliverable slips past every check: the gate no-ops, and
+# `goal_achieved` comes from the merge verdict, not from the answer text. The specific value
+# then ships looking exactly like a researched one.
+#
+# This gate refuses that shape mechanically. It never re-invokes the model (plan §7: a
+# PARTIAL/ABSTAIN render is assembled from state, never by asking the model that was just
+# judged ungrounded to summarize what it is missing) — the abstention text it emits is the
+# model's OWN hedge sentences, and the committing sentences are dropped.
+#
+# It is deliberately narrow, because the false positive it must avoid is a legitimate
+# partial answer ("I could not find the population, but the area is 12 km²"):
+#   * only for answer-shaped mandates (`classify_answer_shape` — one derivable answer);
+#   * only when an explicit abstention marker is present;
+#   * only when some OTHER sentence commits to a bare specific number.
+# A confident answer, a pure abstention, and any narrative/open-ended task are untouched.
+
+_ABSTENTION_MARKERS = (
+    "insufficient evidence",
+    "insufficient information",
+    "insufficient data",
+    "not enough evidence",
+    "not enough information",
+    "no evidence",
+    "cannot determine",
+    "can not determine",
+    "can't determine",
+    "could not determine",
+    "couldn't determine",
+    "unable to determine",
+    "cannot be determined",
+    "could not be determined",
+    "cannot verify",
+    "could not verify",
+    "unable to verify",
+    "cannot confirm",
+    "could not confirm",
+    "unable to confirm",
+    "could not find",
+    "couldn't find",
+    "was not found",
+    "no source",
+    "unverified",
+)
+_ANSWER_CONTRACT_BANNER = (
+    "**Abstained: the evidence did not support a specific answer.** The draft answer "
+    "declared the evidence insufficient and then stated a specific value anyway; that value "
+    "was withheld because nothing in it was supported. What the run could establish:\n\n"
+)
+# A committed value: a bare number (optionally decimal/thousand-separated, optionally with a
+# %/unit suffix) that is not part of a URL, a bracketed citation marker, or a bare year.
+_VALUE_RE = re.compile(r"(?<![\w./#-])\d{1,3}(?:,\d{3})+(?:\.\d+)?|(?<![\w./#-])\d+(?:\.\d+)?")
+
+
+def _split_sentences(text: str) -> List[str]:
+    """Split on line breaks and sentence terminators, keeping non-empty fragments."""
+    parts: List[str] = []
+    for line in str(text or "").splitlines():
+        for piece in re.split(r"(?<=[.!?])\s+", line):
+            if piece.strip():
+                parts.append(piece.strip())
+    return parts
+
+
+def _is_abstaining(sentence: str) -> bool:
+    low = sentence.lower()
+    return any(marker in low for marker in _ABSTENTION_MARKERS)
+
+
+def _committed_values(sentence: str) -> List[str]:
+    """Specific numeric values asserted by ``sentence``, excluding URLs/citations/years."""
+    stripped = _URL_RE.sub(" ", sentence)
+    stripped = re.sub(r"\[\d+\]", " ", stripped)
+    out = []
+    for match in _VALUE_RE.finditer(stripped):
+        value = match.group(0)
+        if "," not in value and "." not in value and len(value) == 4 and value.startswith(("19", "20")):
+            continue  # a bare year is context, not the answer
+        out.append(value)
+    return out
+
+
+def answer_contract_violation(mandate: str, deliverable: str) -> Optional[List[str]]:
+    """Values a deliverable commits to *after* declaring the evidence insufficient.
+
+    ``None`` when the deliverable honours the contract (no abstention, no committed value,
+    or a mandate with no single derivable answer). Never raises: any internal failure reports
+    "no violation", so this gate can never take down a finalize.
+    """
+    try:
+        text = str(deliverable or "")
+        if not text.strip() or classify_answer_shape(mandate) is None:
+            return None
+        sentences = _split_sentences(text)
+        if not any(_is_abstaining(s) for s in sentences):
+            return None
+        values: List[str] = []
+        for sentence in sentences:
+            if _is_abstaining(sentence):
+                continue
+            values.extend(_committed_values(sentence))
+        return values or None
+    except Exception as exc:  # noqa: BLE001 — the gate must never crash finalize
+        _logger.warning(f"[ANSWER-CONTRACT] check failed: {exc}")
+        return None
+
+
+def _render_abstention(deliverable: str) -> str:
+    """Assemble the abstain deliverable from the draft's own hedge sentences only."""
+    kept = [s for s in _split_sentences(deliverable) if _is_abstaining(s)]
+    return _ANSWER_CONTRACT_BANNER + "\n".join(f"- {s}" for s in kept)
+
+
+def _apply_answer_contract(payload: Dict[str, Any], mandate: str) -> None:
+    """Refuse a deliverable that hedges and then states a value anyway (mutates ``payload``).
+
+    No-op unless :func:`answer_contract_violation` fires. When it does, the deliverable is
+    replaced by a deterministic abstention render, ``goal_achieved``/``grounding_satisfied``
+    go False (so the run lands ``blocked``), and the withheld values plus the original draft
+    are recorded for audit rather than silently discarded.
+    """
+    values = answer_contract_violation(mandate, payload.get("final_deliverable", ""))
+    if not values:
+        return
+
+    draft = str(payload.get("final_deliverable", "") or "")
+    payload["answer_contract_draft"] = draft
+    payload["final_deliverable"] = _render_abstention(draft)
+    payload["suppressed_values"] = values
+    payload["answer_contract"] = "abstain-hedged-value"
+    payload["goal_achieved"] = False
+    payload["grounding_satisfied"] = False
+    payload["claim_verification_ratio"] = 0.0
+    derive_completion_fields(payload)
+    _logger.warning(
+        "[ANSWER-CONTRACT] deliverable declared the evidence insufficient and then committed "
+        f"to {len(values)} value(s) ({', '.join(values[:5])}): rendering an abstention instead"
+    )
+
+
 def derive_completion_fields(payload: Dict[str, Any]) -> None:
     """(Re)compute the derived completion signals in place, from the payload's own fields.
 
@@ -1249,6 +1394,12 @@ async def build_final_payload(
         if truncated:
             payload["truncated"] = True
         derive_completion_fields(payload)
+        # Plan §4A: an answer-shaped deliverable that declares the evidence insufficient and
+        # then states a value anyway is rendered as an abstention. Runs BEFORE the grounding
+        # gate so the gate's banner (if it also fires) lands on the abstained text, not on a
+        # draft that still carries the withheld value.
+        if cfg.final.answer_contract_enabled:
+            _apply_answer_contract(payload, mandate)
         # F31: last thing before the payload leaves — an answer with zero opened pages on a
         # grounded-research mandate is refused rather than presented as a researched result.
         if cfg.final.require_grounding:
