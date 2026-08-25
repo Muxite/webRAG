@@ -54,6 +54,9 @@ INTENTIONALLY_JSON_ABSENT = {
     "evaluate_parallel_siblings",
     # PolicyConfig
     "require_score",
+    # RunPolicy: nothing reads the ledger mode yet, so the dataclass default is its
+    # only source of truth (documented in the group's own docstring).
+    "run_policy_ledger_mode",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

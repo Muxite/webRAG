@@ -1154,6 +1154,34 @@ class PolicyConfig:
 
 
 @dataclass(frozen=True)
+class RunPolicy:
+    """Run-scoped semantics decided ONCE per mandate. The ``run_policy_*`` keys.
+
+    Every other group here tunes a *stage* (expansion, merge, a leaf action). This one
+    holds the decisions a profile makes about the run as a whole, so a later run-level
+    subsystem does not have to smuggle its switch into whichever stage group happens to
+    read it first.
+
+    ``ledger_mode`` is the first such switch: ``"off"`` (today's behaviour) or ``"observe"``
+    (the task ledger records the run without steering it). Deliberately a mode string rather
+    than a bool, because the intended progression is off -> observe -> enforce and a bool
+    would have to be replaced the moment a third state exists. Absent from
+    ``idea_dag_settings.json`` on purpose: nothing reads it yet, so the dataclass default is
+    the only source of truth and the shipped settings stay byte-identical.
+    """
+
+    ledger_mode: str = "off"
+
+    _KEYS: ClassVar[dict] = {
+        "ledger_mode": "run_policy_ledger_mode",
+    }
+
+    @classmethod
+    def from_settings(cls, settings: Mapping[str, Any]) -> "RunPolicy":
+        return _build(cls, settings)
+
+
+@dataclass(frozen=True)
 class IdeaConfig:
     """Aggregate of every typed group; built once from the raw settings dict."""
 
@@ -1173,6 +1201,7 @@ class IdeaConfig:
     memory: MemoryConfig
     engine: EngineConfig
     policy: PolicyConfig
+    run_policy: RunPolicy
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, Any]) -> "IdeaConfig":
@@ -1193,6 +1222,7 @@ class IdeaConfig:
             memory=MemoryConfig.from_settings(settings),
             engine=EngineConfig.from_settings(settings),
             policy=PolicyConfig.from_settings(settings),
+            run_policy=RunPolicy.from_settings(settings),
         )
 
 
