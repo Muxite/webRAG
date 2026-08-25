@@ -3742,7 +3742,10 @@ class IdeaDagEngine:
         eligible: List[str],
         step_index: int,
     ) -> Optional[IdeaNode]:
-        return idea_sequencing.reorder_for_sequential(graph, selected, eligible, step_index)
+        return idea_sequencing.reorder_for_sequential(
+            graph, selected, eligible, step_index,
+            identity_guard=self._cfg.run_policy.sequencing_identity_guard,
+        )
 
     def _detect_state_dependencies(self, graph: IdeaDag, candidate_ids: List[str]) -> bool:
         return idea_sequencing.detect_state_dependencies(graph, candidate_ids, self._logger)

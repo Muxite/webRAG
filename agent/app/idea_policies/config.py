@@ -1236,6 +1236,19 @@ class RunPolicy:
     rather than fabricating grounding. Applies ONLY to the sibling-results fallback; a declared
     URL, a ``requires_data`` source pool and the Chroma link query are untouched. Off by default
     and absent from the shipped settings, same as the seven above.
+
+    ``sequencing_identity_guard`` is ``visit_url_identity_guard``'s twin one level up, in
+    ``idea_sequencing.reorder_for_sequential``. That function ALSO blindly takes a sibling
+    candidate on two paths: the highest-scored (or first-if-tied) sibling SEARCH feeding a
+    URL-less visit, and the first data-producing sibling feeding a think/save/merge node --
+    neither checks that the candidate targets the SAME entity as the node it feeds. Unlike
+    ``visit_url_identity_guard`` this changes EXECUTION ORDER, not a success verdict: a
+    mismatch here doesn't fabricate grounding, it can let a consuming node run against another
+    arm's data. It is also deprioritize-not-decline: returning nothing here wouldn't decline
+    the mismatch, since the caller falls back to the originally selected (URL-less/data-
+    starved) node -- so an empty identity-restricted pool falls back to the FULL candidate list
+    (today's behaviour) rather than returning ``None``. Off by default and absent from the
+    shipped settings, same as the eight above.
     """
 
     ledger_mode: str = "off"
@@ -1246,6 +1259,7 @@ class RunPolicy:
     merge_uses_evidence_view: bool = False
     deficit_driven_injection: bool = False
     visit_url_identity_guard: bool = False
+    sequencing_identity_guard: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1256,6 +1270,7 @@ class RunPolicy:
         "merge_uses_evidence_view": "run_policy_merge_uses_evidence_view",
         "deficit_driven_injection": "run_policy_deficit_driven_injection",
         "visit_url_identity_guard": "run_policy_visit_url_identity_guard",
+        "sequencing_identity_guard": "run_policy_sequencing_identity_guard",
     }
 
     @classmethod

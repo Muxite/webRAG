@@ -30,11 +30,12 @@ from __future__ import annotations
 import logging
 
 from agent.app.idea_dag import IdeaDag
-from agent.app.idea_policies.base import DetailKey, IdeaActionType
+from agent.app.idea_policies.base import DetailKey, IdeaActionType, IdeaNodeStatus
 from agent.app.idea_sequencing import (
     defer_unresolved_slot_candidates,
     detect_state_dependencies,
     log_parallel_batch_diagnostic,
+    reorder_for_sequential,
     siblings_are_independent,
 )
 
@@ -517,3 +518,176 @@ def test_parallel_batch_diagnostic_never_raises_on_bad_input(caplog):
     with caplog.at_level(logging.INFO):
         log_parallel_batch_diagnostic(graph, ["missing-a", "missing-b"], None, False, 0, _LOGGER)
     assert "PARALLEL BATCH DIAGNOSTIC:" not in caplog.text
+
+
+# ------------------------------------------------------------------------------------------
+# reorder_for_sequential -- identity_guard (run_policy_sequencing_identity_guard, default
+# OFF). Mirrors the Suez/Erie collision shape from visit_url_identity_guard_test.py: a
+# breadth fan-out names one entity per arm and repeats the category word ("Canal") in every
+# title, so plain word-overlap or a raw score can't tell the arms apart -- only the
+# DISTINGUISHING name (the word the sibling does NOT also use) can.
+# ------------------------------------------------------------------------------------------
+
+def test_reorder_prefers_a_search_that_names_the_same_entity_over_a_higher_scored_unrelated_one():
+    # A rival VISIT arm (visit_erie) is what makes "Canal" a shared/generic word here -- the
+    # matching search (search_suez) is EXCLUDED from that shared-word computation (it's the
+    # candidate pool being chosen from, not a rival arm), so its own "Suez" survives.
+    graph = _graph()
+    root = graph.root_id()
+    visit = graph.add_child(
+        root, "Visit the Suez Canal page", {DetailKey.ACTION.value: IdeaActionType.VISIT.value}
+    )
+    visit_erie = graph.add_child(
+        root,
+        "Visit the Erie Canal page",
+        {DetailKey.ACTION.value: IdeaActionType.VISIT.value, DetailKey.URL.value: "https://example.com/erie"},
+    )
+    search_erie = graph.add_child(
+        root, "Search Erie Canal completion year", {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}, score=0.95
+    )
+    search_suez = graph.add_child(
+        root, "Search Suez Canal completion year", {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}, score=0.9
+    )
+    eligible = [visit.node_id, visit_erie.node_id, search_erie.node_id, search_suez.node_id]
+
+    result = reorder_for_sequential(graph, visit, eligible, step_index=0, identity_guard=True)
+
+    assert result.node_id == search_suez.node_id
+
+
+def test_reorder_flag_off_still_takes_the_highest_scored_search_regardless_of_entity():
+    # Regression fence: identical graph, flag omitted (defaults False) -- today's max()
+    # behaviour is preserved byte-for-byte.
+    graph = _graph()
+    root = graph.root_id()
+    visit = graph.add_child(
+        root, "Visit the Suez Canal page", {DetailKey.ACTION.value: IdeaActionType.VISIT.value}
+    )
+    search_erie = graph.add_child(
+        root, "Search Erie Canal completion year", {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}, score=0.95
+    )
+    search_suez = graph.add_child(
+        root, "Search Suez Canal completion year", {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}, score=0.9
+    )
+    eligible = [visit.node_id, search_erie.node_id, search_suez.node_id]
+
+    result = reorder_for_sequential(graph, visit, eligible, step_index=0)
+
+    assert result.node_id == search_erie.node_id
+
+
+def test_reorder_falls_back_to_full_search_pool_when_no_search_matches():
+    # Deprioritize, not decline: when NO sibling search mentions the visit's distinguishing
+    # name, the guard must not return None (that would just reintroduce the blind-take one
+    # level up, since the caller falls back to the original URL-less visit). The rival arm
+    # (visit_erie) strips "Canal" down to just "Suez" as the distinguishing name, so the only
+    # available search (which never mentions Suez) is a genuine non-match.
+    graph = _graph()
+    root = graph.root_id()
+    visit = graph.add_child(
+        root, "Visit the Suez Canal page", {DetailKey.ACTION.value: IdeaActionType.VISIT.value}
+    )
+    visit_erie = graph.add_child(
+        root,
+        "Visit the Erie Canal page",
+        {DetailKey.ACTION.value: IdeaActionType.VISIT.value, DetailKey.URL.value: "https://example.com/erie"},
+    )
+    search_erie = graph.add_child(
+        root, "Search Erie Canal completion year", {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}, score=0.95
+    )
+    eligible = [visit.node_id, visit_erie.node_id, search_erie.node_id]
+
+    result = reorder_for_sequential(graph, visit, eligible, step_index=0, identity_guard=True)
+
+    assert result.node_id == search_erie.node_id
+
+
+def test_reorder_search_guard_is_a_no_op_when_visit_names_nothing():
+    graph = _graph()
+    root = graph.root_id()
+    visit = graph.add_child(
+        root, "Visit a source page for grounded evidence", {DetailKey.ACTION.value: IdeaActionType.VISIT.value}
+    )
+    search_a = graph.add_child(
+        root, "Search topic A", {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}, score=0.5
+    )
+    search_b = graph.add_child(
+        root, "Search topic B", {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}, score=0.9
+    )
+    eligible = [visit.node_id, search_a.node_id, search_b.node_id]
+
+    result = reorder_for_sequential(graph, visit, eligible, step_index=0, identity_guard=True)
+
+    assert result.node_id == search_b.node_id
+
+
+def test_reorder_prefers_a_same_entity_data_producer_over_a_url_bearing_wrong_one():
+    # An already-completed rival arm (erie_reference) is what strips "Canal" down to just
+    # "Suez"/"Merge" -- it isn't itself a candidate (status=done excludes it from
+    # data_producing_candidates), so it can mark a word shared without also being able to
+    # win the match. Without it, "Canal" would still be common to both candidates below and
+    # the URL-bearing-but-wrong-entity visit_erie would win on the URL-preference tiebreak.
+    graph = _graph()
+    root = graph.root_id()
+    merge = graph.add_child(
+        root, "Merge findings about the Suez Canal", {DetailKey.ACTION.value: IdeaActionType.MERGE.value}
+    )
+    erie_reference = graph.add_child(
+        root,
+        "Visit the Erie Canal page",
+        {DetailKey.ACTION.value: IdeaActionType.VISIT.value, DetailKey.URL.value: "https://example.com/erie-ref"},
+        status=IdeaNodeStatus.DONE,
+    )
+    visit_erie = graph.add_child(
+        root,
+        "Visit another Erie Canal source",
+        {DetailKey.ACTION.value: IdeaActionType.VISIT.value, DetailKey.URL.value: "https://example.com/erie"},
+    )
+    search_suez = graph.add_child(
+        root, "Search Suez Canal completion year", {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}
+    )
+    eligible = [merge.node_id, erie_reference.node_id, visit_erie.node_id, search_suez.node_id]
+
+    result = reorder_for_sequential(graph, merge, eligible, step_index=0, identity_guard=True)
+
+    assert result.node_id == search_suez.node_id
+
+
+def test_reorder_flag_off_still_prefers_the_url_bearing_data_producer_regardless_of_entity():
+    # Regression fence for the merge/think/save fallback path.
+    graph = _graph()
+    root = graph.root_id()
+    merge = graph.add_child(
+        root, "Merge findings about the Suez Canal", {DetailKey.ACTION.value: IdeaActionType.MERGE.value}
+    )
+    visit_erie = graph.add_child(
+        root,
+        "Visit the Erie Canal page",
+        {DetailKey.ACTION.value: IdeaActionType.VISIT.value, DetailKey.URL.value: "https://example.com/erie"},
+    )
+    search_suez = graph.add_child(
+        root, "Search Suez Canal completion year", {DetailKey.ACTION.value: IdeaActionType.SEARCH.value}
+    )
+    eligible = [merge.node_id, visit_erie.node_id, search_suez.node_id]
+
+    result = reorder_for_sequential(graph, merge, eligible, step_index=0)
+
+    assert result.node_id == visit_erie.node_id
+
+
+def test_reorder_falls_back_to_full_data_producer_pool_when_no_candidate_matches():
+    graph = _graph()
+    root = graph.root_id()
+    merge = graph.add_child(
+        root, "Merge findings about the Suez Canal", {DetailKey.ACTION.value: IdeaActionType.MERGE.value}
+    )
+    visit_erie = graph.add_child(
+        root,
+        "Visit the Erie Canal page",
+        {DetailKey.ACTION.value: IdeaActionType.VISIT.value, DetailKey.URL.value: "https://example.com/erie"},
+    )
+    eligible = [merge.node_id, visit_erie.node_id]
+
+    result = reorder_for_sequential(graph, merge, eligible, step_index=0, identity_guard=True)
+
+    assert result.node_id == visit_erie.node_id

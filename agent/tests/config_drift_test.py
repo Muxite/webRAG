@@ -79,6 +79,10 @@ INTENTIONALLY_JSON_ABSENT = {
     # (wrongly) successful visit into a failure: absent means the shipped fallback cascade
     # behaves exactly as it does today.
     "run_policy_visit_url_identity_guard",
+    # And for the sequencing identity guard, visit_url_identity_guard's execution-order
+    # twin in idea_sequencing.reorder_for_sequential: absent means candidate reordering
+    # behaves exactly as it does today (highest-scored/first candidate, no identity check).
+    "run_policy_sequencing_identity_guard",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

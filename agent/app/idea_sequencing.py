@@ -14,6 +14,70 @@ from typing import List, Optional, Tuple
 from agent.app.idea_dag import IdeaDag, IdeaNode
 from agent.app.idea_policies import DetailKey
 from agent.app.idea_policies.action_constants import NodeDetailsExtractor
+from agent.app.idea_policies import entity_names
+
+
+def _selected_parent(graph: IdeaDag, selected: IdeaNode) -> Optional[IdeaNode]:
+    pids = selected.parent_ids if selected.parent_ids else ([selected.parent_id] if selected.parent_id else [])
+    for pid in pids:
+        if not pid:
+            continue
+        parent = graph.get_node(pid)
+        if parent:
+            return parent
+    return None
+
+
+def _distinguishing_names_excluding(
+    graph: IdeaDag, selected: IdeaNode, parent: Optional[IdeaNode], exclude_ids: set
+) -> List[str]:
+    """``entity_names.distinguishing_names``, but a sibling in ``exclude_ids`` never
+    contributes a "shared" word.
+
+    Unlike the leaf-level identity guard (comparing a visit against OTHER VISIT arms),
+    here the "siblings" being compared against include the very candidate pool a match is
+    being picked FROM -- a legitimately on-topic candidate (e.g. the search node that
+    actually feeds this visit) names the SAME entity as ``selected`` by design, and counting
+    it as "shared" would strip that name before it's ever used to find the match. Excluding
+    the candidate pool from the shared-word computation leaves only genuine rival siblings
+    (other arms) able to mark a word as generic.
+    """
+    named = entity_names.named_entities(selected.title, selected.details.get(DetailKey.INTENT.value))
+    if not named or parent is None:
+        return named
+    shared = set()
+    for sibling_id in parent.children:
+        if sibling_id == selected.node_id or sibling_id in exclude_ids:
+            continue
+        sibling = graph.get_node(sibling_id)
+        if sibling is None:
+            continue
+        for name in entity_names.named_entities(sibling.title, sibling.details.get(DetailKey.INTENT.value)):
+            shared.add(name.lower())
+    return [name for name in named if name.lower() not in shared]
+
+
+def _restrict_to_distinguishing_names(
+    graph: IdeaDag, selected: IdeaNode, candidates: List[IdeaNode]
+) -> List[IdeaNode]:
+    """Restrict ``candidates`` to those naming one of ``selected``'s own distinguishing names.
+
+    Deprioritizes rather than declines: an empty restriction falls back to the FULL candidate
+    list (today's behaviour) rather than returning nothing, since -- unlike the leaf-level
+    ``visit_url_identity_guard`` -- there is no "fail loudly" outcome available mid-schedule.
+    Returning nothing here would not decline the mismatch; the caller just falls back to the
+    originally selected node, which may be the same URL-less/data-starved node this reordering
+    exists to unblock. So the correct "decline" is narrower: prefer an identity-matching
+    candidate, and only drop back to the unrestricted pool when nothing matches.
+    """
+    parent = _selected_parent(graph, selected)
+    candidate_ids = {c.node_id for c in candidates}
+    distinguishing = _distinguishing_names_excluding(graph, selected, parent, candidate_ids)
+    if not distinguishing:
+        return candidates
+    lowered = [name.lower() for name in distinguishing]
+    on_topic = [c for c in candidates if any(t in _candidate_text(c).lower() for t in lowered)]
+    return on_topic or candidates
 
 
 def reorder_for_sequential(
@@ -21,6 +85,7 @@ def reorder_for_sequential(
     selected: IdeaNode,
     eligible: List[str],
     step_index: int,
+    identity_guard: bool = False,
 ) -> Optional[IdeaNode]:
     selected_action = NodeDetailsExtractor.get_action(selected.details) or ""
     # If a visit node has no explicit URL, it often depends on a sibling search node
@@ -47,6 +112,8 @@ def reorder_for_sequential(
                 if child_action.lower() == "search":
                     search_candidates.append(child)
             if search_candidates:
+                if identity_guard:
+                    search_candidates = _restrict_to_distinguishing_names(graph, selected, search_candidates)
                 # Prefer the highest-scored search (or first if unscored).
                 best_search = max(search_candidates, key=lambda n: n.score if n.score is not None else float("-inf"))
                 return best_search
@@ -74,6 +141,9 @@ def reorder_for_sequential(
 
     if not data_producing_candidates:
         return None
+
+    if identity_guard:
+        data_producing_candidates = _restrict_to_distinguishing_names(graph, selected, data_producing_candidates)
 
     for candidate in data_producing_candidates:
         url = candidate.details.get("optional_url") or candidate.details.get("url") or candidate.details.get("link") or ""
