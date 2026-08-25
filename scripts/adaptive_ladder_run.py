@@ -578,6 +578,29 @@ AXES = {
              "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
         ],
     },
+    # 2026-08-25: does the deficit-driven ledger scheduler actually help? task_ledger.py /
+    # run_policy_ledger_mode and run_policy_deficit_driven_injection have existed since the
+    # dagv2-evidence-ledger branch's earlier commits but were never live-validated -- the
+    # injector (idea_engine.py::_maybe_inject_ledger_deficit_followup) mints a targeted
+    # SEARCH+VISIT pair in-branch wherever the ledger still reports an unresolved named
+    # entity, at ANY completing node (not just root). Three arms isolate: does the ledger
+    # itself cost anything just by running (ledgerobserve, passive), and does the injector
+    # it enables actually move score/coverage (ledgerdeficit, active). Local model, $0. Drive
+    # with --axis ledger_deficit_local --arms
+    # good_adaptive,good_adaptive_ledgerobserve,good_adaptive_ledgerdeficit --tasks <core24>
+    #
+    # reps=1 (not the other *_local axes' 3): a live smoke check measured this cell's actual
+    # wall-clock on this host at ~145s, well above the ~89s/cell historical estimate. Per
+    # `capspec_chain`'s own precedent above ("this session measured that task count, not rep
+    # count, is what resolves arm ranking"), core24 x 3 arms x 1 rep spends the time budget on
+    # breadth across tasks rather than repeats of few.
+    "ledger_deficit_local": {
+        "json_telemetry": True,
+        "ladders": [
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 1, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
+    },
 }
 
 
