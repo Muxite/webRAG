@@ -71,6 +71,10 @@ INTENTIONALLY_JSON_ABSENT = {
     # of these that can change an answer: absent means the shipped merge prompt is
     # byte-identical to today's.
     "run_policy_merge_uses_evidence_view",
+    # And for the deficit-driven injection, which is inert without the ledger and, when
+    # armed, is the only one of these that adds NODES: absent means the shipped graph
+    # shape is byte-identical to today's.
+    "run_policy_deficit_driven_injection",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

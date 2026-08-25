@@ -847,3 +847,133 @@ def inject_empty_search_followup(
     _record_enforce(telemetry, step_index, visit_node.node_id,
                     "visit", "empty search: a search must yield a visit")
     return 1
+
+
+#: Marker written on the node whose completion triggered a deficit check, so one completion is
+#: checked once. Holds the entity names it minted work for (possibly an empty list, when every
+#: unresolved entity was already targeted).
+_LEDGER_DEFICIT_MARKER = "_ledger_deficit_followup"
+#: Run-scoped counter, kept on the root, for the same reason as the empty-search budget above:
+#: the trigger is per node completion, so a per-call cap would bound nothing.
+_LEDGER_DEFICIT_BUDGET_KEY = "_ledger_deficit_followups"
+
+
+def inject_ledger_deficit_followup(
+    graph: "IdeaDag",
+    node_id: str,
+    step_index: int,
+    logger: logging.Logger,
+    telemetry: Optional[Any] = None,
+    unresolved_entities: Optional[List[str]] = None,
+    mandate: str = "",
+    max_injections: int = _COVERAGE_INJECTION_LIMIT,
+) -> int:
+    """Attach corrective work for the task ledger's unresolved entities to a COMPLETING node.
+
+    The same deterministic remediation as :func:`inject_coverage_visits` -- "this enumerated
+    entity has no successful visit anywhere, so mint a search plus a dependent visit for it" --
+    freed from that function's two structural limits: it fires at every node completion rather
+    than only where the coverage gate is consulted, and it attaches the new pair as a child of
+    the node where the deficit was noticed rather than forcing it back to the root. A deficit
+    spotted deep in a branch is therefore answered inside that branch, keeping the new work in
+    the context that raised it.
+
+    The unresolved set is the ledger's, passed in by the caller: this function has no opinion
+    about how a requirement becomes "supported" (see ``agent/app/task_ledger.py``, which is
+    itself a view of the coverage gate). With no entities it does nothing at all.
+
+    Dedup is :func:`_already_targeted`, reused verbatim: an entity some VISIT node is already
+    aimed at -- pending, running or finished -- is skipped, because the ledger reports it
+    unresolved until that visit SUCCEEDS and re-minting on every completion in between is how a
+    remediation loop starts. A completed SEARCH that already covers the entity is reused as the
+    visit's data source rather than duplicated, exactly as ``inject_coverage_visits`` does.
+
+    Idempotent per completing node (marker in its details) and bounded per RUN (counter on the
+    root), matching :func:`inject_empty_search_followup`'s budget precedent.
+
+    :param graph: Graph being remediated.
+    :param node_id: The just-completed node; the injected pair becomes its child.
+    :param step_index: Current step, for logging.
+    :param logger: Engine logger.
+    :param telemetry: Optional telemetry session for the enforcement record.
+    :param unresolved_entities: Ledger entities still without a successful visit, in mandate
+        order. Empty or ``None`` (e.g. ``ledger_mode`` off) makes this a no-op.
+    :param mandate: The run's mandate, used only to qualify a minted search query.
+    :param max_injections: Run-scoped ceiling on corrective pairs.
+    :returns: How many corrective pairs were injected.
+    """
+    node = graph.get_node(node_id)
+    if node is None:
+        return 0
+    entities = [str(e).strip() for e in (unresolved_entities or ()) if str(e or "").strip()]
+    if not entities:
+        return 0
+    if node.details.get(_LEDGER_DEFICIT_MARKER) is not None:
+        return 0
+
+    root = graph.get_node(graph.root_id())
+    used = int((root.details.get(_LEDGER_DEFICIT_BUDGET_KEY) or 0) if root is not None else 0)
+    if used >= max_injections:
+        logger.info(
+            f"[STEP {step_index}] LEDGER DEFICIT: budget spent ({used}/{max_injections}); "
+            f"no follow-up for {node_id[:8]}"
+        )
+        return 0
+
+    handled: List[str] = []
+    for candidate in entities:
+        if used + len(handled) >= max_injections:
+            break
+        if _already_targeted(graph, candidate):
+            continue
+
+        source_id = _search_node_for(graph, node_id, candidate)
+        if source_id is None:
+            search_node = graph.add_child(
+                parent_id=node_id,
+                title=f"Search {candidate}",
+                details={
+                    DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+                    DetailKey.QUERY.value: f"{candidate} {mandate[:80]}".strip(),
+                    DetailKey.IS_LEAF.value: True,
+                    DetailKey.JUSTIFICATION.value: (
+                        f"Task ledger: '{candidate}' is still unresolved at this point in the run."
+                    ),
+                    DetailKey.GOAL.value: f"Find a source page about {candidate}",
+                },
+            )
+            source_id = search_node.node_id
+            _record_enforce(telemetry, step_index, source_id,
+                            "search", f"ledger deficit: {candidate} unsearched")
+
+        visit_node = graph.add_child(
+            parent_id=node_id,
+            title=f"Visit a page about {candidate}",
+            details={
+                DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+                DetailKey.IS_LEAF.value: True,
+                DetailKey.JUSTIFICATION.value: (
+                    f"Task ledger: no visited page supports '{candidate}', so the answer for it "
+                    "would be ungrounded."
+                ),
+                DetailKey.GOAL.value: f"Visit a page about {candidate}",
+                "link_idea": f"URL for {candidate} from search results",
+                "link_count": 1,
+                DetailKey.REQUIRES_DATA.value: {
+                    "type": URLS_FROM_SEARCH.name,
+                    "source_node_id": source_id,
+                },
+            },
+        )
+        _record_enforce(telemetry, step_index, visit_node.node_id,
+                        "visit", f"ledger deficit: {candidate} unvisited")
+        handled.append(candidate)
+
+    node.details[_LEDGER_DEFICIT_MARKER] = list(handled)
+    if handled and root is not None:
+        root.details[_LEDGER_DEFICIT_BUDGET_KEY] = used + len(handled)
+        logger.warning(
+            f"[STEP {step_index}] LEDGER DEFICIT: injected {len(handled)} pair(s) under "
+            f"{node_id[:8]} for {', '.join(handled)} ({used + len(handled)}/{max_injections})"
+        )
+    return len(handled)

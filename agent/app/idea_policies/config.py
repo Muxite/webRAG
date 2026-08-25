@@ -1212,6 +1212,17 @@ class RunPolicy:
     stays the decision-maker — nothing here overrides ``goal_achieved`` or the deliverable, it
     only changes what the model is shown. Off by default and absent from the shipped settings,
     same as the five above.
+
+    ``deficit_driven_injection`` generalises the deficit remediation the coverage gate already
+    performs at the ROOT (``post_expansion_hooks.inject_coverage_visits``) to ANY completing
+    node: whenever a node finishes and the ledger still reports an entity with no successful
+    visit anywhere, a targeted SEARCH+VISIT pair is attached to THAT node — where the deficit
+    was noticed — instead of being forced back to the root. DEPENDS ON
+    ``ledger_mode == "observe"``: the unresolved set is read from the run's task ledger, so with
+    the ledger off the flag is inert on its own and the injection is a no-op (same
+    fails-open-to-nothing dependency shape as ``sibling_context_delta``). Deterministic and
+    non-LLM: no prompt is touched. Off by default and absent from the shipped settings, same as
+    the six above.
     """
 
     ledger_mode: str = "off"
@@ -1220,6 +1231,7 @@ class RunPolicy:
     evidence_store_mode: str = "off"
     deterministic_merge_view: bool = False
     merge_uses_evidence_view: bool = False
+    deficit_driven_injection: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1228,6 +1240,7 @@ class RunPolicy:
         "evidence_store_mode": "run_policy_evidence_store_mode",
         "deterministic_merge_view": "run_policy_deterministic_merge_view",
         "merge_uses_evidence_view": "run_policy_merge_uses_evidence_view",
+        "deficit_driven_injection": "run_policy_deficit_driven_injection",
     }
 
     @classmethod

@@ -41,6 +41,7 @@ from agent.app.idea_policies.post_expansion_hooks import (
     extract_mandate,
     inject_coverage_visits,
     inject_empty_search_followup,
+    inject_ledger_deficit_followup,
 )
 from agent.app.idea_policies.mandate_requirements import parse_mandate_requirements
 from agent.app.idea_policies.grounding import evaluate_grounding
@@ -2604,6 +2605,41 @@ class IdeaDagEngine:
             self._logger.warning(f"[EMPTY SEARCH INJECT] failed: {exc}")
             return 0
 
+    def _maybe_inject_ledger_deficit_followup(
+        self, graph: IdeaDag, node_id: str, step_index: int
+    ) -> int:
+        """Answer a ledger deficit where it was noticed, instead of only at the root.
+
+        No-op unless ``run_policy.deficit_driven_injection``, and DEPENDS ON the task ledger
+        (``ledger_mode == "observe"``): the unresolved set is the ledger's, so with the ledger
+        off there is nothing to read and the flag fails open to nothing. ``TaskLedger.refresh``
+        is idempotent and is already called per completion by the empty-search remediation
+        above, so re-deriving it here costs one more coverage-gate pass over the graph.
+
+        :param graph: Graph being remediated.
+        :param node_id: The just-completed node; the corrective pair becomes its child.
+        :param step_index: Current step, for logging.
+        :returns: Number of corrective pairs injected.
+        """
+        if not self._cfg.run_policy.deficit_driven_injection:
+            return 0
+        if self._cfg.run_policy.ledger_mode != "observe":
+            return 0
+        ledger = getattr(self, "_task_ledger", None)
+        if ledger is None:
+            return 0
+        try:
+            return inject_ledger_deficit_followup(
+                graph, node_id, step_index, self._logger,
+                telemetry=getattr(self.io, "telemetry", None),
+                unresolved_entities=list(ledger.refresh(graph).unresolved_entities),
+                mandate=getattr(ledger, "mandate", "") or "",
+                max_injections=self._cfg.engine.coverage_visit_injection_max,
+            )
+        except Exception as exc:  # noqa: BLE001 - remediation must never crash a run
+            self._logger.warning(f"[LEDGER DEFICIT INJECT] failed: {exc}")
+            return 0
+
     def _request_root_widen(self, graph: IdeaDag, reason: str) -> bool:
         """Ask for the root to be expanded again, additively.
 
@@ -3038,6 +3074,11 @@ class IdeaDagEngine:
             # of the completion triggers on purpose: the ones above may re-expand this leaf
             # into a real follow-up, and a node with children is not a dead end to remediate.
             self._maybe_inject_empty_search_followup(graph, node_id, step_index)
+            # Ledger-deficit remediation (no-op unless run_policy.deficit_driven_injection AND
+            # the ledger is observing). After the empty-search path on purpose: this one gives
+            # the completing node children, which is exactly what that path treats as "already
+            # has a real follow-up".
+            self._maybe_inject_ledger_deficit_followup(graph, node_id, step_index)
         return status
 
     async def _maybe_record_evidence(self, graph: IdeaDag, node_id: str) -> None:

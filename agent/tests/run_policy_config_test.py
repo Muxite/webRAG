@@ -111,6 +111,22 @@ def test_shipped_settings_leave_the_merge_evidence_view_off():
     assert RunPolicy.from_settings(settings).merge_uses_evidence_view is False
 
 
+def test_deficit_driven_injection_defaults_to_false_when_the_key_is_absent():
+    assert RunPolicy.from_settings({}).deficit_driven_injection is False
+
+
+def test_deficit_driven_injection_resolves_from_settings():
+    resolved = RunPolicy.from_settings({"run_policy_deficit_driven_injection": True})
+    assert resolved.deficit_driven_injection is True
+
+
+def test_shipped_settings_leave_the_deficit_driven_injection_off():
+    """Absent by design; it also needs ``ledger_mode == "observe"`` to inject anything."""
+    settings = load_idea_dag_settings()
+    assert "run_policy_deficit_driven_injection" not in settings
+    assert RunPolicy.from_settings(settings).deficit_driven_injection is False
+
+
 def test_idea_config_exposes_the_group():
     cfg = IdeaConfig.from_settings({})
     assert isinstance(cfg.run_policy, RunPolicy)
@@ -139,6 +155,10 @@ def test_idea_config_exposes_the_group():
     assert cfg.run_policy.merge_uses_evidence_view is False
     consumed = IdeaConfig.from_settings({"run_policy_merge_uses_evidence_view": True})
     assert consumed.run_policy.merge_uses_evidence_view is True
+
+    assert cfg.run_policy.deficit_driven_injection is False
+    deficit = IdeaConfig.from_settings({"run_policy_deficit_driven_injection": True})
+    assert deficit.run_policy.deficit_driven_injection is True
 
 
 def test_group_follows_the_frozen_dataclass_convention():
