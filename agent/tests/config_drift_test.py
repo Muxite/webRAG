@@ -75,6 +75,10 @@ INTENTIONALLY_JSON_ABSENT = {
     # armed, is the only one of these that adds NODES: absent means the shipped graph
     # shape is byte-identical to today's.
     "run_policy_deficit_driven_injection",
+    # And for the visit URL identity guard, which is the only one of these that can turn a
+    # (wrongly) successful visit into a failure: absent means the shipped fallback cascade
+    # behaves exactly as it does today.
+    "run_policy_visit_url_identity_guard",
     # ToolsConfig: the core menu's shipped source of truth is still the legacy
     # `allowed_actions` key (which callers override per run); shipping the typed
     # override too would let a JSON default clobber those overrides. Documented

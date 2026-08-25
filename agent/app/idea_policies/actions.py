@@ -988,6 +988,64 @@ class VisitLeafAction(LeafAction):
         
         return None
     
+    #: Capitalised words that describe the ACT of visiting rather than WHICH page — the leading
+    #: verb of nearly every planner-written visit title, plus the page-type nouns.
+    _GENERIC_TITLE_WORDS = frozenset({
+        "Visit", "Open", "Read", "Fetch", "Retrieve", "Extract", "Check", "Find", "Search",
+        "Page", "Pages", "Site", "Website", "Article", "Wikipedia", "Wiki", "Source", "Sources",
+    })
+    _CAPITALISED_WORD_RE = re.compile(r"\b[A-Z][A-Za-z0-9]{2,}\b")
+
+    @classmethod
+    def _named_entities(cls, *texts: Optional[str]) -> List[str]:
+        """The things a visit leaf NAMES, as written: capitalised words minus the visit verbs.
+
+        Deliberately shallow — capitalisation is the one signal available without a model, and
+        the only question asked of it is "does this leaf name anything at all". A leaf that
+        names Suez Canal is one whose grounding can be checked against a URL; a leaf titled
+        "visit a source page" names nothing and no check is possible. Never used to decide which
+        page is RIGHT, only to reject pages that mention none of the leaf's own names.
+        """
+        names: List[str] = []
+        for text in texts:
+            if not isinstance(text, str):
+                continue
+            for word in cls._CAPITALISED_WORD_RE.findall(text):
+                if word not in cls._GENERIC_TITLE_WORDS and word not in names:
+                    names.append(word)
+        return names
+
+    def _distinguishing_names(
+        self, graph: IdeaDag, node: IdeaNode, parent: Optional[IdeaNode]
+    ) -> List[str]:
+        """The names that tell THIS leaf apart from its siblings — its own, minus the shared ones.
+
+        A breadth fan-out names one entity per arm and repeats the category word in every title
+        ("the Suez Canal page", "the Erie Canal page"), so "does this URL mention a name the leaf
+        uses" is satisfied by ``/wiki/Erie_Canal`` for the Suez leaf — the exact confusion the
+        guard exists to catch. Dropping the names the siblings ALSO use leaves ``Suez``, which
+        the wrong page does not mention.
+
+        Empty when the leaf names nothing, and empty when nothing separates it from a sibling
+        (two identically-titled leaves): both mean the leaf cannot be told apart this way, and
+        the guard declines to judge rather than guessing in the other direction.
+        """
+        named = self._named_entities(node.title, node.details.get(DetailKey.INTENT.value))
+        if not named or parent is None:
+            return named
+        shared = set()
+        for sibling_id in parent.children:
+            if sibling_id == node.node_id:
+                continue
+            sibling = graph.get_node(sibling_id)
+            if sibling is None:
+                continue
+            for name in self._named_entities(
+                sibling.title, sibling.details.get(DetailKey.INTENT.value)
+            ):
+                shared.add(name.lower())
+        return [name for name in named if name.lower() not in shared]
+
     def _extract_url_from_sibling_results(self, graph: IdeaDag, node: IdeaNode) -> Optional[str]:
         import re
 
@@ -1050,6 +1108,28 @@ class VisitLeafAction(LeafAction):
         unique_links = self._drop_chrome_urls(unique_links, "sibling results")
         if not unique_links:
             return None
+
+        # A sibling's link is a GUESS about which page THIS leaf wants, and both steps below
+        # hand one over unconditionally: best word overlap, else the first link outright. On a
+        # breadth fan-out that guess is routinely a DIFFERENT arm's entity, and the visit then
+        # reports success on it. With `visit_url_identity_guard` on, a leaf that names something
+        # only considers links that mention one of its own names, and declines rather than guess
+        # when none does -- a loud failure the run can still remediate beats silent wrong
+        # grounding. A leaf that names nothing ("visit a source page") is unchanged: it has no
+        # identity to violate, and refusing there would only lose it its one candidate.
+        if self._cfg.run_policy.visit_url_identity_guard:
+            distinguishing = self._distinguishing_names(graph, node, parent)
+            if distinguishing:
+                lowered = [name.lower() for name in distinguishing]
+                on_topic = [u for u in unique_links if any(t in u.lower() for t in lowered)]
+                if not on_topic:
+                    self._logger.warning(
+                        f"[VISIT] Identity guard: declining the sibling-link fallback. This leaf "
+                        f"names {', '.join(distinguishing[:3])} and none of the "
+                        f"{len(unique_links)} sibling link(s) mentions it"
+                    )
+                    return None
+                unique_links = on_topic
 
         search_terms = node_title_lower + " " + node_intent
         best_link = None

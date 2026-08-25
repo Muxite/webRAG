@@ -1223,6 +1223,19 @@ class RunPolicy:
     fails-open-to-nothing dependency shape as ``sibling_context_delta``). Deterministic and
     non-LLM: no prompt is touched. Off by default and absent from the shipped settings, same as
     the six above.
+
+    ``visit_url_identity_guard`` states that a VISIT which NAMES an entity may not be grounded
+    on a sibling's page that does not mention it. A visit with no URL and no usable search pool
+    ends at ``VisitLeafAction._extract_url_from_sibling_results``, whose last two steps are
+    guesses: best word overlap, else the first sibling link outright. On a breadth fan-out those
+    guesses land on ANOTHER arm's entity -- measured live, 13 of 62 such visits opened a page
+    sharing no identity token with their own leaf ("Visit the Suez Canal page" reading
+    ``/wiki/Erie_Canal``), each reported ``success=True``. With the flag on, the sibling pool is
+    first restricted to links that mention a name the leaf itself uses, and an empty restriction
+    declines instead of guessing -- so the leaf fails loudly (and stays open to remediation)
+    rather than fabricating grounding. Applies ONLY to the sibling-results fallback; a declared
+    URL, a ``requires_data`` source pool and the Chroma link query are untouched. Off by default
+    and absent from the shipped settings, same as the seven above.
     """
 
     ledger_mode: str = "off"
@@ -1232,6 +1245,7 @@ class RunPolicy:
     deterministic_merge_view: bool = False
     merge_uses_evidence_view: bool = False
     deficit_driven_injection: bool = False
+    visit_url_identity_guard: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1241,6 +1255,7 @@ class RunPolicy:
         "deterministic_merge_view": "run_policy_deterministic_merge_view",
         "merge_uses_evidence_view": "run_policy_merge_uses_evidence_view",
         "deficit_driven_injection": "run_policy_deficit_driven_injection",
+        "visit_url_identity_guard": "run_policy_visit_url_identity_guard",
     }
 
     @classmethod
