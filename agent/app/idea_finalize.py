@@ -327,16 +327,68 @@ def _apply_grounding_gate(
     if unverified:
         deliverable = _strip_urls(deliverable, unverified)
     payload["final_deliverable"] = _UNGROUNDED_BANNER + deliverable
-    payload["success"] = False
     payload["goal_achieved"] = False
     payload["grounded"] = False
+    payload["grounding_satisfied"] = False
     payload["grounding_gate"] = "refused-ungrounded"
     if unverified:
         payload["stripped_citations"] = unverified
+    # Re-derive so `success`/`finalization_status` reflect the refusal (they were computed
+    # from the pre-gate signals a moment ago).
+    derive_completion_fields(payload)
     _logger.warning(
         "[GROUNDING-GATE] zero opened pages on a grounded-research mandate: "
         f"refusing to present the answer as grounded (stripped {len(unverified)} citation(s))"
     )
+
+
+def derive_completion_fields(payload: Dict[str, Any]) -> None:
+    """(Re)compute the derived completion signals in place, from the payload's own fields.
+
+    ``success`` used to be one boolean with two escape hatches: with
+    ``final_allow_partial_success`` on it only asked "is the text non-empty", so a run whose
+    merge said ``goal_achieved=False`` and whose retrieval actions all failed still reported
+    success. The separable signals live on the payload now and ``success`` is a computed
+    back-compat alias of ``finalization_status``.
+
+    Reads (each defaulted, so a partially built payload is safe): ``final_deliverable``,
+    ``execution_completed``, ``goal_achieved``, ``has_failures``, ``grounding_satisfied``,
+    ``coverage_ratio``. Writes ``deliverable_complete``, ``finalization_status``, ``success``
+    and fills in any missing input key with its default, so every payload carries the full set.
+
+    Status precedence (first match wins; every payload maps to exactly one):
+
+    1. ``failed``   — finalization never produced a usable structured result.
+    2. ``blocked``  — an essential dependency failed: no deliverable text, the grounding gate
+       refused, or a critical action failed without the goal being reached anyway.
+    3. ``complete`` — goal reached, no critical failure, grounded, full candidate coverage.
+    4. ``partial``  — anything else that still produced an answer.
+
+    Idempotent: callers that later learn a better signal (the grounding gate, the engine's
+    candidate-coverage ratio) set that field and call this again.
+    """
+    deliverable = str(payload.get("final_deliverable", "") or "")
+    has_text = bool(deliverable.strip())
+    execution_completed = bool(payload.setdefault("execution_completed", True))
+    grounding_satisfied = bool(payload.setdefault("grounding_satisfied", True))
+    coverage_ratio = float(payload.setdefault("coverage_ratio", 1.0))
+    payload.setdefault("claim_verification_ratio", 1.0)
+    goal_achieved = bool(payload.get("goal_achieved", False))
+    has_failures = bool(payload.get("has_failures", False))
+
+    deliverable_complete = goal_achieved and not has_failures
+    if not execution_completed:
+        status = "failed"
+    elif not has_text or not grounding_satisfied or (has_failures and not goal_achieved):
+        status = "blocked"
+    elif deliverable_complete and coverage_ratio >= 1.0:
+        status = "complete"
+    else:
+        status = "partial"
+
+    payload["deliverable_complete"] = deliverable_complete
+    payload["finalization_status"] = status
+    payload["success"] = status in ("complete", "partial") and has_text
 
 
 def _looks_truncated(response: Optional[str], max_completion_tokens: int) -> bool:
@@ -1119,7 +1171,11 @@ async def build_final_payload(
         # from a real model answer. Set on this path only — absent means a normal finalize,
         # matching how the other optional detail keys here (`truncated`, `unverified_citations`)
         # are emitted only when they apply.
-        payload = {"final_deliverable": fallback, "action_summary": "Fallback: LLM finalize call failed", "success": bool(fallback.strip()), "sources": sources, "is_fallback_deliverable": True}
+        # The finalize LLM call failed but was RECOVERED from real graph data, so the run
+        # itself still reached a usable end state: `execution_completed` stays True and the
+        # answer lands as `partial`.
+        payload = {"final_deliverable": fallback, "action_summary": "Fallback: LLM finalize call failed", "sources": sources, "is_fallback_deliverable": True}
+        derive_completion_fields(payload)
         if cfg.final.require_grounding:
             _apply_grounding_gate(payload, graph, mandate, sources)
         return payload
@@ -1165,11 +1221,6 @@ async def build_final_payload(
             if n.details.get(DetailKey.ACTION.value) in critical_actions
         ]
         has_critical_failures = len(critical_failures) > 0
-        allow_partial_success = cfg.final.allow_partial_success
-        if allow_partial_success:
-            success = bool(deliverable.strip())
-        else:
-            success = bool(deliverable.strip()) and (goal_achieved or not has_critical_failures)
 
         unverified = _unverified_citations(deliverable, sources)
         truncated = _looks_truncated(response, int(getattr(cfg.final, "max_tokens", 0) or 0))
@@ -1180,15 +1231,24 @@ async def build_final_payload(
         payload = {
             "final_deliverable": deliverable,
             "action_summary": action_summary,
-            "success": success,
             "goal_achieved": goal_achieved,
             "has_failures": has_critical_failures,
             "sources": sources,
+            "execution_completed": True,
+            # Coarse proxy: no per-candidate ledger exists at payload-build time, so full
+            # coverage is assumed here and `IdeaEngine.finalize` lowers it when the (opt-in)
+            # candidate-coverage gate reports unchecked candidates. Item 2's evidence ledger
+            # replaces this with a real per-claim ratio.
+            "coverage_ratio": 1.0,
+            # Equally coarse: "did every URL the answer cites belong to a page we opened",
+            # collapsed to 1.0/0.0 rather than a real per-claim verification rate.
+            "claim_verification_ratio": 0.0 if unverified else 1.0,
         }
         if unverified:
             payload["unverified_citations"] = unverified
         if truncated:
             payload["truncated"] = True
+        derive_completion_fields(payload)
         # F31: last thing before the payload leaves — an answer with zero opened pages on a
         # grounded-research mandate is refused rather than presented as a researched result.
         if cfg.final.require_grounding:
@@ -1196,7 +1256,10 @@ async def build_final_payload(
         return payload
     except Exception as e:
         _logger.warning(f"[FINALIZE] Failed to parse response: {e}")
-        payload = {"final_deliverable": response, "action_summary": "", "success": False, "sources": sources}
+        # No structured result came back at all -> the run did not reach a usable end state.
+        payload = {"final_deliverable": response, "action_summary": "", "sources": sources,
+                   "execution_completed": False}
+        derive_completion_fields(payload)
         # A parse failure on a near-cap response is itself a strong truncation signal.
         if _looks_truncated(response, int(getattr(cfg.final, "max_tokens", 0) or 0)):
             payload["truncated"] = True

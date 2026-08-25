@@ -25,7 +25,11 @@ from agent.app.idea_policies import (
     LeafActionRegistry,
     NodeDetailsExtractor,
 )
-from agent.app.idea_finalize import build_final_payload, grounding_gate_would_refuse
+from agent.app.idea_finalize import (
+    build_final_payload,
+    derive_completion_fields,
+    grounding_gate_would_refuse,
+)
 from agent.app.idea_branch_pair import BranchPair, find_branch_pair, get_completion_path
 from agent.app.got_operations import GoTOperations
 from agent.app.idea_checkpointer import Checkpointer, create_checkpointer_from_env
@@ -631,6 +635,13 @@ class IdeaDagEngine:
         if _coverage_incomplete is not None:
             final_payload["candidate_coverage_incomplete"] = True
             final_payload["candidate_coverage_missing"] = list(_coverage_incomplete.missing)
+            # The gate already counted named vs resolved candidates, so the payload gets a real
+            # coverage ratio here instead of finalize's optimistic 1.0 placeholder — and the
+            # derived status is recomputed so an unchecked roster can't read as "complete".
+            _named = len(_coverage_incomplete.named)
+            if _named:
+                final_payload["coverage_ratio"] = len(_coverage_incomplete.resolved) / _named
+                derive_completion_fields(final_payload)
             self._logger.warning(
                 f"[COVERAGE] Finalizing with unchecked candidates: {_coverage_incomplete.missing}"
             )
@@ -663,7 +674,12 @@ class IdeaDagEngine:
                     graph, _req,
                     require_page_identity=self._cfg.final.require_grounding_page_identity,
                 )
-                final_payload["grounded"] = bool(_g.grounded)
+                # AND, never overwrite: `_apply_grounding_gate` may already have refused this
+                # payload, and a second opinion here must not silently upgrade its verdict.
+                _prior_grounded = final_payload.get("grounded")
+                final_payload["grounded"] = bool(_g.grounded) and (
+                    True if _prior_grounded is None else bool(_prior_grounded)
+                )
                 final_payload["missing_requirements"] = _g.missing
                 final_payload["grounding_replans"] = int(getattr(self, "_grounding_replans", 0))
                 self._record_decision(
