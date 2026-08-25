@@ -426,9 +426,7 @@ TEST_PRIORITY_ORDER = [
     # ledger/deficit-injector null result interpretable — each isolates ONE failure mechanism the
     # core24 suite never exercises.
     "303",  # Mechanism: ENTITY COLLISION — near-duplicate names on one page: Tay rail bridge length vs Tay Road Bridge (9/10) - level=navigation, weight=medium
-    # Mechanism suite (DAG v3 ledger plan §8.3): one mechanism per task, purpose-built to make the
-    # ledger/deficit-injector null result interpretable.
-    "158",  # Mechanism: stale-vs-current page-vs-page source conflict; a supplied confident page must be VERIFIED against an independent source (8/10) - level=integration, weight=long
+    "304",  # Mechanism: SOURCE CONFLICT requiring VERIFY — stale-vs-current page-vs-page temporal conflict; a supplied confident page must be checked against an independent source (8/10) - level=integration, weight=long
     "014",  # Deep Link Exploration (5/10) - Priority 12
     "020",  # GitHub Repository Analysis (4/10) - Priority 11
     "009",  # Deep Research Synthesis (9/10) - Priority 12
