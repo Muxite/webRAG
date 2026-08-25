@@ -1,0 +1,23 @@
+[
+  {"run_id": "dagv3p0_mech", "axis": "mechanism_suite_local",
+   "tasks": "158,159,160,302,303,304,305", "arms": "good_adaptive", "jobs": 1},
+
+  {"run_id": "dagv3p0_core24base", "axis": "phase0_local", "task_set": "core24",
+   "arms": "baseline,good_adaptive", "jobs": 1},
+
+  {"run_id": "dagv3p0_constrained", "axis": "phase0_local", "task_set": "core24",
+   "arms": "good_adaptive,good_adaptive_constrained", "jobs": 1},
+
+  {"run_id": "dagv3p0_sharedcontext", "axis": "phase0_local", "task_set": "core24",
+   "arms": "good_adaptive,good_adaptive_sharedcontext", "jobs": 1},
+
+  {"run_id": "dagv3p0_noreexpand", "axis": "phase0_local", "task_set": "core24",
+   "arms": "good_adaptive,good_adaptive_noreexpand", "jobs": 1},
+
+  {"run_id": "dagv3p0_seqmatched", "axis": "phase0_local", "task_set": "core24",
+   "arms": "good_adaptive,sequential_react_context_matched", "jobs": 1,
+   "variant": "sequential_react"},
+
+  {"run_id": "dagv3p0_eqstub", "axis": "phase0_local", "task_set": "smoke8",
+   "arms": "good_adaptive", "jobs": 1, "variant": "evidence_queue_deterministic"}
+]

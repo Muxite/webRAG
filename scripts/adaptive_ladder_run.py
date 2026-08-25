@@ -604,6 +604,43 @@ AXES = {
              "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
         ],
     },
+    # 2026-08-25, DAG v3 master plan Phase 0 (docs/DAG_V3_LEDGER_MASTER_PLAN_2026-08-25.md
+    # sec.3): five ablation arms on the EXISTING graph engine, isolating whether core24's
+    # graph-vs-sequential_react gap is caused by branch-isolated context, action-format churn,
+    # repeated-subgoal churn, or a raw context-budget mismatch with sequential_react -- before
+    # betting on a full evidence-queue rewrite. First batch is qwen2.5:7b only (local GPU cells
+    # are confirmed fully serialized regardless of --jobs; broader models are a second batch
+    # once this one is directionally reviewed). Drive with:
+    #   --axis phase0_local --task-set core24 \
+    #   --arms good_adaptive,good_adaptive_constrained,good_adaptive_sharedcontext,good_adaptive_noreexpand
+    # sequential_react_context_matched runs separately (--variant sequential_react, its own
+    # profile carries no graph levers) and evidence_queue_deterministic separately
+    # (--variant evidence_queue_deterministic) -- both reuse this same axis/task grid.
+    "phase0_local": {
+        "json_telemetry": True,
+        "ladders": [
+            # R=1 for the first overnight batch, not R=3: this axis is run against MULTIPLE
+            # 2-arm pairs across all 24 core24 tasks per entry, and this repo's own precedent
+            # (capspec_chain, 2026-08-15) found task count resolves arm ranking faster than rep
+            # count at this tier. Bump to R=2+ per-pair, resumed under the same run-id, only for
+            # whichever pair comes back underpowered/borderline (same pattern as
+            # ledger_deficit_local's R=1-then-R=2 bump).
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 1, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
+    },
+    # 2026-08-25, DAG v3 master plan sec.8.3: the 7 new mechanism-suite tasks (158/159/160/
+    # 302-305) authored this session so the ledger/deficit-injector's earlier underpowered
+    # null result becomes interpretable, and so any future architecture change has a holdout
+    # that isn't shaped like an entity-list slot-filling table. R=3 for smoke-level signal on
+    # a fixed narrow task set (not core24 -- use --tasks with the 7 new ids directly).
+    "mechanism_suite_local": {
+        "json_telemetry": True,
+        "ladders": [
+            {"model": "qwen2.5:7b", "tag": "q7", "reps": 3, "burn": None,
+             "provider": "openai_compatible", "api_url": "http://localhost:11435/v1"},
+        ],
+    },
 }
 
 
