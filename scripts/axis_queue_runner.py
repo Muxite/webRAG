@@ -161,6 +161,17 @@ def main():
     emit(f"axis_queue_runner starting: {len(queue)} entries, log={log_path}")
     try:
         for i, entry in enumerate(queue):
+            # Re-check search infra before EVERY entry, not just once at queue start. An
+            # 11+ hour unattended queue can outlive a search key (this repo already lost a
+            # full 144-cell run once to a dead Serper key that went undetected for the
+            # entire run -- docs/handoffs/GRAPH_VS_SEQREACT_GAP_INVESTIGATION_2026-08-22.md).
+            # A one-time preflight only catches a key that was ALREADY dead at launch.
+            if not args.skip_preflight and not search_infra_healthy():
+                emit(f"[{i+1}/{len(queue)}] SKIPPED run_id={entry['run_id']} axis={entry.get('axis','')} "
+                     f"-- search infra unhealthy at this point in the queue; not burning GPU "
+                     f"hours on what would be infra-confounded cells. Will re-check before the "
+                     f"next entry in case it recovers.")
+                continue
             cmd = build_cell_command(entry)
             emit(f"[{i+1}/{len(queue)}] START run_id={entry['run_id']} axis={entry.get('axis','')} "
                  f"cmd={' '.join(cmd)}")
@@ -170,10 +181,11 @@ def main():
             status = "OK" if proc.returncode == 0 else f"FAILED rc={proc.returncode}"
             emit(f"[{i+1}/{len(queue)}] {status} run_id={entry['run_id']} axis={entry.get('axis','')} "
                  f"elapsed={dt:.0f}s")
-            # Deliberately no early-exit on failure: a single bad axis/arm must not stall the
-            # rest of an unattended overnight queue. Every entry's own driver log + result JSONs
-            # remain the source of truth for what actually happened; this log is only the
-            # top-level sequencing record.
+            # Deliberately no early-exit on a cell-command failure: a single bad axis/arm must
+            # not stall the rest of an unattended overnight queue. Every entry's own driver log
+            # + result JSONs remain the source of truth for what actually happened; this log is
+            # only the top-level sequencing record. Infra failures (above) are handled
+            # separately by skipping rather than running a doomed entry at all.
         emit("axis_queue_runner: all entries processed")
     finally:
         release_pid_lock(LOCK_PATH)
