@@ -127,6 +127,30 @@ def _all_text(result: Dict[str, Any]) -> str:
     return " ".join(parts)
 
 
+def _sources_cited(result: Dict[str, Any], pattern: "re.Pattern") -> bool:
+    """Check the engine's structured citations array (result['output']['sources']) for the
+    expected slug/URL, in addition to the prose-text check. The engine can populate the exact
+    correct source URL there even when the agent's prose answer never repeats the literal
+    string -- relying on prose alone is a false-negative grading bug."""
+    if not isinstance(result, dict):
+        return False
+    output = result.get("output")
+    if not isinstance(output, dict):
+        return False
+    sources = output.get("sources")
+    if not isinstance(sources, list):
+        return False
+    for src in sources:
+        if isinstance(src, dict):
+            for field in ("url", "title"):
+                val = src.get(field)
+                if isinstance(val, str) and pattern.search(val.lower()):
+                    return True
+        elif isinstance(src, str) and pattern.search(src.lower()):
+            return True
+    return False
+
+
 def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     """KEYSTONE: the revised leader's batting average (.371/.372) AND the name Josh Gibson — both
     required so neither a bare number nor a bare name (nor the reflex Ty Cobb) passes. Also requires
@@ -140,7 +164,9 @@ def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -
 
 def _read_evidence(result: Dict[str, Any], observability: Dict[str, Any]) -> bool:
     n = int((observability or {}).get("visit", {}).get("count", 0) or 0)
-    return n > 0 or bool(re.search(_SLUG_RX, _all_text(result).lower()))
+    return n > 0 or bool(re.search(_SLUG_RX, _all_text(result).lower())) or _sources_cited(
+        result, re.compile(_SLUG_RX)
+    )
 
 
 def validate_visits(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
@@ -194,7 +220,9 @@ def validate_citation(result: Dict[str, Any], observability: Dict[str, Any]) -> 
     if not _keystone_ok(result, observability):
         return {"check": "citation", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> citation not credited"}
-    cited = bool(re.search(_SLUG_RX, _all_text(result).lower()))
+    cited = bool(re.search(_SLUG_RX, _all_text(result).lower())) or _sources_cited(
+        result, re.compile(_SLUG_RX)
+    )
     return {"check": "citation", "passed": cited, "score": 1.0 if cited else 0.0,
             "reason": f"authoritative source cited={cited}"}
 
