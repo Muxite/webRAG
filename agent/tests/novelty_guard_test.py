@@ -12,7 +12,10 @@ The load-bearing claims:
   budget, while a genuinely different URL/query does;
 * the budget is spent only by NO-PROGRESS attempts: new evidence since the last attempt of a key
   resets it, so a productive step is never blocked;
-* a blocked action fails without spending a tool call.
+* progress counts per BRANCH, not run-wide: a sibling branch that keeps learning must not refresh
+  a dead end's budget (the regression that made the guard a no-op on multi-branch runs);
+* a blocked action fails without spending a tool call;
+* an armed run reports what it blocked in ``final_payload["novelty_guard"]``.
 """
 from __future__ import annotations
 
@@ -149,6 +152,51 @@ def test_the_watermark_counts_the_evidence_and_claim_sidecars():
     assert ng.evidence_watermark(graph) == 3     # one Evidence + two Claims
 
 
+def test_the_watermark_is_scoped_to_the_nodes_branch():
+    """Evidence on a SIBLING branch is not this branch's progress."""
+    graph = IdeaDag(root_title="root")
+    branch_a = graph.add_child(graph.root_id(), "branch A")
+    branch_b = graph.add_child(graph.root_id(), "branch B")
+    stuck = graph.add_child(
+        branch_b.node_id, "the dead end",
+        details={DetailKey.ACTION.value: IdeaActionType.VISIT.value, "url": "https://x"},
+    )
+    graph.add_child(
+        branch_a.node_id, "branch A learned something",
+        details={DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
+            action="visit", content="text")},
+    )
+    assert ng.evidence_watermark(graph) == 1                      # run-wide
+    assert ng.evidence_watermark(graph, stuck.node_id) == 0       # branch B's own
+    graph.add_child(
+        branch_b.node_id, "branch B learned something",
+        details={DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
+            action="visit", content="text")},
+    )
+    assert ng.evidence_watermark(graph, stuck.node_id) == 1
+
+
+def test_the_branch_scope_is_the_roots_own_child():
+    graph = IdeaDag(root_title="root")
+    branch = graph.add_child(graph.root_id(), "branch")
+    deep = graph.add_child(graph.add_child(branch.node_id, "mid").node_id, "leaf")
+    assert ng.branch_scope_id(graph, deep.node_id) == branch.node_id
+    assert ng.branch_scope_id(graph, branch.node_id) == branch.node_id
+    # The root has no narrower scope than the whole graph, and neither does an unknown node.
+    assert ng.branch_scope_id(graph, graph.root_id()) is None
+    assert ng.branch_scope_id(graph, "nope") is None
+
+
+def test_a_root_level_action_falls_back_to_the_whole_graph():
+    graph = IdeaDag(root_title="root")
+    graph.add_child(
+        graph.root_id(), "visit",
+        details={DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
+            action="visit", content="text")},
+    )
+    assert ng.evidence_watermark(graph, graph.root_id()) == 1
+
+
 def test_the_watermark_never_raises_on_a_broken_graph():
     class Broken:
         def iter_breadth_first(self):
@@ -206,14 +254,54 @@ async def test_the_veto_blocks_the_third_identical_no_progress_attempt():
 
 
 @pytest.mark.asyncio
-async def test_the_veto_never_blocks_while_the_run_is_learning():
+async def test_progress_on_another_branch_does_not_unblock_a_dead_end():
+    """The regression: the watermark is BRANCH-scoped, not run-scoped.
+
+    A multi-branch run (the shape the guard exists for --
+    ``agent/app/idea_tests/test_305_mech_dead_end_retry_cap.py`` has three resolvable branches
+    plus one deliberate dead end) kept the run-wide watermark climbing off the HEALTHY branches,
+    which read as "new evidence appeared" for the stuck one and meant the dead end was never
+    blocked at all.
+    """
     engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
-    graph, node_id = _graph_with_visit()
-    for i in range(6):
-        assert engine._maybe_block_repeated_action(graph, node_id) is None
-        # ... some branch records a new successful result between attempts.
+    graph = IdeaDag(root_title="root", root_details={"mandate": "Research"})
+    branch_a = graph.add_child(graph.root_id(), "branch A")
+    branch_b = graph.add_child(graph.root_id(), "branch B")
+    dead_end = graph.add_child(
+        branch_b.node_id, "visit the dead end",
+        details={DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+                 "url": "https://example.com/dead-end"},
+    )
+    blocked = None
+    for i in range(3):
+        blocked = engine._maybe_block_repeated_action(graph, dead_end.node_id)
+        if blocked is not None:
+            break
+        # Branch A keeps learning things that have nothing to do with branch B's requirement.
         graph.add_child(
-            graph.root_id(), f"progress {i}",
+            branch_a.node_id, f"branch A progress {i}",
+            details={DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
+                action="visit", content="a page that resolves branch A")},
+        )
+    assert blocked is not None
+    assert blocked["novelty_blocked"] is True
+
+
+@pytest.mark.asyncio
+async def test_progress_on_the_same_branch_still_unblocks():
+    """The other half: a branch that IS learning keeps its budget refreshed."""
+    engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
+    graph = IdeaDag(root_title="root", root_details={"mandate": "Research"})
+    branch = graph.add_child(graph.root_id(), "branch B")
+    node = graph.add_child(
+        branch.node_id, "visit it",
+        details={DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+                 "url": "https://example.com/a"},
+    )
+    for i in range(6):
+        assert engine._maybe_block_repeated_action(graph, node.node_id) is None
+        graph.add_child(
+            branch.node_id, f"progress {i}",
             details={DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
                 action="visit", content="new page")},
         )
@@ -255,3 +343,50 @@ async def test_dispatch_is_unchanged_with_the_flag_off():
         result = await engine._execute_action_inner(graph, graph.root_id(), node_id)
         assert "novelty_blocked" not in result
     assert action.calls == 4
+
+
+# ---------------------------------------------------------------------------
+# run-level telemetry (`final_payload["novelty_guard"]`)
+# ---------------------------------------------------------------------------
+async def _finalize(monkeypatch, engine, graph):
+    import agent.app.idea_engine as engine_mod
+
+    async def _fake_final_payload(*args, **kwargs):
+        return {"final_deliverable": "answer", "goal_achieved": True, "has_failures": False}
+
+    monkeypatch.setattr(engine_mod, "build_final_payload", _fake_final_payload)
+    return await engine.finalize(graph, "Research", pending_check=False)
+
+
+@pytest.mark.asyncio
+async def test_the_payload_reports_what_the_guard_blocked(monkeypatch):
+    """Without this a run cannot be asked, from its result alone, whether the guard ever fired."""
+    engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
+    graph, node_id = _graph_with_visit()
+    for _ in range(3):
+        engine._maybe_block_repeated_action(graph, node_id)
+    payload = await _finalize(monkeypatch, engine, graph)
+    record = payload["novelty_guard"]
+    assert record["blocked_actions"] == 1
+    assert record["blocks"][0]["node_id"] == node_id
+    assert record["blocks"][0]["novelty_key"] == ng.novelty_key(
+        IdeaActionType.VISIT.value, graph.get_node(node_id).details
+    )
+    assert record["blocks"][0]["attempts"] == 2
+
+
+@pytest.mark.asyncio
+async def test_the_payload_reports_zero_when_nothing_was_blocked(monkeypatch):
+    engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
+    graph, node_id = _graph_with_visit()
+    engine._maybe_block_repeated_action(graph, node_id)
+    payload = await _finalize(monkeypatch, engine, graph)
+    assert payload["novelty_guard"] == {"blocked_actions": 0, "blocks": []}
+
+
+@pytest.mark.asyncio
+async def test_the_payload_carries_no_record_with_the_flag_off(monkeypatch):
+    engine = _make_engine(_CountingAction([]))
+    graph, _node_id = _graph_with_visit()
+    payload = await _finalize(monkeypatch, engine, graph)
+    assert "novelty_guard" not in payload

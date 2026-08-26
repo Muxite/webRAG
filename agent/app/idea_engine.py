@@ -268,6 +268,7 @@ class IdeaDagEngine:
         # dispatch). An engine instance can be reused across runs, and a key attempted in a
         # PREVIOUS run must never count against this one's budget.
         self._novelty_guard = None
+        self._novelty_blocks = []
         root_title = mandate.split("\n\nTask Statement")[0] if "\n\nTask Statement" in mandate else mandate
 
         graph: Optional[IdeaDag] = None
@@ -752,6 +753,16 @@ class IdeaDagEngine:
                 final_payload["task_ledger"] = _ledger.refresh(graph).to_dict()
             except Exception as exc:  # noqa: BLE001. Telemetry must never crash finalize
                 self._logger.warning(f"[LEDGER] finalize refresh failed: {exc}")
+
+        # Observe-only novelty/churn record, present only when the guard is armed. Read by
+        # nothing: it exists so a run can be asked, from its result JSON alone, whether the
+        # guard ever refused a step and which one.
+        if self._cfg.run_policy.novelty_guard_enabled:
+            _blocks = list(getattr(self, "_novelty_blocks", None) or [])
+            final_payload["novelty_guard"] = {
+                "blocked_actions": len(_blocks),
+                "blocks": _blocks,
+            }
 
         self._logger.info(f"[RUN] Final payload created, graph has {graph.node_count()} nodes, {len(pending_nodes) if pending_nodes else 0} pending")
         return final_payload
@@ -2972,8 +2983,14 @@ class IdeaDagEngine:
         Off by default (``run_policy_novelty_guard_enabled``): returns ``None`` without computing
         a key, so dispatch is byte-identical. Armed, it counts attempts per
         ``novelty_guard.novelty_key`` and blocks the next one once a key has spent
-        ``run_policy_novelty_guard_max_attempts`` attempts WITHOUT the run's evidence watermark
-        moving (see ``novelty_guard.evidence_watermark``); any new evidence resets that key.
+        ``run_policy_novelty_guard_max_attempts`` attempts WITHOUT the evidence watermark of ITS
+        OWN BRANCH moving (see ``novelty_guard.evidence_watermark``); new evidence on that branch
+        resets that key. Measured run-wide, a sibling branch's progress refreshes the stuck
+        branch's budget forever and nothing is ever blocked on exactly the multi-branch shape
+        this guard exists for.
+
+        Blocks are additionally recorded on ``self._novelty_blocks`` and surfaced (observe-only)
+        as ``final_payload["novelty_guard"]``.
 
         A blocked node FAILS rather than silently succeeding, which is the honest outcome and the
         one that routes the run elsewhere: FAILED is what the alternative-branch promotion and the
@@ -2999,18 +3016,24 @@ class IdeaDagEngine:
         key = _novelty.novelty_key(
             str(action_type), node.details, self._novelty_unresolved_requirements(graph)
         )
-        watermark = _novelty.evidence_watermark(graph)
-        if guard.is_blocked(key, watermark):
+        # Attempts and their watermark are counted per (BRANCH, key). The same URL pursued from
+        # two branches is two independent budgets, and -- the point of the scoping -- one
+        # branch's progress cannot refresh another branch's dead end.
+        scope = _novelty.branch_scope_id(graph, node_id)
+        state_key = f"{scope or ''}::{key}"
+        watermark = _novelty.evidence_watermark(graph, node_id)
+        if guard.is_blocked(state_key, watermark):
+            attempts = guard.attempts(state_key)
             self._logger.info(
                 f"[NOVELTY] Blocking repeated no-progress action (node={node_id}, key={key!r}, "
-                f"attempts={guard.attempts(key)})"
+                f"branch={scope}, attempts={attempts})"
             )
             result = {
                 "action": action_type,
                 "success": False,
                 "error": (
                     "Blocked by the novelty guard: this exact step was already attempted "
-                    f"{guard.attempts(key)} times and produced no new evidence. Try a different "
+                    f"{attempts} times and produced no new evidence. Try a different "
                     "source, a different query, or a different sub-goal."
                 ),
                 "retryable": False,
@@ -3021,10 +3044,21 @@ class IdeaDagEngine:
             node.status = IdeaNodeStatus.FAILED
             self._record_decision(
                 "novelty_block", node_id=node_id, chosen=str(action_type),
-                metadata={"novelty_key": key, "attempts": guard.attempts(key)},
+                metadata={"novelty_key": key, "branch": scope, "attempts": attempts},
+            )
+            # Observe-only run record, so a result JSON can say whether the guard ever fired.
+            # A decision-trace entry is not enough: the trace is not in the payload the
+            # benchmark reads, which is why the first live run of this guard produced no
+            # evidence either way about whether it had blocked anything.
+            blocks = getattr(self, "_novelty_blocks", None)
+            if blocks is None:
+                blocks = []
+                self._novelty_blocks = blocks
+            blocks.append(
+                {"node_id": node_id, "novelty_key": key, "branch": scope, "attempts": attempts}
             )
             return result
-        guard.record_attempt(key, watermark)
+        guard.record_attempt(state_key, watermark)
         return None
 
     async def _maybe_retry_tool_failure(self, graph: IdeaDag, node_id: str, action, result):

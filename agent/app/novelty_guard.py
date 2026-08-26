@@ -15,6 +15,9 @@ This module supplies the two pieces that were missing:
 * :class:`NoveltyGuard` -- attempt counting per key, reset by PROGRESS rather than by time. An
   attempt only counts against the budget if no new evidence appeared since the previous attempt
   of that same key; a key that keeps producing evidence is never blocked.
+* :func:`evidence_watermark` -- what "progress" means, measured over the BRANCH the action sits
+  on (:func:`branch_scope_id`) rather than run-wide. Run-wide, the healthy branches of a
+  multi-branch mandate hold the number up for the stuck one and nothing is ever blocked.
 
 The threshold (``max_attempts=2``, i.e. the THIRD identical no-progress attempt is blocked) is a
 FIRST GUESS, not a measured value. It should be revisited against the mechanism suite's dead-end
@@ -89,8 +92,32 @@ def novelty_key(
     return f"{_normalize(action_type)}|{canonical_target(action_type, details)}|{','.join(ids)}"
 
 
-def evidence_watermark(graph) -> int:
-    """A monotone count of the evidence this run has accumulated so far.
+def branch_scope_id(graph, node_id: Any) -> Optional[str]:
+    """The id of the top-level branch ``node_id`` sits on (the root's own child on its path).
+
+    This is the unit the watermark is measured over. Requirement ids are entity NAMES from the
+    task ledger (``agent/app/task_ledger.py``) and nothing tags an ``Evidence``/``Claim`` record
+    or an ``action_result`` with the requirement it served, so "evidence for the requirement this
+    action addresses" has no direct encoding; the branch a node hangs off is the reachability
+    proxy the graph does carry, and re-expansion mints a repeat under the SAME branch, which is
+    exactly the churn being counted.
+
+    ``None`` for the root itself, for an unknown node, or on any error -- callers read that as
+    "no narrower scope than the whole graph".
+    """
+    try:
+        path = graph.path_to_root(node_id)
+    except Exception:  # noqa: BLE001. A guard must never break the run it observes.
+        return None
+    if not path:
+        return None
+    if len(path) < 2:
+        return None      # the node IS the root
+    return str(path[-2].node_id)
+
+
+def evidence_watermark(graph, node_id: Any = None) -> int:
+    """A monotone count of the evidence accumulated inside ``node_id``'s BRANCH so far.
 
     Counts the ``Evidence``/``Claim`` sidecars that ``IdeaEngine._maybe_record_evidence`` writes
     (``evidence_store.Evidence`` / ``.Claim``) -- the records the plan names as the progress
@@ -100,18 +127,31 @@ def evidence_watermark(graph) -> int:
     configuration and every key would look like no-progress, which would turn a churn guard into
     a blanket retry cap.
 
-    Never decreases within a run (nothing removes a result or a sidecar), so a strictly greater
-    value between two attempts of the same key really does mean something new was learned.
+    SCOPE is the whole point. Counted run-wide, a multi-branch mandate -- which is the shape this
+    guard exists for -- keeps the number climbing off whichever branches are healthy, and the ONE
+    stuck branch reads that unrelated progress as "new evidence appeared" and is never blocked.
+    So the count is taken over the subtree of :func:`branch_scope_id`, and only degrades to the
+    whole graph when there is no narrower scope (a root-level action, an unknown node).
+
+    Never decreases within a branch (nothing removes a result or a sidecar), so a strictly
+    greater value between two attempts of the same key really does mean that branch learned
+    something.
     """
     from agent.app.idea_policies.action_constants import ActionResultExtractor
     from agent.app.idea_policies.base import DetailKey
 
     total = 0
+    scope_id = branch_scope_id(graph, node_id) if node_id is not None else None
     try:
-        nodes = list(graph.iter_breadth_first())
+        nodes = list(graph.iter_breadth_first(scope_id))
     except Exception:  # noqa: BLE001. A guard must never break the run it observes.
         return 0
+    seen: set = set()
     for node in nodes:
+        # A node with several parents is yielded once per parent; count it once.
+        if node.node_id in seen:
+            continue
+        seen.add(node.node_id)
         details = node.details if isinstance(node.details, dict) else {}
         if isinstance(details.get(DetailKey.EVIDENCE.value), dict):
             total += 1

@@ -1314,7 +1314,7 @@ class RunPolicy:
     ``novelty_guard_enabled`` arms the churn cap (``agent/app/novelty_guard.py``, vetoed in
     ``IdeaEngine._maybe_block_repeated_action``): an action whose novelty key -- normalized
     ``(action_type, canonical_target, unresolved_requirement_ids)`` -- has already been attempted
-    ``novelty_guard_max_attempts`` times with the run's evidence watermark unmoved is refused
+    ``novelty_guard_max_attempts`` times with its BRANCH's evidence watermark unmoved is refused
     before it spends a tool call, and fails the node instead. ``IdeaDag.has_executed_action``
     does NOT cover this: it records an action only once it succeeded, so a repeated-failure loop
     is invisible to it. The threshold defaults to 2 (the third fruitless identical attempt is

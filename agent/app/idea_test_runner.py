@@ -917,7 +917,7 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
     # failure". The axis is the novelty guard (`agent/app/novelty_guard.py`, vetoed pre-dispatch
     # in `IdeaEngine._maybe_block_repeated_action`), which refuses an action whose normalized
     # (action_type, canonical_target, unresolved_requirement_ids) key has already been attempted
-    # twice without the run's evidence watermark moving. `IdeaDag.has_executed_action` only ever
+    # twice without its own branch's evidence watermark moving. `IdeaDag.has_executed_action` only ever
     # sees SUCCESSFUL actions, so today nothing at all stops the repeated-failure loop task 123
     # exhibited (43 visits, the same sub-goals re-issued 5-8 times, 1/4 sub-entities resolved).
     # The threshold rides the shipped default of 2 and is an unmeasured first guess; the
