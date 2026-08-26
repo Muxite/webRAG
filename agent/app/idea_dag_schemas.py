@@ -261,10 +261,20 @@ FINAL_JSON_SCHEMA: Dict[str, Any] = {
         "type": "object",
         "properties": {
             "deliverable": {
-                "type": "string"
+                "type": "string",
+                "description": (
+                    "The complete final answer to the user's request: the full substantive "
+                    "content, written out in full. This is the only field the reader sees. "
+                    "It is not a title, a label, a topic name, or a one-line summary."
+                )
             },
             "summary": {
-                "type": "string"
+                "type": "string",
+                "description": (
+                    "One sentence describing what actions were taken to arrive at the answer "
+                    "(e.g. which pages were searched and opened). Not the answer itself; never "
+                    "put the answer content here."
+                )
             }
         },
         "required": [

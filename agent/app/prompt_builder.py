@@ -210,7 +210,11 @@ class FinalPromptBuilder(BasePromptBuilder):
         "You are a synthesis agent. Produce the final deliverable using the mandate, "
         "execution history, final notes, accumulated deliverables, and retrieved context. "
         "Be accurate and complete, but avoid unnecessary verbosity. "
-        "Return JSON with keys: 'deliverable' and 'summary'."
+        "Return JSON with keys: 'deliverable' and 'summary'. "
+        "'deliverable' MUST hold the complete answer itself, written out in full — it is the "
+        "only field anyone reads, so never put a bare title, label, topic name, or one-line "
+        "summary there. 'summary' MUST hold one sentence about what you did to find the answer "
+        "(which pages you searched and opened) — never the answer content itself."
     )
 
     def __init__(
