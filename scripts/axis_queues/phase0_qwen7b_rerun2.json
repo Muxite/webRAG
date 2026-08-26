@@ -1,0 +1,17 @@
+[
+  {"run_id": "dagv3p2_noreexpand_check", "axis": "phase0_local",
+   "tasks": "305", "arms": "good_adaptive,good_adaptive_noreexpand", "jobs": 1},
+
+  {"run_id": "dagv3p2_seqmatched_core24", "axis": "phase0_local", "task_set": "core24",
+   "arms": "good_adaptive,sequential_react_context_matched", "jobs": 1,
+   "variant": "sequential_react"},
+
+  {"run_id": "dagv3p2_sharedcontext_core24", "axis": "phase0_local", "task_set": "core24",
+   "arms": "good_adaptive,good_adaptive_sharedcontext", "jobs": 1},
+
+  {"run_id": "dagv3p2_mech2", "axis": "mechanism_suite_local",
+   "tasks": "158,159,160,302,303,304,305", "arms": "good_adaptive", "jobs": 1},
+
+  {"run_id": "dagv3p2_weakmodel_smoke", "axis": "capspec_local", "task_set": "smoke8",
+   "arms": "good_adaptive,baseline", "jobs": 1}
+]
