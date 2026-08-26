@@ -74,6 +74,14 @@ def cell_db_path(cell):
 # Named task sets (see agent/app/BENCHMARK_SUITE_50.md). All ids are validated + deduped.
 TASK_SETS = {
     "smoke8": ["122", "125", "128", "130", "134", "138", "140", "144"],
+    # 2026-08-26: core24 reruns after a same-night bug-fix pair (finalize field-swap +
+    # novelty-guard scoping) take ~70-80min per 2-arm entry on this rig -- too slow to iterate
+    # on quickly. core12 extends smoke8's already-curated even spread across the 122-145 range
+    # with 4 more interleaved ids, rather than taking a contiguous half (which would cluster
+    # whatever task-shape ordering core24 has). Roughly doubles smoke8's statistical power while
+    # halving core24's wall-clock; use core24 (or a rep bump on core12) once an arm looks
+    # promising here.
+    "core12": ["122", "123", "125", "128", "130", "132", "134", "138", "139", "140", "144", "145"],
     "core24": [f"{n:03d}" for n in range(122, 146)],
     "suite50": (
         [f"{n:03d}" for n in range(122, 146)]
