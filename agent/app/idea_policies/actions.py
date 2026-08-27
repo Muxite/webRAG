@@ -2083,8 +2083,14 @@ class VisitLeafAction(LeafAction):
                         candidate_urls = kept
 
                 if candidate_urls:
-                    if link_count > len(urls_to_visit):
-                        needed = link_count - len(urls_to_visit)
+                    # A planner-emitted `link_count: 0` must not zero out a recovered pool: it
+                    # has no sensible reading as "visit nothing" once a candidate has actually
+                    # been found, and would otherwise silently drop the search fallback above
+                    # back to the dead-URL error it exists to avoid (task 130, see
+                    # docs/handoffs/DAG_V3_PHASE0_NIGHT3_HANDOFF_2026-08-28.md section 4).
+                    effective_link_count = max(link_count, 1)
+                    if effective_link_count > len(urls_to_visit):
+                        needed = effective_link_count - len(urls_to_visit)
                         if len(candidate_urls) > needed:
                             named = (
                                 self._pick_link_by_name(link_idea or node.title, candidate_urls)

@@ -169,6 +169,34 @@ async def test_search_exception_preserves_the_original_failure_surface():
 
 
 @pytest.mark.asyncio
+async def test_search_recovery_used_despite_zero_link_count():
+    """A planner-emitted ``link_count: 0`` must not zero out an otherwise-recovered pool.
+
+    The consumption gate (``if link_count > len(urls_to_visit)``) used to read the raw
+    ``link_count`` straight from the plan node, so ``0 > 0`` was always False and the recovered
+    candidates were dropped -- the original dead-URL error was re-raised even though the fallback
+    above had just found a real page. See docs/handoffs/DAG_V3_PHASE0_NIGHT3_HANDOFF_2026-08-28.md
+    section 4 (task 130).
+    """
+    graph = IdeaDag(root_title="root")
+    node = graph.add_child(
+        graph.root_id(),
+        "Read the main span of the John A. Roebling Suspension Bridge",
+        details={
+            DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+            "optional_url": DEAD_URL,
+            "link_count": 0,
+        },
+    )
+    io = FakeIO(search_results=[_hit(REAL_URL)])
+
+    result = await VisitLeafAction().execute(graph, node.node_id, io)
+
+    assert result[ActionResultKey.SUCCESS.value] is True
+    assert result[ActionResultKey.URL.value] == REAL_URL
+
+
+@pytest.mark.asyncio
 async def test_no_inline_search_when_the_cascade_already_has_candidates():
     """One extra search only when everything else is empty -- no unconditional spend."""
     from agent.app.idea_policies.base import IdeaNodeStatus
