@@ -433,6 +433,96 @@ async def test_distinct_targets_for_one_sub_goal_share_a_budget():
     ) <= 1
 
 
+# ---------------------------------------------------------------------------
+# semantic target-coarsening (root cause 3: flat-plan watermark collapse --
+# docs/handoffs/DAG_V3_PHASE0_NIGHT3_HANDOFF_2026-08-28.md section 1.3)
+# ---------------------------------------------------------------------------
+def test_entity_tokens_drops_stopwords_and_short_tokens():
+    tokens = ng._entity_tokens("What is the Denali glacier melt rate?")
+    assert tokens == frozenset({"denali", "glacier", "melt", "rate"})
+    assert ng._entity_tokens("") == frozenset()
+    assert ng._entity_tokens("to a is") == frozenset()
+
+
+def test_sub_goal_cluster_ids_groups_overlapping_targets_only():
+    graph = IdeaDag(root_title="root")
+    stuck_a = _flat_search_node(graph, "denali glacier melt rate")
+    stuck_b = _flat_search_node(graph, "denali glacier ice loss data")
+    unrelated = _flat_search_node(graph, "channel islands lighthouse history")
+    visit = graph.add_child(
+        graph.root_id(), "visit it",
+        details={DetailKey.ACTION.value: IdeaActionType.VISIT.value, "url": "https://x/denali"},
+    )
+    cluster = ng.sub_goal_cluster_ids(graph, stuck_a.node_id, IdeaActionType.SEARCH.value)
+    assert cluster == frozenset({stuck_a.node_id, stuck_b.node_id})
+    assert unrelated.node_id not in cluster
+    # A different action_type is never pulled in, even with matching tokens.
+    assert visit.node_id not in cluster
+
+
+def test_sub_goal_cluster_ids_falls_open_to_the_node_alone_without_salient_tokens():
+    graph = IdeaDag(root_title="root")
+    node = _flat_search_node(graph, "a to is")   # nothing but stopwords/short tokens
+    assert ng.sub_goal_cluster_ids(graph, node.node_id, IdeaActionType.SEARCH.value) == frozenset(
+        {node.node_id}
+    )
+
+
+@pytest.mark.asyncio
+async def test_semantic_coarsening_blocks_a_stuck_flat_plan_sub_goal_despite_unrelated_success():
+    """Root cause 3: unarmed, the coarse budget's watermark degrades to the whole graph on a flat
+    plan, so an unrelated success anywhere resets a genuinely stuck sub-goal's count and it never
+    strikes. Armed, the coarse watermark is scoped to this sub-goal's semantic cluster instead.
+    """
+    engine = _make_engine(
+        _CountingAction([]),
+        run_policy_novelty_guard_enabled=True,
+        run_policy_novelty_guard_semantic_coarsening_enabled=True,
+    )
+    graph = IdeaDag(root_title="root", root_details={"mandate": "Research"})
+    phrasings = [
+        "denali glacier melt rate",
+        "denali glacier ice loss data",
+        "denali national park glacier melt",
+    ]
+    blocked = None
+    for i, query in enumerate(phrasings):
+        blocked = engine._maybe_block_repeated_action(graph, _flat_search_node(graph, query).node_id)
+        if blocked is not None:
+            break
+        # An unrelated success elsewhere in the (flat) graph must not refresh this budget.
+        graph.add_child(
+            graph.root_id(), f"unrelated success {i}",
+            details={DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
+                action="visit", content="a page about something else entirely")},
+        )
+    assert blocked is not None
+    assert blocked["novelty_blocked"] is True
+    assert blocked["novelty_block_scope"] == "sub_goal"
+
+
+@pytest.mark.asyncio
+async def test_semantic_coarsening_still_lets_an_unrelated_sub_goal_proceed():
+    """The companion case: coarsening must not over-merge genuinely different sub-goals."""
+    engine = _make_engine(
+        _CountingAction([]),
+        run_policy_novelty_guard_enabled=True,
+        run_policy_novelty_guard_semantic_coarsening_enabled=True,
+    )
+    graph = IdeaDag(root_title="root", root_details={"mandate": "Research"})
+    for query in ["denali glacier melt rate", "denali glacier ice loss data"]:
+        engine._maybe_block_repeated_action(graph, _flat_search_node(graph, query).node_id)
+    other = _flat_search_node(graph, "channel islands lighthouse history")
+    assert engine._maybe_block_repeated_action(graph, other.node_id) is None
+
+
+def test_semantic_coarsening_flag_ships_absent_and_therefore_off():
+    settings = load_idea_dag_settings()
+    assert "run_policy_novelty_guard_semantic_coarsening_enabled" not in settings
+    run_policy = IdeaConfig.from_settings(settings).run_policy
+    assert run_policy.novelty_guard_semantic_coarsening_enabled is False
+
+
 @pytest.mark.asyncio
 async def test_a_different_sub_goal_keeps_its_own_budget():
     """The negative: two genuinely different sub-goals must not cross-block."""

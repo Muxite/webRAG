@@ -3045,8 +3045,26 @@ class IdeaDagEngine:
         # stuck VISIT loop and a stuck SEARCH loop are not one budget. Its watermark is measured
         # over ITS OWN scope, or a sibling's real progress would read as no-progress here.
         coarse_scope = _novelty.sub_goal_scope_id(graph, node_id)
-        coarse_key = f"{coarse_scope or ''}::{str(action_type).strip().lower()}"
-        coarse_watermark = _novelty.evidence_watermark(graph, node_id, scope_id=coarse_scope)
+        # On a flat plan (every action node a direct child of the root) `coarse_scope` degrades
+        # to the root for every node, so the coarse budget's watermark -- counted over the WHOLE
+        # graph -- is refreshed by any successful action anywhere and never strikes (root cause 3,
+        # docs/handoffs/DAG_V3_PHASE0_NIGHT3_HANDOFF_2026-08-28.md section 1.3). Opt-in fallback:
+        # substitute a semantic cluster (nodes whose target shares entity tokens with this one)
+        # for both the key and the watermark scope, so an unrelated sub-goal's progress no longer
+        # masks a genuinely stuck one. Never fires on a real (non-flat) sub-goal scope.
+        semantic_fallback = (
+            self._cfg.run_policy.novelty_guard_semantic_coarsening_enabled
+            and coarse_scope is not None
+            and str(coarse_scope) == str(graph.root_id())
+        )
+        if semantic_fallback:
+            anchor = _novelty.semantic_cluster_anchor(str(action_type), node.details)
+            coarse_key = f"semantic:{anchor}::{str(action_type).strip().lower()}"
+            cluster_ids = _novelty.sub_goal_cluster_ids(graph, node_id, str(action_type))
+            coarse_watermark = _novelty.evidence_watermark(graph, node_id, scope_ids=cluster_ids)
+        else:
+            coarse_key = f"{coarse_scope or ''}::{str(action_type).strip().lower()}"
+            coarse_watermark = _novelty.evidence_watermark(graph, node_id, scope_id=coarse_scope)
         strict_blocked = guard.is_blocked(state_key, watermark)
         coarse_blocked = guard.is_coarse_blocked(coarse_key, coarse_watermark)
         if strict_blocked or coarse_blocked:

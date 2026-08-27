@@ -932,6 +932,11 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "tool_failure_recovery_enabled": True,
         "final_require_grounding": True,   # validity gate, on in every arm
         "run_policy_novelty_guard_enabled": True,   # the axis under test (shipped: False)
+        # Root cause 3 (docs/handoffs/DAG_V3_PHASE0_NIGHT3_HANDOFF_2026-08-28.md section 1.3): on
+        # a flat plan the coarse budget's watermark collapses to whole-graph scope and never
+        # strikes. Armed here so this arm's own live check answers whether the fix moves
+        # `blocked_actions` off zero.
+        "run_policy_novelty_guard_semantic_coarsening_enabled": True,   # shipped: False
     },
 }
 

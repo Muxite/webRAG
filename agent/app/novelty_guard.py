@@ -165,7 +165,102 @@ def sub_goal_scope_id(graph, node_id: Any) -> Optional[str]:
     return str(path[-1].node_id)     # every ancestor is an action node; fall back to the root
 
 
-def evidence_watermark(graph, node_id: Any = None, scope_id: Any = _UNSET) -> int:
+def semantic_cluster_anchor(action_type: str, details: Optional[Mapping[str, Any]]) -> str:
+    """A deterministic, cross-node-stable label for the semantic cluster ``details`` belongs to.
+
+    Used ONLY as (half of) the flat-plan fallback coarse KEY -- not the watermark scope, which is
+    :func:`sub_goal_cluster_ids`. The lexicographically smallest salient token
+    (:func:`_entity_tokens`) is a pure function of this one node's own target, so it names the
+    same cluster regardless of which node computes it first or how many later attempts join that
+    cluster -- unlike a key built from cluster MEMBERSHIP (a node-id list), which would change,
+    and therefore reset the attempt count, every time a new attempt joined. Falls back to the
+    full canonical target when there is no salient token, which degrades to the strict per-node
+    key rather than merging unrelated targets on a false signal.
+    """
+    tokens = _entity_tokens(canonical_target(action_type, details))
+    return min(tokens) if tokens else canonical_target(action_type, details)
+
+
+#: Short/common words dropped from :func:`_entity_tokens` -- not a linguistic stopword list, just
+#: enough to keep the salient-token overlap from firing on shared connective words rather than a
+#: shared subject.
+_STOPWORDS = frozenset({
+    "what", "when", "where", "which", "who", "whose", "with", "from", "into", "about",
+    "find", "search", "visit", "page", "pages", "source", "sources", "data", "information",
+    "does", "this", "that", "these", "those", "have", "been", "were", "will", "would",
+    "could", "should", "there", "their", "please", "need", "look", "looking",
+})
+
+
+def _entity_tokens(text: Any) -> "frozenset[str]":
+    """Normalized token set of ``text``, filtered to what plausibly names a subject.
+
+    Used only to group DIFFERENT ``canonical_target`` strings that plausibly address the same
+    underlying entity -- two phrasings of a search query, or two candidate URLs, for one sub-goal.
+    Tokens shorter than 4 characters and the connective words in :data:`_STOPWORDS` are dropped,
+    since those are the ones two unrelated targets are likeliest to share by accident.
+    """
+    normalized = _normalize(text)
+    if not normalized:
+        return frozenset()
+    tokens = re.findall(r"[a-z0-9]+", normalized)
+    return frozenset(token for token in tokens if len(token) >= 4 and token not in _STOPWORDS)
+
+
+def sub_goal_cluster_ids(
+    graph, node_id: Any, action_type: str, overlap_threshold: float = 0.3,
+) -> "frozenset[str]":
+    """Node ids of the flat-plan siblings that plausibly serve the same sub-goal as ``node_id``.
+
+    Only meaningful -- and only ever called -- once :func:`sub_goal_scope_id` has already
+    degraded to the root (a flat plan): the structural signal that distinguishes sub-goals from
+    each other has nothing left to say there, so this substitutes a semantic one. An
+    ``action_type``-matching action node elsewhere in the graph joins ``node_id``'s cluster when
+    its canonical-target entity tokens overlap ``node_id``'s by at least ``overlap_threshold``
+    (Jaccard). Always includes ``node_id`` itself.
+
+    A node with no salient tokens (an empty or purely-connective canonical target) clusters with
+    nothing else -- falls open to the strict, per-node case rather than merging unrelated targets
+    on a false signal, matching this module's fail-open-by-staying-conservative design (see
+    :func:`canonical_target`).
+    """
+    from agent.app.idea_policies.base import DetailKey
+
+    node = graph.get_node(node_id)
+    if node is None:
+        return frozenset({str(node_id)})
+    details = node.details if isinstance(node.details, dict) else {}
+    action = _normalize(action_type)
+    self_tokens = _entity_tokens(canonical_target(action_type, details))
+    cluster = {str(node_id)}
+    if not self_tokens:
+        return frozenset(cluster)
+    try:
+        candidates = list(graph.iter_breadth_first(graph.root_id()))
+    except Exception:  # noqa: BLE001. A guard must never break the run it observes.
+        return frozenset(cluster)
+    seen: set = set()
+    for candidate in candidates:
+        if candidate.node_id in seen:
+            continue
+        seen.add(candidate.node_id)
+        if str(candidate.node_id) == str(node_id):
+            continue
+        cand_details = candidate.details if isinstance(candidate.details, dict) else {}
+        if _normalize(cand_details.get(DetailKey.ACTION.value)) != action:
+            continue
+        cand_tokens = _entity_tokens(canonical_target(action_type, cand_details))
+        if not cand_tokens:
+            continue
+        overlap = len(self_tokens & cand_tokens) / len(self_tokens | cand_tokens)
+        if overlap >= overlap_threshold:
+            cluster.add(str(candidate.node_id))
+    return frozenset(cluster)
+
+
+def evidence_watermark(
+    graph, node_id: Any = None, scope_id: Any = _UNSET, scope_ids: Optional[Iterable[Any]] = None,
+) -> int:
     """A monotone count of the evidence accumulated inside ``node_id``'s BRANCH so far.
 
     Counts the ``Evidence``/``Claim`` sidecars that ``IdeaEngine._maybe_record_evidence`` writes
@@ -190,17 +285,29 @@ def evidence_watermark(graph, node_id: Any = None, scope_id: Any = _UNSET) -> in
     counted over one scope must have its progress signal counted over the SAME scope, so the
     sub-goal-scoped key (:func:`sub_goal_scope_id`) passes its own scope in rather than reusing
     the narrower branch watermark, which would read a sibling's real progress as no-progress.
+
+    ``scope_ids``, when given, overrides ``scope_id`` entirely: the count is taken over exactly
+    this set of node ids rather than a single node's subtree (``graph.iter_breadth_first``
+    assumes one). This is what lets a scope be a semantic CLUSTER
+    (:func:`sub_goal_cluster_ids`) instead of a structural subtree -- the flat-plan case where
+    the sub-goal-scoped key has no ancestor left to distinguish sub-goals with.
     """
     from agent.app.idea_policies.action_constants import ActionResultExtractor
     from agent.app.idea_policies.base import DetailKey
 
     total = 0
-    if scope_id is _UNSET:
-        scope_id = branch_scope_id(graph, node_id) if node_id is not None else None
-    try:
-        nodes = list(graph.iter_breadth_first(scope_id))
-    except Exception:  # noqa: BLE001. A guard must never break the run it observes.
-        return 0
+    if scope_ids is not None:
+        try:
+            nodes = [n for n in (graph.get_node(sid) for sid in scope_ids) if n is not None]
+        except Exception:  # noqa: BLE001. A guard must never break the run it observes.
+            return 0
+    else:
+        if scope_id is _UNSET:
+            scope_id = branch_scope_id(graph, node_id) if node_id is not None else None
+        try:
+            nodes = list(graph.iter_breadth_first(scope_id))
+        except Exception:  # noqa: BLE001. A guard must never break the run it observes.
+            return 0
     seen: set = set()
     for node in nodes:
         # A node with several parents is yielded once per parent; count it once.

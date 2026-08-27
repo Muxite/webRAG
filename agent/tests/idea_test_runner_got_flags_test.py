@@ -120,6 +120,9 @@ def _base():
         # `good_adaptive_noreexpand` sets (it leaves the threshold at the default).
         "run_policy_novelty_guard_enabled": False,
         "run_policy_novelty_guard_max_attempts": 2,
+        # flat-plan semantic-coarsening fallback (root cause 3): shipped OFF, armed alongside
+        # the guard on `good_adaptive_noreexpand` only.
+        "run_policy_novelty_guard_semantic_coarsening_enabled": False,
     }
 
 
@@ -855,24 +858,35 @@ def test_arm_sequential_react_context_matched_sets_only_the_cap():
 
 
 def test_arm_good_adaptive_noreexpand_isolates_the_novelty_guard():
-    """Phase 0's churn arm: `good_adaptive` plus the novelty guard, at the shipped threshold."""
+    """Phase 0's churn arm: `good_adaptive` plus the novelty guard, at the shipped threshold.
+
+    Also carries the flat-plan semantic-coarsening fallback (root cause 3,
+    docs/handoffs/DAG_V3_PHASE0_NIGHT3_HANDOFF_2026-08-28.md section 1.3), armed on THIS arm only
+    so its own live check can answer whether the fix moves `blocked_actions` off zero -- it is
+    inert without `run_policy_novelty_guard_enabled`, so it never widens what any other arm does.
+    """
     from agent.app.idea_test_runner import _GOT_ARM_PROFILES
 
     base = _GOT_ARM_PROFILES["good_adaptive"]
     arm = _GOT_ARM_PROFILES["good_adaptive_noreexpand"]
-    assert set(arm) - set(base) == {"run_policy_novelty_guard_enabled"}
+    assert set(arm) - set(base) == {
+        "run_policy_novelty_guard_enabled",
+        "run_policy_novelty_guard_semantic_coarsening_enabled",
+    }
     assert set(base) - set(arm) == set()
     assert all(arm[k] == v for k, v in base.items())
 
     settings = _base()
     _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_noreexpand"})
     assert settings["run_policy_novelty_guard_enabled"] is True
+    assert settings["run_policy_novelty_guard_semantic_coarsening_enabled"] is True
     # The threshold is NOT part of the arm: it stays at the shipped first guess so the A/B
     # measures the mechanism, not a tuned constant.
     assert settings["run_policy_novelty_guard_max_attempts"] == 2
     control = _base()
     _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
     assert control["run_policy_novelty_guard_enabled"] is False
+    assert control["run_policy_novelty_guard_semantic_coarsening_enabled"] is False
 
 
 def test_arm_good_adaptive_backtrackrel_isolates_backtrack_and_its_relative_threshold():

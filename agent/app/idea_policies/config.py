@@ -1334,6 +1334,19 @@ class RunPolicy:
     is invisible to it. The threshold defaults to 2 (the third fruitless identical attempt is
     blocked) and is an unmeasured first guess -- see that module's docstring for what should
     revise it. Off by default and absent from the shipped settings, same as the eleven above.
+
+    ``novelty_guard_semantic_coarsening_enabled`` fixes a collapse specific to the flat plans this
+    engine actually produces (every action node a direct child of the root): the coarse,
+    sub-goal-scoped budget's watermark degrades to a whole-graph scope on those plans, so ANY
+    successful action anywhere resets every stuck sub-goal's no-progress count and the coarse
+    budget never strikes (confirmed live: 5 of 8 coarse attempts reset by unrelated successes in
+    one DAG v3 Phase 0 session -- see ``docs/handoffs/DAG_V3_PHASE0_NIGHT3_HANDOFF_2026-08-28.md``
+    section 1.3). Armed, a flat-plan coarse key/watermark is instead scoped to
+    ``novelty_guard.sub_goal_cluster_ids`` -- the action nodes whose canonical-target entity
+    tokens overlap this one's -- so an unrelated sub-goal's progress no longer masks a genuinely
+    stuck one. Independent of ``novelty_guard_enabled``/``novelty_guard_max_attempts`` (inert
+    unless those are also on) and of the strict per-target budget, which this never touches. Off
+    by default and absent from the shipped settings, same as the flags above.
     """
 
     ledger_mode: str = "off"
@@ -1351,6 +1364,7 @@ class RunPolicy:
     sequential_context_cap_enabled: bool = False
     novelty_guard_enabled: bool = False
     novelty_guard_max_attempts: int = 2
+    novelty_guard_semantic_coarsening_enabled: bool = False
 
     _KEYS: ClassVar[dict] = {
         "ledger_mode": "run_policy_ledger_mode",
@@ -1368,6 +1382,7 @@ class RunPolicy:
         "sequential_context_cap_enabled": "run_policy_sequential_context_cap_enabled",
         "novelty_guard_enabled": "run_policy_novelty_guard_enabled",
         "novelty_guard_max_attempts": "run_policy_novelty_guard_max_attempts",
+        "novelty_guard_semantic_coarsening_enabled": "run_policy_novelty_guard_semantic_coarsening_enabled",
     }
 
     @classmethod
