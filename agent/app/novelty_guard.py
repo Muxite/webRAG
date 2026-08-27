@@ -24,6 +24,16 @@ FIRST GUESS, not a measured value. It should be revisited against the mechanism 
 retry-cap task (``agent/app/idea_tests/test_305_mech_dead_end_retry_cap.py``), which is the first
 fixture able to say whether it is too tight (killing a legitimate second look at a flaky page) or
 too loose (still paying for 5-8 repeats).
+
+That revision is :func:`sub_goal_scope_id`. Armed against 305 the guard blocked NOTHING, twice
+over: the per-TARGET key is too fine for the failure it is meant to catch. One dead-end sub-goal
+is pursued through several textually distinct targets (305 ships two trap URLs on purpose, and
+the model re-words the query each try), so every attempt opens a fresh budget and no key reaches
+the threshold. Attempts are therefore counted a SECOND time over ``(sub_goal_scope_id,
+action_type)`` -- the target dimension dropped, the action type kept so a stuck VISIT loop and a
+stuck SEARCH loop stay separate budgets -- and either key striking vetoes the action. The
+progress reset does the safety work: a scope whose actions keep yielding evidence never blocks,
+so the coarse key only ever fires on a scope that is genuinely standing still.
 """
 
 from __future__ import annotations
@@ -33,6 +43,9 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 _WHITESPACE = re.compile(r"\s+")
+
+#: "argument not given", so that ``scope_id=None`` can mean the explicit whole-graph scope.
+_UNSET = object()
 
 
 def _normalize(text: Any) -> str:
@@ -116,7 +129,43 @@ def branch_scope_id(graph, node_id: Any) -> Optional[str]:
     return str(path[-2].node_id)
 
 
-def evidence_watermark(graph, node_id: Any = None) -> int:
+def sub_goal_scope_id(graph, node_id: Any) -> Optional[str]:
+    """The id of the SUB-GOAL ``node_id`` serves: its nearest non-action ancestor.
+
+    Coarser than :func:`branch_scope_id`, and for a different question. ``branch_scope_id``
+    answers "whose evidence counts as progress for THIS target"; this answers "which open
+    sub-goal is this attempt spending budget on", so that N textually-distinct targets pursued
+    for one sub-goal are one budget rather than N fresh ones. Task 305 is the case: two
+    distinct trap URLs plus several phrasings of one query each mint their own strict key, so no
+    key ever reaches the strike threshold while the run burns its budget on one dead end.
+
+    The requirement-owning ancestor has no explicit marker on the node (requirement ids are
+    entity NAMES from the task ledger and nothing tags a node with the one it serves), so the
+    structural proxy is "the nearest STRICT ancestor that is not itself an executable action" --
+    a planner/sub-goal node. On the flat plans the engine actually produces (every action node a
+    direct child of the root) that resolves to the root, which is the correct reading: those
+    action nodes are the sub-goals, and their retries all belong to one budget. On a nested plan
+    it resolves to the sub-goal node that owns the subtree, so two genuinely different sub-goals
+    keep separate budgets.
+
+    ``None`` for the root itself, for an unknown node, or on any error.
+    """
+    from agent.app.idea_policies.base import DetailKey
+
+    try:
+        path = graph.path_to_root(node_id)
+    except Exception:  # noqa: BLE001. A guard must never break the run it observes.
+        return None
+    if not path or len(path) < 2:
+        return None      # unknown node, or the node IS the root
+    for ancestor in path[1:]:
+        details = ancestor.details if isinstance(ancestor.details, dict) else {}
+        if not details.get(DetailKey.ACTION.value):
+            return str(ancestor.node_id)
+    return str(path[-1].node_id)     # every ancestor is an action node; fall back to the root
+
+
+def evidence_watermark(graph, node_id: Any = None, scope_id: Any = _UNSET) -> int:
     """A monotone count of the evidence accumulated inside ``node_id``'s BRANCH so far.
 
     Counts the ``Evidence``/``Claim`` sidecars that ``IdeaEngine._maybe_record_evidence`` writes
@@ -136,12 +185,18 @@ def evidence_watermark(graph, node_id: Any = None) -> int:
     Never decreases within a branch (nothing removes a result or a sidecar), so a strictly
     greater value between two attempts of the same key really does mean that branch learned
     something.
+
+    ``scope_id`` overrides the derived branch scope (``None`` meaning the whole graph). A budget
+    counted over one scope must have its progress signal counted over the SAME scope, so the
+    sub-goal-scoped key (:func:`sub_goal_scope_id`) passes its own scope in rather than reusing
+    the narrower branch watermark, which would read a sibling's real progress as no-progress.
     """
     from agent.app.idea_policies.action_constants import ActionResultExtractor
     from agent.app.idea_policies.base import DetailKey
 
     total = 0
-    scope_id = branch_scope_id(graph, node_id) if node_id is not None else None
+    if scope_id is _UNSET:
+        scope_id = branch_scope_id(graph, node_id) if node_id is not None else None
     try:
         nodes = list(graph.iter_breadth_first(scope_id))
     except Exception:  # noqa: BLE001. A guard must never break the run it observes.
@@ -176,13 +231,42 @@ class NoveltyGuard:
     max_attempts: int = 2
     #: key -> (no-progress attempts so far, evidence watermark at the last attempt)
     _state: Dict[str, Tuple[int, int]] = field(default_factory=dict)
+    #: the SUB-GOAL-scoped budget, same semantics over a coarser key (see the class docstring).
+    _coarse_state: Dict[str, Tuple[int, int]] = field(default_factory=dict)
+    #: observe-only: coarse key -> {strict key -> attempts}, for keys that never blocked.
+    _near_miss: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    #: observe-only counters for the coarse budget itself (see :meth:`record_coarse_attempt`).
+    _coarse_stats: Dict[str, int] = field(
+        default_factory=lambda: {"records": 0, "resets": 0, "max_attempts": 0}
+    )
 
     def reset(self) -> None:
         self._state.clear()
+        self._coarse_state.clear()
+        self._near_miss.clear()
+        self._coarse_stats.update({"records": 0, "resets": 0, "max_attempts": 0})
+
+    @staticmethod
+    def _attempts(state: Dict[str, Tuple[int, int]], key: str) -> int:
+        return state.get(key, (0, 0))[0]
+
+    def _is_blocked(self, state: Dict[str, Tuple[int, int]], key: str, watermark: int) -> bool:
+        if self.max_attempts <= 0:
+            return False
+        count, last_watermark = state.get(key, (0, 0))
+        if count < self.max_attempts:
+            return False
+        return watermark <= last_watermark
+
+    def _record(self, state: Dict[str, Tuple[int, int]], key: str, watermark: int) -> int:
+        count, last_watermark = state.get(key, (0, 0))
+        count = 1 if watermark > last_watermark else count + 1
+        state[key] = (count, watermark)
+        return count
 
     def attempts(self, key: str) -> int:
         """No-progress attempts recorded for ``key`` (0 if it has never been attempted)."""
-        return self._state.get(key, (0, 0))[0]
+        return self._attempts(self._state, key)
 
     def is_blocked(self, key: str, watermark: int) -> bool:
         """Whether this key has burned its budget with nothing to show for it.
@@ -191,12 +275,7 @@ class NoveltyGuard:
         evidence has appeared since, so this attempt is a step in a moving run rather than a
         repeat of a dead one.
         """
-        if self.max_attempts <= 0:
-            return False
-        count, last_watermark = self._state.get(key, (0, 0))
-        if count < self.max_attempts:
-            return False
-        return watermark <= last_watermark
+        return self._is_blocked(self._state, key, watermark)
 
     def record_attempt(self, key: str, watermark: int) -> int:
         """Register an attempt of ``key`` at ``watermark``; returns the new no-progress count.
@@ -204,7 +283,62 @@ class NoveltyGuard:
         Progress since the previous attempt RESETS the count to 1 rather than decrementing it:
         the budget is "two consecutive fruitless tries", not "two tries ever".
         """
-        count, last_watermark = self._state.get(key, (0, 0))
-        count = 1 if watermark > last_watermark else count + 1
-        self._state[key] = (count, watermark)
+        return self._record(self._state, key, watermark)
+
+    def coarse_attempts(self, key: str) -> int:
+        """No-progress attempts recorded for a SUB-GOAL-scoped ``key``."""
+        return self._attempts(self._coarse_state, key)
+
+    def is_coarse_blocked(self, key: str, watermark: int) -> bool:
+        """:meth:`is_blocked` over the sub-goal-scoped budget."""
+        return self._is_blocked(self._coarse_state, key, watermark)
+
+    def record_coarse_attempt(self, key: str, watermark: int) -> int:
+        """:meth:`record_attempt` over the sub-goal-scoped budget."""
+        previous = self._attempts(self._coarse_state, key)
+        count = self._record(self._coarse_state, key, watermark)
+        self._coarse_stats["records"] += 1
+        # A reset means the scope's watermark MOVED between two attempts of this key. Counted
+        # because it is the other half of "why did nothing block": a coarse key that keeps being
+        # reset never reaches the threshold no matter how fine or coarse the key is.
+        if previous >= 1 and count == 1:
+            self._coarse_stats["resets"] += 1
+        self._coarse_stats["max_attempts"] = max(self._coarse_stats["max_attempts"], count)
         return count
+
+    def observe_near_miss(self, coarse_key: str, state_key: str, attempts: int) -> None:
+        """Record that ``state_key`` spent ``attempts`` under ``coarse_key`` without blocking.
+
+        Observe-only. This is the measurement that says whether the strict key FANS OUT: several
+        distinct targets each stopping short of the strike threshold while one sub-goal is
+        retried, which is invisible in a per-target counter by construction.
+        """
+        self._near_miss.setdefault(str(coarse_key), {})[str(state_key)] = int(attempts)
+
+    def forget_near_miss(self, coarse_key: str, state_key: str) -> None:
+        """Drop a key that went on to block; a blocked key is not a near miss."""
+        self._near_miss.get(str(coarse_key), {}).pop(str(state_key), None)
+
+    def near_miss_summary(self) -> Dict[str, Any]:
+        """Observe-only counters for ``final_payload["novelty_guard"]``.
+
+        ``near_miss_keys`` is the WORST sub-goal scope's fan-out (distinct strict keys that spent
+        attempts there without any one of them blocking), because the question is whether ONE
+        sub-goal's retries scatter across keys -- summed run-wide, a healthy run with many
+        one-shot sub-goals would look identical.
+        """
+        per_scope = {scope: dict(keys) for scope, keys in self._near_miss.items() if keys}
+        return {
+            "near_miss_keys": max((len(keys) for keys in per_scope.values()), default=0),
+            "near_miss_keys_total": sum(len(keys) for keys in per_scope.values()),
+            "near_miss_total_attempts": max(
+                (sum(keys.values()) for keys in per_scope.values()), default=0
+            ),
+            "near_miss_by_scope": {
+                scope: {"keys": len(keys), "attempts": sum(keys.values())}
+                for scope, keys in per_scope.items()
+            },
+            "sub_goal_attempts_recorded": self._coarse_stats["records"],
+            "sub_goal_progress_resets": self._coarse_stats["resets"],
+            "sub_goal_max_attempts": self._coarse_stats["max_attempts"],
+        }

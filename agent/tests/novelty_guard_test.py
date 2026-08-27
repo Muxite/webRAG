@@ -187,6 +187,73 @@ def test_the_branch_scope_is_the_roots_own_child():
     assert ng.branch_scope_id(graph, "nope") is None
 
 
+def test_the_sub_goal_scope_is_the_nearest_non_action_ancestor():
+    """The coarse scope groups one sub-goal's retries; unrelated sub-goals stay apart."""
+    graph = IdeaDag(root_title="root")
+    sub_goal = graph.add_child(graph.root_id(), "resolve dam X")
+    other_sub_goal = graph.add_child(graph.root_id(), "resolve dam Y")
+    visit = graph.add_child(
+        sub_goal.node_id, "visit trap A",
+        details={DetailKey.ACTION.value: IdeaActionType.VISIT.value, "url": "https://x/a"},
+    )
+    # A retry authored UNDER the failed action node still belongs to the same sub-goal.
+    retry = graph.add_child(
+        visit.node_id, "search another phrasing",
+        details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value, "query": "dam X height"},
+    )
+    assert ng.sub_goal_scope_id(graph, visit.node_id) == sub_goal.node_id
+    assert ng.sub_goal_scope_id(graph, retry.node_id) == sub_goal.node_id
+    assert ng.sub_goal_scope_id(graph, other_sub_goal.node_id) == graph.root_id()
+    assert ng.sub_goal_scope_id(
+        graph, graph.add_child(
+            other_sub_goal.node_id, "visit Y",
+            details={DetailKey.ACTION.value: IdeaActionType.VISIT.value, "url": "https://y"},
+        ).node_id
+    ) == other_sub_goal.node_id
+    assert ng.sub_goal_scope_id(graph, graph.root_id()) is None
+    assert ng.sub_goal_scope_id(graph, "nope") is None
+
+
+def test_the_sub_goal_scope_of_a_flat_plan_is_the_root():
+    """The shape the engine actually produces: every action node a direct child of the root.
+
+    ``branch_scope_id`` gives each such node ITSELF as its scope, so nothing can ever accumulate
+    across them; the sub-goal scope is the root, which is what makes the retries one budget.
+    """
+    graph = IdeaDag(root_title="root")
+    first = graph.add_child(
+        graph.root_id(), "search one phrasing",
+        details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value, "query": "victoria dam"},
+    )
+    second = graph.add_child(
+        graph.root_id(), "search another phrasing",
+        details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+                 "query": "victoria dam cape town height"},
+    )
+    assert ng.branch_scope_id(graph, first.node_id) != ng.branch_scope_id(graph, second.node_id)
+    assert ng.sub_goal_scope_id(graph, first.node_id) == graph.root_id()
+    assert ng.sub_goal_scope_id(graph, second.node_id) == graph.root_id()
+
+
+def test_an_explicit_watermark_scope_overrides_the_branch():
+    graph = IdeaDag(root_title="root")
+    branch_a = graph.add_child(graph.root_id(), "branch A")
+    branch_b = graph.add_child(graph.root_id(), "branch B")
+    stuck = graph.add_child(
+        branch_b.node_id, "the dead end",
+        details={DetailKey.ACTION.value: IdeaActionType.VISIT.value, "url": "https://x"},
+    )
+    graph.add_child(
+        branch_a.node_id, "branch A learned something",
+        details={DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
+            action="visit", content="text")},
+    )
+    assert ng.evidence_watermark(graph, stuck.node_id) == 0
+    # ``None`` is an explicit whole-graph scope, not "no argument given".
+    assert ng.evidence_watermark(graph, stuck.node_id, scope_id=None) == 1
+    assert ng.evidence_watermark(graph, stuck.node_id, scope_id=branch_a.node_id) == 1
+
+
 def test_a_root_level_action_falls_back_to_the_whole_graph():
     graph = IdeaDag(root_title="root")
     graph.add_child(
@@ -308,16 +375,111 @@ async def test_progress_on_the_same_branch_still_unblocks():
 
 
 @pytest.mark.asyncio
-async def test_a_different_url_is_not_blocked_by_a_burned_sibling():
+async def test_a_different_url_is_not_blocked_while_the_sub_goal_is_moving():
+    """A burned target does not condemn its sibling -- as long as the scope is learning."""
     engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
     graph, node_id = _graph_with_visit()
     for _ in range(3):
         engine._maybe_block_repeated_action(graph, node_id)
+    graph.add_child(
+        graph.root_id(), "something worked",
+        details={DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
+            action="visit", content="a real page")},
+    )
     other = graph.add_child(
         graph.root_id(), "visit elsewhere",
         details={DetailKey.ACTION.value: IdeaActionType.VISIT.value, "url": "https://example.com/b"},
     )
     assert engine._maybe_block_repeated_action(graph, other.node_id) is None
+
+
+# ---------------------------------------------------------------------------
+# the sub-goal-scoped second key (Finding A: the strict per-target key fans out)
+# ---------------------------------------------------------------------------
+def _flat_search_node(graph, query: str):
+    return graph.add_child(
+        graph.root_id(), f"search: {query}",
+        details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value, "query": query},
+    )
+
+
+@pytest.mark.asyncio
+async def test_distinct_targets_for_one_sub_goal_share_a_budget():
+    """Task 305's actual shape: one dead end, several wordings, none of them ever striking.
+
+    Every phrasing is its own strict key AND (flat plan) its own branch scope, so the per-target
+    counter can watch the whole run burn on one sub-goal and never reach 2. The sub-goal-scoped
+    key is what accumulates across them.
+    """
+    engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
+    graph = IdeaDag(root_title="root", root_details={"mandate": "Research"})
+    phrasings = [
+        "victoria dam height",
+        "victoria dam cape town height",
+        "table mountain victoria dam",
+    ]
+    results = [
+        engine._maybe_block_repeated_action(graph, _flat_search_node(graph, q).node_id)
+        for q in phrasings
+    ]
+    assert results[0] is None and results[1] is None
+    assert results[2] is not None
+    assert results[2]["novelty_blocked"] is True
+    assert results[2]["novelty_block_scope"] == "sub_goal"
+    # Every strict key is still a first attempt: the strict gate alone could not have fired.
+    assert engine._novelty_guard.attempts(
+        f"{ng.branch_scope_id(graph, graph.get_node(graph.root_id()).children[-1])}::"
+        f"{ng.novelty_key(IdeaActionType.SEARCH.value, {'query': phrasings[-1]})}"
+    ) <= 1
+
+
+@pytest.mark.asyncio
+async def test_a_different_sub_goal_keeps_its_own_budget():
+    """The negative: two genuinely different sub-goals must not cross-block."""
+    engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
+    graph = IdeaDag(root_title="root", root_details={"mandate": "Research"})
+    dead_end = graph.add_child(graph.root_id(), "resolve the dead end")
+    healthy = graph.add_child(graph.root_id(), "resolve dam Y")
+    blocked = None
+    for query in ("victoria dam height", "victoria dam cape town", "table mountain dam"):
+        node = graph.add_child(
+            dead_end.node_id, f"search: {query}",
+            details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value, "query": query},
+        )
+        blocked = engine._maybe_block_repeated_action(graph, node.node_id) or blocked
+    assert blocked is not None and blocked["novelty_block_scope"] == "sub_goal"
+    other = graph.add_child(
+        healthy.node_id, "search dam Y",
+        details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value, "query": "dam Y height"},
+    )
+    assert engine._maybe_block_repeated_action(graph, other.node_id) is None
+
+
+@pytest.mark.asyncio
+async def test_a_stuck_search_loop_does_not_block_a_visit():
+    """Only the target dimension is coarsened; the action type stays in the key."""
+    engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
+    graph = IdeaDag(root_title="root", root_details={"mandate": "Research"})
+    for query in ("a", "b", "c"):
+        engine._maybe_block_repeated_action(graph, _flat_search_node(graph, query).node_id)
+    visit = graph.add_child(
+        graph.root_id(), "visit a page",
+        details={DetailKey.ACTION.value: IdeaActionType.VISIT.value, "url": "https://example.com/a"},
+    )
+    assert engine._maybe_block_repeated_action(graph, visit.node_id) is None
+
+
+@pytest.mark.asyncio
+async def test_a_productive_sub_goal_is_never_blocked():
+    """The safety half: the coarse key only fires on a scope that is standing still."""
+    engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
+    graph = IdeaDag(root_title="root", root_details={"mandate": "Research"})
+    for i in range(6):
+        node = _flat_search_node(graph, f"query {i}")
+        assert engine._maybe_block_repeated_action(graph, node.node_id) is None
+        graph.update_details(node.node_id, {
+            DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
+                action="search", content="results")})
 
 
 @pytest.mark.asyncio
@@ -381,7 +543,54 @@ async def test_the_payload_reports_zero_when_nothing_was_blocked(monkeypatch):
     graph, node_id = _graph_with_visit()
     engine._maybe_block_repeated_action(graph, node_id)
     payload = await _finalize(monkeypatch, engine, graph)
-    assert payload["novelty_guard"] == {"blocked_actions": 0, "blocks": []}
+    assert payload["novelty_guard"]["blocked_actions"] == 0
+    assert payload["novelty_guard"]["blocks"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_payload_reports_the_near_miss_fan_out(monkeypatch):
+    """The Finding A diagnostic: N distinct targets each stopping short of the threshold.
+
+    Task 305 spends its budget on ONE dead end via two trap URLs and several query phrasings.
+    Each is its own strict key, so none of them ever strikes; the count of such keys under ONE
+    sub-goal scope is the measurement that says so.
+    """
+    engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
+    graph = IdeaDag(root_title="root", root_details={"mandate": "Research"})
+    for i in range(4):
+        node = graph.add_child(
+            graph.root_id(), f"another phrasing {i}",
+            details={DetailKey.ACTION.value: IdeaActionType.SEARCH.value,
+                     "query": f"victoria dam height phrasing {i}"},
+        )
+        assert engine._maybe_block_repeated_action(graph, node.node_id) is None
+        # Each attempt does return SOMETHING, so nothing strikes; the fan-out is still real and
+        # this is exactly the run shape that reported "the guard never fired".
+        graph.update_details(node.node_id, {
+            DetailKey.ACTION_RESULT.value: ActionResultBuilder.success(
+                action="search", content="results")})
+    payload = await _finalize(monkeypatch, engine, graph)
+    record = payload["novelty_guard"]
+    assert record["near_miss_keys"] == 4
+    assert record["near_miss_total_attempts"] == 4
+    scope_key = f"{graph.root_id()}::{IdeaActionType.SEARCH.value}"
+    assert record["near_miss_by_scope"][scope_key] == {"keys": 4, "attempts": 4}
+    # ...and the other half of "why did nothing block": the sub-goal budget was reset by the
+    # scope's own progress every time, so it never reached the threshold either.
+    assert record["sub_goal_attempts_recorded"] == 4
+    assert record["sub_goal_progress_resets"] == 3
+    assert record["sub_goal_max_attempts"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_blocked_key_is_not_counted_as_a_near_miss(monkeypatch):
+    engine = _make_engine(_CountingAction([]), run_policy_novelty_guard_enabled=True)
+    graph, node_id = _graph_with_visit()
+    for _ in range(3):
+        engine._maybe_block_repeated_action(graph, node_id)
+    payload = await _finalize(monkeypatch, engine, graph)
+    assert payload["novelty_guard"]["blocked_actions"] == 1
+    assert payload["novelty_guard"]["near_miss_keys"] == 0
 
 
 @pytest.mark.asyncio

@@ -763,6 +763,15 @@ class IdeaDagEngine:
                 "blocked_actions": len(_blocks),
                 "blocks": _blocks,
             }
+            # Fan-out diagnostic: distinct strict keys that spent attempts under ONE sub-goal
+            # scope without any of them blocking -- the reason a per-target counter can watch a
+            # dead end be retried all run and never strike.
+            _guard = getattr(self, "_novelty_guard", None)
+            if _guard is not None:
+                try:
+                    final_payload["novelty_guard"].update(_guard.near_miss_summary())
+                except Exception as exc:  # noqa: BLE001. Telemetry must never crash finalize
+                    self._logger.warning(f"[NOVELTY] near-miss summary failed: {exc}")
 
         self._logger.info(f"[RUN] Final payload created, graph has {graph.node_count()} nodes, {len(pending_nodes) if pending_nodes else 0} pending")
         return final_payload
@@ -2989,6 +2998,12 @@ class IdeaDagEngine:
         branch's budget forever and nothing is ever blocked on exactly the multi-branch shape
         this guard exists for.
 
+        A SECOND budget with the same semantics runs over a coarser key,
+        ``(novelty_guard.sub_goal_scope_id, action_type)``, and either one is enough to veto.
+        The strict key alone fired zero times across two nights of live runs, task 305 included:
+        it is per-TARGET, and one dead-end sub-goal is pursued through several textually distinct
+        URLs and query phrasings, so every attempt mints a fresh budget and none ever strikes.
+
         Blocks are additionally recorded on ``self._novelty_blocks`` and surfaced (observe-only)
         as ``final_payload["novelty_guard"]``.
 
@@ -3022,29 +3037,52 @@ class IdeaDagEngine:
         scope = _novelty.branch_scope_id(graph, node_id)
         state_key = f"{scope or ''}::{key}"
         watermark = _novelty.evidence_watermark(graph, node_id)
-        if guard.is_blocked(state_key, watermark):
-            attempts = guard.attempts(state_key)
+        # Second, COARSER budget over the same semantics: the SUB-GOAL this attempt serves,
+        # keyed on the action type only. The strict key above fans out -- two trap URLs and four
+        # phrasings of one query are six keys -- so no single key reaches the strike threshold
+        # while one dead end eats the whole run's budget (measured on task 305: three distinct
+        # search keys under one sub-goal scope, zero blocks). Action type stays in the key so a
+        # stuck VISIT loop and a stuck SEARCH loop are not one budget. Its watermark is measured
+        # over ITS OWN scope, or a sibling's real progress would read as no-progress here.
+        coarse_scope = _novelty.sub_goal_scope_id(graph, node_id)
+        coarse_key = f"{coarse_scope or ''}::{str(action_type).strip().lower()}"
+        coarse_watermark = _novelty.evidence_watermark(graph, node_id, scope_id=coarse_scope)
+        strict_blocked = guard.is_blocked(state_key, watermark)
+        coarse_blocked = guard.is_coarse_blocked(coarse_key, coarse_watermark)
+        if strict_blocked or coarse_blocked:
+            block_scope = "target" if strict_blocked else "sub_goal"
+            attempts = (
+                guard.attempts(state_key) if strict_blocked
+                else guard.coarse_attempts(coarse_key)
+            )
+            guard.forget_near_miss(coarse_key, state_key)
             self._logger.info(
                 f"[NOVELTY] Blocking repeated no-progress action (node={node_id}, key={key!r}, "
-                f"branch={scope}, attempts={attempts})"
+                f"branch={scope}, scope={block_scope}, attempts={attempts})"
+            )
+            what = (
+                "this exact step" if strict_blocked
+                else "this sub-goal (across differently-worded targets)"
             )
             result = {
                 "action": action_type,
                 "success": False,
                 "error": (
-                    "Blocked by the novelty guard: this exact step was already attempted "
+                    f"Blocked by the novelty guard: {what} was already attempted "
                     f"{attempts} times and produced no new evidence. Try a different "
                     "source, a different query, or a different sub-goal."
                 ),
                 "retryable": False,
                 "novelty_blocked": True,
                 "novelty_key": key,
+                "novelty_block_scope": block_scope,
             }
             graph.update_details(node_id, {DetailKey.ACTION_RESULT.value: result})
             node.status = IdeaNodeStatus.FAILED
             self._record_decision(
                 "novelty_block", node_id=node_id, chosen=str(action_type),
-                metadata={"novelty_key": key, "branch": scope, "attempts": attempts},
+                metadata={"novelty_key": key, "branch": scope, "attempts": attempts,
+                          "scope": block_scope},
             )
             # Observe-only run record, so a result JSON can say whether the guard ever fired.
             # A decision-trace entry is not enough: the trace is not in the payload the
@@ -3055,10 +3093,13 @@ class IdeaDagEngine:
                 blocks = []
                 self._novelty_blocks = blocks
             blocks.append(
-                {"node_id": node_id, "novelty_key": key, "branch": scope, "attempts": attempts}
+                {"node_id": node_id, "novelty_key": key, "branch": scope, "attempts": attempts,
+                 "scope": block_scope, "sub_goal": coarse_scope}
             )
             return result
-        guard.record_attempt(state_key, watermark)
+        attempts = guard.record_attempt(state_key, watermark)
+        guard.record_coarse_attempt(coarse_key, coarse_watermark)
+        guard.observe_near_miss(coarse_key, state_key, attempts)
         return None
 
     async def _maybe_retry_tool_failure(self, graph: IdeaDag, node_id: str, action, result):
