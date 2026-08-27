@@ -905,6 +905,20 @@ class ActionConfig:
     # the cascade; if the cascade resolves nothing NEW the original error is re-raised, so the
     # action's failure surface is unchanged. Off -> byte-identical to the old abort.
     visit_dead_url_fallback_enabled: bool = True
+    # Inline search recovery for a dead declared URL (kill-switch, default ON). The cascade the
+    # flag above unlocks reads only the graph and the stored link index: parent search hits, a
+    # sibling's result, the link index, the previous hop's page menu. A plan with no dedicated
+    # search leaf that dies on its FIRST hop has none of those, so all four come back empty and
+    # the 404 is re-raised -- `visit_count` never increments and every gated downstream validator
+    # collapses to 0.0 (recorded on tasks 130 and 132). Whether a compiled plan contains a search
+    # leaf is a per-task planning choice no arm profile controls, so that loss lands
+    # stochastically on every arm INCLUDING the shared control every ablation is measured
+    # against; leaving it in place is a fairness defect, not a lever. When on, one inline
+    # `io.search` for the leaf's own link idea runs only after the other four are empty, and its
+    # results go through the same dead-URL/chrome/sibling filtering and selection as every other
+    # source. Empty results or a search failure fall through to the original raise, so the
+    # failure surface is unchanged. Off -> byte-identical.
+    visit_declared_url_search_fallback_enabled: bool = True
     # Site-chrome filtering of the visit URL POOL (opt-in). The chrome test added for the dead-URL
     # recovery harvest is applied there only, so every OTHER pool a URL-less visit resolves from --
     # ancestor page links (``_extract_url_from_parents``), sibling results, the Chroma link index --

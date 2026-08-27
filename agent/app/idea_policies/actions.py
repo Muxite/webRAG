@@ -2013,6 +2013,49 @@ class VisitLeafAction(LeafAction):
                             candidate_urls.append(url)
                             seen.add(url)
 
+                # Fifth and last source. The four above all read the graph or the link index,
+                # so a plan with no search leaf and no page visited yet leaves the pool empty
+                # and the 404 is re-raised -- `visit_count` never increments and every gated
+                # downstream validator collapses to 0.0. Whether a plan HAS a search leaf is a
+                # per-task planning choice no arm profile controls, so that loss lands
+                # stochastically on every arm including the control. One inline search closes it;
+                # the results join `candidate_urls` and go through the same dead-URL, chrome and
+                # sibling-claim filtering and the same selection below as every other source.
+                if (
+                    declared_url_error is not None
+                    and not candidate_urls
+                    and self._cfg.action.visit_declared_url_search_fallback_enabled
+                ):
+                    search_query = (link_idea or intent or node.title or "").strip()[:200]
+                    if search_query:
+                        self._logger.info(
+                            f"[VISIT] declared-URL search fallback: cascade empty "
+                            f"(parent search, siblings, link index, page harvest); "
+                            f"searching '{search_query[:60]}...'"
+                        )
+                        try:
+                            recovery_results = await io.search(
+                                search_query,
+                                count=self._cfg.action.visit_link_query_top_k,
+                                timeout_seconds=self._timeout_seconds("search_timeout_seconds"),
+                            )
+                        except Exception as search_exc:
+                            recovery_results = None
+                            self._logger.warning(
+                                f"[VISIT] declared-URL search fallback failed: "
+                                f"{str(search_exc)[:120]}"
+                            )
+                        seen = set(candidate_urls)
+                        for item in recovery_results or []:
+                            url = str(item.get("url") or "") if isinstance(item, dict) else ""
+                            if url and url not in seen:
+                                candidate_urls.append(url)
+                                seen.add(url)
+                        self._logger.info(
+                            f"[VISIT] declared-URL search fallback: "
+                            f"{len(candidate_urls)} candidate URL(s) recovered"
+                        )
+
                 if declared_url_error is not None and candidate_urls:
                     dead = self._normalize_visit_url(str(optional_url))
                     candidate_urls = [
