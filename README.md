@@ -68,6 +68,7 @@ Timeline below:
 | **Compiled v1** | 2026-06 | An expensive model authors a full DAG plan once, offline; a cheap model executes that fixed plan on every request (see Benchmark Results below). |
 | **DAG v2** | 2026-07 → present | The current native-DAG improvement series, built on DAG v1's base loop, porting Compiled v1's planning lessons back in as opt-in adaptive mechanisms (see Notes below). |
 | **v3** | planned | Moves past one-shot mandates toward a more continuable, chatbot-like interaction; folds in codebench and additional tool/capability work deferred out of v2. |
+| **Euglena Ledger** | 2026-08-31 → present | A scoped pivot out of DAG v2: an auditable, replayable evidence compiler that emits verified claims, deterministic derivations, and an ANSWER/PARTIAL/ABSTAIN verdict. A component other agents call, not a general agentic framework. See [docs/LEDGER.md](docs/LEDGER.md). |
 
 **Why the emphasis stays on native DAG work, not compiled:** Compiled v1 authors a plan with one
 expensive LLM call and reuses it, using pre-computed structure as its mechanism. Compared to DAG
