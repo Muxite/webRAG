@@ -86,10 +86,10 @@ Each gets its own spec and its own cycle. Several exist in partial form today.
 |---|---|---|
 | 1 | Typed action queue + parallel scheduler | partial — engine has parallel visits |
 | 2 | DAG evidence-dependency analysis | partial — DAG v2 planning to be re-scoped |
-| 3 | Deterministic derivation + unit refusal + abstain | **built, unwired** (`evidence_graph.py`) |
-| 4 | Per-call audit log: prompt, response, timing, cost | partial — `trace_recorder.py`, `telemetry.py` |
-| 5 | Record/replay + counterfactual re-run | **corpus replay LIVE** — `connector_search_corpus.py` + `scripts/build_corpus.py`; 289 docs harvested free from 5,973 stored cells |
-| 6 | Leak-resistant benchmark construction | partial — keystone gates exist; 046/047 asymmetry fixed |
+| 3 | Deterministic derivation + unit refusal + abstain | **WIRED AND LIVE-MEASURED** (`evidence_graph.py` via `execution_evidence_loop.py`); typed `derive` action, verdict gate `LEDGER_DERIVATION_GATE` default OFF; live cell 210-231 run: 21/22 cells carry a graph artifact, 109 source + 16 derived nodes, zero invalid derivations, fabricated-arithmetic rate 0.0 (n=8) |
+| 4 | Per-call audit log: prompt, response, timing, cost | **shipped** — `call_id` pairing (was file-order, broke under 32-way concurrency), `stage`/`node_id`, sampling params + `seed`, retry `attempts`, `scripts/trace_read.py`; `seed` is Ollama-only, no-op elsewhere (Anthropic has no such parameter) |
+| 5 | Record/replay + counterfactual re-run | **corpus replay LIVE** (`connector_search_corpus.py` + `scripts/build_corpus.py`, 313 docs / $0.11 for the numeric suite) **+ counterfactual replay tooling shipped, provider-limited**: `scripts/replay_call.py` refuses replay without full-capture text rather than reconstructing lossily; `scripts/reverify.py` re-checks quotes/derivations offline, $0. Honest limit: without a seed a re-run is not comparable to its original — true on Anthropic by construction, and even seeded Ollama showed one cold-start exception (first call after model load) |
+| 6 | Leak-resistant benchmark construction | keystone gates exist; 046/047 asymmetry fixed; **all 12 verify-leaf `optional_url` leaks now closed** (six fixed 2026-08-31 to match the two fixed earlier); `[LEAK]` lint severity in `scripts/validator_lint.py` makes it un-reintroducible, gated by `validator_lint_test.py` over `ACTIVE_SUITE_IDS` (still 59 — the numeric suite 210-231 is deliberately not promoted) |
 
 The single largest concrete gap is #5, though not for the reason an earlier draft of this
 document claimed. Search **is** already recordable and replayable: `ConnectorSearch`
@@ -141,8 +141,15 @@ This is the inheritance that makes a scoped project fast. Do not re-litigate the
 - Reason-first merge ordering: do not flip the default.
 
 **Retired hypotheses**
-- "Graph collapses on fan-out" (−0.266) is retired. Breadth is a dead tie across two
-  backends and six tasks each (−0.002 / −0.007), including the full N=4→32 sweep.
+- "Graph collapses on fan-out" (−0.266) is retired for **fan-out width** specifically —
+  the N=4→32 sweep and the literal `breadth`-labeled shape are a dead tie (−0.002 / −0.007,
+  two backends, six tasks each). This does **not** extend to **aggregation shape** (tasks
+  whose answer requires combining evidence across branches — count/argmax/AND-filter):
+  `AGGREGATION_SHAPE_FINDING_2026-08-30.md` measures graph losing those by **−0.461
+  (t=−7.73, n=23)** on a blind classification of 59 tasks, with a stated mechanism
+  (root-ward-only expansion context, siblings invisible to each other). Width and shape are
+  different variables; both results stand. Widening a fan-out is cheap and parity-tied;
+  making the branches jointly aware of what's already covered is the open, unmeasured fix.
 - "Parallelism compensates for a weak model" was never testable on this suite and is not
   supported where it was tested.
 - The quantitative-shape advantage (+0.321) sign-flipped to −0.216 on a second backend.
@@ -209,12 +216,20 @@ provenance on operands, no abstain when an operand is missing. That is open spac
 
 ## Next
 
-Scoping per subsystem, then an expanded development cycle. Immediate queue:
+Items 1-4 below are **done** as of 2026-08-31 (see
+`docs/handoffs/LEDGER_PROGRAM_HANDOFF_2026-08-31.md`): search-result fixtures (corpus replay),
+the derivation layer wired and live-measured, the 22-task numeric suite (210-231, out of
+`ACTIVE_SUITE_IDS`), and a fresh three-arm run with evidence persistence (`ledgernum22`,
+66/66 cells, superseding the old 046/047 gap). Open queue:
 
-1. Search-result fixtures — unblocks deterministic comparison, ends the paid-live regime.
-2. Wire the derivation layer against the `Extraction` records that already run live.
-3. A purpose-built numeric suite; the effect is unmeasurable at n=24 on `core_long24`.
-4. Fresh 046/047 comparison — the archive cannot supply it.
+1. `sequential_react`'s evidence-persistence gap (fixed for `langgraph_react`, not this arm).
+2. Powered re-measurement — n=22 rep=1 settles nothing against this repo's own n=61-111 power
+   table; a repeat under corpus replay is $0 but costs GPU wall clock.
+3. Whether the derived verdict is a working selective classifier for non-ledger arms — n=4-5
+   ANSWER-tier cells scored *below* their own ALL rate, the wrong direction, too small to call
+   an inversion but flagged as the first thing a powered follow-up must test.
+4. Subsystems 1 (typed action queue) and 2 (DAG evidence-dependency analysis) — out of scope,
+   starting points recorded in the handoff.
 
 ---
 
