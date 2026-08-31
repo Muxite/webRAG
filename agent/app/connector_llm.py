@@ -129,6 +129,8 @@ class ConnectorLLM(ConnectorBase):
         json_schema: Optional[dict] = None,
         reasoning_effort: Optional[str] = None,
         text_verbosity: Optional[str] = None,
+        seed: Optional[int] = None,
+        top_p: Optional[float] = None,
     ) -> dict:
         """
         Build a normalized payload for LLM requests.
@@ -140,6 +142,14 @@ class ConnectorLLM(ConnectorBase):
         :param json_schema: Optional JSON schema for structured output.
         :param reasoning_effort: Optional reasoning effort level.
         :param text_verbosity: Optional text verbosity level.
+        :param seed: Optional sampling seed. Reaches the wire unfiltered on
+            ``OpenAICompatibleBackend`` (OpenAI/OpenRouter honor it, best-effort); is read by
+            ``OllamaNativeBackend._native_body`` for ``options.seed``; and is silently dropped
+            by ``AnthropicMessagesBackend`` (the Messages API has no seed parameter -- see its
+            class docstring). When omitted, ``OllamaNativeBackend`` still applies its own
+            ``LLM_SEED``-configured default, if any.
+        :param top_p: Optional nucleus-sampling parameter, passed through unchanged to
+            providers that accept it.
         :returns: Payload dict.
         """
         payload = {
@@ -148,6 +158,10 @@ class ConnectorLLM(ConnectorBase):
         }
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
+        if seed is not None:
+            payload["seed"] = seed
+        if top_p is not None:
+            payload["top_p"] = top_p
         if json_mode:
             if json_schema:
                 payload["response_format"] = {
@@ -236,32 +250,63 @@ class ConnectorLLM(ConnectorBase):
         payload: dict,
         model_name: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
+        stage: Optional[str] = None,
+        node_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         Sends a chat completion request to the LLM API.
         :param payload: The properly formatted dict payload.
         :param model_name: Optional model override.
         :param timeout_seconds: Optional timeout budget for the full query operation.
+        :param stage: Optional decision-stage label (e.g. a ``DecisionStage`` value) the caller
+            issued this call for, when known. Recorded on the trace's connector_io events so a
+            trace reader can attribute a call to a point in the control loop, not just to
+            "some LLM call somewhere in this run".
+        :param node_id: Optional graph/node id this call was issued on behalf of, when known.
         :return: The response text content, or None if all retries failed.
         """
         if model_name and model_name.strip():
             payload["model"] = model_name.strip()
         payload = self._normalize_payload(payload)
         model_name = str(payload.get("model") or "")
+        # One id per logical call (shared by its "in" and "out"/error events), allocated from a
+        # process-wide counter -- see ConnectorBase._next_call_id. "in"/"out" used to be
+        # correlated only by their position in the trace file, which breaks under any
+        # concurrency (the in-flight semaphore alone allows up to 32 concurrent calls).
+        call_id = self._next_call_id()
 
         messages = payload.get("messages") or []
         prompt_text = "\n".join(str(item.get("content", "")) for item in messages if isinstance(item, dict))
+        # Sampling/config parameters that determine whether a re-run is a genuine repeat of THIS
+        # call or just a differently-configured one. Recorded unconditionally (not gated behind
+        # full capture) -- these are small scalars, not raw text, so they don't reintroduce the
+        # size blowup full capture exists to avoid. ``response_format`` itself is a dict (and,
+        # for json_schema, can carry an arbitrarily large schema), so only its cheap ``type``
+        # tag is unconditional; the full structure follows the same full-capture gate as
+        # prompt/completion text below.
+        num_ctx = getattr(self._backend, "num_ctx", None)
+        response_format = payload.get("response_format")
+        response_format_type = (
+            response_format.get("type") if isinstance(response_format, dict) else None
+        )
         in_payload = {
             "model": model_name,
             "prompt_chars": len(prompt_text),
             "prompt_words": len(prompt_text.split()),
             "max_tokens": payload.get("max_tokens"),
             "max_completion_tokens": payload.get("max_completion_tokens"),
+            "temperature": payload.get("temperature"),
+            "top_p": payload.get("top_p"),
+            "seed": payload.get("seed"),
+            "num_ctx": num_ctx,
+            "response_format_type": response_format_type,
         }
-        # Only include the real prompt text when full capture is on, so default
-        # telemetry stays byte-identical (no text blowup in the result JSON).
+        # Only include the real prompt text (and the full response_format/schema) when full
+        # capture is on, so default telemetry stays byte-identical (no text/schema blowup in
+        # the result JSON).
         if getattr(self, "_full_capture", False):
             in_payload["prompt_text"] = prompt_text
+            in_payload["response_format"] = response_format
             # Also record the per-message role/content pairs, so callers can
             # distinguish system/user/assistant text instead of one flat blob.
             in_payload["messages"] = [
@@ -273,6 +318,9 @@ class ConnectorLLM(ConnectorBase):
             direction="in",
             operation="llm_query",
             payload=in_payload,
+            call_id=call_id,
+            stage=stage,
+            node_id=node_id,
         )
 
         max_attempts = 3
@@ -281,8 +329,14 @@ class ConnectorLLM(ConnectorBase):
         started_at = asyncio.get_event_loop().time()
         perf_started = time.perf_counter()
         retry_types = retryable_llm_exceptions()
+        # Retry wraps up to `max_attempts` tries and (pre-fix) only ever recorded the outcome,
+        # so a call that succeeded on attempt 3 was indistinguishable from one that succeeded
+        # on attempt 1 -- `attempts` below makes that visible on both the success and failure
+        # paths.
+        attempt_counter = {"n": 0}
 
         async def do_call() -> Optional[str]:
+            attempt_counter["n"] += 1
             safe_payload = self._backend.simplify_payload(payload)
             # Bound total concurrent wire calls across all pooled connectors (no-op at
             # concurrency=1 with the default high ceiling).
@@ -335,12 +389,17 @@ class ConnectorLLM(ConnectorBase):
                 name="llm_call",
                 started_at=perf_started,
                 success=True,
-                payload={"model": model_name, "completion_chars": len(content)},
+                payload={
+                    "model": model_name,
+                    "completion_chars": len(content),
+                    "attempts": attempt_counter["n"],
+                },
             )
             out_payload = {
                 "model": model_name,
                 "completion_chars": len(content),
                 "completion_words": len(content.split()),
+                "attempts": attempt_counter["n"],
             }
             if getattr(self, "_full_capture", False):
                 out_payload["completion_text"] = content
@@ -348,6 +407,9 @@ class ConnectorLLM(ConnectorBase):
                 direction="out",
                 operation="llm_query",
                 payload=out_payload,
+                call_id=call_id,
+                stage=stage,
+                node_id=node_id,
             )
             return content
         except Exception as e:
@@ -370,15 +432,26 @@ class ConnectorLLM(ConnectorBase):
                 name="llm_call",
                 started_at=perf_started,
                 success=False,
-                payload={"model": model_name, "infra_failed": infra_failed},
+                payload={
+                    "model": model_name,
+                    "infra_failed": infra_failed,
+                    "attempts": attempt_counter["n"],
+                },
                 error=str(e),
             )
             self.logger.error(f"LLM query failed (model={model_name}): {e}")
             self._record_io(
                 direction="out",
                 operation="llm_query",
-                payload={"model": model_name, "infra_failed": infra_failed},
+                payload={
+                    "model": model_name,
+                    "infra_failed": infra_failed,
+                    "attempts": attempt_counter["n"],
+                },
                 error=str(e),
+                call_id=call_id,
+                stage=stage,
+                node_id=node_id,
             )
             return None
 

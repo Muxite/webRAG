@@ -8,6 +8,7 @@ import asyncio
 import ipaddress
 import json
 import logging
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
@@ -237,6 +238,14 @@ def create_llm_backend(config: ConnectorConfig, logger: logging.Logger) -> LLMBa
 class OpenAICompatibleBackend(LLMBackend):
     """
     OpenAI-compatible Chat Completions (OpenAI, Azure OpenAI, Ollama, vLLM, llama.cpp server, etc.).
+
+    Seed reality (verified, so callers can be honest about what "same seed" buys them):
+    ``complete`` passes ``**payload`` straight to ``chat.completions.create`` with no field
+    filtering, so a ``payload["seed"]`` set upstream (``ConnectorLLM.build_payload``) DOES reach
+    the wire for OpenAI / OpenRouter / any other OpenAI-compatible provider that honors the
+    Chat Completions ``seed`` parameter (OpenAI's own docs describe it as "best effort"
+    determinism, not guaranteed -- a provider/model update can still change output even at a
+    fixed seed). ``simplify_payload`` does not strip ``seed``.
     """
 
     def __init__(self, config: ConnectorConfig, logger: logging.Logger):
@@ -518,6 +527,29 @@ class OllamaNativeBackend(OpenAICompatibleBackend):
         # openai_compatible URL is probed once (it may be vLLM / llama.cpp / LM Studio).
         self._is_ollama: Optional[bool] = True if provider in ("ollama", "local") else None
         self._http = self._build_http_client()
+        #: Process-default seed for deterministic decoding, from ``LLM_SEED`` (unset -> None,
+        #: i.e. ordinary non-deterministic sampling, unchanged default behavior). A per-call
+        #: ``payload["seed"]`` always takes precedence over this default -- see
+        #: :meth:`_native_body`.
+        self.seed = self._parse_seed(getattr(config, "llm_seed", None))
+
+    @staticmethod
+    def _parse_seed(raw: Any) -> Optional[int]:
+        """
+        Parse a configured/environment seed value into an int, tolerating blank/invalid input.
+
+        :param raw: Raw seed value (``ConnectorConfig.llm_seed`` if that attribute exists, else
+            ``None``); a plain env-var read (``LLM_SEED``) is the actual source today since
+            ``ConnectorConfig`` (out of this lane's manifest) has no typed field for it yet.
+        :returns: The parsed int, or ``None`` when unset/blank/unparsable.
+        """
+        text = str(raw if raw is not None else os.environ.get("LLM_SEED", "")).strip()
+        if not text:
+            return None
+        try:
+            return int(text)
+        except ValueError:
+            return None
 
     def _build_http_client(self) -> httpx.AsyncClient:
         """
@@ -562,6 +594,15 @@ class OllamaNativeBackend(OpenAICompatibleBackend):
 
         Mirrors what ollama's own shim does with the same fields, then adds ``num_ctx``.
 
+        ``seed`` is read from ``payload["seed"]`` (an explicit per-call override, set via
+        :meth:`ConnectorLLM.build_payload`/``query_llm``'s ``payload["seed"]``) and falls back
+        to this backend's configured default (``self.seed``, from ``LLM_SEED`` -- see
+        ``__init__``). Without a seed, "re-run this exact call with one thing changed" is
+        indistinguishable from ordinary sampling noise: replay tooling (Lane E's
+        ``replay_call.py``) needs a fixed seed to attribute a changed completion to the thing
+        that actually changed. Ollama's native ``/api/chat`` honors ``options.seed`` for
+        deterministic decoding (same model + prompt + seed + sampling params -> same output).
+
         :param payload: Simplified payload.
         :param model_name: Resolved model id.
         :returns: Request body for /api/chat.
@@ -574,6 +615,11 @@ class OllamaNativeBackend(OpenAICompatibleBackend):
             max_out = payload.get("max_tokens")
         if max_out is not None:
             options["num_predict"] = int(max_out)
+        seed = payload.get("seed")
+        if seed is None:
+            seed = self.seed
+        if seed is not None:
+            options["seed"] = int(seed)
         body: dict[str, Any] = {
             "model": model_name,
             "messages": payload.get("messages") or [],
@@ -664,6 +710,13 @@ class OllamaNativeBackend(OpenAICompatibleBackend):
 class AnthropicMessagesBackend(LLMBackend):
     """
     Native Anthropic Messages API (Claude). Uses the anthropic Python SDK.
+
+    Seed reality (verified against the Messages API): Anthropic's Messages API has NO ``seed``
+    parameter at all -- there is nothing to pass, and ``complete`` below builds its ``kwargs``
+    dict explicitly (model/max_tokens/messages/system/temperature) rather than forwarding the
+    payload, so even a ``payload["seed"]`` set upstream is silently dropped, never sent. A
+    replay/re-run tool targeting this backend cannot claim seed-controlled determinism; the
+    honest claim is "same prompt, same params, independent sample."
     """
 
     def __init__(self, config: ConnectorConfig, logger: logging.Logger):

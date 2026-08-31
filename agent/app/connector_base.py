@@ -1,7 +1,26 @@
+import itertools
 import logging
 from typing import Any, Dict, Optional
 
 from shared.connector_config import ConnectorConfig
+
+# Process-wide monotonic call-id source, shared across every ConnectorBase subclass
+# (LLM / search / http / chroma) and every connector instance. "in" and "out" trace
+# events used to be correlated ONLY by their position in the JSONL file -- which
+# breaks the moment more than one call is in flight (the LLM in-flight semaphore
+# alone allows up to 32 concurrent calls, default). A single shared counter means a
+# call_id is unique across the whole trace file regardless of which connector or
+# instance emitted it, so a reader can pair "in"/"out" (and "error") events by id
+# instead of assuming they arrive in order.
+_CALL_ID_COUNTER = itertools.count(1)
+
+
+def next_call_id() -> int:
+    """Allocate the next process-wide monotonic call id.
+
+    :returns: A strictly increasing int, unique for the life of the process.
+    """
+    return next(_CALL_ID_COUNTER)
 
 
 class ConnectorBase:
@@ -18,6 +37,18 @@ class ConnectorBase:
         self.logger = logging.getLogger(name or self.__class__.__name__)
         self._telemetry = None
         self._full_capture = False
+
+    def _next_call_id(self) -> int:
+        """
+        Allocate a new monotonic call id for correlating a call's "in"/"out" trace events.
+
+        Callers that issue a single wire call should allocate ONE id at the start and pass
+        it to every ``_record_io`` call describing that same call (the request, the response
+        or error) so a trace reader can pair them without relying on file order.
+
+        :returns: A process-wide unique, strictly increasing int.
+        """
+        return next_call_id()
 
     def set_telemetry(self, telemetry: Optional[Any]) -> None:
         """
@@ -63,6 +94,9 @@ class ConnectorBase:
         operation: str,
         payload: Optional[Dict[str, Any]] = None,
         error: Optional[str] = None,
+        call_id: Optional[int] = None,
+        stage: Optional[str] = None,
+        node_id: Optional[str] = None,
     ) -> None:
         """
         Record structured connector IO events if enabled.
@@ -70,6 +104,14 @@ class ConnectorBase:
         :param operation: Operation label.
         :param payload: Payload metadata.
         :param error: Optional error string.
+        :param call_id: Monotonic id shared by this call's "in" and "out"/error events (see
+            :meth:`_next_call_id`), so a trace reader can pair them without relying on file
+            order -- the only correlation available before this, which breaks under any
+            concurrency (the LLM in-flight semaphore alone allows up to 32 concurrent calls).
+        :param stage: Optional decision-stage label (e.g. one of ``DecisionStage``'s values),
+            when the caller knows which stage of the control loop issued this call.
+        :param node_id: Optional graph/node id the call was issued on behalf of, when the
+            caller knows it.
         :returns: None
         """
         if self._telemetry is None:
@@ -81,6 +123,12 @@ class ConnectorBase:
             "operation": operation,
             "payload": raw if self._full_capture else self._summarize_payload(raw),
         }
+        if call_id is not None:
+            entry["call_id"] = call_id
+        if stage:
+            entry["stage"] = stage
+        if node_id:
+            entry["node_id"] = node_id
         if error:
             entry["error"] = error
         self._record_event("connector_io", entry)

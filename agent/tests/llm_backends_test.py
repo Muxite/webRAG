@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -280,6 +281,126 @@ async def test_ollama_native_completion_sends_num_ctx(monkeypatch):
     assert body["stream"] is False
     assert text == "ok"
     assert (usage.prompt_tokens, usage.completion_tokens, usage.total_tokens) == (18279, 12, 18291)
+
+
+# --- seed: configurable + recorded, so a re-run can prove it used the same config ---------
+def test_ollama_backend_seed_defaults_to_none_when_unconfigured(monkeypatch):
+    monkeypatch.delenv("LLM_SEED", raising=False)
+    b, _ = _ollama_backend(monkeypatch)
+    assert b.seed is None
+
+
+def test_ollama_backend_seed_reads_llm_seed_env(monkeypatch):
+    monkeypatch.setenv("LLM_SEED", "4242")
+    b, _ = _ollama_backend(monkeypatch)
+    assert b.seed == 4242
+
+
+def test_ollama_backend_seed_env_blank_or_invalid_is_none(monkeypatch):
+    monkeypatch.setenv("LLM_SEED", "   ")
+    b, _ = _ollama_backend(monkeypatch)
+    assert b.seed is None
+
+    monkeypatch.setenv("LLM_SEED", "not-a-number")
+    b2, _ = _ollama_backend(monkeypatch)
+    assert b2.seed is None
+
+
+@pytest.mark.asyncio
+async def test_ollama_native_body_uses_configured_default_seed(monkeypatch):
+    monkeypatch.setenv("LLM_SEED", "7")
+    b, fake = _ollama_backend(monkeypatch)
+    await b.complete({"model": "qwen2.5:7b", "messages": [{"role": "user", "content": "hi"}]}, "qwen2.5:7b")
+    _, body = fake.posts[0]
+    assert body["options"]["seed"] == 7
+
+
+@pytest.mark.asyncio
+async def test_ollama_native_body_per_call_seed_overrides_default(monkeypatch):
+    monkeypatch.setenv("LLM_SEED", "7")
+    b, fake = _ollama_backend(monkeypatch)
+    await b.complete(
+        {"model": "qwen2.5:7b", "messages": [{"role": "user", "content": "hi"}], "seed": 999},
+        "qwen2.5:7b",
+    )
+    _, body = fake.posts[0]
+    assert body["options"]["seed"] == 999
+
+
+@pytest.mark.asyncio
+async def test_ollama_native_body_omits_seed_when_unset(monkeypatch):
+    monkeypatch.delenv("LLM_SEED", raising=False)
+    b, fake = _ollama_backend(monkeypatch)
+    await b.complete({"model": "qwen2.5:7b", "messages": [{"role": "user", "content": "hi"}]}, "qwen2.5:7b")
+    _, body = fake.posts[0]
+    assert "seed" not in body["options"]
+
+
+@pytest.mark.asyncio
+async def test_anthropic_backend_never_sends_seed(monkeypatch):
+    # The Messages API has no seed parameter -- complete() builds kwargs explicitly and must
+    # never forward payload["seed"] onto the wire, even when the caller set one.
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
+    from shared.connector_config import ConnectorConfig
+    from agent.app.llm_backends import AnthropicMessagesBackend
+
+    b = AnthropicMessagesBackend(ConnectorConfig(), logging.getLogger("t"))
+    captured = {}
+
+    class _FakeMessages:
+        async def create(self, **kwargs):
+            captured.update(kwargs)
+
+            class _Block:
+                type = "text"
+                text = "ok"
+
+            class _Msg:
+                content = [_Block()]
+                usage = None
+
+            return _Msg()
+
+    b._client = SimpleNamespace(messages=_FakeMessages())
+    payload = {"model": "claude-opus-4.7", "messages": [{"role": "user", "content": "hi"}], "seed": 999}
+    await b.complete(payload, "claude-opus-4.7")
+    assert "seed" not in captured
+
+
+@pytest.mark.asyncio
+async def test_openai_compatible_backend_passes_seed_through_unfiltered(monkeypatch):
+    # OpenAI/OpenRouter accept `seed` on Chat Completions; complete() forwards **payload
+    # verbatim, and simplify_payload must not strip it.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-x")
+    from shared.connector_config import ConnectorConfig
+    from agent.app.llm_backends import OpenAICompatibleBackend
+
+    b = OpenAICompatibleBackend(ConnectorConfig(), logging.getLogger("t"))
+    payload = {"model": "gpt-5-mini", "messages": [{"role": "user", "content": "hi"}], "seed": 123}
+    simplified = b.simplify_payload(payload)
+    assert simplified["seed"] == 123
+
+    captured = {}
+
+    class _Msg:
+        content = "ok"
+
+    class _Choice:
+        message = _Msg()
+        finish_reason = "stop"
+
+    class _Resp:
+        choices = [_Choice()]
+        usage = None
+
+    async def _create(**kwargs):
+        captured.update(kwargs)
+        return _Resp()
+
+    b.client.chat.completions.create = _create
+    await b.complete(simplified, "gpt-5-mini")
+    assert captured.get("seed") == 123
 
 
 @pytest.mark.asyncio

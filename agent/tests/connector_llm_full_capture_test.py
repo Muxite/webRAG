@@ -162,6 +162,84 @@ async def test_full_capture_off_does_not_include_messages():
 
 
 @pytest.mark.asyncio
+async def test_sampling_params_recorded_on_in_event_regardless_of_full_capture():
+    """temperature/top_p/seed/num_ctx must land on the `in` event's numeric fields even with
+    full capture OFF -- ConnectorBase._summarize_payload only touches str/list/dict values, so
+    plain numeric config scalars pass through unsummarized (the same as e.g. `max_tokens`
+    always has), while `response_format_type` (a str, like `model`) is summarized to a char
+    count in this mode -- consistent with every other string field's pre-existing behavior,
+    not a new gap. A re-run must be able to prove it used the same numeric configuration even
+    without opting into full capture."""
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.return_value = (
+        "ok", SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+    telemetry = MagicMock()
+    connector.set_telemetry(telemetry)
+    # full capture left OFF on purpose
+
+    schema = {"type": "json_schema", "json_schema": {"name": "x", "schema": {"type": "object"}}}
+    await connector.query_llm({
+        "messages": [{"role": "user", "content": "hi"}],
+        "model": "openai/gpt-5-mini",
+        "temperature": 0.2,
+        "top_p": 0.9,
+        "seed": 42,
+        "response_format": schema,
+    })
+
+    io_calls = _record_io_calls(telemetry)
+    in_payload = next(c for c in io_calls if c["direction"] == "in")["payload"]
+    assert in_payload["temperature"] == 0.2
+    assert in_payload["top_p"] == 0.9
+    assert in_payload["seed"] == 42
+    # A str field: summarized like every other string field is under default capture.
+    assert in_payload["response_format_type"] == {"chars": len("json_schema")}
+    # The full schema is NOT included without full capture (it can be arbitrarily large).
+    assert "response_format" not in in_payload
+
+
+@pytest.mark.asyncio
+async def test_full_response_format_recorded_under_full_capture():
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.return_value = (
+        "ok", SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+    telemetry = MagicMock()
+    connector.set_telemetry(telemetry)
+    connector.set_full_capture(True)
+
+    schema = {"type": "json_schema", "json_schema": {"name": "x", "schema": {"type": "object"}}}
+    await connector.query_llm({
+        "messages": [{"role": "user", "content": "hi"}],
+        "model": "openai/gpt-5-mini",
+        "response_format": schema,
+    })
+
+    io_calls = _record_io_calls(telemetry)
+    in_payload = next(c for c in io_calls if c["direction"] == "in")["payload"]
+    assert in_payload["response_format"] == schema
+    assert in_payload["response_format_type"] == "json_schema"
+
+
+@pytest.mark.asyncio
+async def test_num_ctx_recorded_from_backend_when_present():
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.return_value = (
+        "ok", SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+    mock_backend.num_ctx = 32768
+    telemetry = MagicMock()
+    connector.set_telemetry(telemetry)
+
+    await connector.query_llm({"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"})
+
+    io_calls = _record_io_calls(telemetry)
+    in_payload = next(c for c in io_calls if c["direction"] == "in")["payload"]
+    assert in_payload["num_ctx"] == 32768
+
+
+@pytest.mark.asyncio
 async def test_full_capture_missing_attribute_does_not_raise():
     """query_llm's own getattr(self, "_full_capture", False) guard must not blow up even if
     a subclass/mock never set _full_capture. We stub _record_io itself (ConnectorBase's

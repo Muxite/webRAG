@@ -238,6 +238,114 @@ async def test_query_llm_tags_infra_failed_in_telemetry_on_terminal_402():
 
 
 @pytest.mark.asyncio
+async def test_query_llm_records_attempts_on_success_first_try():
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.return_value = (
+        "ok", SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+    telemetry = MagicMock()
+    connector.set_telemetry(telemetry)
+
+    await connector.query_llm({"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"})
+
+    out_kwargs = [c for c in telemetry.record_event.call_args_list if c.args[1]["direction"] == "out"][0]
+    assert out_kwargs.args[1]["payload"]["attempts"] == 1
+
+
+@pytest.mark.asyncio
+async def test_query_llm_records_attempts_after_a_retried_call():
+    """A call that succeeded on attempt 3 must be distinguishable from one that succeeded on
+    attempt 1 -- Retry used to record only the outcome, not how many tries it took."""
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.side_effect = [
+        _FakeStatusError(402),
+        _FakeStatusError(429),
+        ("recovered on third try", SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2)),
+    ]
+    telemetry = MagicMock()
+    connector.set_telemetry(telemetry)
+
+    out = await connector.query_llm({"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"})
+
+    assert out == "recovered on third try"
+    out_kwargs = [c for c in telemetry.record_event.call_args_list if c.args[1]["direction"] == "out"][0]
+    assert out_kwargs.args[1]["payload"]["attempts"] == 3
+    _, timing_kwargs = telemetry.record_timing.call_args
+    assert timing_kwargs["payload"]["attempts"] == 3
+
+
+@pytest.mark.asyncio
+async def test_query_llm_records_attempts_on_terminal_failure():
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.side_effect = _FakeStatusError(402)
+    telemetry = MagicMock()
+    connector.set_telemetry(telemetry)
+
+    out = await connector.query_llm({"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"})
+
+    assert out is None
+    out_kwargs = [c for c in telemetry.record_event.call_args_list if c.args[1]["direction"] == "out"][0]
+    assert out_kwargs.args[1]["payload"]["attempts"] == 3  # max_attempts exhausted
+
+
+@pytest.mark.asyncio
+async def test_query_llm_pairs_in_and_out_events_by_call_id():
+    """in/out events used to be correlated only by file order, which breaks under
+    concurrency. Both events of one call must share the same call_id, and two
+    sequential calls must get DIFFERENT call_ids."""
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.return_value = (
+        "ok", SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+    telemetry = MagicMock()
+    connector.set_telemetry(telemetry)
+
+    await connector.query_llm({"messages": [{"role": "user", "content": "first"}], "model": "openai/gpt-5-mini"})
+    await connector.query_llm({"messages": [{"role": "user", "content": "second"}], "model": "openai/gpt-5-mini"})
+
+    io_entries = [c.args[1] for c in telemetry.record_event.call_args_list if c.args[0] == "connector_io"]
+    first_in, first_out, second_in, second_out = io_entries
+    assert first_in["call_id"] == first_out["call_id"]
+    assert second_in["call_id"] == second_out["call_id"]
+    assert first_in["call_id"] != second_in["call_id"]
+    assert isinstance(first_in["call_id"], int) and isinstance(second_in["call_id"], int)
+
+
+@pytest.mark.asyncio
+async def test_query_llm_records_stage_and_node_id_when_provided():
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.return_value = (
+        "ok", SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+    telemetry = MagicMock()
+    connector.set_telemetry(telemetry)
+
+    await connector.query_llm(
+        {"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"},
+        stage="expansion",
+        node_id="n7",
+    )
+
+    io_entries = [c.args[1] for c in telemetry.record_event.call_args_list if c.args[0] == "connector_io"]
+    assert all(e["stage"] == "expansion" and e["node_id"] == "n7" for e in io_entries)
+
+
+@pytest.mark.asyncio
+async def test_query_llm_omits_stage_and_node_id_when_not_provided():
+    connector, mock_backend = _make_connector_with_mock_backend()
+    mock_backend.complete.return_value = (
+        "ok", SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+    telemetry = MagicMock()
+    connector.set_telemetry(telemetry)
+
+    await connector.query_llm({"messages": [{"role": "user", "content": "hi"}], "model": "openai/gpt-5-mini"})
+
+    io_entries = [c.args[1] for c in telemetry.record_event.call_args_list if c.args[0] == "connector_io"]
+    assert all("stage" not in e and "node_id" not in e for e in io_entries)
+
+
+@pytest.mark.asyncio
 async def test_query_llm_does_not_tag_infra_failed_for_genuine_content_error():
     """A non-infra terminal failure (e.g. a plain bug) must NOT be tagged infra_failed — only
     real payment/rate-limit/timeout/transport signals should be quarantined."""
