@@ -14,6 +14,7 @@ from agent.app.testing.evidence_graph import (
     VALUE_FAIL_JUNK,
     VALUE_FAIL_NO_PAGE,
     EvidenceGraph,
+    _candidates,
     extract_unit,
     is_junk_value,
     is_unit_bearing,
@@ -1019,3 +1020,57 @@ class TestTypedDerivationRefusals:
         graph = _graph()
         with pytest.raises(eg.MissingOperand):
             graph.add_derived("x", "sum", ["nope"])
+
+
+class TestDeclaredUnitRespelling:
+    """A value whose unit is ABBREVIATED differently from the page must still verify.
+
+    Found on a real cell (task 130, qwen2.5:7b, evidence_loop): the USGS page says
+    ``"20,310 feet"``; the extractor reported ``value="20,310 ft"`` with ``unit="feet"`` — the
+    right number, the unit correctly declared in its own field, and merely a different spelling
+    in the value string. ``_candidates`` only ever tried ``"20,310 ft"``, so the value was
+    reported ABSENT and admitted no node. Six of six extractions failed that way and the graph
+    admitted nothing at all, which would leave the whole derivation layer inert in production
+    while every offline test stayed green.
+
+    The fix stays inside the module's no-fuzzy-matching rule: the extra spelling is built from
+    the value's own numeric half plus the unit the MODEL ITSELF declared, and it is still matched
+    as one exact, boundary-checked span. No conversion, no synonym table, no token-overlap.
+    """
+
+    PAGE = ("The official height for Denali has been measured at 20,310 feet, just 10 feet "
+            "less than the previous elevation of 20,320 feet.")
+
+    def test_an_abbreviated_unit_verifies_against_the_pages_spelling(self):
+        match = verify_value(self.PAGE, "20,310 ft", unit="feet")
+        assert match.verified is True
+        assert self.PAGE[match.start:match.end] == "20,310 feet"
+        assert match.unit_bearing is True, "the re-spelled match is still one unit-bearing span"
+
+    def test_the_pages_own_spelling_still_verifies_unchanged(self):
+        assert verify_value(self.PAGE, "20,310 feet", unit="feet").verified is True
+
+    def test_a_wrong_number_is_still_refused_however_the_unit_is_spelled(self):
+        assert verify_value(self.PAGE, "20,315 ft", unit="feet").verified is False
+
+    def test_a_genuinely_absent_unit_family_is_still_refused(self):
+        # The page is imperial only; a metric figure must not be manufactured from it.
+        assert verify_value(self.PAGE, "6,194 m", unit="metres").verified is False
+
+    def test_a_declared_unit_that_matches_the_value_adds_no_new_spelling(self):
+        assert _candidates("20,310 feet", "feet") == [("20,310 feet", True)]
+
+    def test_the_respelling_is_offered_after_the_models_own_spelling(self):
+        cands = _candidates("20,310 ft", "feet")
+        assert cands[0] == ("20,310 ft", True), "the model's literal spelling is still tried first"
+        assert ("20,310 feet", True) in cands
+
+    def test_a_bare_value_with_a_declared_unit_is_unchanged(self):
+        assert _candidates("20,310", "feet")[0] == ("20,310 feet", True)
+
+    def test_the_admitted_node_records_the_unit_it_was_given(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://example.org/denali", self.PAGE)
+        node = graph.add_source("p1", "20,310 ft", unit="feet")
+        assert node is not None
+        assert graph.rejections == []

@@ -591,13 +591,47 @@ def _label_in_window(text: str, start: int, end: int, tokens: List[str], window:
 
 
 def _candidates(value: str, unit: Any) -> List[Tuple[str, bool]]:
-    """The spellings to look for, best first, each flagged as unit-bearing or bare."""
+    """The spellings to look for, best first, each flagged as unit-bearing or bare.
+
+    Three sources of a spelling, in priority order:
+
+    1. ``value`` joined with a separately-reported ``unit``, when the value stands bare.
+    2. ``value`` exactly as the model wrote it.
+    3. ``value``'s NUMERIC half joined with the model's own declared ``unit``, when the value is
+       unit-bearing but spells its unit differently from the ``unit`` field.
+    4. the canonical (digit-group-normalized) form.
+
+    Case 3 exists because of a real measured failure. On task 130 the USGS page says
+    ``"20,310 feet"``; the extractor reported ``value="20,310 ft"`` with ``unit="feet"`` — the
+    right number, off the right page, with the unit correctly declared in its own field, and only
+    the spelling inside ``value`` differing. Only ``"20,310 ft"`` was ever tried, so the value was
+    reported ABSENT. Six of six extractions failed that way in one cell and the graph admitted
+    ZERO nodes, which silently makes the whole derivation layer inert while every offline test
+    stays green.
+
+    This is NOT a loosening of the module's no-fuzzy-matching rule, and must not become one. The
+    added spelling is built from the value's own numeric half plus the unit the MODEL ITSELF
+    declared, and it is still located as ONE exact, boundary-checked span. There is no conversion,
+    no synonym table, no token-overlap and no edit distance: ``"20,310 ft"`` with ``unit="metres"``
+    would look for ``"20,310 metres"`` and simply not find it. The match also stays UNIT-BEARING,
+    so it keeps the 12-55x decoy resistance that carrying the unit buys — the alternative fix,
+    falling back to the bare number, would have thrown that away.
+    """
     text = value.strip()
     out: List[Tuple[str, bool]] = []
     unit_text = str(unit or "").strip()
     if unit_text and not is_unit_bearing(text):
         out.append((f"{text} {unit_text}", True))
     out.append((text, is_unit_bearing(text)))
+    if unit_text and is_unit_bearing(text):
+        embedded = extract_unit(text)
+        if normalize_for_match(_unit_leading_token(embedded)) != normalize_for_match(
+                _unit_leading_token(unit_text)):
+            match = _NUMBER_UNIT_SPLIT.fullmatch(text)
+            if match:
+                respelled = f"{match.group('number').strip()} {unit_text}"
+                if respelled != text:
+                    out.append((respelled, True))
     canonical = _canonical_value(text)
     if canonical != text:
         out.append((canonical, is_unit_bearing(canonical)))
