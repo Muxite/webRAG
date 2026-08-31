@@ -30,7 +30,14 @@ apply it to whatever the user brought.
    without new infrastructure" section — there's no dedicated review subagent, and that's
    intentional.
 7. **Never treat a live benchmark run as pre-authorized by the plan alone** — confirm budget and
-   go-ahead with the user at execution time, even mid-cycle.
+   go-ahead with the user at execution time, even mid-cycle. **Exception: the Autonomous tier**,
+   where the user is not reachable. There the gate is machine-checkable rather than human-checkable
+   — a written preregistration (`scripts/prereg.py`), a budget ceiling enforced in code, the
+   `driver.lock` singleton refusal, pre-declared abort conditions, and durable resume. Read the
+   "Autonomous cycles" section of DEV_CYCLE.md before running one; do not invent a sixth gate.
+   Offline tests and corpus replay (`SEARCH_PROVIDER=corpus`) are $0 and GPU-free, so they need no
+   gate at all — prefer them over a live run whenever the question can be answered on fixed
+   evidence.
 8. When the cycle closes (Analyze stage done), summarize concretely what was found and what it
    implies for the *next* cycle's Plan stage — that hand-off is what makes this a loop instead of a
    one-off.

@@ -37,7 +37,7 @@ what master now assumes?), not just a mechanical `git merge`.
 | Implement | Write the code. | Never |
 | Run tests | `PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests/...` green, touched files byte-compiled. Required before any live spend. Venv-free equivalent: `cd services && docker compose --profile test run --rm agent-test`. | Never |
 | Run benchmarks | Live-$ runs. Smoke (1×1) before a full matrix. Explicit budget authorization at execution time — never pre-authorized by a plan. | Change has no live-benchmark surface |
-| Review results | Read raw output (`gate_report.py` / `level_ladder.py` / `recovery_curve.py` / `unified_bench_report.py`) against any pre-registration. | Benchmarks were skipped |
+| Review results | Read raw output (`compare_arms.py` for an arm-vs-arm A/B, `kpi_dashboard.py` / `task_discrimination.py` for suite-wide health, or the older `gate_report.py` / `level_ladder.py` / `recovery_curve.py` / `unified_bench_report.py`) against any pre-registration. | Benchmarks were skipped |
 | Analyze | Trace failures to root cause, not just an aggregate score. Findings become the next cycle's Plan input — this is what closes the loop. | Never |
 
 ## Sizing
@@ -56,6 +56,67 @@ for what actually needs it.
   written spec under `docs/superpowers/specs/` (via the `brainstorming` skill). Review = a full
   adversarial panel; pre-registration required before any live run (see
   `scripts/LADDER_PREREGISTRATION.md` for the precedent).
+
+## Autonomous cycles
+
+The four tiers above assume a human is reachable to authorise a live run. When one is not — an
+overnight batch, a maintainer travelling — that assumption converts every experiment into a stall.
+The **Autonomous** tier does not remove the gate; it makes it *machine-checkable* rather than
+human-checkable. The other four tiers keep their rules unchanged.
+
+Autonomy is granted **per run class**, not globally:
+
+| Run class | Cost | GPU | Autonomy |
+|---|---|---|---|
+| Offline tests | $0 | no | unrestricted, parallel |
+| Corpus replay (`SEARCH_PROVIDER=corpus`) | $0 | no | unrestricted, parallel |
+| Local inference (ollama) | $0 | **yes** | autonomous, serialised under the gpu-lock |
+| Paid API | **$** | no | autonomous under a standing budget ceiling |
+
+Corpus replay is what makes this safe. A replay costs nothing, touches no network and does not
+contend for the GPU, so the dangerous category shrinks to runs that genuinely need live inference.
+
+### The five machine gates
+
+1. **Preregistration supplies the denominator.** Write the design before launching:
+   `scripts/prereg.py write --spec <file>`, giving hypothesis, arms, tasks, reps, primary endpoint,
+   budget and abort conditions. `scripts/prereg.py audit --run-id <id>` then compares what landed
+   against what was designed. This closes the trap where **a dead cell writes no file** and vanishes
+   from the denominator — `langgraph_react` silently lost 6–7 of 48 cells and its mean was computed
+   over the survivors. A missing cell is a failure, never an absence.
+2. **Budget is enforced in code, not by asking.** `IDEA_TEST_USD_CEILING`,
+   `adaptive_ladder_run.py --budget`, and `LEDGER_MAX_LIVE_FALLBACKS` (live search under corpus
+   replay, default 25). The standing budget lives in the prereg; exceeding it aborts the run.
+3. **Singleton enforced by lockfile, not by memory.** `adaptive_ladder_run.py:acquire_pid_lock`
+   already refuses to start against a held `driver.lock`. Use it. An autonomous agent cannot be
+   trusted to remember that the benchmark path is a singleton; the file can.
+4. **Abort conditions are pre-declared** in the prereg and checked as cells land: `infra_failed`
+   rate, grounding rate, spend rate. `compare_arms.py` already refuses to print on ungrounded or
+   auth-failed runs; the same predicate should abort a run, not merely decline to report it.
+5. **Durability by default.** `setsid nohup … < /dev/null & disown` — backgrounded jobs die past
+   roughly an hour. Resume is safe because `has_complete_result()` counts only finished
+   `*_r1.json`. Keep slices ≤4 against `OLLAMA_NUM_PARALLEL=1`; 8-way slicing resynchronises and
+   hammers a single-threaded backend.
+
+### Auditability defaults must be flipped
+
+`IDEA_TEST_KEEP_TRACES` and `IDEA_TEST_CAPTURE_LLM_IO` are both **off** by default, so raw prompts
+and responses are never stored — a 96-cell baseline once yielded zero recoverable traces. Turn both
+**on** for any cycle whose purpose is to explain a result rather than only to score one.
+`telemetry.py` already records `t_start`/`t_end` against a monotonic anchor, so per-call timings and
+overlap need retention, not new instrumentation.
+
+### Not repeating an experiment
+
+Result filenames already carry `cfg` + the first 8 hex of a sha256 over the sorted settings dict
+(`idea_test_runner.py:1667`). Before launching, check whether `(task set, arms, cfg hash, model
+digest)` has already been measured and skip those cells.
+
+### Token discipline
+
+Subagents read; the coordinator keeps conclusions. Handoff documents get one finding per section
+with a hard cap — the 616-line append-only accretion in `DAG_V3_S1_…_2026-08-28.md` is the failure
+mode to avoid. Raw numbers live in the result JSON and are linked, never pasted.
 
 ## Adversarial review, without new infrastructure
 
@@ -90,7 +151,7 @@ Most stages already have a tool-shaped home; the loop above is mainly what ties 
 | Implement | `.claude/agents/engine-dev.md` |
 | Run tests | `PYTHONPATH=.:services:agent ./.venv/bin/python -m pytest -q agent/tests`, or `docker compose --profile test run --rm agent-test` |
 | Run benchmarks | `.claude/agents/benchmark.md`, `scripts/adaptive_ladder_run.py`, or `docker compose --profile ladder-benchmark run --rm ladder-benchmark` ($0 local models) |
-| Review results / Analyze | `scripts/gate_report.py`, `scripts/level_ladder.py`, `scripts/recovery_curve.py`, `scripts/unified_bench_report.py` |
+| Review results / Analyze | `scripts/compare_arms.py` (N-way paired arm comparison, the current default), `scripts/kpi_dashboard.py` (suite-wide KPI table), `scripts/task_discrimination.py` (which tasks carry statistical power); older: `scripts/gate_report.py`, `scripts/level_ladder.py`, `scripts/recovery_curve.py`, `scripts/unified_bench_report.py` |
 | Pre-commit gate | `.claude/agents/reviewer.md` |
 | One variable at a time, live-gated | `.claude/agents/strategy-tuner.md` |
 
