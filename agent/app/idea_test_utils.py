@@ -71,6 +71,14 @@ def visited_evidence(result: Dict[str, Any], observability: Optional[Dict[str, A
     ``runner.run_complete_test`` projects it into ``observability["evidence"]`` for validation.
     The graph walk is kept only as a fallback (and for richer per-node fields like ``links_full``).
 
+    A third fallback reads ``output["pages"]``: ``evidence_loop`` and ``sequential_react_extract``
+    freeze every visited page there (id, url, content_hash, text) specifically so a run can be
+    re-audited later, but ``observability["evidence"]`` is a validation-time-only projection built
+    by ``testing/runner.py`` and never persisted to the result JSON, and neither arm populates
+    ``result["graph"]``. Without this, re-scoring one of those two arms' STORED cells from disk
+    sees zero evidence regardless of what the run actually visited -- exactly the structural-0
+    trap this function exists to avoid, just triggered by re-loading from disk instead of by arm.
+
     :param result: Test result payload.
     :param observability: Observability payload; carries ``evidence`` when injected by the runner.
     :return: List of ``{"url": str, "content": str}`` for successfully visited pages.
@@ -99,6 +107,17 @@ def visited_evidence(result: Dict[str, Any], observability: Optional[Dict[str, A
         for u in (ar.get("urls_visited") or ([ar.get("url")] if ar.get("url") else [])):
             if u:
                 out.append({"url": str(u).strip(), "content": content})
+    if out:
+        return out
+    output = result.get("output") or {}
+    pages = output.get("pages") if isinstance(output, dict) else None
+    for page in pages or []:
+        if not isinstance(page, dict):
+            continue
+        url = str(page.get("url") or "").strip()
+        content = str(page.get("text") or "")
+        if url or content:
+            out.append({"url": url, "content": content})
     return out
 
 

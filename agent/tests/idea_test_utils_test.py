@@ -147,6 +147,38 @@ def test_visited_evidence_sourced_from_observability_not_graph():
     assert ev == [{"url": "https://example.com/x", "content": "hello"}]
 
 
+def test_visited_evidence_falls_back_to_output_pages_when_stored_offline():
+    """``evidence_loop`` / ``sequential_react_extract`` persist ``output["pages"]`` (id, url,
+    content_hash, text) precisely so a re-loaded STORED cell can be re-audited offline -- but
+    ``observability["evidence"]`` is a validation-time-only projection (never persisted, see
+    ``testing/runner.py``) and neither arm populates ``result["graph"]``. Without this third
+    fallback, re-scoring a stored evidence_loop/sequential_react_extract cell from disk always
+    sees zero evidence regardless of what the run actually visited."""
+    result = {
+        "output": {
+            "final_deliverable": "...",
+            "pages": [
+                {"page_id": "p1", "url": "https://example.com/denali",
+                 "content_hash": "abc", "chars": 20, "stored_chars": 20, "truncated": False,
+                 "text": "Denali is 20310 feet tall."},
+            ],
+        },
+        "graph": {},
+    }
+    ev = visited_evidence(result, observability=None)
+    assert ev == [{"url": "https://example.com/denali", "content": "Denali is 20310 feet tall."}]
+
+
+def test_visited_evidence_output_pages_fallback_only_used_when_others_empty():
+    result = {
+        "output": {"pages": [{"url": "https://example.com/fallback", "text": "fallback text"}]},
+        "graph": {},
+    }
+    observability = {"evidence": {"visited": [{"url": "https://example.com/x", "content": "hello"}]}}
+    ev = visited_evidence(result, observability)
+    assert ev == [{"url": "https://example.com/x", "content": "hello"}]
+
+
 def test_chain_coverage_zero_when_no_evidence_channel_at_all():
     """When NEITHER observability.evidence NOR result.graph carries anything (e.g. a rescore of a
     verbosity-stripped, non-graph-variant result), the helper degrades to 0 credit -- fail-closed
