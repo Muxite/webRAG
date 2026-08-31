@@ -112,12 +112,15 @@ any of these could change measured latency/cost and must not be mixed into an in
   instances (or at least per-task model/telemetry scoping) so concurrency can be raised safely.
   This contradicts an older memory note ("per-task connectors unneeded") — that note is stale
   against the current shared-connector code and should be corrected when this is picked up.
-- **`sequential_react` has no fixture cache for search.** `IDEA_TEST_FIXTURES=replay` only covers
-  `ConnectorHttp` page visits (`web_fixtures.py`); `connector_search.py` has no fixture integration
-  at all, so every repeat run (including R=3 reruns of the identical test) pays full live search
-  latency every time. Adding search fixtures would cut repeat-run wall-clock without touching
-  scored behavior (search results would need to be identical across replayed runs, same
-  replay-vs-record semantics as the existing HTTP fixtures).
+- **~~`sequential_react` has no fixture cache for search.~~ RETRACTED 2026-08-31 — this was wrong.**
+  `ConnectorSearch` subclasses `ConnectorHttp` (`connector_search.py:104`) and the fixture hook is
+  inside `ConnectorHttp.request` (`connector_http.py:125-155`), so search queries and their health
+  probes have always recorded and replayed. The `make_key` `json_body` slot exists specifically for
+  Serper's POST-body search. The real problem is that keys are a sha256 over the exact request
+  including query text (`web_fixtures.py:74-81`), so a variable-query agent almost never hits the
+  cache — measured at ~0 effective hits from a 289 MB record pass
+  (`scripts/BENCHMARK_NATIVE.md:14-19`). See `docs/LEDGER.md` subsystem 5 for the corpus-replay
+  approach that replaces exact-key lookup.
 - **`sequential_react`'s per-step loop is serial by construction** (`execution_sequential.py`,
   plain `for step in range(max_steps)`, ~30 LLM calls/test at ~6.9s avg latency each, up to 24.8s
   under retry) — the single biggest wall-clock driver in a batch. Not a bug, just worth knowing

@@ -88,13 +88,28 @@ Each gets its own spec and its own cycle. Several exist in partial form today.
 | 2 | DAG evidence-dependency analysis | partial — DAG v2 planning to be re-scoped |
 | 3 | Deterministic derivation + unit refusal + abstain | **built, unwired** (`evidence_graph.py`) |
 | 4 | Per-call audit log: prompt, response, timing, cost | partial — `trace_recorder.py`, `telemetry.py` |
-| 5 | Record/replay + counterfactual re-run | partial — `web_fixtures.py` covers HTTP only, **not search** |
+| 5 | Record/replay + counterfactual re-run | partial — record/replay works for HTTP *and* search, but exact-key fixtures ~never hit for a variable-query agent |
 | 6 | Leak-resistant benchmark construction | partial — keystone gates exist; 046/047 asymmetry fixed |
 
-The single largest concrete gap is #5: `web_fixtures` wires into `connector_http` but not
-into any search connector. Until search replays, every arm comparison is a live, paid,
-non-reproducible experiment — which is exactly why the backend confound below was able to
-invert a headline result.
+The single largest concrete gap is #5, though not for the reason an earlier draft of this
+document claimed. Search **is** already recordable and replayable: `ConnectorSearch`
+subclasses `ConnectorHttp` (`agent/app/connector_search.py:104`) and the fixture hook lives
+inside `ConnectorHttp.request` (`agent/app/connector_http.py:125-155`), so all three
+backends inherit it. Four modes exist — `off`, `record`, `replay` (live-fallback-and-record)
+and `replay_strict` (`agent/app/web_fixtures.py:32-39`).
+
+The real blocker is that fixture keys are a sha256 over the *exact* request, query text
+included (`web_fixtures.py:74-81`). An adaptive agent re-expands to different pages and
+emits different queries on every run, so a cache recorded on one arm misses on another —
+measured as a 289 MB record pass producing roughly zero effective hits
+(`scripts/BENCHMARK_NATIVE.md:14-19`), which is why `scripts/native_ab_run.sh:50` forces
+`IDEA_TEST_FIXTURES=off`. Exact-key replay is structurally incompatible with an agent that
+never repeats itself.
+
+So #5 is not "add fixtures to search". It is: freeze a task's evidence universe once, and
+let every arm query that frozen universe freely. Until that exists, every arm comparison is
+a live, paid, non-reproducible experiment — which is exactly why the backend confound below
+was able to invert a headline result.
 
 ## KPIs
 
