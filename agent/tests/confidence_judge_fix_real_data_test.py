@@ -1,4 +1,4 @@
-"""Cross-check of the confidence-judge blindness fix against REAL recorded runs.
+"""Cross-check of the confidence-judge payload fix (N3a) against REAL recorded runs.
 
 ``step_confidence_judge_test.py`` covers the same fix with *hand-built* result shapes — i.e.
 against what we assumed ``merge``/``think``/``verify``/``save`` return. This module re-runs the
@@ -14,6 +14,11 @@ file's ``_meta``); this module reads only the frozen copy.
 Both outcomes of ``judge_step_confidence`` are ``None`` here — declining to judge and attempting
 the call return the same value — so the assertions are on the fake IO's counters, which are what
 separate "never called the LLM" from "called it and swallowed the failure".
+
+Earlier this module pinned the opposite contract: merge/think/verify/save were *declined*
+(proposal P1(b)), which removed the empty-payload signal but left the judge blind on 43.4% of
+the trajectory. N3a ships P1(a) instead — those kinds are rendered from their own output keys
+into the same payload field — so the same real samples must now reach the LLM.
 """
 from __future__ import annotations
 
@@ -29,12 +34,12 @@ from agent.app.idea_policies.base import DetailKey
 
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "real_action_result_samples.json"
 
-#: Kinds whose real output lands under keys ``judge_step_confidence`` never reads.
-BLIND_KINDS = ("merge", "think", "verify", "save")
+#: Kinds whose real output lands under their own keys, not the three the judge payload reads.
+OWN_KEY_KINDS = ("merge", "think", "verify", "save")
 #: Kinds that populate ``content``/``content_full``/``results`` — the judge can see these.
 VISIBLE_KINDS = ("visit", "search")
-#: The key each blind kind actually writes its output under (the reason the judge is blind).
-BLIND_OUTPUT_KEYS = {
+#: The keys each such kind actually writes its output under (what N3a renders for the judge).
+OWN_OUTPUT_KEYS = {
     "merge": ("synthesized", "raw_response"),
     "think": ("thinking_content",),
     "verify": ("verdict", "quote", "reasoning"),
@@ -68,7 +73,7 @@ def _ids(rows):
     ]
 
 
-_BLIND_SAMPLES = _samples(*BLIND_KINDS)
+_OWN_KEY_SAMPLES = _samples(*OWN_KEY_KINDS)
 _VISIBLE_SAMPLES = _samples(*VISIBLE_KINDS)
 
 
@@ -126,28 +131,28 @@ def _graph_with_real_result(action: str, action_result: dict):
 def test_fixture_covers_every_kind_with_real_samples():
     # Without this, a truncated fixture would collapse the parametrized tests below to zero
     # cases and the suite would still be green.
-    for kind in BLIND_KINDS + VISIBLE_KINDS:
+    for kind in OWN_KEY_KINDS + VISIBLE_KINDS:
         rows = _FIXTURE["samples"][kind]
         assert len(rows) >= 2, f"{kind}: expected >=2 frozen samples, got {len(rows)}"
         for row in rows:
             assert row["source"], "every sample records the run it came from"
             assert isinstance(row["action_result"], dict) and row["action_result"]
             assert row["action_result"].get(ActionResultKey.SUCCESS.value) is True
-    assert len(_BLIND_SAMPLES) == 11
+    assert len(_OWN_KEY_SAMPLES) == 11
     assert len(_VISIBLE_SAMPLES) == 4
 
 
 # ---------------------------------------------------------------------------
 # the shape claim the hand-built fixtures rest on
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("kind,sample", _BLIND_SAMPLES, ids=_ids(_BLIND_SAMPLES))
-def test_real_blind_result_carries_nothing_the_judge_reads(kind, sample):
+@pytest.mark.parametrize("kind,sample", _OWN_KEY_SAMPLES, ids=_ids(_OWN_KEY_SAMPLES))
+def test_real_own_key_result_carries_nothing_in_the_three_payload_fields(kind, sample):
     result = sample["action_result"]
     for key in JUDGE_VISIBLE_KEYS:
-        assert not result.get(key), f"real {kind} result carries {key!r} — it is NOT blind"
+        assert not result.get(key), f"real {kind} result carries {key!r} — it needs no fallback"
     # ...and it does carry its own output, under a key the judge never looks at.
-    assert any(key in result for key in BLIND_OUTPUT_KEYS[kind]), (
-        f"real {kind} result carries none of {BLIND_OUTPUT_KEYS[kind]}"
+    assert any(key in result for key in OWN_OUTPUT_KEYS[kind]), (
+        f"real {kind} result carries none of {OWN_OUTPUT_KEYS[kind]}"
     )
 
 
@@ -163,17 +168,28 @@ def test_real_visible_result_carries_something_the_judge_reads(kind, sample):
 # the fix, driven by real data
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.parametrize("kind,sample", _BLIND_SAMPLES, ids=_ids(_BLIND_SAMPLES))
-async def test_real_blind_result_is_declined_without_an_llm_call(kind, sample):
+@pytest.mark.parametrize("kind,sample", _OWN_KEY_SAMPLES, ids=_ids(_OWN_KEY_SAMPLES))
+async def test_real_own_key_result_is_judged_on_its_own_output(kind, sample):
     io = _RaisingIO()
     graph, leaf = _graph_with_real_result(kind, sample["action_result"])
 
     verdict = await _ops(io).judge_step_confidence(graph, leaf.node_id)
 
-    assert verdict is None
-    assert io.llm_attempts == 0, f"real {kind} step reached the LLM ({sample['source']})"
-    assert io.payloads_built == 0, "no payload should even be built for a blind step"
-    assert io.last_messages is None
+    assert io.llm_attempts == 1, f"real {kind} step never reached the LLM ({sample['source']})"
+    assert verdict is None, "the raised call is swallowed — instrumentation never crashes a run"
+    payload = json.loads(io.last_messages[1]["content"])
+    assert payload["resolved_content"], f"real {kind} step was judged on an empty payload"
+
+
+@pytest.mark.asyncio
+async def test_a_real_result_with_no_output_keys_is_still_declined():
+    """The decline path survives for results carrying neither payload field nor own output."""
+    io = _RaisingIO()
+    graph, leaf = _graph_with_real_result("merge", {ActionResultKey.SUCCESS.value: True})
+
+    assert await _ops(io).judge_step_confidence(graph, leaf.node_id) is None
+    assert io.llm_attempts == 0
+    assert io.payloads_built == 0
 
 
 @pytest.mark.asyncio
@@ -197,12 +213,13 @@ async def test_real_visible_result_still_reaches_the_llm(kind, sample):
 # ---------------------------------------------------------------------------
 # do the hand-built shapes in step_confidence_judge_test.py match reality?
 # ---------------------------------------------------------------------------
-def test_hand_built_blind_shapes_are_faithful_to_real_results():
+def test_hand_built_own_key_shapes_are_faithful_to_real_results():
     """The keys the hand-built parametrization uses are really the keys these kinds emit.
 
     One documented divergence: the hand-built merge fixture puts a *string* under
-    ``synthesized`` while every recorded merge (281/281) puts a *dict* there. The judge reads
-    neither, so the blindness verdict is identical — asserted below rather than left implicit.
+    ``synthesized`` while every recorded merge (281/281) puts a *dict* there. N3a renders both
+    via ``json.dumps``, so the judge-visible outcome is identical — asserted below rather than
+    left implicit.
     """
     hand_built = {
         "merge": {"synthesized", "raw_response"},

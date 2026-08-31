@@ -139,8 +139,32 @@ def test_goal_not_achieved_with_a_clean_action_log_is_partial_not_complete():
     assert payload["success"] is True
 
 
+_ROSTER_MANDATE = (
+    "Report the maximum depth of each lake.\n1. Quesnel Lake\n2. Kootenay Lake\n"
+)
+
+
+def _covered_roster_graph() -> IdeaDag:
+    """A goal-achieved run that opened a page for EVERY candidate the mandate enumerates."""
+    g = _achieved_graph()
+    g.get_node(g.root_id()).details["mandate"] = _ROSTER_MANDATE
+    g.add_child(
+        g.root_id(), "visit the second lake page",
+        details={
+            DetailKey.ACTION.value: IdeaActionType.VISIT.value,
+            DetailKey.ACTION_RESULT.value: {
+                "success": True, "action": IdeaActionType.VISIT.value,
+                "url": "https://en.wikipedia.org/wiki/Kootenay_Lake",
+                "title": "Kootenay Lake", "content": "Maximum depth: 150 m.",
+            },
+        },
+        status=IdeaNodeStatus.DONE,
+    )
+    return g
+
+
 def test_achieved_run_with_full_coverage_is_complete():
-    payload = _run(_achieved_graph())
+    payload = _run(_covered_roster_graph(), mandate=_ROSTER_MANDATE)
     assert payload["goal_achieved"] is True
     assert payload["success"] is True
     assert payload["finalization_status"] == "complete"
@@ -148,6 +172,18 @@ def test_achieved_run_with_full_coverage_is_complete():
     assert payload["coverage_ratio"] == 1.0
     assert payload["grounding_satisfied"] is True
     assert payload["claim_verification_ratio"] == 1.0
+
+
+def test_achieved_run_with_unmeasurable_coverage_is_partial_not_complete():
+    """Same run against a mandate that enumerates nothing: coverage is UNKNOWN, so the payload
+    stops at ``partial``. It used to read ``complete`` off a hardcoded ``coverage_ratio`` of 1.0
+    that no run ever computed."""
+    payload = _run(_achieved_graph())
+    assert payload["goal_achieved"] is True
+    assert payload["deliverable_complete"] is True
+    assert payload["coverage_ratio"] is None
+    assert payload["finalization_status"] == "partial"
+    assert payload["success"] is True
 
 
 def test_empty_deliverable_is_blocked():

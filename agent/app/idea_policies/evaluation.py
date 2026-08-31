@@ -246,6 +246,8 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
     ) -> Dict[str, float]:
         if not candidate_ids:
             return {}
+        # One map per chunk, always restarting at "1". Safe while each chunk is its own prompt
+        # and its own reply; merging chunks into a single prompt would collide the ids.
         messages, candidate_id_map = self._build_messages(graph, parent, candidate_ids)
         model_name = self.model_name or self._cfg.evaluation.model
         json_schema = self.settings.get("evaluation_batch_json_schema")
@@ -355,10 +357,11 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
             )
         candidates = []
         candidate_id_map = {}
-        for idx, candidate_id in enumerate(candidate_ids, start=1):
-            node = graph.get_node(candidate_id)
-            if not node:
-                continue
+        # Enumerating the PRESENT nodes, not the requested ids: a candidate that has left the
+        # graph used to consume its index anyway, so the prompt could read 1, 3, 4 and a model
+        # that renumbered to 1, 2, 3 misrouted every score.
+        present = [(cid, node) for cid in candidate_ids if (node := graph.get_node(cid))]
+        for idx, (candidate_id, node) in enumerate(present, start=1):
             simple_id = str(idx)
             candidate_id_map[simple_id] = candidate_id
             details_text = _serialize_details_for_prompt(node.details, max_detail_chars)
@@ -414,6 +417,14 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
         return max(0.0, min(1.0, float(value)))
 
     def _parse_scores(self, content: Optional[str], candidate_id_map: Dict[str, str] = None) -> Dict[str, float]:
+        """Resolve a judge reply's simple ids back onto node ids.
+
+        :param content: Raw LLM response; ``None``/empty yields ``{}``.
+        :param candidate_id_map: ``{"1": node_id, ...}`` in prompt order, as minted by
+            ``_build_messages``. Ids outside it pass through unchanged, so an unresolvable one
+            is dropped later (with a warning) instead of landing on the wrong node.
+        :returns: ``{node_id: score}``; ``{}`` on unparseable content (never raises).
+        """
         if not content:
             return {}
         if candidate_id_map is None:
@@ -421,7 +432,7 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
         try:
             data = json.loads(content)
             scores = data.get("scores", [])
-            output: Dict[str, float] = {}
+            items: List[tuple[str, float]] = []
             for item in scores:
                 if not isinstance(item, dict):
                     self._logger.warning(f"[EVALUATION_BATCH] Skipping non-dict item in scores: {item}")
@@ -430,17 +441,35 @@ class LlmBatchEvaluationPolicy(EvaluationPolicy):
                 if not simple_id:
                     self._logger.warning(f"[EVALUATION_BATCH] Missing id/node_id in item: {item}")
                     continue
-                simple_id = str(simple_id)
+                score_val = item.get("score")
+                if score_val is None:
+                    self._logger.warning(f"[EVALUATION_BATCH] Missing score in item: {item}")
+                    continue
+                items.append((str(simple_id), self._clamp(float(score_val))))
+
+            unknown = [sid for sid, _ in items if sid not in candidate_id_map]
+            if unknown and candidate_id_map and len(items) == len(candidate_id_map):
+                # A complete reply under ids of the model's own invention ("A", "cand 2",
+                # a rewritten node_id). One score per presented candidate, and the prompt
+                # order is the map's insertion order, so order carries the assignment.
+                self._logger.warning(
+                    f"[EVALUATION_BATCH] Recovering {len(unknown)} unmapped id(s) positionally: "
+                    f"{unknown} -> {list(candidate_id_map)}"
+                )
+                by_position = list(candidate_id_map.values())
+                return {
+                    candidate_id_map.get(simple_id) or by_position[pos]: score
+                    for pos, (simple_id, score) in enumerate(items)
+                }
+
+            output: Dict[str, float] = {}
+            for simple_id, score in items:
                 node_id = candidate_id_map.get(simple_id, simple_id)
                 if simple_id in candidate_id_map:
                     self._logger.debug(f"[EVALUATION_BATCH] Mapped simple ID '{simple_id}' to node_id '{node_id}'")
                 else:
                     self._logger.debug(f"[EVALUATION_BATCH] Using '{simple_id}' as node_id directly (not in map)")
-                score_val = item.get("score")
-                if score_val is None:
-                    self._logger.warning(f"[EVALUATION_BATCH] Missing score in item: {item}")
-                    continue
-                output[node_id] = self._clamp(float(score_val))
+                output[node_id] = score
             return output
         except json.JSONDecodeError as e:
             self._logger.error(f"[EVALUATION_BATCH] JSON decode error: {e}, content: {content[:500]}")

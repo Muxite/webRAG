@@ -150,10 +150,10 @@ async def test_judge_skips_unsuccessful_leaf():
     assert await ops.judge_step_confidence(g, leaf.node_id) is None
 
 
-def _graph_with_blind_leaf(action: str, extra_result: dict):
-    """A successful leaf whose result carries only kind-specific keys the judge
-    doesn't read (no content/content_full/results) — the shape merge/think/verify/save
-    actually return. See CONFIDENCE_JUDGE_MISCALIBRATION.md."""
+def _graph_with_own_key_leaf(action: str, extra_result: dict):
+    """A successful leaf whose result carries only kind-specific keys (no
+    content/content_full/results) — the shape merge/think/verify/save actually return.
+    See CONFIDENCE_JUDGE_MISCALIBRATION.md."""
     g = IdeaDag(root_title="root")
     g.get_node(g.root_id()).details["mandate"] = "Find the poet's birthplace."
     leaf = g.add_child(
@@ -194,12 +194,25 @@ def _graph_with_blind_leaf(action: str, extra_result: dict):
     ],
     ids=["merge", "think", "verify", "save"],
 )
-async def test_judge_declines_blind_step_without_calling_the_llm(action, extra_result):
-    ops = _ops('{"confidence": 0.95, "reason": "should never be seen"}')
-    g, leaf = _graph_with_blind_leaf(action, extra_result)
+async def test_judge_reads_each_kinds_own_output(action, extra_result):
+    """N3a: these kinds used to be declined outright; now their own keys become the payload.
+
+    ``judge_payload_extraction_test`` owns the payload-content assertions; this pins the
+    gating decision at the judge's own layer.
+    """
+    ops = _ops('{"confidence": 0.95, "reason": "judged from the kind\'s own output"}')
+    g, leaf = _graph_with_own_key_leaf(action, extra_result)
     verdict = await ops.judge_step_confidence(g, leaf.node_id)
-    assert verdict is None
-    assert ops.io.last_messages is None, "no LLM payload should be built for a blind step"
+    assert verdict is not None and verdict["confidence"] == pytest.approx(0.95)
+    assert ops.io.last_messages is not None
+
+
+@pytest.mark.asyncio
+async def test_judge_still_declines_a_result_with_no_output_at_all():
+    ops = _ops('{"confidence": 0.95, "reason": "should never be seen"}')
+    g, leaf = _graph_with_own_key_leaf(IdeaActionType.MERGE.value, {"duration_ms": 4})
+    assert await ops.judge_step_confidence(g, leaf.node_id) is None
+    assert ops.io.last_messages is None, "no LLM payload should be built for an empty payload"
 
 
 # ---------------------------------------------------------------------------

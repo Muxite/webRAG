@@ -13,6 +13,7 @@ from agent.app.model_tiers import capability_tier, tier_value
 from agent.app.agent_io import AgentIO
 from agent.app.idea_dag_settings import load_idea_dag_settings
 from agent.app.idea_policies.config import IdeaConfig
+from agent.app.idea_policies.citation_echo import attach_citation_echo
 from agent.app.idea_memory import MemoryManager
 from agent.app.idea_policies import (
     DetailKey,
@@ -93,6 +94,28 @@ def _reformulate_multi_entity_query(query: Optional[str]) -> Optional[str]:
     remainder = re.sub(r"\s+", " ", remainder).strip()
     or_joined = " OR ".join(f'"{p}"' for p in phrases)
     return f"{or_joined} {remainder}" if remainder else or_joined
+
+
+
+def _root_mandate_text(root) -> str:
+    """Read a root node's mandate text, whichever detail key holds it.
+
+    ``IdeaDagEngine`` seeds the root with ``"mandate"``, while expansion writes ``goal`` /
+    ``original_goal`` onto children. A root-only consumer that checks the child keys alone
+    silently reads empty. Mirrors the key order already used by
+    ``idea_policies.chain_closure``.
+
+    :param root: The root node, or ``None``.
+    :returns: The mandate text, or ``""`` when the node is missing or carries none.
+    """
+    if root is None:
+        return ""
+    details = getattr(root, "details", None) or {}
+    for key in (DetailKey.ORIGINAL_GOAL.value, DetailKey.GOAL.value, "mandate"):
+        value = details.get(key)
+        if value:
+            return str(value)
+    return ""
 
 
 class IdeaDagEngine:
@@ -772,6 +795,13 @@ class IdeaDagEngine:
                     final_payload["novelty_guard"].update(_guard.near_miss_summary())
                 except Exception as exc:  # noqa: BLE001. Telemetry must never crash finalize
                     self._logger.warning(f"[NOVELTY] near-miss summary failed: {exc}")
+
+        # Unconditional citation-echo telemetry: how many distinct per-entity claims lean on
+        # one cited URL, and how many the answer asserts per page it opened. Read by nothing --
+        # ``FinalConfig.citation_echo_enforcement_enabled`` reaches no enforcement path yet, so
+        # every score, gate and verdict above is untouched. Absent unless the deliverable
+        # carries an enumerated per-entity run.
+        attach_citation_echo(final_payload)
 
         self._logger.info(f"[RUN] Final payload created, graph has {graph.node_count()} nodes, {len(pending_nodes) if pending_nodes else 0} pending")
         return final_payload
@@ -2772,11 +2802,7 @@ class IdeaDagEngine:
         root = graph.get_node(node_id)
         if root is None:
             return width
-        mandate = (
-            root.details.get(DetailKey.ORIGINAL_GOAL.value)
-            or root.details.get(DetailKey.GOAL.value)
-            or ""
-        )
+        mandate = _root_mandate_text(root)
         if not mandate:
             return width
         try:

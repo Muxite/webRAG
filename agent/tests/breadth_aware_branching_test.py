@@ -51,9 +51,18 @@ def _engine(**overrides) -> IdeaDagEngine:
     return engine
 
 
-def _graph(mandate: str) -> IdeaDag:
-    from agent.app.idea_policies.base import DetailKey
-    return IdeaDag(root_title="root", root_details={DetailKey.ORIGINAL_GOAL.value: mandate})
+def _graph(mandate: str, detail_key: str = "mandate") -> IdeaDag:
+    """Build a single-root graph whose mandate lives under ``detail_key``.
+
+    Defaults to ``"mandate"`` because that is the key ``IdeaDagEngine`` actually seeds the
+    root with (``idea_engine.py`` root creation). Seeding only ``original_goal`` here is what
+    let a root-only feature pass its tests while never firing in a live run.
+
+    :param mandate: Mandate text to place on the root.
+    :param detail_key: Root detail key to store it under.
+    :returns: A graph with one root node.
+    """
+    return IdeaDag(root_title="root", root_details={detail_key: mandate})
 
 
 def test_flag_is_off_by_default():
@@ -148,3 +157,33 @@ def test_the_prompt_child_count_follows_the_widened_width():
 
     default = policy._build_messages(graph, node)
     assert any("2-5" in m.get("content", "") for m in default)
+
+
+@pytest.mark.parametrize("detail_key", ["mandate", "original_goal", "goal"])
+def test_widening_reads_the_mandate_under_every_root_detail_key(detail_key):
+    # The engine seeds the root with "mandate"; expansion writes goal/original_goal onto
+    # children. A root-only feature that checked only the child keys read empty in every live
+    # run while its tests passed, so all three shapes are pinned here.
+    engine = _engine(breadth_aware_branching_enabled=True)
+    graph = _graph(SEVEN, detail_key=detail_key)
+    assert engine._effective_branching(graph, graph.root_id(), 5) == 7
+
+
+def test_widening_is_inert_when_the_root_carries_no_mandate_under_any_key():
+    engine = _engine(breadth_aware_branching_enabled=True)
+    graph = IdeaDag(root_title="root", root_details={"memo_namespace": "ns"})
+    assert engine._effective_branching(graph, graph.root_id(), 5) == 5
+
+
+def test_root_mandate_text_prefers_original_goal_then_goal_then_mandate():
+    from agent.app.idea_engine import _root_mandate_text
+
+    class _Node:
+        def __init__(self, details):
+            self.details = details
+
+    assert _root_mandate_text(_Node({"original_goal": "a", "goal": "b", "mandate": "c"})) == "a"
+    assert _root_mandate_text(_Node({"goal": "b", "mandate": "c"})) == "b"
+    assert _root_mandate_text(_Node({"mandate": "c"})) == "c"
+    assert _root_mandate_text(_Node({})) == ""
+    assert _root_mandate_text(None) == ""

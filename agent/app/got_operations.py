@@ -18,6 +18,53 @@ from agent.app.plan_library.retrieval import similarity_from_distance
 _logger = logging.getLogger(__name__)
 
 
+#: Result keys carrying a non-web action's real output, in the order they are rendered.
+#: ``visit``/``search`` write ``content``/``content_full``/``results``; ``merge`` writes
+#: ``synthesized``, ``think`` writes ``thinking_content``, ``verify`` writes
+#: ``verdict``/``quote``/``reasoning``, ``save`` writes ``count``.
+_JUDGE_OUTPUT_KEYS = ("synthesized", "thinking_content", "verdict", "quote", "reasoning", "count")
+
+#: Same budget the page-content path applies, so no kind can dominate the judge prompt.
+_JUDGE_CONTENT_MAX_CHARS = 3000
+
+
+def _truncate_for_judge(text: str, max_chars: int = _JUDGE_CONTENT_MAX_CHARS) -> str:
+    """Clip judge-visible text to ``max_chars``, marking the clip.
+
+    :param text: Text to clip.
+    :param max_chars: Inclusive character budget before the marker is appended.
+    :returns: ``text`` unchanged, or its first ``max_chars`` characters plus a truncation marker.
+    """
+    if len(text) > max_chars:
+        return text[:max_chars] + "... [truncated]"
+    return text
+
+
+def judge_visible_content(result: Dict[str, Any]) -> str:
+    """Render an action result's own output keys as text the confidence judge can read.
+
+    ``judge_step_confidence`` builds its payload from ``content``/``content_full``/``results``,
+    which only ``visit`` and ``search`` populate — so ``merge``/``think``/``verify``/``save``
+    were judged on an empty payload (43.4% of judged steps, CONFIDENCE_JUDGE_MISCALIBRATION.md
+    §2a). This maps their own keys into that same payload field rather than adding a key to the
+    shared result shape, where ``content`` also means "fetched evidence" to grounding, the
+    evidence store, and finalization.
+
+    :param result: A successful action result dict.
+    :returns: A JSON rendering of whichever ``_JUDGE_OUTPUT_KEYS`` the result carries, clipped
+        to ``_JUDGE_CONTENT_MAX_CHARS``; ``""`` when it carries none of them (the caller then
+        declines to judge rather than asking about nothing).
+    """
+    visible = {
+        key: result[key]
+        for key in _JUDGE_OUTPUT_KEYS
+        if result.get(key) or result.get(key) == 0
+    }
+    if not visible:
+        return ""
+    return _truncate_for_judge(json.dumps(visible, ensure_ascii=True, default=str))
+
+
 # Reason-before-answer variant of the shipped ``got_reexpand_followup_system_prompt``,
 # selected under ``got_reexpand_followup_reason_first_enabled``. Only the
 # ``needs_followup`` / ``reason`` pair is swapped; every other byte is identical.
@@ -288,16 +335,18 @@ class GoTOperations:
             or result.get("content_full")
             or ""
         )
-        if isinstance(content, str) and len(content) > 3000:
-            content = content[:3000] + "... [truncated]"
+        if isinstance(content, str):
+            content = _truncate_for_judge(content)
         results_summary = result.get("results")
         if isinstance(results_summary, list):
             results_summary = results_summary[:5]
 
-        # Some leaf kinds (merge/think/verify/save) write their real output under keys this
-        # judge doesn't read (``synthesized``, ``thinking_content``, ``verdict``, ``count``, ...).
-        # Judging "nothing visible" produced a confidently-wrong signal instead of no signal —
-        # see CONFIDENCE_JUDGE_MISCALIBRATION.md. Decline rather than guess from an empty prompt.
+        # merge/think/verify/save write their real output under their own keys, so this judge
+        # used to be handed an empty payload on 43.4% of judged steps
+        # (CONFIDENCE_JUDGE_MISCALIBRATION.md §2a). Render those keys into the same field
+        # instead. A result with no output at all is still declined rather than guessed at.
+        if not content and not results_summary:
+            content = judge_visible_content(result)
         if not content and not results_summary:
             return None
 

@@ -432,6 +432,13 @@ class FinalConfig:
     # so a confident answer, a pure abstention and any narrative task are byte-identical. The
     # flag exists so an arm can turn the contract OFF for an A/B, not to keep it dormant.
     answer_contract_enabled: bool = True
+    # N7: send ``FINAL_JSON_SCHEMA_WITH_ANSWER`` instead of ``FINAL_JSON_SCHEMA``, giving a
+    # count/argmax/per-entity result a structured slot (``answer``, ``per_entity``) instead of
+    # only two prose fields. Opt-in, default OFF: the finalize request and the payload keys are
+    # byte-identical when false, and the extra fields are recorded as inert instrumentation
+    # (``structured_answer`` / ``per_entity``) when true -- no consumer reads them yet, so the
+    # A/B measures the schema's effect on the prose, not a new enforcement path.
+    answer_slot_enabled: bool = False
     # C1b: approximator-stripped k-sample vote for terminal answer (opt-in). When
     # native_vote_k_enabled and native_vote_k >= 2, finalize answer is extracted k times
     # (anchor temp-0 + diverse temps), normalized via approximator-stripped vote key, and
@@ -481,6 +488,23 @@ class FinalConfig:
     final_verify_enabled: bool = False
     final_variations_enabled: bool = False
     final_variations_k: int = 3
+    # Act on ``citation_echo.audit_citation_echo``: how many DISTINCT per-entity claims lean on
+    # one cited URL, and how many per-entity facts the answer asserts per page it actually
+    # opened. Targets the 2026-08-28 task-162 capture -- a 7-branch fan-out that opened five
+    # pages, ran out of visit budget, finished the remaining branches from parametric memory
+    # (fabricating a date of birth that then WON the superlative) and pasted one generic
+    # landing page as the source of all seven astronauts. Five real visits satisfy visit-count
+    # grounding, and the fake URL registers as a single ``unverified_citations`` entry,
+    # indistinguishable from one uncopied source.
+    #
+    # Opt-in, default OFF, and today a no-op: no enforcement path reads it. It exists so a
+    # future downgrade has a switch, and so the flag ships with the detector rather than after
+    # it. Detection is unconditional either way -- the ``citation_echo`` marker is stamped on
+    # every payload with an enumerated per-entity answer -- because reuse is a signal and not
+    # proof: several entities genuinely documented on ONE page (a joint biography, a crew
+    # roster) echo exactly like fabricated ones, so the live rate has to be countable from
+    # report captures before it decides anything.
+    citation_echo_enforcement_enabled: bool = False
     # The answer-shape labels (see ``shape_classifier.classify_answer_shape``) that gate the chain.
     final_recompute_shapes: Tuple[str, ...] = (
         "computation", "count", "argmax", "disambiguation", "single_value",
@@ -496,6 +520,8 @@ class FinalConfig:
         "require_grounding": "final_require_grounding",
         "require_grounding_page_identity": "final_require_grounding_page_identity",
         "answer_contract_enabled": "final_answer_contract_enabled",
+        "answer_slot_enabled": "final_answer_slot_enabled",
+        "citation_echo_enforcement_enabled": "final_citation_echo_enforcement_enabled",
     }
 
     @classmethod

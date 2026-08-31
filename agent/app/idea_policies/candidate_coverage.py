@@ -92,24 +92,25 @@ def strip_enumerated_items(mandate: str) -> str:
     return _NUMBERED_LINE.sub(" ", mandate or "")
 
 
-def extract_named_candidates(mandate: str) -> List[str]:
-    """Extract an enumerated candidate list's NAMES from ``mandate``.
+def enumerated_items(text: str) -> List[str]:
+    """The BODIES of ``text``'s enumerated per-item run, or ``[]``.
 
-    Returns the name portion (before the em-dash/parenthetical/description) of each
-    item in the longest consecutive ``1, 2, ... N`` numbered run with ``N >= 2``.
+    :param text: any prose that may carry a ``1. ... 2. ...`` list (a mandate's candidate
+        roster, a deliverable's per-entity answer block).
+    :returns: the body of each item in the longest consecutive ``1, 2, ... N`` numbered run
+        with ``N >= 2``, in list order.
+    :raises: nothing — every non-list input fails open to ``[]``.
 
-    Fails OPEN (returns ``[]``) when:
-    * there is no consecutive numbered run of length >= 2, or
-    * ANY item begins with an imperative verb (it's an INSTRUCTION list, not
-      candidates — e.g. test_051 / test_065's "1. Identify ... 2. Open ..."), or
-    * fewer than 2 non-empty names survive extraction.
+    Fails OPEN when there is no consecutive numbered run of length >= 2, or when ANY item
+    begins with an imperative verb (it's an INSTRUCTION list, not per-item content — e.g.
+    test_051 / test_065's "1. Identify ... 2. Open ...").
     """
-    if not mandate:
+    if not isinstance(text, str) or not text:
         return []
 
     # Collect (index, body) for every numbered line, then take the longest run that
     # starts at 1 and increments by 1 (so a stray "1." in later prose can't extend it).
-    items = [(int(m.group(1)), m.group(2)) for m in _NUMBERED_LINE.finditer(mandate)]
+    items = [(int(m.group(1)), m.group(2)) for m in _NUMBERED_LINE.finditer(text)]
     if not items:
         return []
 
@@ -136,8 +137,18 @@ def extract_named_candidates(mandate: str) -> List[str]:
     for body in run:
         if _first_token(body) in _INSTRUCTION_VERBS:
             return []
+    return run
 
-    names = [n for n in (_extract_name(body) for body in run) if n]
+
+def extract_named_candidates(mandate: str) -> List[str]:
+    """Extract an enumerated candidate list's NAMES from ``mandate``.
+
+    :param mandate: the task statement.
+    :returns: the name portion (before the em-dash/parenthetical/description) of each item in
+        ``enumerated_items(mandate)``, or ``[]`` when fewer than 2 non-empty names survive.
+    :raises: nothing — fails open to ``[]``.
+    """
+    names = [n for n in (_extract_name(body) for body in enumerated_items(mandate)) if n]
     if len(names) < 2:
         return []
     return names

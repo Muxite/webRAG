@@ -15,6 +15,7 @@ from agent.app.model_tiers import (
 )
 
 from agent.app.idea_dag import IdeaDag, IdeaNode
+from agent.app.idea_dag_schemas import FINAL_JSON_SCHEMA_WITH_ANSWER
 from agent.app.agent_io import AgentIO
 from agent.app.idea_policies.base import DetailKey
 from agent.app.idea_policies.config import IdeaConfig
@@ -102,13 +103,53 @@ def _collect_leaf_results_fallback(graph: IdeaDag) -> list:
     return results
 
 
+def _visit_url_key(url: Any) -> str:
+    """Normalized identity of a visited page, for "have we already emitted this one".
+
+    Drops the fragment, one trailing slash and case, so ``.../Dam``, ``.../Dam/``,
+    ``.../Dam#History`` and ``.../DAM`` are one page. Shared by the two selections over the
+    successful-VISIT set (``_collect_all_visit_content`` and ``_visited_sources``) so they
+    cannot disagree about what counts as the same page.
+
+    :param url: Raw ``url`` field of a visit action result; ``None``/non-string tolerated.
+    :returns: Normalized key, or ``""`` when there is no URL to key on.
+    """
+    return str(url or "").strip().split("#", 1)[0].rstrip("/").lower()
+
+
+def _normalize_ws(text: Any) -> str:
+    """Collapse every run of whitespace to a single space.
+
+    :param text: Any value; non-strings are coerced, ``None`` yields ``""``.
+    :returns: The whitespace-normalized text, so a quote and the page it came from compare
+        the same whether or not the extraction wrapped a line between them.
+    """
+    return " ".join(str(text or "").split())
+
+
 def _collect_all_visit_content(graph: IdeaDag, max_chars_per_visit: int = 15000) -> str:
+    """The page bodies of the successful VISITs, as the ``visit_content`` prompt block.
+
+    One section per DISTINCT page (``_visit_url_key``, first-seen wins), because a hub page
+    opened from several branches used to be emitted once per branch: the walk fills
+    depth-first to a hard total budget and then stops, so repeats evicted pages further down
+    the graph that were never reached at all. A visit with no URL is never treated as a
+    repeat -- two unnamed pages are not evidence of one page.
+
+    Note the deliberate asymmetry with ``_visited_sources``: ``_is_superseded`` nodes are
+    skipped here and NOT there (see that function's docstring). Pre-existing, left alone.
+
+    :param graph: The executed idea DAG.
+    :param max_chars_per_visit: Per-page bound on the emitted body.
+    :returns: The joined sections, or ``""`` when no visit produced content.
+    """
     from agent.app.idea_policies.base import IdeaActionType
     from agent.app.idea_policies.action_constants import ActionResultExtractor
 
     sections = []
     total_chars = 0
     max_total = 80000
+    seen: set = set()
 
     for node in graph.iter_depth_first():
         action = node.details.get(DetailKey.ACTION.value)
@@ -122,6 +163,9 @@ def _collect_all_visit_content(graph: IdeaDag, max_chars_per_visit: int = 15000)
         if not ActionResultExtractor.is_success(ar):
             continue
         url = ar.get("url", "") or ""
+        key = _visit_url_key(url)
+        if key and key in seen:
+            continue
         title = ar.get("title", "") or ""
         # ``content`` is the connector's already-truncated payload; ``content_full`` is the
         # same page uncut and is present on the same dict (see VisitLeafAction's result
@@ -145,6 +189,8 @@ def _collect_all_visit_content(graph: IdeaDag, max_chars_per_visit: int = 15000)
             break
         sections.append(section)
         total_chars += len(section)
+        if key:
+            seen.add(key)
 
     if not sections:
         return ""
@@ -172,7 +218,7 @@ def _visited_sources(graph: IdeaDag, cap: int = 25) -> List[Dict[str, str]]:
         url = (ar.get("url") or "").strip()
         if not url:
             continue
-        key = url.split("#", 1)[0].rstrip("/").lower()
+        key = _visit_url_key(url)
         if key in seen:
             continue
         seen.add(key)
@@ -180,6 +226,113 @@ def _visited_sources(graph: IdeaDag, cap: int = 25) -> List[Dict[str, str]]:
         if len(sources) >= cap:
             break
     return sources
+
+
+def _visited_page_texts(graph: IdeaDag) -> Dict[str, str]:
+    """Body text of every successfully visited page, keyed by ``_visit_url_key``.
+
+    The evidence a quote can be checked against. Whitespace is collapsed on the way in, because
+    extracted page text wraps wherever the source HTML did and a quote copied out of it would
+    otherwise fail a literal comparison for that reason alone.
+
+    :param graph: The executed idea DAG.
+    :returns: ``{normalized url: normalized page text}``, first-seen wins. Pages that returned
+        no body are omitted, so a caller cannot mistake "opened, but empty" for "checkable".
+    """
+    from agent.app.idea_policies.base import IdeaActionType
+    from agent.app.idea_policies.action_constants import ActionResultExtractor
+
+    pages: Dict[str, str] = {}
+    for node in graph.iter_depth_first():
+        if node.details.get(DetailKey.ACTION.value) != IdeaActionType.VISIT.value:
+            continue
+        ar = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not ar or not isinstance(ar, dict) or not ActionResultExtractor.is_success(ar):
+            continue
+        key = _visit_url_key(ar.get("url"))
+        if not key or key in pages:
+            continue
+        text = _normalize_ws(ar.get("content_full") or ar.get("content") or "")
+        if text:
+            pages[key] = text
+    return pages
+
+
+def _claim_provenance(graph: IdeaDag, cap: int = 25) -> List[Dict[str, Any]]:
+    """Per-claim evidence from the successful VERIFY actions, for the payload's provenance block.
+
+    ``sources`` is a log of the pages the run opened; this is its per-claim counterpart -- which
+    claim, what the verifier decided, which page it leaned on, and the quote it pulled. Verify
+    has always computed this and finalize has always discarded it.
+
+    A quote is only evidence if it is really on that page, so it is checked MECHANICALLY
+    (literal substring, whitespace-normalized, no model judgment) against the fetched text of
+    the supporting page:
+
+    * ``quote_verified=True``  -- the quote occurs in that page's text.
+    * ``quote_verified=False`` -- we hold that page's text and the quote is NOT in it.
+    * ``quote_verified=None``  -- unchecked: no quote, no supporting URL, or that page is not
+      among the ones this run fetched. Never presented as verified.
+
+    :param graph: The executed idea DAG.
+    :param cap: Maximum entries emitted, to keep the result payload small.
+    :returns: One entry per successful VERIFY node in depth-first order, each
+        ``{claim, verdict, supporting_url, quote, quote_verified}``; ``[]`` for a run that
+        performed no verification.
+    """
+    from agent.app.idea_policies.base import IdeaActionType
+    from agent.app.idea_policies.action_constants import ActionResultExtractor
+
+    entries: List[Dict[str, Any]] = []
+    pages: Optional[Dict[str, str]] = None
+    for node in graph.iter_depth_first():
+        if node.details.get(DetailKey.ACTION.value) != IdeaActionType.VERIFY.value:
+            continue
+        ar = node.details.get(DetailKey.ACTION_RESULT.value)
+        if not ar or not isinstance(ar, dict) or not ActionResultExtractor.is_success(ar):
+            continue
+        if pages is None:
+            pages = _visited_page_texts(graph)
+        quote = str(ar.get("quote") or "").strip()
+        supporting_url = str(ar.get("supporting_url") or "").strip()
+        page = pages.get(_visit_url_key(supporting_url)) if supporting_url else None
+        quote_verified = None if (not quote or page is None) else _normalize_ws(quote) in page
+        entries.append({
+            "claim": str(ar.get("claim") or ""),
+            "verdict": str(ar.get("verdict") or ""),
+            "supporting_url": supporting_url,
+            "quote": quote,
+            "quote_verified": quote_verified,
+        })
+        if len(entries) >= cap:
+            break
+    return entries
+
+
+def _candidate_coverage_ratio(graph: IdeaDag, mandate: str) -> Optional[float]:
+    """Fraction of the mandate's enumerated candidates that a visited page actually resolved.
+
+    Replaces a literal ``1.0`` that reported full coverage for every run ever finalized,
+    including runs whose own task validators found nothing resolved. Uses the deterministic
+    (no LLM, no config) candidate-coverage check, so this is the same number the engine's
+    opt-in coverage gate reports over the same graph.
+
+    :param graph: The executed idea DAG.
+    :param mandate: The task mandate, whose enumerated roster defines what coverage means here.
+    :returns: ``resolved / named`` in [0.0, 1.0], or ``None`` when the mandate enumerates no
+        roster -- there is then nothing to measure coverage against, and unknown coverage must
+        not be reported as full coverage.
+    :raises: nothing -- a check that fails degrades to ``None`` (unknown).
+    """
+    try:
+        from agent.app.idea_policies.candidate_coverage import evaluate_candidate_coverage
+        coverage = evaluate_candidate_coverage(graph, mandate)
+    except Exception as exc:  # noqa: BLE001. Never crash finalize on a coverage read
+        _logger.warning(f"[FINALIZE] candidate-coverage check failed: {exc}")
+        return None
+    if not coverage.named:
+        return None
+    return len(coverage.resolved) / len(coverage.named)
 
 
 _URL_RE = re.compile(r'https?://[^\s<>"\']+')
@@ -487,6 +640,104 @@ def _apply_answer_contract(payload: Dict[str, Any], mandate: str) -> None:
     )
 
 
+def _record_structured_answer(payload: Dict[str, Any], data: Dict[str, Any]) -> None:
+    """Copy the N7 structured slots off a finalize response onto the payload, if present.
+
+    Inert instrumentation: nothing reads ``structured_answer`` / ``per_entity`` yet, so a
+    model that ignores the slots (or a response predating them) is indistinguishable from
+    today. Absent, empty and wrongly-typed values are all dropped rather than raising --
+    the schema reaches the model as an advisory prompt hint on providers without strict
+    structured output, so neither field can be assumed.
+
+    :param payload: The finalize payload, mutated in place.
+    :param data: The parsed finalize response.
+    """
+    answer = data.get("answer")
+    if answer is not None and str(answer).strip():
+        payload["structured_answer"] = str(answer).strip()
+    per_entity = data.get("per_entity")
+    if isinstance(per_entity, list) and per_entity:
+        payload["per_entity"] = per_entity
+
+
+# --------------------------------------------------------------------------------------
+# F3: the deliverable/summary inversion
+# --------------------------------------------------------------------------------------
+#
+# Measured on 43 of 59 cells: the model writes a title or lead-in into ``deliverable`` and
+# the real answer into ``summary``, which nothing downstream reads. Re-scoring with the
+# summary substituted moved the arm mean 0.400 -> 0.447. The schema and the prompt already
+# state the distinction in plain words (see ``FINAL_JSON_SCHEMA``) and are ignored, so the
+# recovery has to be a runtime guard.
+_SWAP_MAX_DELIVERABLE_CHARS = 120
+_SWAP_MIN_SUMMARY_CHARS = 200
+_SWAP_MIN_LENGTH_RATIO = 4.0
+# Past-tense retrieval verbs: what an action log says and what an answer does not. Present
+# participles are excluded on purpose -- "the dam's opening years" is answer text.
+_ACTION_LOG_RE = re.compile(
+    r"\b(searched|visited|opened|browsed|queried|retrieved|fetched|"
+    r"look(?:ed)? up|navigated|crawled|scraped)\b",
+    re.IGNORECASE,
+)
+
+
+def _maybe_swap_answer_fields(deliverable: Any, summary: Any) -> Tuple[str, str, bool]:
+    """Recover the answer when finalize inverted ``deliverable`` and ``summary``.
+
+    All four conditions must hold, and each exists to stop the swap rather than to cause it
+    -- replacing a correct terse answer with an action log is worse than shipping the
+    inversion, so the guard is calibrated for precision over recall:
+
+    * ``deliverable`` is at most ``_SWAP_MAX_DELIVERABLE_CHARS`` (120). Every observed stub
+      was 1-55 chars ("7", "Mount Gongga", "Verification Results"); a written-out answer
+      clears 120 easily.
+    * ``summary`` is at least ``_SWAP_MIN_SUMMARY_CHARS`` (200). Its contract is ONE
+      sentence of process, which lands at 60-160 chars; past 200 it is already something
+      else. Inversions below that floor stay unswapped by design.
+    * ``summary`` is at least ``_SWAP_MIN_LENGTH_RATIO`` (4x) the deliverable, so a merely
+      chatty action summary beside a mid-length answer is left alone.
+    * ``summary`` contains no past-tense retrieval verb (``_ACTION_LOG_RE``). This is the
+      main protection: a genuine summary names what the agent did. URLs are blanked before
+      the check, since a cited slug (``.../never-opened``) is not prose.
+
+    :param deliverable: The model's ``deliverable`` field; ``None``/non-string tolerated.
+    :param summary: The model's ``summary`` field; ``None``/non-string tolerated.
+    :returns: ``(deliverable, summary, swapped)`` -- the inputs coerced to ``str``, exchanged
+        only when every condition above holds.
+    """
+    deliverable = str(deliverable or "")
+    summary = str(summary or "")
+    d_len = len(deliverable.strip())
+    s_len = len(summary.strip())
+
+    if d_len > _SWAP_MAX_DELIVERABLE_CHARS or s_len < _SWAP_MIN_SUMMARY_CHARS:
+        return deliverable, summary, False
+    if s_len < _SWAP_MIN_LENGTH_RATIO * max(d_len, 1):
+        return deliverable, summary, False
+    if _ACTION_LOG_RE.search(_URL_RE.sub(" ", summary)):
+        return deliverable, summary, False
+    return summary, deliverable, True
+
+
+# A deliverable this short carries no answer -- not even a unit or a label -- so
+# ``finalization_status`` must not call it complete.
+_STUB_DELIVERABLE_MAX_CHARS = 1
+
+
+def _is_full_coverage(ratio: Any) -> bool:
+    """Whether ``ratio`` is a real number reporting COMPLETE candidate coverage.
+
+    :param ratio: ``coverage_ratio`` as carried on the payload.
+    :returns: True only for a numeric value >= 1.0. ``None`` (coverage not measurable for this
+        mandate) and any non-numeric value answer False: unknown coverage is not full coverage.
+    :raises: nothing.
+    """
+    try:
+        return float(ratio) >= 1.0
+    except (TypeError, ValueError):
+        return False
+
+
 def derive_completion_fields(payload: Dict[str, Any]) -> None:
     """(Re)compute the derived completion signals in place, from the payload's own fields.
 
@@ -506,17 +757,21 @@ def derive_completion_fields(payload: Dict[str, Any]) -> None:
     1. ``failed``   — finalization never produced a usable structured result.
     2. ``blocked``  — an essential dependency failed: no deliverable text, the grounding gate
        refused, or a critical action failed without the goal being reached anyway.
-    3. ``complete`` — goal reached, no critical failure, grounded, full candidate coverage.
-    4. ``partial``  — anything else that still produced an answer.
+    3. ``complete`` — goal reached, no critical failure, grounded, and candidate coverage
+       MEASURED at full. A ``coverage_ratio`` of ``None`` means no roster made coverage
+       measurable for this mandate; unknown coverage cannot carry a payload here (it used to,
+       via a literal 1.0 that finalize wrote for every run).
+    4. ``partial``  — anything else that still produced an answer, including a goal-achieved
+       run whose coverage is unknown.
 
     Idempotent: callers that later learn a better signal (the grounding gate, the engine's
     candidate-coverage ratio) set that field and call this again.
     """
     deliverable = str(payload.get("final_deliverable", "") or "")
-    has_text = bool(deliverable.strip())
+    has_text = len(deliverable.strip()) > _STUB_DELIVERABLE_MAX_CHARS
     execution_completed = bool(payload.setdefault("execution_completed", True))
     grounding_satisfied = bool(payload.setdefault("grounding_satisfied", True))
-    coverage_ratio = float(payload.setdefault("coverage_ratio", 1.0))
+    coverage_full = _is_full_coverage(payload.setdefault("coverage_ratio", None))
     payload.setdefault("claim_verification_ratio", 1.0)
     goal_achieved = bool(payload.get("goal_achieved", False))
     has_failures = bool(payload.get("has_failures", False))
@@ -526,7 +781,7 @@ def derive_completion_fields(payload: Dict[str, Any]) -> None:
         status = "failed"
     elif not has_text or not grounding_satisfied or (has_failures and not goal_achieved):
         status = "blocked"
-    elif deliverable_complete and coverage_ratio >= 1.0:
+    elif deliverable_complete and coverage_full:
         status = "complete"
     else:
         status = "partial"
@@ -1215,6 +1470,8 @@ async def build_final_payload(
         _logger.warning("[FINALIZE] Empty prompts detected")
 
     json_schema = settings.get("final_json_schema")
+    if cfg.final.answer_slot_enabled:
+        json_schema = FINAL_JSON_SCHEMA_WITH_ANSWER
     reasoning_effort = cfg.generation.reasoning_effort
     text_verbosity = cfg.generation.text_verbosity
 
@@ -1355,6 +1612,14 @@ async def build_final_payload(
         data = json.loads(response)
         deliverable = data.get("deliverable", "")
         action_summary = data.get("summary", "")
+        deliverable, action_summary, fields_swapped = _maybe_swap_answer_fields(
+            deliverable, action_summary
+        )
+        if fields_swapped:
+            _logger.warning(
+                "[FINALIZE] deliverable/summary inverted: recovered the answer from `summary` "
+                f"({len(deliverable)}c) over a {len(action_summary)}c deliverable"
+            )
 
         goal_achieved = resolve_goal_achieved(graph, root)
 
@@ -1379,12 +1644,12 @@ async def build_final_payload(
             "goal_achieved": goal_achieved,
             "has_failures": has_critical_failures,
             "sources": sources,
+            "claim_provenance": _claim_provenance(graph),
             "execution_completed": True,
-            # Coarse proxy: no per-candidate ledger exists at payload-build time, so full
-            # coverage is assumed here and `IdeaEngine.finalize` lowers it when the (opt-in)
-            # candidate-coverage gate reports unchecked candidates. Item 2's evidence ledger
-            # replaces this with a real per-claim ratio.
-            "coverage_ratio": 1.0,
+            # `None` for any mandate with no enumerated roster: coverage is UNMEASURABLE there,
+            # and `derive_completion_fields` keeps such a run out of `complete` rather than
+            # crediting it with coverage nobody checked.
+            "coverage_ratio": _candidate_coverage_ratio(graph, mandate),
             # Equally coarse: "did every URL the answer cites belong to a page we opened",
             # collapsed to 1.0/0.0 rather than a real per-claim verification rate.
             "claim_verification_ratio": 0.0 if unverified else 1.0,
@@ -1393,6 +1658,10 @@ async def build_final_payload(
             payload["unverified_citations"] = unverified
         if truncated:
             payload["truncated"] = True
+        if fields_swapped:
+            payload["answer_fields_swapped"] = True
+        if cfg.final.answer_slot_enabled:
+            _record_structured_answer(payload, data)
         derive_completion_fields(payload)
         # Plan §4A: an answer-shaped deliverable that declares the evidence insufficient and
         # then states a value anyway is rendered as an abstention. Runs BEFORE the grounding

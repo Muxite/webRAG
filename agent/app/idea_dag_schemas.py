@@ -285,6 +285,81 @@ FINAL_JSON_SCHEMA: Dict[str, Any] = {
     }
 }
 
+# N7: structured-answer variant of ``FINAL_JSON_SCHEMA``. Selected under
+# ``final_answer_slot_enabled``; opt-in, default OFF.
+#
+# The shipped schema offers exactly two prose fields, so a count, an argmax or a per-entity
+# list has nowhere to land except inside ``deliverable``. Measured on 43 of 59 cells, the
+# model resolves that by inverting the pair -- a label in ``deliverable``, the substantive
+# answer in ``summary`` -- which nothing downstream reads (``_maybe_swap_answer_fields``
+# recovers what it can after the fact). ``answer`` and ``per_entity`` give the value a slot
+# of its own, declared BEFORE the prose so the value is committed and then written up.
+#
+# Deliberately NOT registered in ``DEFAULT_JSON_SCHEMAS`` -- the shipped finalize request is
+# byte-identical when the flag is off. Same shape as ``MERGE_JSON_SCHEMA_GOAL_EVAL_FIRST``.
+#
+# Unlike merge's variant this one IS sent as a strict ``json_schema`` response format (see
+# ``strict_json_schema_compat_test``), so every property is enumerated in ``required`` and
+# every object closes ``additionalProperties``. "Optional" therefore means the CONSUMER
+# tolerates the field being absent or empty, not that the schema exempts it: a model that
+# has no per-entity breakdown answers with an empty array.
+FINAL_JSON_SCHEMA_WITH_ANSWER: Dict[str, Any] = {
+    "name": "final_result",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "answer": {
+                "type": "string",
+                "description": (
+                    "The answer value on its own, with no sentence around it: the count, the "
+                    "name, the date, the winner. Empty string if the request has no single "
+                    "value to give."
+                )
+            },
+            "per_entity": {
+                "type": "array",
+                "description": (
+                    "One row per entity the request asked about, when it asked about several. "
+                    "Empty array otherwise."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "entity": {
+                            "type": "string",
+                            "description": "The entity this row is about."
+                        },
+                        "value": {
+                            "type": "string",
+                            "description": "The value found for that entity."
+                        },
+                        "source_url": {
+                            "type": "string",
+                            "description": "The URL of the page this row was read from."
+                        }
+                    },
+                    "required": [
+                        "entity",
+                        "value",
+                        "source_url"
+                    ],
+                    "additionalProperties": False
+                }
+            },
+            "deliverable": FINAL_JSON_SCHEMA["schema"]["properties"]["deliverable"],
+            "summary": FINAL_JSON_SCHEMA["schema"]["properties"]["summary"]
+        },
+        "required": [
+            "answer",
+            "per_entity",
+            "deliverable",
+            "summary"
+        ],
+        "additionalProperties": False
+    }
+}
+
+
 MERGE_JSON_SCHEMA: Dict[str, Any] = {
     "name": "merge_result",
     "schema": {

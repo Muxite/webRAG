@@ -48,6 +48,11 @@ class SolverResult(TypedDict, total=False):
     goal_achieved: NotRequired[bool]
     has_failures: NotRequired[bool]
     warning: NotRequired[str]
+    #: Which tool transport actually ran: ``"native"`` (an HTTP ``tools`` parameter) or
+    #: ``"emulated"`` (the same loop over a text/JSON protocol, for a model whose endpoint
+    #: rejects that parameter). Without it an arm comparison cannot tell a fair result from
+    #: one where the arm was structurally unable to run the model at all.
+    tool_transport: NotRequired[str]
 
 
 class Solver(Protocol):
