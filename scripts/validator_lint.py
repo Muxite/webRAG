@@ -9,12 +9,19 @@ Flags, per task file:
   [GATE]  keystone/answer validators that can score >0 with ZERO grounding
           (no observability visit gate AND no build_visit_link_graph gate).
   [LLM]   a non-None LLM judge (violates the deterministic-only validity bar).
+  [LEAK]  a compiled-plan ``verify`` leaf whose ``details.optional_url``/``details.url`` is set
+          to a module-level authoritative-URL constant. ``VerifyLeafAction`` (agent/app/
+          idea_policies/actions.py) auto-fetches that field and inserts the page at
+          evidence[0] before its LLM call, grounding the reconcile step off the answer page
+          directly regardless of what upstream visit leaves actually found -- the same leak
+          found+fixed across six tasks on 2026-08-31 (commit 4bd17b0a). [LEAK] makes that bug
+          class un-reintroducible.
   [UNIT]  abbreviation-only unit keystones ( \\d\\s*m\\b / \\s*mph / \\s*kn )
           with NO bare-number or spelled-unit fallback -> "300 metres" false-fails.
   [DEC]   no-tolerance decimal keystones (\\bNN\\.NN\\b) -> standard roundings false-fail.
 
 CLI usage:  python scripts/validator_lint.py [dir]   (default: agent/app/idea_tests)
-Exit 1 if any [GATE] or [LLM] finding (the two score-corrupting severities).
+Exit 1 if any [GATE], [LLM], or [LEAK] finding (the three score-corrupting severities).
 
 Programmatic usage (e.g. from a pytest CI gate):
     from validator_lint import lint_directory
@@ -57,12 +64,76 @@ _ANSWER_LIKE = re.compile(
 )
 
 
+def _dict_get(node, key: str):
+    """Return the value node for ``key`` in an ``ast.Dict`` literal, or ``None``."""
+    if not isinstance(node, ast.Dict):
+        return None
+    for k, v in zip(node.keys, node.values):
+        if isinstance(k, ast.Constant) and k.value == key:
+            return v
+    return None
+
+
+def _find_verify_url_leaks(tree: ast.AST) -> List[str]:
+    """Find compiled-plan ``verify`` leaves whose ``details.optional_url``/``details.url`` is
+    wired to a module-level authoritative-URL constant (see the [LEAK] docstring above)."""
+    # Collect module-level "authoritative URL" constants: NAME containing both AUTHORITATIVE
+    # and URL, assigned a (possibly implicitly-concatenated) string literal.
+    auth_values = set()
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+            name = n.targets[0].id
+            if re.search(r"AUTHORITATIVE", name, re.I) and re.search(r"URL", name, re.I):
+                try:
+                    val = ast.literal_eval(n.value)
+                except (ValueError, TypeError):
+                    val = None
+                if isinstance(val, str):
+                    auth_values.add(val)
+
+    findings: List[str] = []
+    if not auth_values:
+        return findings
+
+    for n in ast.walk(tree):
+        if not isinstance(n, ast.Dict):
+            continue
+        action_v = _dict_get(n, "action")
+        if not (isinstance(action_v, ast.Constant) and action_v.value == "verify"):
+            continue
+        details_v = _dict_get(n, "details")
+        if not isinstance(details_v, ast.Dict):
+            continue
+        for key_name in ("optional_url", "url"):
+            val_node = _dict_get(details_v, key_name)
+            if val_node is None:
+                continue
+            leaked_value = None
+            try:
+                literal = ast.literal_eval(val_node)
+            except (ValueError, TypeError):
+                literal = None
+            if isinstance(literal, str) and literal in auth_values:
+                leaked_value = literal
+            elif isinstance(val_node, ast.Name) and re.search(r"AUTHORITATIVE", val_node.id, re.I):
+                leaked_value = val_node.id
+            if leaked_value is not None:
+                node_id_v = _dict_get(n, "id")
+                nid = node_id_v.value if isinstance(node_id_v, ast.Constant) else "?"
+                findings.append(
+                    f"[LEAK] verify leaf {nid!r}: details.{key_name} set to the authoritative "
+                    f"URL constant -- VerifyLeafAction will auto-fetch it and ground the "
+                    f"reconcile step off the answer page regardless of upstream visits"
+                )
+    return findings
+
+
 def lint_file(path: str) -> List[str]:
     """
     Lint a single idea_tests task file.
     :param path: Absolute path to a ``test_NNN_*.py`` task file.
     :return: List of finding strings, each prefixed with its severity tag
-             (``[GATE]``, ``[LLM]``, ``[UNIT]``, ``[DEC]``).
+             (``[GATE]``, ``[LLM]``, ``[LEAK]``, ``[UNIT]``, ``[DEC]``).
     """
     src = open(path).read()
     tree = ast.parse(src)
@@ -72,6 +143,9 @@ def lint_file(path: str) -> List[str]:
     llm = _fn(tree, "get_llm_validation_function")
     if llm and "return None" not in _seg(llm, src):
         findings.append("[LLM]  get_llm_validation_function returns a judge")
+
+    # --- [LEAK] ---
+    findings.extend(_find_verify_url_leaks(tree))
 
     # --- [GATE] ---
     uses_graph = bool(re.search(
@@ -136,8 +210,8 @@ def lint_directory(directory: str = DEFAULT_DIR) -> List[Tuple[str, str]]:
 
 
 def hard_findings(findings: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
-    """Filter to the two score-corrupting severities: [GATE] and [LLM]."""
-    return [(tid, fi) for tid, fi in findings if fi.startswith(("[GATE]", "[LLM]"))]
+    """Filter to the three score-corrupting severities: [GATE], [LLM], and [LEAK]."""
+    return [(tid, fi) for tid, fi in findings if fi.startswith(("[GATE]", "[LLM]", "[LEAK]"))]
 
 
 def main(argv: List[str]) -> int:
@@ -146,7 +220,7 @@ def main(argv: List[str]) -> int:
     for tid, fi in findings:
         print(f"{tid}  {fi}")
     hard = hard_findings(findings)
-    print(f"\n{len(hard)} score-corrupting [GATE]/[LLM] findings")
+    print(f"\n{len(hard)} score-corrupting [GATE]/[LLM]/[LEAK] findings")
     return 1 if hard else 0
 
 

@@ -57,6 +57,44 @@ REASONING_SUITE_IDS = [
 ]
 
 
+# The 22 new numeric tasks (210-231, committed at 330becbd/5b6e8032/969084ba) registered in
+# TEST_PRIORITY_ORDER (agent/app/idea_test_runner.py) but NOT YET promoted into ACTIVE_SUITE_IDS.
+# Kept as an EXPLICITLY SEPARATE list on purpose: folding them into ACTIVE_SUITE_IDS (and bumping
+# the `== 59` assertion below) would silently widen what the barrage actually runs and change its
+# statistical denominator -- that is a campaign-design decision for a later lane/the user, not a
+# side effect of wiring up a lint rule. This list exists only so the [LEAK] verify-URL check (the
+# thing this file gates in CI) protects these 22 tasks from day one, without smuggling them into
+# the active suite's own validity gate.
+NUMERIC_SUITE_IDS = [f"{i:03d}" for i in range(210, 232)]
+
+
+def test_numeric_suite_task_files_exist():
+    import glob
+    missing = [tid for tid in NUMERIC_SUITE_IDS
+               if not glob.glob(os.path.join(_IDEA_TESTS_DIR, f"test_{tid}_*.py"))]
+    assert not missing, f"numeric-suite IDs with no matching task file: {missing}"
+
+
+def test_numeric_suite_is_disjoint_from_active_suite():
+    """NUMERIC_SUITE_IDS must stay separate from ACTIVE_SUITE_IDS -- see the comment above."""
+    overlap = set(NUMERIC_SUITE_IDS) & set(ACTIVE_SUITE_IDS)
+    assert not overlap, f"numeric ids must not overlap the active suite: {overlap}"
+
+
+def test_active_suite_plus_numeric_suite_lint_clean_of_leaks():
+    """[LEAK] hard gate (F-verify-url-leak): a compiled-plan verify leaf whose optional_url/url
+    is wired to a module-level authoritative-URL constant lets VerifyLeafAction auto-fetch and
+    ground the reconcile step off the answer page regardless of what upstream visits found (the
+    bug found+fixed across six tasks on 2026-08-31, commit 4bd17b0a). Scoped to ACTIVE_SUITE_IDS
+    UNION NUMERIC_SUITE_IDS -- the two lists stay separate (see NUMERIC_SUITE_IDS comment) but
+    both need this protection from day one."""
+    protected = set(ACTIVE_SUITE_IDS) | set(NUMERIC_SUITE_IDS)
+    all_findings = lint.lint_directory(_IDEA_TESTS_DIR)
+    hard = lint.hard_findings(all_findings)
+    leaks = [(tid, fi) for tid, fi in hard if tid in protected and fi.startswith("[LEAK]")]
+    assert leaks == [], f"{len(leaks)} [LEAK] verify-URL violation(s): {leaks}"
+
+
 def test_reasoning_suite_is_disjoint_from_active_suite():
     """A 2xx reasoning id must never be folded into the grounding-gated active suite -- these
     tasks structurally have no visit.count to gate on, so mixing them in would silently weaken
@@ -117,6 +155,75 @@ def test_idea_tests_directory_lints_clean_on_the_active_suite():
     assert active_hard == [], (
         f"{len(active_hard)} [GATE]/[LLM] violation(s) in the active 59-task suite: {active_hard}"
     )
+
+
+@pytest.mark.parametrize("task_id", ["056", "066", "128", "129", "130", "131", "132", "133"])
+def test_verify_leaf_url_leak_tasks_are_clean(task_id):
+    """Regression guard for the 2026-08-31 leak fix (commit 4bd17b0a, plus 130/132 fixed the day
+    before): none of these eight verify-leaf tasks may still wire details.optional_url/url to the
+    module-level authoritative-URL constant."""
+    import glob
+    path = glob.glob(os.path.join(_IDEA_TESTS_DIR, f"test_{task_id}_*.py"))[0]
+    findings = lint.lint_file(path)
+    leaks = [fi for fi in findings if fi.startswith("[LEAK]")]
+    assert leaks == [], f"task {task_id} still has [LEAK] findings: {leaks}"
+
+
+def test_leak_rule_fires_on_the_pre_fix_shape(tmp_path):
+    """Proves the [LEAK] rule actually bites: reconstructs the exact pre-fix shape (a compiled
+    verify leaf whose details.optional_url is set to the module-level AUTHORITATIVE_URL) removed
+    in commit 4bd17b0a, and asserts the lint fires on it. A rule never shown to fail on the bug
+    it targets is not evidence of anything."""
+    pre_fix_src = '''
+AUTHORITATIVE_URL = "https://en.wikipedia.org/wiki/Example"
+
+
+def get_compiled_plan():
+    return {
+        "nodes": [
+            {
+                "id": "verify_popular",
+                "action": "verify",
+                "details": {
+                    "claim": "some claim",
+                    "optional_url": AUTHORITATIVE_URL,
+                },
+            },
+        ],
+    }
+'''
+    p = tmp_path / "test_999_synthetic_pre_fix_leak.py"
+    p.write_text(pre_fix_src)
+    findings = lint.lint_file(str(p))
+    leaks = [fi for fi in findings if fi.startswith("[LEAK]")]
+    assert leaks, "the [LEAK] rule must fire on the pre-fix verify-leaf shape"
+    assert "verify_popular" in leaks[0]
+
+
+def test_leak_rule_does_not_fire_on_a_bare_verify_leaf(tmp_path):
+    """A verify leaf with no optional_url/url at all (the post-fix shape) must not be flagged."""
+    post_fix_src = '''
+AUTHORITATIVE_URL = "https://en.wikipedia.org/wiki/Example"
+
+
+def get_compiled_plan():
+    return {
+        "nodes": [
+            {
+                "id": "verify_popular",
+                "action": "verify",
+                "details": {
+                    "claim": "some claim",
+                },
+            },
+        ],
+    }
+'''
+    p = tmp_path / "test_999_synthetic_post_fix.py"
+    p.write_text(post_fix_src)
+    findings = lint.lint_file(str(p))
+    leaks = [fi for fi in findings if fi.startswith("[LEAK]")]
+    assert leaks == []
 
 
 def test_dropped_task_024_still_flags_llm_judge():
