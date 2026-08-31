@@ -110,6 +110,12 @@ async def run_offtheshelf_execution(
         # Opt-in, default off: imitate sequential_react's explicit finish(answer) action (see
         # `LangGraphSolver.__init__`). Awaiting a live A/B before it becomes default.
         require_finish_tool=os.environ.get("IDEA_TEST_LANGGRAPH_REQUIRE_FINISH_TOOL", "") in ("1", "true", "True"),
+        # DEFAULT ON (arm fairness): a model with no tool-calling endpoint fails
+        # `create_react_agent` in ~0.1s and scores a genuine 0.0, while the native engine runs it
+        # fine over text/JSON — so this arm's roster was narrower than the comparison implied.
+        # The path actually taken is reported as `output.tool_transport`. Opt OUT with
+        # IDEA_TEST_LANGGRAPH_TOOL_EMULATION=0 to reproduce a pre-shim measurement.
+        tool_call_emulation=os.environ.get("IDEA_TEST_LANGGRAPH_TOOL_EMULATION", "1") not in ("0", "false", "False"),
     )
 
     started = time.perf_counter()
@@ -126,6 +132,9 @@ async def run_offtheshelf_execution(
         "success": bool(solver_result.get("success")),
         "goal_achieved": None,
         "action_summary": "langgraph_react",
+        # "native" | "emulated" | "unknown" (the solver never got far enough to route). Analysis
+        # MUST stratify on this: an emulated cell is a different transport, not a different model.
+        "tool_transport": solver_result.get("tool_transport") or "unknown",
     }
     warning = solver_result.get("warning")
     if warning:

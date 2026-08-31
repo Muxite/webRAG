@@ -37,6 +37,7 @@ identical observability shape (cost, tokens, search/visit counts) with no bespok
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -61,6 +62,7 @@ from agent.app.idea_policies.candidate_coverage import (
     extract_named_candidates,
 )
 from agent.app.idea_test_utils import count_chars, count_words
+from agent.app.model_capabilities import supports_native_tool_calling
 from agent.app.solver import SolverResult
 from agent.app.testing.execution_sequential import (
     ToolRetry, _EMPTY_PAGE, _call_search_with_retry, _call_tool_with_retry,
@@ -586,6 +588,189 @@ def _final_answer(messages: List[Any]) -> str:
     return ""
 
 
+#: How many characters of a step's ``thought`` are kept in the emulated transcript. Mirrors
+#: ``execution_sequential._run_react``'s own 300-char thought cap.
+_EMULATION_THOUGHT_CHARS = 300
+#: Consecutive unparseable model turns tolerated before the emulated loop stops nudging and
+#: accepts the model's prose as its answer. A model that cannot emit JSON at all would otherwise
+#: burn its whole step budget on nudges and deliver nothing, which is the hard 0 this transport
+#: exists to prevent; ``create_react_agent`` likewise treats any tool-call-free turn as final.
+_EMULATION_MAX_MALFORMED_TURNS = 3
+#: How many ``{"action": ...}`` spans are attempted when the whole completion is not itself JSON.
+#: Bounded so a long prose completion full of braces cannot make extraction quadratic.
+_EMULATION_MAX_JSON_CANDIDATES = 5
+
+_EMULATION_PROTOCOL_HEADER = (
+    "You do NOT have a function-calling API. Work ONE step at a time: think, then call exactly "
+    "one tool by returning JSON.\nTools:\n"
+)
+_EMULATION_PROTOCOL_FOOTER = (
+    "- finish(answer): output the FINAL answer and end the task. Cite the source URLs you used.\n"
+    "Each step, return ONLY JSON and nothing else: {\"thought\": \"...\", \"action\": "
+    "\"<tool name>\", \"args\": {\"<slot>\": \"...\"}}."
+)
+_EMULATION_STEP_SUFFIX = "Return the next step as JSON."
+_EMULATION_NUDGE = (
+    "Your last message was not valid JSON, so NO tool ran and you made no progress. Reply with "
+    "ONLY a JSON object of the form {\"thought\": \"...\", \"action\": \"<tool name>\", "
+    "\"args\": {...}} and nothing else — no prose, no markdown fence."
+)
+
+
+def _one_line(text: Optional[str]) -> str:
+    return " ".join((text or "").split())
+
+
+def _emulated_protocol(tools: List[Any]) -> str:
+    """The tool menu and action format the emulated transport prompts with.
+
+    Built from the SAME tool objects ``create_react_agent`` would have bound, so the emulated
+    and native transports advertise one action space, not two: each tool's own name, argument
+    slots and docstring are rendered as text instead of as a JSON function schema.
+
+    :param tools: The run's LangChain tools. A ``finish`` tool (opt-in) is skipped — the
+        emulated loop always documents ``finish`` as its terminator, since without it there is
+        no way for the model to stop.
+    :returns: The protocol block appended to the system prompt.
+    """
+    lines = []
+    for t in tools:
+        name = getattr(t, "name", "")
+        if name == "finish":
+            continue
+        slots = ", ".join((getattr(t, "args", None) or {}).keys())
+        lines.append(f"- {name}({slots}): {_one_line(getattr(t, 'description', ''))}")
+    return _EMULATION_PROTOCOL_HEADER + "\n".join(lines) + "\n" + _EMULATION_PROTOCOL_FOOTER
+
+
+def _invalid_action_message(names: List[str]) -> str:
+    return f"INVALID ACTION — no such tool. Use one of: {'/'.join(list(names) + ['finish'])}."
+
+
+def _balanced_span(text: str, start: int) -> Optional[str]:
+    """The ``{...}``/``[...]`` span opening at ``start``, or None when it never closes.
+
+    String-aware (a brace inside a JSON string does not change nesting depth), so a page
+    quotation embedded in an argument cannot truncate the extraction.
+    """
+    opener = text[start]
+    closer = "}" if opener == "{" else "]"
+    depth = 0
+    in_string = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == opener:
+            depth += 1
+        elif ch == closer:
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return None
+
+
+def _json_candidates(text: str) -> List[str]:
+    """``text`` itself, then each balanced JSON span inside it (most likely first)."""
+    out = [text]
+    for i, ch in enumerate(text):
+        if ch not in "{[":
+            continue
+        span = _balanced_span(text, i)
+        if span and span not in out:
+            out.append(span)
+        if len(out) > _EMULATION_MAX_JSON_CANDIDATES:
+            break
+    return out
+
+
+def _extract_json_object(raw: Optional[str]) -> Optional[Dict[str, Any]]:
+    """The first JSON object in a model completion, or None when there is none.
+
+    Deliberately tolerant: the emulated transport cannot rely on a provider-side JSON mode (the
+    models it exists for are the ones with the least schema discipline), so a fenced block,
+    leading prose, or a single-element list wrapper — all live-observed in
+    ``execution_sequential``'s own telemetry — still parse.
+
+    :param raw: A model completion, possibly wrapped in prose or a ```json fence.
+    :returns: The decoded object, or None if nothing in ``raw`` parses as one.
+    :raises: Never — an unparseable completion is a None, which the caller turns into a nudge.
+    """
+    text = (raw or "").strip()
+    if not text:
+        return None
+    fenced = re.search(r"```(?:json)?\s*(.+?)```", text, re.DOTALL)
+    if fenced:
+        text = fenced.group(1).strip()
+    for candidate in _json_candidates(text):
+        try:
+            value = json.loads(candidate)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if isinstance(value, list):
+            value = next((item for item in value if isinstance(item, dict)), None)
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def _render_transcript(messages: List[Any]) -> str:
+    """The message list as the plain text an emulated turn is prompted with.
+
+    The transport keeps ONE canonical transcript in LangChain message objects (so
+    ``_extract_usage``/``_final_answer``/``_visit_haystacks`` and the coverage/stall gates all
+    read it exactly as they read a native run) and renders this text view only for the model —
+    a model with no tool-calling template must never be sent ``tool_calls`` back either.
+    """
+    lines: List[str] = []
+    task_seen = False
+    for m in messages or []:
+        text = _msg_text(m)
+        if isinstance(m, HumanMessage):
+            if task_seen:
+                lines.append(f"INSTRUCTION: {text}")
+            else:
+                task_seen = True
+                lines.append(f"TASK:\n{text}")
+        elif isinstance(m, AIMessage):
+            if text.strip():
+                lines.append(f"THOUGHT: {text}")
+            for call in _msg_tool_calls(m):
+                args = json.dumps(call.get("args", {}), default=str)[:400]
+                lines.append(f"ACTION: {call.get('name', '')} {args}")
+        elif isinstance(m, ToolMessage):
+            lines.append(f"OBSERVATION: {text}")
+    return "\n".join(lines)
+
+
+async def _invoke_tool(tool: Any, args: Dict[str, Any]) -> str:
+    """Run one tool, turning ANY failure into an observation the model can act on.
+
+    A weak model routinely invents an argument slot; letting the resulting validation error
+    propagate would kill the cell outright, which is the failure this whole transport exists to
+    remove.
+
+    :param tool: The LangChain tool to invoke.
+    :param args: The model's argument dict.
+    :returns: The tool's string result, or a ``TOOL ERROR: ...`` observation.
+    :raises: Never.
+    """
+    try:
+        result = await tool.ainvoke(dict(args))
+    except Exception as exc:  # noqa: BLE001 — a bad argument must not end the run
+        return f"TOOL ERROR: {type(exc).__name__}: {exc}"
+    return result if isinstance(result, str) else str(result or "")
+
+
 @dataclass
 class _SolveState:
     """Mutable run state threaded through `solve()`'s primary pass and its corrective extensions
@@ -604,10 +789,171 @@ class _SolveState:
     run_error: Optional[BaseException] = None
 
 
+class _NativeGraphTransport:
+    """``create_react_agent``'s graph, streamed — the path every tool-calling model keeps taking.
+
+    Wraps the SAME ``astream`` call, config and stream mode the arm has always used; the
+    wrapper exists only so the emulated transport can be substituted at one place.
+    """
+
+    name = "native"
+
+    def __init__(self, graph: Any) -> None:
+        self._graph = graph
+
+    async def run(self, state: "_SolveState", messages: List[Any], recursion_limit: int) -> None:
+        """Stream one pass, refreshing ``state.messages`` as the graph yields.
+
+        :param state: The run state; ``messages`` is replaced with each yielded full conversation
+            so a mid-run crash still leaves the turns (and therefore the token cost) gathered.
+        :param messages: The conversation to run from.
+        :param recursion_limit: LangGraph's own step budget for this pass.
+        :raises GraphRecursionError: When the budget is exhausted.
+        """
+        async for graph_state in self._graph.astream(
+            {"messages": messages},
+            config={"recursion_limit": recursion_limit},
+            stream_mode="values",
+        ):
+            if isinstance(graph_state, dict) and graph_state.get("messages"):
+                state.messages = graph_state["messages"]
+
+
+class _EmulatedToolCallTransport:
+    """The same ReAct loop over a text/JSON protocol, for models with no tool-calling endpoint.
+
+    Ollama answers a ``tools``-bearing request with ``400 ... does not support tools`` for a
+    model with no tool-calling template, and OpenRouter with ``404 no endpoints found that
+    support tool use`` — instantly, scoring a genuine 0.0 on the whole cell. This runs the
+    identical loop against the identical tool objects, budgets and search backend; only the
+    transport differs: the model is asked for ``{"thought", "action", "args"}`` (the scheme
+    ``execution_sequential`` has always used on exactly these models) and the parsed action is
+    dispatched by calling the tool directly.
+
+    The transcript it accumulates is built from ordinary ``AIMessage(tool_calls=...)`` /
+    ``ToolMessage`` objects, so every downstream consumer in this module —
+    ``_extract_usage``, ``_final_answer``, ``_finish_answer``, ``_evidence_from``,
+    ``_visit_haystacks``, ``_record_io_parity``, the coverage and stall gates — reads an emulated
+    run exactly as it reads a native one.
+    """
+
+    name = "emulated"
+
+    def __init__(self, llm: Any, tools: List[Any], system_prompt: str,
+                 pre_model_hook: Optional[Any] = None) -> None:
+        self._llm = llm
+        self._tools = list(tools)
+        self._by_name = {getattr(t, "name", ""): t for t in self._tools}
+        self._system = f"{system_prompt}\n{_emulated_protocol(self._tools)}"
+        self._pre_model_hook = pre_model_hook
+
+    def _model_view(self, transcript: List[Any]) -> List[Any]:
+        """What the model is shown this turn — the same ``pre_model_hook`` the native transport
+        would have been given, applied to the same transcript."""
+        if self._pre_model_hook is None:
+            return transcript
+        trimmed = self._pre_model_hook({"messages": transcript})
+        return trimmed.get("llm_input_messages", transcript) if isinstance(trimmed, dict) else transcript
+
+    def _finish_messages(self, answer: str, call_id: str, usage: Optional[Dict[str, Any]]) -> List[Any]:
+        """The terminal turn for a ``finish`` action.
+
+        Without the opt-in ``finish`` tool this is one tool-call-free ``AIMessage`` — exactly the
+        shape ``create_react_agent`` ends a run with, and what ``_final_answer`` reads. With it,
+        the submission is ALSO recorded as a ``finish`` tool call plus its result, so
+        ``_finish_answer`` (which ``solve`` trusts exclusively when that flag is on) sees the
+        deliberate submission it requires.
+        """
+        if "finish" in self._by_name:
+            return [
+                AIMessage(content=answer, usage_metadata=usage,
+                          tool_calls=[{"name": "finish", "args": {"answer": answer}, "id": call_id}]),
+                ToolMessage(content="Answer submitted.", tool_call_id=call_id, name="finish"),
+            ]
+        return [AIMessage(content=answer, usage_metadata=usage)]
+
+    async def run(self, state: "_SolveState", messages: List[Any], recursion_limit: int) -> None:
+        """Run the think -> act -> observe loop until the model finishes or the budget runs out.
+
+        :param state: The run state; ``messages`` is refreshed after every turn so a raise still
+            leaves the evidence (and token cost) gathered so far.
+        :param messages: The conversation to run from — the mandate on the primary pass, or the
+            prior transcript plus a corrective turn on an extension pass.
+        :param recursion_limit: The native transport's step budget, in graph steps (one model
+            turn plus its tool execution), so both transports get the same number of model turns.
+        :raises GraphRecursionError: When the budget is exhausted without a final answer — the
+            SAME exception the native transport raises, so ``solve``'s forced-synthesis safety
+            net needs no separate handling for this path.
+        """
+        transcript = list(messages)
+        state.messages = transcript
+        malformed = 0
+        turns = max(1, int(recursion_limit) // 2)
+        for step in range(turns):
+            response = await self._llm.ainvoke([
+                SystemMessage(content=self._system),
+                HumanMessage(content=(
+                    f"{_render_transcript(self._model_view(transcript))}\n\n{_EMULATION_STEP_SUFFIX}"
+                )),
+            ])
+            raw = _msg_text(response)
+            usage = getattr(response, "usage_metadata", None)
+            decision = _extract_json_object(raw)
+
+            if decision is None:
+                malformed += 1
+                transcript.append(AIMessage(content=raw, usage_metadata=usage))
+                state.messages = transcript
+                if malformed >= _EMULATION_MAX_MALFORMED_TURNS:
+                    _logger.warning(
+                        "[TOOL-EMULATION] %d consecutive unparseable turns; accepting the "
+                        "model's prose instead of burning the remaining budget on nudges.",
+                        malformed,
+                    )
+                    return
+                transcript.append(HumanMessage(content=_EMULATION_NUDGE))
+                continue
+
+            malformed = 0
+            action = str(decision.get("action", "")).strip().lower()
+            args = decision.get("args")
+            if not isinstance(args, dict):
+                args = {}
+            thought = str(decision.get("thought", ""))[:_EMULATION_THOUGHT_CHARS]
+            call_id = f"emu_{step}"
+
+            if action == "finish":
+                answer = str(args.get("answer", "") or "")
+                transcript.extend(self._finish_messages(answer, call_id, usage))
+                state.messages = transcript
+                return
+
+            tool = self._by_name.get(action)
+            if tool is None:
+                transcript.append(AIMessage(content=thought or raw, usage_metadata=usage))
+                transcript.append(HumanMessage(content=_invalid_action_message(
+                    [n for n in self._by_name if n != "finish"])))
+                state.messages = transcript
+                continue
+
+            transcript.append(AIMessage(
+                content=thought, usage_metadata=usage,
+                tool_calls=[{"name": action, "args": args, "id": call_id}],
+            ))
+            transcript.append(ToolMessage(
+                content=await _invoke_tool(tool, args), tool_call_id=call_id, name=action,
+            ))
+            state.messages = transcript
+
+        raise GraphRecursionError(
+            f"Recursion limit of {recursion_limit} reached without hitting a stop condition."
+        )
+
+
 async def _run_extension(
-    graph: Any, state: _SolveState, corrective_content: str, extension_steps: int, *, label: str,
+    transport: Any, state: _SolveState, corrective_content: str, extension_steps: int, *, label: str,
 ) -> bool:
-    """Run one corrective `astream` pass: append `corrective_content` as a fresh `HumanMessage`
+    """Run one corrective pass on `transport`: append `corrective_content` as a fresh `HumanMessage`
     to `state.messages`, replay the graph, and refresh `state.messages`/`usages`/`final_text` in
     place from the result — same step-exhaustion-without-exception rewrite the primary pass
     applies. Returns True if the pass raised (recursion or otherwise), so a caller looping over
@@ -617,13 +963,7 @@ async def _run_extension(
     except-blocks verbatim (same log wording, same exception handling)."""
     ext_messages = list(state.messages) + [HumanMessage(content=corrective_content)]
     try:
-        async for graph_state in graph.astream(
-            {"messages": ext_messages},
-            config={"recursion_limit": max(4, extension_steps * 2)},
-            stream_mode="values",
-        ):
-            if isinstance(graph_state, dict) and graph_state.get("messages"):
-                state.messages = graph_state["messages"]
+        await transport.run(state, ext_messages, max(4, extension_steps * 2))
     except GraphRecursionError as exc:
         state.recursion_hit = True
         state.run_error = exc
@@ -792,6 +1132,7 @@ class LangGraphSolver:
         context_trim: bool = False,
         stall_recovery_gate: bool = False,
         require_finish_tool: bool = False,
+        tool_call_emulation: bool = True,
     ) -> None:
         self._connector_llm = connector_llm
         self._connector_search = connector_search
@@ -852,6 +1193,55 @@ class LangGraphSolver:
         #: as currently scoped — see `_finish_answer`'s docstring for the full result and stays
         #: opt-in; do not flip this default without also addressing the step-budget interaction.
         self._require_finish_tool = bool(require_finish_tool)
+        #: ARM FAIRNESS, default ON. `create_react_agent` binds tools unconditionally, so a model
+        #: with no tool-calling endpoint (tinyllama/phi3:mini/gemma2:2b on Ollama, llama-3.2-1b on
+        #: OpenRouter) fails this arm in ~0.1s and scores a genuine 0.0 — while the native engine
+        #: runs it fine over text/JSON. Comparing the arms on that roster measures an
+        #: implementation gap we imposed, not an architectural advantage. When this is on and
+        #: `model_capabilities.supports_native_tool_calling` says no, the run takes
+        #: `_EmulatedToolCallTransport` (same tools, same budgets, same backend; text/JSON
+        #: transport) instead. Every tool-calling-capable model keeps the `create_react_agent`
+        #: path unchanged, and the path actually taken is reported as `tool_transport` so an
+        #: analysis can stratify on it. Set False to force the native path (and its 400) — e.g.
+        #: to reproduce a pre-shim measurement.
+        self._tool_call_emulation = bool(tool_call_emulation)
+
+    def _pre_model_hook(self) -> Optional[Any]:
+        """The per-turn context-bounding hook for this run, or None (see `_trim_for_model`)."""
+        return _trim_for_model if self._context_trim else None
+
+    async def _build_transport(self, llm: Any, tools: List[Any], system_prompt: str):
+        """Pick the tool transport for this run's model.
+
+        Detection is consulted ONLY when emulation is enabled, so an opted-out run makes no
+        probe and behaves exactly as it did before this existed. A config that cannot be read
+        keeps the native path (the status quo) rather than silently rerouting a paid run.
+
+        :param llm: The chat model both transports drive.
+        :param tools: The run's tools — the SAME objects either transport dispatches.
+        :param system_prompt: The system prompt both transports open with.
+        :returns: ``(transport, "native" | "emulated")``.
+        :raises: Never — a detection failure resolves to one of the two transports.
+        """
+        if self._tool_call_emulation:
+            try:
+                cfg = ConnectorConfig()
+                provider, api_url = cfg.llm_provider, cfg.llm_api_url
+            except Exception as exc:  # noqa: BLE001 — detection must never fail a run
+                _logger.warning(f"LangGraph tool-capability config read failed: {exc}")
+                provider, api_url = None, None
+            if not await supports_native_tool_calling(self._model_name, provider, api_url):
+                _logger.info(
+                    f"[TOOL-EMULATION] {self._model_name} has no native tool-calling endpoint; "
+                    "running the ReAct loop over the text/JSON transport instead."
+                )
+                return _EmulatedToolCallTransport(
+                    llm, tools, system_prompt, pre_model_hook=self._pre_model_hook(),
+                ), "emulated"
+        graph = create_react_agent(
+            llm, tools, prompt=system_prompt, pre_model_hook=self._pre_model_hook(),
+        )
+        return _NativeGraphTransport(graph), "native"
 
     def _build_llm(self) -> ChatOpenAI:
         """Point LangChain's OpenAI-compatible client at whatever provider the run is configured
@@ -905,10 +1295,7 @@ class LangGraphSolver:
                              require_finish_tool=self._require_finish_tool)
         llm = self._build_llm()
         system_prompt = f"{_SYSTEM}\n{_FINISH_TOOL_GUIDANCE}" if self._require_finish_tool else _SYSTEM
-        graph = create_react_agent(
-            llm, tools, prompt=system_prompt,
-            pre_model_hook=(_trim_for_model if self._context_trim else None),
-        )
+        transport, tool_transport = await self._build_transport(llm, tools, system_prompt)
 
         started = time.perf_counter()
         state = _SolveState(messages=[])
@@ -917,13 +1304,9 @@ class LangGraphSolver:
         # the token usage — accumulated so far. ainvoke would raise and discard the whole state,
         # reporting $0 for a run that really did spend money.
         try:
-            async for graph_state in graph.astream(
-                {"messages": [HumanMessage(content=mandate)]},
-                config={"recursion_limit": max(4, int(max_steps) * 2)},
-                stream_mode="values",
-            ):
-                if isinstance(graph_state, dict) and graph_state.get("messages"):
-                    state.messages = graph_state["messages"]
+            await transport.run(
+                state, [HumanMessage(content=mandate)], max(4, int(max_steps) * 2),
+            )
         except GraphRecursionError as exc:
             state.recursion_hit = True
             state.run_error = exc
@@ -960,7 +1343,7 @@ class LangGraphSolver:
                     f"tool result(s); corrective pass {episodes}/{_STALL_MAX_EPISODES}"
                 )
                 hard_failed = await _run_extension(
-                    graph, state, _STALL_CORRECTIVE_MESSAGE, _STALL_EXTENSION_STEPS,
+                    transport, state, _STALL_CORRECTIVE_MESSAGE, _STALL_EXTENSION_STEPS,
                     label="stall-recovery",
                 )
                 if hard_failed:
@@ -986,7 +1369,7 @@ class LangGraphSolver:
                         "extension before finalizing"
                     )
                     await _run_extension(
-                        graph, state, _coverage_corrective_message(cov.missing), extension_steps,
+                        transport, state, _coverage_corrective_message(cov.missing), extension_steps,
                         label="candidate-coverage",
                     )
 
@@ -1046,6 +1429,7 @@ class LangGraphSolver:
         result_out: SolverResult = {
             "final_deliverable": final_text,
             "success": bool(final_text.strip()),
+            "tool_transport": tool_transport,
             "observability": observability,
             "wall_time_s": wall_time_s,
             "llm_calls": len(state.usages),
