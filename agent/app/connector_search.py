@@ -359,7 +359,8 @@ def create_search_backend(config: ConnectorConfig) -> ConnectorSearch:
 
     Mirrors ``llm_backends.create_llm_backend``'s dispatch pattern. ``"brave"``/``"serper"`` are the
     paid backends; ``"searxng"`` routes at a self-hosted, keyless SearXNG instance
-    (``SEARXNG_URL``). SearXNG used to be a manual per-call-site instantiation for codebench's
+    (``SEARXNG_URL``); ``"corpus"`` serves a frozen recorded document set from
+    ``LEDGER_CORPUS_DIR`` with no network at all, for deterministic $0 replay. SearXNG used to be a manual per-call-site instantiation for codebench's
     network-isolated sandbox only; it is dispatched here as well because it is the only search
     backend a $0 local-model benchmark can use once the paid keys are exhausted, and an offline
     experiment that cannot search is not an experiment. Opt-in by env, so nothing routes at it
@@ -377,6 +378,12 @@ def create_search_backend(config: ConnectorConfig) -> ConnectorSearch:
         from agent.app.connector_search_searxng import ConnectorSearchXNG
 
         return ConnectorSearchXNG(config)
+    if provider == "corpus":
+        # Frozen recorded corpus, ranked locally: $0, no network, deterministic across runs.
+        # Lazy for the same circular-import reason as the two branches around it.
+        from agent.app.connector_search_corpus import ConnectorSearchCorpus
+
+        return ConnectorSearchCorpus(config)
     if provider != "serper":
         config.logger.warning("Unknown SEARCH_PROVIDER=%s; using serper", provider)
     # Lazy import: connector_search_serper.py imports FROM this module (ConnectorSearch, _collect),

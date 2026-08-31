@@ -88,7 +88,7 @@ Each gets its own spec and its own cycle. Several exist in partial form today.
 | 2 | DAG evidence-dependency analysis | partial — DAG v2 planning to be re-scoped |
 | 3 | Deterministic derivation + unit refusal + abstain | **built, unwired** (`evidence_graph.py`) |
 | 4 | Per-call audit log: prompt, response, timing, cost | partial — `trace_recorder.py`, `telemetry.py` |
-| 5 | Record/replay + counterfactual re-run | partial — record/replay works for HTTP *and* search, but exact-key fixtures ~never hit for a variable-query agent |
+| 5 | Record/replay + counterfactual re-run | **corpus replay LIVE** — `connector_search_corpus.py` + `scripts/build_corpus.py`; 289 docs harvested free from 5,973 stored cells |
 | 6 | Leak-resistant benchmark construction | partial — keystone gates exist; 046/047 asymmetry fixed |
 
 The single largest concrete gap is #5, though not for the reason an earlier draft of this
@@ -215,3 +215,45 @@ Scoping per subsystem, then an expanded development cycle. Immediate queue:
 2. Wire the derivation layer against the `Extraction` records that already run live.
 3. A purpose-built numeric suite; the effect is unmeasurable at n=24 on `core_long24`.
 4. Fresh 046/047 comparison — the archive cannot supply it.
+
+---
+
+## Subsystem 5 status — frozen-corpus replay (2026-08-31)
+
+**Shipped.** `SEARCH_PROVIDER=corpus` + `LEDGER_CORPUS_DIR` serve search from a frozen
+document set ranked by a pure-Python BM25 index — no service, no GPU, no network, and
+byte-identical across processes.
+
+Why the altitude changed: exact-key fixtures hash the literal query, and an adaptive agent
+never repeats a query, so a 289 MB record pass produced ~0 effective hits
+(`scripts/BENCHMARK_NATIVE.md:14-19`). Ranking a corpus asks a different question — "what
+does the frozen evidence hold for this query?" — so any phrasing, recorded or not, returns
+results. Every arm can then query one identical evidence universe freely, which is what
+makes a controller comparison a controller comparison.
+
+| Piece | Where |
+|---|---|
+| Backend | `agent/app/connector_search_corpus.py` |
+| Factory branch | `agent/app/connector_search.py` (`create_search_backend`) |
+| Builder | `scripts/build_corpus.py` |
+| Tests | `agent/tests/connector_search_corpus_test.py` (16), `agent/tests/build_corpus_test.py` (7) |
+
+**First corpus cost $0.** Harvested 289 distinct documents (1.44 MB) from 5,973 stored
+result cells — evidence already paid for. Live top-up via `scripts/prewarm_fixtures.py` is
+a deliberate, budgeted step rather than a prerequisite.
+
+**Spend policy.** A corpus miss falls back to live search and records the result, per the
+chosen throughput-first policy. Bounded rather than silent: `LEDGER_MAX_LIVE_FALLBACKS`
+(default 25) caps live calls, the resolved provider and document count are logged at
+construction, and `live_fallbacks` / `provenance` make per-cell replay fidelity measurable
+instead of assumed.
+
+**Design detail worth keeping.** Absorbed live results index the *originating query*
+alongside the result text. Indexing content alone means the very query that paid to fetch a
+result cannot find it again and bills twice — caching by content is not caching by query.
+A test drove this out.
+
+**Known limits.** BM25 ranking is not Serper's ranking, so replay measures controller
+behaviour over a fixed evidence universe, not end-to-end production retrieval; a headline
+end-to-end number still needs a live run. A frozen corpus also cannot show a regression
+caused by the live web changing.
