@@ -87,3 +87,34 @@ def test_write_corpus_emits_documents_jsonl_readable_by_the_backend(tmp_path):
     loaded = load_documents(str(out))
     assert len(loaded) == 1
     assert loaded[0].url == "https://example.org/a"
+
+
+def test_harvest_collapses_urls_differing_only_by_fragment(tmp_path):
+    """ADVERSARIAL: a fragment names a position on a page, not a different page."""
+    _cell(tmp_path, "a_122_m_v_r1.json", pages=[PAGE])
+    _cell(tmp_path, "b_122_m_v_r1.json",
+          pages=[dict(PAGE, url=PAGE["url"] + "#geology")])
+    assert len(build_corpus.harvest_documents(str(tmp_path))) == 1
+
+
+def test_harvest_collapses_the_same_page_reached_by_different_query_strings(tmp_path):
+    """ADVERSARIAL: measured on the real corpus -- the USGS Denali release appeared twice,
+    once bare and once with `?qt-science_center_objects=0#...`, burning two of three result
+    slots with one page. URL canonicalisation keeps the query, so identical content must
+    collapse on content, not on URL.
+    """
+    body = "Denali's new elevation is 20,310 feet after the 2015 resurvey."
+    _cell(tmp_path, "a_122_m_v_r1.json", pages=[dict(PAGE, text=body)])
+    _cell(tmp_path, "b_122_m_v_r1.json",
+          pages=[dict(PAGE, url=PAGE["url"] + "?qt-science_center_objects=0", text=body)])
+    docs = build_corpus.harvest_documents(str(tmp_path))
+    assert len(docs) == 1
+    assert "?" not in docs[0]["url"], "the cleaner URL should win"
+
+
+def test_harvest_keeps_genuinely_different_pages_on_one_host(tmp_path):
+    """The collapse must not over-merge: different content is different documents."""
+    _cell(tmp_path, "a_122_m_v_r1.json", pages=[dict(PAGE, text="Denali is in Alaska.")])
+    _cell(tmp_path, "b_122_m_v_r1.json",
+          pages=[dict(PAGE, url="https://example.org/eiffel2", text="The Eiffel Tower is 330 m.")])
+    assert len(build_corpus.harvest_documents(str(tmp_path))) == 2

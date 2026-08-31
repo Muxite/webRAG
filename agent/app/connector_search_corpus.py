@@ -49,6 +49,21 @@ def _max_live_fallbacks_setting() -> int:
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 
 
+def title_from_url(url: str) -> str:
+    """A human-readable title derived from a URL's last meaningful path segment.
+
+    ``https://en.wikipedia.org/wiki/Denali`` becomes ``Denali``; a bare host falls back to the
+    host itself. Used when a harvested page carries no title of its own.
+    """
+    text = str(url or "").split("?")[0].split("#")[0].rstrip("/")
+    if not text:
+        return ""
+    tail = text.rsplit("/", 1)[-1]
+    if not tail or "." in tail and tail == text.split("//")[-1]:
+        tail = text.split("//")[-1].split("/")[0]
+    return re.sub(r"[_+-]+", " ", tail).replace("%20", " ").strip() or text
+
+
 def tokenize(text: Any) -> List[str]:
     """Lowercase alphanumeric tokens, the same way for documents and queries.
 
@@ -64,7 +79,9 @@ class CorpusDocument:
     def __init__(self, url: str, title: str, description: str, text: str = "",
                  text_chars: int = DEFAULT_TEXT_CHARS) -> None:
         self.url = str(url or "")
-        self.title = str(title or "")
+        # Harvested store_page dicts carry no title field, so without a fallback every harvested
+        # document would rank and render with an empty title.
+        self.title = str(title or "").strip() or title_from_url(self.url)
         self.description = str(description or "")
         self.text = str(text or "")
         self.tokens = tokenize(f"{self.title} {self.description} {self.text[:text_chars]}")
@@ -232,6 +249,11 @@ class ConnectorSearchCorpus(ConnectorSearch):
             match. Never ``None`` -- that value is reserved for a backend that failed to
             initialise, and this one cannot.
         """
+        if int(count) <= 0:
+            # A degenerate count slices the ranked list to empty. Reading that as "corpus miss"
+            # would bill a live search for a query the corpus can actually answer.
+            self.provenance.append("none")
+            return []
         hits = self.index.search(query, count)
         if hits:
             self.provenance.append("corpus")

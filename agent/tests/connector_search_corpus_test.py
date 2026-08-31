@@ -214,3 +214,36 @@ async def test_each_result_records_which_source_served_it(tmp_path):
     await connector.query_search("tower in Paris", count=1)
     await connector.query_search("zzzzz qqqqq", count=1)
     assert connector.provenance == ["corpus", "live"]
+
+
+@pytest.mark.asyncio
+async def test_zero_count_never_triggers_a_paid_live_call(tmp_path):
+    """ADVERSARIAL: count=0 slices the ranked list to empty.
+
+    If "no results" is read as "corpus miss", a degenerate count would bill a live search for a
+    query the corpus could actually answer.
+    """
+    fallback = _RecordingFallback()
+    connector = ConnectorSearchCorpus(ConnectorConfig(), corpus_dir=str(_corpus(tmp_path)),
+                                      fallback=fallback, max_live_fallbacks=5)
+    results = await connector.query_search("tower in Paris", count=0)
+    assert results == []
+    assert fallback.calls == []
+    assert connector.live_fallbacks == 0
+
+
+@pytest.mark.asyncio
+async def test_documents_without_a_stored_title_still_get_a_usable_one(tmp_path):
+    """ADVERSARIAL: harvested store_page dicts carry no title field at all.
+
+    Every harvested document would render with an empty title, degrading both BM25 ranking and
+    whatever the model sees in its search results.
+    """
+    path = tmp_path / "corpus"
+    path.mkdir()
+    (path / "documents.jsonl").write_text(json.dumps(
+        {"url": "https://en.wikipedia.org/wiki/Denali", "title": "",
+         "description": "", "text": "Denali is the highest peak."}) + "\n", encoding="utf-8")
+    connector = ConnectorSearchCorpus(ConnectorConfig(), corpus_dir=str(path))
+    results = await connector.query_search("Denali highest peak", count=1)
+    assert results[0]["title"]

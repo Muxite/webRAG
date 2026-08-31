@@ -31,6 +31,9 @@ from typing import Any, Dict, Iterable, List
 RESULT_GLOB = "*_r[0-9]*.json"
 #: Page body kept per document. Enough to rank on, bounded so a corpus stays reviewable.
 MAX_TEXT_CHARS = 20000
+#: Opening characters used to decide two pages are the same content. Long enough that distinct
+#: articles diverge, short enough that different truncations of one page still agree.
+CONTENT_KEY_CHARS = 400
 
 
 def _cell_output(payload: Any) -> Dict[str, Any]:
@@ -53,44 +56,80 @@ def iter_result_files(results_dir: str) -> Iterable[Path]:
                   if path.is_file() and not path.name.endswith("_summary.json"))
 
 
+def _content_key(text: str) -> str:
+    """Identity of a page by its opening body, whitespace-normalised.
+
+    URL canonicalisation is not enough. ``canonicalize_url`` deliberately keeps the query string,
+    so the same article reached bare and with a tracking parameter stays two URLs -- measured on
+    the real corpus, where one USGS release appeared twice and burned two of three result slots.
+    Two documents that begin with identical prose are one page however they were reached.
+    """
+    return " ".join(str(text or "").split())[:CONTENT_KEY_CHARS]
+
+
+def _better_url(left: str, right: str) -> str:
+    """The cleaner of two URLs for the same content: fewer parameters, then shorter."""
+    return min((left, right), key=lambda url: (url.count("?") + url.count("&"), len(url)))
+
+
 def harvest_documents(results_dir: str, max_text_chars: int = MAX_TEXT_CHARS) -> List[Dict[str, str]]:
-    """Collect one document per distinct URL from every stored cell.
+    """Collect one document per distinct page from every stored cell.
 
-    A URL seen in several cells keeps the **longest** stored text: cells truncate pages to
-    different budgets, and the most complete copy is the one worth freezing.
+    Identity is applied twice, because neither key alone is sufficient:
 
-    A corrupt or unreadable cell is skipped rather than fatal -- an unattended build cannot stop
-    to ask what to do about one bad file.
+    * **Canonical URL** (``evidence_store.canonicalize_url``) folds fragments and host casing.
+    * **Content prefix** folds the same page reached through different query strings.
+
+    A page seen in several cells keeps the **longest** stored text -- cells truncate to different
+    budgets, and the most complete copy is the one worth freezing -- and the cleanest URL.
+
+    A corrupt or unreadable cell is skipped rather than fatal: an unattended build cannot stop to
+    ask what to do about one bad file.
 
     :param results_dir: directory of per-cell result JSONs.
     :param max_text_chars: per-document body cap.
     :returns: documents in first-seen order, each ``{url, title, description, text}``.
     """
-    best: Dict[str, Dict[str, str]] = {}
+    from agent.app.evidence_store import canonicalize_url
+
+    by_url: Dict[str, Dict[str, str]] = {}
     for path in iter_result_files(results_dir):
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError, UnicodeDecodeError):
             continue
-        output = _cell_output(payload)
-        pages = output.get("pages")
+        pages = _cell_output(payload).get("pages")
         if not isinstance(pages, list):
             continue
         for page in pages:
             if not isinstance(page, dict):
                 continue
-            url = str(page.get("url") or "").strip()
+            url = canonicalize_url(page.get("url"))
             if not url:
                 continue
             text = str(page.get("text") or "")[:max_text_chars]
-            existing = best.get(url)
+            existing = by_url.get(url)
             if existing is None:
-                best[url] = {"url": url, "title": str(page.get("title") or "").strip(),
-                             "description": text[:300], "text": text}
+                by_url[url] = {"url": url, "title": str(page.get("title") or "").strip(),
+                               "description": text[:300], "text": text}
             elif len(text) > len(existing["text"]):
-                existing["text"] = text
-                existing["description"] = text[:300]
-    return list(best.values())
+                existing.update({"text": text, "description": text[:300]})
+
+    by_content: Dict[str, Dict[str, str]] = {}
+    for doc in by_url.values():
+        key = _content_key(doc["text"])
+        if not key:
+            # No body to compare on; keep it, keyed uniquely so it cannot swallow others.
+            by_content[f"\x00{doc['url']}"] = doc
+            continue
+        existing = by_content.get(key)
+        if existing is None:
+            by_content[key] = doc
+        else:
+            existing["url"] = _better_url(existing["url"], doc["url"])
+            if len(doc["text"]) > len(existing["text"]):
+                existing.update({"text": doc["text"], "description": doc["text"][:300]})
+    return list(by_content.values())
 
 
 def write_corpus(out_dir: str, documents: List[Dict[str, str]]) -> Path:
