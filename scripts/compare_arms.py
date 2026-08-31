@@ -23,8 +23,24 @@ Usage:
   PYTHONPATH=.:services:agent ./.venv/bin/python scripts/compare_arms.py \\
       runA:a runB:b runC:c --shapes shapes.json --i-know-the-data-is-suspect
 
+  # anchor matching so a prefix can't over-match a longer arm name (see --exact below):
+  PYTHONPATH=.:services:agent ./.venv/bin/python scripts/compare_arms.py --exact \\
+      bfx_r1_q7_good_adaptive_rep1:adaptive bfx_r1_q7_good_adaptive_breadth_rep1:breadth
+
+  # structured selection instead of hand-building the prefix, transparently spanning the 4
+  # axis_queue_runner.py --slices 4 shards of run-id bfx_r1 as one logical arm per --arm:
+  PYTHONPATH=.:services:agent ./.venv/bin/python scripts/compare_arms.py \\
+      --run-id bfx_r1 --tag q7 --arm good_adaptive --arm good_adaptive_breadth \\
+      --slices 4 --exact
+
 Each positional ARM argument is `run_id_prefix[:label]` (label defaults to the prefix itself).
+A prefix may be comma-joined (`idA,idB`) to merge several run-ids into one arm, matching the
+precedent in adaptive_ab_analyze.py::load_arm.
 --shapes points to a JSON file mapping {"task_id": "shape_name", ...}.
+--exact anchors run-id matching (see the flag's own help) -- opt-in, default off for backward
+compatibility with existing invocations.
+--run-id/--tag/--arm/--rep/--slices compose positional-equivalent specs for you and can be
+combined with explicit positional ARM arguments.
 """
 import argparse
 import glob
@@ -119,10 +135,66 @@ def _auth_marker_hit(d):
     return bool(AUTH_FAILURE_MARKERS.search(blob))
 
 
-def load_arm(run_id, results_dir=RESULTS_DIR):
+REP_TAIL_RE = re.compile(r"_rep\d+$")
+
+
+def _result_files_for_id(run_id, results_dir, exact):
+    """Result-JSON files (unfiltered for _summary.json) belonging to one run-id.
+
+    Without `exact`, any file whose basename starts with `{run_id}_` and has at least two more
+    underscore-separated components is included -- the historical, loose behaviour. This is
+    what let a prefix like `X_q7_good_adaptive` also match `X_q7_good_adaptive_breadth_rep1_...`:
+    a longer, DISTINCT arm name that merely happens to have `run_id` as a string prefix (see
+    docs/handoffs/DAG_V3_PHASE0_NIGHT2_HANDOFF_2026-08-27.md).
+
+    With `exact`, the match is anchored so a shorter arm name cannot match a longer one:
+    - if `run_id` does not already end in `_rep<N>`, the very next characters in the filename
+      after `run_id` must begin a `_rep<N>_` component (so `good_adaptive` cannot match
+      `good_adaptive_breadth_rep1_...`, since `_breadth_rep1_` != `_rep<N>_`);
+    - if `run_id` already ends in `_rep<N>`, no further digits may immediately follow (so
+      `..._rep1` cannot match `..._rep10_...`).
+
+    Args:
+        run_id: single run-id (no commas -- callers split comma-joined ids first).
+        results_dir: directory to glob in.
+        exact: whether to apply the anchor above.
+
+    Returns:
+        Sorted list of matching file paths (may include `_summary.json` files; callers filter).
+    """
+    candidates = set(glob.glob(f"{results_dir}/{run_id}_*_*.json"))
+    if not exact:
+        return sorted(candidates)
+    if REP_TAIL_RE.search(run_id):
+        anchor = re.compile(r"^" + re.escape(run_id) + r"(?!\d)_")
+    else:
+        anchor = re.compile(r"^" + re.escape(run_id) + r"_rep\d+(?!\d)_")
+    return sorted(f for f in candidates if anchor.match(os.path.basename(f)))
+
+
+def load_arm(run_id, results_dir=RESULTS_DIR, exact=False):
+    """Load an arm's result rows, one row per cell JSON.
+
+    Args:
+        run_id: run-id prefix, or a comma-joined list of prefixes to merge into one arm
+            (matches the precedent in adaptive_ab_analyze.py::load_arm; this is how a
+            `--slices N`-sharded logical run -- `{run_id}_s0` .. `{run_id}_s{N-1}` -- is
+            addressed as a single arm).
+        results_dir: directory containing per-cell result JSONs.
+        exact: anchor matching per `_result_files_for_id` instead of the loose prefix glob.
+
+    Returns:
+        (rows, unreadable) -- rows is a list of per-cell dicts; unreadable is a list of
+        (file, error) pairs for files that failed to parse as JSON.
+    """
     rows = []
     unreadable = []
-    for f in sorted(set(glob.glob(f"{results_dir}/{run_id}_*_*.json"))):
+    files = set()
+    for rid in str(run_id).split(","):
+        rid = rid.strip()
+        if rid:
+            files.update(_result_files_for_id(rid, results_dir, exact))
+    for f in sorted(files):
         if f.endswith("_summary.json"):
             continue
         try:
@@ -393,17 +465,88 @@ def parse_arm_spec(spec):
     return rid, label
 
 
+def build_structured_specs(run_id, tag, arms, rep, slices):
+    """Compose `run_id_prefix[:label]` arm specs from `--run-id`/`--tag`/`--arm`/`--rep`/
+    `--slices`, so a caller doesn't have to hand-build the glob (or, for a sliced run, a
+    comma-joined list of every slice's run-id).
+
+    `axis_queue_runner.py --slices N` shards one logical run into N run-ids suffixed `_s0` ..
+    `_s{N-1}` before the tag/arm/rep components; when `slices > 1` each returned spec's prefix
+    is the comma-joined list of that arm's N per-slice run-ids (following the precedent in
+    adaptive_ab_analyze.py::load_arm, which already accepts a comma-joined run-id to merge
+    groups), so the sliced run is addressable as one logical arm.
+
+    Args:
+        run_id: base run-id, before any `_s{i}` slice infix, tag, arm, or rep.
+        tag: optional axis tag component (e.g. "q7"); omitted from the composed prefix if
+            falsy.
+        arms: non-empty list of arm names; one spec is produced per entry, labeled with the
+            arm name.
+        rep: rep number appended as `_rep{rep}`, matching the convention
+            `adaptive_ladder_run.py` writes.
+        slices: slice count; 1 means the run is unsliced (no `_s{i}` infix).
+
+    Returns:
+        List of `"prefix[:label]"` strings, one per entry in `arms`, in the same format
+        `parse_arm_spec` expects for a positional ARM argument.
+
+    Raises:
+        ValueError: if `arms` is empty or `slices` < 1.
+    """
+    if not arms:
+        raise ValueError("--arm must be given at least once when using --run-id")
+    if slices < 1:
+        raise ValueError("--slices must be >= 1")
+    bases = [f"{run_id}_s{i}" for i in range(slices)] if slices > 1 else [run_id]
+    specs = []
+    for arm in arms:
+        parts = [f"{b}_{tag}_{arm}_rep{rep}" if tag else f"{b}_{arm}_rep{rep}" for b in bases]
+        specs.append(",".join(parts) + f":{arm}")
+    return specs
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("arms", nargs="+",
-                    help="2+ run-id prefixes, each `run_id_prefix[:label]`")
+    ap.add_argument("arms", nargs="*",
+                    help="2+ run-id prefixes, each `run_id_prefix[:label]` (can be combined "
+                         "with --run-id/--tag/--arm structured specs)")
     ap.add_argument("--results-dir", default=RESULTS_DIR)
     ap.add_argument("--shapes", default=None,
                     help="JSON file mapping {task_id: shape_name} for a per-shape breakdown")
     ap.add_argument("--i-know-the-data-is-suspect", action="store_true", dest="override",
                     help="print comparisons even if the mandatory sanity block refuses")
+    ap.add_argument("--exact", action="store_true",
+                    help="anchor run-id matching to a terminating _rep<N> component so a "
+                         "shorter arm name (e.g. good_adaptive) cannot match a longer one that "
+                         "has it as a string prefix (e.g. good_adaptive_breadth). Off by "
+                         "default for backward compatibility with existing invocations.")
+    ap.add_argument("--run-id", default=None,
+                    help="base run-id for structured selection; combine with --tag/--arm/"
+                         "--rep/--slices instead of hand-building a prefix")
+    ap.add_argument("--tag", default=None,
+                    help="axis tag component for structured selection, e.g. q7")
+    ap.add_argument("--arm", action="append", default=[], dest="arm_names",
+                    help="arm name for structured selection; repeat to compare multiple arms "
+                         "(e.g. --arm good_adaptive --arm good_adaptive_breadth)")
+    ap.add_argument("--rep", type=int, default=1,
+                    help="rep number for structured selection (default 1)")
+    ap.add_argument("--slices", type=int, default=1,
+                    help="slice count for structured selection; addresses the N run-ids an "
+                         "axis_queue_runner.py --slices N shard produces as one logical arm "
+                         "per --arm (default 1 = unsliced)")
     args = ap.parse_args(argv)
+
+    arm_args = list(args.arms)
+    if args.run_id:
+        try:
+            arm_args += build_structured_specs(args.run_id, args.tag, args.arm_names,
+                                               args.rep, args.slices)
+        except ValueError as e:
+            ap.error(str(e))
+    elif args.arm_names or args.tag or args.rep != 1 or args.slices != 1:
+        ap.error("--tag/--arm/--rep/--slices require --run-id")
+    args.arms = arm_args
 
     if len(args.arms) < 2:
         ap.error("need at least 2 arms to compare")
@@ -415,7 +558,7 @@ def main(argv=None):
 
     arms = []
     for rid, label in specs:
-        rows, unreadable = load_arm(rid, args.results_dir)
+        rows, unreadable = load_arm(rid, args.results_dir, exact=args.exact)
         arms.append((label, rows, unreadable))
 
     try:

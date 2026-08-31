@@ -1,0 +1,1 @@
+These dated one-off analyzers were superseded by `scripts/compare_arms.py` (2026-08-25, generic N-way arm comparison) and are kept only to reproduce the exact numbers cited in their dated handoff docs.

@@ -1,0 +1,26 @@
+[
+ {
+  "run_id": "lad3_sr",
+  "axis": "phase0_local",
+  "tasks": "130,072,059",
+  "arms": "good_adaptive",
+  "variant": "sequential_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "lad3_sx",
+  "axis": "phase0_local",
+  "tasks": "130,072,059",
+  "arms": "good_adaptive",
+  "variant": "sequential_react_extract",
+  "jobs": 1
+ },
+ {
+  "run_id": "lad3_el",
+  "axis": "phase0_local",
+  "tasks": "130,072,059",
+  "arms": "good_adaptive",
+  "variant": "evidence_loop",
+  "jobs": 1
+ }
+]

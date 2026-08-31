@@ -1,0 +1,34 @@
+[
+ {
+  "run_id": "cross1_el",
+  "axis": "capspec_local",
+  "tasks": "040,108,047,042,052,041,072,078,081,070,046,071,130,132,144,059,140,122,125,073",
+  "arms": "good_adaptive",
+  "variant": "evidence_loop",
+  "jobs": 1
+ },
+ {
+  "run_id": "cross1_sr",
+  "axis": "capspec_local",
+  "tasks": "040,108,047,042,052,041,072,078,081,070,046,071,130,132,144,059,140,122,125,073",
+  "arms": "good_adaptive",
+  "variant": "sequential_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "cross2_el",
+  "axis": "capspec_local",
+  "tasks": "040,108,047,042,052,041,072,078,081,070,046,071,130,132,144,059,140,122,125,073",
+  "arms": "good_adaptive",
+  "variant": "evidence_loop",
+  "jobs": 1
+ },
+ {
+  "run_id": "cross2_sr",
+  "axis": "capspec_local",
+  "tasks": "040,108,047,042,052,041,072,078,081,070,046,071,130,132,144,059,140,122,125,073",
+  "arms": "good_adaptive",
+  "variant": "sequential_react",
+  "jobs": 1
+ }
+]

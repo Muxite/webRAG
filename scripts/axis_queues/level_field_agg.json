@@ -1,0 +1,34 @@
+[
+ {
+  "run_id": "lvl_el",
+  "axis": "phase0_local",
+  "tasks": "041,042,052,059,060,062,067,068,070,071,072,073,075,078,079,081,082,084,090,091,094",
+  "arms": "good_adaptive",
+  "variant": "evidence_loop",
+  "jobs": 1
+ },
+ {
+  "run_id": "lvl_sr",
+  "axis": "phase0_local",
+  "tasks": "041,042,052,059,060,062,067,068,070,071,072,073,075,078,079,081,082,084,090,091,094",
+  "arms": "good_adaptive",
+  "variant": "sequential_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "lvl_lg",
+  "axis": "phase0_local",
+  "tasks": "041,042,052,059,060,062,067,068,070,071,072,073,075,078,079,081,082,084,090,091,094",
+  "arms": "good_adaptive",
+  "variant": "langgraph_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "lvl_g",
+  "axis": "phase0_local",
+  "tasks": "041,042,052,059,060,062,067,068,070,071,072,073,075,078,079,081,082,084,090,091,094",
+  "arms": "good_adaptive",
+  "variant": "graph",
+  "jobs": 1
+ }
+]

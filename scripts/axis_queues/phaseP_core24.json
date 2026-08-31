@@ -1,0 +1,4 @@
+[
+  {"run_id": "phaseP_c24", "axis": "phase0_local", "task_set": "core24",
+   "arms": "good_adaptive", "variant": "graph", "jobs": 1}
+]

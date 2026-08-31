@@ -1,0 +1,66 @@
+[
+ {
+  "run_id": "bfx_r5",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "bfx_r6",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "bfx_r7",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "bfx_r8",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "bfx_r9",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "bfx_r10",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "bfx_r11",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "bfx_r12",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ }
+]

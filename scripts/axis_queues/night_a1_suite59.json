@@ -1,0 +1,26 @@
+[
+ {
+  "run_id": "night_a1_g",
+  "axis": "phase0_local",
+  "task_set": "suite59",
+  "arms": "good_adaptive",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "night_a1_sr",
+  "axis": "phase0_local",
+  "task_set": "suite59",
+  "arms": "good_adaptive",
+  "variant": "sequential_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "night_a1_lg",
+  "axis": "phase0_local",
+  "task_set": "suite59",
+  "arms": "good_adaptive",
+  "variant": "langgraph_react",
+  "jobs": 1
+ }
+]

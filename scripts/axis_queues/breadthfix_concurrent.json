@@ -1,0 +1,5 @@
+[
+  {"run_id": "breadthfix2", "axis": "phase0_local",
+   "tasks": "152,154,155,156", "reps": 3,
+   "arms": "good_adaptive,good_adaptive_breadth", "variant": "graph", "jobs": 1}
+]

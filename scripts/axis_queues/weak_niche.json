@@ -1,0 +1,18 @@
+[
+ {
+  "run_id": "wk2_el",
+  "axis": "capspec_local",
+  "tasks": "122,130,134,141,152,154,156,041,059,072",
+  "arms": "good_adaptive",
+  "variant": "evidence_loop",
+  "jobs": 1
+ },
+ {
+  "run_id": "wk2_sr",
+  "axis": "capspec_local",
+  "tasks": "122,130,134,141,152,154,156,041,059,072",
+  "arms": "good_adaptive",
+  "variant": "sequential_react",
+  "jobs": 1
+ }
+]

@@ -256,6 +256,118 @@ def test_main_three_way_produces_three_pairs(tmp_path, capsys):
     assert out.count("---") >= 3 * 2  # each of the 3 pairs opens a "--- X vs Y ---" block
 
 
+# ---------------------------------------------------------------------------
+# --exact
+# ---------------------------------------------------------------------------
+
+def test_exact_prevents_shorter_arm_matching_longer_one(tmp_path):
+    # the real bug: "good_adaptive" is a string prefix of "good_adaptive_breadth", so the
+    # loose glob for the former also picks up the latter's files.
+    _write_cell(tmp_path, "bfx_r1_q7_good_adaptive", 1, "100", score=0.8)
+    _write_cell(tmp_path, "bfx_r1_q7_good_adaptive_breadth", 1, "100", score=0.2)
+
+    loose, _ = ca.load_arm("bfx_r1_q7_good_adaptive", results_dir=str(tmp_path))
+    assert len(loose) == 2  # demonstrates the bug: both cells match
+
+    exact, _ = ca.load_arm("bfx_r1_q7_good_adaptive_rep1", results_dir=str(tmp_path),
+                           exact=True)
+    assert len(exact) == 1
+    assert exact[0]["score"] == 0.8
+
+
+def test_exact_rep_number_boundary_not_confused(tmp_path):
+    # "_rep1" must not match "_rep10"
+    _write_cell(tmp_path, "run", 1, "100", score=0.9)
+    _write_cell(tmp_path, "run", 10, "100", score=0.1)
+    rows, _ = ca.load_arm("run_rep1", results_dir=str(tmp_path), exact=True)
+    assert len(rows) == 1
+    assert rows[0]["score"] == 0.9
+
+
+def test_exact_prefix_without_rep_suffix_anchors_on_rep_marker(tmp_path):
+    _write_cell(tmp_path, "run", 1, "100", score=0.9)
+    _write_cell(tmp_path, "run_breadth", 1, "100", score=0.1)
+    rows, _ = ca.load_arm("run", results_dir=str(tmp_path), exact=True)
+    assert len(rows) == 1
+    assert rows[0]["score"] == 0.9
+
+
+def test_default_exact_off_preserves_backward_compatible_overmatch(tmp_path):
+    # documents current (loose) default behavior is unchanged
+    _write_cell(tmp_path, "bfx_r1_q7_good_adaptive", 1, "100", score=0.8)
+    _write_cell(tmp_path, "bfx_r1_q7_good_adaptive_breadth", 1, "100", score=0.2)
+    rows, _ = ca.load_arm("bfx_r1_q7_good_adaptive", results_dir=str(tmp_path))
+    assert len(rows) == 2
+
+
+# ---------------------------------------------------------------------------
+# comma-joined run-ids (slice merging)
+# ---------------------------------------------------------------------------
+
+def test_load_arm_accepts_comma_joined_run_ids(tmp_path):
+    _write_cell(tmp_path, "run_s0", 1, "100", score=0.8)
+    _write_cell(tmp_path, "run_s1", 1, "101", score=0.6)
+    rows, _ = ca.load_arm("run_s0,run_s1", results_dir=str(tmp_path))
+    assert len(rows) == 2
+    assert {r["test_id"] for r in rows} == {"100", "101"}
+
+
+# ---------------------------------------------------------------------------
+# build_structured_specs
+# ---------------------------------------------------------------------------
+
+def test_build_structured_specs_single_slice():
+    specs = ca.build_structured_specs("bfx_r1", "q7", ["good_adaptive"], 1, 1)
+    assert specs == ["bfx_r1_q7_good_adaptive_rep1:good_adaptive"]
+
+
+def test_build_structured_specs_multi_slice_comma_joins():
+    specs = ca.build_structured_specs("bfx_r1", "q7", ["good_adaptive"], 1, 4)
+    assert specs == [
+        "bfx_r1_s0_q7_good_adaptive_rep1,bfx_r1_s1_q7_good_adaptive_rep1,"
+        "bfx_r1_s2_q7_good_adaptive_rep1,bfx_r1_s3_q7_good_adaptive_rep1:good_adaptive"
+    ]
+
+
+def test_build_structured_specs_multi_arm():
+    specs = ca.build_structured_specs("bfx_r1", "q7",
+                                      ["good_adaptive", "good_adaptive_breadth"], 1, 1)
+    assert specs == [
+        "bfx_r1_q7_good_adaptive_rep1:good_adaptive",
+        "bfx_r1_q7_good_adaptive_breadth_rep1:good_adaptive_breadth",
+    ]
+
+
+def test_build_structured_specs_requires_arms():
+    try:
+        ca.build_structured_specs("bfx_r1", "q7", [], 1, 1)
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_main_structured_selection_end_to_end(tmp_path, capsys):
+    for s in range(2):
+        _write_cell(tmp_path, f"bfx_x_s{s}_q7_good_adaptive", 1, f"{100 + s}",
+                    score=0.9, searches_ok=3, visits=2)
+        _write_cell(tmp_path, f"bfx_x_s{s}_q7_good_adaptive_breadth", 1, f"{100 + s}",
+                    score=0.3, searches_ok=3, visits=2)
+    rc = ca.main(["--run-id", "bfx_x", "--tag", "q7", "--arm", "good_adaptive",
+                 "--arm", "good_adaptive_breadth", "--slices", "2", "--exact",
+                 "--results-dir", str(tmp_path)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "good_adaptive vs good_adaptive_breadth" in out
+
+
+def test_main_structured_selection_requires_run_id():
+    try:
+        ca.main(["--arm", "good_adaptive"])
+        assert False, "expected SystemExit"
+    except SystemExit as e:
+        assert e.code != 0
+
+
 def test_per_shape_breakdown_reports_unmapped_tasks(tmp_path, capsys):
     for r in range(1, 3):
         _write_cell(tmp_path, "armA", r, "100", score=0.9, searches_ok=3, visits=2)

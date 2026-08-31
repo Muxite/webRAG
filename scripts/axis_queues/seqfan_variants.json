@@ -1,0 +1,50 @@
+[
+ {
+  "run_id": "seqfan_g_r1",
+  "axis": "phase0_local",
+  "tasks": "161,162,163,164",
+  "arms": "good_adaptive",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "seqfan_sr_r1",
+  "axis": "phase0_local",
+  "tasks": "161,162,163,164",
+  "arms": "good_adaptive",
+  "variant": "sequential_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "seqfan_lg_r1",
+  "axis": "phase0_local",
+  "tasks": "161,162,163,164",
+  "arms": "good_adaptive",
+  "variant": "langgraph_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "seqfan_g_r2",
+  "axis": "phase0_local",
+  "tasks": "161,162,163,164",
+  "arms": "good_adaptive",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "seqfan_sr_r2",
+  "axis": "phase0_local",
+  "tasks": "161,162,163,164",
+  "arms": "good_adaptive",
+  "variant": "sequential_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "seqfan_lg_r2",
+  "axis": "phase0_local",
+  "tasks": "161,162,163,164",
+  "arms": "good_adaptive",
+  "variant": "langgraph_react",
+  "jobs": 1
+ }
+]

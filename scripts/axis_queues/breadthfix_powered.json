@@ -1,0 +1,10 @@
+[
+  {"run_id": "bfx_r1", "axis": "phase0_local", "tasks": "152,154,155,156",
+   "arms": "good_adaptive,good_adaptive_breadth", "variant": "graph", "jobs": 1},
+  {"run_id": "bfx_r2", "axis": "phase0_local", "tasks": "152,154,155,156",
+   "arms": "good_adaptive,good_adaptive_breadth", "variant": "graph", "jobs": 1},
+  {"run_id": "bfx_r3", "axis": "phase0_local", "tasks": "152,154,155,156",
+   "arms": "good_adaptive,good_adaptive_breadth", "variant": "graph", "jobs": 1},
+  {"run_id": "bfx_r4", "axis": "phase0_local", "tasks": "152,154,155,156",
+   "arms": "good_adaptive,good_adaptive_breadth", "variant": "graph", "jobs": 1}
+]

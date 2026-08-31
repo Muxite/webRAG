@@ -108,6 +108,31 @@ TASK_SETS = {
 TASK_SETS["suite59"] = [t for t in TASK_SETS["suite50"] if t != "024"] + [
     "052", "071", "078", "079", "081", "082", "084", "085", "091", "094",
 ]
+# core_long24 (2026-08-28 curation cycle): a discrimination- and length-vetted replacement CORE
+# for A/B work, sized to be re-run at 5 reps rather than suite59's 1. Selected from
+# scripts/task_discrimination.py's suite59 scan: every id below is DISCRIMINATING with OK
+# confidence, none is weight=="short" (the lean-overlay cap in
+# idea_test_runner.py::_apply_lean_overlay is a per-variant confound that only 049/044 in suite59
+# carry, and both are excluded here), and the set is chosen to skew toward the longest-running,
+# highest score_sd shapes in the pool rather than a contiguous or historically-inherited slice.
+# 20 shape tasks spanning chain/conflicting-source/aggregation/count-threshold/AND-filter/
+# distractor-resistance/navigation(near-floor)/disambiguation/survivor/computed-ranking, plus the
+# 4-member N=4/8/16/32 nested-roster sweep family (165-168) as the controlled breadth-scaling arm.
+TASK_SETS["core_long24"] = [
+    "040", "108", "047",                # chain (incl. wikirace, the hardest/near-floor chain)
+    "042",                               # conflicting-source (longest-running task in suite59)
+    "052", "041",                        # aggregation / wide-breadth fan-out
+    "072", "078",                        # count-with-threshold
+    "081",                                # two-constraint numeric AND-filter
+    "070",                                # bounded subset-sum with an aggregate distractor
+    "046",                                # navigation link-following, hardest genuinely-scored (64% floor)
+    "071",                                # closest-to-reference argmin
+    "130", "132", "144", "059",           # conflicting-source-reconciliation / computed-ratio argmax
+    "140",                                # under-grounded re-expansion trigger (disambiguation)
+    "122", "125",                         # branch-to-eliminate survivor (core24 anchors, high-n)
+    "073",                                # temporal range filter / count
+    "165", "166", "167", "168",           # N-sweep: N=4/8/16/32 nested-prefix roster, same template
+]
 TASKS = TASK_SETS["smoke8"]  # default; overridden by --task-set / --tasks
 
 
@@ -205,6 +230,13 @@ def cell_env(cell):
         env["IDEA_TEST_JSON_TELEMETRY"] = "1"
     env["CHROMA_MODE"] = RUN_CFG["chroma_mode"]
     env["CHROMA_EMBED_DEVICE"] = RUN_CFG["embed_device"]
+    # The embedding model is already in the local HF cache, but every cell re-resolves it over the
+    # network first -- ~18 unauthenticated HEAD requests on the startup critical path, multiplied
+    # by the slice count under concurrent runs. It is also an unmonitored external dependency in a
+    # benchmark that is otherwise hermetic, which is the failure class search_infra_healthy() exists
+    # to prevent.
+    env["HF_HUB_OFFLINE"] = "1"
+    env["TRANSFORMERS_OFFLINE"] = "1"
     if RUN_CFG["chroma_mode"] == "embedded":
         env["CHROMA_EMBEDDED_PATH"] = cell_db_path(cell)
     for k, v in (cell.get("burn") or {}).items():

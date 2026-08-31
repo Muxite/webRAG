@@ -1,0 +1,34 @@
+[
+ {
+  "run_id": "weak_lg",
+  "axis": "capspec_local",
+  "tasks": "122,130,134,141,152,154,156,041,059,072",
+  "arms": "good_adaptive",
+  "variant": "langgraph_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "weak_sr",
+  "axis": "capspec_local",
+  "tasks": "122,130,134,141,152,154,156,041,059,072",
+  "arms": "good_adaptive",
+  "variant": "sequential_react",
+  "jobs": 1
+ },
+ {
+  "run_id": "weak_el",
+  "axis": "capspec_local",
+  "tasks": "122,130,134,141,152,154,156,041,059,072",
+  "arms": "good_adaptive",
+  "variant": "evidence_loop",
+  "jobs": 1
+ },
+ {
+  "run_id": "weak_g",
+  "axis": "capspec_local",
+  "tasks": "122,130,134,141,152,154,156,041,059,072",
+  "arms": "good_adaptive",
+  "variant": "graph",
+  "jobs": 1
+ }
+]

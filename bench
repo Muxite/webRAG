@@ -1,0 +1,33 @@
+#!/bin/sh
+# bench -- shim for `PYTHONPATH=.:services:agent ./.venv/bin/python scripts/<name>.py ...`.
+# Usage: ./bench <script-name> [args...]   (name with or without .py)
+#        ./bench [--list|-h]               (list available scripts)
+set -eu
+
+self_dir=$(cd "$(dirname "$0")" && pwd)
+scripts_dir="$self_dir/scripts"
+venv_python="$self_dir/.venv/bin/python"
+
+if [ "$#" -eq 0 ] || [ "$1" = "--list" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    echo "Usage: ./bench <script-name> [args...]"
+    echo "Available scripts:"
+    ls "$scripts_dir"/*.py | xargs -n1 basename | sed 's/\.py$//' | sed 's/^/  /'
+    exit 0
+fi
+
+name="$1"; shift
+case "$name" in
+    *.py) script="$scripts_dir/$name" ;;
+    *) script="$scripts_dir/$name.py" ;;
+esac
+
+if [ ! -x "$venv_python" ] && [ ! -f "$venv_python" ]; then
+    echo "bench: no venv python at $venv_python" >&2
+    exit 1
+fi
+if [ ! -f "$script" ]; then
+    echo "bench: no such script: $script" >&2
+    exit 1
+fi
+
+PYTHONPATH="$self_dir:$self_dir/services:$self_dir/agent" exec "$venv_python" "$script" "$@"

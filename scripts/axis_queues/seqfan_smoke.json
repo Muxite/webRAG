@@ -1,0 +1,4 @@
+[
+  {"run_id": "seqfan_smoke", "axis": "phase0_local", "tasks": "161,162,163,164",
+   "arms": "good_adaptive", "variant": "graph", "jobs": 1}
+]

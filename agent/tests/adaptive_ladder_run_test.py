@@ -334,3 +334,12 @@ def test_the_repo_root_and_cell_interpreter_are_env_overridable():
     # The cell subprocess must launch CELL_PYTHON, not the hard-coded host venv path.
     assert "CELL_PYTHON, \"-m\", \"agent.app.idea_test_runner\"" in src
     assert "/.venv/bin/python\", \"-m\"" not in src
+
+
+def test_cell_env_pins_huggingface_offline(monkeypatch, tmp_path):
+    # The embedding model is cached locally; re-resolving it over the network put ~18 HEAD
+    # requests on every cell's startup path and made a hermetic benchmark depend on hf.co.
+    monkeypatch.setitem(ladder.RUN_CFG, "embedded_root", str(tmp_path))
+    env = ladder.cell_env(_local_cell())
+    assert env["HF_HUB_OFFLINE"] == "1"
+    assert env["TRANSFORMERS_OFFLINE"] == "1"

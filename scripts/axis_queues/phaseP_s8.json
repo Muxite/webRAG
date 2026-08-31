@@ -1,0 +1,18 @@
+[
+ {
+  "run_id": "phaseP_s8_r1",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ },
+ {
+  "run_id": "phaseP_s8_r2",
+  "axis": "phase0_local",
+  "tasks": "152,154,155,156",
+  "arms": "good_adaptive,good_adaptive_breadth",
+  "variant": "graph",
+  "jobs": 1
+ }
+]
