@@ -230,9 +230,12 @@ def get_compiled_plan() -> Dict[str, Any]:
             {
                 "id": "reconcile",
                 "action": "verify",
+                # No "optional_url": VerifyLeafAction auto-fetches any such field before its LLM
+                # call, which would silently ground this reconcile step off the authoritative
+                # page directly -- regardless of whether the "metro"/"city_proper" visit leaves
+                # ever found it -- defeating the narrow-golden-path design (2026-08-31 leak fix).
                 "details": {
                     "claim": "Toronto's population is about 6.2 million.",
-                    "optional_url": AUTHORITATIVE_URL,
                 },
                 "instruction": (
                     "Reconcile the two figures using this rule: the question asks for the "

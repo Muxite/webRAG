@@ -235,9 +235,12 @@ def get_compiled_plan() -> Dict[str, Any]:
             {
                 "id": "reconcile",
                 "action": "verify",
+                # No "optional_url": VerifyLeafAction auto-fetches any such field before its LLM
+                # call, which would silently ground this reconcile step off the authoritative
+                # page directly -- regardless of whether the "preliminary"/"refined" visit leaves
+                # ever found it -- defeating the narrow-golden-path design (2026-08-31 leak fix).
                 "details": {
                     "claim": "Pluto's diameter is about 2,370 km (the first value announced).",
-                    "optional_url": AUTHORITATIVE_URL,
                 },
                 "instruction": (
                     "Reconcile the two figures using this rule: the REFINED FINAL measurement "

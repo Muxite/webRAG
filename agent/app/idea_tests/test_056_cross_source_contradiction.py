@@ -234,9 +234,13 @@ def get_compiled_plan() -> Dict[str, Any]:
             {
                 "id": "verify_popular",
                 "action": "verify",
+                # No "optional_url": VerifyLeafAction auto-fetches any such field before its LLM
+                # call, which would silently ground this reconcile step off the authoritative
+                # page directly -- regardless of whether the "current_height"/"previous_height"
+                # visit leaves ever found it -- defeating the narrow-golden-path design
+                # (2026-08-31 leak fix).
                 "details": {
                     "claim": "The official height of Mount Everest is 8,848 metres (29,029 feet).",
-                    "optional_url": AUTHORITATIVE_URL,
                 },
                 "instruction": (
                     "Fact-check this commonly-cited CLAIM against the evidence already gathered: "

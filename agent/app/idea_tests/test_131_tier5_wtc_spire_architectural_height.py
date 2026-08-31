@@ -235,9 +235,12 @@ def get_compiled_plan() -> Dict[str, Any]:
             {
                 "id": "reconcile",
                 "action": "verify",
+                # No "optional_url": VerifyLeafAction auto-fetches any such field before its LLM
+                # call, which would silently ground this reconcile step off the authoritative
+                # page directly -- regardless of whether the "roof"/"architectural" visit leaves
+                # ever found it -- defeating the narrow-golden-path design (2026-08-31 leak fix).
                 "details": {
                     "claim": "One World Trade Center is 1,368 ft (417 m) tall.",
-                    "optional_url": AUTHORITATIVE_URL,
                 },
                 "instruction": (
                     "Reconcile the two figures using this rule: the OFFICIAL CTBUH architectural "
