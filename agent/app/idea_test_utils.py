@@ -180,6 +180,58 @@ def build_visit_link_graph(result: Dict[str, Any]):
     return link_map, visited_order
 
 
+def visited_url_set(result: Dict[str, Any], observability: Optional[Dict[str, Any]] = None) -> set:
+    """Arm-symmetric set of normalized URLs the agent actually, successfully visited.
+
+    Sourced from :func:`visited_evidence`, which every execution arm populates identically
+    (via ``telemetry.documents_seen`` -> ``observability['evidence']['visited']``, with the
+    graph walk as a same-arm fallback). Use this instead of reading
+    ``build_visit_link_graph``'s ``visited_order`` directly whenever a task keystone needs
+    "was page X visited" and must stay satisfiable by ``sequential_react``, ``graph_compiled``
+    and ``langgraph_react``, not just the graph/``naive_discretion`` arms.
+
+    :param result: Test result payload.
+    :param observability: Observability payload; carries ``evidence`` when injected by the runner.
+    :return: Set of normalized visited URLs.
+    """
+    return {normalize_url(e["url"]) for e in visited_evidence(result, observability) if e.get("url")}
+
+
+def visit_adjacency_map(result: Dict[str, Any], observability: Optional[Dict[str, Any]] = None) -> Dict[str, set]:
+    """Arm-symmetric per-page outgoing-link map: ``{normalized_from_url: {normalized_to_url, ...}}``.
+
+    ``build_visit_link_graph`` reconstructs adjacency exclusively from ``result["graph"]["nodes"]``,
+    which -- per :func:`visited_evidence`'s docstring -- is populated ONLY by the ``graph`` /
+    ``naive_discretion`` arms; ``sequential_react``, ``graph_compiled`` and ``langgraph_react``
+    always return the empty graph. A hop-adjacency keystone (e.g. "did page A really link to page
+    B") built directly on ``build_visit_link_graph`` therefore scores a STRUCTURAL 0 for those
+    three arms regardless of what they actually visited -- an arm-comparison artifact, not a
+    capability difference (found live in tasks 046/047's navigation/wiki-race keystones).
+
+    This merges that graph-derived map (richer: sees the real, uncapped ``links_full`` anchor
+    list) with a content-derived fallback -- URLs appearing verbatim in each visited page's own
+    fetched TEXT, read via :func:`visited_evidence` (populated identically by every arm). The
+    fallback is strictly weaker evidence (a page can link somewhere without echoing the raw URL
+    in its visible text, and vice versa a URL could appear in unrelated boilerplate) but it is the
+    only signal non-graph arms can offer, and it never fabricates an adjacency for a page that
+    was not genuinely visited: an entry only exists here when :func:`visited_evidence` reports it.
+
+    :param result: Test result payload (carries the ``graph`` fallback).
+    :param observability: Observability payload; carries ``evidence`` when injected by the runner.
+    :return: ``{normalized_from_url: set(normalized_to_url)}``.
+    """
+    link_map, _ = build_visit_link_graph(result)
+    merged: Dict[str, set] = {k: set(v) for k, v in link_map.items()}
+    for entry in visited_evidence(result, observability):
+        url = normalize_url(entry.get("url") or "")
+        if not url:
+            continue
+        found = {normalize_url(u) for u in re.findall(r"https?://[^\s)\"'\\\]<>]+", entry.get("content") or "")}
+        if found:
+            merged.setdefault(url, set()).update(found)
+    return merged
+
+
 def waypoint_evidence_ok(waypoint: Dict[str, Any], visited: list) -> bool:
     """True if some genuinely visited page (an entry from :func:`visited_evidence`) supports
     this waypoint on its own: the page's URL matches the waypoint's ``slug_rx``, or the page's

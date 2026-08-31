@@ -275,9 +275,12 @@ def get_compiled_plan() -> Dict[str, Any]:
             {
                 "id": "reconcile",
                 "action": "verify",
+                # No "optional_url": VerifyLeafAction auto-fetches any such field before its LLM
+                # call, which would silently ground this reconcile step off the authoritative
+                # page directly -- regardless of whether the "former"/"current" visit leaves ever
+                # found it -- defeating the narrow-golden-path design (2026-08-31 leak fix).
                 "details": {
                     "claim": "Ty Cobb is the all-time MLB career batting-average leader, at .367.",
-                    "optional_url": AUTHORITATIVE_URL,
                 },
                 "instruction": (
                     "Reconcile the two answers using this rule: MLB's 2024 incorporation of Negro "

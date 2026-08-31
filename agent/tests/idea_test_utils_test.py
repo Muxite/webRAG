@@ -17,6 +17,8 @@ from agent.app.idea_test_utils import (
     visited_evidence,
     waypoint_evidence_ok,
     waypoint_chain_coverage,
+    visit_adjacency_map,
+    visited_url_set,
 )
 
 
@@ -183,3 +185,70 @@ def test_real_corpus_off_topic_single_visit_does_not_credit_the_named_waypoint()
     result = waypoint_chain_coverage(_GAUDI_CHAIN, {}, observability, confused_answer)
     assert result["score"] == 0.0
     assert result["passed"] is False
+
+
+# ---------------------------------------------------------------------------------------------
+# visit_adjacency_map / visited_url_set (2026-08-31 arm-symmetry fix)
+#
+# ``build_visit_link_graph`` reads exclusively from ``result["graph"]["nodes"]``, which per
+# ``visited_evidence``'s own docstring is populated ONLY by the ``graph``/``naive_discretion``
+# arms -- ``sequential_react``, ``graph_compiled`` and ``langgraph_react`` always return
+# ``_empty_graph()``. Any task validator built directly on ``build_visit_link_graph`` (e.g. the
+# navigation/wiki-race keystones in tasks 046/047) therefore scores a STRUCTURAL 0 for those
+# three arms regardless of what they actually visited: an arm-comparison artifact, not a
+# capability difference. ``visit_adjacency_map``/``visited_url_set`` fix this by additionally
+# reading ``visited_evidence()`` (populated identically by every arm via
+# ``telemetry.documents_seen``), which recovers "was this page visited" and "does its fetched
+# text literally contain this URL" for the arms the graph-only path cannot see.
+# ---------------------------------------------------------------------------------------------
+
+_PIZZA = "https://en.wikipedia.org/wiki/Pizza"
+_ITALY = "https://en.wikipedia.org/wiki/Italy"
+_ROME = "https://en.wikipedia.org/wiki/Roman_Empire"
+
+
+def test_visited_url_set_reads_graph_only_arm():
+    r = {"graph": {"nodes": {"0": {"details": {"action_result": {
+        "action": "visit", "success": True, "url": _PIZZA, "urls_visited": [_PIZZA],
+    }}}}}}
+    assert visited_url_set(r, {}) == {"en.wikipedia.org/wiki/pizza"}
+
+
+def test_visited_url_set_reads_non_graph_arm_via_observability_evidence():
+    """A sequential_react/langgraph_react-style run: result['graph'] is the empty-graph
+    placeholder, but observability['evidence']['visited'] carries the real visit record."""
+    r = {"graph": {"nodes": {}}}
+    obs = {"evidence": {"visited": [{"url": _PIZZA, "content": "Pizza is a dish."}]}}
+    assert visited_url_set(r, obs) == {"en.wikipedia.org/wiki/pizza"}
+
+
+def test_visit_adjacency_map_graph_arm_uses_links_full():
+    r = {"graph": {"nodes": {"0": {"details": {"action_result": {
+        "action": "visit", "success": True, "url": _PIZZA, "urls_visited": [_PIZZA],
+        "links_full": [_ITALY],
+    }}}}}}
+    adj = visit_adjacency_map(r, {})
+    assert "en.wikipedia.org/wiki/italy" in adj["en.wikipedia.org/wiki/pizza"]
+
+
+def test_visit_adjacency_map_non_graph_arm_recovers_adjacency_from_fetched_text():
+    """The graph-only path sees nothing here (empty graph). A non-graph arm that genuinely
+    visited Pizza and whose fetched page text contains the raw Italy URL must still verify
+    the Pizza -> Italy hop, or the keystone is unsatisfiable by 3 of 4 execution arms."""
+    r = {"graph": {"nodes": {}}}
+    obs = {"evidence": {"visited": [
+        {"url": _PIZZA, "content": f"Pizza is associated with Italian cuisine. See {_ITALY} for more."},
+        {"url": _ITALY, "content": f"Italy was part of the {_ROME} for a long time."},
+    ]}}
+    adj = visit_adjacency_map(r, obs)
+    assert "en.wikipedia.org/wiki/italy" in adj["en.wikipedia.org/wiki/pizza"]
+    assert "en.wikipedia.org/wiki/roman_empire" in adj["en.wikipedia.org/wiki/italy"]
+
+
+def test_visit_adjacency_map_does_not_fabricate_adjacency_for_unvisited_pages():
+    """A hallucinated chain with NO real visited evidence anywhere (graph empty, no
+    observability evidence) must stay unverifiable -- the arm-symmetry fix only recovers
+    adjacency actually present in genuinely fetched content, it never invents any."""
+    r = {"graph": {"nodes": {}}}
+    adj = visit_adjacency_map(r, {})
+    assert adj == {}

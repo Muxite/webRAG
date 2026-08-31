@@ -74,7 +74,9 @@ def lint_file(path: str) -> List[str]:
         findings.append("[LLM]  get_llm_validation_function returns a judge")
 
     # --- [GATE] ---
-    uses_graph = bool(re.search(r"build_visit_link_graph|_hop_visited", src))
+    uses_graph = bool(re.search(
+        r"build_visit_link_graph|_hop_visited|visit_adjacency_map|visited_url_set", src,
+    ))
     gvf = _fn(tree, "get_validation_functions")
     val_names = re.findall(r"\b(validate_\w+)", _seg(gvf, src)) if gvf else []
     for vn in val_names:
@@ -88,9 +90,13 @@ def lint_file(path: str) -> List[str]:
         # are the shared per-waypoint grounding helpers the chain_coverage repair (2026-08-16)
         # factored the visit-evidence check into -- a validator that delegates to one of them is
         # grounded even though the grounding logic itself now lives outside this file's AST.
+        # `visit_adjacency_map`/`visited_url_set` (2026-08-31) are the arm-symmetric replacements
+        # for `build_visit_link_graph` (which reads exclusively from result["graph"], populated
+        # only by the graph/naive_discretion arms) -- also grounding helpers.
         grounds = bool(re.search(
             r"observability.*visit|\[.visit.\]|_hop_visited|build_visit_link_graph|"
-            r"waypoint_chain_coverage|waypoint_evidence_ok|visited_evidence",
+            r"waypoint_chain_coverage|waypoint_evidence_ok|visited_evidence|"
+            r"visit_adjacency_map|visited_url_set",
             vs,
         ))
         calls_ks = "_keystone_ok(" in vs

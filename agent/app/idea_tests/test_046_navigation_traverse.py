@@ -18,7 +18,9 @@ Chain (verified against live English Wikipedia, 2026-06):
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text, build_visit_link_graph, normalize_url
+from agent.app.idea_test_utils import (
+    extract_final_text, visit_adjacency_map, visited_url_set, normalize_url,
+)
 
 
 START_URL = "https://en.wikipedia.org/wiki/Apollo_11"
@@ -62,9 +64,12 @@ def get_success_criteria() -> List[str]:
     ]
 
 
-def _hop_visited(result: Dict[str, Any]) -> bool:
-    _, visited = build_visit_link_graph(result)
-    return normalize_url(HOP_URL) in visited
+def _hop_visited(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
+    # visited_url_set is arm-symmetric (sourced from visited_evidence, populated identically by
+    # every execution arm) -- unlike build_visit_link_graph's visited_order, which reads
+    # exclusively from result["graph"] and is therefore always empty for sequential_react,
+    # graph_compiled and langgraph_react (2026-08-31 arm-symmetry fix; see idea_test_utils.py).
+    return normalize_url(HOP_URL) in visited_url_set(result, observability)
 
 
 def _has_height(result: Dict[str, Any]) -> bool:
@@ -72,14 +77,14 @@ def _has_height(result: Dict[str, Any]) -> bool:
     return bool(re.search(r"\b363\b", low)) or bool(re.search(r"\b1(10|11)(\.\d+)?\s*m", low))
 
 
-def _keystone_ok(result: Dict[str, Any]) -> bool:
+def _keystone_ok(result: Dict[str, Any], observability: Dict[str, Any] = None) -> bool:
     # Grounded navigation: the destination page was actually opened AND its height fact reported.
-    return _hop_visited(result) and _has_height(result)
+    return _hop_visited(result, observability) and _has_height(result)
 
 
 def validate_keystone_target(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE: actually opened the Saturn V page AND reported its height fact. Hard 0/1."""
-    visited = _hop_visited(result)
+    visited = _hop_visited(result, observability)
     height = _has_height(result)
     passed = visited and height
     return {
@@ -92,14 +97,15 @@ def validate_keystone_target(result: Dict[str, Any], observability: Dict[str, An
 
 def validate_path_adjacency(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Verify the Apollo 11 -> Saturn V hyperlink was really followed. Short-circuits on keystone."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "path_adjacency", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> adjacency not credited"}
-    link_map, visited = build_visit_link_graph(result)
+    adj = visit_adjacency_map(result, observability)
+    visited = visited_url_set(result, observability)
     start = normalize_url(START_URL)
     hop = normalize_url(HOP_URL)
     start_visited = start in visited
-    adjacency = hop in link_map.get(start, set())
+    adjacency = hop in adj.get(start, set())
     hits = int(start_visited) + int(adjacency)
     return {
         "check": "path_adjacency",
@@ -111,7 +117,7 @@ def validate_path_adjacency(result: Dict[str, Any], observability: Dict[str, Any
 
 def validate_company(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Secondary: the first-stage contractor. Short-circuits when keystone absent."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "first_stage_company", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> company not credited"}
     named = bool(re.search(TARGET_COMPANY, extract_final_text(result).lower()))
@@ -125,7 +131,7 @@ def validate_company(result: Dict[str, Any], observability: Dict[str, Any]) -> D
 
 def validate_efficiency(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Good surfers are efficient. Reward a short path. Short-circuits on keystone."""
-    if not _keystone_ok(result):
+    if not _keystone_ok(result, observability):
         return {"check": "efficiency", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> efficiency not credited"}
     visits = observability.get("visit", {}).get("count", 0)

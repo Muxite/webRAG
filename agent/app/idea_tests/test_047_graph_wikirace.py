@@ -19,7 +19,7 @@ Canonical path (verified plausible against live English Wikipedia, 2026-06):
 
 from typing import Dict, Any, List
 import re
-from agent.app.idea_test_utils import extract_final_text, build_visit_link_graph, normalize_url
+from agent.app.idea_test_utils import extract_final_text, visit_adjacency_map, normalize_url
 
 
 START_URL = "https://en.wikipedia.org/wiki/Pizza"
@@ -73,13 +73,17 @@ def _reported_chain(result: Dict[str, Any]) -> List[str]:
     return chain
 
 
-def _verify(result: Dict[str, Any]):
+def _verify(result: Dict[str, Any], observability: Dict[str, Any] = None):
     """Return (ok, verified_adjacencies, total_pairs, hops, reason)."""
     chain = _reported_chain(result)
     start, target = normalize_url(START_URL), normalize_url(TARGET_URL)
     if len(chain) < 2 or chain[0] != start or chain[-1] != target:
         return False, 0, max(0, len(chain) - 1), max(0, len(chain) - 1), "chain must start at START and end at TARGET"
-    link_map, _ = build_visit_link_graph(result)
+    # visit_adjacency_map is arm-symmetric: it merges the graph-derived link map (only populated
+    # by the graph/naive_discretion arms) with a content-derived fallback sourced from
+    # visited_evidence (populated identically by every arm), so sequential_react/graph_compiled/
+    # langgraph_react are not structurally zeroed here (2026-08-31 arm-symmetry fix).
+    link_map = visit_adjacency_map(result, observability)
     total = len(chain) - 1
     verified = 0
     for a, b in zip(chain, chain[1:]):
@@ -91,7 +95,7 @@ def _verify(result: Dict[str, Any]):
 
 def validate_keystone_chain(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """KEYSTONE: a fully verified hyperlink chain from START to TARGET. Hard 0/1."""
-    ok, verified, total, hops, reason = _verify(result)
+    ok, verified, total, hops, reason = _verify(result, observability)
     return {
         "check": "keystone_verified_chain",
         "passed": ok,
@@ -102,7 +106,7 @@ def validate_keystone_chain(result: Dict[str, Any], observability: Dict[str, Any
 
 def validate_chain_progress(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Partial credit for fraction of hops verified. Short-circuits when keystone absent."""
-    ok, verified, total, hops, _ = _verify(result)
+    ok, verified, total, hops, _ = _verify(result, observability)
     if not ok:
         return {"check": "chain_progress", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> no fully verified chain"}
@@ -116,7 +120,7 @@ def validate_chain_progress(result: Dict[str, Any], observability: Dict[str, Any
 
 def validate_efficiency(result: Dict[str, Any], observability: Dict[str, Any]) -> Dict[str, Any]:
     """Shortest useful chain. Reward few hops. Short-circuits when keystone absent."""
-    ok, verified, total, hops, _ = _verify(result)
+    ok, verified, total, hops, _ = _verify(result, observability)
     if not ok:
         return {"check": "efficiency", "passed": False, "score": 0.0,
                 "reason": "Keystone absent -> efficiency not credited"}

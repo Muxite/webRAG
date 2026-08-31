@@ -138,3 +138,17 @@ def test_compiled_plan_leaks_nothing():
     blob = " ".join(str(l) for l in plan["leaves"]).lower() + " " + plan["aggregation"].lower()
     for leak in ("gibson", ".371", ".372"):
         assert leak not in blob, f"plan leaks {leak!r}"
+
+
+def test_compiled_plan_does_not_hand_the_reconcile_leaf_the_answer_url():
+    """The 'reconcile' verify leaf must not carry an 'optional_url'/'url' field: VerifyLeafAction
+    (agent/app/idea_policies/actions.py) auto-fetches any such field BEFORE the LLM call and
+    injects its content as evidence, which -- for this task -- IS the authoritative leaders-list
+    page that resolves the keystone. That silently grounds the reconcile step regardless of
+    whether the upstream 'former'/'current' visit leaves ever found the page themselves, defeating
+    the 'few reads, not breadth' design. The upstream leaves must remain the only source of
+    genuine navigation."""
+    plan = t.get_compiled_plan()
+    reconcile = next(leaf for leaf in plan["leaves"] if leaf["id"] == "reconcile")
+    assert "optional_url" not in reconcile.get("details", {})
+    assert "url" not in reconcile.get("details", {})
