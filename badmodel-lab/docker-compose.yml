@@ -17,7 +17,23 @@ services:
       - badmodel_ollama:/root/.ollama
     environment:
       OLLAMA_KEEP_ALIVE: "10m"        # keep a model resident between cells; swaps on demand
-      OLLAMA_MAX_LOADED_MODELS: "1"   # one subject at a time — 12 GB card, run serially
+      OLLAMA_MAX_LOADED_MODELS: "1"   # one subject at a time; a swap costs more than it saves
+      # Sized for the RTX 5070 Ti (15.5 GiB visible), which replaced an 11.6 GiB RTX 3060 on
+      # 2026-08-28. qwen2.5:7b is 4.4 GiB of weights; KV at 32k f16 is 56 KiB/token = 1.75 GiB
+      # per slot, so N=4 slots is ~12.4 GiB total — comfortable. Flash attention is what makes
+      # the fat prompt tail affordable (the workload is ~98% prefill, p99 21k tokens, and
+      # attention is quadratic), and it is also ollama's prerequisite for quantizing the KV
+      # cache. q8_0 halves KV, which is what lets qwen2.5:14b (192 KiB/token = 6.0 GiB at f16,
+      # over budget beside 9 GiB of weights) fit on the GPU at all instead of offloading.
+      OLLAMA_FLASH_ATTENTION: "true"
+      OLLAMA_KV_CACHE_TYPE: "q8_0"
+      # NOTE: ollama sizes the KV cache for NUM_PARALLEL sequences at load time, not on demand
+      # (the load log reads "4/4 seqs"), so this multiplies reserved KV even when one request is
+      # in flight. At 4 it costs qwen2.5:14b full GPU residency: 31/49 layers at 32k ctx,
+      # 47/49 at 16k. Kept at 1 so any model up to 14b stays fully offloaded; throughput comes
+      # from running several driver processes instead (axis_queue_runner --slices), which keeps
+      # ollama's queue non-empty without extra slots.
+      OLLAMA_NUM_PARALLEL: "1"
       # CRITICAL for the native (graph) engine: ollama's runtime default is 4096 tokens
       # regardless of a model's trained max (qwen2.5:7b supports 32768) — server logs showed
       # `n_ctx_slot = 4096` + active `context shift` (silent mid-prompt truncation, discarding
