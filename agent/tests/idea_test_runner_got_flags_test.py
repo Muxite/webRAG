@@ -9,7 +9,12 @@ default untouched. Pinned here for the confidence->action loop toggle
 """
 from __future__ import annotations
 
+import dataclasses as dc
+import json
 import logging
+from pathlib import Path
+
+from agent.app.idea_policies.config import validate_settings
 
 from agent.app.idea_test_runner import (
     _GOT_ARM_PROFILES,
@@ -688,11 +693,49 @@ def test_unknown_arm_warns_and_is_noop(caplog):
     assert any("Unknown IDEA_TEST_ARM" in rec.message for rec in caplog.records)
 
 
+def _shipped_settings_keys() -> set:
+    """Settings keys present in the shipped defaults file.
+
+    Prompt templates and strategy names (``expansion_system_prompt``,
+    ``merge_strategy``, ...) are consumed outside the typed dataclass layer, so they appear
+    here but never in :func:`_declared_settings_keys`.
+
+    :returns: Key names from ``agent/app/idea_dag_settings.json``.
+    :raises FileNotFoundError: If the shipped settings file is missing.
+    """
+    settings_path = Path(__file__).resolve().parents[1] / "app" / "idea_dag_settings.json"
+    return set(json.loads(settings_path.read_text()).keys())
+
+
+def _declared_settings_keys() -> set:
+    """Every JSON settings key the typed config layer can read.
+
+    ``_base()`` is a hand-maintained fixture and the shipped ``idea_dag_settings.json`` omits
+    dormant knobs, so neither is a complete authority. ``_build`` resolves a field to
+    ``_KEYS[field]`` (or ``json_key(field)`` where a group defines one, e.g. ``GoTConfig``'s
+    ``got_`` prefix), falling back to the bare field name -- deriving the key set the same way
+    makes this guard catch real typos instead of merely unfamiliar names.
+
+    :returns: Every settings key resolvable by some config group.
+    """
+    config = validate_settings({})
+    keys: set = set()
+    for group_field in dc.fields(config):
+        group = getattr(config, group_field.name)
+        if not dc.is_dataclass(group):
+            continue
+        group_cls = type(group)
+        json_key = getattr(group_cls, "json_key", None)
+        key_map = getattr(group_cls, "_KEYS", {})
+        for f in dc.fields(group_cls):
+            keys.add(json_key(f.name) if callable(json_key) else key_map.get(f.name, f.name))
+    return keys
+
+
 def test_arm_profiles_registry_keys_are_valid_settings_keys():
-    # Guard against typos: every jsonkey referenced by a profile must be one this
-    # module knows how to represent (i.e. present in the "full" superset or the base
-    # settings fixture above).
-    known_keys = set(_base().keys())
+    # Guard against typos: every jsonkey referenced by a profile must be a real settings key,
+    # per the shipped settings file unioned with the fixture's own superset.
+    known_keys = set(_base().keys()) | _declared_settings_keys() | _shipped_settings_keys()
     for arm_name, profile in _GOT_ARM_PROFILES.items():
         for key in profile:
             assert key in known_keys, f"{arm_name} references unknown key {key}"
@@ -909,3 +952,52 @@ def test_arm_good_adaptive_backtrackrel_isolates_backtrack_and_its_relative_thre
     _apply_got_experiment_overrides(control, environ={"IDEA_TEST_ARM": "good_adaptive"})
     for key in added:
         assert control[key] is False
+
+
+def test_declared_settings_keys_covers_each_key_naming_convention():
+    keys = _declared_settings_keys()
+    # GoTConfig auto-prefixes; RunPolicy remaps via _KEYS; EngineConfig uses the bare name.
+    assert "got_candidate_coverage_enabled" in keys
+    assert "run_policy_coverage_entity_conflict_check" in keys
+    assert "breadth_aware_branching_enabled" in keys
+
+
+def test_declared_settings_keys_rejects_near_miss_typos():
+    keys = _declared_settings_keys()
+    assert "got_candidate_coverage_enabledd" not in keys
+    assert "breadth_aware_branching" not in keys
+    assert "candidate_coverage_enabled" not in keys  # missing the got_ prefix
+
+
+def test_shipped_keys_outside_the_typed_layer_are_prompts_and_strategies():
+    # The typed config groups do not read prompt templates or strategy names; those are
+    # consumed directly from the settings mapping. Pinned so a genuinely orphaned knob --
+    # one no code reads at all -- shows up here instead of hiding among them.
+    orphans = _shipped_settings_keys() - _declared_settings_keys()
+    assert all(
+        key.endswith(("_prompt", "_addendum", "_strategy", "_status", "_statuses"))
+        or key in {"enable_idea_dag", "allowed_actions", "memoization_enabled", "memoization_namespace"}
+        for key in orphans
+    ), sorted(orphans)
+
+
+def test_arm_good_adaptive_breadth_isolates_the_native_breadth_mechanisms():
+    base = _GOT_ARM_PROFILES["good_adaptive"]
+    breadth = _GOT_ARM_PROFILES["good_adaptive_breadth"]
+    assert {k: v for k, v in breadth.items() if k not in base} == {
+        "breadth_aware_branching_enabled": True,
+        "got_candidate_coverage_enabled": True,
+        "run_policy_coverage_entity_conflict_check": True,
+    }
+    assert all(base[key] == breadth[key] for key in base)
+
+
+def test_arm_good_adaptive_breadth_flags_reach_the_typed_config():
+    settings = _base()
+    _apply_got_experiment_overrides(settings, environ={"IDEA_TEST_ARM": "good_adaptive_breadth"})
+    config = validate_settings(settings)
+    assert config.engine.breadth_aware_branching_enabled is True
+    assert config.got.candidate_coverage_enabled is True
+    assert config.run_policy.coverage_entity_conflict_check is True
+    # The widening ceiling must actually clear the widest breadth task (7 candidates).
+    assert config.engine.breadth_branching_max >= 7

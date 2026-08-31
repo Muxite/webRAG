@@ -433,6 +433,20 @@ TEST_PRIORITY_ORDER = [
     # deliberate pair to the suite's wide-fan-out task. Width-1 chain: nothing is parallelisable,
     # so a breadth-oriented engine can only add cost (priced by the un-gated path_efficiency check).
     "159",  # Narrow-sequential: 4-hop dependent chain, leak-resistant terminus (lighthouse engineer -> novelist grandson -> burial mountain elevation) (9/10) - level=graph, weight=long
+    # 161 is the SEQFAN shape the suite lacked: a dependent prefix must DISCOVER the candidate
+    # set before any fan-out is possible, and each discovered branch is itself multi-step.
+    "161",  # Seqfan: 3-hop discovery prefix (station -> line -> network -> line roster) + 6 independent multi-step branches + argmax: newest line terminus (Barking Riverside, 2022) (9/10) - level=graph, weight=long
+    "162",  # Sequential prefix -> fan-out: 3-hop chain discovers a 7-member crew (Hubble instrument -> COSTAR -> STS-61), then 7 independent age-at-launch derivations + argmax (Story Musgrave, 58) (9/10) - level=graph, weight=long
+    "163",  # Sequential prefix -> fan-out: 3-hop chain discovers a 7-college roster (founder -> college -> historic group), then 7 independent 2-hop municipality-population lookups + argmin (Bryn Mawr College, 5,879) (9/10) - level=graph, weight=long
+    "164",  # Sequential prefix -> fan-out: 3-hop chain discovers a 6-species subfamily (Wojtek -> subspecies -> species -> subfamily), then 6 independent 2-hop describer-birth-year lookups + argmax (sun bear / Stamford Raffles, b. 1781) (9/10) - level=graph, weight=long
+    # N-SWEEP family (2026-08-30): ONE template, N the ONLY variable. The four rosters are nested
+    # prefixes of one ordered list, so per-item difficulty cannot drift with N (the confound that
+    # made 161-164 score 0 for every variant) and per-item recall vs N is directly comparable.
+    # Sized to straddle sequential ReAct's fixed 12-step scratchpad window / 25-step budget.
+    "165",  # N-sweep N=4: roster discovery ('List of Godzilla films') + 4 independent one-page infobox reads + argmin running time (Godzilla Raids Again, 81 min; margin 7) (6/10) - level=graph, weight=long
+    "166",  # N-sweep N=8: same template, 8 independent one-page infobox reads + argmin running time (Godzilla Raids Again, 81 min; margin 5) (7/10) - level=graph, weight=long
+    "167",  # N-sweep N=16: same template, 16 independent one-page infobox reads + argmin running time (All Monsters Attack, 70 min; margin 11) (8/10) - level=graph, weight=long
+    "168",  # N-sweep N=32: same template, 32 independent one-page infobox reads + argmin running time (All Monsters Attack, 70 min; margin 11) (9/10) - level=graph, weight=long
     # Mechanism suite (2026-08-25, DAG v3 ledger plan Sec 8.3): purpose-built tasks that make the
     # ledger/deficit-injector null result interpretable — each isolates ONE failure mechanism the
     # core24 suite never exercises.
@@ -537,6 +551,31 @@ _GOT_ARM_PROFILES: Dict[str, Dict[str, Any]] = {
         "got_reexpand_corrective_context_enabled": True,
         "tool_failure_recovery_enabled": True,
         "final_require_grounding": True,   # validity gate, on in every arm
+    },
+    # The native-engine twin of the breadth fix that shipped for `langgraph_react` only
+    # (ba351857). `good_adaptive` verbatim plus the two flags that make a fan-out mandate
+    # reachable: `breadth_aware_branching_enabled` lets `_effective_branching` widen the ROOT
+    # past the flat `max_branching` cap of 5 to the number of candidates the mandate enumerates
+    # (capped by `breadth_branching_max`=8), and `got_candidate_coverage_enabled` gates
+    # synthesis on every named candidate actually having been opened. Measured motivation:
+    # graph 0.189 vs langgraph_react 0.959 on tasks 152/154/155/156, where task 152 chose
+    # "5 sub-problems" for a 7-way ask and task 155 merged after 1 visit for 2 candidates.
+    # `run_policy_coverage_entity_conflict_check` rides along as STRICTLY OBSERVE-ONLY
+    # telemetry: the coverage gate matches candidates against a pooled haystack of every
+    # visited page, so one wrong page mentioning several other candidates can read as full
+    # coverage. It never touches scores; it counts how often that false-coverage mode fires.
+    "good_adaptive_breadth": {
+        "got_reexpand_enabled": True,
+        "got_reexpand_max_iterations": 2,
+        "got_step_confidence_judge_enabled": True,
+        "got_step_confidence_reexpand_enabled": True,
+        "got_contract_reexpand_enabled": True,
+        "got_reexpand_corrective_context_enabled": True,
+        "tool_failure_recovery_enabled": True,
+        "final_require_grounding": True,   # validity gate, on in every arm
+        "breadth_aware_branching_enabled": True,
+        "got_candidate_coverage_enabled": True,
+        "run_policy_coverage_entity_conflict_check": True,
     },
     # E1's ablation arm (ASSUMPTION_AUDIT.md PART 5): `good_adaptive` with the memory-based
     # duplicate-candidate filter removed, so a paired run against `good_adaptive` isolates dedup
@@ -1238,6 +1277,11 @@ def _parse_execution_variants(raw: str) -> List[str]:
         "sequential_react": "sequential_react",
         "react": "sequential_react",
         "linear": "sequential_react",
+        # The same linear arm plus evidence_loop's per-hop typed extraction, so an evidence_loop
+        # comparison isolates the ledger instead of the extra extraction call (fairness arm).
+        "sequential_react_extract": "sequential_react_extract",
+        "react_extract": "sequential_react_extract",
+        "linear_extract": "sequential_react_extract",
         # Honest floor: same tools and same dispatch, minimal prompt, no engineered structure.
         "naive_discretion": "naive_discretion",
         "discretion": "naive_discretion",
@@ -1261,6 +1305,11 @@ def _parse_execution_variants(raw: str) -> List[str]:
         "evidence_queue_deterministic": "evidence_queue_deterministic",
         "evidence_queue": "evidence_queue_deterministic",
         "queue": "evidence_queue_deterministic",
+        # ReAct's flat loop plus a never-expiring ledger, per-hop typed extraction, quote-offset
+        # grounding and table-first finalization (testing/execution_evidence_loop.py).
+        "evidence_loop": "evidence_loop",
+        "ledger": "evidence_loop",
+        "loop": "evidence_loop",
     }
     out: List[str] = []
     seen = set()
