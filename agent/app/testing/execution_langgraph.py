@@ -11,7 +11,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
@@ -31,6 +31,46 @@ from agent.app.testing.utils import summarize_observability
 from agent.app.testing.execution import _empty_graph
 
 _logger = logging.getLogger(__name__)
+
+
+def pages_from_telemetry(telemetry: Any, max_chars: int) -> List[Dict[str, Any]]:
+    """Freeze every VISITED page this run read into the ``store_page`` shape.
+
+    Why this exists. Measured over the stored corpus, 36 of 40 sampled ``langgraph_react`` cells
+    had ``observability.visit.count > 0`` and ZERO carried recoverable page text: the full body is
+    recorded on ``telemetry.documents_seen`` (``source="visit"``, ``document={"url", "content"}``
+    -- the CLEANED page text, not a preview), but ``testing/utils.slim_telemetry_raw`` strips
+    ``documents_seen`` before the result JSON is written, this arm emitted no ``output["pages"]``,
+    and it never populates ``result["graph"]``. The archive therefore recorded THAT this arm
+    visited and never WHAT it read, which makes claim-grounding, an arm-symmetric verdict and a
+    risk-coverage curve impossible for it rather than merely awkward.
+
+    ``evidence_loop`` and ``sequential_react_extract`` already freeze their pages exactly this
+    way, so this puts the off-the-shelf arm on the same contract and nothing downstream needs a
+    special case: ``idea_test_utils.visited_evidence`` reads ``output["pages"]`` directly.
+
+    Search hits are deliberately NOT frozen -- a result snippet is not a page the agent read.
+
+    :param telemetry: the run's ``TelemetrySession`` (or None).
+    :param max_chars: cap on the STORED window; the content hash still covers the whole text.
+    :returns: ``store_page``-shaped dicts, one per distinct visited URL, in visit order.
+    :raises: nothing.
+    """
+    from agent.app.testing.execution_evidence_loop import store_page
+
+    pages: List[Dict[str, Any]] = []
+    seen: set = set()
+    for entry in (getattr(telemetry, "documents_seen", None) or []):
+        if not isinstance(entry, dict) or entry.get("source") != "visit":
+            continue
+        document = entry.get("document") or {}
+        url = str(document.get("url") or "").strip()
+        text = str(document.get("content") or "")
+        if not url or not text.strip() or url in seen:
+            continue
+        seen.add(url)
+        pages.append(store_page(f"p{len(pages) + 1}", url, text, max_chars))
+    return pages
 
 
 async def run_offtheshelf_execution(
@@ -135,6 +175,11 @@ async def run_offtheshelf_execution(
         # "native" | "emulated" | "unknown" (the solver never got far enough to route). Analysis
         # MUST stratify on this: an emulated cell is a different transport, not a different model.
         "tool_transport": solver_result.get("tool_transport") or "unknown",
+        # The pages this arm actually read, frozen so a stored cell can be re-audited offline.
+        # Without this the archive records THAT it visited and never WHAT it read -- see
+        # `pages_from_telemetry`. Same shape and same purpose as `evidence_loop`'s `pages`.
+        "pages": pages_from_telemetry(
+            telemetry, int(os.environ.get("IDEA_TEST_PERSIST_PAGE_CHARS", "6000"))),
     }
     warning = solver_result.get("warning")
     if warning:
