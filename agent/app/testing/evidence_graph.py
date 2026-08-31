@@ -153,6 +153,61 @@ KIND_DERIVED = "derived"
 #: checkable from the input values alone and are implemented in this module (see the module
 #: docstring's Layer 4 section); the other three have no seam here on purpose.
 OPERATION_KINDS = ("arith", "count", "extremum", "compare", "lookup", "assert_verbatim", "judgment")
+
+
+class DerivationError(ValueError):
+    """A refused derivation, carrying a machine-readable :attr:`code`.
+
+    Every refusal in this module is one of these. It subclasses ``ValueError`` so the historical
+    contract ("an impossible derivation raises and creates no node") is unchanged for existing
+    callers, and adds the one thing a caller could not previously get without matching on prose:
+    WHICH refusal it was.
+
+    The consumer is the evidence loop's ``derive`` action, which turns a refusal into an
+    observation the model can act on. "your two operands are in different units, and this system
+    does not convert" is a step the model can recover from; "ValueError" is a dead step. Typing
+    at the raise site keeps that mapping from being coupled to the wording of a message.
+    """
+
+    #: Stable, machine-readable identifier for this refusal. Subclasses override it.
+    code = "DERIVATION_ERROR"
+
+
+class UnitMismatch(DerivationError):
+    """Two operands carry different, both-present units. Refusal is correct; there is no
+    conversion table here and deliberately never will be."""
+
+    code = "UNIT_MISMATCH"
+
+
+class MissingOperand(DerivationError):
+    """An input id names no node in this graph, so the derivation would have no provenance."""
+
+    code = "MISSING_OPERAND"
+
+
+class NonNumeric(DerivationError):
+    """An operand's value carries no number, so it cannot enter an arithmetic operation."""
+
+    code = "NON_NUMERIC"
+
+
+class DivisionByZero(DerivationError):
+    """The denominator recomputes to zero."""
+
+    code = "DIVISION_BY_ZERO"
+
+
+class UnknownOperation(DerivationError):
+    """The requested operation or mode is outside this module's closed vocabulary."""
+
+    code = "UNKNOWN_OPERATION"
+
+
+class WrongArity(DerivationError):
+    """The operation was given the wrong number of operands."""
+
+    code = "WRONG_ARITY"
 #: The subset of :data:`OPERATION_KINDS` this module can actually recompute and check.
 MECHANICALLY_CHECKABLE_KINDS = ("arith", "count", "extremum", "compare")
 
@@ -876,10 +931,10 @@ class EvidenceGraph:
         """
         inputs = tuple(str(i) for i in input_ids)
         if not inputs:
-            raise ValueError("a derived node needs at least one input node")
+            raise WrongArity("a derived node needs at least one input node")
         missing = [i for i in inputs if i not in self._nodes]
         if missing:
-            raise ValueError(f"unknown input node(s): {missing}")
+            raise MissingOperand(f"unknown input node(s): {missing}")
         node_id = derived_node_id(str(operation), inputs, str(value))
         existing = self._nodes.get(node_id)
         if existing is not None:
@@ -895,14 +950,14 @@ class EvidenceGraph:
         """The node with ``node_id``, or a loud ``ValueError`` — never a silent None here."""
         node = self.node(node_id)
         if node is None:
-            raise ValueError(f"unknown input node: {node_id!r}")
+            raise MissingOperand(f"unknown input node: {node_id!r}")
         return node
 
     def _require_numeric(self, node: EvidenceNode) -> float:
         """``node``'s value as a float, or a loud ``ValueError`` when it has no number."""
         value = numeric_value(node.value, node.unit)
         if value is None:
-            raise ValueError(f"node {node.id!r} value {node.value!r} is not numeric")
+            raise NonNumeric(f"node {node.id!r} value {node.value!r} is not numeric")
         return value
 
     def _inputs_valid(self, inputs: Iterable[EvidenceNode]) -> Tuple[bool, List[str]]:
@@ -939,7 +994,7 @@ class EvidenceGraph:
         present = [node.unit for node in nodes if node.unit]
         distinct = {normalize_for_match(_unit_leading_token(unit)) for unit in present}
         if len(distinct) > 1:
-            raise ValueError(f"mismatched units: {sorted(set(present))}")
+            raise UnitMismatch(f"mismatched units: {sorted(set(present))}")
         return present[0] if present else ""
 
     def _arith_detail(self, inputs_ok: bool, invalid_ids: List[str],
@@ -970,12 +1025,12 @@ class EvidenceGraph:
             non-numeric input, division by zero, or mismatched units on ``sum`` / ``difference``.
         """
         if operation not in _ARITH_VARIADIC_OPS and operation not in _ARITH_BINARY_OPS:
-            raise ValueError(f"unknown arith operation: {operation!r}")
+            raise UnknownOperation(f"unknown arith operation: {operation!r}")
         inputs = [self._require_node(i) for i in input_ids]
         if operation in _ARITH_BINARY_OPS and len(inputs) != 2:
-            raise ValueError(f"{operation} needs exactly 2 inputs, got {len(inputs)}")
+            raise WrongArity(f"{operation} needs exactly 2 inputs, got {len(inputs)}")
         if not inputs:
-            raise ValueError("arith needs at least one input")
+            raise WrongArity("arith needs at least one input")
         numeric = [self._require_numeric(node) for node in inputs]
 
         unit = ""
@@ -988,7 +1043,7 @@ class EvidenceGraph:
                 recomputed *= number
         else:  # quotient / ratio
             if numeric[1] == 0:
-                raise ValueError("division by zero")
+                raise DivisionByZero("division by zero")
             recomputed = numeric[0] / numeric[1]
             if inputs[0].unit and inputs[1].unit:
                 unit = f"{inputs[0].unit}/{inputs[1].unit}"
@@ -1035,10 +1090,10 @@ class EvidenceGraph:
             mismatched units among the inputs.
         """
         if mode not in ("max", "min"):
-            raise ValueError(f"unknown extremum mode: {mode!r}")
+            raise UnknownOperation(f"unknown extremum mode: {mode!r}")
         inputs = [self._require_node(i) for i in input_ids]
         if not inputs:
-            raise ValueError("extremum needs at least one input")
+            raise WrongArity("extremum needs at least one input")
         unit = self._check_common_unit(inputs)
         numeric = [(node, self._require_numeric(node)) for node in inputs]
         winner_node, winner_value = (max if mode == "max" else min)(numeric, key=lambda pair: pair[1])
@@ -1067,7 +1122,7 @@ class EvidenceGraph:
         """
         ops = {"gt": operator.gt, "lt": operator.lt, "ge": operator.ge, "le": operator.le}
         if mode not in ops and mode not in ("eq", "ne"):
-            raise ValueError(f"unknown compare mode: {mode!r}")
+            raise UnknownOperation(f"unknown compare mode: {mode!r}")
         left = self._require_node(left_id)
         right = self._require_node(right_id)
         self._check_common_unit([left, right])

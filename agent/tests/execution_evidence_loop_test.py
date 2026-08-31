@@ -1271,3 +1271,228 @@ async def test_the_result_payload_reports_the_roster_counts(monkeypatch):
     assert output["roster_resolved"] == 6
     assert output["roster_complete"] is False
     assert output["roster_truncated"] is False
+
+
+# --------------------------------------------------------------------------------------
+# layer 4: the derivation graph is BUILT during the run and `derive` is a typed action
+# --------------------------------------------------------------------------------------
+
+TOWERS = "Tower A is 590 m tall. Tower B is 566 m tall. Its architect was Gustave Eiffel."
+
+
+def _extractions(*records):
+    """One extraction reply carrying several records, as the extractor really emits them."""
+    return json.dumps({"extractions": [
+        {"entity": e, "field": f, "value": v, "verdict": "SUPPORTED", "quote": q, "unit": u}
+        for e, f, v, q, u in records]})
+
+
+_TOWER_RECORDS = (
+    ("Tower A", "height", "590 m", "Tower A is 590 m tall.", "m"),
+    ("Tower B", "height", "566 m", "Tower B is 566 m tall.", "m"),
+)
+
+
+def _visit_then(*decisions, page=TOWERS):
+    """Replies for: visit -> extraction -> each further decision in turn."""
+    return [{"action": "visit", "args": {"url": "https://example.org/towers"}},
+            _extractions(*_TOWER_RECORDS), *decisions]
+
+
+def _run(replies, mandate="How much taller is Tower A than Tower B?", page=TOWERS):
+    io = _io(replies, page_text=page)
+    return asyncio.run(el.run_evidence_loop(io, mandate, "m", max_steps=6, max_tokens=64))
+
+
+class TestDerivationGraphIsBuilt:
+    def test_a_visited_page_and_its_verified_values_enter_the_graph(self):
+        result = _run(_visit_then({"action": "finish", "args": {"answer": "24 m"}}))
+        graph = result.ledger.graph
+        assert graph is not None
+        assert [p["page_id"] for p in graph.pages()] == ["p1"]
+        values = sorted(n.value for n in graph.nodes())
+        assert values == ["566 m", "590 m"]
+
+    def test_a_value_absent_from_the_page_is_refused_a_source_node(self):
+        replies = [{"action": "visit", "args": {"url": "https://example.org/towers"}},
+                   _extractions(("Tower C", "height", "999 m", "Tower C is 999 m tall.", "m")),
+                   {"action": "finish", "args": {"answer": "x"}}]
+        result = _run(replies)
+        assert result.ledger.graph.nodes() == []
+        assert result.ledger.graph.rejections
+
+    def test_each_admitted_source_gets_a_stable_prompt_handle(self):
+        result = _run(_visit_then({"action": "finish", "args": {"answer": "24 m"}}))
+        handles = result.ledger.handles
+        assert sorted(handles) == ["E1", "E2"]
+        assert all(result.ledger.graph.node(nid) is not None for nid in handles.values())
+
+
+class TestDeriveAction:
+    def test_difference_is_recomputed_and_reported_with_its_unit(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "difference",
+                                          "input_refs": ["E1", "E2"], "expected_unit": "m"}},
+            {"action": "finish", "args": {"answer": "24 m"}}))
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "DERIVED D1 = 24 m" in step
+        assert any(n.operation == "difference" and n.value == "24" for n in result.ledger.graph.nodes())
+
+    def test_a_models_proposed_value_never_replaces_the_recomputation(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "difference", "input_refs": ["E1", "E2"],
+                                          "proposed_value": "1594"}},
+            {"action": "finish", "args": {"answer": "x"}}))
+        derived = [n for n in result.ledger.graph.nodes() if n.operation == "difference"][0]
+        assert derived.value == "24"
+        assert derived.derivation_valid is False
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "disagrees" in step
+
+    def test_mismatched_units_are_refused_with_a_typed_code_the_model_can_act_on(self):
+        page = "Tower A is 590 m tall. Tower B is 1,940 ft tall."
+        replies = [{"action": "visit", "args": {"url": "https://example.org/towers"}},
+                   _extractions(("Tower A", "height", "590 m", "Tower A is 590 m tall.", "m"),
+                                ("Tower B", "height", "1,940 ft", "Tower B is 1,940 ft tall.", "ft")),
+                   {"action": "derive", "args": {"operation": "difference",
+                                                 "input_refs": ["E1", "E2"]}},
+                   {"action": "finish", "args": {"answer": "x"}}]
+        result = _run(replies, page=page)
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "DERIVE REFUSED [UNIT_MISMATCH]" in step
+        assert "does not convert" in step
+        assert not [n for n in result.ledger.graph.nodes() if n.operation == "difference"]
+
+    def test_an_unknown_reference_is_refused_as_a_missing_operand(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "sum", "input_refs": ["E1", "E9"]}},
+            {"action": "finish", "args": {"answer": "x"}}))
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "DERIVE REFUSED [MISSING_OPERAND]" in step
+
+    def test_dividing_by_a_zero_operand_is_refused_not_crashed(self):
+        page = "Team A scored 400 goals. Team B played 0 games."
+        replies = [{"action": "visit", "args": {"url": "https://example.org/t"}},
+                   _extractions(("A", "goals", "400 goals", "Team A scored 400 goals.", "goals"),
+                                ("B", "games", "0 games", "Team B played 0 games.", "games")),
+                   {"action": "derive", "args": {"operation": "quotient",
+                                                 "input_refs": ["E1", "E2"]}},
+                   {"action": "finish", "args": {"answer": "x"}}]
+        result = _run(replies, page=page)
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "DERIVE REFUSED [DIVISION_BY_ZERO]" in step
+
+    def test_a_non_numeric_operand_is_refused(self):
+        replies = [{"action": "visit", "args": {"url": "https://example.org/towers"}},
+                   _extractions(("Tower A", "height", "590 m", "Tower A is 590 m tall.", "m"),
+                                ("Tower A", "architect", "Gustave Eiffel",
+                                 "Its architect was Gustave Eiffel.", "")),
+                   {"action": "derive", "args": {"operation": "sum", "input_refs": ["E1", "E2"]}},
+                   {"action": "finish", "args": {"answer": "x"}}]
+        result = _run(replies)
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "DERIVE REFUSED [NON_NUMERIC]" in step
+
+    def test_an_unknown_operation_is_refused_and_names_the_vocabulary(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "integrate", "input_refs": ["E1"]}},
+            {"action": "finish", "args": {"answer": "x"}}))
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "DERIVE REFUSED [UNKNOWN_OPERATION]" in step
+
+    def test_derive_with_no_evidence_yet_is_an_observation_not_a_crash(self):
+        result = _run([{"action": "derive", "args": {"operation": "sum", "input_refs": ["E1"]}},
+                       {"action": "finish", "args": {"answer": "x"}}])
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "DERIVE REFUSED" in step
+
+    def test_the_invalid_action_nudge_now_offers_derive(self):
+        result = _run([{"action": "nonsense", "args": {}},
+                       {"action": "finish", "args": {"answer": "x"}}])
+        assert any("derive" in s for s in result.scratchpad if "INVALID ACTION" in s)
+
+
+class TestDerivedValuesReachSynthesis:
+    def test_the_finalization_context_carries_the_locked_derived_values(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "difference", "input_refs": ["E1", "E2"]}},
+            {"action": "finish", "args": {}}))
+        context = el.render_finalization_context(result.ledger, [], 4000)
+        assert "DERIVED VALUES" in context
+        assert "24" in context
+
+    def test_a_ledger_with_no_derivations_renders_no_derived_block(self):
+        ledger = el.Ledger.mint("Who wrote Beloved?")
+        assert "DERIVED VALUES" not in el.render_finalization_context(ledger, [], 2000)
+
+
+class TestDerivationGate:
+    def _invalid_run(self):
+        return _run(_visit_then(
+            {"action": "derive", "args": {"operation": "difference", "input_refs": ["E1", "E2"],
+                                          "proposed_value": "1594"}},
+            {"action": "finish", "args": {"answer": "x"}}))
+
+    def test_an_invalid_derivation_does_not_downgrade_the_verdict_by_default(self, monkeypatch):
+        monkeypatch.delenv("LEDGER_DERIVATION_GATE", raising=False)
+        assert el.derivation_gate_enabled() is False
+
+    def test_the_gate_downgrades_an_answer_to_partial_when_enabled(self, monkeypatch):
+        result = self._invalid_run()
+        ledger = result.ledger
+        for row in ledger.rows:
+            row.status = el.STATUS_SUPPORTED
+            row.value = row.value or "590 m"
+        monkeypatch.delenv("LEDGER_DERIVATION_GATE", raising=False)
+        assert ledger.verdict() == el.VERDICT_ANSWER
+        monkeypatch.setenv("LEDGER_DERIVATION_GATE", "1")
+        assert ledger.verdict() == el.VERDICT_PARTIAL
+
+
+class TestGraphArtifact:
+    def test_the_graph_is_emitted_and_reverifies_offline(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "difference", "input_refs": ["E1", "E2"]}},
+            {"action": "finish", "args": {"answer": "24 m"}}))
+        artifact = result.ledger.graph.to_dict()
+        from agent.app.testing.evidence_graph import reverify_graph
+        report = reverify_graph(artifact)
+        assert report["pages"] == 1
+        assert report["counts"]["page_drift"] == 0
+        assert report["counts"]["derived"] == 1
+
+
+class TestEvidenceBlockRendering:
+    def test_an_already_unit_bearing_value_does_not_get_its_unit_twice(self):
+        result = _run(_visit_then({"action": "finish", "args": {"answer": "x"}}))
+        lines = result.ledger.evidence_lines()
+        assert any(line.startswith("E1 = 590 m ") for line in lines)
+        assert not any("590 m m" in line for line in lines)
+
+    def test_a_bare_derived_value_still_gets_its_composed_unit(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "difference", "input_refs": ["E1", "E2"]}},
+            {"action": "finish", "args": {"answer": "x"}}))
+        assert any(line.startswith("D1 = 24 m ") for line in result.ledger.evidence_lines())
+
+    def test_the_source_block_is_bounded_but_never_drops_a_derived_value(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "difference", "input_refs": ["E1", "E2"]}},
+            {"action": "finish", "args": {"answer": "x"}}))
+        ledger = result.ledger
+        # Stand in 60 further sources past the cap. They point at a real admitted node, because
+        # a handle whose node id is not in the graph is skipped rather than counted.
+        real = ledger.handles["E1"]
+        for i in range(60):
+            ledger.handles[f"E{i + 100}"] = real
+        lines = ledger.evidence_lines(max_sources=3)
+        assert any("not shown" in line for line in lines)
+        assert any(line.startswith("D1 = 24 m") for line in lines), "a derived value was elided"
+
+    def test_the_cap_is_a_display_bound_not_a_retention_bound(self):
+        result = _run(_visit_then({"action": "finish", "args": {"answer": "x"}}))
+        ledger = result.ledger
+        assert ledger.evidence_lines(max_sources=1) != ledger.evidence_lines(max_sources=40)
+        # both handles still resolve, so a `derive` call can still reference the elided one
+        assert ledger.resolve_ref("E1") in {n.id for n in ledger.graph.nodes()}
+        assert ledger.resolve_ref("E2") in {n.id for n in ledger.graph.nodes()}

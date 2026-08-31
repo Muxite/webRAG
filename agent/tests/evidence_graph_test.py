@@ -2,6 +2,8 @@
 
 import pytest
 
+import agent.app.testing.evidence_graph as eg
+
 from agent.app.idea_policies.contract_satisfaction import StepContract
 from agent.app.testing.evidence_graph import (
     KIND_DERIVED,
@@ -911,3 +913,109 @@ class TestDerivedNodeSerialization:
         derived = [n for n in restored.nodes() if n.kind == KIND_DERIVED][0]
         assert derived.unit == "goals"
         assert derived.derivation_valid is True
+
+
+class TestTypedDerivationRefusals:
+    """Every ``add_*`` refusal carries a machine-readable CODE, not just prose.
+
+    The consumer is the evidence loop's ``derive`` action, which has to turn a refusal into an
+    observation the model can act on ("your two operands are in different units") rather than a
+    dead step. Matching on the message text would couple that mapping to wording; these are typed
+    at the raise site instead. Every one still subclasses ``ValueError``, so the pre-existing
+    ``pytest.raises(ValueError)`` assertions above keep their meaning.
+    """
+
+    def test_every_derivation_error_is_still_a_value_error(self):
+        for cls in (eg.UnitMismatch, eg.MissingOperand, eg.NonNumeric, eg.DivisionByZero,
+                    eg.UnknownOperation, eg.WrongArity):
+            assert issubclass(cls, eg.DerivationError)
+            assert issubclass(cls, ValueError)
+
+    def test_mismatched_units_raise_unit_mismatch(self):
+        graph = _arith_graph()
+        metres = graph.add_source("p1", "590 m")
+        feet = graph.add_source("p1", "1,940 ft")
+        with pytest.raises(eg.UnitMismatch) as excinfo:
+            graph.add_arith("difference", [metres.id, feet.id])
+        assert excinfo.value.code == "UNIT_MISMATCH"
+
+    def test_unknown_input_id_raises_missing_operand(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        with pytest.raises(eg.MissingOperand) as excinfo:
+            graph.add_arith("sum", [a.id, "no-such-node"])
+        assert excinfo.value.code == "MISSING_OPERAND"
+
+    def test_non_numeric_operand_raises_non_numeric(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://example.org/x", "Gustave Eiffel built it in 1889.")
+        name = graph.add_source("p1", "Gustave Eiffel")
+        year = graph.add_source("p1", "1889")
+        with pytest.raises(eg.NonNumeric) as excinfo:
+            graph.add_arith("sum", [name.id, year.id])
+        assert excinfo.value.code == "NON_NUMERIC"
+
+    def test_division_by_zero_raises_division_by_zero(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        graph.add_page("p2", "https://example.org/zero", "Score: 0 goals total")
+        zero = graph.add_source("p2", "0 goals")
+        with pytest.raises(eg.DivisionByZero) as excinfo:
+            graph.add_arith("quotient", [a.id, zero.id])
+        assert excinfo.value.code == "DIVISION_BY_ZERO"
+
+    def test_unknown_operation_raises_unknown_operation(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        with pytest.raises(eg.UnknownOperation) as excinfo:
+            graph.add_arith("exponentiate", [a.id])
+        assert excinfo.value.code == "UNKNOWN_OPERATION"
+
+    def test_binary_op_with_wrong_arity_raises_wrong_arity(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        c = graph.add_source("p1", "42 goals")
+        with pytest.raises(eg.WrongArity) as excinfo:
+            graph.add_arith("difference", [a.id, b.id, c.id])
+        assert excinfo.value.code == "WRONG_ARITY"
+
+    def test_arith_with_no_inputs_raises_wrong_arity(self):
+        graph = _arith_graph()
+        with pytest.raises(eg.WrongArity) as excinfo:
+            graph.add_arith("sum", [])
+        assert excinfo.value.code == "WRONG_ARITY"
+
+    def test_extremum_mode_and_arity_are_typed(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        with pytest.raises(eg.UnknownOperation):
+            graph.add_extremum([a.id], "median")
+        with pytest.raises(eg.WrongArity):
+            graph.add_extremum([], "max")
+
+    def test_extremum_unit_mismatch_is_typed(self):
+        graph = _arith_graph()
+        metres = graph.add_source("p1", "590 m")
+        feet = graph.add_source("p1", "1,940 ft")
+        with pytest.raises(eg.UnitMismatch):
+            graph.add_extremum([metres.id, feet.id], "max")
+
+    def test_compare_mode_and_operands_are_typed(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        with pytest.raises(eg.UnknownOperation):
+            graph.add_compare(a.id, b.id, "approx")
+        with pytest.raises(eg.MissingOperand):
+            graph.add_compare(a.id, "no-such-node", "gt")
+
+    def test_count_on_an_unknown_input_is_missing_operand(self):
+        graph = _arith_graph()
+        with pytest.raises(eg.MissingOperand):
+            graph.add_count(["no-such-node"])
+
+    def test_add_derived_unknown_input_is_missing_operand(self):
+        graph = _graph()
+        with pytest.raises(eg.MissingOperand):
+            graph.add_derived("x", "sum", ["nope"])

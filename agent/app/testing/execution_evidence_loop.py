@@ -142,6 +142,50 @@ def unit_extraction_enabled() -> bool:
     return _flag("IDEA_TEST_EVIDENCE_LOOP_UNIT_EXTRACT")
 
 
+def derivation_gate_enabled() -> bool:
+    """True when a KNOWN-INVALID derivation may downgrade the verdict (default OFF).
+
+    Opt-in on the same precedent as :func:`roster_gate_enabled`: the roster gate, shipped ON,
+    blocked 46 of 48 eligible cells including two that scored 1.00. A derivation is marked
+    invalid when the model's proposed figure disagrees with the Python recomputation, which is
+    exactly the signal this layer exists to surface — but whether that should cost the whole
+    verdict is an empirical question, and nothing has measured it yet. The graph, the invalid
+    flag and the detail are all reported regardless; only the DOWNGRADE is behind this flag.
+
+    :returns: the value of ``LEDGER_DERIVATION_GATE``, defaulting to disabled.
+    :raises: nothing.
+    """
+    return _flag("LEDGER_DERIVATION_GATE", default="0")
+
+
+#: Operations ``derive`` accepts, mapped to the graph method that RECOMPUTES each one. The
+#: vocabulary is closed on purpose and is a strict subset of the graph's: ``lookup`` /
+#: ``assert_verbatim`` / ``judgment`` have no recomputation, so exposing them would let a model
+#: assert a number under the appearance of having derived it.
+#: Most recent SOURCE handles rendered into a step prompt. The analogue of
+#: ``_SCRATCHPAD_WINDOW`` for evidence: a bound on what one step can show, not on what is kept.
+_EVIDENCE_BLOCK_SOURCES = 40
+
+_DERIVE_ARITH_OPS = ("sum", "difference", "product", "quotient", "ratio")
+_DERIVE_EXTREMUM_OPS = ("max", "min")
+_DERIVE_COMPARE_MODES = ("gt", "lt", "ge", "le", "eq", "ne")
+
+#: What the model should DO about each refusal. A code alone is a dead step; the loop's whole
+#: premise is that an observation has to be actionable.
+_DERIVE_ADVICE = {
+    "UNIT_MISMATCH": ("This system does not convert between units. Find both values in the same "
+                      "unit, or report that they cannot be combined."),
+    "MISSING_OPERAND": ("Use a handle from the EVIDENCE VALUES list. Only values already verified "
+                        "on a fetched page can be combined; visit a page to obtain one first."),
+    "NON_NUMERIC": "One operand carries no number. Extract a numeric value before combining.",
+    "DIVISION_BY_ZERO": "The denominator recomputes to zero. Check which operand you divided by.",
+    "UNKNOWN_OPERATION": ("Supported operations: sum, difference, product, quotient, ratio, max, "
+                          "min, count, compare_gt/lt/ge/le/eq/ne."),
+    "WRONG_ARITY": ("Wrong number of operands: difference/quotient/ratio/compare_* take exactly "
+                    "two; sum/product/max/min/count take one or more."),
+}
+
+
 _SYSTEM = (
     "You are a web-research agent solving a TASK with tools. Work ONE step at a time: "
     "think, then call exactly one tool. Tools:\n"
@@ -156,8 +200,16 @@ _SYSTEM = (
     "scratchpad. Work the OPEN rows: search for one, visit its authoritative page, and read the "
     "value straight off that page. Never answer a row from memory, and do not finish while rows "
     "are still OPEN unless you have exhausted the sources for them.\n"
-    "Each step, return ONLY JSON: {\"thought\": \"...\", \"action\": \"search|visit|verify|finish\", "
-    "\"args\": {\"query|url|claim|answer\": \"...\"}}."
+    "- derive(operation, input_refs, proposed_value?, expected_unit?): combine values ALREADY "
+    "verified on a page. Refer to them by the handles in EVIDENCE VALUES (E1, E2, ...); the "
+    "result gets its own handle (D1, D2, ...). The arithmetic is recomputed in Python from the "
+    "verified spans, so the figure you get back is the figure to state — never recompute it in "
+    "your head, and never state a computed number you did not derive here. Operations: sum, "
+    "difference, product, quotient, ratio, max, min, count, compare_gt/lt/ge/le/eq/ne. Units are "
+    "NOT converted: combining metres with feet is refused, and the correct response to that "
+    "refusal is to find both figures in one unit or to report that they cannot be combined.\n"
+    "Each step, return ONLY JSON: {\"thought\": \"...\", \"action\": "
+    "\"search|visit|derive|verify|finish\", \"args\": {...}}."
 )
 
 _EXTRACT_SYSTEM_BARE = (
@@ -418,6 +470,10 @@ class Extraction:
     value_unit_bearing: bool = False
     value_shape: str = ""
     value_fail_reason: Optional[str] = None
+    #: Id of the SOURCE node this record's value was admitted as, when it was located on the
+    #: page. Empty when the value never became a node, which is the same thing as saying it was
+    #: never mechanically found — the record survives either way.
+    evidence_node_id: str = ""
 
     def as_dict(self) -> Dict[str, Any]:
         """This record as a JSON-serializable dict for the result payload."""
@@ -430,6 +486,7 @@ class Extraction:
             "value_verified": self.value_verified,
             "value_unit_bearing": self.value_unit_bearing, "value_shape": self.value_shape,
             "value_fail_reason": self.value_fail_reason,
+            "evidence_node_id": self.evidence_node_id,
         }
 
 
@@ -541,6 +598,124 @@ class Ledger:
     extractions: List[Extraction] = dataclass_field(default_factory=list)
     #: The mandate the rows were minted from, kept so the CLOSED roster it names stays countable.
     mandate: str = ""
+    #: The run's :class:`~agent.app.testing.evidence_graph.EvidenceGraph`, built lazily. Typed
+    #: ``Any`` deliberately: ``evidence_graph`` imports THIS module, so it can only be imported
+    #: inside a function body here, exactly as :func:`_check_value` already does.
+    graph: Any = None
+    #: Prompt handle -> node id, in admission order. A node id is a content hash the model never
+    #: sees; ``E1``/``D1`` are what it can actually refer to in a ``derive`` call.
+    handles: Dict[str, str] = dataclass_field(default_factory=dict)
+
+    def ensure_graph(self) -> Any:
+        """The run's evidence graph, created on first use."""
+        if self.graph is None:
+            from agent.app.testing.evidence_graph import EvidenceGraph
+            self.graph = EvidenceGraph()
+        return self.graph
+
+    def handle_for(self, node: Any) -> str:
+        """This node's stable prompt handle, assigning one on first sight.
+
+        ``E``-prefixed for a located SOURCE span, ``D``-prefixed for a recomputed DERIVED value,
+        numbered per prefix in admission order. Re-admitting a content-identical node returns the
+        SAME node object (the graph is content-addressed), so a handle is never duplicated.
+        """
+        from agent.app.testing.evidence_graph import KIND_DERIVED
+        for handle, node_id in self.handles.items():
+            if node_id == node.id:
+                return handle
+        prefix = "D" if node.kind == KIND_DERIVED else "E"
+        handle = f"{prefix}{1 + sum(1 for h in self.handles if h.startswith(prefix))}"
+        self.handles[handle] = node.id
+        return handle
+
+    def resolve_ref(self, ref: Any) -> str:
+        """A model-supplied reference resolved to a node id.
+
+        A handle (``"E1"``, case-insensitively) maps through :attr:`handles`; anything else is
+        passed through unchanged so a raw node id still works and an unknown reference reaches
+        the graph, which refuses it as ``MISSING_OPERAND`` rather than being silently dropped.
+        """
+        key = str(ref or "").strip()
+        return self.handles.get(key) or self.handles.get(key.upper()) or key
+
+    @staticmethod
+    def _render_value(node: Any) -> str:
+        """``value`` with its unit, appending the unit only when the value lacks one.
+
+        A SOURCE value is usually already unit-bearing ("590 m") because that is what makes it
+        verifiable as ONE span, while a DERIVED value is bare ("24") with the composed unit
+        alongside. Appending unconditionally renders "590 m m", which is the figure the model is
+        then asked to state.
+        """
+        from agent.app.testing.evidence_graph import is_unit_bearing
+        value = str(node.value)
+        if node.unit and not is_unit_bearing(value):
+            return f"{value} {node.unit}".strip()
+        return value
+
+    def _render_node(self, handle: str, node: Any) -> str:
+        from agent.app.testing.evidence_graph import KIND_DERIVED
+        value = self._render_value(node)
+        if node.kind != KIND_DERIVED:
+            return f"{handle} = {value}  [{node.page_id}]"
+        inputs = ", ".join(self.handle_for(self.graph.node(i)) if self.graph.node(i) else i
+                           for i in node.input_ids)
+        detail = f"  WARNING: {node.derivation_detail}" if node.derivation_valid is False else ""
+        return f"{handle} = {value}  ({node.operation} of {inputs}){detail}"
+
+    def evidence_lines(self, max_sources: int = _EVIDENCE_BLOCK_SOURCES) -> List[str]:
+        """The per-step evidence block: EVERY derived value, plus the most recent sources.
+
+        Unlike the ledger, whose rows are bounded by the minted roster, admitted SOURCE nodes are
+        unbounded — a 32-page fan-out task yielding several values per page would put hundreds of
+        lines into every step's prompt and crowd out the scratchpad. Sources are therefore capped
+        at the most recent ``max_sources`` with an explicit count of what was elided.
+
+        DERIVED values are NEVER elided: they are the locked figures the model is required to
+        state rather than recompute, and they are few by construction.
+        """
+        if self.graph is None:
+            return []
+        from agent.app.testing.evidence_graph import KIND_DERIVED
+        sources, derived = [], []
+        for handle, node_id in self.handles.items():
+            node = self.graph.node(node_id)
+            if node is None:
+                continue
+            (derived if node.kind == KIND_DERIVED else sources).append((handle, node))
+        elided = max(0, len(sources) - int(max_sources))
+        shown = sources[elided:]
+        lines = [self._render_node(handle, node) for handle, node in shown]
+        if elided:
+            lines.insert(0, f"... {elided} older verified value(s) not shown; they remain in the "
+                            f"evidence graph and can still be referenced by handle.")
+        lines.extend(self._render_node(handle, node) for handle, node in derived)
+        return lines
+
+    def derived_lines(self) -> List[str]:
+        """One line per RECOMPUTED value, for the finalization context."""
+        if self.graph is None:
+            return []
+        from agent.app.testing.evidence_graph import KIND_DERIVED
+        lines = []
+        for handle, node_id in self.handles.items():
+            node = self.graph.node(node_id)
+            if node is not None and node.kind == KIND_DERIVED:
+                lines.append(self._render_node(handle, node))
+        return lines
+
+    def has_invalid_derivation(self) -> bool:
+        """True when any DERIVED node's postcondition is KNOWN to have failed.
+
+        ``None`` (unassessed) is not counted: "unknown" is not the same claim as "wrong", the
+        same rule :meth:`EvidenceGraph._inputs_valid` applies one layer down.
+        """
+        if self.graph is None:
+            return False
+        from agent.app.testing.evidence_graph import KIND_DERIVED
+        return any(node.kind == KIND_DERIVED and node.derivation_valid is False
+                   for node in self.graph.nodes())
 
     @classmethod
     def mint(cls, mandate: str, max_rows: Optional[int] = None) -> "Ledger":
@@ -742,6 +917,8 @@ class Ledger:
             return VERDICT_PARTIAL
         if roster_gate_enabled() and not self.roster()["roster_complete"]:
             return VERDICT_PARTIAL
+        if derivation_gate_enabled() and self.has_invalid_derivation():
+            return VERDICT_PARTIAL
         return VERDICT_ANSWER
 
     def render(self) -> str:
@@ -786,9 +963,14 @@ def compose_user_prompt(mandate: str, ledger: Ledger, scratchpad: List[str]) -> 
     :raises: nothing.
     """
     history = "\n\n".join(scratchpad[-_SCRATCHPAD_WINDOW:]) if scratchpad else "(no actions yet)"
+    evidence = ledger.evidence_lines()
+    evidence_block = (
+        "EVIDENCE VALUES (verified on a page; refer to these handles in a derive call):\n"
+        + "\n".join(evidence) + "\n\n") if evidence else ""
     return (
         f"TASK:\n{mandate}\n\n"
         f"LEDGER (persists for the whole run):\n{ledger.render()}\n\n"
+        f"{evidence_block}"
         f"SCRATCHPAD (your last {_SCRATCHPAD_WINDOW} steps only — older steps are gone; the "
         f"ledger above is what survives):\n{history}\n\n"
         "Return the next step as JSON."
@@ -868,6 +1050,11 @@ async def extract_from_page(agent_io: AgentIO, model_name: str, mandate: str, le
     """
     if not (page_text or "").strip():
         return []
+    # The page is frozen into the graph BEFORE the extraction call, so a page that yields no
+    # usable record still leaves an auditable trace of having been fetched and read.
+    graph = ledger.ensure_graph()
+    if graph.page(page_id) is None:
+        graph.add_page(page_id, page_url, page_text)
     rows_block = "\n".join(f"- entity: {row.entity} | field: {row.field} | status: {row.status}"
                            for row in ledger.rows)
     payload = agent_io.build_llm_payload(
@@ -913,6 +1100,17 @@ async def extract_from_page(agent_io: AgentIO, model_name: str, mandate: str, le
             value_shape=shape,
             value_fail_reason=value_match.fail_reason,
         )
+        # The graph is the single arbiter of admission, so `add_source` is called for EVERY
+        # record rather than only for ones `_check_value` already liked: a value it admits gets a
+        # prompt handle and becomes referable in a later `derive` call, and a value it refuses is
+        # appended to `graph.rejections` WITH its reason. Refusing silently would lose the more
+        # interesting half -- the graph's premise is that every operand traces back to a literal
+        # span, so which values had nothing to trace to is exactly what an audit wants to read.
+        node = graph.add_source(page_id, value, quote=quote, unit=unit or None,
+                                label=record.field or None)
+        if node is not None:
+            ledger.handle_for(node)
+            record.evidence_node_id = node.id
         ledger.apply(record)
         records.append(record)
     return records
@@ -945,8 +1143,12 @@ def render_finalization_context(ledger: Ledger, pages: List[Dict[str, str]],
             if line not in quote_lines:
                 quote_lines.append(line)
     quotes_block = "CONTESTED QUOTES:\n" + ("\n".join(quote_lines) if quote_lines else "(none)")
+    derived = ledger.derived_lines()
+    derived_block = ("DERIVED VALUES (recomputed in Python from the verified spans — state these "
+                     "figures as given; do NOT recompute them):\n" + "\n".join(derived)
+                     ) if derived else ""
 
-    residual = max(0, int(char_budget) - len(table) - len(quotes_block))
+    residual = max(0, int(char_budget) - len(table) - len(quotes_block) - len(derived_block))
     excerpt_lines: List[str] = []
     if pages and residual > 0:
         per_page = max(1, residual // len(pages))
@@ -955,7 +1157,8 @@ def render_finalization_context(ledger: Ledger, pages: List[Dict[str, str]],
             excerpt_lines.append(f"SOURCE {page.get('url', '')}\n{text}")
     excerpts_block = "RAW EXCERPTS (truncated to the residual budget):\n" + (
         "\n\n".join(excerpt_lines) if excerpt_lines else "(none)")
-    return f"{table}\n\n{quotes_block}\n\n{excerpts_block}"
+    blocks = [table] + ([derived_block] if derived_block else []) + [quotes_block, excerpts_block]
+    return "\n\n".join(blocks)
 
 
 def _empty_quote_counts() -> Dict[str, int]:
@@ -1041,6 +1244,13 @@ class EvidenceLoopResult:
     scratchpad: List[str]
     verdict: str
     pages: List[Dict[str, Any]] = dataclass_field(default_factory=list)
+    #: The run's evidence graph. Taken from the ledger rather than passed at each of the loop's
+    #: exit points, so no return path can forget it.
+    graph: Any = None
+
+    def __post_init__(self) -> None:
+        if self.graph is None:
+            self.graph = self.ledger.graph
 
 
 def _fmt_search(results: List[Dict[str, str]], k: int) -> str:
@@ -1062,6 +1272,75 @@ async def _verify_claim(agent_io: AgentIO, claim: str, evidence: str, model_name
     payload = agent_io.build_llm_payload(messages=messages, json_mode=False,
                                          model_name=model_name, temperature=0.0, max_tokens=300)
     return (await agent_io.query_llm(payload, model_name=model_name)) or "UNVERIFIABLE"
+
+
+def _handle_derive(ledger: Ledger, args: Dict[str, Any]) -> str:
+    """Run ONE typed derivation and render it as an observation the model can act on.
+
+    This is the first action with a real argument schema rather than a bare string: the other
+    four coerce one key out of ``args`` and nudge in prose when it is missing, which costs a whole
+    step and teaches the model nothing. Here the arguments are named
+    (``operation`` / ``input_refs`` / ``proposed_value`` / ``expected_unit``) and every refusal
+    comes back with its typed code AND what to do about it.
+
+    Declarative by design — ``input_refs`` are handles, never a code string. A model that can send
+    an expression to be evaluated can send an expression that fabricates its own inputs, which is
+    precisely the failure this layer exists to prevent.
+
+    :param ledger: the run's ledger, carrying the graph and the handle map.
+    :param args: the decision's ``args`` object.
+    :returns: the observation text, either the recomputed value or a typed refusal.
+    :raises: nothing — every refusal is an observation, never an exception out of the loop.
+    """
+    from agent.app.testing.evidence_graph import (DerivationError, UnknownOperation, WrongArity)
+
+    graph = ledger.ensure_graph()
+    operation = str(args.get("operation", "") or "").strip().lower()
+    refs = args.get("input_refs")
+    if isinstance(refs, (str, int)):
+        refs = [refs]
+    input_ids = [ledger.resolve_ref(ref) for ref in refs] if isinstance(refs, list) else []
+    proposed = args.get("proposed_value")
+    expected_unit = str(args.get("expected_unit", "") or "").strip()
+
+    try:
+        if operation in _DERIVE_ARITH_OPS:
+            node = graph.add_arith(operation, input_ids, proposed_value=proposed)
+        elif operation in _DERIVE_EXTREMUM_OPS:
+            node = graph.add_extremum(input_ids, operation)
+        elif operation == "count":
+            node = graph.add_count(input_ids)
+        elif operation.startswith("compare_") and operation[8:] in _DERIVE_COMPARE_MODES:
+            if len(input_ids) != 2:
+                raise WrongArity(f"{operation} needs exactly 2 inputs, got {len(input_ids)}")
+            node = graph.add_compare(input_ids[0], input_ids[1], operation[8:])
+        else:
+            raise UnknownOperation(f"unknown derive operation: {operation!r}")
+    except DerivationError as exc:
+        return f"DERIVE REFUSED [{exc.code}]: {exc}. {_DERIVE_ADVICE.get(exc.code, '')}".strip()
+
+    handle = ledger.handle_for(node)
+    value = Ledger._render_value(node)
+    inputs = ", ".join(ledger.handle_for(graph.node(i)) if graph.node(i) else str(i)
+                       for i in node.input_ids)
+    parts = [f"DERIVED {handle} = {value} ({operation} of {inputs}). Recomputed in Python from "
+             f"the verified spans — state THIS figure and do not recompute it yourself."]
+    if node.derivation_valid is False and node.derivation_detail:
+        parts.append(f"WARNING: {node.derivation_detail}. The recomputed figure stands; your "
+                     f"proposed one does not.")
+    if expected_unit and node.unit and normalize_for_derive(expected_unit) != normalize_for_derive(node.unit):
+        parts.append(f"NOTE: you expected unit {expected_unit!r}; the operands compose to "
+                     f"{node.unit!r}.")
+    return " ".join(parts)
+
+
+def normalize_for_derive(unit: Any) -> str:
+    """Lowercased, whitespace-stripped unit text, for comparing an EXPECTED unit to a composed one.
+
+    Deliberately not ``evidence_graph.normalize_for_match``: that pass exists to make a value
+    locatable in page text and does far more than this comparison wants.
+    """
+    return re.sub(r"\s+", "", str(unit or "")).lower()
 
 
 def _decorate(answer: str, ledger: Ledger) -> str:
@@ -1188,13 +1467,15 @@ async def run_evidence_loop(agent_io: AgentIO, mandate: str, model_name: str, ma
                 await extract_from_page(agent_io, model_name, mandate, ledger,
                                         page_id=page_id, page_url=url, page_text=content)
                 obs = f"PAGE {url}:\n{content}"
+        elif action == "derive":
+            obs = _handle_derive(ledger, args)
         elif action == "verify":
             claim = str(args.get("claim", ""))
             evidence = "\n\n".join(f"SOURCE {p['url']}\n{p['text']}" for p in context_pages)
             verdict = await _verify_claim(agent_io, claim, evidence, model_name)
             obs = f"VERIFY '{claim[:80]}': {verdict}"
         else:
-            obs = "INVALID ACTION. Use search/visit/verify/finish."
+            obs = "INVALID ACTION. Use search/visit/derive/verify/finish."
 
         scratchpad.append(
             f"STEP {step+1}: thought={thought}\naction={action} args={json.dumps(args)[:200]}\n"
@@ -1308,6 +1589,15 @@ async def run_evidence_loop_execution(
         "quote_fail_reasons": {reason: quote_counts[reason]
                                for reason in (QUOTE_FAIL_ABSENT, QUOTE_FAIL_NO_PAGE,
                                               QUOTE_FAIL_EMPTY)},
+        # The derivation graph rides in `output`, NOT in the cell's top-level "graph" key: that
+        # one is taken by the link-graph null object (`testing/execution._empty_graph`). Living
+        # in `output` is also what makes it free to audit offline -- `reverify_cell` already
+        # reads from there, and `evidence_graph.reverify_graph` re-checks this payload with no
+        # model, no network and no GPU.
+        "evidence_graph": ledger.graph.to_dict() if ledger.graph is not None else None,
+        "derivation_gate": derivation_gate_enabled(),
+        "derivation_validity": (ledger.graph.derivation_validity()
+                                if ledger.graph is not None else None),
     }
     telemetry.finish(success=output["success"])
     tracer.close()
