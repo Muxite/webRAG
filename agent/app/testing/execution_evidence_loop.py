@@ -1,0 +1,1338 @@
+"""Evidence-loop executor — ReAct's winning loop plus a ledger, typed extraction and quotes.
+
+The measured comparator on this suite is the plain sequential ReAct loop
+(``testing/execution_sequential.py``), which beats the Graph-of-Thoughts engine by a wide margin
+at half the step budget. This arm therefore STARTS from that loop's shape rather than defending a
+tree: one flat ``for step in range(max_steps)`` pass, one JSON decision per step
+(``{thought, action, args}``), the same ``search`` / ``visit`` / ``verify`` / ``finish`` verbs, the
+same normalized-query dedup nudge, the same whole-page observation under a 1500-character cap, and
+the same forced synthesis when the model never calls ``finish``. No graph, no scores, no beam.
+
+Four things ReAct structurally lacks are added, and nothing else:
+
+1. **A ledger sidecar that never expires.** The scratchpad is a fixed 12-step SLIDING WINDOW, so a
+   value read more than twelve steps ago is simply gone (at ~2 steps per item that is ~6 items of
+   live memory). The ledger is ``(entity, field) -> status`` rows rendered into EVERY prompt,
+   outside the window, at ~100 characters per row against the 1500-character observation it
+   stands in for.
+2. **Per-hop typed extraction.** After each successful visit, one bounded call turns that page
+   into ``{entity, field, value, verdict, source_url, quote}`` records for the rows the page
+   plausibly addresses. Records are append-only and keep a raw pointer (page id + character
+   offsets) so a value is never summarised away.
+3. **Quote-offset grounding, on its own axis.** A row records two independent things: RESOLUTION
+   (a value was read off a named page) and VERIFICATION (a verbatim quote for it is literally
+   present in that page's text). :func:`verify_quote` decides verification mechanically, with no
+   model judgment and no fuzzy matching, so a paraphrase always fails it — that failure rate is
+   the honest measure of how often a weak model invents its supporting text. Verification does
+   NOT gate resolution: a value the model paraphrased is still reported, carrying an explicit
+   ``resolved_unverified`` tier, because being unable to work while holding evidence for it is
+   not a good outcome. Every visited page is frozen into the
+   result (id, URL, SHA-256, text), so :func:`reverify_cell` re-audits a finished run's quotes
+   offline from the saved artifact — a runtime check nobody can re-run is not a verifiable result.
+4. **Table-first finalization.** The typed table renders FIRST and is never truncated, then quotes
+   for contested cells, then raw excerpts under whatever budget is left. The
+   ANSWER / PARTIAL / ABSTAIN verdict is derived from RESOLUTION in code — the model is never
+   asked what it is missing — and the quote-backed fraction rides alongside it, so an answer with
+   unverified provenance is reported as exactly that rather than as an abstention.
+
+Row minting routes on COUNT, never on task shape (``classify_shape`` is disproven here): a mandate
+enumerating >= 2 names mints one row per name (capped at 8), anything else mints exactly one. The
+single-row case is this loop reduced to plain ReAct plus a one-line ledger, so a misrouted
+aggregation task degrades to the winning baseline rather than to a wrong branch.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import os
+import re
+import time
+from dataclasses import dataclass, field as dataclass_field
+from pathlib import Path
+from typing import Any, Dict, List, NamedTuple, Optional
+
+from agent.app.agent_io import AgentIO
+from agent.app.connector_chroma import ConnectorChroma
+from agent.app.connector_http import ConnectorHttp
+from agent.app.connector_llm import ConnectorLLM
+from agent.app.connector_search import ConnectorSearch
+from agent.app.idea_policies.candidate_coverage import (
+    extract_named_candidates,
+    strip_enumerated_items,
+)
+from agent.app.telemetry import TelemetrySession
+from agent.app.testing import json_telemetry as _json_telemetry
+from agent.app.testing.execution import _empty_graph
+from agent.app.testing.test_module import IdeaTestModule
+from agent.app.testing.utils import summarize_observability
+from agent.app.trace_recorder import TraceRecorder, build_trace_path, traces_retained
+
+_logger = logging.getLogger(__name__)
+
+STATUS_OPEN = "OPEN"
+STATUS_SUPPORTED = "SUPPORTED"
+STATUS_ABSENT = "ABSENT"
+STATUS_CONFLICTED = "CONFLICTED"
+STATUS_BLOCKED = "BLOCKED"
+
+#: Per-row confidence tiers: the two axes crossed, in decreasing order of trust.
+TIER_RESOLVED_VERIFIED = "resolved_verified"
+TIER_RESOLVED_UNVERIFIED = "resolved_unverified"
+TIER_UNRESOLVED = "unresolved"
+
+VERDICT_ANSWER = "ANSWER"
+VERDICT_PARTIAL = "PARTIAL"
+VERDICT_ABSTAIN = "ABSTAIN"
+
+#: Ledger rows this arm will carry by default. A hard stop on the roster, matching the sibling
+#: variants; a mandate naming more candidates than this is TRUNCATED, which
+#: :meth:`Ledger.roster` reports rather than hiding. Raise it with
+#: ``IDEA_TEST_EVIDENCE_LOOP_MAX_ROWS`` for an N=16 / N=32 task.
+_MAX_ROWS = 8
+#: Scratchpad window, copied verbatim from the sequential control: the model sees the last N steps.
+_SCRATCHPAD_WINDOW = 12
+#: Per-step observation cap, copied verbatim from the sequential control.
+_UNCAPPED_OBSERVATION_CHARS = 1500
+#: Longest ``value`` / ``source_url`` fragment a ledger row renders, keeping a row near ~100 chars.
+_ROW_VALUE_CHARS = 60
+_ROW_URL_CHARS = 70
+#: Longest field label derived from a mandate.
+_FIELD_LABEL_CHARS = 80
+
+def _flag(name: str, default: str = "1") -> bool:
+    """True when environment variable ``name`` is not one of the off spellings."""
+    return os.environ.get(name, default) not in ("0", "false", "False")
+
+
+def max_rows_setting() -> int:
+    """The ledger's row cap: ``IDEA_TEST_EVIDENCE_LOOP_MAX_ROWS``, else :data:`_MAX_ROWS`.
+
+    :returns: the cap, never below 1.
+    :raises: nothing — an unparsable override falls back to the default.
+    """
+    try:
+        return max(1, int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_MAX_ROWS", str(_MAX_ROWS))))
+    except (TypeError, ValueError):
+        return _MAX_ROWS
+
+
+def roster_gate_enabled() -> bool:
+    """True when the closed-roster completeness gate may downgrade a verdict (default OFF).
+
+    Opt-in because ``roster_resolved`` counts ledger extraction records, which lag the
+    values a model states correctly in its finalised deliverable. Measured on 48 eligible
+    stored cells the gate blocked 46, including two that scored 1.00, while the two it
+    let through scored 0.40 — an inverted signal. The roster arithmetic is still reported
+    and still reaches the prompt; only the verdict downgrade is gated by this flag.
+
+    :returns: the value of ``IDEA_TEST_EVIDENCE_LOOP_ROSTER_GATE``, defaulting to disabled.
+    :raises: nothing.
+    """
+    return _flag("IDEA_TEST_EVIDENCE_LOOP_ROSTER_GATE", default="0")
+
+
+def unit_extraction_enabled() -> bool:
+    """True when the extractor asks for the value WITH its unit (default ON).
+
+    :returns: the value of ``IDEA_TEST_EVIDENCE_LOOP_UNIT_EXTRACT``, defaulting to enabled.
+    :raises: nothing.
+    """
+    return _flag("IDEA_TEST_EVIDENCE_LOOP_UNIT_EXTRACT")
+
+
+_SYSTEM = (
+    "You are a web-research agent solving a TASK with tools. Work ONE step at a time: "
+    "think, then call exactly one tool. Tools:\n"
+    "- search(query): web search; returns titles+URLs+snippets. Keep the query SHORT — a few "
+    "focused keywords (max ~400 characters / 50 words). Do NOT put whole sentences, your reasoning, "
+    "or the full task text into the query; over-long queries are rejected by the search API.\n"
+    "- visit(url): read a page's full text. Use EXACT URLs from search results.\n"
+    "- verify(claim): cross-check a claim against the pages you have already read.\n"
+    "- finish(answer): output the final answer. Cite the source URLs you used.\n"
+    "You are also given a LEDGER: one row per fact the task requires. It persists for the whole "
+    "run, so a row you resolved long ago is still shown even after its page scrolled out of the "
+    "scratchpad. Work the OPEN rows: search for one, visit its authoritative page, and read the "
+    "value straight off that page. Never answer a row from memory, and do not finish while rows "
+    "are still OPEN unless you have exhausted the sources for them.\n"
+    "Each step, return ONLY JSON: {\"thought\": \"...\", \"action\": \"search|visit|verify|finish\", "
+    "\"args\": {\"query|url|claim|answer\": \"...\"}}."
+)
+
+_EXTRACT_SYSTEM_BARE = (
+    "Extract typed evidence from ONE page. For each ledger row this page actually addresses, emit "
+    "a record. Quote EXACTLY from the page text — a quote that is not literally present is "
+    "discarded. Never use memory or another page.\n"
+    "Return ONLY JSON: {\"extractions\": [{\"entity\": \"...\", \"field\": \"...\", "
+    "\"value\": \"...\", \"verdict\": \"SUPPORTED|ABSENT|BLOCKED\", \"quote\": \"...\"}]}\n"
+    "Use SUPPORTED with the value and its verbatim quote when the page states it; ABSENT when the "
+    "page is on-topic but does not state it; BLOCKED when the page refuses to show the content "
+    "(paywall, login, bot check). Emit no record for a row this page says nothing about."
+)
+
+_EXTRACT_SYSTEM_UNIT = (
+    "Extract typed evidence from ONE page. For each ledger row this page actually addresses, emit "
+    "a record. Quote EXACTLY from the page text — a quote that is not literally present is "
+    "discarded. Never use memory or another page.\n"
+    "Return ONLY JSON: {\"extractions\": [{\"entity\": \"...\", \"field\": \"...\", "
+    "\"value\": \"...\", \"unit\": \"...\", \"verdict\": \"SUPPORTED|ABSENT|BLOCKED\", "
+    "\"quote\": \"...\"}]}\n"
+    "Write the value WITH ITS UNIT exactly as the page spells it (\"590 m\", \"1,991 metres\", "
+    "\"824 °C\"), and repeat the unit alone in the \"unit\" field. A page usually lists SEVERAL "
+    "figures for the same quantity in different units (an infobox lists feet before metres), so a "
+    "bare number silently becomes the wrong one. When the value genuinely has no unit (a name, a "
+    "year, a count), give the value as the page writes it and leave \"unit\" empty — never skip "
+    "a record over a missing unit.\n"
+    "Use SUPPORTED with the value and its verbatim quote when the page states it; ABSENT when the "
+    "page is on-topic but does not state it; BLOCKED when the page refuses to show the content "
+    "(paywall, login, bot check). Emit no record for a row this page says nothing about."
+)
+
+
+def extract_system_prompt(unit_bearing: bool = True) -> str:
+    """The extraction system prompt.
+
+    :param unit_bearing: when True (the shipped default) the model is asked for the value WITH its
+        unit plus the unit in its own field, which is what makes a figure verifiable as one span;
+        when False the legacy bare-``value`` prompt is used.
+    :returns: the prompt text.
+    :raises: nothing.
+    """
+    return _EXTRACT_SYSTEM_UNIT if unit_bearing else _EXTRACT_SYSTEM_BARE
+
+
+_SYNTHESIS_SYSTEM = (
+    "Write the FINAL answer using ONLY the evidence below. The EVIDENCE TABLE is authoritative: "
+    "report every SUPPORTED row's value with the source URL it came from, and state plainly that "
+    "an ABSENT / BLOCKED / OPEN row could not be established. For a CONFLICTED row, give both "
+    "values and their sources. A row marked UNVERIFIED QUOTE still has a value read off its "
+    "source — report it, and say explicitly that its supporting quote could not be matched to "
+    "the page. Never add a fact that is not in the evidence."
+)
+
+
+#: The quote was checked against a page in hand and its words are not there (paraphrase,
+#: composed sentence, or a quote from somewhere else). This is the finding the check exists for.
+QUOTE_FAIL_ABSENT = "absent"
+#: No page text was available, so nothing could be checked. Never a claim about the quote.
+QUOTE_FAIL_NO_PAGE = "no_page"
+#: The model emitted no quote (or only wrapper punctuation), so there was nothing to check.
+QUOTE_FAIL_EMPTY = "empty"
+
+#: Wrapper pairs a model puts AROUND a quote: straight, curly and guillemet, opener to closer.
+_QUOTE_WRAPPERS = (('"', '"'), ("'", "'"), ("\u201c", "\u201d"), ("\u2018", "\u2019"),
+                   ("\u00ab", "\u00bb"))
+
+
+class QuoteMatch(NamedTuple):
+    """Where a quote was found in a page, mechanically.
+
+    :param verified: True when the quote is literally present in the page text, False when the
+        page was in hand and the quote is not in it, None when nothing could be checked.
+    :param start: Start offset in the RAW page text, or -1.
+    :param end: End offset (exclusive) in the RAW page text, or -1.
+    :param fail_reason: ``absent`` / ``no_page`` / ``empty`` when ``verified`` is not True,
+        else None. This is what makes a low pass rate interpretable.
+    """
+
+    verified: Optional[bool]
+    start: int
+    end: int
+    fail_reason: Optional[str] = None
+
+
+def _collapse_whitespace(text: str):
+    """``text`` with whitespace runs collapsed to single spaces, plus a raw-offset map.
+
+    :param text: any string.
+    :returns: ``(collapsed, offsets)`` where ``offsets[i]`` is the index in ``text`` of
+        ``collapsed[i]`` — the map that lets :func:`verify_quote` report RAW page offsets for a
+        match found in collapsed space.
+    :raises: nothing.
+    """
+    collapsed: List[str] = []
+    offsets: List[int] = []
+    in_space = False
+    for index, char in enumerate(text):
+        if char.isspace():
+            if collapsed and not in_space:
+                collapsed.append(" ")
+                offsets.append(index)
+            in_space = True
+            continue
+        in_space = False
+        collapsed.append(char)
+        offsets.append(index)
+    while collapsed and collapsed[-1] == " ":
+        collapsed.pop()
+        offsets.pop()
+    return "".join(collapsed), offsets
+
+
+def strip_quote_wrapper(quote: str) -> str:
+    """``quote`` with the punctuation the MODEL wrapped around it removed, content untouched.
+
+    Surrounding whitespace and MATCHED wrapping quote characters (straight, curly, guillemet,
+    single and double, nested) come off. An unmatched quote character is content and stays: a
+    lone ``"`` at one end is part of what the page said, and removing it would invent a match.
+
+    :param quote: the model's claimed quote.
+    :returns: the quote's content, possibly empty when the input was only wrapper punctuation.
+    :raises: nothing.
+    """
+    text = (quote or "").strip()
+    while len(text) >= 2:
+        for opener, closer in _QUOTE_WRAPPERS:
+            if text[0] == opener and text[-1] == closer:
+                text = text[1:-1].strip()
+                break
+        else:
+            break
+    return text
+
+
+def _locate(page_text: str, quote: str) -> Optional[QuoteMatch]:
+    """``quote`` located in ``page_text`` exactly, else with whitespace runs collapsed on both
+    sides; None when its words are not there."""
+    if not quote:
+        return None
+    start = page_text.find(quote)
+    if start >= 0:
+        return QuoteMatch(True, start, start + len(quote))
+    collapsed_page, offsets = _collapse_whitespace(page_text)
+    collapsed_quote, _ = _collapse_whitespace(quote)
+    if not collapsed_quote:
+        return None
+    index = collapsed_page.find(collapsed_quote)
+    if index < 0:
+        return None
+    return QuoteMatch(True, offsets[index], offsets[index + len(collapsed_quote) - 1] + 1)
+
+
+def verify_quote(page_text: str, quote: str) -> QuoteMatch:
+    """Check mechanically that ``quote`` is literally present in ``page_text``.
+
+    The quote is tried verbatim first, then with the wrapper punctuation the model added stripped
+    (:func:`strip_quote_wrapper`); each attempt is matched exactly and then with whitespace runs
+    collapsed on both sides, so a quote copied across a line break still verifies. Only what the
+    model wrapped around the quote is normalized — a quote whose WORDS differ from the page never
+    verifies, which is exactly how a paraphrase is caught. No model judgment is involved, and no
+    fuzzy, token-overlap or edit-distance matching is used or wanted here.
+
+    :param page_text: the fetched page text, exactly as it was handed to the model.
+    :param quote: the model's claimed verbatim quote.
+    :returns: a :class:`QuoteMatch`. ``verified`` is True with RAW page offsets on a hit, False
+        with ``(-1, -1)`` and ``absent`` when the page was in hand and the quote is not in it, and
+        None with ``empty`` / ``no_page`` when there was nothing to check.
+    :raises: nothing — non-string input is simply unchecked.
+    """
+    if not isinstance(quote, str) or not strip_quote_wrapper(quote):
+        return QuoteMatch(None, -1, -1, QUOTE_FAIL_EMPTY)
+    if not isinstance(page_text, str) or not page_text.strip():
+        return QuoteMatch(None, -1, -1, QUOTE_FAIL_NO_PAGE)
+    for candidate in (quote.strip(), strip_quote_wrapper(quote)):
+        match = _locate(page_text, candidate)
+        if match is not None:
+            return match
+    return QuoteMatch(False, -1, -1, QUOTE_FAIL_ABSENT)
+
+
+def hash_page_text(text: str) -> str:
+    """The SHA-256 hex digest of ``text``, so drift or tampering in a stored page is detectable.
+
+    :param text: the fetched page text as the extraction step saw it.
+    :returns: a 64-character lowercase hex digest.
+    :raises: nothing — non-string input is hashed as the empty string.
+    """
+    return hashlib.sha256((text if isinstance(text, str) else "").encode("utf-8")).hexdigest()
+
+
+def store_page(page_id: str, url: str, text: str, max_chars: int) -> Dict[str, Any]:
+    """Freeze ONE visited page into the result payload so its quotes stay checkable forever.
+
+    The stored window is a head slice, and a head slice can silently put a late-page quote out of
+    reach — so ``truncated`` is recorded and :func:`verify_against_stored_page` downgrades a miss
+    on a truncated page to *unverifiable* rather than reporting a false ``absent``. The hash always
+    covers the WHOLE fetched text, so a shortened window still detects drift.
+
+    :param page_id: the id extraction records point back to.
+    :param url: the canonical URL, taken from the fetch.
+    :param text: the fetched page text as the extraction step saw it.
+    :param max_chars: cap on the STORED window; the fetched text is unchanged.
+    :returns: ``{"page_id", "url", "content_hash", "chars", "stored_chars", "truncated", "text"}``.
+    :raises: nothing.
+    """
+    full = text if isinstance(text, str) else ""
+    stored = full[:max(0, int(max_chars))]
+    return {
+        "page_id": page_id, "url": url, "content_hash": hash_page_text(full),
+        "chars": len(full), "stored_chars": len(stored),
+        "truncated": len(stored) < len(full), "text": stored,
+    }
+
+
+def verify_against_stored_page(page: Optional[Dict[str, Any]], quote: str) -> QuoteMatch:
+    """Re-check ``quote`` against a page frozen by :func:`store_page`, offline.
+
+    A quote absent from a page stored IN FULL is a real ``absent`` — the model paraphrased. A quote
+    absent from a TRUNCATED page is merely unverifiable: it may live past the stored window, and
+    calling that a failure would manufacture evidence of fabrication. Same for a missing page.
+
+    :param page: a stored page dict, or None when the extraction's page was not persisted.
+    :param quote: the model's claimed quote.
+    :returns: a :class:`QuoteMatch` with the same tri-state contract as :func:`verify_quote`.
+    :raises: nothing.
+    """
+    if not isinstance(quote, str) or not strip_quote_wrapper(quote):
+        return QuoteMatch(None, -1, -1, QUOTE_FAIL_EMPTY)
+    if not isinstance(page, dict) or not str(page.get("text") or ""):
+        return QuoteMatch(None, -1, -1, QUOTE_FAIL_NO_PAGE)
+    match = verify_quote(str(page.get("text")), quote)
+    if match.verified is False and page.get("truncated"):
+        return QuoteMatch(None, -1, -1, QUOTE_FAIL_NO_PAGE)
+    return match
+
+
+@dataclass
+class Extraction:
+    """One typed record read off ONE page for ONE ledger row. Append-only, never rewritten.
+
+    ``page_id`` / ``quote_start`` / ``quote_end`` are the raw pointer back into the fetched text,
+    kept so that a later summarisation step can never destroy the only copy of a value.
+    """
+
+    entity: str
+    field: str
+    value: str
+    verdict: str
+    source_url: str
+    quote: str
+    quote_verified: Optional[bool]
+    page_id: str
+    quote_start: int = -1
+    quote_end: int = -1
+    quote_fail_reason: Optional[str] = None
+    unit: str = ""
+    value_verified: Optional[bool] = None
+    value_unit_bearing: bool = False
+    value_shape: str = ""
+    value_fail_reason: Optional[str] = None
+
+    def as_dict(self) -> Dict[str, Any]:
+        """This record as a JSON-serializable dict for the result payload."""
+        return {
+            "entity": self.entity, "field": self.field, "value": self.value,
+            "verdict": self.verdict, "source_url": self.source_url, "quote": self.quote,
+            "quote_verified": self.quote_verified, "page_id": self.page_id,
+            "quote_start": self.quote_start, "quote_end": self.quote_end,
+            "quote_fail_reason": self.quote_fail_reason, "unit": self.unit,
+            "value_verified": self.value_verified,
+            "value_unit_bearing": self.value_unit_bearing, "value_shape": self.value_shape,
+            "value_fail_reason": self.value_fail_reason,
+        }
+
+
+@dataclass
+class LedgerRow:
+    """One ``(entity, field)`` obligation on TWO axes.
+
+    ``status`` is the RESOLUTION axis: ``SUPPORTED`` means a value was read off a named page,
+    ``CONFLICTED`` that two equally trusted pages disagreed, ``ABSENT`` / ``BLOCKED`` that a page
+    was consulted and could not supply it, ``OPEN`` that nothing has been read yet.
+    ``quote_verified`` is the VERIFICATION axis, decided only by :func:`verify_quote`. The two are
+    reported together as :attr:`confidence_tier` and never collapsed into one another.
+    """
+
+    entity: str
+    field: str
+    status: str = STATUS_OPEN
+    value: str = ""
+    source_url: str = ""
+    quote: str = ""
+    quote_verified: bool = False
+    unit: str = ""
+
+    @property
+    def resolved(self) -> bool:
+        """True when this row holds ONE value read off a page, quote or no quote.
+
+        ``CONFLICTED`` is not resolved: two values that disagree are not an answer.
+        """
+        return self.status == STATUS_SUPPORTED and bool(self.value)
+
+    @property
+    def confidence_tier(self) -> str:
+        """``resolved_verified`` / ``resolved_unverified`` / ``unresolved`` — the two axes crossed."""
+        if not self.resolved:
+            return TIER_UNRESOLVED
+        return TIER_RESOLVED_VERIFIED if self.quote_verified else TIER_RESOLVED_UNVERIFIED
+
+    def render(self) -> str:
+        """This row as one compact prompt line (~100 chars), value and URL truncated."""
+        head = f"[{self.status}] {self.entity} | {self.field}"
+        if self.status in (STATUS_SUPPORTED, STATUS_CONFLICTED) and self.value:
+            head += f" = {self.value[:_ROW_VALUE_CHARS]}"
+        if self.source_url:
+            head += f" <{self.source_url[:_ROW_URL_CHARS]}>"
+        if self.confidence_tier == TIER_RESOLVED_UNVERIFIED:
+            head += " (unverified quote)"
+        return head
+
+    def as_dict(self) -> Dict[str, Any]:
+        """This row as a JSON-serializable dict for the result payload, both axes explicit."""
+        return {
+            "entity": self.entity, "field": self.field, "status": self.status,
+            "value": self.value, "source_url": self.source_url, "quote": self.quote,
+            "quote_verified": self.quote_verified, "resolved": self.resolved,
+            "confidence_tier": self.confidence_tier, "unit": self.unit,
+        }
+
+
+def derive_field_label(mandate: str) -> str:
+    """The short FIELD label every minted row shares: what the mandate asks about each entity.
+
+    Taken from the mandate's own prose with the enumerated roster blanked out (so a candidate's
+    own wording cannot answer for the question), truncated to a prompt-sized label.
+
+    :param mandate: the task statement.
+    :returns: a non-empty label; ``"requested value"`` when the mandate carries no usable prose.
+    :raises: nothing.
+    """
+    prose = re.sub(r"\s+", " ", strip_enumerated_items(mandate or "")).strip()
+    if not prose:
+        return "requested value"
+    sentence = re.split(r"(?<=[.?!])\s", prose)[0].strip()
+    return (sentence or prose)[:_FIELD_LABEL_CHARS]
+
+
+def _condense(text: str, limit: int = 80) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip()[:limit]
+
+
+def mint_rows(mandate: str, max_rows: Optional[int] = None) -> List[LedgerRow]:
+    """Mint the ledger's rows from ``mandate``, routing on COUNT and never on shape.
+
+    :param mandate: the task statement.
+    :param max_rows: hard cap on the roster; ``None`` takes :func:`max_rows_setting`. A mandate
+        naming more candidates than the cap is truncated, and :meth:`Ledger.roster` reports that.
+    :returns: one row per enumerated named candidate when the mandate names >= 2 of them
+        (capped at ``max_rows``), otherwise exactly ONE row covering the whole mandate — the
+        chain case, in which this loop is plain ReAct plus a one-line ledger.
+    :raises: nothing — an empty mandate still mints its single row.
+    """
+    cap = max_rows_setting() if max_rows is None else max(1, int(max_rows))
+    label = derive_field_label(mandate)
+    names = [name for name in extract_named_candidates(mandate or "") if name.strip()]
+    if len(names) >= 2:
+        return [LedgerRow(entity=_condense(name), field=label) for name in names[:cap]]
+    return [LedgerRow(entity=_condense(mandate) or "(task)", field=label)]
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip()
+
+
+@dataclass
+class Ledger:
+    """The never-expiring sidecar: typed rows plus the append-only extraction records."""
+
+    rows: List[LedgerRow]
+    extractions: List[Extraction] = dataclass_field(default_factory=list)
+    #: The mandate the rows were minted from, kept so the CLOSED roster it names stays countable.
+    mandate: str = ""
+
+    @classmethod
+    def mint(cls, mandate: str, max_rows: Optional[int] = None) -> "Ledger":
+        """Build a ledger for ``mandate`` (see :func:`mint_rows`)."""
+        return cls(rows=mint_rows(mandate, max_rows=max_rows), mandate=mandate or "")
+
+    @staticmethod
+    def _names(row: LedgerRow, entity: str) -> bool:
+        """True when ``entity`` names ``row``: normalized equality, else containment either way."""
+        target, row_norm = _norm(entity), _norm(row.entity)
+        if not target or not row_norm:
+            return False
+        return target == row_norm or target in row_norm or row_norm in target
+
+    def find(self, entity: str) -> Optional[LedgerRow]:
+        """The row ``entity`` names, or ``None``.
+
+        Exact normalized match first, then containment either way (a page may name a row's entity
+        more or less specifically than the mandate did). A single-row ledger always matches, which
+        is what keeps the N=1 case from silently dropping its only value.
+        """
+        if len(self.rows) == 1:
+            return self.rows[0]
+        target = _norm(entity)
+        if not target:
+            return None
+        for row in self.rows:
+            if _norm(row.entity) == target:
+                return row
+        for row in self.rows:
+            if self._names(row, entity):
+                return row
+        return None
+
+    def _is_wildcard(self, row: LedgerRow, entity: str) -> bool:
+        """True when ``row`` came from the single-row catch-all rather than from being named.
+
+        A single-row ledger's entity IS the condensed mandate, so only a record naming it exactly
+        is about that row specifically; anything else reached it through the catch-all and is
+        about whatever the page happened to state. Differing values from such records are not
+        evidence of a disagreement.
+        """
+        return len(self.rows) == 1 and _norm(entity) != _norm(row.entity)
+
+    def open_rows(self) -> List[LedgerRow]:
+        """Rows still awaiting a grounded value."""
+        return [row for row in self.rows if row.status == STATUS_OPEN]
+
+    def apply(self, record: Extraction) -> None:
+        """Fold one extraction record into the ledger, then keep the record forever.
+
+        Transitions, in code and not by model judgment. A ``SUPPORTED`` record CARRYING A VALUE
+        resolves an ``OPEN`` / ``ABSENT`` / ``BLOCKED`` row whether or not its quote verified — the
+        quote decides how much the row is trusted, not whether the value exists. Between records
+        for an already-resolved row: a verified record supersedes an unverified one; an unverified
+        record never overturns a verified one; two records at the SAME tier carrying different
+        values make the row ``CONFLICTED`` at that tier, and a conflict between UNVERIFIED values
+        is itself superseded by a later verified record — otherwise a weak model's paraphrases
+        could permanently deadlock a row it went on to prove. Records that reached a single-row
+        ledger through its catch-all match (:meth:`_is_wildcard`) never conflict it: they are
+        about different facts, not about the same one twice. ``ABSENT`` and ``BLOCKED`` mark only a row that is
+        still ``OPEN``, so a value is never demoted by a later page that simply lacks it.
+
+        :param record: one typed extraction, appended to :attr:`extractions` unconditionally.
+        :returns: None.
+        :raises: nothing — a record naming no known row is kept and changes nothing.
+        """
+        self.extractions.append(record)
+        row = self.find(record.entity)
+        if row is None:
+            return
+        verdict = (record.verdict or "").strip().upper()
+        if verdict == STATUS_SUPPORTED and record.value:
+            self._resolve(row, record, self._is_wildcard(row, record.entity))
+        elif verdict in (STATUS_ABSENT, STATUS_BLOCKED) and row.status == STATUS_OPEN:
+            row.status = verdict
+
+    @staticmethod
+    def _write(row: LedgerRow, record: Extraction) -> None:
+        row.status = STATUS_SUPPORTED
+        row.value = record.value
+        row.source_url = record.source_url
+        row.quote = record.quote
+        row.quote_verified = record.quote_verified is True
+        row.unit = record.unit
+
+    def _resolve(self, row: LedgerRow, record: Extraction, wildcard: bool = False) -> None:
+        """Fold a value-carrying ``SUPPORTED`` record into ``row`` (see :meth:`apply`)."""
+        verified = record.quote_verified is True
+        if row.status == STATUS_CONFLICTED:
+            if verified and not row.quote_verified:
+                self._write(row, record)
+            return
+        if not row.resolved:
+            self._write(row, record)
+            return
+        if _norm(row.value) == _norm(record.value):
+            if verified and not row.quote_verified:
+                self._write(row, record)
+            return
+        if verified and not row.quote_verified:
+            self._write(row, record)
+        elif verified == row.quote_verified and not wildcard:
+            row.status = STATUS_CONFLICTED
+            row.quote_verified = verified
+
+    def status_counts(self) -> Dict[str, int]:
+        """Row count per status."""
+        counts: Dict[str, int] = {}
+        for row in self.rows:
+            counts[row.status] = counts.get(row.status, 0) + 1
+        return counts
+
+    def resolution_counts(self) -> Dict[str, int]:
+        """The two axes, counted separately over the rows.
+
+        :returns: ``{"rows", "resolved", "resolved_verified", "resolved_unverified",
+            "unresolved"}``. ``resolved`` answers "did we obtain the values"; the
+            ``resolved_verified`` / ``resolved_unverified`` split answers "and can we prove them
+            with a verbatim quote" — an analyst reads both without either hiding the other.
+        :raises: nothing.
+        """
+        tiers = [row.confidence_tier for row in self.rows]
+        verified = tiers.count(TIER_RESOLVED_VERIFIED)
+        unverified = tiers.count(TIER_RESOLVED_UNVERIFIED)
+        return {
+            "rows": len(self.rows), "resolved": verified + unverified,
+            "resolved_verified": verified, "resolved_unverified": unverified,
+            "unresolved": tiers.count(TIER_UNRESOLVED),
+        }
+
+    def roster(self) -> Dict[str, Any]:
+        """Completeness of the CLOSED roster the mandate names, as arithmetic on two integers.
+
+        These tasks state every candidate in the prompt, so "did we work them all" needs no
+        discovery and no judgment: it is ``resolved rows >= names in the mandate``. A count,
+        extremum or comparison over a roster one member short is simply a different question —
+        dropping one lake flips a "deeper than 480 m" count.
+
+        :returns: ``{"roster_named", "roster_resolved", "roster_rows", "roster_truncated",
+            "roster_complete"}``. ``roster_named`` is 0 when the mandate enumerates no roster, and
+            the gate is then inert (``roster_complete`` True). ``roster_truncated`` is True when
+            the mandate names more candidates than the row cap admitted — a truncated roster can
+            never complete, which is what keeps an N=16 task from being silently capped.
+        :raises: nothing.
+        """
+        named = len(extract_named_candidates(self.mandate or ""))
+        resolved = sum(1 for row in self.rows if row.resolved)
+        truncated = named > len(self.rows)
+        return {
+            "roster_named": named, "roster_resolved": resolved, "roster_rows": len(self.rows),
+            "roster_truncated": truncated,
+            "roster_complete": named < 2 or (resolved >= named and not truncated),
+        }
+
+    def roster_line(self) -> str:
+        """The banner an INCOMPLETE closed roster earns, for the prompt and the deliverable.
+
+        Emitted whenever the roster is provably short, independent of
+        :func:`roster_gate_enabled` — the banner is advice to the model, while the flag governs
+        only whether :meth:`verdict` may downgrade on it.
+
+        :returns: the warning text, or ``""`` when the roster is complete or names no candidates.
+        :raises: nothing.
+        """
+        status = self.roster()
+        if status["roster_complete"]:
+            return ""
+        line = (f"ROSTER INCOMPLETE: {status['roster_resolved']} of the "
+                f"{status['roster_named']} candidates named in the task have a resolved value. "
+                "Do NOT assert a count, extremum or comparison over this roster — report the "
+                "resolved values, and name the candidates that were not established.")
+        if status["roster_truncated"]:
+            line += (f"\nROSTER TRUNCATED: the ledger carries only {status['roster_rows']} of "
+                     f"those {status['roster_named']} candidates, so the rest were never worked.")
+        return line
+
+    def verdict(self) -> str:
+        """ANSWER / PARTIAL / ABSTAIN, derived from RESOLUTION alone.
+
+        ``ANSWER`` — every row holds ONE value read off a page. ``PARTIAL`` — some rows do and
+        some do not, ``CONFLICTED`` rows included, since two disagreeing values are reportable but
+        are not an answer. ``ABSTAIN`` — no row obtained anything at all, which is the only honest
+        reason to decline: "we did not obtain the values", never "we obtained them but the model
+        paraphrased its quote" and never "we obtained two of them and they disagree". How many
+        of the resolved rows are quote-backed is reported separately by
+        :meth:`resolution_counts`, and a run answering with unverified provenance says so in its
+        deliverable rather than abstaining.
+
+        :returns: one of :data:`VERDICT_ANSWER` / :data:`VERDICT_PARTIAL` / :data:`VERDICT_ABSTAIN`.
+        :raises: nothing — a ledger with no rows abstains.
+        """
+        resolved = sum(1 for row in self.rows if row.resolved)
+        obtained = sum(1 for row in self.rows
+                       if row.resolved or row.status == STATUS_CONFLICTED)
+        if not self.rows or obtained == 0:
+            return VERDICT_ABSTAIN
+        if resolved != len(self.rows):
+            return VERDICT_PARTIAL
+        if roster_gate_enabled() and not self.roster()["roster_complete"]:
+            return VERDICT_PARTIAL
+        return VERDICT_ANSWER
+
+    def render(self) -> str:
+        """The prompt-side ledger block: every row, one compact line each, never truncated."""
+        lines = [f"{i}. {row.render()}" for i, row in enumerate(self.rows, 1)]
+        return "\n".join(lines)
+
+    def render_table(self) -> str:
+        """The finalization table: every row with value, status and source. Never truncated.
+
+        An incomplete closed roster appends :meth:`roster_line`, so the same warning reaches the
+        synthesis prompt and the deliverable.
+        """
+        counts = self.resolution_counts()
+        header = (
+            f"EVIDENCE TABLE ({counts['rows']} rows; {counts['resolved']} resolved, of which "
+            f"{counts['resolved_verified']} are backed by a verbatim quote found on the page):"
+        )
+        lines = [header]
+        for i, row in enumerate(self.rows, 1):
+            value = row.value or "(none)"
+            source = row.source_url or "(no source)"
+            mark = {TIER_RESOLVED_VERIFIED: " [verified quote]",
+                    TIER_RESOLVED_UNVERIFIED: " [UNVERIFIED QUOTE]"}.get(row.confidence_tier, "")
+            lines.append(
+                f"{i}. [{row.status}] {row.entity} | {row.field} = {value} — {source}{mark}")
+        banner = self.roster_line()
+        if banner:
+            lines.append(banner)
+        return "\n".join(lines)
+
+
+def compose_user_prompt(mandate: str, ledger: Ledger, scratchpad: List[str]) -> str:
+    """The per-step user message: task, the FULL ledger, and the last 12 scratchpad steps.
+
+    :param mandate: the task statement.
+    :param ledger: the run's ledger — rendered in full every step, which is the whole mechanism:
+        a row costs ~100 characters and outlives the window that drops its 1500-character
+        observation.
+    :param scratchpad: every step entry so far; only the last ``_SCRATCHPAD_WINDOW`` are shown.
+    :returns: the user message text.
+    :raises: nothing.
+    """
+    history = "\n\n".join(scratchpad[-_SCRATCHPAD_WINDOW:]) if scratchpad else "(no actions yet)"
+    return (
+        f"TASK:\n{mandate}\n\n"
+        f"LEDGER (persists for the whole run):\n{ledger.render()}\n\n"
+        f"SCRATCHPAD (your last {_SCRATCHPAD_WINDOW} steps only — older steps are gone; the "
+        f"ledger above is what survives):\n{history}\n\n"
+        "Return the next step as JSON."
+    )
+
+
+def _loads_first_object(raw: Any) -> Any:
+    """Parse ``raw`` as JSON, tolerating a code fence or surrounding prose. ``None`` on failure."""
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        pass
+    match = re.search(r"[\[{].*[\]}]", raw, re.DOTALL)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(0))
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def _check_value(page_text: str, value: str, unit: str):
+    """Locate ``value`` (with ``unit``, as one span) in ``page_text``.
+
+    ``evidence_graph`` imports this module, so its verifier is imported HERE rather than at module
+    scope; the check itself is not reimplemented.
+
+    :param page_text: the fetched page text.
+    :param value: the value the record claims to have read off it.
+    :param unit: the unit the record reported alongside it, possibly empty.
+    :returns: ``(ValueMatch, shape)`` where shape is ``evidence_graph.value_shape(value, unit)`` —
+        the unit FIELD is passed through so a bare number reported alongside a separate unit
+        (never embedded in ``value`` itself) still counts as unit-bearing coverage.
+    :raises: nothing.
+    """
+    from agent.app.testing.evidence_graph import value_shape, verify_value
+
+    return verify_value(page_text, value, unit=unit), value_shape(value, unit)
+
+
+def _records_from_payload(payload: Any) -> List[Dict[str, Any]]:
+    if isinstance(payload, dict):
+        items = payload.get("extractions")
+        if isinstance(items, list):
+            return [item for item in items if isinstance(item, dict)]
+        return [payload] if payload.get("entity") else []
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    return []
+
+
+async def extract_from_page(agent_io: AgentIO, model_name: str, mandate: str, ledger: Ledger,
+                            page_id: str, page_url: str, page_text: str,
+                            max_tokens: int = 900) -> List[Extraction]:
+    """Run ONE bounded typed-extraction call over a freshly visited page and fold it in.
+
+    :param agent_io: the run's IO facade.
+    :param model_name: executor model.
+    :param mandate: the task statement (context for what a value means).
+    :param ledger: the run's ledger; matched rows are updated via :meth:`Ledger.apply`.
+    :param page_id: stable id of the fetched page, kept on every record as a raw pointer.
+    :param page_url: the visited URL. Taken from the FETCH, never from the model, so a record
+        can't cite a page it did not come from.
+    :param page_text: the fetched page text the quote must literally appear in.
+    :param max_tokens: cap for the extraction call.
+    Each record's VALUE is additionally located on the page by ``evidence_graph.verify_value``,
+    together with the unit the model reported, and the record carries what that found
+    (``value_verified`` / ``value_unit_bearing`` / ``value_shape``). A unit-bearing span is the
+    point: a bare number is far easier to hit by accident, since a page listing feet before metres
+    contains both figures. The check is reported, never a gate — a value that fails it is still a
+    value the model read off a named page.
+
+    :returns: the records produced, in emission order (also appended to ``ledger.extractions``).
+    :raises: nothing — a malformed or failed extraction yields ``[]`` and leaves the ledger as-is.
+    """
+    if not (page_text or "").strip():
+        return []
+    rows_block = "\n".join(f"- entity: {row.entity} | field: {row.field} | status: {row.status}"
+                           for row in ledger.rows)
+    payload = agent_io.build_llm_payload(
+        messages=[
+            {"role": "system", "content": extract_system_prompt(unit_extraction_enabled())},
+            {"role": "user", "content": (
+                f"TASK:\n{mandate}\n\nLEDGER ROWS:\n{rows_block}\n\n"
+                f"SOURCE {page_url}\nPAGE TEXT:\n{page_text}"
+            )},
+        ],
+        json_mode=True, model_name=model_name, temperature=0.0, max_tokens=max_tokens,
+    )
+    try:
+        raw = await agent_io.query_llm(payload, model_name=model_name)
+    except Exception as exc:  # noqa: BLE001. A failed extraction must not end the run.
+        _logger.warning(f"[EVIDENCE-LOOP] extraction failed for {page_url}: {exc}")
+        return []
+    parsed = _loads_first_object(raw)
+    _json_telemetry.record(model_name, raw, True, parsed is not None, phase="evidence_loop_extract")
+
+    records: List[Extraction] = []
+    for item in _records_from_payload(parsed):
+        quote = str(item.get("quote", "") or "")
+        match = verify_quote(page_text, quote)
+        value = str(item.get("value", "") or "")
+        unit = str(item.get("unit", "") or "").strip()
+        value_match, shape = _check_value(page_text, value, unit)
+        record = Extraction(
+            entity=str(item.get("entity", "") or ""),
+            field=str(item.get("field", "") or ""),
+            value=value,
+            verdict=str(item.get("verdict", "") or "").strip().upper(),
+            source_url=page_url,
+            quote=quote,
+            quote_verified=match.verified,
+            page_id=page_id,
+            quote_start=match.start,
+            quote_end=match.end,
+            quote_fail_reason=match.fail_reason,
+            unit=unit,
+            value_verified=value_match.verified,
+            value_unit_bearing=value_match.unit_bearing,
+            value_shape=shape,
+            value_fail_reason=value_match.fail_reason,
+        )
+        ledger.apply(record)
+        records.append(record)
+    return records
+
+
+def render_finalization_context(ledger: Ledger, pages: List[Dict[str, str]],
+                                char_budget: int) -> str:
+    """Assemble the finalization context TABLE-FIRST.
+
+    The table renders in full and is never truncated; quotes for contested cells come next; raw
+    page excerpts get only whatever budget remains, split evenly across pages. That ordering is
+    the point — the graph finalizer's page-first assembly truncates at a per-page cap and then
+    breaks out of its loop, so late evidence silently disappears. Here only the raw excerpts can
+    ever be squeezed.
+
+    :param ledger: the run's ledger.
+    :param pages: ``[{"page_id", "url", "text"}, ...]`` in visit order.
+    :param char_budget: total context budget; the table may exceed it, nothing else may.
+    :returns: the assembled context text.
+    :raises: nothing.
+    """
+    table = ledger.render_table()
+    contested = [row for row in ledger.rows
+                 if row.status == STATUS_CONFLICTED or (row.value and not row.quote_verified)]
+    quote_lines = [f"- {row.entity} | {row.field}: \"{row.quote}\" — {row.source_url}"
+                   for row in contested if row.quote]
+    for record in ledger.extractions:
+        if record.quote and any(_norm(record.entity) == _norm(row.entity) for row in contested):
+            line = f"- {record.entity} = {record.value}: \"{record.quote}\" — {record.source_url}"
+            if line not in quote_lines:
+                quote_lines.append(line)
+    quotes_block = "CONTESTED QUOTES:\n" + ("\n".join(quote_lines) if quote_lines else "(none)")
+
+    residual = max(0, int(char_budget) - len(table) - len(quotes_block))
+    excerpt_lines: List[str] = []
+    if pages and residual > 0:
+        per_page = max(1, residual // len(pages))
+        for page in pages:
+            text = str(page.get("text", "") or "")[:per_page]
+            excerpt_lines.append(f"SOURCE {page.get('url', '')}\n{text}")
+    excerpts_block = "RAW EXCERPTS (truncated to the residual budget):\n" + (
+        "\n\n".join(excerpt_lines) if excerpt_lines else "(none)")
+    return f"{table}\n\n{quotes_block}\n\n{excerpts_block}"
+
+
+def _empty_quote_counts() -> Dict[str, int]:
+    return {"verified": 0, "failed": 0, "unchecked": 0, "absent": 0, "no_page": 0, "empty": 0}
+
+
+def _tally(counts: Dict[str, int], verified: Optional[bool], reason: Optional[str]) -> None:
+    if verified is True:
+        counts["verified"] += 1
+        return
+    counts["failed" if verified is False else "unchecked"] += 1
+    if reason in counts:
+        counts[reason] += 1
+
+
+def _cell_output(cell: Dict[str, Any]) -> Dict[str, Any]:
+    node = cell if isinstance(cell, dict) else {}
+    for key in ("execution", "output"):
+        if isinstance(node.get(key), dict):
+            node = node[key]
+    return node
+
+
+def quote_verification_counts(ledger: Ledger) -> Dict[str, int]:
+    """Split the run's extractions by what quote verification actually found.
+
+    The three causes of a non-verified quote are reported separately because they mean different
+    things: ``absent`` is the model paraphrasing or fabricating (the finding this check exists
+    for), while ``empty`` and ``no_page`` are extractions nothing could be said about. A pass rate
+    without this split is uninterpretable.
+
+    :param ledger: the run's ledger, carrying every append-only extraction record.
+    :returns: ``{"verified", "failed", "unchecked", "absent", "no_page", "empty"}`` counts;
+        ``verified + failed + unchecked`` is the total number of extractions.
+    :raises: nothing.
+    """
+    counts = _empty_quote_counts()
+    for record in ledger.extractions:
+        _tally(counts, record.quote_verified, record.quote_fail_reason)
+    return counts
+
+
+def reverify_cell(cell: Dict[str, Any]) -> Dict[str, Any]:
+    """Re-check every stored extraction of a finished cell against its PERSISTED page, offline.
+
+    This is the audit path: it needs no network, no model and no GPU, and it turns a pass rate into
+    something anyone can reproduce from the artifact alone. Extractions resolve to pages by
+    ``page_id``; an extraction whose page was not persisted, or whose quote falls past a truncated
+    window, is reported unverifiable rather than failed.
+
+    :param cell: a result-cell dict — the full saved JSON, its ``execution`` node, or the
+        ``output`` node itself; all three resolve to the same payload.
+    :returns: ``{"pages": n, "extractions": [{page_id, url, quote, quote_verified,
+        quote_fail_reason}], "counts": {...}}`` with counts as in
+        :func:`quote_verification_counts`.
+    :raises: nothing — a cell with no ``extractions`` reports zeroes.
+    """
+    output = _cell_output(cell)
+    pages = {str(page.get("page_id")): page
+             for page in output.get("pages", []) if isinstance(page, dict)}
+    counts = _empty_quote_counts()
+    rows: List[Dict[str, Any]] = []
+    for record in output.get("extractions", []):
+        if not isinstance(record, dict):
+            continue
+        page = pages.get(str(record.get("page_id")))
+        match = verify_against_stored_page(page, str(record.get("quote", "") or ""))
+        _tally(counts, match.verified, match.fail_reason)
+        rows.append({
+            "page_id": record.get("page_id"), "url": (page or {}).get("url", ""),
+            "quote": record.get("quote", ""), "quote_verified": match.verified,
+            "quote_fail_reason": match.fail_reason,
+        })
+    return {"pages": len(pages), "extractions": rows, "counts": counts}
+
+
+@dataclass
+class EvidenceLoopResult:
+    """What one run of :func:`run_evidence_loop` produced."""
+
+    deliverable: str
+    ledger: Ledger
+    scratchpad: List[str]
+    verdict: str
+    pages: List[Dict[str, Any]] = dataclass_field(default_factory=list)
+
+
+def _fmt_search(results: List[Dict[str, str]], k: int) -> str:
+    lines = []
+    for i, item in enumerate((results or [])[:k], 1):
+        lines.append(f"{i}. {item.get('title','')} — {item.get('url','')}\n   "
+                     f"{item.get('description','')}")
+    return "SEARCH RESULTS:\n" + ("\n".join(lines) if lines else "(none)")
+
+
+async def _verify_claim(agent_io: AgentIO, claim: str, evidence: str, model_name: str) -> str:
+    messages = [
+        {"role": "system", "content": (
+            "Judge whether the CLAIM is supported by the EVIDENCE (text from the pages already "
+            "visited). Reply in one line: TRUE / PARTIALLY_TRUE / FALSE / UNVERIFIABLE, then the "
+            "supporting-or-contradicting source URL and a brief reason.")},
+        {"role": "user", "content": f"CLAIM: {claim}\n\nEVIDENCE:\n{evidence[:8000] or '(no evidence gathered yet)'}"},
+    ]
+    payload = agent_io.build_llm_payload(messages=messages, json_mode=False,
+                                         model_name=model_name, temperature=0.0, max_tokens=300)
+    return (await agent_io.query_llm(payload, model_name=model_name)) or "UNVERIFIABLE"
+
+
+def _decorate(answer: str, ledger: Ledger) -> str:
+    """The deliverable: the model's prose, the full table, and BOTH axes stated in one line.
+
+    :param answer: the model's prose answer.
+    :param ledger: the run's ledger.
+    :returns: the decorated deliverable. The verdict line reports rows resolved and, separately,
+        rows backed by a verified quote; when those differ the answer carries an explicit
+        ``UNVERIFIED PROVENANCE`` flag, which is more useful than declining the answer outright.
+    :raises: nothing.
+    """
+    counts = ledger.resolution_counts()
+    total = counts["rows"]
+    verdict_line = (f"VERDICT: {ledger.verdict()} "
+                    f"({counts['resolved']}/{total} ledger rows resolved; "
+                    f"{counts['resolved_verified']}/{total} backed by a verified verbatim quote)")
+    if counts["resolved_unverified"]:
+        verdict_line += (f"\nUNVERIFIED PROVENANCE: {counts['resolved_unverified']} resolved "
+                         "row(s) cite a quote that is not literally present on the cited page; "
+                         "their values are reported, their supporting text is not proven.")
+    return f"{answer}\n\n{ledger.render_table()}\n{verdict_line}".strip()
+
+
+async def run_evidence_loop(agent_io: AgentIO, mandate: str, model_name: str, max_steps: int,
+                            max_tokens: int) -> EvidenceLoopResult:
+    """Run the flat ReAct loop with the ledger, per-hop extraction and quote grounding.
+
+    :param agent_io: the run's IO facade (search / visit / query_llm / build_llm_payload).
+    :param mandate: the task statement.
+    :param model_name: executor model.
+    :param max_steps: hard step budget for the flat loop.
+    :param max_tokens: cap for the final synthesis call.
+    :returns: an :class:`EvidenceLoopResult` carrying the deliverable, the ledger (rows and
+        append-only extraction records), the full scratchpad and the derived verdict.
+    :raises: nothing from the tool surface — a failed search/visit becomes an observation, and a
+        malformed decision becomes an empty decision, exactly as in the sequential control.
+    """
+    page_chars = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_PAGE_CHARS", "6000"))
+    search_k = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_SEARCH_K", "6"))
+    step_max_tokens = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_STEP_MAX_TOKENS", "4096"))
+    final_context_chars = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_FINAL_CHARS", "12000"))
+    store_chars = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_STORE_CHARS", str(page_chars)))
+    dedup_search = os.environ.get("IDEA_TEST_EVIDENCE_LOOP_DEDUP_SEARCH", "1") not in (
+        "0", "false", "False")
+
+    ledger = Ledger.mint(mandate)
+    scratchpad: List[str] = []
+    pages: List[Dict[str, Any]] = []
+    # What the MODEL sees is always the full fetched text: the storage cap must never silently
+    # shrink the finalization context.
+    context_pages: List[Dict[str, str]] = []
+    seen_queries: set = set()
+    last_answer = ""
+
+    for step in range(max_steps):
+        messages = [
+            {"role": "system", "content": _SYSTEM},
+            {"role": "user", "content": compose_user_prompt(mandate, ledger, scratchpad)},
+        ]
+        payload = agent_io.build_llm_payload(messages=messages, json_mode=True,
+                                             model_name=model_name, temperature=0.1,
+                                             max_tokens=step_max_tokens)
+        raw = await agent_io.query_llm(payload, model_name=model_name)
+        decision = _loads_first_object(raw)
+        _json_telemetry.record(model_name, raw, True, decision is not None, phase="evidence_loop")
+        if isinstance(decision, list):
+            decision = next((item for item in decision if isinstance(item, dict)), {})
+        if not isinstance(decision, dict):
+            decision = {}
+        action = str(decision.get("action", "")).strip().lower()
+        args = decision.get("args")
+        if not isinstance(args, dict):
+            args = {}
+        thought = str(decision.get("thought", ""))[:300]
+
+        if action == "finish" or step == max_steps - 1:
+            last_answer = str(args.get("answer", "")) or last_answer
+            if last_answer:
+                return EvidenceLoopResult(_decorate(last_answer, ledger), ledger, scratchpad,
+                                          ledger.verdict(), pages)
+            context = render_finalization_context(ledger, context_pages, final_context_chars)
+            messages = [
+                {"role": "system", "content": _SYNTHESIS_SYSTEM},
+                {"role": "user", "content": f"TASK:\n{mandate}\n\n{context}"},
+            ]
+            payload = agent_io.build_llm_payload(messages=messages, json_mode=False,
+                                                 model_name=model_name, temperature=0.3,
+                                                 max_tokens=max_tokens)
+            answer = (await agent_io.query_llm(payload, model_name=model_name)) or ""
+            return EvidenceLoopResult(_decorate(answer, ledger), ledger, scratchpad,
+                                      ledger.verdict(), pages)
+
+        if action == "search":
+            query = str(args.get("query", ""))
+            norm = re.sub(r"\s+", " ", query).strip().lower()
+            if dedup_search and norm and norm in seen_queries:
+                obs = (f"ALREADY SEARCHED '{query[:80]}'. Its results are in your scratchpad above — "
+                       "VISIT one of those result URLs to read it, or FINISH if you have enough. "
+                       "Do not repeat a search you have already run.")
+            else:
+                if norm:
+                    seen_queries.add(norm)
+                try:
+                    results = await agent_io.search(query, count=search_k, timeout_seconds=20)
+                    obs = _fmt_search(results or [], search_k)
+                except Exception as exc:  # noqa: BLE001
+                    obs = f"SEARCH ERROR: {exc}"
+        elif action == "visit":
+            url = str(args.get("url", "")).strip()
+            try:
+                content = (await agent_io.visit(url, timeout_seconds=30) or "")[:page_chars]
+                error = None
+            except Exception as exc:  # noqa: BLE001
+                content, error = "", exc
+            if error is not None:
+                obs = f"VISIT ERROR for {url}: {error}"
+            elif not content.strip():
+                obs = f"VISIT ERROR for {url}: no extractable page text"
+            else:
+                page_id = f"p{len(pages) + 1}"
+                pages.append(store_page(page_id, url, content, store_chars))
+                context_pages.append({"page_id": page_id, "url": url, "text": content})
+                await extract_from_page(agent_io, model_name, mandate, ledger,
+                                        page_id=page_id, page_url=url, page_text=content)
+                obs = f"PAGE {url}:\n{content}"
+        elif action == "verify":
+            claim = str(args.get("claim", ""))
+            evidence = "\n\n".join(f"SOURCE {p['url']}\n{p['text']}" for p in context_pages)
+            verdict = await _verify_claim(agent_io, claim, evidence, model_name)
+            obs = f"VERIFY '{claim[:80]}': {verdict}"
+        else:
+            obs = "INVALID ACTION. Use search/visit/verify/finish."
+
+        scratchpad.append(
+            f"STEP {step+1}: thought={thought}\naction={action} args={json.dumps(args)[:200]}\n"
+            f"observation={obs[:_UNCAPPED_OBSERVATION_CHARS]}")
+
+    return EvidenceLoopResult(_decorate(last_answer, ledger), ledger, scratchpad, ledger.verdict(),
+                              pages)
+
+
+async def run_evidence_loop_execution(
+    test_module: IdeaTestModule,
+    model_name: str,
+    connector_llm: ConnectorLLM,
+    connector_search: ConnectorSearch,
+    connector_http: ConnectorHttp,
+    connector_chroma: ConnectorChroma,
+    run_stamp: str,
+    cell_tag: str = "",
+    summarize_observability_func=summarize_observability,
+    connector_browser=None,
+    idea_settings: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Run the evidence-loop variant; same result shape as every other execution variant.
+
+    ``output`` carries the standard ``final_deliverable`` / ``success`` / ``action_summary`` keys
+    the analysis scripts read, PLUS this arm's own fields — additive, so nothing downstream has to
+    know about them. They report the two axes separately: RESOLUTION in ``ledger_verdict``,
+    ``ledger_resolution_counts``, ``rows_resolved``, ``rows_quote_backed``, ``rows_unresolved``,
+    ``unverified_provenance`` and each row's ``confidence_tier``; ROSTER COMPLETENESS in
+    ``roster_named`` / ``roster_resolved`` / ``roster_rows`` / ``roster_truncated`` /
+    ``roster_complete`` / ``roster_gate``, so a count asserted over a partial closed roster is
+    visible in the artifact; VERIFICATION in
+    ``quote_verified_count``, ``quote_unverified_count``, ``quote_unchecked_count`` and
+    ``quote_fail_reasons``, counted over extractions and unaffected by how rows resolved. ``pages`` freezes every visited page
+    (id, URL, content hash, text) so :func:`reverify_cell` can re-audit the run's quotes offline
+    from the saved artifact alone.
+
+    :param test_module: the task under test.
+    :param model_name: executor model.
+    :param connector_llm: LLM connector (its model is set from ``model_name``).
+    :param connector_search: search connector.
+    :param connector_http: HTTP fetch connector.
+    :param connector_chroma: vector-store connector.
+    :param run_stamp: the run's timestamp, used in the correlation id and trace path.
+    :param cell_tag: disambiguating suffix shared with the result JSON's filename.
+    :param summarize_observability_func: observability summarizer (visit counts etc.).
+    :param connector_browser: optional headless-Chrome fallback, wired like every other arm.
+    :param idea_settings: accepted for signature parity and currently UNREAD — this arm has no
+        graph knobs, and pretending otherwise would suggest it can be tuned when it cannot.
+    :returns: the standard execution-result dict.
+    :raises: nothing — a crashing loop is reported as an unsuccessful, well-formed result.
+    """
+    connector_llm.set_model(model_name)
+    test_id = test_module.metadata.get("test_id", "unknown")
+    correlation_id = f"idea_test_{test_id}_{model_name}_evidence_loop_{run_stamp}"
+
+    results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    trace_path = build_trace_path(results_dir, run_stamp, test_id, model_name, "evidence_loop",
+                                  cell_tag)
+    tracer = TraceRecorder(trace_path)
+
+    mandate = test_module.get_task_statement()
+    mandate_suffix = os.environ.get("IDEA_TEST_MANDATE_SUFFIX", "").strip()
+    if mandate_suffix:
+        mandate = f"{mandate}\n\n{mandate_suffix}"
+
+    telemetry = TelemetrySession(enabled=True, mandate=mandate, correlation_id=correlation_id,
+                                 trace_path=trace_path)
+    agent_io = AgentIO(
+        connector_llm=connector_llm, connector_search=connector_search,
+        connector_http=connector_http, connector_chroma=connector_chroma,
+        connector_browser=connector_browser,
+        telemetry=telemetry, collection_name=f"idea_test_{test_id}_{run_stamp}",
+    )
+
+    max_steps = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_MAX_STEPS", "25"))
+    max_tokens = int(os.environ.get("IDEA_TEST_BASELINE_MAX_TOKENS", "8192"))
+    started = time.perf_counter()
+    result: Optional[EvidenceLoopResult] = None
+    try:
+        result = await run_evidence_loop(agent_io, mandate, model_name, max_steps, max_tokens)
+    except Exception as exc:  # noqa: BLE001. Same failure contract as the sibling variants.
+        _logger.error(f"Evidence loop failed: {exc}", exc_info=True)
+
+    ledger = result.ledger if result else Ledger.mint(mandate)
+    deliverable = result.deliverable if result else ""
+    quote_counts = quote_verification_counts(ledger)
+    resolution_counts = ledger.resolution_counts()
+    roster = ledger.roster()
+    output = {
+        "final_deliverable": deliverable,
+        "success": bool(deliverable),
+        "goal_achieved": None,
+        "action_summary": "evidence_loop",
+        "ledger": [row.as_dict() for row in ledger.rows],
+        "ledger_verdict": result.verdict if result else ledger.verdict(),
+        "ledger_status_counts": ledger.status_counts(),
+        "ledger_resolution_counts": resolution_counts,
+        "rows_resolved": resolution_counts["resolved"],
+        "rows_quote_backed": resolution_counts["resolved_verified"],
+        "rows_unresolved": resolution_counts["unresolved"],
+        "unverified_provenance": bool(resolution_counts["resolved_unverified"]),
+        "extractions": [record.as_dict() for record in ledger.extractions],
+        **roster,
+        "roster_gate": roster_gate_enabled(),
+        "pages": result.pages if result else [],
+        "quote_verified_count": quote_counts["verified"],
+        "quote_unverified_count": quote_counts["failed"],
+        "quote_unchecked_count": quote_counts["unchecked"],
+        "quote_fail_reasons": {reason: quote_counts[reason]
+                               for reason in (QUOTE_FAIL_ABSENT, QUOTE_FAIL_NO_PAGE,
+                                              QUOTE_FAIL_EMPTY)},
+    }
+    telemetry.finish(success=output["success"])
+    tracer.close()
+
+    observability = summarize_observability_func({"output": output}, telemetry, model_name)
+    telemetry_summary = telemetry.summary()
+    ended = time.perf_counter()
+
+    if not traces_retained():
+        try:
+            if trace_path.exists():
+                trace_path.unlink()
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning(f"Failed to delete trace file {trace_path}: {exc}")
+
+    return {
+        "output": output,
+        "graph": _empty_graph(),
+        "observability": observability,
+        "duration_seconds": round(max(0.0, ended - started), 2),
+        "telemetry": {
+            "correlation_id": correlation_id,
+            "trace_file": str(trace_path),
+            "events_count": len(telemetry.events),
+            "timings_count": len(telemetry.timings),
+        },
+        "telemetry_raw": telemetry_summary,
+    }
