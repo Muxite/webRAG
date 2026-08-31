@@ -290,3 +290,79 @@ def _run_live_harvest(mandates, search, visit, *, queries_per_task, visits_per_q
         queries_per_task=queries_per_task,
         visits_per_query=visits_per_query,
         max_searches=max_searches))
+
+
+# --------------------------------------------------------------------------------------
+# --live mode: one failing search must not destroy a whole paid harvest
+# --------------------------------------------------------------------------------------
+
+
+class _FlakySearch:
+    """Raises on the Nth call, returns results otherwise — a transient provider failure."""
+
+    def __init__(self, fail_on_call: int, results):
+        self.fail_on_call = fail_on_call
+        self.results = results
+        self.calls = 0
+
+    async def __call__(self, query, count):
+        self.calls += 1
+        if self.calls == self.fail_on_call:
+            raise RuntimeError("Search API query failed: status=None data=Request failed "
+                               "after 3 attempts: ")
+        return self.results
+
+
+def test_live_harvest_survives_one_failed_search_and_keeps_going():
+    """A single transient search failure must skip that QUERY, never abort the harvest.
+
+    Observed live building the 210-231 corpus: the very first search raised
+    ``Request failed after 3 attempts`` and the whole 22-task run died, discarding every
+    document already paid for. The sibling ``visit`` call inside this same loop has always been
+    guarded ("one bad fetch must not abort the run"); the search was not, which is an asymmetry
+    with real money on it.
+    """
+    search = _FlakySearch(fail_on_call=1, results=[
+        {"url": "https://example.org/a", "title": "A", "description": "da"}])
+    visit = _FakeVisit(text_by_url={"https://example.org/a": "body a"})
+    docs, searches_used, exhausted = _run_live_harvest(
+        [("100", "first query here."), ("200", "second query here.")],
+        search, visit, queries_per_task=1, visits_per_query=1, max_searches=10)
+    assert search.calls == 2, "the harvest must attempt the second task after the first failed"
+    assert [d["url"] for d in docs] == ["https://example.org/a"]
+    assert searches_used == 2, "a failed attempt still counts against the paid budget"
+    assert not exhausted
+
+
+def test_live_harvest_that_fails_every_search_still_returns_cleanly():
+    """An entirely dead provider yields no documents rather than an exception."""
+    search = _FlakySearch(fail_on_call=1, results=[])
+
+    async def always_fails(query, count):
+        raise RuntimeError("Search API query failed: status=None data=")
+
+    visit = _FakeVisit()
+    docs, searches_used, exhausted = _run_live_harvest(
+        [("100", "a query."), ("200", "b query.")],
+        always_fails, visit, queries_per_task=1, visits_per_query=1, max_searches=10)
+    assert docs == []
+    assert searches_used == 2
+    assert not exhausted
+
+
+def test_a_failed_search_still_consumes_the_budget_so_a_dead_key_cannot_loop():
+    """The budget is a spend ceiling, so a failing call must still count toward it."""
+
+    async def always_fails(query, count):
+        raise RuntimeError("boom")
+
+    visit = _FakeVisit()
+    # Four tasks, one derived query each, against a ceiling of three: the fourth task is the one
+    # that trips exhaustion. (A single mandate would not do -- `derive_queries` collapses short
+    # sentence lists into ONE query, so per-task queries are not a reliable way to spend budget.)
+    mandates = [(str(100 * n), f"Task {n} about the Gotthard Base Tunnel in Switzerland.")
+                for n in range(1, 5)]
+    _, searches_used, exhausted = _run_live_harvest(
+        mandates, always_fails, visit, queries_per_task=1, visits_per_query=1, max_searches=3)
+    assert searches_used == 3
+    assert exhausted

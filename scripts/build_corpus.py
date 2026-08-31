@@ -24,6 +24,7 @@ import asyncio
 import json
 import os
 import re
+import logging
 import sys
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Tuple
@@ -38,6 +39,8 @@ MAX_TEXT_CHARS = 20000
 #: articles diverge, short enough that different truncations of one page still agree.
 CONTENT_KEY_CHARS = 400
 
+
+_logger = logging.getLogger(__name__)
 
 def _cell_output(payload: Any) -> Dict[str, Any]:
     """The ``execution.output`` dict of a result payload, or ``{}`` when absent."""
@@ -272,7 +275,17 @@ async def live_harvest(
             if max_searches is not None and searches_used >= max_searches:
                 budget_exhausted = True
                 break
-            results = await query_search(query, visits_per_query) or []
+            # A failed search skips this QUERY; it must never abort the harvest. The sibling
+            # `visit` below has always been guarded, and the asymmetry had real money on it: one
+            # transient "Request failed after 3 attempts" on the FIRST query of a 22-task build
+            # discarded every document already paid for. The attempt still counts against
+            # `max_searches`, so a dead key or an exhausted quota burns the budget down and stops
+            # rather than retrying forever.
+            try:
+                results = await query_search(query, visits_per_query) or []
+            except Exception as exc:  # noqa: BLE001 -- one bad search must not abort the run
+                _logger.warning(f"[BUILD-CORPUS] search failed for {query[:60]!r}: {exc}")
+                results = []
             searches_used += 1
             for row in list(results)[:visits_per_query]:
                 url = str((row or {}).get("url") or "")
