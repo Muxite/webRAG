@@ -447,6 +447,45 @@ TEST_PRIORITY_ORDER = [
     "166",  # N-sweep N=8: same template, 8 independent one-page infobox reads + argmin running time (Godzilla Raids Again, 81 min; margin 5) (7/10) - level=graph, weight=long
     "167",  # N-sweep N=16: same template, 16 independent one-page infobox reads + argmin running time (All Monsters Attack, 70 min; margin 11) (8/10) - level=graph, weight=long
     "168",  # N-sweep N=32: same template, 32 independent one-page infobox reads + argmin running time (All Monsters Attack, 70 min; margin 11) (9/10) - level=graph, weight=long
+    # NUMERIC SUITE (2026-08-31, Euglena Ledger layer 4): web-grounded tasks whose answer REQUIRES
+    # arithmetic over values extracted off pages, so the derivation graph has something to measure.
+    # The effect was unmeasurable on core_long24, which contains almost no such task. Every keystone
+    # demands the DERIVED value -- printed on no source page -- plus grounding, so a parametric arm
+    # floors at ~0 by construction. Authored against test_052's validator shape and test_204/205's
+    # rigour (two independent reference solvers, import-time constraint assertions, stated margins).
+    "210",  # Numeric: same-unit difference, chimney height: GRES-2 stack (419.7 m) - Inco Superstack (381 m) = 38.7 m (7/10) - level=graph, weight=medium
+    "211",  # Numeric: same-unit sum, lake max depth: Baikal (1,642 m) + Tanganyika (1,470 m) = 3,112 m (6/10) - level=graph, weight=medium
+    "212",  # Numeric: same-unit difference, rail tunnel length: Gotthard Base (57.09 km) - Seikan (53.85 km) = 3.24 km (7/10) - level=graph, weight=medium
+    "213",  # Numeric: same-unit difference, national park area: Wood Buffalo (44,741 km2) - Kruger (19,623 km2) = 25,118 km2 (7/10) - level=graph, weight=medium
+    "214",  # Numeric: dimensionless ratio, hydropower capacity: Xiluodu (13,860 MW) / Longtan (6,426 MW) = 2.157x (7/10) - level=graph, weight=medium
+    "215",  # Numeric: COMPOSED num/den unit, stadium cost per seat: Puskas Arena (EUR 533M) / 67,215 seats = ~EUR 7,930/seat (8/10) - level=graph, weight=medium
+    "216",  # Numeric: COMPOSED num/den unit, average speed: Tokaido Shinkansen (515.4 km) / 2h21m = ~219.3 km/h (8/10) - level=graph, weight=medium
+    "217",  # Numeric: dimensionless ratio, lake area: Titicaca (8,372 km2) / Tahoe (490 km2) = 17.09x (7/10) - level=graph, weight=medium
+    # Argmax over a DERIVED quantity: the raw-value leader is deliberately NOT the derived-value
+    # winner, so an arm that skips the arithmetic and reports the famous superlative scores 0.
+    "218",  # Numeric argmax: channel-length density (length/basin area); Mekong beats the longest (Nile) and largest-basin (Amazon) (9/10) - level=graph, weight=long
+    "219",  # Numeric argmax: waterfall aspect ratio (height/width); Multnomah beats the tallest (Kaieteur) and widest (Victoria) (8/10) - level=graph, weight=long
+    "220",  # Numeric argmax: bridge span fraction (main span/total length); Humber beats longest-span (Akashi Kaikyo) and longest-overall (Mackinac) (8/10) - level=graph, weight=long
+    "221",  # Numeric argmax: average floor height (height/floors); One WTC beats the world's-tallest decoy (Burj Khalifa), 8.1% margin (9/10) - level=graph, weight=long
+    # Incompatible-unit REFUSAL. Correct behaviour is declining to combine, never converting: the
+    # derivation layer refuses two different present units and has no conversion table by design.
+    # A confidently-converted (even arithmetically correct) answer scores 0. This rewards a
+    # system-level policy, not an inability to convert -- do not "fix" it as inverted logic.
+    "222",  # Numeric refusal: Wimbledon prize money (GBP) vs US Open (USD) -- refuse to combine, do not convert (8/10) - level=graph, weight=medium
+    "223",  # Numeric refusal: World Snooker prize fund (GBP) vs WSOP Main Event (USD) -- refuse to combine (8/10) - level=graph, weight=medium
+    "224",  # Numeric refusal: Chhaava opening weekend (INR crore) vs A Minecraft Movie (USD) -- refuse to combine (8/10) - level=graph, weight=medium
+    # Missing operand: one required value is genuinely unrecorded, so PARTIAL/ABSTAIN is correct and
+    # a confidently-completed number is wrong. The un-gated coverage axis stops blanket abstention
+    # from scoring: an arm that abstains without gathering the AVAILABLE operands still scores 0 there.
+    "225",  # Numeric abstention: Renaissance artist birth dates; Donatello's exact date is unrecorded (only "c. 1386") (8/10) - level=graph, weight=long
+    "226",  # Numeric abstention: software creators' birth dates; Satoshi Nakamoto's identity and date are unknown (8/10) - level=graph, weight=long
+    "227",  # Numeric abstention: monument construction costs; the Great Pyramid's original cost is unrecorded (8/10) - level=graph, weight=long
+    # Fabrication bait: the asked-for figure exists NOWHERE while adjacent plausible numbers do, on
+    # the same pages and in the same units. Extends test_160's pattern.
+    "228",  # Numeric bait: McDonald's cumulative Big Mac units sold (never disclosed); bait = the frozen "99 billion served" sign (8/10) - level=graph, weight=long
+    "229",  # Numeric bait: X/Twitter current mDAU (no disclosure since privatization); bait = the stale 237.8M Q2 2022 filing (8/10) - level=graph, weight=long
+    "230",  # Numeric bait: exact Milky Way star count (only a 100-400B estimate exists); bait = rounding an estimate to a single figure (8/10) - level=graph, weight=long
+    "231",  # Numeric bait: verified exact Bitcoin permanently lost (unknowable on-chain); bait = the Chainalysis ~3.7M BTC dormancy estimate (9/10) - level=graph, weight=long
     # Mechanism suite (2026-08-25, DAG v3 ledger plan Sec 8.3): purpose-built tasks that make the
     # ledger/deficit-injector null result interpretable — each isolates ONE failure mechanism the
     # core24 suite never exercises.
