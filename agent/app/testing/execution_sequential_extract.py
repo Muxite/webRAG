@@ -30,6 +30,7 @@ from agent.app.connector_search import ConnectorSearch
 from agent.app.sandbox_tool_surface import PARITY_ACTIONS, run_sandbox_action
 from agent.app.telemetry import TelemetrySession
 from agent.app.trace_recorder import TraceRecorder, build_trace_path, traces_retained
+from agent.app.testing import confidence_channel
 from agent.app.testing.execution import _empty_graph
 from agent.app.testing.execution_evidence_loop import Extraction, Ledger, extract_from_page, store_page
 from agent.app.testing.execution_sequential import (
@@ -278,6 +279,11 @@ async def run_sequential_extract_execution(
         "extractions": [record.as_dict() for record in (result.extractions if result else [])],
         "pages": result.pages if result else [],
     }
+    # The confidence/abstain channel every arm reports (see `confidence_channel` module docstring):
+    # for this arm it is derived from this arm's own extraction records, never a ledger field.
+    channel = confidence_channel.from_sequential_extractions(output["extractions"])
+    if channel is not None:
+        output.update(channel)
     telemetry.finish(success=output["success"])
     tracer.close()
 

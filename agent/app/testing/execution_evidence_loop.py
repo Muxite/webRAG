@@ -63,6 +63,7 @@ from agent.app.idea_policies.candidate_coverage import (
     strip_enumerated_items,
 )
 from agent.app.telemetry import TelemetrySession
+from agent.app.testing import confidence_channel
 from agent.app.testing import json_telemetry as _json_telemetry
 from agent.app.testing.execution import _empty_graph
 from agent.app.testing.test_module import IdeaTestModule
@@ -1704,6 +1705,11 @@ async def run_evidence_loop_execution(
         "derivation_refusals": (ledger.graph.refusal_counts()
                                 if ledger.graph is not None else None),
     }
+    # The confidence/abstain channel every arm reports (see `confidence_channel` module docstring):
+    # for this arm it is a direct re-export of the ledger verdict already computed above.
+    channel = confidence_channel.from_evidence_loop_verdict(output["ledger_verdict"])
+    if channel is not None:
+        output.update(channel)
     telemetry.finish(success=output["success"])
     tracer.close()
 

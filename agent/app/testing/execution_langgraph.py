@@ -26,6 +26,7 @@ from agent.app.trace_recorder import (
     sanitize_path_component,
     traces_retained,
 )
+from agent.app.testing import confidence_channel
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.testing.execution import _empty_graph
@@ -192,6 +193,14 @@ async def run_offtheshelf_execution(
     # `run_*_execution` does — the solver's copy is for standalone `Solver` consumers.
     observability = summarize_observability_func({"output": output}, telemetry, model_name)
     telemetry_summary = telemetry.summary()
+    # The confidence/abstain channel every arm reports (see `confidence_channel` module docstring):
+    # this arm keeps no ledger and emits no typed extractions, so its channel is AUDIT-DERIVED --
+    # the arm-blind auditor run over this arm's own stored pages and final text, never over
+    # another arm's fields (there are none to read here).
+    channel = confidence_channel.from_langgraph_audit(
+        {"output": output, "telemetry_raw": telemetry_summary})
+    if channel is not None:
+        output.update(channel)
     ended = time.perf_counter()
 
     if not traces_retained():
