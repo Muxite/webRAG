@@ -418,6 +418,115 @@ def test_capability_detection_is_skipped_when_emulation_is_off(monkeypatch):
     assert result["tool_transport"] == "native"
 
 
+# --------------------------------------------------------------------------- LEDGER_TOOL_TRANSPORT
+
+
+def test_ledger_tool_transport_unset_behaves_exactly_like_today_on_a_capable_model(monkeypatch):
+    """Hard constraint: an `auto` run (the default, i.e. the var unset) must not change behavior
+    for any model. A capable model still takes the native path."""
+    result, native_calls = _solve_with_capability(monkeypatch, True)
+    assert len(native_calls) == 1
+    assert result["tool_transport"] == "native"
+
+
+def test_ledger_tool_transport_auto_is_equivalent_to_unset(monkeypatch):
+    monkeypatch.setenv("LEDGER_TOOL_TRANSPORT", "auto")
+    result, native_calls = _solve_with_capability(monkeypatch, True)
+    assert len(native_calls) == 1
+    assert result["tool_transport"] == "native"
+
+
+def test_ledger_tool_transport_prompted_forces_the_shim_on_a_capable_model(monkeypatch):
+    """The whole point: this is the only way to measure the shim at $0 on a model (e.g.
+    qwen2.5:7b) that DOES advertise tool calling."""
+    from agent.app import langgraph_solver
+
+    async def _boom(*a, **k):
+        raise AssertionError("capability probe must not run when the transport is forced")
+
+    monkeypatch.setattr(langgraph_solver, "supports_native_tool_calling", _boom)
+    monkeypatch.setenv("LEDGER_TOOL_TRANSPORT", "prompted")
+    result, native_calls = _solve_with_capability(monkeypatch, True)
+    assert native_calls == []
+    assert result["tool_transport"] == "emulated"
+    assert result["final_deliverable"] == "emulated answer"
+
+
+def test_ledger_tool_transport_native_forces_the_native_path_on_an_incapable_model(monkeypatch):
+    from agent.app import langgraph_solver
+
+    async def _boom(*a, **k):
+        raise AssertionError("capability probe must not run when the transport is forced")
+
+    monkeypatch.setattr(langgraph_solver, "supports_native_tool_calling", _boom)
+    monkeypatch.setenv("LEDGER_TOOL_TRANSPORT", "native")
+    result, native_calls = _solve_with_capability(monkeypatch, False)
+    assert len(native_calls) == 1
+    assert result["tool_transport"] == "native"
+
+
+def test_ledger_tool_transport_unrecognized_value_falls_back_to_auto(monkeypatch):
+    monkeypatch.setenv("LEDGER_TOOL_TRANSPORT", "bogus")
+    result, native_calls = _solve_with_capability(monkeypatch, True)
+    assert len(native_calls) == 1
+    assert result["tool_transport"] == "native"
+
+
+def test_legacy_emulation_env_opt_out_is_honored_as_a_native_alias(monkeypatch):
+    """IDEA_TEST_LANGGRAPH_TOOL_EMULATION=0 must keep working as a `native` alias even for a
+    caller that never translated it into the `tool_call_emulation` constructor flag itself (the
+    old reproduction path — direct construction with the flag left at its default True)."""
+    from agent.app import langgraph_solver
+
+    async def _boom(*a, **k):
+        raise AssertionError("capability probe must not run under the legacy opt-out")
+
+    monkeypatch.setattr(langgraph_solver, "supports_native_tool_calling", _boom)
+    monkeypatch.setenv("IDEA_TEST_LANGGRAPH_TOOL_EMULATION", "0")
+    result, native_calls = _solve_with_capability(monkeypatch, False)  # tool_call_emulation=True default
+    assert len(native_calls) == 1
+    assert result["tool_transport"] == "native"
+
+
+def test_explicit_ledger_tool_transport_wins_over_the_legacy_alias(monkeypatch):
+    monkeypatch.setenv("IDEA_TEST_LANGGRAPH_TOOL_EMULATION", "0")
+    monkeypatch.setenv("LEDGER_TOOL_TRANSPORT", "prompted")
+    result, native_calls = _solve_with_capability(monkeypatch, True)
+    assert native_calls == []
+    assert result["tool_transport"] == "emulated"
+
+
+def test_prompted_turn_records_telemetry_via_the_shared_telemetry_session(monkeypatch):
+    """Wiring test: LEDGER_TOOL_TRANSPORT=prompted plus a real TelemetrySession records at least
+    one `tool_call_emulation` timing (payload shape is covered exhaustively in
+    prompted_tools_test.py — this only pins that langgraph_solver actually threads the session
+    through)."""
+    from agent.app import langgraph_solver
+    from agent.app.telemetry import TelemetrySession
+
+    monkeypatch.setenv("LEDGER_TOOL_TRANSPORT", "prompted")
+
+    class _StubGraph:
+        async def astream(self, *a, **k):
+            yield {"messages": [HumanMessage(content="the task"), AIMessage(content="native answer")]}
+            return
+            yield  # pragma: no cover - never reached; makes this an async generator
+
+    monkeypatch.setattr(langgraph_solver, "create_react_agent", lambda *a, **k: _StubGraph())
+    monkeypatch.setattr(LangGraphSolver, "_build_llm",
+                        lambda self: _ScriptedLLM([
+                            '{"thought": "done", "action": "finish", "args": {"answer": "a"}}']))
+    telemetry = TelemetrySession(enabled=True, mandate="the task")
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="qwen2.5:7b",
+    )
+    asyncio.run(solver.solve("the task", max_steps=4, telemetry=telemetry))
+    tool_call_timings = [t for t in telemetry.timings if t.get("name") == "tool_call_emulation"]
+    assert tool_call_timings
+    assert tool_call_timings[0]["payload"]["transport"] == "prompted"
+
+
 # --------------------------------------------------------------------------- result payload
 
 

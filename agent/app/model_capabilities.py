@@ -18,12 +18,52 @@ than adding a second one, and shares its cache.
 from __future__ import annotations
 
 import logging
+import os
 from types import SimpleNamespace
 from typing import Any, Dict, Optional, Tuple
 
 from agent.app.testing.model_metadata import collect_model_metadata, is_local_ollama
 
 _logger = logging.getLogger(__name__)
+
+#: ``LEDGER_TOOL_TRANSPORT`` values understood by :func:`resolve_tool_transport_mode`.
+TOOL_TRANSPORT_MODES = ("auto", "native", "prompted")
+
+
+def resolve_tool_transport_mode() -> str:
+    """Read the forced-transport override for the ``langgraph_react`` arm.
+
+    The emulated (prompted) path has never run in any stored campaign — every ``langgraph_react``
+    cell recorded ``tool_transport == "native"`` because the roster's model
+    (``qwen2.5:7b``) advertises tool calling, so :func:`supports_native_tool_calling` always
+    routes it native. There was previously no way to force the prompted path on a capable model,
+    so the shim could not be measured at all. ``LEDGER_TOOL_TRANSPORT`` fixes that:
+
+    * ``"auto"`` (default, including when unset) — exactly today's behavior: the caller consults
+      :func:`supports_native_tool_calling` and its own ``tool_call_emulation`` opt-out flag.
+    * ``"native"`` — force the native ``create_react_agent`` path regardless of capability.
+    * ``"prompted"`` — force the emulated text/JSON path regardless of capability, the only way
+      to measure the shim at $0 on a tool-calling-capable model.
+
+    The legacy ``IDEA_TEST_LANGGRAPH_TOOL_EMULATION=0`` opt-out (``execution_langgraph.py``'s own
+    env var, translated there into the ``tool_call_emulation`` constructor flag) is honored here
+    too, as an alias for ``"native"``, ONLY when ``LEDGER_TOOL_TRANSPORT`` itself is unset or
+    unrecognized — so old reproductions that only set the old var still reproduce, without
+    overriding a caller who explicitly set the new one.
+
+    :returns: One of :data:`TOOL_TRANSPORT_MODES`.
+    :raises: Never.
+    """
+    raw = os.environ.get("LEDGER_TOOL_TRANSPORT", "").strip().lower()
+    if raw in TOOL_TRANSPORT_MODES:
+        return raw
+    if raw:
+        _logger.warning(
+            "[TOOL-TRANSPORT] unrecognized LEDGER_TOOL_TRANSPORT=%r; using auto", raw,
+        )
+    if os.environ.get("IDEA_TEST_LANGGRAPH_TOOL_EMULATION", "") in ("0", "false", "False"):
+        return "native"
+    return "auto"
 
 #: Hosted-provider model slugs empirically confirmed to reject a ``tools`` request. Hosted
 #: providers expose no capability endpoint, so a deny-list is the only signal available there —
