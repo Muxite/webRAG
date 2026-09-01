@@ -33,14 +33,30 @@ Usage:
       --run-id bfx_r1 --tag q7 --arm good_adaptive --arm good_adaptive_breadth \\
       --slices 4 --exact
 
-Each positional ARM argument is `run_id_prefix[:label]` (label defaults to the prefix itself).
-A prefix may be comma-joined (`idA,idB`) to merge several run-ids into one arm, matching the
-precedent in adaptive_ab_analyze.py::load_arm.
+  # ONE run_id holding multiple arms (idea_test_runner.py convention: every arm of a run is
+  # written under the same run_id, with the arm encoded as execution_variant INSIDE each cell
+  # JSON, not in the run_id) -- split back into distinct arms with `@execution_variant`:
+  PYTHONPATH=.:services:agent ./.venv/bin/python scripts/compare_arms.py \\
+      ledgernum22@evidence_loop:evidence ledgernum22@langgraph_react:langgraph
+
+Each positional ARM argument is `run_id_prefix[@execution_variant][:label]` (label defaults to
+the full prefix[@variant] spec itself). A prefix may be comma-joined (`idA,idB`) to merge
+several run-ids into one arm, matching the precedent in adaptive_ab_analyze.py::load_arm.
+`@execution_variant` (optional) filters the loaded cells to just that execution_variant, read
+from each cell JSON's `execution_variant` field -- REQUIRED whenever two or more arms share a
+run_id, since a bare run_id prefix with no `@variant` matches every arm's cells at once. `@` is
+used (not `:`) so it can never be confused with the pre-existing `[:label]` suffix.
 --shapes points to a JSON file mapping {"task_id": "shape_name", ...}.
 --exact anchors run-id matching (see the flag's own help) -- opt-in, default off for backward
 compatibility with existing invocations.
 --run-id/--tag/--arm/--rep/--slices compose positional-equivalent specs for you and can be
-combined with explicit positional ARM arguments.
+combined with explicit positional ARM arguments (these do not currently support `@variant`;
+use a positional ARM spec when you need both structured selection and a variant filter).
+
+A MANDATORY guard also refuses to print a comparison if any two arms resolve to the IDENTICAL
+set of cell files (e.g. a missing `@variant` filter, or a copy-pasted arm spec) -- see the
+"IDENTICAL set of ... cell files" refusal in sanity_check(), gated by the same
+--i-know-the-data-is-suspect override as the rest of the sanity block.
 """
 import argparse
 import glob
@@ -172,7 +188,7 @@ def _result_files_for_id(run_id, results_dir, exact):
     return sorted(f for f in candidates if anchor.match(os.path.basename(f)))
 
 
-def load_arm(run_id, results_dir=RESULTS_DIR, exact=False):
+def load_arm(run_id, results_dir=RESULTS_DIR, exact=False, variant=None):
     """Load an arm's result rows, one row per cell JSON.
 
     Args:
@@ -182,6 +198,11 @@ def load_arm(run_id, results_dir=RESULTS_DIR, exact=False):
             addressed as a single arm).
         results_dir: directory containing per-cell result JSONs.
         exact: anchor matching per `_result_files_for_id` instead of the loose prefix glob.
+        variant: if given, keep only rows whose `execution_variant` (read from the JSON body,
+            matching bench_common.load_row's precedent -- never parsed from the filename)
+            equals this value. idea_test_runner.py writes every arm of a run under one
+            run_id, encoding the arm as execution_variant, so without this filter a run-id
+            prefix alone resolves to the UNION of every arm's cells (see module docstring).
 
     Returns:
         (rows, unreadable) -- rows is a list of per-cell dicts; unreadable is a list of
@@ -210,6 +231,9 @@ def load_arm(run_id, results_dir=RESULTS_DIR, exact=False):
         if prompt_tokens is None:
             prompt_tokens = (llm.get("prompt") or {}).get("tokens")
         total_tokens = llm.get("total_tokens")
+        cell_variant = d.get("execution_variant")
+        if variant is not None and cell_variant != variant:
+            continue
         rows.append({
             "file": f,
             "test_id": tid,
@@ -222,6 +246,7 @@ def load_arm(run_id, results_dir=RESULTS_DIR, exact=False):
             "searches_ok": _search_success_count(ob),
             "infra_failed": _infra_failed(d, ob),
             "auth_marker": _auth_marker_hit(d),
+            "variant": cell_variant,
         })
     return rows, unreadable
 
@@ -280,6 +305,25 @@ def sanity_check(arms, override=False):
             "n_fully_ungrounded": n_fully_ungrounded, "n_auth": n_auth,
             "n_missing_score": n_missing_score,
         })
+
+    # Guard against the "two arm specs silently resolve to the exact same cells" bug class:
+    # idea_test_runner.py writes every arm of a run under one run_id (the arm lives in
+    # execution_variant, not the run_id), so a run-id-prefix-only arm spec -- or a copy-paste
+    # of the same spec under two labels -- can load the IDENTICAL cell set into both sides of
+    # a comparison and print a perfect, spurious zero delta. Compare resolved cell identity
+    # (file path set) pairwise across arms and refuse if any two arms match exactly.
+    file_sets = [(label, frozenset(r["file"] for r in rows)) for label, rows, _ in arms]
+    for i in range(len(file_sets)):
+        la, fa = file_sets[i]
+        for j in range(i + 1, len(file_sets)):
+            lb, fb = file_sets[j]
+            if fa and fa == fb:
+                hard_fail_reasons.append(
+                    f"arm '{la}' and arm '{lb}' resolved to the IDENTICAL set of {len(fa)} "
+                    f"cell files -- this pair cannot produce a real comparison (check for a "
+                    f"missing/wrong execution-variant filter, e.g. `run_id@variant`, or a "
+                    f"copy-pasted arm spec)")
+
     print("-" * 78)
     if hard_fail_reasons:
         print("REFUSING TO PRINT COMPARISON RESULTS -- the data looks invalid:")
@@ -458,11 +502,29 @@ def per_shape_breakdown(arms, shapes):
 # ---------------------------------------------------------------------------
 
 def parse_arm_spec(spec):
+    """Parse one positional ARM argument: `run_id_prefix[@execution_variant][:label]`.
+
+    `@execution_variant` is optional and filters the loaded rows to just that
+    execution_variant (see load_arm's `variant` param) -- this is how a single run_id that
+    idea_test_runner.py wrote multiple arms under (the arm lives in the JSON's
+    execution_variant field, not the run_id) gets split back into distinct arms. `@` was
+    chosen because `:` is already taken by the pre-existing `[:label]` suffix and this way
+    the two cannot be confused with each other: `:` always splits off the label first (same
+    as before -- unaffected callers who never use `@` see byte-identical behavior), then `@`
+    (if present) splits the remaining run-id part into (prefix, variant).
+
+    Returns:
+        (rid, variant, label) -- variant is None when no `@` is present.
+    """
     if ":" in spec:
-        rid, label = spec.split(":", 1)
+        rid_part, label = spec.split(":", 1)
     else:
-        rid, label = spec, spec
-    return rid, label
+        rid_part, label = spec, spec
+    if "@" in rid_part:
+        rid, variant = rid_part.split("@", 1)
+    else:
+        rid, variant = rid_part, None
+    return rid, variant, label
 
 
 def build_structured_specs(run_id, tag, arms, rep, slices):
@@ -552,13 +614,13 @@ def main(argv=None):
         ap.error("need at least 2 arms to compare")
 
     specs = [parse_arm_spec(s) for s in args.arms]
-    labels = [label for _, label in specs]
+    labels = [label for _, _, label in specs]
     if len(set(labels)) != len(labels):
         ap.error(f"duplicate arm labels: {labels}")
 
     arms = []
-    for rid, label in specs:
-        rows, unreadable = load_arm(rid, args.results_dir, exact=args.exact)
+    for rid, variant, label in specs:
+        rows, unreadable = load_arm(rid, args.results_dir, exact=args.exact, variant=variant)
         arms.append((label, rows, unreadable))
 
     try:

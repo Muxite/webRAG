@@ -16,8 +16,9 @@ import compare_arms as ca  # noqa: E402
 
 
 def _cell(test_id, score=0.5, searches_ok=3, visits=2, infra_failed=False, llm_calls=5,
-          prompt_tokens=1000, total_tokens=1200, final_deliverable="answer text", auth_text=""):
-    return {
+          prompt_tokens=1000, total_tokens=1200, final_deliverable="answer text", auth_text="",
+          variant=None):
+    d = {
         "test_metadata": {"test_id": str(test_id)},
         "execution": {
             "output": {"final_deliverable": final_deliverable + auth_text},
@@ -34,11 +35,18 @@ def _cell(test_id, score=0.5, searches_ok=3, visits=2, infra_failed=False, llm_c
         "validation": {"overall_score": score, "llm_validation": None},
         "infra_failed": infra_failed,
     }
+    if variant is not None:
+        d["execution_variant"] = variant
+    return d
 
 
-def _write_cell(dirpath, run_id, rep, task, suffix_r=1, **kw):
-    d = _cell(task, **kw)
-    fname = f"{run_id}_rep{rep}_{task}_model_engine_cfgabc_r{suffix_r}.json"
+def _write_cell(dirpath, run_id, rep, task, suffix_r=1, variant=None, **kw):
+    d = _cell(task, variant=variant, **kw)
+    # Match the real driver's filename shape when a variant is given so the fixture also
+    # exercises variant-in-filename data, even though the filter reads execution_variant from
+    # the JSON body (matching bench_common.load_row precedent), never the filename.
+    variant_tag = f"_{variant}" if variant else ""
+    fname = f"{run_id}_rep{rep}_{task}_model_engine{variant_tag}_cfgabc_r{suffix_r}.json"
     with open(os.path.join(dirpath, fname), "w") as fh:
         json.dump(d, fh)
     return fname
@@ -108,16 +116,22 @@ def _arm_from_rows(label, rows):
     return (label, rows, [])
 
 
-def _row(test_id, rep, score=0.5, searches_ok=3, visits=2, infra_failed=False, auth_marker=False):
-    return {"file": f"f_{test_id}_{rep}", "test_id": str(test_id), "rep": rep, "score": score,
-            "prompt_tokens": 1000, "total_tokens": 1200, "llm_calls": 5,
+def _row(test_id, rep, score=0.5, searches_ok=3, visits=2, infra_failed=False, auth_marker=False,
+         arm=""):
+    # `arm` namespaces the synthetic "file" path so two rows lists representing two DIFFERENT
+    # real arms (as they would be in practice -- distinct files on disk) don't accidentally
+    # collide under the identical-resolved-cell-set guard purely because this fixture builder
+    # derives "file" from (test_id, rep) alone. Tests that deliberately want two arms to
+    # resolve to the identical cell set (the guard itself) pass the same `arm` value for both.
+    return {"file": f"f_{arm}_{test_id}_{rep}", "test_id": str(test_id), "rep": rep,
+            "score": score, "prompt_tokens": 1000, "total_tokens": 1200, "llm_calls": 5,
             "visits": visits, "searches_ok": searches_ok, "infra_failed": infra_failed,
             "auth_marker": auth_marker}
 
 
 def test_sanity_check_passes_on_healthy_data(capsys):
-    rows_a = [_row(100, 1, searches_ok=3, visits=2) for _ in range(5)]
-    rows_b = [_row(100, 1, searches_ok=3, visits=2) for _ in range(5)]
+    rows_a = [_row(100, 1, searches_ok=3, visits=2, arm="a") for _ in range(5)]
+    rows_b = [_row(100, 1, searches_ok=3, visits=2, arm="b") for _ in range(5)]
     summaries = ca.sanity_check([_arm_from_rows("a", rows_a), _arm_from_rows("b", rows_b)])
     assert len(summaries) == 2
     out = capsys.readouterr().out
@@ -127,8 +141,8 @@ def test_sanity_check_passes_on_healthy_data(capsys):
 def test_sanity_check_refuses_on_ungrounded_run(capsys):
     # every cell has zero successful searches AND zero visits -- a dead search key or
     # equivalent -- must trigger a hard refusal by default.
-    rows_a = [_row(100, r, searches_ok=0, visits=0) for r in range(1, 6)]
-    rows_b = [_row(100, r, searches_ok=3, visits=2) for r in range(1, 6)]
+    rows_a = [_row(100, r, searches_ok=0, visits=0, arm="a") for r in range(1, 6)]
+    rows_b = [_row(100, r, searches_ok=3, visits=2, arm="b") for r in range(1, 6)]
     try:
         ca.sanity_check([_arm_from_rows("ungrounded", rows_a), _arm_from_rows("healthy", rows_b)])
         assert False, "expected SanityFailure"
@@ -139,8 +153,8 @@ def test_sanity_check_refuses_on_ungrounded_run(capsys):
 
 
 def test_sanity_check_override_flag_proceeds_anyway(capsys):
-    rows_a = [_row(100, r, searches_ok=0, visits=0) for r in range(1, 6)]
-    rows_b = [_row(100, r, searches_ok=3, visits=2) for r in range(1, 6)]
+    rows_a = [_row(100, r, searches_ok=0, visits=0, arm="a") for r in range(1, 6)]
+    rows_b = [_row(100, r, searches_ok=3, visits=2, arm="b") for r in range(1, 6)]
     # should NOT raise when override=True
     summaries = ca.sanity_check(
         [_arm_from_rows("ungrounded", rows_a), _arm_from_rows("healthy", rows_b)], override=True)
@@ -158,8 +172,8 @@ def test_sanity_check_refuses_on_empty_arm():
 
 
 def test_sanity_check_refuses_on_auth_markers():
-    rows_a = [_row(100, r, searches_ok=3, visits=2, auth_marker=True) for r in range(1, 6)]
-    rows_b = [_row(100, r, searches_ok=3, visits=2) for r in range(1, 6)]
+    rows_a = [_row(100, r, searches_ok=3, visits=2, auth_marker=True, arm="a") for r in range(1, 6)]
+    rows_b = [_row(100, r, searches_ok=3, visits=2, arm="b") for r in range(1, 6)]
     try:
         ca.sanity_check([_arm_from_rows("bad_auth", rows_a), _arm_from_rows("healthy", rows_b)])
         assert False, "expected SanityFailure"
@@ -384,3 +398,165 @@ def test_per_shape_breakdown_reports_unmapped_tasks(tmp_path, capsys):
     assert "PER-SHAPE BREAKDOWN" in out
     assert "no shape mapping" in out
     assert "999" in out
+
+
+# ---------------------------------------------------------------------------
+# execution_variant filter (the run-id-prefix-only bug)
+# ---------------------------------------------------------------------------
+
+def test_load_arm_without_variant_filter_returns_every_arm_mixed_together(tmp_path):
+    # THE BUG: idea_test_runner.py writes every arm of a run under one run_id, encoding the
+    # arm as execution_variant inside the JSON, not the run_id. Without a variant filter,
+    # load_arm returns all arms' cells for any caller.
+    for v in ("evidence_loop", "sequential_react_extract", "langgraph_react"):
+        _write_cell(tmp_path, "run22", 1, "100", variant=v, score=0.5)
+    rows, _ = ca.load_arm("run22", results_dir=str(tmp_path))
+    assert len(rows) == 3
+    assert {r["variant"] for r in rows} == {
+        "evidence_loop", "sequential_react_extract", "langgraph_react"}
+
+
+def test_load_arm_variant_filter_separates_arms(tmp_path):
+    # THE FIX: passing variant= filters post-load to just that arm's cells.
+    for task in ("100", "101"):
+        for v in ("evidence_loop", "sequential_react_extract", "langgraph_react"):
+            _write_cell(tmp_path, "run22", 1, task, variant=v, score=0.5)
+    evidence, _ = ca.load_arm("run22", results_dir=str(tmp_path), variant="evidence_loop")
+    seqreact, _ = ca.load_arm("run22", results_dir=str(tmp_path),
+                              variant="sequential_react_extract")
+    langgraph, _ = ca.load_arm("run22", results_dir=str(tmp_path), variant="langgraph_react")
+    assert len(evidence) == 2
+    assert len(seqreact) == 2
+    assert len(langgraph) == 2
+    assert {r["file"] for r in evidence}.isdisjoint({r["file"] for r in seqreact})
+    assert {r["file"] for r in evidence}.isdisjoint({r["file"] for r in langgraph})
+
+
+def test_load_arm_variant_filter_on_real_ledgernum22_data():
+    # Live-verifies the fix against the real 66-cell (3 arms x 22 tasks) fixture set already
+    # on disk in agent/idea_test_results/ -- no benchmark run, just reading existing files.
+    all_rows, _ = ca.load_arm("ledgernum22")
+    assert len(all_rows) == 66  # demonstrates the bug persists at the loader level: no filter
+    evidence, _ = ca.load_arm("ledgernum22", variant="evidence_loop")
+    seqreact, _ = ca.load_arm("ledgernum22", variant="sequential_react_extract")
+    langgraph, _ = ca.load_arm("ledgernum22", variant="langgraph_react")
+    assert len(evidence) == 22
+    assert len(seqreact) == 22
+    assert len(langgraph) == 22
+    files_e = {r["file"] for r in evidence}
+    files_s = {r["file"] for r in seqreact}
+    files_l = {r["file"] for r in langgraph}
+    assert files_e.isdisjoint(files_s)
+    assert files_e.isdisjoint(files_l)
+    assert files_s.isdisjoint(files_l)
+
+
+# ---------------------------------------------------------------------------
+# parse_arm_spec: @variant syntax (must not collide with the pre-existing :label syntax)
+# ---------------------------------------------------------------------------
+
+def test_parse_arm_spec_plain_prefix_unchanged():
+    rid, variant, label = ca.parse_arm_spec("myrun")
+    assert (rid, variant, label) == ("myrun", None, "myrun")
+
+
+def test_parse_arm_spec_prefix_with_label_unchanged():
+    rid, variant, label = ca.parse_arm_spec("myrun:mylabel")
+    assert (rid, variant, label) == ("myrun", None, "mylabel")
+
+
+def test_parse_arm_spec_prefix_with_variant():
+    rid, variant, label = ca.parse_arm_spec("ledgernum22@evidence_loop")
+    assert (rid, variant, label) == ("ledgernum22", "evidence_loop", "ledgernum22@evidence_loop")
+
+
+def test_parse_arm_spec_prefix_variant_and_label():
+    rid, variant, label = ca.parse_arm_spec("ledgernum22@evidence_loop:evidence")
+    assert (rid, variant, label) == ("ledgernum22", "evidence_loop", "evidence")
+
+
+def test_main_variant_filter_end_to_end(tmp_path, capsys):
+    for r in range(1, 4):
+        _write_cell(tmp_path, "run22", r, "100", variant="evidence_loop", score=0.9,
+                    searches_ok=3, visits=2)
+        _write_cell(tmp_path, "run22", r, "100", variant="langgraph_react", score=0.4,
+                    searches_ok=3, visits=2)
+    rc = ca.main(["run22@evidence_loop:evidence", "run22@langgraph_react:langgraph",
+                 "--results-dir", str(tmp_path)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "evidence vs langgraph" in out
+    assert "n_usable" not in out  # sanity: real report text, not a repr dump
+    assert "SCORE  Δ(evidence-langgraph) = +0.500" in out
+
+
+# ---------------------------------------------------------------------------
+# identical-resolved-cell-set guard (kills the whole bug class, not just this instance)
+# ---------------------------------------------------------------------------
+
+def test_sanity_check_refuses_when_two_arms_resolve_identical_cell_sets(capsys):
+    rows_a = [_row(100, r) for r in range(1, 4)]
+    rows_b = [_row(100, r) for r in range(1, 4)]  # same "file" keys as rows_a (see _row)
+    try:
+        ca.sanity_check([_arm_from_rows("evidence_loop", rows_a),
+                         _arm_from_rows("langgraph_react", rows_b)])
+        assert False, "expected SanityFailure"
+    except ca.SanityFailure as e:
+        assert "evidence_loop" in str(e) and "langgraph_react" in str(e)
+    out = capsys.readouterr().out
+    assert "REFUSING TO PRINT COMPARISON RESULTS" in out
+    assert "IDENTICAL" in out
+
+
+def test_sanity_check_identical_cell_set_guard_overridable(capsys):
+    rows_a = [_row(100, r) for r in range(1, 4)]
+    rows_b = [_row(100, r) for r in range(1, 4)]
+    summaries = ca.sanity_check(
+        [_arm_from_rows("evidence_loop", rows_a), _arm_from_rows("langgraph_react", rows_b)],
+        override=True)
+    assert len(summaries) == 2
+    out = capsys.readouterr().out
+    assert "proceeding anyway" in out
+
+
+def test_sanity_check_does_not_false_fire_on_distinct_cell_sets(capsys):
+    # different "file" keys (different test_id) -> must NOT trip the identical-set guard
+    rows_a = [_row(100, 1)]
+    rows_b = [_row(101, 1)]
+    summaries = ca.sanity_check([_arm_from_rows("a", rows_a), _arm_from_rows("b", rows_b)])
+    assert len(summaries) == 2
+    out = capsys.readouterr().out
+    assert "sanity checks passed" in out
+
+
+def test_main_reproduces_and_then_fixes_the_zero_delta_bug(tmp_path, capsys):
+    # End-to-end: without the @variant filter, comparing "the same run_id" against itself
+    # under two different display labels loads the identical file set and must now be
+    # REFUSED (previously this silently printed a spurious zero delta).
+    for r in range(1, 4):
+        _write_cell(tmp_path, "run22", r, "100", variant="evidence_loop", score=0.9,
+                    searches_ok=3, visits=2)
+    rc = ca.main(["run22:evidence_loop", "run22:langgraph_react",
+                 "--results-dir", str(tmp_path)])
+    assert rc != 0
+    out = capsys.readouterr().out
+    assert "REFUSING TO PRINT COMPARISON RESULTS" in out
+    assert "ARM-PAIR COMPARISONS" not in out
+
+
+# ---------------------------------------------------------------------------
+# backward compatibility: --slices / structured selection unaffected by @variant addition
+# ---------------------------------------------------------------------------
+
+def test_slices_and_structured_selection_still_work_without_variant(tmp_path, capsys):
+    for s in range(2):
+        _write_cell(tmp_path, f"bfx_y_s{s}_q7_good_adaptive", 1, f"{200 + s}",
+                    score=0.9, searches_ok=3, visits=2)
+        _write_cell(tmp_path, f"bfx_y_s{s}_q7_good_adaptive_breadth", 1, f"{200 + s}",
+                    score=0.3, searches_ok=3, visits=2)
+    rc = ca.main(["--run-id", "bfx_y", "--tag", "q7", "--arm", "good_adaptive",
+                 "--arm", "good_adaptive_breadth", "--slices", "2", "--exact",
+                 "--results-dir", str(tmp_path)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "good_adaptive vs good_adaptive_breadth" in out
