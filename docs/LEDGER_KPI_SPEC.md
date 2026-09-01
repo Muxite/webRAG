@@ -300,4 +300,36 @@ reported as not replicated. It is not a second experiment and confers no ranking
 
 ## Amendments
 
-None. Any change to a definition above is recorded here with a date and a reason.
+### 2026-09-01 — v1.0.0 to v1.1.0: operands must appear in the answer
+
+**Changed.** `support.operands_must_appear_in_answer: true` added. A claim is `recomputable` only
+when the operands that reproduce it are themselves quantities the answer states, not merely
+numbers present somewhere on a visited page. Also recorded:
+`support.measured_cross_cell_false_positive_floor: 0.0188`.
+
+**Why.** The spec's own mandatory control caught the original definition before it reported a
+number. Measured on the tuning split (140 cells, 2,601 cross-cell trials): with operands drawn
+from every number on every page, the coincidence floor was **0.2526** — five times the 0.05
+ceiling, and *higher* than the genuine recomputable rate of 0.145. A pair search over 24 operands
+and 6 operations fires roughly 3,300 candidates at a 2% tolerance window, so it reproduces almost
+any target by luck. The class was measuring its own arithmetic luck.
+
+**Alternatives measured and rejected.** Requiring unit-bearing operands alone: floor 0.128, still
+over ceiling. Tightening the tolerance to 1e-3: floor 0.0008 but genuine detection collapses to
+0.068, rejecting the legitimate rounding the suite's own `VALUE_TOL` of 2e-2 exists to allow.
+Requiring stated operands *and* unit-bearing: floor 0.0038 with genuine 0.263 — a better ratio,
+but it discards about a quarter of genuine detections for a floor already well inside the
+ceiling.
+
+**Chosen.** Stated operands only. Measured with the shipped implementation: floor **0.0188**,
+inside the 0.05 ceiling. The rationale is also substantive rather than merely statistical — a real
+derivation is reported together with its inputs.
+
+The standalone comparison that selected this option reported 0.0138 for the same rule. The
+shipped figure is higher because the implementation gives `on_page` priority before testing
+recomputability, so the two are measuring slightly different denominators. **0.0188 is the
+reportable number**, because it is the one the code that produces the KPI actually yields; the
+comparison's figures are retained above only for the relative ordering that drove the choice.
+
+**Effect on prior numbers.** None published. The original definition never produced a reported
+figure; the control ran before any support number was released.

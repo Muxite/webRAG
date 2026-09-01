@@ -27,7 +27,7 @@ _DOC_PATH = _ROOT / "docs" / "LEDGER_KPI_SPEC.md"
 #: sha256 of ``scripts/ledger_kpi_spec.json`` as frozen on 2026-09-01. Updating this constant is
 #: the deliberate, reviewable act of amending a frozen specification -- see the amendment section
 #: at the bottom of the doc, which must be updated in the same commit.
-FROZEN_SHA256 = "9e29c4a78a487b10e0724b8c605b861c53ca50c5c234bc1d37913596ef7b5115"
+FROZEN_SHA256 = "5be51a6da4365c31b2b817b065d8cb94e26bb35052a796f37749c478381fdc9a"
 
 
 @pytest.fixture(scope="module")
