@@ -1,6 +1,9 @@
 # Euglena Ledger
 
 **Codename:** `ledger` · **Status:** pivot declared 2026-08-31 · **Repo:** webRAG (unchanged)
+**Operative plan:** `docs/LEDGER_PLAN_2026-09-01.md` (supersedes the DAG v3 master plan's
+thesis, metric order and build order) · **Latest handoff:**
+`docs/handoffs/LEDGER_HANDOFF_2026-09-01.md`
 
 Euglena Ledger is an auditable evidence compiler. Give it a question and a set of
 sources; it returns a ledger of atomic claims, each pinned to a verbatim span on a fetched
