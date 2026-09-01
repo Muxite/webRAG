@@ -35,6 +35,22 @@ Four things ReAct structurally lacks are added, and nothing else:
    asked what it is missing — and the quote-backed fraction rides alongside it, so an answer with
    unverified provenance is reported as exactly that rather than as an abstention.
 
+**Extraction-time value gate** (:func:`extraction_value_gate_enabled`, default OFF). Both this
+arm and ``sequential_react_extract`` already compute, per record, whether the VALUE itself (not
+just the quote) is literally on the page it cites — that is the ``value_verified`` field — and
+both mint the extraction as a supported record regardless of what it says. Measured on the tuning
+split of the stored ``ledgernum22r3`` campaign: 41.6% of this arm's extractions and 32.9% of
+``sequential_react_extract``'s cite a page that does not contain the value, and a cell's
+unsupported-extraction fraction anti-correlates with its ``validation.overall_score``. The gate
+behind this flag stops a record failing that check from resolving a ledger row to SUPPORTED — the
+record itself is still appended, unconditionally, to the append-only audit trail; only its power
+to make a row look answered is withheld. IMPORTANT — read before citing a KPI number produced with
+this flag ON: refusing an unsupported extraction improves the unsupported-claim KPI BY
+CONSTRUCTION. That improvement is not evidence of a capability gain by itself; it only counts if
+``validation.overall_score`` holds steady or improves alongside it on the same cells. A KPI-only
+win here is not a result — see :func:`extraction_value_gate_enabled` for the full design rationale
+and the over-refusal guard.
+
 Row minting routes on COUNT, never on task shape (``classify_shape`` is disproven here): a mandate
 enumerating >= 2 names mints one row per name (capped at 8), anything else mints exactly one. The
 single-row case is this loop reduced to plain ReAct plus a one-line ledger, so a misrouted
@@ -141,6 +157,50 @@ def unit_extraction_enabled() -> bool:
     :raises: nothing.
     """
     return _flag("IDEA_TEST_EVIDENCE_LOOP_UNIT_EXTRACT")
+
+
+def extraction_value_gate_enabled() -> bool:
+    """True when a record whose value is not located on the page it cites is EXCLUDED FROM
+    SUPPORT rather than minted as a supported extraction (default OFF).
+
+    Measured on the tuning split of the stored ``ledgernum22r3`` campaign (re-checking each
+    extraction's ``value`` against the page it cites, offline, via
+    ``evidence_graph.verify_value_against_stored_page``): ``evidence_loop`` mints 332
+    extractions of which 138 (41.6%) cite a page that does NOT contain the value;
+    ``sequential_react_extract`` mints 334 of which 110 (32.9%) do the same. Both arms already
+    compute this per record -- it is the ``value_verified`` field set in :func:`extract_from_page`
+    -- and mint the extraction as SUPPORTED anyway. That is not cosmetic: the unsupported
+    fraction of a cell's extractions anti-correlates with ``validation.overall_score``
+    (``sequential_react_extract`` pearson -0.372, cells <=25% unsupported score 0.625 vs cells
+    >=60% score 0.385; ``evidence_loop`` pearson -0.084, 0.515 vs 0.426).
+
+    Refusing an unverifiable extraction lowers the unsupported-claim KPI BY CONSTRUCTION -- that
+    improvement, on its own, proves nothing about capability; it is just hiding evidence. This
+    flag is validated ONLY by whether ``validation.overall_score`` holds steady (or improves)
+    alongside the KPI move on the frozen-corpus A/B the coordinator runs; a KPI-only win here
+    must not be reported as a capability gain.
+
+    Design chosen over refusing the record outright: the extraction record itself is APPENDED
+    UNCONDITIONALLY regardless of this flag (see :func:`extract_from_page`) -- this is the
+    append-only ledger sidecar, and the model's claim is exactly the kind of miss an audit wants
+    to keep. What the flag controls is narrower: whether that record is allowed to resolve a
+    ledger row to SUPPORTED. The alternative (dropping the record) was rejected because it
+    destroys the raw pointer (page id, quote, claimed value) that lets a later pass tell a
+    mis-attributed citation (the value IS on some OTHER stored page in the same cell) apart from
+    a genuine fabrication -- exactly the split this flag's own measurement report distinguishes.
+
+    The gate never widens what counts as a match: it reads ``value_verified``, which
+    ``evidence_graph.verify_value`` already resolved through ONE normalized pass (digit-group
+    separators, unit spacing, dash unification, a unit reported in a separate field but spelled
+    differently in the value) before returning anything other than True. A value present on the
+    page under one of those surface forms is ``value_verified is True`` and is therefore never
+    gated -- over-refusing a real citation because of formatting would trade real accuracy for a
+    flattered metric, which is the failure mode this module exists to avoid.
+
+    :returns: the value of ``IDEA_TEST_EVIDENCE_LOOP_VALUE_GATE``, defaulting to disabled.
+    :raises: nothing.
+    """
+    return _flag("IDEA_TEST_EVIDENCE_LOOP_VALUE_GATE", default="0")
 
 
 def derivation_gate_enabled() -> bool:
@@ -520,6 +580,11 @@ class Extraction:
     #: page. Empty when the value never became a node, which is the same thing as saying it was
     #: never mechanically found — the record survives either way.
     evidence_node_id: str = ""
+    #: True when :func:`extraction_value_gate_enabled` was ON and this record's value was NOT
+    #: ``value_verified is True`` against the page it cites, so it was withheld from resolving a
+    #: ledger row to SUPPORTED. The record is appended regardless -- this only marks that its
+    #: value claim did not earn support. Always False when the gate is OFF (the shipped default).
+    excluded_from_support: bool = False
 
     def as_dict(self) -> Dict[str, Any]:
         """This record as a JSON-serializable dict for the result payload."""
@@ -533,6 +598,7 @@ class Extraction:
             "value_unit_bearing": self.value_unit_bearing, "value_shape": self.value_shape,
             "value_fail_reason": self.value_fail_reason,
             "evidence_node_id": self.evidence_node_id,
+            "excluded_from_support": self.excluded_from_support,
         }
 
 
@@ -824,6 +890,9 @@ class Ledger:
         ledger through its catch-all match (:meth:`_is_wildcard`) never conflict it: they are
         about different facts, not about the same one twice. ``ABSENT`` and ``BLOCKED`` mark only a row that is
         still ``OPEN``, so a value is never demoted by a later page that simply lacks it.
+        A record :attr:`~Extraction.excluded_from_support` (set by :func:`extract_from_page` under
+        :func:`extraction_value_gate_enabled`) is still appended below, but never resolves a row —
+        that is the whole effect of the gate, and the ONLY place it takes effect.
 
         :param record: one typed extraction, appended to :attr:`extractions` unconditionally.
         :returns: None.
@@ -834,7 +903,7 @@ class Ledger:
         if row is None:
             return
         verdict = (record.verdict or "").strip().upper()
-        if verdict == STATUS_SUPPORTED and record.value:
+        if verdict == STATUS_SUPPORTED and record.value and not record.excluded_from_support:
             self._resolve(row, record, self._is_wildcard(row, record.entity))
         elif verdict in (STATUS_ABSENT, STATUS_BLOCKED) and row.status == STATUS_OPEN:
             row.status = verdict
@@ -1145,6 +1214,14 @@ async def extract_from_page(agent_io: AgentIO, model_name: str, mandate: str, le
             value_unit_bearing=value_match.unit_bearing,
             value_shape=shape,
             value_fail_reason=value_match.fail_reason,
+            # Gated (default OFF, see extraction_value_gate_enabled): a value that is not
+            # `value_verified is True` against the page it cites -- confirmed absent, or never
+            # even a checkable value (empty/junk) -- is withheld from resolving a ledger row.
+            # `value_verified` already carries one normalized pass (digit grouping, unit
+            # spacing, a differently-spelled declared unit), so this never punishes a value that
+            # is genuinely on the page under a different surface form.
+            excluded_from_support=(extraction_value_gate_enabled()
+                                   and value_match.verified is not True),
         )
         # The graph is the single arbiter of admission, so `add_source` is called for EVERY
         # record rather than only for ones `_check_value` already liked: a value it admits gets a
