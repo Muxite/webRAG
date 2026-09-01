@@ -1317,6 +1317,11 @@ def _handle_derive(ledger: Ledger, args: Dict[str, Any]) -> str:
         else:
             raise UnknownOperation(f"unknown derive operation: {operation!r}")
     except DerivationError as exc:
+        # Record it on the ARTIFACT as well as telling the model. A refusal creates no node by
+        # design and the scratchpad is not persisted in a result cell, so without this row a
+        # refused derivation is indistinguishable from one that was never attempted -- which is
+        # exactly what made the incompatible-unit endpoint unmeasurable on `ledgernum22`.
+        graph.record_refusal(operation, input_ids, exc)
         return f"DERIVE REFUSED [{exc.code}]: {exc}. {_DERIVE_ADVICE.get(exc.code, '')}".strip()
 
     handle = ledger.handle_for(node)
@@ -1597,6 +1602,11 @@ async def run_evidence_loop_execution(
         "evidence_graph": ledger.graph.to_dict() if ledger.graph is not None else None,
         "derivation_gate": derivation_gate_enabled(),
         "derivation_validity": (ledger.graph.derivation_validity()
+                                if ledger.graph is not None else None),
+        # Refused derivations, tallied by typed code. The endpoint the incompatible-unit tasks
+        # (222-224) exist to measure: a correct refusal and a never-attempted derivation both
+        # leave zero DERIVED nodes, and only this distinguishes them.
+        "derivation_refusals": (ledger.graph.refusal_counts()
                                 if ledger.graph is not None else None),
     }
     telemetry.finish(success=output["success"])

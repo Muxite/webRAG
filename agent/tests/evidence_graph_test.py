@@ -1074,3 +1074,74 @@ class TestDeclaredUnitRespelling:
         node = graph.add_source("p1", "20,310 ft", unit="feet")
         assert node is not None
         assert graph.rejections == []
+
+
+class TestDerivationRefusalsAreRecorded:
+    """A REFUSED derivation must survive into the artifact, like a refused SOURCE already does.
+
+    Found by auditing the `ledgernum22` campaign: tasks 222-224 exist to test that incompatible
+    units are REFUSED rather than converted, and their cells carried zero DERIVED nodes -- which
+    is consistent both with "correctly refused" and with "never attempted". Nothing distinguished
+    them, because a refused derivation left no trace anywhere: the graph records `rejections` for
+    SOURCE admission, the loop's scratchpad is not persisted in the result JSON, and a refusal by
+    definition creates no node. The unit-mismatch refusal endpoint was therefore unmeasurable.
+    """
+
+    def test_a_recorded_refusal_carries_its_code_operation_and_operands(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "590 m")
+        b = graph.add_source("p1", "1,940 ft")
+        try:
+            graph.add_arith("difference", [a.id, b.id])
+        except eg.DerivationError as exc:
+            graph.record_refusal("difference", [a.id, b.id], exc)
+        assert len(graph.derivation_refusals) == 1
+        row = graph.derivation_refusals[0]
+        assert row["code"] == "UNIT_MISMATCH"
+        assert row["operation"] == "difference"
+        assert row["input_ids"] == [a.id, b.id]
+        assert "mismatched units" in row["message"]
+
+    def test_a_refusal_creates_no_node(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "590 m")
+        b = graph.add_source("p1", "1,940 ft")
+        before = len(graph.nodes())
+        try:
+            graph.add_arith("difference", [a.id, b.id])
+        except eg.DerivationError as exc:
+            graph.record_refusal("difference", [a.id, b.id], exc)
+        assert len(graph.nodes()) == before
+
+    def test_refusals_survive_the_artifact_roundtrip(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "590 m")
+        b = graph.add_source("p1", "1,940 ft")
+        try:
+            graph.add_arith("sum", [a.id, b.id])
+        except eg.DerivationError as exc:
+            graph.record_refusal("sum", [a.id, b.id], exc)
+        restored = EvidenceGraph.from_dict(graph.to_dict())
+        assert [r["code"] for r in restored.derivation_refusals] == ["UNIT_MISMATCH"]
+
+    def test_the_artifact_exposes_refusals_as_their_own_key(self):
+        graph = _arith_graph()
+        assert graph.to_dict()["derivation_refusals"] == []
+
+    def test_refusal_counts_are_reported_by_code(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "590 m")
+        b = graph.add_source("p1", "1,940 ft")
+        for op in ("sum", "difference"):
+            try:
+                graph.add_arith(op, [a.id, b.id])
+            except eg.DerivationError as exc:
+                graph.record_refusal(op, [a.id, b.id], exc)
+        try:
+            graph.add_arith("integrate", [a.id])
+        except eg.DerivationError as exc:
+            graph.record_refusal("integrate", [a.id], exc)
+        assert graph.refusal_counts() == {"UNIT_MISMATCH": 2, "UNKNOWN_OPERATION": 1}
+
+    def test_a_graph_with_no_refusals_counts_nothing(self):
+        assert _arith_graph().refusal_counts() == {}

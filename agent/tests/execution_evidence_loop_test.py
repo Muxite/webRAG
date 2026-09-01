@@ -1496,3 +1496,51 @@ class TestEvidenceBlockRendering:
         # both handles still resolve, so a `derive` call can still reference the elided one
         assert ledger.resolve_ref("E1") in {n.id for n in ledger.graph.nodes()}
         assert ledger.resolve_ref("E2") in {n.id for n in ledger.graph.nodes()}
+
+
+class TestRefusalsReachTheArtifact:
+    """A live `derive` refusal must be countable from the STORED cell, not only in the prompt.
+
+    The observation already told the model what went wrong; the artifact told nobody. On the
+    `ledgernum22` campaign that made the unit-mismatch refusal endpoint unmeasurable: tasks
+    222-224 exist to prove incompatible units are refused rather than converted, and a refusal is
+    invisible because it creates no node and the scratchpad is not persisted.
+    """
+
+    def _mismatch_run(self):
+        page = "Tower A is 590 m tall. Tower B is 1,940 ft tall."
+        replies = [{"action": "visit", "args": {"url": "https://example.org/towers"}},
+                   _extractions(("Tower A", "height", "590 m", "Tower A is 590 m tall.", "m"),
+                                ("Tower B", "height", "1,940 ft", "Tower B is 1,940 ft tall.", "ft")),
+                   {"action": "derive", "args": {"operation": "difference",
+                                                 "input_refs": ["E1", "E2"]}},
+                   {"action": "finish", "args": {"answer": "they cannot be combined"}}]
+        return _run(replies, page=page)
+
+    def test_a_refused_derivation_is_recorded_on_the_graph(self):
+        result = self._mismatch_run()
+        refusals = result.ledger.graph.derivation_refusals
+        assert len(refusals) == 1
+        assert refusals[0]["code"] == "UNIT_MISMATCH"
+        assert refusals[0]["operation"] == "difference"
+
+    def test_the_refusal_is_countable_from_the_artifact_alone(self):
+        artifact = self._mismatch_run().ledger.graph.to_dict()
+        assert artifact["refusal_counts"] == {"UNIT_MISMATCH": 1}
+
+    def test_a_refusal_still_creates_no_derived_node(self):
+        result = self._mismatch_run()
+        assert not [n for n in result.ledger.graph.nodes() if n.kind == "derived"]
+
+    def test_a_successful_derivation_records_no_refusal(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "difference", "input_refs": ["E1", "E2"]}},
+            {"action": "finish", "args": {"answer": "24 m"}}))
+        assert result.ledger.graph.derivation_refusals == []
+        assert result.ledger.graph.to_dict()["refusal_counts"] == {}
+
+    def test_the_model_still_sees_the_actionable_observation(self):
+        """Recording the refusal must not replace telling the model what to do about it."""
+        step = [s for s in self._mismatch_run().scratchpad if "action=derive" in s][0]
+        assert "DERIVE REFUSED [UNIT_MISMATCH]" in step
+        assert "does not convert" in step

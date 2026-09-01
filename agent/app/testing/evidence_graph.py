@@ -851,6 +851,41 @@ class EvidenceGraph:
     _pages: Dict[str, Dict[str, Any]] = dataclass_field(default_factory=dict)
     #: Every refused admission, with the reason. A rejection is data, not silence.
     rejections: List[Dict[str, Any]] = dataclass_field(default_factory=list)
+    #: Every refused DERIVATION, with its typed code. The sibling of :attr:`rejections` for the
+    #: computed half. Without it a refusal is indistinguishable from never having been attempted:
+    #: it creates no node by design, and the loop's scratchpad is not persisted in a result cell.
+    #: Measured consequence — on the `ledgernum22` campaign the three incompatible-unit tasks
+    #: (222-224) carried zero DERIVED nodes, which is exactly what BOTH "correctly refused" and
+    #: "never tried" look like, so the refusal endpoint could not be computed at all.
+    derivation_refusals: List[Dict[str, Any]] = dataclass_field(default_factory=list)
+
+    def record_refusal(self, operation: str, input_ids: Iterable[str],
+                       error: Exception) -> Dict[str, Any]:
+        """Record one refused derivation on the artifact.
+
+        :param operation: the operation that was attempted.
+        :param input_ids: the operand ids it was attempted over, in argument order.
+        :param error: the :class:`DerivationError` raised (its ``code`` is what makes the refusal
+            countable; a non-typed exception is recorded as ``DERIVATION_ERROR``).
+        :returns: the recorded row.
+        :raises: nothing.
+        """
+        row = {
+            "operation": str(operation),
+            "input_ids": [str(i) for i in input_ids],
+            "code": str(getattr(error, "code", "DERIVATION_ERROR")),
+            "message": str(error),
+        }
+        self.derivation_refusals.append(row)
+        return row
+
+    def refusal_counts(self) -> Dict[str, int]:
+        """Refused derivations tallied by typed code, e.g. ``{"UNIT_MISMATCH": 2}``."""
+        counts: Dict[str, int] = {}
+        for row in self.derivation_refusals:
+            code = str(row.get("code") or "DERIVATION_ERROR")
+            counts[code] = counts.get(code, 0) + 1
+        return counts
 
     def add_page(self, page_id: str, url: str, text: str,
                  max_chars: int = DEFAULT_STORE_CHARS) -> Dict[str, Any]:
@@ -1247,15 +1282,18 @@ class EvidenceGraph:
     def to_dict(self) -> Dict[str, Any]:
         """The whole graph as a JSON-serializable artifact, pages included.
 
-        :returns: ``{"pages", "nodes", "rejections", "counts"}``. Pages carry their text and
-            SHA-256, so :func:`reverify_graph` needs nothing else.
+        :returns: ``{"pages", "nodes", "rejections", "derivation_refusals", "counts",
+            "refusal_counts"}``. Pages carry their text and SHA-256, so :func:`reverify_graph`
+            needs nothing else.
         :raises: nothing.
         """
         return {
             "pages": [dict(page) for page in self._pages.values()],
             "nodes": [node.as_dict() for node in self._nodes.values()],
             "rejections": [dict(row) for row in self.rejections],
+            "derivation_refusals": [dict(row) for row in self.derivation_refusals],
             "counts": self.counts(),
+            "refusal_counts": self.refusal_counts(),
         }
 
     @classmethod
@@ -1278,6 +1316,9 @@ class EvidenceGraph:
         for row in (artifact or {}).get("rejections", []) or []:
             if isinstance(row, dict):
                 graph.rejections.append(dict(row))
+        for row in (artifact or {}).get("derivation_refusals", []) or []:
+            if isinstance(row, dict):
+                graph.derivation_refusals.append(dict(row))
         return graph
 
 
