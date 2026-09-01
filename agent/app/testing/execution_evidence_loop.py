@@ -170,6 +170,34 @@ _DERIVE_ARITH_OPS = ("sum", "difference", "product", "quotient", "ratio")
 _DERIVE_EXTREMUM_OPS = ("max", "min")
 _DERIVE_COMPARE_MODES = ("gt", "lt", "ge", "le", "eq", "ne")
 
+#: A weak model paraphrases the closed vocabulary rather than quoting it verbatim, even when the
+#: system prompt spells it out (`multiply` and `convert_to_numeric` both surfaced live, and got
+#: rejected as ``UNKNOWN_OPERATION`` — see `ledgernum22`). Each key maps a paraphrase onto the ONE
+#: canonical op it unambiguously means; applied once, in ``_handle_derive``, before dispatch, so
+#: every other code path (dedup key, ``graph.add_arith``, the emitted node's ``operation`` field)
+#: only ever sees the canonical spelling. ``minimum``/``maximum`` are unambiguous the same way
+#: ``multiply`` is. ``average``/``mean`` are deliberately NOT aliased: an arithmetic mean is
+#: ``sum / count``, a two-step composition this system has no single recomputable op for, and
+#: guessing which one the model meant (sum? a bare average-of-two as quotient?) would silently
+#: substitute a DIFFERENT computation for the one asked for — exactly the failure mode this whole
+#: derive layer exists to prevent. Left unmapped, `average`/`mean` fall through to the existing
+#: ``UNKNOWN_OPERATION`` refusal, whose advice already spells out the real vocabulary.
+_DERIVE_OP_ALIASES = {
+    "multiply": "product",
+    "add": "sum",
+    "subtract": "difference",
+    "divide": "quotient",
+    "minimum": "min",
+    "maximum": "max",
+}
+
+#: Conversion-shaped requests (`convert_to_numeric` live; a couple of obvious synonyms added
+#: defensively) are refused by a DEDICATED message, never aliased onto an arithmetic op — the
+#: module this loop sits on top of (``evidence_graph``) has no unit-conversion table and
+#: deliberately never will, so mapping "convert" onto e.g. `quotient` would make the loop silently
+#: answer a question it was never asked. See :data:`_DERIVE_ADVICE`'s ``CONVERSION_UNAVAILABLE``.
+_DERIVE_CONVERSION_OPS = ("convert_to_numeric", "convert", "unit_convert", "to_numeric")
+
 #: What the model should DO about each refusal. A code alone is a dead step; the loop's whole
 #: premise is that an observation has to be actionable.
 _DERIVE_ADVICE = {
@@ -180,10 +208,27 @@ _DERIVE_ADVICE = {
     "NON_NUMERIC": "One operand carries no number. Extract a numeric value before combining.",
     "DIVISION_BY_ZERO": "The denominator recomputes to zero. Check which operand you divided by.",
     "UNKNOWN_OPERATION": ("Supported operations: sum, difference, product, quotient, ratio, max, "
-                          "min, count, compare_gt/lt/ge/le/eq/ne."),
+                          "min, count, compare_gt/lt/ge/le/eq/ne (multiply/add/subtract/divide/"
+                          "minimum/maximum are also accepted as aliases)."),
     "WRONG_ARITY": ("Wrong number of operands: difference/quotient/ratio/compare_* take exactly "
                     "two; sum/product/max/min/count take one or more."),
+    "CONVERSION_UNAVAILABLE": ("Unit conversion is not available here. Find both values already "
+                               "expressed in the SAME unit on a page, or report that they cannot "
+                               "be combined; do not ask this system to convert."),
 }
+
+
+class _ConversionUnavailable(Exception):
+    """A `derive` request shaped like a unit conversion (`convert_to_numeric` and its synonyms).
+
+    Not an :class:`~agent.app.testing.evidence_graph.DerivationError` subclass — this module owns
+    it rather than ``evidence_graph`` because it is a REFUSAL BY POLICY (no conversion table,
+    deliberately) rather than a property of the operands ``evidence_graph`` could check. It still
+    carries a ``code`` attribute so :meth:`EvidenceGraph.record_refusal` records it exactly like
+    any other typed refusal.
+    """
+
+    code = "CONVERSION_UNAVAILABLE"
 
 
 _SYSTEM = (
@@ -1274,7 +1319,8 @@ async def _verify_claim(agent_io: AgentIO, claim: str, evidence: str, model_name
     return (await agent_io.query_llm(payload, model_name=model_name)) or "UNVERIFIABLE"
 
 
-def _handle_derive(ledger: Ledger, args: Dict[str, Any]) -> str:
+def _handle_derive(ledger: Ledger, args: Dict[str, Any],
+                   refusal_repeats: Optional[Dict[Any, Dict[str, Any]]] = None) -> str:
     """Run ONE typed derivation and render it as an observation the model can act on.
 
     This is the first action with a real argument schema rather than a bare string: the other
@@ -1287,8 +1333,33 @@ def _handle_derive(ledger: Ledger, args: Dict[str, Any]) -> str:
     an expression to be evaluated can send an expression that fabricates its own inputs, which is
     precisely the failure this layer exists to prevent.
 
+    ``operation`` is normalized through :data:`_DERIVE_OP_ALIASES` before ANYTHING else — dedup
+    key, dispatch, the node's stored ``operation`` — so ``multiply`` and ``product`` over the same
+    operands are the exact same attempt, not two.
+
+    Repeat-refusal guard (mirrors the ``search`` action's ``seen_queries`` dedup — see the same
+    shape at the top of :func:`run_evidence_loop`): on a live campaign one cell retried the SAME
+    impossible derivation 10 times, burning a step on an identical ``NON_NUMERIC`` refusal each
+    time. ``refusal_repeats`` keys on ``(operation, tuple(input_ids))`` AFTER alias normalisation
+    and ref resolution; a repeat short-circuits before the graph is touched, returning a canned
+    ``ALREADY REFUSED`` observation that still carries the ORIGINAL typed code and advice — the
+    model needs to know what was wrong, not merely that it repeated itself, or the guard just
+    trades one dead step for another.
+
+    Design call: a repeat is NOT recorded again on ``graph.derivation_refusals``. Those rows are
+    the measurement substrate for the refusal-rate endpoint (see the module note on
+    `ledgernum22`'s incompatible-unit tasks); a model stuck in a 10-attempt loop would inflate
+    that rate 10x for what is mechanically one refused derivation, corrupting the very endpoint
+    this recording exists to make measurable. The looping behaviour itself is not lost — it is
+    visible in ``refusal_repeats``' per-key count (available to a caller that wants it), in the
+    scratchpad's repeated ``action=derive`` steps, and in the ``ALREADY REFUSED`` text itself — a
+    caller can always recover "this was retried N times", just not by inflating a count that
+    other code treats as "N independent refusals occurred."
+
     :param ledger: the run's ledger, carrying the graph and the handle map.
     :param args: the decision's ``args`` object.
+    :param refusal_repeats: mutable dedup state, one dict shared across the run's steps (like
+        ``seen_queries``); ``None`` disables the guard entirely (``IDEA_TEST_EVIDENCE_LOOP_DEDUP_DERIVE=0``).
     :returns: the observation text, either the recomputed value or a typed refusal.
     :raises: nothing — every refusal is an observation, never an exception out of the loop.
     """
@@ -1296,12 +1367,29 @@ def _handle_derive(ledger: Ledger, args: Dict[str, Any]) -> str:
 
     graph = ledger.ensure_graph()
     operation = str(args.get("operation", "") or "").strip().lower()
+    operation = _DERIVE_OP_ALIASES.get(operation, operation)
     refs = args.get("input_refs")
     if isinstance(refs, (str, int)):
         refs = [refs]
     input_ids = [ledger.resolve_ref(ref) for ref in refs] if isinstance(refs, list) else []
     proposed = args.get("proposed_value")
     expected_unit = str(args.get("expected_unit", "") or "").strip()
+
+    dedup_key = (operation, tuple(input_ids))
+    if refusal_repeats is not None and dedup_key in refusal_repeats:
+        prior = refusal_repeats[dedup_key]
+        prior["count"] += 1
+        return (f"DERIVE ALREADY REFUSED [{prior['code']}]: same operation and operands as a "
+                f"prior attempt ({prior['message']}). {_DERIVE_ADVICE.get(prior['code'], '')} "
+                "Retrying will not change the outcome -- try a different approach.").strip()
+
+    if operation in _DERIVE_CONVERSION_OPS:
+        exc: Exception = _ConversionUnavailable(
+            f"{operation!r} requests a unit conversion, which this system refuses by design")
+        graph.record_refusal(operation, input_ids, exc)
+        if refusal_repeats is not None:
+            refusal_repeats[dedup_key] = {"code": exc.code, "message": str(exc), "count": 1}
+        return f"DERIVE REFUSED [{exc.code}]: {exc}. {_DERIVE_ADVICE.get(exc.code, '')}".strip()
 
     try:
         if operation in _DERIVE_ARITH_OPS:
@@ -1322,6 +1410,8 @@ def _handle_derive(ledger: Ledger, args: Dict[str, Any]) -> str:
         # refused derivation is indistinguishable from one that was never attempted -- which is
         # exactly what made the incompatible-unit endpoint unmeasurable on `ledgernum22`.
         graph.record_refusal(operation, input_ids, exc)
+        if refusal_repeats is not None:
+            refusal_repeats[dedup_key] = {"code": exc.code, "message": str(exc), "count": 1}
         return f"DERIVE REFUSED [{exc.code}]: {exc}. {_DERIVE_ADVICE.get(exc.code, '')}".strip()
 
     handle = ledger.handle_for(node)
@@ -1391,6 +1481,8 @@ async def run_evidence_loop(agent_io: AgentIO, mandate: str, model_name: str, ma
     store_chars = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_STORE_CHARS", str(page_chars)))
     dedup_search = os.environ.get("IDEA_TEST_EVIDENCE_LOOP_DEDUP_SEARCH", "1") not in (
         "0", "false", "False")
+    dedup_derive = os.environ.get("IDEA_TEST_EVIDENCE_LOOP_DEDUP_DERIVE", "1") not in (
+        "0", "false", "False")
 
     ledger = Ledger.mint(mandate)
     scratchpad: List[str] = []
@@ -1399,6 +1491,9 @@ async def run_evidence_loop(agent_io: AgentIO, mandate: str, model_name: str, ma
     # shrink the finalization context.
     context_pages: List[Dict[str, str]] = []
     seen_queries: set = set()
+    # (operation, input_ids) -> {"code", "message", "count"} for the LAST refused attempt at that
+    # key. Shared across steps exactly like ``seen_queries``.
+    derive_refusals: Dict[Any, Dict[str, Any]] = {}
     last_answer = ""
 
     for step in range(max_steps):
@@ -1473,7 +1568,7 @@ async def run_evidence_loop(agent_io: AgentIO, mandate: str, model_name: str, ma
                                         page_id=page_id, page_url=url, page_text=content)
                 obs = f"PAGE {url}:\n{content}"
         elif action == "derive":
-            obs = _handle_derive(ledger, args)
+            obs = _handle_derive(ledger, args, derive_refusals if dedup_derive else None)
         elif action == "verify":
             claim = str(args.get("claim", ""))
             evidence = "\n\n".join(f"SOURCE {p['url']}\n{p['text']}" for p in context_pages)

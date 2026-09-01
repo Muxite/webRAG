@@ -1544,3 +1544,127 @@ class TestRefusalsReachTheArtifact:
         step = [s for s in self._mismatch_run().scratchpad if "action=derive" in s][0]
         assert "DERIVE REFUSED [UNIT_MISMATCH]" in step
         assert "does not convert" in step
+
+
+# --------------------------------------------------------------------------------------
+# repeat-refusal guard — a live cell retried the SAME impossible derivation 10 times,
+# each attempt burning one of the run's limited steps for an identical NON_NUMERIC refusal
+# --------------------------------------------------------------------------------------
+
+
+def _run_steps(replies, mandate="How much taller is Tower A than Tower B?", page=TOWERS,
+              max_steps=8):
+    io = _io(replies, page_text=page)
+    return asyncio.run(el.run_evidence_loop(io, mandate, "m", max_steps=max_steps, max_tokens=64))
+
+
+def _non_numeric_derive_replies(n, operation="sum"):
+    """visit -> extraction (one numeric, one non-numeric field) -> N identical derive attempts."""
+    return [{"action": "visit", "args": {"url": "https://example.org/towers"}},
+            _extractions(("Tower A", "height", "590 m", "Tower A is 590 m tall.", "m"),
+                        ("Tower A", "architect", "Gustave Eiffel",
+                         "Its architect was Gustave Eiffel.", "")),
+            *[{"action": "derive", "args": {"operation": operation, "input_refs": ["E1", "E2"]}}
+              for _ in range(n)],
+            {"action": "finish", "args": {"answer": "x"}}]
+
+
+class TestDeriveRepeatGuard:
+    def test_a_repeated_refused_derivation_short_circuits_after_the_first_attempt(self):
+        result = _run_steps(_non_numeric_derive_replies(3))
+        derive_steps = [s for s in result.scratchpad if "action=derive" in s]
+        assert len(derive_steps) == 3
+        assert "DERIVE REFUSED [NON_NUMERIC]" in derive_steps[0]
+        assert "ALREADY REFUSED" in derive_steps[1]
+        assert "ALREADY REFUSED" in derive_steps[2]
+
+    def test_the_repeat_notice_names_the_original_refusal_code_and_advice(self):
+        result = _run_steps(_non_numeric_derive_replies(2))
+        derive_steps = [s for s in result.scratchpad if "action=derive" in s]
+        repeat = derive_steps[1]
+        assert "NON_NUMERIC" in repeat
+        assert "numeric value" in repeat
+
+    def test_the_repeat_is_not_double_counted_on_the_artifact(self):
+        result = _run_steps(_non_numeric_derive_replies(3))
+        assert result.ledger.graph.refusal_counts() == {"NON_NUMERIC": 1}
+        assert len(result.ledger.graph.derivation_refusals) == 1
+
+    def test_a_different_operand_set_for_the_same_operation_is_not_a_repeat(self):
+        page = ("Tower A is 590 m tall. Its architect was Gustave Eiffel. "
+                "Tower B's architect was Someone Else.")
+        replies = [{"action": "visit", "args": {"url": "https://example.org/towers"}},
+                   _extractions(("Tower A", "height", "590 m", "Tower A is 590 m tall.", "m"),
+                                ("Tower A", "architect", "Gustave Eiffel",
+                                 "Its architect was Gustave Eiffel.", ""),
+                                ("Tower B", "architect", "Someone Else",
+                                 "Tower B's architect was Someone Else.", "")),
+                   {"action": "derive", "args": {"operation": "sum", "input_refs": ["E1", "E2"]}},
+                   {"action": "derive", "args": {"operation": "sum", "input_refs": ["E1", "E3"]}},
+                   {"action": "finish", "args": {"answer": "x"}}]
+        result = _run_steps(replies, page=page)
+        derive_steps = [s for s in result.scratchpad if "action=derive" in s]
+        assert len(derive_steps) == 2
+        assert "DERIVE REFUSED [NON_NUMERIC]" in derive_steps[0]
+        assert "DERIVE REFUSED [NON_NUMERIC]" in derive_steps[1]
+        assert "ALREADY REFUSED" not in derive_steps[1]
+
+    def test_the_guard_can_be_disabled_by_flag(self, monkeypatch):
+        monkeypatch.setenv("IDEA_TEST_EVIDENCE_LOOP_DEDUP_DERIVE", "0")
+        result = _run_steps(_non_numeric_derive_replies(2))
+        derive_steps = [s for s in result.scratchpad if "action=derive" in s]
+        assert len(derive_steps) == 2
+        assert "DERIVE REFUSED [NON_NUMERIC]" in derive_steps[0]
+        assert "DERIVE REFUSED [NON_NUMERIC]" in derive_steps[1]
+        assert "ALREADY REFUSED" not in derive_steps[1]
+
+
+# --------------------------------------------------------------------------------------
+# operation aliases — the same weak model emitted `multiply` (spelled `product`) and
+# `convert_to_numeric`, both rejected as UNKNOWN_OPERATION despite the system prompt
+# --------------------------------------------------------------------------------------
+
+
+class TestDeriveOperationAliases:
+    def test_multiply_aliases_to_product_with_an_identical_node(self):
+        result_product = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "product", "input_refs": ["E1", "E2"]}},
+            {"action": "finish", "args": {"answer": "x"}}))
+        result_multiply = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "multiply", "input_refs": ["E1", "E2"]}},
+            {"action": "finish", "args": {"answer": "x"}}))
+        derived_p = [n for n in result_product.ledger.graph.nodes() if n.kind == "derived"][0]
+        derived_m = [n for n in result_multiply.ledger.graph.nodes() if n.kind == "derived"][0]
+        assert derived_p.operation == "product"
+        assert derived_m.operation == "product"
+        assert derived_p.value == derived_m.value
+        assert derived_p.id == derived_m.id
+
+    def test_add_subtract_divide_alias_to_the_named_ops(self):
+        for alias, canonical in (("add", "sum"), ("subtract", "difference"),
+                                 ("divide", "quotient")):
+            result = _run(_visit_then(
+                {"action": "derive", "args": {"operation": alias, "input_refs": ["E1", "E2"]}},
+                {"action": "finish", "args": {"answer": "x"}}))
+            derived = [n for n in result.ledger.graph.nodes() if n.kind == "derived"]
+            assert derived, f"{alias} produced no node"
+            assert derived[0].operation == canonical
+
+    def test_convert_to_numeric_is_refused_with_conversion_specific_advice(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "convert_to_numeric",
+                                          "input_refs": ["E1"]}},
+            {"action": "finish", "args": {"answer": "x"}}))
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "DERIVE REFUSED" in step
+        assert "convert" in step.lower()
+        assert "not available" in step.lower() or "does not convert" in step.lower()
+        assert not [n for n in result.ledger.graph.nodes() if n.kind == "derived"]
+
+    def test_convert_to_numeric_is_not_silently_mapped_onto_an_arithmetic_op(self):
+        result = _run(_visit_then(
+            {"action": "derive", "args": {"operation": "convert_to_numeric",
+                                          "input_refs": ["E1"]}},
+            {"action": "finish", "args": {"answer": "x"}}))
+        step = [s for s in result.scratchpad if "action=derive" in s][0]
+        assert "UNKNOWN_OPERATION" not in step
