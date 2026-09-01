@@ -34,7 +34,14 @@ Metric definitions:
                              quote absent -- counted as unsupported), None (unverifiable: no
                              quote, no page, or truncated). Only False counts as unsupported;
                              None is EXCLUDED from both numerator and denominator, never treated
-                             as a failure.
+                             as a failure. A THIRD series, "audit (arm-blind)", is pooled from
+                             agent.app.testing.claim_audit.audit() over every cell regardless of
+                             arm -- it is the only one of the three computable for
+                             langgraph_react, which writes neither extractions nor
+                             claim_provenance. It classifies claims STATED IN THE FINAL ANSWER
+                             (a different object than a typed extraction record), so it is
+                             printed as its own line and never blended into or substituted for
+                             the two extraction-based numbers above.
   verdict calibration    -- per (model, variant), the mean overall_score conditioned on each
                              self-reported verdict label, for every verdict field present in
                              that cell's era: ledger_verdict (evidence_loop), goal_achieved and
@@ -57,7 +64,12 @@ Metric definitions:
                              ==True entries across extractions + claim_provenance, over cells
                              with at least one verified claim. Cells with a claims field but
                              zero verified claims are excluded from the denominator rather than
-                             producing a fabricated infinite or zero cost.
+                             producing a fabricated infinite or zero cost. A SEPARATE
+                             "[audit, arm-blind]" series does the same pooling, but over the
+                             auditor's `on_page` claim count instead of quote_verified==True
+                             extraction entries -- a claim-stated-in-the-answer count, not a
+                             typed-extraction count. Printed as its own line, never averaged
+                             with or substituted for the extraction-based number.
 
 Missing-key discipline (see MEMORY: a sibling tool once read an empty ``nodes`` dict as "0
 distinct URLs" -- that bug class is what this discipline exists to prevent): a field that is
@@ -81,6 +93,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bench_stats import mean  # noqa: E402
 from compare_arms import _infra_failed, _obs  # noqa: E402
 import kpi_dashboard as kd  # noqa: E402
+from agent.app.testing.claim_audit import audit as _claim_audit, UNSUPPORTED as _AUDIT_UNSUPPORTED  # noqa: E402
 
 BAD_ABSTAIN_SCORE = 0.3   # benchmark threshold: grounding gate's measured 0.4% bad-abstain rate
 NEAR_ZERO_SCORE = 0.1     # "would have scored ~0" -- the good abstain case
@@ -198,6 +211,67 @@ def pooled_quote_stats(ds, extractor):
     return {
         "cells_with_field": cells_with_field, "n_checked": n_checked,
         "n_unsupported": n_unsupported, "n_unverifiable": n_unverifiable,
+        "unsupported_rate": rate,
+    }
+
+
+def audit_claim_states(d):
+    """Per-claim classification from the arm-blind auditor, for one cell.
+
+    Unlike :func:`extraction_quote_states`/:func:`claim_provenance_quote_states`, this is
+    computable for every arm and every era: ``claim_audit.audit`` reads only
+    ``output.final_deliverable``, ``output.pages`` and ``telemetry_raw.timings`` visit events,
+    fields every arm writes. It classifies claims STATED IN THE FINAL ANSWER -- a different
+    object than a typed extraction record -- so its result is pooled and printed as its own
+    series, never merged with the extraction-based ones.
+
+    Params:
+        d: one cell's full parsed result JSON.
+
+    Returns:
+        dict ``{claim: "on_page"|"recomputable"|"unsupported"}``, empty when the answer has no
+        checkable claim (a real "nothing to check" observation, not a missing-field case --
+        ``claim_audit.audit`` never raises and never returns None for a well-formed cell dict).
+    """
+    return _claim_audit(d)["claims"]
+
+
+def pooled_audit_claim_stats(ds):
+    """Pool the arm-blind auditor's claim classifications across ``ds``.
+
+    Same result shape as :func:`pooled_quote_stats` so the same printing code can render both,
+    but sourced from :func:`audit_claim_states` instead of a tri-state quote_verified list.
+    Only ``on_page``/``recomputable``/``unsupported`` exist at this layer (the auditor has
+    already resolved "unverifiable" internally via ``evidence_graph.verify_value_against_stored_page``,
+    which downgrades a truncated-page miss to "not on_page" rather than surfacing a third state
+    here), so ``n_unverifiable`` is always 0 -- kept in the returned dict only for shape parity
+    with :func:`pooled_quote_stats`.
+
+    Params:
+        ds: list of full parsed result JSON dicts.
+
+    Returns:
+        dict with ``cells_with_field`` (cells with at least one checkable claim -- a cell whose
+        answer states nothing checkable contributes to neither this count nor ``n_checked``, per
+        the same "absent is never zero" discipline as the rest of this module),
+        ``n_checked``/``n_unsupported``/``n_unverifiable``, and ``unsupported_rate`` (NaN if
+        ``n_checked`` is 0).
+    """
+    cells_with_field = 0
+    n_checked = n_unsupported = 0
+    for d in ds:
+        states = audit_claim_states(d)
+        if not states:
+            continue
+        cells_with_field += 1
+        for cls in states.values():
+            n_checked += 1
+            if cls == _AUDIT_UNSUPPORTED:
+                n_unsupported += 1
+    rate = n_unsupported / n_checked if n_checked else float("nan")
+    return {
+        "cells_with_field": cells_with_field, "n_checked": n_checked,
+        "n_unsupported": n_unsupported, "n_unverifiable": 0,
         "unsupported_rate": rate,
     }
 
@@ -333,6 +407,43 @@ def cost_per_verified_claim(ds):
     }
 
 
+def cost_per_verified_claim_audit(ds):
+    """Tokens spent per auditor-``on_page`` claim, the arm-blind analogue of
+    :func:`cost_per_verified_claim`.
+
+    "Verified" here means the auditor located the claim on a page the arm stored
+    (:data:`agent.app.testing.claim_audit.ON_PAGE`), not a quote_verified==True extraction
+    entry -- a different object, computable for every arm including ``langgraph_react``. Reported
+    as its own line, never blended with or substituted for the extraction-based number.
+
+    Params:
+        ds: list of full parsed result JSON dicts.
+
+    Returns:
+        dict with ``cells_n`` (cells contributing to the pool -- at least one on_page claim AND
+        a token count), ``n_verified_total`` (pooled on_page claim count), and
+        ``tokens_per_verified_claim`` (NaN if ``cells_n`` is 0).
+    """
+    total_tokens = 0
+    n_verified_total = 0
+    cells_n = 0
+    for d in ds:
+        rec = _claim_audit(d)
+        n_verified = rec["counts"]["on_page"]
+        if n_verified == 0:
+            continue
+        tokens = kd.k7_cost_fields(d)["total_tokens"]
+        if tokens is None:
+            continue
+        total_tokens += tokens
+        n_verified_total += n_verified
+        cells_n += 1
+    return {
+        "cells_n": cells_n, "n_verified_total": n_verified_total,
+        "tokens_per_verified_claim": (total_tokens / n_verified_total) if cells_n else float("nan"),
+    }
+
+
 def flag_safety_accuracy_tradeoffs(groups):
     """Flag any (model) pair of variants that looks safer only by being less accurate.
 
@@ -411,10 +522,12 @@ def aggregate_group(cells):
         "quote_fail_present_n": len(qfp_vals),
         "unsupported_extractions": pooled_quote_stats(ds, extraction_quote_states),
         "unsupported_claim_provenance": pooled_quote_stats(ds, claim_provenance_quote_states),
+        "unsupported_audit": pooled_audit_claim_stats(ds),
         "verdict_calibration": verdict_tables,
         "abstention": abstention,
         "overall_score_mean": mean(scores), "overall_score_n": len(scores),
         "cost_per_verified_claim": cost_per_verified_claim(ds),
+        "cost_per_verified_claim_audit": cost_per_verified_claim_audit(ds),
     }
 
 
@@ -452,10 +565,13 @@ def print_table(groups):
         print(f"     corroboration -- quote-fail-present: "
               f"{_pct(g['quote_fail_present_rate'], g['quote_fail_present_n'])}")
         for label, key in (("extractions (evidence_loop)", "unsupported_extractions"),
-                           ("claim_provenance (graph finalize)", "unsupported_claim_provenance")):
+                           ("claim_provenance (graph finalize)", "unsupported_claim_provenance"),
+                           ("audit (arm-blind)", "unsupported_audit")):
             s = g[key]
             if s["cells_with_field"] == 0:
-                print(f"  unsupported-claim rate [{label}]: uncomputable (0/{total} cells wrote this field)")
+                reason = ("had a checkable claim" if key == "unsupported_audit"
+                          else "wrote this field")
+                print(f"  unsupported-claim rate [{label}]: uncomputable (0/{total} cells {reason})")
                 continue
             rate = s["unsupported_rate"]
             rv = f"{100 * rate:.1f}%" if s["n_checked"] else "n/a"
@@ -481,6 +597,15 @@ def print_table(groups):
         else:
             print(f"  cost per verified claim: {cpv['tokens_per_verified_claim']:.0f} tokens/claim  "
                   f"computed over {cpv['n_verified_total']} verified claims in {cpv['cells_n']}/{total} cells")
+        cpva = g["cost_per_verified_claim_audit"]
+        if cpva["cells_n"] == 0:
+            print("  cost per verified claim [audit, arm-blind]: uncomputable "
+                  "(no cells with an on_page claim + token count)")
+        else:
+            print(f"  cost per verified claim [audit, arm-blind]: "
+                  f"{cpva['tokens_per_verified_claim']:.0f} tokens/claim  "
+                  f"computed over {cpva['n_verified_total']} on_page claims in "
+                  f"{cpva['cells_n']}/{total} cells")
 
 
 # ---------------------------------------------------------------------------

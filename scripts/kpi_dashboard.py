@@ -49,6 +49,23 @@ infra_failed cells are dropped from every KPI's numerator AND denominator (an in
 outage measures the provider, not the arm) -- mirroring compare_arms.compare_pair. The dropped
 count is reported per group.
 
+Ledger-arm fallback (K1/K3/K5/K7): the Ledger campaign's three arms (evidence_loop,
+langgraph_react, sequential_react_extract) never write ``execution.output.grounded``,
+``sources``/``unverified_citations``, or any of the K5 abstention fields -- those are graph-engine
+fields from an older era. Rather than report those cells as an uncomputable n/a forever, K1/K3/K5
+fall back to ``agent.app.testing.claim_audit.audit()``, the arm-blind auditor that reconstructs an
+equivalent record (claim support against actually-visited pages) from fields every arm DOES write
+(``output.final_deliverable``, ``output.pages``, ``telemetry_raw.timings`` visit events). K7
+reuses K1's fallback for its "grounded" denominator, since K7 has always been defined as cost per
+*grounded* answer. The fallback is a claim-level proxy, not the original URL-level/field-level
+definition -- see each function's docstring for the exact mapping -- and it activates ONLY when
+the native graph-engine field is absent; a cell that carries the native field is scored exactly as
+before (this is asserted by the pre-existing test suite, which is unmodified). A cell whose answer
+has no checkable claim yields None (UNKNOWN) from the fallback too, same missing-key discipline as
+everywhere else in this file. Coverage counts distinguish native from fallback cells
+(``k1_fallback_n``, ``k5_native_n``/``k5_fallback_n``) so a fallback-heavy number is visible as
+such, never silently blended with the native-field number it stands in for.
+
 Usage:
   PYTHONPATH=.:services:agent ./.venv/bin/python scripts/kpi_dashboard.py \\
       --run-id dagbase_20260824 --results-dir agent/idea_test_results --csv out.csv
@@ -64,6 +81,7 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bench_stats import ci95, mean  # noqa: E402
 from compare_arms import _infra_failed, _obs  # noqa: E402
+from agent.app.testing.claim_audit import audit as _claim_audit  # noqa: E402
 
 RESULTS_DIR = "agent/idea_test_results"
 
@@ -191,6 +209,25 @@ def group_key(cell):
 # fabricated 0/False), so callers can distinguish "computed as false" from "not computable".
 # ---------------------------------------------------------------------------
 
+def _audit_k1_fallback(d):
+    """K1 fallback via the arm-blind auditor: is the answer grounded in a page it visited.
+
+    Params:
+        d: one cell's full parsed result JSON.
+
+    Returns:
+        True if the auditor found at least one checkable claim classified ``on_page`` (i.e. a
+        claim the answer states was actually located on a page the arm stored); False if the
+        answer states checkable claims but none of them are ``on_page``; ``None`` if the answer
+        has no checkable claim at all -- there is nothing for the auditor to ground, so
+        "grounded" is undefined rather than false.
+    """
+    rec = _claim_audit(d)
+    if rec["checkable_claims"] == 0:
+        return None
+    return rec["counts"]["on_page"] > 0
+
+
 def k1_available(d):
     """K1 per-cell: grounded-answer availability, or None if not computable.
 
@@ -198,16 +235,23 @@ def k1_available(d):
         d: one cell's full parsed result JSON.
 
     Returns:
-        True/False if ``execution.observability.visit.count`` and
-        ``execution.output.grounded`` are both present; ``None`` if either is missing.
+        True/False if ``execution.observability.visit.count`` and ``execution.output.grounded``
+        are both present, computed exactly as before. If ``visit.count`` is present but
+        ``grounded`` is absent (the Ledger arms never write it), falls back to
+        :func:`_audit_k1_fallback`. ``None`` if ``visit.count`` itself is missing (the auditor
+        needs no visit-count field, but a cell missing it is missing observability entirely, and
+        this KPI's coverage denominator should reflect that as still-uncomputable rather than
+        silently switching data sources).
     """
     ob = _obs(d)
     visit_count = (ob.get("visit") or {}).get("count")
     out = d.get("execution", {}).get("output", {})
     grounded = out.get("grounded")
-    if visit_count is None or grounded is None:
+    if visit_count is not None and grounded is not None:
+        return bool(visit_count > 0 and grounded)
+    if visit_count is None:
         return None
-    return bool(visit_count > 0 and grounded)
+    return _audit_k1_fallback(d)
 
 
 def k1_never_started(d):
@@ -246,6 +290,30 @@ def k2_keystone(d):
     return all(bool(c.get("passed")) for c in keystone_checks)
 
 
+def _audit_k3_fallback(d):
+    """K3 fallback via the arm-blind auditor: claim-level analogue of citation validity.
+
+    K3's native definition is URL-level (was a cited URL actually visited). The Ledger arms
+    write no ``sources``/``unverified_citations`` list at all, so there is no URL list to score.
+    The auditor's claim-level analogue -- the fraction of the answer's checkable claims located
+    on a page the arm actually stored -- measures the same underlying question (is what the
+    answer asserts backed by evidence it fetched) at a different granularity. Callers must not
+    read this as the same metric as the native fraction; ``k1_fallback``-style bookkeeping in
+    :func:`aggregate_group` keeps native and fallback cells distinguishable.
+
+    Params:
+        d: one cell's full parsed result JSON.
+
+    Returns:
+        float in [0, 1] -- ``on_page claims / checkable claims``; ``None`` if the answer has no
+        checkable claim (undefined, not 0).
+    """
+    rec = _claim_audit(d)
+    if rec["checkable_claims"] == 0:
+        return None
+    return rec["counts"]["on_page"] / rec["checkable_claims"]
+
+
 def k3_citation_validity(d):
     """K3 per-cell: fraction of cited URLs that were actually visited/verified.
 
@@ -253,11 +321,16 @@ def k3_citation_validity(d):
         d: one cell's full parsed result JSON.
 
     Returns:
-        float in [0, 1] -- ``len(sources) / (len(sources) + len(unverified_citations))``;
-        ``None`` if the cell cites nothing at all (both lists empty/absent), since the fraction
-        is undefined rather than 0 in that case.
+        float in [0, 1] -- ``len(sources) / (len(sources) + len(unverified_citations))`` when
+        either field is present on the cell, computed exactly as before; ``None`` if that
+        fraction's own denominator is 0 (cites nothing). When BOTH fields are entirely absent
+        (the Ledger arms never write them), falls back to :func:`_audit_k3_fallback`, a
+        claim-level proxy -- see its docstring for why this is a different metric, not a silent
+        substitute for the native one.
     """
     out = d.get("execution", {}).get("output", {})
+    if "sources" not in out and "unverified_citations" not in out:
+        return _audit_k3_fallback(d)
     sources = out.get("sources") or []
     unverified = out.get("unverified_citations") or []
     total = len(sources) + len(unverified)
@@ -304,22 +377,53 @@ ABSTENTION_FIELDS = ("finalization_status", "answer_contract", "deliverable_comp
                      "grounding_satisfied")
 
 
-def k5_abstention_row(d):
-    """K5 per-cell: abstention cross-tab row, or None if none of its fields are present.
+def _audit_k5_fallback(d):
+    """K5 fallback via the arm-blind auditor, for cells that write none of ABSTENTION_FIELDS.
+
+    The Ledger arms write no ``finalization_status``/``answer_contract``/``deliverable_complete``/
+    ``grounding_satisfied`` -- those are graph-engine decision-state fields with no equivalent in
+    the auditor's vocabulary. Rather than force-fit a claim-support signal into those specific
+    field names (which would silently blend a different measurement into a native-looking row),
+    this returns a row with the native fields explicitly None (not computed) plus two
+    auditor-native keys, ``audit_supported``/``audit_checkable_claims``, so a reader can never
+    mistake this for a native row.
 
     Params:
         d: one cell's full parsed result JSON.
 
     Returns:
-        A dict with keys ``ABSTENTION_FIELDS`` plus ``overall_passed`` when at least one
-        abstention-related field is present on this cell; ``None`` if none are (this dataset
-        era never wrote them, which must show as 0 coverage, not as all-False rows).
+        A dict, or ``None`` if the answer has no checkable claim (nothing for the auditor to
+        cross-tab).
+    """
+    rec = _claim_audit(d)
+    if rec["checkable_claims"] == 0:
+        return None
+    row = {f: None for f in ABSTENTION_FIELDS}
+    row["audit_supported"] = rec["counts"]["on_page"] > 0
+    row["audit_checkable_claims"] = rec["checkable_claims"]
+    row["source"] = "audit_fallback"
+    return row
+
+
+def k5_abstention_row(d):
+    """K5 per-cell: abstention cross-tab row, or None if none of its fields are present/computable.
+
+    Params:
+        d: one cell's full parsed result JSON.
+
+    Returns:
+        A dict with keys ``ABSTENTION_FIELDS`` plus ``overall_passed`` and ``source="native"``
+        when at least one abstention-related field is present on this cell (unchanged from
+        before, aside from the added ``source`` tag). When NONE of ``ABSTENTION_FIELDS`` are
+        present (the Ledger arms), falls back to :func:`_audit_k5_fallback`; ``None`` if even
+        that is uncomputable (no checkable claim in the answer).
     """
     out = d.get("execution", {}).get("output", {})
     if not any(out.get(f) is not None for f in ABSTENTION_FIELDS):
-        return None
+        return _audit_k5_fallback(d)
     row = {f: out.get(f) for f in ABSTENTION_FIELDS}
     row["overall_passed"] = d.get("validation", {}).get("overall_passed")
+    row["source"] = "native"
     return row
 
 
@@ -399,6 +503,13 @@ def aggregate_group(cells):
 
     k1_vals = [k1_available(d) for d in ds]
     k1_rate, k1_true, k1_n = _rate(k1_vals)
+    # cells whose K1 value came from the auditor fallback rather than the native `grounded`
+    # field -- kept visible so a fallback-heavy number is never mistaken for a native one.
+    k1_fallback_n = sum(
+        1 for d in ds
+        if d.get("execution", {}).get("output", {}).get("grounded") is None
+        and k1_available(d) is not None
+    )
     never_started_vals = [k1_never_started(d) for d in ds]
     ns_rate, ns_true, ns_n = _rate(never_started_vals)
 
@@ -411,6 +522,12 @@ def aggregate_group(cells):
 
     k3_vals = [k3_citation_validity(d) for d in ds]
     k3_present = [v for v in k3_vals if v is not None]
+    k3_fallback_n = sum(
+        1 for d in ds
+        if "sources" not in d.get("execution", {}).get("output", {})
+        and "unverified_citations" not in d.get("execution", {}).get("output", {})
+        and k3_citation_validity(d) is not None
+    )
 
     k4_vals = [k4_fabrication(d) for d in ds]
     k4_rate, k4_true, k4_n = _rate(k4_vals)
@@ -419,6 +536,8 @@ def aggregate_group(cells):
 
     k5_rows = [k5_abstention_row(d) for d in ds]
     k5_rows = [r for r in k5_rows if r is not None]
+    k5_native_n = sum(1 for r in k5_rows if r.get("source") == "native")
+    k5_fallback_n = sum(1 for r in k5_rows if r.get("source") == "audit_fallback")
 
     k7 = [k7_cost_fields(d) for d in ds]
     k7_usd_present = [r for r in k7 if r["usd"] is not None]
@@ -435,14 +554,16 @@ def aggregate_group(cells):
     return {
         "total": total,
         "k1_availability_rate": k1_rate, "k1_true": k1_true, "k1_n": k1_n,
+        "k1_fallback_n": k1_fallback_n,
         "never_started_rate": ns_rate, "never_started_true": ns_true, "never_started_n": ns_n,
         "k2_keystone_pass_rate": k2_rate, "k2_true": k2_true, "k2_n": k2_n,
         "overall_score_mean": mean(overall_scores), "overall_score_n": len(overall_scores),
         "pass_rate_mean": mean(pass_rates), "pass_rate_n": len(pass_rates),
         "k3_citation_validity_mean": mean(k3_present), "k3_n": len(k3_present),
+        "k3_fallback_n": k3_fallback_n,
         "k4_fabrication_rate": k4_rate, "k4_true": k4_true, "k4_n": k4_n,
         "k4_refused_ungrounded_rate": refused_rate, "k4_refused_n": refused_n,
-        "k5_rows_n": len(k5_rows),
+        "k5_rows_n": len(k5_rows), "k5_native_n": k5_native_n, "k5_fallback_n": k5_fallback_n,
         "k7_usd_per_grounded": (
             (sum(r["usd"] for r in grounded_cells_with_usd) / len(grounded_cells_with_usd))
             if grounded_cells_with_usd else float("nan")
@@ -491,6 +612,9 @@ def print_table(groups):
         print(f"\n--- {model} / {variant}  (n={total} cells) ---")
         print(f"  K1 availability (grounded answer):  {_pct(g['k1_availability_rate'], g['k1_n'], total)}"
               f"  computed over {g['k1_n']}/{total}")
+        if g["k1_fallback_n"]:
+            print(f"     (includes {g['k1_fallback_n']} cells scored via the arm-blind auditor "
+                  f"fallback -- no native 'grounded' field on this era/arm)")
         print(f"     never-started (tool-support 400/404): "
               f"{_pct(g['never_started_rate'], g['never_started_n'], total)}")
         print(f"  K2 keystone pass rate (visited cells only): "
@@ -505,11 +629,16 @@ def print_table(groups):
         k3v = f"{g['k3_citation_validity_mean']:.3f}" if k3n else "n/a"
         print(f"  K3 citation validity (fraction visited of cited): {k3v}  "
               f"computed over {k3n}/{total}")
+        if g["k3_fallback_n"]:
+            print(f"     (includes {g['k3_fallback_n']} cells scored via the arm-blind auditor's "
+                  f"claim-support proxy -- no native sources/unverified_citations on this "
+                  f"era/arm; this is a DIFFERENT metric at claim granularity, not the native one)")
         print(f"  K4 fabrication rate: {_pct(g['k4_fabrication_rate'], g['k4_n'], total)}"
               f"  computed over {g['k4_n']}/{total}")
         print(f"     refused-ungrounded gate fired: "
               f"{_pct(g['k4_refused_ungrounded_rate'], g['k4_refused_n'], total)}")
-        print(f"  K5 abstention cross-tab rows available: {g['k5_rows_n']}/{total}")
+        print(f"  K5 abstention cross-tab rows available: {g['k5_rows_n']}/{total}"
+              f"  (native={g['k5_native_n']}, audit-fallback={g['k5_fallback_n']})")
         if g["k7_usd_is_fallback"]:
             tokn, secn = g["k7_tokens_n"], g["k7_secs_n"]
             toks = f"{g['k7_tokens_per_grounded']:.0f}" if tokn else "n/a"
@@ -539,15 +668,15 @@ def write_csv(path, groups):
     import csv
     fieldnames = [
         "model", "variant", "total",
-        "k1_availability_rate", "k1_n",
+        "k1_availability_rate", "k1_n", "k1_fallback_n",
         "never_started_rate", "never_started_n",
         "k2_keystone_pass_rate", "k2_n",
         "overall_score_mean", "overall_score_n",
         "pass_rate_mean", "pass_rate_n",
-        "k3_citation_validity_mean", "k3_n",
+        "k3_citation_validity_mean", "k3_n", "k3_fallback_n",
         "k4_fabrication_rate", "k4_n",
         "k4_refused_ungrounded_rate", "k4_refused_n",
-        "k5_rows_n",
+        "k5_rows_n", "k5_native_n", "k5_fallback_n",
         "k7_usd_per_grounded", "k7_usd_n", "k7_usd_is_fallback",
         "k7_tokens_per_grounded", "k7_tokens_n",
         "k7_secs_per_grounded", "k7_secs_n",

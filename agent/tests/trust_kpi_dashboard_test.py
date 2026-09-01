@@ -19,7 +19,8 @@ def _cell(test_id="100", model="qwen2.5:7b", variant="evidence_loop", visit_coun
           grounded=True, score=0.5, success=True, final_deliverable="answer text",
           sources=None, unverified_citations=None, extractions=None, claim_provenance=None,
           ledger_verdict=None, goal_achieved=None, finalization_status=None,
-          grounding_gate=None, usd=None, total_tokens=1000, seconds=10.0, infra_failed=False):
+          grounding_gate=None, usd=None, total_tokens=1000, seconds=10.0, infra_failed=False,
+          pages=None, visit_urls=None):
     out = {"final_deliverable": final_deliverable, "success": success, "grounded": grounded}
     if sources is not None:
         out["sources"] = sources
@@ -37,6 +38,8 @@ def _cell(test_id="100", model="qwen2.5:7b", variant="evidence_loop", visit_coun
         out["finalization_status"] = finalization_status
     if grounding_gate is not None:
         out["grounding_gate"] = grounding_gate
+    if pages is not None:
+        out["pages"] = pages
     d = {
         "test_metadata": {"test_id": str(test_id)},
         "model": model,
@@ -55,6 +58,10 @@ def _cell(test_id="100", model="qwen2.5:7b", variant="evidence_loop", visit_coun
         "validation": {"overall_score": score, "overall_passed": score is not None and score >= 0.5},
         "infra_failed": infra_failed,
     }
+    if visit_urls is not None:
+        d["execution"]["telemetry_raw"] = {
+            "timings": [{"name": "visit", "payload": {"url": u}} for u in visit_urls]
+        }
     return d
 
 
@@ -304,6 +311,102 @@ def test_flag_tradeoffs_skips_when_coverage_missing():
     }
     flags = tkd.flag_safety_accuracy_tradeoffs(groups)
     assert flags == []
+
+
+# ---------------------------------------------------------------------------
+# arm-blind auditor series -- fills the gap for langgraph_react (no output.extractions), reported
+# as a THIRD, separately-labeled series alongside the two extraction-based ones (never blended).
+# ---------------------------------------------------------------------------
+
+def test_audit_claim_states_empty_when_no_checkable_claims():
+    d = _cell(final_deliverable="answer text")
+    assert tkd.audit_claim_states(d) == {}
+
+
+def test_audit_claim_states_classifies_on_page_and_unsupported():
+    d = _cell(final_deliverable="Values are 1111 and 2222 total",
+              pages=[{"url": "http://a", "text": "Confirmed value 1111 in source."}],
+              visit_urls=["http://a"])
+    states = tkd.audit_claim_states(d)
+    assert states["1111"] == "on_page"
+    assert states["2222"] == "unsupported"
+
+
+def test_pooled_audit_claim_stats_pools_across_cells():
+    cells = [
+        _cell(test_id="1", final_deliverable="Value is 1111 total",
+              pages=[{"url": "http://a", "text": "Value is 1111 confirmed."}],
+              visit_urls=["http://a"]),
+        _cell(test_id="2", final_deliverable="Value is 2222 total",
+              pages=[{"url": "http://b", "text": "no matching figure here"}],
+              visit_urls=["http://b"]),
+        _cell(test_id="3", final_deliverable="answer text"),  # no checkable claim -- excluded
+    ]
+    stats = tkd.pooled_audit_claim_stats(cells)
+    assert stats["cells_with_field"] == 2  # only cells with >=1 checkable claim count
+    assert stats["n_checked"] == 2
+    assert stats["n_unsupported"] == 1
+    assert math.isclose(stats["unsupported_rate"], 0.5)
+
+
+def test_pooled_audit_claim_stats_uncomputable_when_nothing_checkable():
+    cells = [_cell(test_id="1", final_deliverable="answer text")]
+    stats = tkd.pooled_audit_claim_stats(cells)
+    assert stats["cells_with_field"] == 0
+    assert math.isnan(stats["unsupported_rate"])
+
+
+def test_cost_per_verified_claim_audit_pools_tokens_over_on_page_claims():
+    cells = [
+        _cell(test_id="1", total_tokens=1000, final_deliverable="Value is 1111 total",
+              pages=[{"url": "http://a", "text": "Value is 1111 confirmed."}],
+              visit_urls=["http://a"]),
+        _cell(test_id="2", total_tokens=2000, final_deliverable="Value is 2222 total",
+              pages=[{"url": "http://b", "text": "no matching figure here"}]),
+    ]
+    stats = tkd.cost_per_verified_claim_audit(cells)
+    assert stats["n_verified_total"] == 1
+    assert stats["cells_n"] == 1
+    assert math.isclose(stats["tokens_per_verified_claim"], 1000)
+
+
+def test_cost_per_verified_claim_audit_uncomputable_when_no_on_page_claims():
+    cells = [_cell(test_id="1", total_tokens=1000, final_deliverable="answer text")]
+    stats = tkd.cost_per_verified_claim_audit(cells)
+    assert stats["cells_n"] == 0
+    assert math.isnan(stats["tokens_per_verified_claim"])
+
+
+def test_aggregate_group_includes_audit_series_for_langgraph_react_shaped_cells():
+    # langgraph_react writes no extractions/claim_provenance at all -- the audit series must
+    # still produce a real number from final_deliverable + pages.
+    cells = [
+        {"file": "a", "data": _cell(test_id="1", variant="langgraph_react",
+                                     final_deliverable="Value is 1111 total",
+                                     pages=[{"url": "http://a", "text": "Value is 1111 confirmed."}],
+                                     visit_urls=["http://a"])},
+    ]
+    g = tkd.aggregate_group(cells)
+    assert g["unsupported_extractions"]["cells_with_field"] == 0  # native series still uncomputable
+    assert g["unsupported_audit"]["cells_with_field"] == 1        # audit series fills the gap
+    assert g["cost_per_verified_claim"]["cells_n"] == 0
+    assert g["cost_per_verified_claim_audit"]["cells_n"] == 1
+
+
+def test_print_table_labels_audit_series_distinctly_from_extraction_series(capsys):
+    groups = {
+        ("m1", "langgraph_react"): tkd.aggregate_group([
+            {"file": "a", "data": _cell(test_id="1", variant="langgraph_react",
+                                         final_deliverable="Value is 1111 total",
+                                         pages=[{"url": "http://a",
+                                                 "text": "Value is 1111 confirmed."}],
+                                         visit_urls=["http://a"])},
+        ]),
+    }
+    tkd.print_table(groups)
+    out = capsys.readouterr().out
+    assert "audit (arm-blind)" in out
+    assert "cost per verified claim [audit" in out
 
 
 # ---------------------------------------------------------------------------

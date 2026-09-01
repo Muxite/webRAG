@@ -20,7 +20,7 @@ def _cell(test_id="100", model="qwen2.5:7b", variant="graph", visit_count=1, gro
           score=0.5, pass_rate=0.4, sources=None, unverified_citations=None,
           success=True, final_deliverable="answer text", grounding_gate=None,
           warning=None, grep_validations=None, usd=None, total_tokens=1000, seconds=10.0,
-          infra_failed=False, nodes=None, abstention=None):
+          infra_failed=False, nodes=None, abstention=None, pages=None, visit_urls=None):
     out = {
         "final_deliverable": final_deliverable,
         "success": success,
@@ -36,6 +36,8 @@ def _cell(test_id="100", model="qwen2.5:7b", variant="graph", visit_count=1, gro
         out["warning"] = warning
     if abstention:
         out.update(abstention)
+    if pages is not None:
+        out["pages"] = pages
     d = {
         "test_metadata": {"test_id": str(test_id)},
         "model": model,
@@ -59,6 +61,10 @@ def _cell(test_id="100", model="qwen2.5:7b", variant="graph", visit_count=1, gro
         },
         "infra_failed": infra_failed,
     }
+    if visit_urls is not None:
+        d["execution"]["telemetry_raw"] = {
+            "timings": [{"name": "visit", "payload": {"url": u}} for u in visit_urls]
+        }
     return d
 
 
@@ -394,6 +400,113 @@ def test_aggregate_group_k5_zero_coverage_when_never_written():
     cells = [{"file": "a", "data": _cell(test_id="1")}, {"file": "b", "data": _cell(test_id="2")}]
     g = kd.aggregate_group(cells)
     assert g["k5_rows_n"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Arm-blind auditor fallback (Ledger arms: evidence_loop/langgraph_react/sequential_react_extract
+# never write execution.output.grounded or sources/unverified_citations/abstention fields -- these
+# tests exercise the claim_audit.audit() fallback path added for those cells, while every test
+# above stays unmodified proof that cells carrying the graph-engine fields are untouched).
+# ---------------------------------------------------------------------------
+
+def test_k1_available_audit_fallback_true_when_claim_on_page():
+    d = _cell(grounded=None, visit_count=1,
+              final_deliverable="The height is 1234 meters.",
+              pages=[{"url": "http://a", "text": "Confirmed: height is 1234 meters."}],
+              visit_urls=["http://a"])
+    assert kd.k1_available(d) is True
+
+
+def test_k1_available_audit_fallback_false_when_claim_unsupported():
+    d = _cell(grounded=None, visit_count=1,
+              final_deliverable="The height is 9999 meters.",
+              pages=[{"url": "http://a", "text": "Unrelated content, no matching figure."}],
+              visit_urls=["http://a"])
+    assert kd.k1_available(d) is False
+
+
+def test_k1_available_audit_fallback_none_when_nothing_checkable():
+    # final_deliverable has no numeric/quoted claim -- the auditor has nothing to check, so this
+    # must read UNKNOWN (None), never a fabricated False. Also proves the pre-existing
+    # test_k1_available_none_when_grounded_missing case is exactly this shape.
+    d = _cell(grounded=None, visit_count=1, final_deliverable="answer text")
+    assert kd.k1_available(d) is None
+
+
+def test_aggregate_group_k1_counts_audit_fallback_cells():
+    cells = [
+        {"file": "a", "data": _cell(test_id="1", grounded=None, visit_count=1,
+                                     final_deliverable="Value is 4242 units.",
+                                     pages=[{"url": "http://a", "text": "Value is 4242 units."}],
+                                     visit_urls=["http://a"])},
+        {"file": "b", "data": _cell(test_id="2", grounded=None, visit_count=1,
+                                     final_deliverable="Value is 8181 units.",
+                                     pages=[{"url": "http://b", "text": "no matching figure here"}],
+                                     visit_urls=["http://b"])},
+    ]
+    g = kd.aggregate_group(cells)
+    assert g["k1_n"] == 2
+    assert g["k1_true"] == 1
+    assert g["k1_fallback_n"] == 2
+
+
+def test_k3_citation_validity_audit_fallback_full_support():
+    d = _cell(final_deliverable="Area is 4321 km2.",
+              pages=[{"url": "http://a", "text": "Area is 4321 km2 according to the record."}],
+              visit_urls=["http://a"])
+    val = kd.k3_citation_validity(d)
+    assert val == 1.0
+
+
+def test_k3_citation_validity_audit_fallback_partial_support():
+    d = _cell(final_deliverable="Values are 1111 and 2222.",
+              pages=[{"url": "http://a", "text": "Confirmed value 1111 in source."}],
+              visit_urls=["http://a"])
+    val = kd.k3_citation_validity(d)
+    assert math.isclose(val, 0.5)
+
+
+def test_k3_citation_validity_audit_fallback_only_when_native_fields_absent():
+    # native sources/unverified_citations present -- fallback must NOT override them.
+    d = _cell(sources=[{"url": "http://a"}], unverified_citations=[],
+              final_deliverable="Value is 1234 units.",
+              pages=[{"url": "http://b", "text": "no matching figure"}],
+              visit_urls=["http://b"])
+    assert kd.k3_citation_validity(d) == 1.0
+
+
+def test_k5_abstention_row_audit_fallback_when_native_absent():
+    d = _cell(final_deliverable="Total is 5555 units.",
+              pages=[{"url": "http://a", "text": "Total is 5555 units, confirmed."}],
+              visit_urls=["http://a"])
+    row = kd.k5_abstention_row(d)
+    assert row is not None
+    assert row["source"] == "audit_fallback"
+    assert row["audit_supported"] is True
+
+
+def test_k5_abstention_row_native_still_marked_native():
+    d = _cell(abstention={"finalization_status": "blocked", "answer_contract": "partial"})
+    row = kd.k5_abstention_row(d)
+    assert row["source"] == "native"
+
+
+def test_k5_abstention_row_audit_fallback_none_when_nothing_checkable():
+    d = _cell(final_deliverable="answer text")
+    assert kd.k5_abstention_row(d) is None
+
+
+def test_aggregate_group_k5_counts_fallback_rows():
+    cells = [
+        {"file": "a", "data": _cell(test_id="1", final_deliverable="Total is 5555 units.",
+                                     pages=[{"url": "http://a", "text": "Total is 5555 units."}],
+                                     visit_urls=["http://a"])},
+        {"file": "b", "data": _cell(test_id="2")},
+    ]
+    g = kd.aggregate_group(cells)
+    assert g["k5_rows_n"] == 1
+    assert g["k5_fallback_n"] == 1
+    assert g["k5_native_n"] == 0
 
 
 # ---------------------------------------------------------------------------
