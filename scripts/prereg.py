@@ -33,7 +33,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence, Tuple
 
 #: Fields without which a run is not an experiment. ``abort_conditions`` is required so an
 #: unattended run has pre-declared stopping rules rather than a human watching it.
@@ -151,6 +151,44 @@ def _infra_failed_rate(landed_paths: List[Path]) -> float:
     return failed / len(landed_paths)
 
 
+
+def _live_fallbacks(landed_paths: Sequence[Path]) -> Tuple[int, int]:
+    """Live search calls across the run, and how many cells could not report.
+
+    Per-search provenance became persistent in commit 88a57429, which writes
+    ``observability.search.{live_fallbacks,corpus_hits,empty_results}`` whenever any search timing
+    carried it. Before that the count existed only on the in-memory ``ConnectorSearchCorpus``
+    instance, which is why this gate was hardcoded UNKNOWN -- a defensive choice that is now
+    stale, and that would otherwise keep a checkable gate permanently switched off.
+
+    The counts SUM across the run rather than taking a per-cell max: the budget being enforced is
+    a property of the whole run ("this run must not have reached live search at all"), and a
+    per-cell rule would let many small leaks pass while each one looked individually harmless.
+
+    :param landed_paths: the cells that actually landed.
+    :returns: ``(total_live_fallbacks, cells_missing_the_field)``. A cell missing the field is
+        counted as MISSING, never as zero -- folding it in as 0 would manufacture a pass the data
+        cannot support.
+    """
+    total = 0
+    missing = 0
+    for path in landed_paths:
+        try:
+            cell = json.loads(path.read_text())
+        except (OSError, ValueError):
+            missing += 1
+            continue
+        search = (((cell.get("execution") or {}).get("observability") or {}).get("search") or {})
+        if "live_fallbacks" not in search:
+            missing += 1
+            continue
+        try:
+            total += int(search["live_fallbacks"])
+        except (TypeError, ValueError):
+            missing += 1
+    return total, missing
+
+
 def _evaluate_abort_conditions(spec: Dict[str, Any], completion_rate: float,
                                 landed_paths: List[Path]) -> Dict[str, Dict[str, Any]]:
     """Evaluate each declared ``abort_conditions`` entry against the cells that actually landed.
@@ -186,14 +224,24 @@ def _evaluate_abort_conditions(spec: Dict[str, Any], completion_rate: float,
                 "detail": f"infra_failed_rate={rate:.3f} vs max {threshold}",
             }
         elif key == "max_live_fallbacks":
-            gates[key] = {
-                "status": "unknown",
-                "threshold": threshold,
-                "value": None,
-                "detail": ("live-fallback count is not recoverable from a stored cell -- it "
-                           "lives only on the ConnectorSearchCorpus instance of the run that "
-                           "produced it and is never persisted into the cell's JSON"),
-            }
+            total, missing = _live_fallbacks(landed_paths)
+            if missing:
+                gates[key] = {
+                    "status": "unknown",
+                    "threshold": threshold,
+                    "value": None,
+                    "detail": (f"{missing} of {len(landed_paths)} cells carry no search-provenance "
+                               "block (written before 88a57429); absent is not zero, so this gate "
+                               "cannot be evaluated for this run"),
+                }
+            else:
+                passed = total <= threshold
+                gates[key] = {
+                    "status": "pass" if passed else "fail",
+                    "threshold": threshold,
+                    "value": total,
+                    "detail": f"live_fallbacks={total} (summed over the run) vs max {threshold}",
+                }
         else:
             gates[key] = {
                 "status": "unknown",

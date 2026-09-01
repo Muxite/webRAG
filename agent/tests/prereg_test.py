@@ -240,3 +240,63 @@ def test_audit_preserves_the_existing_return_contract(tmp_path):
     report = prereg.audit(spec, str(tmp_path))
     for key in ("run_id", "expected", "found", "missing", "complete", "completion_rate"):
         assert key in report
+
+
+# --------------------------------------------------------------------- max_live_fallbacks gate
+
+
+def _cell_with_search(tmp_path, name, *, live=None):
+    """A landed cell whose observability carries (or omits) the provenance block."""
+    import json
+    search = {"count": 3}
+    if live is not None:
+        search.update({"live_fallbacks": live, "corpus_hits": 3 - live, "empty_results": 0})
+    path = tmp_path / name
+    path.write_text(json.dumps({
+        "test_metadata": {"test_id": "210"},
+        "execution": {"observability": {"search": search}},
+        "infra_failed": False,
+    }))
+    return path
+
+
+def test_live_fallback_gate_passes_when_every_cell_recorded_zero(tmp_path):
+    """The gate became checkable when 88a57429 persisted per-search provenance.
+
+    It was hardcoded UNKNOWN because the count used to live only on the in-memory
+    ConnectorSearchCorpus instance. It is now written to observability.search.live_fallbacks, and
+    a gate that reports UNKNOWN when the data exists is a gate that silently stopped working.
+    """
+    from scripts.prereg import _evaluate_abort_conditions
+
+    paths = [_cell_with_search(tmp_path, f"c{i}.json", live=0) for i in range(3)]
+    gates = _evaluate_abort_conditions({"abort_conditions": {"max_live_fallbacks": 0}}, 1.0, paths)
+
+    assert gates["max_live_fallbacks"]["status"] == "pass"
+    assert gates["max_live_fallbacks"]["value"] == 0
+
+
+def test_live_fallback_gate_sums_across_the_run_and_can_fail(tmp_path):
+    """Run-level budget: the question is whether this run touched live search at all, so the
+    counts SUM. A max-per-cell rule would let many small leaks through unnoticed."""
+    from scripts.prereg import _evaluate_abort_conditions
+
+    paths = [_cell_with_search(tmp_path, "a.json", live=1),
+             _cell_with_search(tmp_path, "b.json", live=2)]
+    gates = _evaluate_abort_conditions({"abort_conditions": {"max_live_fallbacks": 0}}, 1.0, paths)
+
+    assert gates["max_live_fallbacks"]["status"] == "fail"
+    assert gates["max_live_fallbacks"]["value"] == 3
+
+
+def test_live_fallback_gate_is_unknown_when_any_cell_predates_the_field(tmp_path):
+    """Absent must never read as zero. A cell written before 88a57429 carries no provenance at
+    all, and folding it in as 0 would manufacture a pass the data cannot support."""
+    from scripts.prereg import _evaluate_abort_conditions
+
+    paths = [_cell_with_search(tmp_path, "new.json", live=0),
+             _cell_with_search(tmp_path, "old.json", live=None)]
+    gates = _evaluate_abort_conditions({"abort_conditions": {"max_live_fallbacks": 0}}, 1.0, paths)
+
+    assert gates["max_live_fallbacks"]["status"] == "unknown"
+    assert "1" in gates["max_live_fallbacks"]["detail"]
