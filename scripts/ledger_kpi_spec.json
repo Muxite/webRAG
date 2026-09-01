@@ -1,0 +1,52 @@
+{
+  "spec_version": "1.0.0",
+  "frozen_on": "2026-09-01",
+  "doc": "docs/LEDGER_KPI_SPEC.md",
+  "metric_order": ["L1", "L2", "L3", "L4", "L5", "L6"],
+  "kpis": {
+    "L1": {"name": "risk_coverage_calibration", "direction": "higher", "headline": "monotonicity", "correct_threshold": 0.5, "sources": ["native", "audit"]},
+    "L2": {"name": "claim_support_by_edge", "direction": "higher", "arm_limited_edge": "retrieved_to_extracted"},
+    "L3": {"name": "fabricated_arithmetic_rate", "direction": "lower", "arm_limited": true},
+    "L4": {"name": "unsupported_claim_rate", "direction": "lower"},
+    "L5": {"name": "replay_fidelity", "direction": "higher", "components": ["quote_replay", "derivation_replay", "corpus_service_fidelity"]},
+    "L6": {"name": "cost_and_wall_clock", "direction": "lower", "first_class": true},
+    "L7": {"name": "quote_fabrication_rate", "direction": "lower"},
+    "L8": {"name": "redundant_read_waste", "direction": "lower", "primary_view": "visit", "character_view_arms": ["evidence_loop", "sequential_react_extract"]}
+  },
+  "support": {
+    "min_claim_digits": 2,
+    "operations": ["add", "subtract", "abs_difference", "multiply", "divide", "share_of_total"],
+    "relative_tolerance": 0.02,
+    "max_operands_per_cell": 24,
+    "unit_conversion_allowed": false,
+    "cross_cell_false_positive_ceiling": 0.05
+  },
+  "graded_verdict": {
+    "answer_min_support": 0.8,
+    "answer_requires_at_least_one_supported_claim": true,
+    "abstain_on_no_evidence": true
+  },
+  "task_clusters": {
+    "sum_difference": [210, 211, 212, 213],
+    "ratio_quotient": [214, 215, 216, 217],
+    "computed_ratio_argmax": [218, 219, 220, 221],
+    "unit_mismatch_refusal": [222, 223, 224],
+    "missing_operand_abstention": [225, 226, 227],
+    "unsupported_numeric": [228, 229, 230, 231]
+  },
+  "split_rule": "max_task_id_per_cluster_is_holdout",
+  "holdout": [213, 217, 221, 224, 227, 231],
+  "tuning": [210, 211, 212, 214, 215, 216, 218, 219, 220, 222, 223, 225, 226, 228, 229, 230],
+  "arms": ["evidence_loop", "sequential_react_extract", "langgraph_react"],
+  "accuracy_anchor": "validation.overall_score",
+  "power": {
+    "paired_unit": "task",
+    "n_paired_tasks": 22,
+    "n_tuning_tasks": 16,
+    "required_for_0_10_effect": [61, 111],
+    "arm_ranking_claim_permitted": false
+  },
+  "invalid_sources": {
+    "langgraph_react_page_redundancy": "output.pages is deduplicated at write time by execution_langgraph.pages_from_telemetry; use telemetry_raw.timings visit events instead"
+  }
+}
