@@ -115,10 +115,18 @@ not help.
 anything about a second model size (everything is qwen2.5:7b); any holdout claim — the holdout
 (213, 217, 221, 224, 227, 231) has NOT been opened and must stay sealed until a rule is final.
 
+## 7b. The campaign ran, and its headline did not survive the holdout
+
+`ledgerfinal01` (seeded, 66/66 cells, live_fallbacks **0 measured**) is written up in
+`docs/LEDGER_FINAL01_TUNING_RESULT.md`. The tuning split showed `evidence_loop` with a 4x lower
+unsupported-claim rate; **the holdout inverted it** (0.081 -> 0.320 for evidence_loop, 0.327 ->
+0.063 for langgraph_react), and L1 monotonicity flipped for all three arms. Per-arm KPI
+comparison on this suite is not reportable below ~60 paired tasks. That headline is withdrawn.
+
 ## 8. Open queue
 
-1. Re-run the full 3-arm campaign seeded, with `--rule graded` and the confidence channels live,
-   then open the holdout ONCE. This is the phase's remaining deliverable.
+1. More TASKS. The binding constraint is now measured, not quoted: arm orderings invert between
+   task subsets. More reps will not help (seeding already removes sampling noise).
 2. Decide whether `--rule graded` becomes the default (it is opt-in today).
 3. Shim faults: the action-with-inline-argument case; capture raw completions to build a fault
    corpus; run a weak model that produces near-miss JSON so the repair rules are exercised at all.
