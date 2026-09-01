@@ -153,3 +153,47 @@ def test_load_cells_variant_filter(tmp_path, monkeypatch):
                score=1.0, final_deliverable="x")
     cells = risk_coverage.load_cells(run_ids=["myrun"], variants=["graph"])
     assert {c["variant"] for c in cells} == {"graph"}
+
+
+# ---------------------------------------------------------------------------------------------
+# --rule old|graded: load_cells must be able to select derive_verdict_graded instead of
+# derive_verdict, and every existing flag must keep working with either rule.
+# ---------------------------------------------------------------------------------------------
+
+def test_load_cells_defaults_to_the_old_literal_match_rule(tmp_path, monkeypatch):
+    monkeypatch.setattr(risk_coverage.bench_common, "results_dir", lambda: tmp_path)
+    # A derived claim (89.7) absent from the page: the old rule can only reach PARTIAL.
+    _write_cell(
+        tmp_path / "myrun_999_m_evidence_loop_cfgabc_r1.json",
+        variant="evidence_loop", score=1.0,
+        final_deliverable="Tower A is 419.7 metres and Tower B is 330.0 metres, so the "
+                          "difference is 89.7 metres.",
+        pages=[{"url": "https://example.com/towers",
+               "text": "Tower A stands 419.7 metres. Tower B stands 330.0 metres."}],
+    )
+    cells = risk_coverage.load_cells(run_ids=["myrun"])
+    assert cells[0]["verdict"] == VERDICT_PARTIAL
+
+
+def test_load_cells_rule_graded_credits_the_recomputable_derived_claim(tmp_path, monkeypatch):
+    monkeypatch.setattr(risk_coverage.bench_common, "results_dir", lambda: tmp_path)
+    _write_cell(
+        tmp_path / "myrun_999_m_evidence_loop_cfgabc_r1.json",
+        variant="evidence_loop", score=1.0,
+        final_deliverable="Tower A is 419.7 metres and Tower B is 330.0 metres, so the "
+                          "difference is 89.7 metres.",
+        pages=[{"url": "https://example.com/towers",
+               "text": "Tower A stands 419.7 metres. Tower B stands 330.0 metres."}],
+    )
+    cells = risk_coverage.load_cells(run_ids=["myrun"], rule="graded")
+    assert cells[0]["verdict"] == VERDICT_ANSWER
+
+
+def test_main_accepts_rule_flag_and_defaults_to_old(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(risk_coverage.bench_common, "results_dir", lambda: tmp_path)
+    _write_cell(tmp_path / "myrun_999_m_evidence_loop_cfgabc_r1.json", variant="evidence_loop",
+               score=1.0, final_deliverable="x")
+    rc = risk_coverage.main(["--run-ids", "myrun", "--rule", "graded", "--json"])
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert "evidence_loop" in out

@@ -166,3 +166,58 @@ def derive_verdict(result: Dict[str, Any], observability: Optional[Dict[str, Any
     if all(_claim_grounded(claim, corpus) for claim in claims):
         return VERDICT_ANSWER
     return VERDICT_PARTIAL
+
+
+def derive_verdict_graded(result: Dict[str, Any], observability: Optional[Dict[str, Any]] = None) -> str:
+    """ANSWER / PARTIAL / ABSTAIN, delegating claim support to the arm-blind auditor.
+
+    Unlike :func:`derive_verdict`, this credits a claim that is :data:`claim_audit.RECOMPUTABLE`
+    -- a value reproduced by one whitelisted operation over operands the answer itself states --
+    not only a claim located verbatim on a visited page. That is the fix for the structural
+    defect this module's docstring measures: the numeric suite's derived tasks are leak-proofed,
+    so a correct derived keystone can never be :data:`claim_audit.ON_PAGE`, and the old
+    literal-match rule could therefore never reach :data:`VERDICT_ANSWER` for one.
+
+    ``derive_verdict`` itself is left completely unchanged by this function's existence -- the
+    old rule stays computable so every report can show old-vs-new side by side.
+
+    Rule (every threshold read from ``scripts/ledger_kpi_spec.json``'s ``graded_verdict`` block,
+    never a literal in this function -- that file is hash-frozen):
+
+    1. :data:`VERDICT_ABSTAIN` if no pages were stored, the answer has no checkable claim, or the
+       text matches one of :data:`_ABSTENTION_PATTERNS` (the same patterns
+       :func:`derive_verdict` uses -- reused, not reimplemented).
+    2. :data:`VERDICT_ANSWER` if the auditor's ``support_rate`` meets ``answer_min_support`` AND
+       at least one claim is supported (``on_page`` or ``recomputable``).
+    3. :data:`VERDICT_PARTIAL` otherwise.
+
+    :param result: same shape :func:`derive_verdict` accepts -- ``{"output": ..., "graph": ...}``
+        or a raw ``execution`` block; only ``output`` (``final_deliverable`` / ``pages``) is read,
+        since :func:`claim_audit.audit` is arm-blind by construction.
+    :param observability: accepted for signature parity with :func:`derive_verdict`; unused, since
+        :func:`claim_audit.audit` deliberately reads only ``output.pages``, never the
+        multi-source ``visited_evidence`` fallback -- see ``claim_audit.py``'s module docstring.
+    :return: One of :data:`VERDICT_ANSWER` / :data:`VERDICT_PARTIAL` / :data:`VERDICT_ABSTAIN`.
+    """
+    # Local import: claim_audit imports `_claims` from this module at load time, so a top-level
+    # import here would be circular.
+    from agent.app.testing.claim_audit import ON_PAGE, RECOMPUTABLE, audit, load_spec
+
+    text = extract_final_text(result).strip()
+    if not text or _is_abstention_text(text):
+        return VERDICT_ABSTAIN
+
+    record = audit(result)
+    if record["pages_stored"] == 0:
+        return VERDICT_ABSTAIN
+    if record["checkable_claims"] == 0:
+        return VERDICT_ABSTAIN
+
+    spec = load_spec()["graded_verdict"]
+    supported = record["counts"][ON_PAGE] + record["counts"][RECOMPUTABLE]
+    support_rate = record["support_rate"] or 0.0
+    if support_rate >= float(spec["answer_min_support"]) and (
+        supported >= 1 or not bool(spec["answer_requires_at_least_one_supported_claim"])
+    ):
+        return VERDICT_ANSWER
+    return VERDICT_PARTIAL

@@ -42,7 +42,14 @@ from agent.app.testing.arm_verdict import (  # noqa: E402
     VERDICT_PARTIAL,
     VERDICT_ABSTAIN,
     derive_verdict,
+    derive_verdict_graded,
 )
+
+# --rule old|graded: "old" is the literal-match rule (derive_verdict), "graded" delegates claim
+# support to claim_audit.audit and can credit a RECOMPUTABLE derived claim. Default stays "old"
+# until the coordinator reviews the graded rule's live numbers and flips it.
+_RULES = {"old": derive_verdict, "graded": derive_verdict_graded}
+DEFAULT_RULE = "old"
 
 DEFAULT_CORRECT_THRESHOLD = 1.0
 
@@ -60,13 +67,21 @@ def is_correct(score: Optional[float], threshold: float = DEFAULT_CORRECT_THRESH
 def load_cells(run_ids: Optional[Sequence[str]] = None, *,
                extra_run_ids: Optional[Sequence[str]] = None, since: str = "",
                files: Optional[Sequence[str]] = None, tests: Optional[Sequence[str]] = None,
-               variants: Optional[Sequence[str]] = None) -> List[Dict[str, Any]]:
+               variants: Optional[Sequence[str]] = None,
+               rule: str = DEFAULT_RULE) -> List[Dict[str, Any]]:
     """Every stored cell, flattened to ``{test_id, model, variant, score, verdict}``.
 
     Reuses :func:`bench_common.discover_files` for path/run-id scoping (the one place that logic
     lives) but reads the raw JSON itself -- ``bench_common.load_row`` flattens away ``execution``
-    entirely, and ``derive_verdict`` needs ``output`` / ``graph`` / ``observability``.
+    entirely, and both verdict rules need ``output`` / ``graph`` / ``observability``.
+
+    :param rule: ``"old"`` (:func:`arm_verdict.derive_verdict`, literal-match) or ``"graded"``
+        (:func:`arm_verdict.derive_verdict_graded`, delegates to the arm-blind claim auditor).
     """
+    try:
+        derive = _RULES[rule]
+    except KeyError:
+        raise ValueError(f"unknown --rule {rule!r}; choose one of {sorted(_RULES)}") from None
     ids = list(bench_common.DEFAULT_RUN_IDS) if run_ids is None else list(run_ids)
     if extra_run_ids:
         ids = ids + list(extra_run_ids)
@@ -98,7 +113,7 @@ def load_cells(run_ids: Optional[Sequence[str]] = None, *,
             continue
         result = {"output": ex.get("output") or {}, "graph": ex.get("graph") or {}}
         observability = ex.get("observability") if isinstance(ex.get("observability"), dict) else None
-        verdict = derive_verdict(result, observability)
+        verdict = derive(result, observability)
         cells.append({
             "path": str(path), "test_id": test_id, "model": d.get("model"),
             "variant": variant, "score": float(score), "verdict": verdict,
@@ -160,6 +175,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--since", default="")
     parser.add_argument("--threshold", type=float, default=DEFAULT_CORRECT_THRESHOLD,
                         help="score >= threshold counts as correct (default: 1.0)")
+    parser.add_argument("--rule", choices=sorted(_RULES), default=DEFAULT_RULE,
+                        help="verdict rule: 'old' (literal-match) or 'graded' (arm-blind claim "
+                             "auditor, credits recomputable derivations) (default: %(default)s)")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of a table")
     args = parser.parse_args(argv)
 
@@ -169,7 +187,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     variants = args.variant.split(",") if args.variant else None
     tests = args.tests.split(",") if args.tests else None
 
-    cells = load_cells(run_ids=run_ids, since=args.since, tests=tests, variants=variants)
+    cells = load_cells(run_ids=run_ids, since=args.since, tests=tests, variants=variants,
+                       rule=args.rule)
     curves = curves_by_variant(cells, args.threshold)
 
     if args.json:

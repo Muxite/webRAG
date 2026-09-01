@@ -145,3 +145,91 @@ def test_does_not_read_native_ledger_verdict_field():
 def test_does_not_read_success_field():
     result = {"output": {"final_deliverable": "", "success": True}, "graph": {}}
     assert derive_verdict(result, observability=None) == VERDICT_ABSTAIN
+
+
+# ---------------------------------------------------------------------------------------------
+# derive_verdict_graded: delegates to the arm-blind auditor (claim_audit.audit), which can
+# credit a RECOMPUTABLE claim -- a value reproduced by one whitelisted operation over operands
+# the answer itself states -- not just an ON_PAGE literal match. This is the fix for the
+# structural defect the module docstring measures: a leak-proofed derived keystone can never be
+# ON_PAGE, so the old literal-match rule could never credit it.
+# ---------------------------------------------------------------------------------------------
+
+def test_graded_credits_a_correct_derived_answer_whose_keystone_is_on_no_page():
+    from agent.app.testing.arm_verdict import derive_verdict_graded
+
+    result = {
+        "output": {
+            "final_deliverable": "Tower A is 419.7 metres and Tower B is 330.0 metres, so the "
+                                 "difference is 89.7 metres.",
+            "pages": [{"url": "https://example.com/towers",
+                      "text": "Tower A stands 419.7 metres. Tower B stands 330.0 metres."}],
+        },
+        "graph": {},
+    }
+    # The old, literal-match rule cannot credit this: 89.7 appears on no page.
+    assert derive_verdict(result, observability=None) == VERDICT_PARTIAL
+    assert derive_verdict_graded(result, observability=None) == VERDICT_ANSWER
+
+
+def test_graded_does_not_automatically_answer_a_claim_poor_response_with_one_grounded_number():
+    from agent.app.testing.arm_verdict import derive_verdict_graded
+
+    result = {
+        "output": {
+            "final_deliverable": "Denali is 20310 feet tall and was climbed by 99999 people.",
+            "pages": [{"url": "https://example.com/denali",
+                      "text": "Denali stands at 20310 feet."}],
+        },
+        "graph": {},
+    }
+    # 20310 is on_page, 99999 is unsupported (not on any page, not recomputable) ->
+    # support_rate 0.5, below answer_min_support -> not credited as ANSWER.
+    assert derive_verdict_graded(result, observability=None) == VERDICT_PARTIAL
+
+
+def test_graded_abstains_on_explicit_non_answer_language():
+    from agent.app.testing.arm_verdict import derive_verdict_graded
+
+    result = {
+        "output": {
+            "final_deliverable": "I could not determine the value from the available sources.",
+            "pages": [{"url": "https://example.com/x", "text": "unrelated page content"}],
+        },
+        "graph": {},
+    }
+    assert derive_verdict_graded(result, observability=None) == VERDICT_ABSTAIN
+
+
+def test_graded_abstains_when_no_pages_were_stored():
+    from agent.app.testing.arm_verdict import derive_verdict_graded
+
+    result = {"output": {"final_deliverable": "The answer is 42."}, "graph": {}}
+    assert derive_verdict_graded(result, observability=None) == VERDICT_ABSTAIN
+
+
+def test_graded_abstains_when_the_answer_has_no_checkable_claim():
+    from agent.app.testing.arm_verdict import derive_verdict_graded
+
+    result = {
+        "output": {
+            "final_deliverable": "The mountain is very tall and well known.",
+            "pages": [{"url": "https://example.com/denali", "text": "Denali is a mountain."}],
+        },
+        "graph": {},
+    }
+    assert derive_verdict_graded(result, observability=None) == VERDICT_ABSTAIN
+
+
+def test_derive_verdict_unchanged_by_the_presence_of_derive_verdict_graded():
+    # derive_verdict itself must stay byte-identical in behaviour: the old rule must remain
+    # computable so every report can show old-vs-new side by side.
+    result = {
+        "output": {
+            "final_deliverable": "Denali's official elevation is 20310 feet.",
+            "pages": [{"url": "https://example.com/denali",
+                      "text": "In 2015 the USGS resurveyed Denali at 20310 feet."}],
+        },
+        "graph": {},
+    }
+    assert derive_verdict(result, observability=None) == VERDICT_ANSWER
