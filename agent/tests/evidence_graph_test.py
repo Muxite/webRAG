@@ -1145,3 +1145,199 @@ class TestDerivationRefusalsAreRecorded:
 
     def test_a_graph_with_no_refusals_counts_nothing(self):
         assert _arith_graph().refusal_counts() == {}
+
+
+class TestParseQuantityConservation:
+    """`parse_quantity` must account for EVERY character or refuse.
+
+    The defect this replaces produced confidently wrong numbers marked valid:
+    ``sum("121 crore", "162753003")`` recomputed to 162,753,124 with ``derivation_valid: True``
+    against a true 1,372,753,003 -- wrong by 8.4x -- because scale words were treated as opaque
+    unit suffixes and the magnitude was silently discarded. A parser that cannot lose silently
+    makes that class of bug impossible rather than patching the one instance.
+    """
+
+    def test_a_plain_number_parses_with_no_dimensions(self):
+        q = eg.parse_quantity("162,753,003")
+        assert q.ok and q.magnitude == 162753003.0
+        assert (q.currency, q.unit, q.scale_name, q.residue) == ("", "", "", "")
+
+    def test_a_unit_bearing_value_keeps_its_unit(self):
+        q = eg.parse_quantity("590 m")
+        assert q.ok and q.magnitude == 590.0 and q.unit == "m"
+
+    def test_unparsed_residue_refuses_rather_than_guessing(self):
+        q = eg.parse_quantity("1,645 ft or 501 m (from Wikipedia)")
+        assert not q.ok and q.residue
+
+    def test_prose_is_not_a_quantity(self):
+        assert not eg.parse_quantity("Directly counting all stars is not feasible").ok
+        assert not eg.parse_quantity("Gustave Eiffel").ok
+
+
+class TestParseQuantityRanges:
+    """A range is not a quantity. Today `numeric_value('1 trillion to 2.6 trillion')` silently
+    returns 1.0 -- it takes the lower bound. Ranges must be detected BEFORE number extraction,
+    because that is exactly how the lower bound leaks through."""
+
+    @pytest.mark.parametrize("text", [
+        "1 trillion to 2.6 trillion", "100–400 billion", "11 to 18%", "11–18%",
+        "2.3 – 4.0", "~5.6", "100 or 400", "±3", "between 5 and 9",
+    ])
+    def test_ranges_and_approximations_refuse(self, text):
+        q = eg.parse_quantity(text)
+        assert not q.ok, f"{text!r} must not parse to a single magnitude"
+
+    def test_a_range_never_silently_becomes_its_lower_bound(self):
+        assert eg.parse_quantity("100–400 billion").magnitude in (None,)
+        assert eg.numeric_value("1 trillion to 2.6 trillion") is None
+
+
+class TestParseQuantityScaleWords:
+    """Scale words join the MAGNITUDE, never the unit."""
+
+    @pytest.mark.parametrize("text,expected", [
+        ("2.5 thousand", 2_500.0), ("237.8 million", 237_800_000.0),
+        ("100 billion", 100_000_000_000.0), ("1 trillion", 1_000_000_000_000.0),
+        ("5 lakh", 500_000.0), ("121 crore", 1_210_000_000.0), ("116.5 crore", 1_165_000_000.0),
+    ])
+    def test_full_scale_words_multiply_the_magnitude(self, text, expected):
+        q = eg.parse_quantity(text)
+        assert q.ok and q.magnitude == expected
+        assert q.unit == "", "a scale word is magnitude, not a unit"
+
+    def test_the_scale_name_is_kept_for_provenance(self):
+        assert eg.parse_quantity("121 crore").scale_name == "crore"
+
+    def test_values_at_different_scales_become_comparable(self):
+        """Today this raises a SPURIOUS unit mismatch because 'million' and 'billion' look like
+        different units. They are the same dimension at different magnitudes."""
+        assert eg.parse_quantity("2 billion").magnitude > eg.parse_quantity("500 million").magnitude
+
+    def test_a_scale_word_with_a_real_unit_keeps_both(self):
+        q = eg.parse_quantity("1.5 million tonnes")
+        assert q.ok and q.magnitude == 1_500_000.0 and q.unit == "tonnes"
+
+
+class TestParseQuantityBareLetterTrap:
+    """THE dangerous rule. 245 stored values end in a bare letter and are overwhelmingly METRES.
+
+    A naive scale parser reading `m` as "million" would turn `1,158 m` into 1.158 billion and
+    corrupt every height and elevation task in the suite. Single-letter abbreviations scale ONLY
+    when a currency prefix was consumed.
+    """
+
+    @pytest.mark.parametrize("text,magnitude,unit", [
+        ("1,158 m", 1158.0, "m"), ("1,410 m", 1410.0, "m"), ("100 m", 100.0, "m"),
+        ("590 m", 590.0, "m"), ("2 k", 2.0, "k"), ("5 bn", 5.0, "bn"),
+    ])
+    def test_a_bare_letter_after_a_plain_number_is_a_unit_not_a_scale(self, text, magnitude, unit):
+        q = eg.parse_quantity(text)
+        assert q.ok and q.magnitude == magnitude, f"{text!r} must stay {magnitude}"
+        assert q.unit == unit and q.scale_name == ""
+
+    @pytest.mark.parametrize("text,expected", [
+        ("$5m", 5_000_000.0), ("$1.2bn", 1_200_000_000.0), ("£250k", 250_000.0),
+    ])
+    def test_a_bare_letter_behind_a_currency_IS_a_scale(self, text, expected):
+        q = eg.parse_quantity(text)
+        assert q.ok and q.magnitude == expected and q.currency
+
+    def test_the_metres_corpus_is_unharmed(self):
+        """Regression guard over the real shape that dominates the stored corpus."""
+        for n in ("1,280", "1,298", "1,470", "1,594", "1,642", "1,675.15", "1,777"):
+            q = eg.parse_quantity(f"{n} m")
+            assert q.ok and q.magnitude == float(n.replace(",", "")) and q.unit == "m"
+
+
+class TestParseQuantityCurrency:
+    """Currency is a DIMENSION, not decoration -- so GBP vs USD is a real mismatch."""
+
+    @pytest.mark.parametrize("text,magnitude,currency", [
+        ("$162,753,003", 162753003.0, "USD"), ("£7,481,396", 7481396.0, "GBP"),
+        ("€533 million", 533_000_000.0, "EUR"), ("Rs 116.5 crore", 1_165_000_000.0, "INR"),
+        ("INR 121 crore", 1_210_000_000.0, "INR"), ("¥500", 500.0, "JPY"),
+    ])
+    def test_a_currency_prefixed_value_parses(self, text, magnitude, currency):
+        q = eg.parse_quantity(text)
+        assert q.ok and q.magnitude == magnitude and q.currency == currency
+
+    def test_currency_is_not_conflated_with_the_unit(self):
+        q = eg.parse_quantity("£2,395,000")
+        assert q.currency == "GBP" and q.unit == ""
+
+    def test_two_currencies_are_different_dimensions(self):
+        assert eg.parse_quantity("$100").currency != eg.parse_quantity("£100").currency
+
+
+class TestParseQuantityRestatement:
+    """`"1,308 m (4,291 ft)"` -- 359 stored occurrences, the largest recoverable set. The module
+    already knows this shape: `_UNIT_PARENTHETICAL` strips it before comparing units."""
+
+    def test_a_dual_unit_parenthetical_keeps_the_primary_quantity(self):
+        q = eg.parse_quantity("1,308 m (4,291 ft)")
+        assert q.ok and q.magnitude == 1308.0 and q.unit == "m"
+
+    def test_the_restatement_is_recorded_not_discarded(self):
+        q = eg.parse_quantity("1,308 m (4,291 ft)")
+        assert q.restatement is not None
+        assert q.restatement.magnitude == 4291.0 and q.restatement.unit == "ft"
+
+    def test_a_prose_parenthetical_is_residue_and_refuses(self):
+        q = eg.parse_quantity("1,645 ft (from a comparison table on another page)")
+        assert not q.ok and q.residue
+
+    def test_a_spelled_out_restatement_still_parses(self):
+        q = eg.parse_quantity("1,642 m (5,387 feet)")
+        assert q.ok and q.magnitude == 1642.0
+
+
+class TestParseQuantityWiring:
+    """The parse feeds ARITHMETIC only. Span location keeps today's semantics exactly."""
+
+    def test_numeric_value_delegates_to_the_parser(self):
+        assert eg.numeric_value("121 crore") == 1_210_000_000.0
+        assert eg.numeric_value("Rs 116.5 crore") == 1_165_000_000.0
+        assert eg.numeric_value("1,158 m") == 1158.0
+
+    def test_matching_semantics_are_untouched(self):
+        """`verify_value`/`is_unit_bearing`/`value_shape` must not shift: they locate spans."""
+        assert eg.is_unit_bearing("121 crore") is True
+        assert eg.value_shape("1,158 m") == "number_with_unit"
+        page = "The tower is 121 crore rupees and 1,158 m tall."
+        assert eg.verify_value(page, "1,158 m").verified is True
+        assert eg.verify_value(page, "121 crore").verified is True
+
+    def test_the_motivating_bug_is_fixed(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x", "Chhaava 121 crore. Minecraft 162753003 dollars.")
+        a = graph.add_source("p1", "121 crore")
+        b = graph.add_source("p1", "162753003")
+        assert a is not None and b is not None
+        node = graph.add_arith("sum", [a.id, b.id])
+        assert float(node.value) == 121 * 10**7 + 162753003
+
+    def test_mixed_scales_now_compare_correctly_instead_of_refusing(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x", "Alpha 500 million. Beta 2 billion.")
+        a = graph.add_source("p1", "500 million")
+        b = graph.add_source("p1", "2 billion")
+        node = graph.add_extremum([a.id, b.id], "max")
+        assert "2 billion" in node.value
+
+    def test_currency_mismatch_is_a_unit_mismatch_not_a_parse_failure(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x", "Wimbledon £2,395,000 and US Open $90,535,500.")
+        a = graph.add_source("p1", "£2,395,000")
+        b = graph.add_source("p1", "$90,535,500")
+        assert a is not None and b is not None
+        with pytest.raises(eg.UnitMismatch):
+            graph.add_arith("sum", [a.id, b.id])
+
+    def test_same_currency_still_combines(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x", "First £2,395,000 then £7,481,396.")
+        a = graph.add_source("p1", "£2,395,000")
+        b = graph.add_source("p1", "£7,481,396")
+        node = graph.add_arith("sum", [a.id, b.id])
+        assert float(node.value) == 2395000 + 7481396

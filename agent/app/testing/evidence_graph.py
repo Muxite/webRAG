@@ -482,32 +482,173 @@ def extract_unit(value: Any) -> str:
     return match.group("unit").strip() if match else ""
 
 
+#: Scale multipliers that ALWAYS apply, whatever precedes them. Short scale throughout
+#: (``billion`` = 10^9): the long scale is historical and regionally ambiguous, so rather than
+#: guess we fix the modern convention and say so. ``lakh`` (10^5) and ``crore`` (10^7) are the
+#: Indian conventions, ubiquitous in Indian trade press and therefore in real page text.
+_SCALE_WORDS = {
+    "thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12,
+    "lakh": 1e5, "lakhs": 1e5, "crore": 1e7, "crores": 1e7,
+}
+
+#: Abbreviations that mean a scale ONLY when a currency prefix was consumed first.
+#:
+#: This is the single most dangerous rule in the parser. Across every value this system has
+#: stored, 245 end in a bare letter and are overwhelmingly METRES -- ``"1,158 m"``, ``"1,410 m"``,
+#: ``"590 m"``. Reading that ``m`` as "million" would turn 1,158 metres into 1.158 billion and
+#: silently corrupt every height and elevation task in the suite. ``$5m`` is five million;
+#: ``1,158 m`` is a tower. The currency prefix is what disambiguates, so it is required.
+_SCALE_ABBREVIATIONS = {"k": 1e3, "m": 1e6, "mn": 1e6, "b": 1e9, "bn": 1e9, "tn": 1e12}
+
+#: Currency prefixes, normalized to a stable code. Currency is a DIMENSION here, not decoration:
+#: promoting it is what makes GBP-vs-USD a genuine ``UnitMismatch`` instead of a parse failure.
+#: A bare ``$`` is read as USD -- a documented assumption, not a detection; it only affects the
+#: label, since two ``$`` values would compare equal under any labelling.
+_CURRENCY_CODES = {
+    "$": "USD", "us$": "USD", "usd": "USD", "£": "GBP", "gbp": "GBP", "€": "EUR", "eur": "EUR",
+    "¥": "JPY", "jpy": "JPY", "₹": "INR", "rs": "INR", "rs.": "INR", "inr": "INR",
+}
+_CURRENCY_PREFIX = re.compile(
+    r"^(?:US\$|Rs\.?|INR|USD|GBP|EUR|JPY|[$£€¥₹])\s*", re.IGNORECASE)
+
+#: Tokens that make a string a RANGE or an approximation rather than one quantity. Checked BEFORE
+#: any number is extracted, because that ordering is exactly what the old parser got wrong:
+#: ``numeric_value("1 trillion to 2.6 trillion")`` silently returned 1.0, taking the lower bound.
+_RANGE_MARKERS = re.compile(r"[–—±~]|\bto\b|\bor\b|\bbetween\b|\bapprox\b|\s-\s", re.IGNORECASE)
+
+#: A trailing parenthetical, e.g. ``"1,308 m (4,291 ft)"`` -- the Wikipedia dual-unit idiom, and
+#: the largest recoverable set in the stored corpus (359 occurrences).
+_TRAILING_PARENTHETICAL = re.compile(r"^(?P<body>.*?)\s*\((?P<inner>[^()]*)\)$", re.DOTALL)
+
+#: What may follow the number (and optional scale) and still count as a unit rather than residue.
+_UNIT_TAIL = re.compile(r"^(?:%|[^\W\d_][\w%°/^·.\-\s]*)$")
+
+
+@dataclass(frozen=True)
+class Quantity:
+    """One value decomposed into every part that carries meaning.
+
+    The parser is TOTAL: each character of the input is classified as currency, number, scale,
+    unit or restatement, and anything left over lands in :attr:`residue`, which refuses the parse.
+    That is the whole design. The defect this replaces was silent LOSS --
+    ``numeric_value("121 crore")`` returned ``121.0``, discarding the x10^7, so
+    ``sum("121 crore", "162753003")`` recomputed to 162,753,124 against a true 1,372,753,003 and
+    marked itself ``derivation_valid: True``. A parser that cannot lose silently makes that class
+    of error impossible rather than patching the one instance.
+
+    Being permissive would be the wrong kind of clever for this module, which already refuses
+    token-overlap and edit-distance matching by name. Refusing on residue is the same instinct.
+    """
+
+    #: The number with its scale multiplier FULLY applied, or None when nothing parsed.
+    magnitude: Optional[float]
+    #: Normalized currency code, or ``""``. A dimension, compared like a unit.
+    currency: str = ""
+    #: The physical unit (``"m"``, ``"ft"``, ``"goals"``, ``"%"``), or ``""``.
+    unit: str = ""
+    #: The scale word consumed (``"crore"``), kept for provenance. Never part of the unit.
+    scale_name: str = ""
+    #: A trailing parenthetical restatement, itself parsed (``"1,308 m (4,291 ft)"``).
+    restatement: Optional["Quantity"] = None
+    #: Anything unaccounted for. Non-empty means the value was NOT understood.
+    residue: str = ""
+    #: The input, verbatim.
+    source_text: str = ""
+
+    @property
+    def ok(self) -> bool:
+        """True only when a magnitude was found AND every character was accounted for."""
+        return self.magnitude is not None and not self.residue
+
+    @property
+    def dimension(self) -> Tuple[str, str]:
+        """``(currency, unit)`` -- what must match for two quantities to combine. Scale is
+        deliberately absent: 500 million and 2 billion are the same dimension."""
+        return (self.currency, normalize_for_match(_unit_leading_token(self.unit)))
+
+
 def numeric_value(value: Any, unit: Any = "") -> Optional[float]:
-    """The float ``value`` denotes, parsed via the shared :func:`_normalize_number` machinery.
+    """The float ``value`` denotes, with any scale word FULLY applied.
 
-    A known trailing unit is stripped first (``numeric_value("330 m", "m")`` and
-    ``numeric_value("330 m")`` both give ``330.0``, the second by way of :func:`extract_unit`); a
-    value with no recognizable leading number is not a value this function will guess at.
+    Delegates to :func:`parse_quantity`, so a value this cannot fully account for returns None
+    rather than a partially-understood number. That is the point: the previous implementation
+    treated a scale word as an opaque unit suffix and returned ``121.0`` for ``"121 crore"``,
+    which is how a recomputed sum came out 8.4x low while marking itself valid.
 
-    :param value: the candidate value, bare or unit-bearing.
-    :param unit: an optional known unit to strip before parsing.
-    :returns: the parsed float, or None when ``value`` carries no number.
+    :param value: the value text.
+    :param unit: retained for call-compatibility. The parser reads a value's own unit and scale
+        directly, so this is no longer needed to strip a duplicate suffix -- and must NOT be used
+        to strip one, since stripping ``"crore"`` off ``"121 crore"`` would discard the magnitude
+        this function exists to preserve.
+    :returns: the magnitude, or None when the value was not fully understood.
     :raises: nothing.
     """
-    text = str(value or "").strip()
-    unit_text = str(unit or "").strip()
-    if unit_text and text.endswith(unit_text):
-        text = text[: -len(unit_text)].strip()
-    number_text = text
-    if not _BARE_NUMBER.fullmatch(number_text):
-        split = _NUMBER_UNIT_SPLIT.fullmatch(text)
-        if split is None:
-            return None
-        number_text = split.group("number")
-    normalized = _normalize_number(number_text)
+    parsed = parse_quantity(value)
+    return parsed.magnitude if parsed.ok else None
+
+def _refused(raw: str, residue: str) -> "Quantity":
+    return Quantity(None, residue=residue or raw or "(empty)", source_text=raw)
+
+
+def parse_quantity(text: Any) -> Quantity:
+    """Decompose ``text`` into a :class:`Quantity`, or refuse it.
+
+    Grammar, positional and ordered::
+
+        [currency_prefix] number [scale_word] [unit] [ "(" restatement ")" ]
+
+    :param text: the value string as the model reported it.
+    :returns: a :class:`Quantity`; check :attr:`Quantity.ok` before trusting ``magnitude``.
+    :raises: nothing -- an unparseable value is a refusal, never an exception.
+    """
+    raw = str(text if text is not None else "").strip()
+    if not raw:
+        return _refused(raw, "(empty)")
+
+    body = raw
+    restatement: Optional[Quantity] = None
+    paren = _TRAILING_PARENTHETICAL.match(body)
+    if paren:
+        inner = (paren.group("inner") or "").strip()
+        sub = parse_quantity(inner)
+        if not sub.ok:
+            # A parenthetical that is not itself a quantity is prose we did not understand.
+            return _refused(raw, inner)
+        restatement = sub
+        body = (paren.group("body") or "").strip()
+
+    if _RANGE_MARKERS.search(body):
+        return _refused(raw, body)
+
+    currency = ""
+    prefix = _CURRENCY_PREFIX.match(body)
+    if prefix:
+        currency = _CURRENCY_CODES.get(prefix.group(0).strip().lower(), "")
+        body = body[prefix.end():].strip()
+
+    number = re.match(rf"^({_NUMBER_PATTERN})", body)
+    if not number:
+        return _refused(raw, body)
+    normalized = _normalize_number(number.group(1))
     if not normalized:
-        return None
-    return float(normalized)
+        return _refused(raw, body)
+    magnitude = float(normalized)
+    tail = body[number.end():].strip()
+
+    scale_name = ""
+    if tail:
+        head, _, remainder = tail.partition(" ")
+        key = head.lower().rstrip(".,")
+        if key in _SCALE_WORDS:
+            magnitude *= _SCALE_WORDS[key]
+            scale_name, tail = key, remainder.strip()
+        elif currency and key in _SCALE_ABBREVIATIONS:
+            magnitude *= _SCALE_ABBREVIATIONS[key]
+            scale_name, tail = key, remainder.strip()
+
+    if tail and not _UNIT_TAIL.match(tail):
+        return _refused(raw, tail)
+    return Quantity(magnitude, currency, tail, scale_name, restatement, "", raw)
 
 
 def _adjacent(offsets: Optional[List[int]], raw: str, left: int, right: int) -> bool:
@@ -1041,30 +1182,46 @@ class EvidenceGraph:
         return not invalid, invalid
 
     def _check_common_unit(self, inputs: Iterable[EvidenceNode]) -> str:
-        """The one unit ``inputs`` share, refusing loudly when two PRESENT units disagree.
+        """The one dimension ``inputs`` share, refusing loudly when two PRESENT ones disagree.
 
-        A missing unit (``""``) on one side is not a mismatch by itself — only two different,
-        both-present units refuse. That is the documented, deliberate gap: a genuinely unitless
-        extraction paired with a unit-bearing one is not caught here. No conversion table is
-        applied; ``m`` and ``ft`` are recognized as different, not reconciled.
+        A dimension is ``(currency, unit)``. Scale words are deliberately NOT part of it: 500
+        million and 2 billion are the same dimension at different magnitudes, and treating the
+        scale word as a unit used to raise a spurious mismatch between them. Currency IS part of
+        it, so GBP against USD is a real mismatch rather than a parse failure -- which is what
+        the incompatible-currency tasks exist to exercise.
 
-        Comparison is on the LEADING TOKEN (:func:`_unit_leading_token`), stripping any dual-unit
-        parenthetical first: Wikipedia infoboxes render both systems in one string (``"m (423
-        ft)"``, ``"metres (2,051 ft)"``), and comparing those raw strings would raise a FALSE
-        mismatch and refuse a valid derivation whose value itself is correct.
+        A missing dimension on one side is still not a mismatch by itself; that documented gap is
+        unchanged. No conversion is applied and none ever will be: ``m`` and ``ft``, ``GBP`` and
+        ``USD``, are recognized as different, never reconciled.
 
         :param inputs: the nodes about to be combined.
-        :returns: the shared unit AS RECORDED on the first input that has one (unstripped), or
-            ``""`` when none of them has one.
-        :raises: ValueError: when two present units differ, by their leading token, after
-            :func:`normalize_for_match`.
+        :returns: a display unit for the result -- the first input's recorded unit that is not
+            merely a scale word, else the shared currency.
+        :raises ValueError: when two present dimensions differ.
         """
         nodes = list(inputs)
-        present = [node.unit for node in nodes if node.unit]
-        distinct = {normalize_for_match(_unit_leading_token(unit)) for unit in present}
-        if len(distinct) > 1:
-            raise UnitMismatch(f"mismatched units: {sorted(set(present))}")
-        return present[0] if present else ""
+        dimensions = {self._dimension_of(node) for node in nodes}
+        present = {dim for dim in dimensions if dim != ("", "")}
+        if len(present) > 1:
+            raise UnitMismatch(f"mismatched units: {sorted(dim[0] or dim[1] for dim in present)}")
+        display = [node.unit for node in nodes
+                   if node.unit and normalize_for_match(node.unit) not in _SCALE_WORDS]
+        if display:
+            return display[0]
+        currency = next((dim[0] for dim in present if dim[0]), "")
+        return currency
+
+    @staticmethod
+    def _dimension_of(node: EvidenceNode) -> Tuple[str, str]:
+        """``(currency, unit)`` for a node, reading its VALUE first and falling back to the unit
+        the extractor reported separately. A recorded unit that is only a scale word carries no
+        dimension and is ignored."""
+        parsed = parse_quantity(node.value)
+        currency = parsed.currency if parsed.ok else ""
+        unit = parsed.unit if parsed.ok else ""
+        if not unit and node.unit and normalize_for_match(node.unit) not in _SCALE_WORDS:
+            unit = node.unit
+        return (currency, normalize_for_match(_unit_leading_token(unit)))
 
     def _arith_detail(self, inputs_ok: bool, invalid_ids: List[str],
                       disagreement: str = "") -> Tuple[bool, str]:
