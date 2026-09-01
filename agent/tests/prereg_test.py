@@ -29,9 +29,10 @@ SPEC = {
 }
 
 
-def _result(tmp_path, run_id, task, model, variant, rep):
+def _result(tmp_path, run_id, task, model, variant, rep, infra_failed=False):
     name = f"{run_id}_{task}_{model}_{variant}_cfgdeadbeef_r{rep}.json"
-    (tmp_path / name).write_text(json.dumps({"execution": {"output": {}}}), encoding="utf-8")
+    body = {"execution": {"output": {}}, "infra_failed": infra_failed}
+    (tmp_path / name).write_text(json.dumps(body), encoding="utf-8")
 
 
 def test_expected_cells_is_the_full_cartesian_product():
@@ -136,3 +137,106 @@ def test_audit_does_not_confuse_rep_1_with_rep_10(tmp_path):
     spec = {**SPEC, "tasks": ["122"], "arms": ["evidence_loop"], "reps": 1}
     _result(tmp_path, "ledger001", "122", "qwen2.5:7b", "evidence_loop", 10)
     assert prereg.audit(spec, str(tmp_path))["found"] == 0
+
+
+# -- abort_conditions gating -------------------------------------------------------------------
+#
+# validate() previously only checked that ``abort_conditions`` was present; audit() never read
+# its contents, so the three conditions already in use in real specs (min_completion_rate,
+# max_infra_failed_rate, max_live_fallbacks) were documentation, not gates. These tests pin down
+# that audit() actually evaluates them against the landed cells.
+
+def _full_spec(tmp_path, abort_conditions):
+    spec = {**SPEC, "tasks": ["122", "130"], "arms": ["evidence_loop", "langgraph_react"],
+            "reps": 2, "abort_conditions": abort_conditions}
+    for task in ("122", "130"):
+        for variant in ("evidence_loop", "langgraph_react"):
+            for rep in (1, 2):
+                _result(tmp_path, "ledger001", task, "qwen2.5:7b", variant, rep)
+    return spec
+
+
+def test_validate_rejects_an_unrecognised_abort_condition_key():
+    """A typo'd key (e.g. max_infra_falied_rate) must not silently disable a gate."""
+    spec = {**SPEC, "abort_conditions": {"max_infra_falied_rate": 0.2}}
+    errors = prereg.validate(spec)
+    assert any("max_infra_falied_rate" in error for error in errors)
+
+
+def test_write_refuses_a_spec_with_an_unknown_abort_condition_key(tmp_path):
+    spec = {**SPEC, "abort_conditions": {"min_completion_rate": 0.9, "totally_made_up": 1}}
+    with pytest.raises(ValueError):
+        prereg.write(str(tmp_path), spec)
+
+
+def test_audit_min_completion_rate_passes_when_met(tmp_path):
+    spec = _full_spec(tmp_path, {"min_completion_rate": 0.5})
+    report = prereg.audit(spec, str(tmp_path))
+    assert report["gates"]["min_completion_rate"]["status"] == "pass"
+    assert report["gates_passed"] is True
+
+
+def test_audit_min_completion_rate_fails_when_missed(tmp_path):
+    spec = {**SPEC, "tasks": ["122", "130"], "arms": ["evidence_loop", "langgraph_react"],
+            "reps": 2, "abort_conditions": {"min_completion_rate": 0.9}}
+    # only land 6 of 8 cells
+    for task in ("122", "130"):
+        for variant in ("evidence_loop", "langgraph_react"):
+            for rep in (1, 2):
+                if task == "130" and variant == "langgraph_react":
+                    continue
+                _result(tmp_path, "ledger001", task, "qwen2.5:7b", variant, rep)
+    report = prereg.audit(spec, str(tmp_path))
+    assert report["gates"]["min_completion_rate"]["status"] == "fail"
+    assert report["gates_passed"] is False
+
+
+def test_audit_max_infra_failed_rate_passes_when_zero_failures(tmp_path):
+    spec = _full_spec(tmp_path, {"max_infra_failed_rate": 0.2})
+    report = prereg.audit(spec, str(tmp_path))
+    assert report["gates"]["max_infra_failed_rate"]["status"] == "pass"
+    assert report["gates"]["max_infra_failed_rate"]["value"] == 0.0
+
+
+def test_audit_max_infra_failed_rate_fails_when_exceeded(tmp_path):
+    spec = {**SPEC, "tasks": ["122", "130"], "arms": ["evidence_loop", "langgraph_react"],
+            "reps": 2, "abort_conditions": {"max_infra_failed_rate": 0.2}}
+    for task in ("122", "130"):
+        for variant in ("evidence_loop", "langgraph_react"):
+            for rep in (1, 2):
+                failed = task == "130" and rep == 1
+                _result(tmp_path, "ledger001", task, "qwen2.5:7b", variant, rep,
+                        infra_failed=failed)
+    report = prereg.audit(spec, str(tmp_path))
+    gate = report["gates"]["max_infra_failed_rate"]
+    assert gate["status"] == "fail"
+    assert gate["value"] == pytest.approx(2 / 8)
+
+
+def test_audit_max_live_fallbacks_is_always_unknown_not_a_silent_pass(tmp_path):
+    """Live-fallback counts live only on the in-memory connector; no stored cell records them.
+
+    A gate that always reports "pass" for data it never actually checked is worse than no gate,
+    so this must come back UNKNOWN, never "pass".
+    """
+    spec = _full_spec(tmp_path, {"max_live_fallbacks": 0})
+    report = prereg.audit(spec, str(tmp_path))
+    gate = report["gates"]["max_live_fallbacks"]
+    assert gate["status"] == "unknown"
+    assert report["gates_passed"] is False
+
+
+def test_audit_unknown_gate_never_reads_as_overall_pass(tmp_path):
+    spec = _full_spec(tmp_path, {"min_completion_rate": 0.5, "max_live_fallbacks": 0})
+    report = prereg.audit(spec, str(tmp_path))
+    assert report["gates"]["min_completion_rate"]["status"] == "pass"
+    assert report["gates"]["max_live_fallbacks"]["status"] == "unknown"
+    assert report["gates_passed"] is False
+
+
+def test_audit_preserves_the_existing_return_contract(tmp_path):
+    """audit() is already consumed elsewhere; the original keys must remain, only extended."""
+    spec = _full_spec(tmp_path, {"min_completion_rate": 0.5})
+    report = prereg.audit(spec, str(tmp_path))
+    for key in ("run_id", "expected", "found", "missing", "complete", "completion_rate"):
+        assert key in report

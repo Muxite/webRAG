@@ -43,6 +43,15 @@ REQUIRED_FIELDS = ("run_id", "hypothesis", "tasks", "arms", "reps", "primary_end
 DEFAULT_PREREG_DIR = "agent/idea_test_results/prereg"
 DEFAULT_RESULTS_DIR = "agent/idea_test_results"
 
+#: The only ``abort_conditions`` keys ``audit()`` knows how to evaluate. A key outside this set
+#: is not silently ignored -- ``validate()`` rejects it at ``write`` time (a typo'd key such as
+#: ``max_infra_falied_rate`` would otherwise disable a gate without any signal that it happened),
+#: and ``audit()`` reports it as an "unknown" gate defensively for specs loaded without going
+#: through ``write``/``validate`` first.
+KNOWN_ABORT_CONDITIONS = frozenset({
+    "min_completion_rate", "max_infra_failed_rate", "max_live_fallbacks",
+})
+
 
 def validate(spec: Dict[str, Any]) -> List[str]:
     """Every reason ``spec`` is not a usable preregistration.
@@ -60,6 +69,13 @@ def validate(spec: Dict[str, Any]) -> List[str]:
     reps = spec.get("reps")
     if "reps" in spec and (not isinstance(reps, int) or reps < 1):
         errors.append("reps must be a positive integer")
+    abort_conditions = spec.get("abort_conditions")
+    if isinstance(abort_conditions, dict):
+        for key in abort_conditions:
+            if key not in KNOWN_ABORT_CONDITIONS:
+                errors.append(
+                    f"unknown abort_conditions key: {key} (known: "
+                    f"{', '.join(sorted(KNOWN_ABORT_CONDITIONS))})")
     return errors
 
 
@@ -83,8 +99,8 @@ def expected_cells(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
 _TAG_SUFFIX = r"(?:_t\d+)?(?:_cfg[0-9a-fA-F]+)?"
 
 
-def _cell_landed(cell: Dict[str, Any], results_dir: str) -> bool:
-    """True when a canonical result file exists for ``cell``.
+def _cell_path(cell: Dict[str, Any], results_dir: str) -> Any:
+    """The canonical result file for ``cell``, or ``None`` when it never landed.
 
     Arm matching is **anchored, not substring**. ``sequential_react`` is a prefix of
     ``sequential_react_extract``, and both contain underscores, so neither a substring test nor an
@@ -105,29 +121,121 @@ def _cell_landed(cell: Dict[str, Any], results_dir: str) -> bool:
         if not path.is_file() or path.name.endswith("_summary.json"):
             continue
         if pattern.match(path.name):
-            return True
-    return False
+            return path
+    return None
+
+
+def _cell_landed(cell: Dict[str, Any], results_dir: str) -> bool:
+    """True when a canonical result file exists for ``cell``. See :func:`_cell_path`."""
+    return _cell_path(cell, results_dir) is not None
+
+
+def _infra_failed_rate(landed_paths: List[Path]) -> float:
+    """Fraction of landed cells whose stored result carries a truthy top-level ``infra_failed``.
+
+    Missing/unreadable files count as not-failed here (they were already excluded from ``landed``
+    by :func:`_cell_path`, which only returns paths that matched the naming pattern); a file that
+    exists but fails to parse is treated as no evidence of an infra failure rather than raising,
+    since a gate function must not itself become a new way for an audit to crash.
+    """
+    if not landed_paths:
+        return 0.0
+    failed = 0
+    for path in landed_paths:
+        try:
+            body = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(body, dict) and body.get("infra_failed"):
+            failed += 1
+    return failed / len(landed_paths)
+
+
+def _evaluate_abort_conditions(spec: Dict[str, Any], completion_rate: float,
+                                landed_paths: List[Path]) -> Dict[str, Dict[str, Any]]:
+    """Evaluate each declared ``abort_conditions`` entry against the cells that actually landed.
+
+    Three statuses, never conflated:
+
+    * ``"pass"`` -- the condition was checked against real data and held.
+    * ``"fail"`` -- the condition was checked against real data and was violated.
+    * ``"unknown"`` -- the condition names something this module cannot recover from a stored
+      cell (currently ``max_live_fallbacks``: the live-search-call count lives only on the
+      in-memory ``ConnectorSearchCorpus`` instance for the run that produced a cell and is never
+      written into the cell's JSON) or a key ``audit()`` does not recognise at all. Unknown must
+      never be reported as, or folded into, a pass -- a gate that always appears to pass when it
+      was never actually checked is worse than no gate.
+    """
+    gates: Dict[str, Dict[str, Any]] = {}
+    for key, threshold in (spec.get("abort_conditions") or {}).items():
+        if key == "min_completion_rate":
+            passed = completion_rate >= threshold
+            gates[key] = {
+                "status": "pass" if passed else "fail",
+                "threshold": threshold,
+                "value": completion_rate,
+                "detail": f"completion_rate={completion_rate:.3f} vs min {threshold}",
+            }
+        elif key == "max_infra_failed_rate":
+            rate = _infra_failed_rate(landed_paths)
+            passed = rate <= threshold
+            gates[key] = {
+                "status": "pass" if passed else "fail",
+                "threshold": threshold,
+                "value": rate,
+                "detail": f"infra_failed_rate={rate:.3f} vs max {threshold}",
+            }
+        elif key == "max_live_fallbacks":
+            gates[key] = {
+                "status": "unknown",
+                "threshold": threshold,
+                "value": None,
+                "detail": ("live-fallback count is not recoverable from a stored cell -- it "
+                           "lives only on the ConnectorSearchCorpus instance of the run that "
+                           "produced it and is never persisted into the cell's JSON"),
+            }
+        else:
+            gates[key] = {
+                "status": "unknown",
+                "threshold": threshold,
+                "value": None,
+                "detail": f"unrecognised abort_conditions key: {key}",
+            }
+    return gates
 
 
 def audit(spec: Dict[str, Any], results_dir: str = DEFAULT_RESULTS_DIR) -> Dict[str, Any]:
-    """Compare what landed against what was designed.
+    """Compare what landed against what was designed, and gate on the declared abort conditions.
 
     A cell in ``missing`` is a **failure**, not an absence: it was planned, so its non-appearance
     is data. Reporting a mean over ``found`` alone is the survivor bias this function exists to
     prevent.
 
-    :returns: ``{expected, found, missing, complete, completion_rate}``.
+    ``abort_conditions`` used to be checked for presence only (by :func:`validate`) and never
+    evaluated -- a spec could declare ``max_infra_failed_rate: 0.2`` and nothing would ever read
+    it. This now evaluates every declared condition against the cells that actually landed; see
+    :func:`_evaluate_abort_conditions` for the pass/fail/unknown contract.
+
+    :returns: the original ``{expected, found, missing, complete, completion_rate}`` plus
+        ``gates`` (per-condition ``{status, threshold, value, detail}``) and ``gates_passed``
+        (``True`` iff every declared gate's status is ``"pass"`` -- unknown counts as not-passed).
     """
     cells = expected_cells(spec)
-    missing = [cell for cell in cells if not _cell_landed(cell, results_dir)]
+    cell_paths = [(cell, _cell_path(cell, results_dir)) for cell in cells]
+    missing = [cell for cell, path in cell_paths if path is None]
+    landed_paths = [path for _, path in cell_paths if path is not None]
     found = len(cells) - len(missing)
+    completion_rate = (found / len(cells)) if cells else 0.0
+    gates = _evaluate_abort_conditions(spec, completion_rate, landed_paths)
     return {
         "run_id": spec.get("run_id", ""),
         "expected": len(cells),
         "found": found,
         "missing": missing,
         "complete": not missing and bool(cells),
-        "completion_rate": (found / len(cells)) if cells else 0.0,
+        "completion_rate": completion_rate,
+        "gates": gates,
+        "gates_passed": all(gate["status"] == "pass" for gate in gates.values()),
     }
 
 
@@ -182,8 +290,18 @@ def main() -> int:
         print(f"MISSING {len(report['missing'])} cell(s) -- these are failures, not absences:")
         for cell in report["missing"]:
             print(f"  task={cell['task']} arm={cell['arm']} rep={cell['rep']}")
+    else:
+        print("complete: every designed cell landed")
+
+    ok = True
+    for name, gate in report["gates"].items():
+        marker = {"pass": "OK", "fail": "FAIL", "unknown": "UNKNOWN"}[gate["status"]]
+        print(f"  gate {name}: {marker} -- {gate['detail']}")
+        if gate["status"] != "pass":
+            ok = False
+
+    if report["missing"] or not ok:
         return 1
-    print("complete: every designed cell landed")
     return 0
 
 
