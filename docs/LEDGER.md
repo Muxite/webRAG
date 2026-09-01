@@ -3,7 +3,18 @@
 **Codename:** `ledger` · **Status:** pivot declared 2026-08-31 · **Repo:** webRAG (unchanged)
 **Operative plan:** `docs/LEDGER_PLAN_2026-09-01.md` (supersedes the DAG v3 master plan's
 thesis, metric order and build order) · **Latest handoff:**
-`docs/handoffs/LEDGER_HANDOFF_2026-09-01.md`
+`docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md` (prior:
+`docs/handoffs/LEDGER_HANDOFF_2026-09-01.md`)
+
+## Operative plan
+
+- **Phase handoff (latest): `docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md`** — the KPI
+  phase. Frozen metric contract, arm-blind auditor, per-arm confidence channel, graded verdict,
+  shared prompted tool transport. Retracts "calibration cannot be retrofitted"; records the
+  extraction value gate as a negative result; sets the seeded-A/B protocol.
+- **Frozen metric contract: `docs/LEDGER_KPI_SPEC.md`** + `scripts/ledger_kpi_spec.json`
+  (hash-guarded by `agent/tests/ledger_kpi_spec_frozen_test.py`). Holdout 213, 217, 221, 224, 227,
+  231 is SEALED.
 
 Euglena Ledger is an auditable evidence compiler. Give it a question and a set of
 sources; it returns a ledger of atomic claims, each pinned to a verbatim span on a fetched
