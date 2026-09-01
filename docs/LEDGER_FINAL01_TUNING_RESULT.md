@@ -59,3 +59,58 @@ a measured trajectory-chaos floor where a single mechanism flip leaves 12/16 tas
 and swings 2 by ~0.6. The score column above is reported, never led with. Single model
 (qwen2.5:7b). `evidence_loop`'s worse repeat-visit rate (0.221) is real but small in cost terms —
 the token gap is call count (49.3 vs 17.2), not re-read bulk.
+
+---
+
+# HOLDOUT OPENED — the tuning result does NOT replicate
+
+Opened once, after the above was committed (`7ff53d4e`). It reverses.
+
+## L4 unsupported-claim rate: the ordering flips completely
+
+| arm | tuning (16 tasks) | holdout (6 tasks) |
+|---|---|---|
+| evidence_loop | **0.081** (best) | **0.320** (4x worse) |
+| langgraph_react | 0.327 (worst) | **0.063** (best, 5x better) |
+| sequential_react_extract | 0.240 | 0.448 |
+
+On the tuning split `evidence_loop` looked 4x cleaner than `langgraph_react`. On the holdout
+`langgraph_react` is 5x cleaner than `evidence_loop`. The arm ordering is not merely unstable —
+it inverts.
+
+## L1 monotonicity also flips
+
+| arm | tuning | holdout |
+|---|---|---|
+| evidence_loop | NOT monotone | monotone (0.565 -> 0.725) |
+| langgraph_react | monotone | NOT monotone |
+| sequential_react_extract | monotone | NOT monotone |
+
+Every arm's verdict on the primary endpoint reverses between the two splits.
+
+## What this means, and what it does not
+
+**It does not mean `evidence_loop` is bad.** It means that at 16 and 6 tasks these KPIs cannot
+distinguish the arms at all: per-arm values swing by 4-5x between task subsets of the same suite,
+and orderings invert. The differences reported on the tuning split were subset effects.
+
+**The headline from the tuning analysis is withdrawn.** "`evidence_loop` buys a 4x lower
+unsupported-claim rate" does not survive its own holdout and must not be cited.
+
+**What still stands**, because it is structural rather than comparative:
+- `evidence_loop` is the only arm that builds a derivation graph, and it re-verifies offline with
+  0 invalid derivations and 0 page-drift. The other arms' fabricated-arithmetic rate is not worse
+  — it is *uncomputable*, permanently, by anyone.
+- The graded rule makes all three arms working selective classifiers where the pre-phase rule gave
+  selective accuracy 0.000 at maximum confidence.
+- The prompted transport takes `gemma2:2b` from an instant 400 to a scoring run.
+- The cost gap is large and stable in kind: 49.3 vs 17.2 LLM calls per cell.
+
+**The holdout did exactly the job it was built for.** Without it, this phase would have shipped a
+4x evidence-quality claim as its headline. The anti-gaming design — freeze the metrics, seal a
+split, report the accuracy anchor beside every KPI — caught a wrong conclusion before it was
+published, which is worth more than the conclusion would have been.
+
+**Operational consequence:** no per-arm KPI comparison on this suite should be reported at n<60
+paired tasks. The next campaign needs more TASKS, not more reps or more mechanisms. This is now
+measured, not merely quoted from the power table.
