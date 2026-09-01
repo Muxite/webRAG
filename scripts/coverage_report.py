@@ -108,38 +108,24 @@ def normalize_url(url):
     return url.split("#", 1)[0].rstrip("/").lower()
 
 
-def extract_visits(execution):
-    """Successful VISIT nodes and their distinct normalized URLs from one cell's graph.
+_GRAPH_NOT_COMPUTABLE = object()  # sentinel: fall back to telemetry (nodes missing/malformed/empty)
 
-    Params:
-        execution: one cell's ``result["execution"]`` dict.
 
-    Returns:
-        ``(n_visit_nodes, distinct_urls)`` where ``n_visit_nodes`` is the count of successful
-        VISIT-action nodes found in ``execution["graph"]["nodes"]`` and ``distinct_urls`` is the
-        ``set`` of their normalized URLs; or ``None`` if ``execution["graph"]["nodes"]`` is
-        missing/malformed/empty, or if any successful VISIT node's action_result has no
-        ``"url"`` key at all -- an untrustworthy extraction is reported as unknown, never as a
-        silently undercounted real value.
+def _extract_visits_from_graph(graph):
+    """``extract_visits``'s primary source: successful VISIT nodes in ``graph["nodes"]``.
 
-        An empty ``nodes`` dict is treated as "not computable" rather than "0 distinct URLs":
-        the GoT ``graph`` engine variant always seeds at least a root node, so a totally-empty
-        ``nodes`` is the signature of a DAG-less engine variant (``sequential_react``,
-        ``langgraph_react``) that never populates ``execution.graph`` at all, not a run that
-        genuinely visited nothing.
-
-    Raises:
-        Nothing -- a malformed individual node/details/action_result shape is skipped rather
-        than raising.
+    Returns ``(n_visit_nodes, urls)``; ``None`` if a successful VISIT node's action_result has no
+    ``"url"`` key at all (an untrustworthy extraction, reported as unknown -- never falls back to
+    telemetry, since the graph *was* present and populated); or the ``_GRAPH_NOT_COMPUTABLE``
+    sentinel when ``nodes`` is missing/malformed/empty, since an empty ``nodes`` dict is the
+    signature of a DAG-less engine variant (see :func:`extract_visits` docstring) that should
+    fall back to telemetry rather than report unknown.
     """
-    if not isinstance(execution, dict):
-        return None
-    graph = execution.get("graph")
     if not isinstance(graph, dict):
-        return None
+        return _GRAPH_NOT_COMPUTABLE
     nodes = graph.get("nodes")
     if not isinstance(nodes, dict) or not nodes:
-        return None
+        return _GRAPH_NOT_COMPUTABLE
     n_visit_nodes = 0
     urls = set()
     for node in nodes.values():
@@ -159,6 +145,85 @@ def extract_visits(execution):
             continue
         urls.add(normalize_url(url))
     return n_visit_nodes, urls
+
+
+def _extract_visits_from_telemetry(telemetry_raw):
+    """``extract_visits``'s fallback source: ``name == "visit"`` entries in ``telemetry_raw["timings"]``.
+
+    Every arm's ``agent_io.visit()`` records one such timing per visit regardless of engine
+    variant, unlike ``execution.graph`` which only the GoT ``graph`` variant populates.
+
+    Every ``"visit"`` timing counts toward ``n_visit_nodes``, including ones with
+    ``success: False``. The reason is that this denominator measures the STEPS THE AGENT SPENT,
+    not the pages it obtained: a failed visit consumed a decision and a step from the budget
+    exactly like a successful one, and dropping it would credit an arm for choosing badly. The
+    frozen KPI spec (``docs/LEDGER_KPI_SPEC.md``, L8) defines the visit view over "total visit
+    events" for the same reason.
+
+    Measured sensitivity, so the choice is not silently load-bearing: on the ledgernum22r3 corpus
+    66 of 753 visit timings failed, and excluding them moves the repeat-visit rate by about one
+    point per arm (evidence_loop 0.292 -> 0.301, langgraph_react 0.140 -> 0.121,
+    sequential_react_extract 0.368 -> 0.375). It does not change any ordering.
+
+    A timing missing a ``payload.url`` merely contributes no URL to the distinct set, mirroring
+    how the graph source skips an empty/blank url string.
+
+    Returns ``(n_visit_nodes, urls)``, or ``None`` if ``telemetry_raw["timings"]`` is
+    missing/malformed.
+    """
+    if not isinstance(telemetry_raw, dict):
+        return None
+    timings = telemetry_raw.get("timings")
+    if not isinstance(timings, list):
+        return None
+    n_visit_nodes = 0
+    urls = set()
+    for timing in timings:
+        if not isinstance(timing, dict) or timing.get("name") != "visit":
+            continue
+        n_visit_nodes += 1
+        payload = timing.get("payload")
+        url = str((payload or {}).get("url") or "").strip() if isinstance(payload, dict) else ""
+        if url:
+            urls.add(normalize_url(url))
+    return n_visit_nodes, urls
+
+
+def extract_visits(execution):
+    """Visit count and distinct normalized URLs from one cell, graph source preferred.
+
+    Params:
+        execution: one cell's ``result["execution"]`` dict.
+
+    Returns:
+        ``(n_visit_nodes, distinct_urls)`` -- ``distinct_urls`` is the ``set`` of normalized
+        visited URLs. Two sources, tried in order:
+
+        1. ``execution["graph"]["nodes"]``: successful VISIT-action nodes. This is the
+           authoritative source when present, so nothing previously reported off it changes.
+           An empty ``nodes`` dict is treated as "not computable from the graph" rather than "0
+           distinct URLs": the GoT ``graph`` engine variant always seeds at least a root node,
+           so a totally-empty ``nodes`` is the signature of a DAG-less engine variant
+           (``sequential_react``, ``langgraph_react``, ``evidence_loop``) that never populates
+           ``execution.graph`` at all, not a run that genuinely visited nothing. In that case a
+           successful VISIT node missing its ``"url"`` key makes the whole graph extraction
+           untrustworthy and it is abandoned (falls through to telemetry) rather than silently
+           undercounted.
+        2. ``execution["telemetry_raw"]["timings"]``: entries with ``name == "visit"``, url from
+           ``payload.url``. Used only when the graph source above is not computable.
+
+        ``None`` if neither source is computable/present.
+
+    Raises:
+        Nothing -- a malformed individual node/timing/payload shape is skipped rather than
+        raising.
+    """
+    if not isinstance(execution, dict):
+        return None
+    from_graph = _extract_visits_from_graph(execution.get("graph"))
+    if from_graph is not _GRAPH_NOT_COMPUTABLE:
+        return from_graph
+    return _extract_visits_from_telemetry(execution.get("telemetry_raw"))
 
 
 # ---------------------------------------------------------------------------

@@ -107,10 +107,88 @@ def test_extract_visits_none_when_nodes_missing_or_malformed():
     assert cr.extract_visits({"graph": {"nodes": "not-a-dict"}}) is None
 
 
-def test_extract_visits_none_when_nodes_empty():
+def test_extract_visits_none_when_nodes_empty_and_no_telemetry():
     # An empty `nodes` dict is the signature of a DAG-less engine variant (sequential_react /
-    # langgraph_react) that never populates execution.graph -- not a real zero-visit run.
+    # langgraph_react) that never populates execution.graph -- not a real zero-visit run. With
+    # no telemetry_raw fallback available either, this stays unknown (None), not 0.
     assert cr.extract_visits({"graph": _graph({})}) is None
+
+
+# ---------------------------------------------------------------------------
+# telemetry_raw fallback when graph.nodes is empty (sequential_react_extract /
+# langgraph_react / evidence_loop never populate execution.graph)
+# ---------------------------------------------------------------------------
+
+def _timing(name, url=None, success=True, has_payload=True):
+    t = {"name": name, "success": success}
+    if has_payload:
+        payload = {}
+        if url is not None:
+            payload["url"] = url
+        t["payload"] = payload
+    return t
+
+
+def test_extract_visits_falls_back_to_telemetry_when_nodes_empty():
+    timings = [
+        _timing("visit", "https://ex.com/x"),
+        _timing("visit", "https://EX.com/x/"),
+        _timing("visit", "https://ex.com/y"),
+        _timing("llm_call"),
+        _timing("search"),
+    ]
+    execution = {"graph": _graph({}), "telemetry_raw": {"timings": timings}}
+    result = cr.extract_visits(execution)
+    assert result is not None
+    n_visits, urls = result
+    assert n_visits == 3
+    assert urls == {"https://ex.com/x", "https://ex.com/y"}
+
+
+def test_extract_visits_telemetry_fallback_counts_failed_visits_too():
+    # Ground-truth reconciliation on the ledgernum22r3 corpus showed the telemetry-derived
+    # visit counts match summing ALL name=="visit" timings (no success filter) -- a visit
+    # timing without a "success": True gate is still one recorded agent_io.visit() call.
+    timings = [
+        _timing("visit", "https://ex.com/x", success=True),
+        _timing("visit", "https://ex.com/z", success=False),
+    ]
+    execution = {"graph": _graph({}), "telemetry_raw": {"timings": timings}}
+    n_visits, urls = cr.extract_visits(execution)
+    assert n_visits == 2
+    assert urls == {"https://ex.com/x", "https://ex.com/z"}
+
+
+def test_extract_visits_telemetry_fallback_skips_visits_without_url():
+    timings = [
+        _timing("visit", "https://ex.com/x"),
+        _timing("visit", url=None, has_payload=True),
+        _timing("visit", has_payload=False),
+    ]
+    execution = {"graph": _graph({}), "telemetry_raw": {"timings": timings}}
+    n_visits, urls = cr.extract_visits(execution)
+    assert n_visits == 3  # every "visit" timing still counts as a visit
+    assert urls == {"https://ex.com/x"}
+
+
+def test_extract_visits_none_when_telemetry_raw_missing_or_malformed():
+    assert cr.extract_visits({"graph": _graph({})}) is None
+    assert cr.extract_visits({"graph": _graph({}), "telemetry_raw": None}) is None
+    assert cr.extract_visits({"graph": _graph({}), "telemetry_raw": {}}) is None
+    assert cr.extract_visits(
+        {"graph": _graph({}), "telemetry_raw": {"timings": "not-a-list"}}
+    ) is None
+
+
+def test_extract_visits_prefers_graph_over_telemetry_when_graph_nonempty():
+    # Non-empty graph.nodes is still the authoritative source -- telemetry_raw is only a
+    # fallback for the "nodes == {}" case, so no previously reported graph-arm number changes.
+    nodes = {"a": _visit_node("a", "https://ex.com/x")}
+    timings = [_timing("visit", "https://ex.com/should-be-ignored")]
+    execution = {"graph": _graph(nodes), "telemetry_raw": {"timings": timings}}
+    n_visits, urls = cr.extract_visits(execution)
+    assert n_visits == 1
+    assert urls == {"https://ex.com/x"}
 
 
 def test_extract_visits_none_when_a_visit_node_lacks_url_key():

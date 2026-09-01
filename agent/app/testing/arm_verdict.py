@@ -51,14 +51,37 @@ Verdict rule (deterministic, identical for every arm)
      this rule mirrors on purpose.
 
 Known limitation, stated plainly rather than hidden: this can only ground a claim against
-evidence :func:`idea_test_utils.visited_evidence` can actually recover. For ``langgraph_react``
-and plain ``sequential_react``, the stored corpus in ``agent/idea_test_results`` carries NEITHER
+evidence :func:`idea_test_utils.visited_evidence` can actually recover. For plain
+``sequential_react``, the stored corpus in ``agent/idea_test_results`` carries NEITHER
 ``observability["evidence"]`` (a validation-time-only projection, never persisted --
-``testing/runner.py``) NOR a populated ``result["graph"]`` NOR an ``output["pages"]`` freeze (only
-``evidence_loop`` / ``sequential_react_extract`` emit that). Re-scoring those two arms' stored
-cells therefore derives :data:`VERDICT_ABSTAIN` unconditionally, regardless of the true score --
-a genuine structural gap in what got persisted, not a defect in this rule. See the module's test
-suite and the risk-coverage tooling built on top of it for how this shows up in practice.
+``testing/runner.py``) NOR a populated ``result["graph"]`` NOR an ``output["pages"]`` freeze, so
+re-scoring its stored cells derives :data:`VERDICT_ABSTAIN` unconditionally, regardless of the
+true score -- a genuine structural gap in what got persisted, not a defect in this rule.
+``langgraph_react`` no longer has this gap: commit 2cdc9066 made it persist ``output["pages"]``,
+and ``ledgernum22r3``'s ``langgraph_react`` cells carry it, so this rule can and does ground
+claims against langgraph's visited evidence like any other arm. See the module's test suite and
+the risk-coverage tooling built on top of it for how this shows up in practice.
+
+Measured structural limitation of the literal-match rule itself (not the persistence gap above),
+reproduced over all 198 scorable cells of the ``ledgernum22r3`` campaign: step 3's ALL-claims-
+grounded requirement for :data:`VERDICT_ANSWER` systematically SELECTS AGAINST correct arithmetic
+answers on this suite's numeric tasks. The DERIVED-arithmetic tasks are 210-221 (sum/difference,
+ratio/quotient, computed-ratio argmax) and they are deliberately leak-proofed -- the keystone is
+constructed so it never appears verbatim on any visited page -- so a literal-match rule can never
+credit a correct derived number; it can only credit an arm that happened to produce no checkable
+derived claim at all. The data confirms this: 28 of the 29 ANSWER-tier cells in the campaign come
+from 222-231, the NON-derived tasks (unit-mismatch refusal, missing-operand abstention,
+plausible-but-unsupported numeric), and exactly ONE comes from the whole 210-221 derived range.
+ANSWER-tier cells score WORSE on
+average than PARTIAL-tier cells from the same arm -- ``langgraph_react`` ANSWER mean 0.362 vs its
+own PARTIAL mean 0.705; ``sequential_react_extract`` ANSWER mean 0.379 vs PARTIAL mean 0.574;
+``evidence_loop`` ANSWER mean 0.562 vs PARTIAL mean 0.548. :data:`VERDICT_ANSWER` under this rule
+therefore does not mean "the answer was verified correct" on the numeric suite -- it means "the
+answer's claims happened to be literally quotable from a page," which anti-correlates with
+producing the actually-correct derived number. A replacement rule (one that can credit a
+mechanically-verified DERIVATION, not just a literal page quote -- see ``evidence_graph.py`` and
+:func:`scripts.claim_metrics.derivation_fabrication_rate`) is planned separately; this paragraph
+only records the finding, it does not change :func:`derive_verdict`.
 """
 from __future__ import annotations
 

@@ -99,7 +99,7 @@ def test_extractions_with_blank_value_are_not_counted_as_extracted():
     assert edges["extracted"] == 0
 
 
-def test_stated_claim_precision_penalizes_fabricated_numbers_in_final_text():
+def test_verbatim_extraction_rate_counts_only_exact_restatements():
     # Final text asserts TWO numbers; only one is backed by a verified extraction.
     output = {
         "final_deliverable": "The elevation is 20310 feet and 500000 people visit yearly.",
@@ -108,7 +108,7 @@ def test_stated_claim_precision_penalizes_fabricated_numbers_in_final_text():
     }
     edges = claim_metrics.pipeline_edges(output)
     assert edges["stated_claim_count"] == 2
-    assert edges["stated_claim_precision"] == 0.5
+    assert edges["stated_claim_verbatim_extraction_rate"] == 0.5
 
 
 # ---------------------------------------------------------------------------------------------
@@ -204,3 +204,73 @@ def test_load_cells_scopes_by_run_id_and_variant(tmp_path, monkeypatch):
     cells = claim_metrics.load_cells(run_ids=["myrun"], variants=["evidence_loop"])
     assert len(cells) == 1
     assert cells[0]["variant"] == "evidence_loop"
+
+
+# ---------------------------------------------------------------------------------------------
+# derivation_fabrication_rate against the real ledgernum22r3 campaign -- 65 of its 66
+# evidence_loop cells carry a populated evidence_graph (248 source nodes, 57 derived nodes,
+# zero invalid derivations); langgraph_react / sequential_react_extract cells carry none at
+# all. This is the exact real-data shape the module's docstring used to (wrongly) claim did
+# not exist yet.
+# ---------------------------------------------------------------------------------------------
+
+def _ledgernum22r3_cells(variants):
+    return claim_metrics.load_cells(run_ids=["ledgernum22r3"], variants=list(variants))
+
+
+def test_ledgernum22r3_evidence_loop_cells_carry_a_populated_evidence_graph():
+    cells = _ledgernum22r3_cells(["evidence_loop"])
+    assert len(cells) == 66
+    with_graph = [c for c in cells if isinstance(c["output"].get("evidence_graph"), dict)]
+    assert len(with_graph) == 65
+
+    total_source = total_derived = invalid = 0
+    for cell in with_graph:
+        nodes = cell["output"]["evidence_graph"].get("nodes") or []
+        total_source += sum(1 for n in nodes if isinstance(n, dict) and n.get("kind") == "source")
+        derived = [n for n in nodes if isinstance(n, dict) and n.get("kind") == "derived"]
+        total_derived += len(derived)
+        invalid += sum(1 for n in derived if n.get("derivation_valid") is False)
+    assert total_source == 248
+    assert total_derived == 57
+    assert invalid == 0
+
+
+def test_ledgernum22r3_fabrication_rate_is_zero_not_none_where_a_graph_has_derived_nodes():
+    cells = _ledgernum22r3_cells(["evidence_loop"])
+    rates = [claim_metrics.derivation_fabrication_rate(c["output"]) for c in cells]
+    computed = [r for r in rates if r is not None]
+    # 26 of the 65 graphs actually contain a derived node; the other 39 (graph present, no
+    # derivation attempted) correctly fall back to None rather than a fabricated 0.0.
+    assert len(computed) == 26
+    assert all(r == 0.0 for r in computed)
+
+
+def test_ledgernum22r3_arms_without_a_graph_at_all_are_none_never_zero():
+    for variant in ("langgraph_react", "sequential_react_extract"):
+        cells = _ledgernum22r3_cells([variant])
+        assert len(cells) == 66
+        assert all(claim_metrics.derivation_fabrication_rate(c["output"]) is None for c in cells)
+
+
+def test_verbatim_extraction_rate_is_near_zero_by_construction_on_a_derivation_suite():
+    """The metric formerly named `stated_claim_precision` cannot mean what its name implied.
+
+    It tests EXACT string equality between a claim token and an extraction's whole `value`
+    string. Real extraction values carry units and parentheticals ('6,300 km (3,900 mi)') while
+    `_claims` yields bare tokens ('6300'), so equality essentially never holds. Worse, on this
+    suite the answer states DERIVED ratios while extractions hold the RAW operands, so the two
+    sets are disjoint by design. Reported as "precision" it read as "96% of stated claims are
+    unsupported", which is false -- the arm-blind auditor measures 0.224 unsupported for the same
+    arm. Renamed to say what it actually counts.
+    """
+    from scripts.claim_metrics import pipeline_edges
+
+    edges = pipeline_edges({
+        "pages": [{"page_id": "p1", "url": "u", "text": "t"}],
+        "extractions": [{"page_id": "p1", "value": "6,300 km", "value_verified": True}],
+        "final_deliverable": "The ratio is 1.16, derived from 6300 km.",
+    })
+
+    assert "stated_claim_precision" not in edges, "the misleading name must not survive"
+    assert edges["stated_claim_verbatim_extraction_rate"] == 0.0

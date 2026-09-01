@@ -34,10 +34,13 @@ Also computes the FABRICATED-ARITHMETIC RATE: the fraction of the run's DERIVED 
 nodes (Lane A, commit 1464afa8 / ``evidence_graph.py``) whose value disagreed with the model's own
 recomputation. A derived node's value is ALWAYS the Python recomputation; a model's disagreeing
 proposal is recorded and marks the node invalid (``derivation_valid=False``) rather than silently
-overwritten -- see ``evidence_graph.py``'s module docstring. As of this writing NO stored cell in
-``agent/idea_test_results`` carries a populated ``evidence_graph`` (Lane A landed same-day), so
-this rate is untestable against real data yet; the function returns ``None`` for any cell without
-one rather than fabricating a rate from a graph that doesn't exist.
+overwritten -- see ``evidence_graph.py``'s module docstring. This rate is now testable against
+real data: 65 of the 66 ``evidence_loop`` cells in the ``ledgernum22r3`` campaign carry a
+populated ``evidence_graph``, together holding 248 source nodes and 57 derived nodes, with zero
+derivations marked invalid -- so on this data the measured fabrication rate is 0.0 wherever a
+graph is present, not an untestable ``None``. ``None`` is still returned, and must stay that way,
+for any cell without a graph at all (an arm that doesn't build one, or a crashed run) -- an
+absent graph is not evidence of a 0% rate, only of nothing to measure.
 
 Usage:
   python3 scripts/claim_metrics.py                                  # pipeline edges, all arms
@@ -91,8 +94,14 @@ def pipeline_edges(output: Dict[str, Any]) -> Dict[str, Any]:
     stated = len(stated_records)
 
     # What the final answer itself asserts as checkable claims (arm_verdict's own claim
-    # extractor, reused rather than reimplemented) -- the denominator for stated-claim precision:
-    # of everything the answer asserts, how much traces to a verified extraction.
+    # extractor, reused rather than reimplemented). NOTE what the counter below actually tests:
+    # EXACT string equality between a claim token and an extraction's whole `value`. Real values
+    # carry units and parentheticals ("6,300 km (3,900 mi)") while `_claims` yields bare tokens
+    # ("6300"), and on this suite the answer states DERIVED values while extractions hold the RAW
+    # operands -- so the two sets are largely disjoint BY CONSTRUCTION. It was previously named
+    # `stated_claim_precision`, which read as "how much of the answer is supported" and reported
+    # 0.040 for evidence_loop; the arm-blind auditor measures 0.224 unsupported for the same arm.
+    # It is a verbatim-restatement counter, not a support metric, and is named that way now.
     stated_claims = _claims(extract_final_text({"output": output}))
     stated_claims_backed = sum(
         1 for claim in stated_claims
@@ -113,7 +122,7 @@ def pipeline_edges(output: Dict[str, Any]) -> Dict[str, Any]:
         "extracted_to_verified_rate": (verified / extracted if extracted else None),
         "verified_to_stated_recall": (stated / verified if verified else None),
         "stated_claim_count": len(stated_claims),
-        "stated_claim_precision": (stated_claims_backed / len(stated_claims) if stated_claims else None),
+        "stated_claim_verbatim_extraction_rate": (stated_claims_backed / len(stated_claims) if stated_claims else None),
     }
 
 
@@ -140,8 +149,8 @@ def aggregate_pipeline_edges(cells: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
                           if e["extracted_to_verified_rate"] is not None]
     verified_stated = [e["verified_to_stated_recall"] for e in edges
                        if e["verified_to_stated_recall"] is not None]
-    stated_precision = [e["stated_claim_precision"] for e in edges
-                        if e["stated_claim_precision"] is not None]
+    stated_verbatim = [e["stated_claim_verbatim_extraction_rate"] for e in edges
+                        if e["stated_claim_verbatim_extraction_rate"] is not None]
     return {
         "n": n,
         "total_retrieved": sum(e["retrieved"] for e in edges),
@@ -155,8 +164,8 @@ def aggregate_pipeline_edges(cells: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         "extracted_to_verified_rate_ci95": bench_stats.ci95(extracted_verified),
         "verified_to_stated_recall_mean": bench_stats.mean(verified_stated),
         "verified_to_stated_recall_ci95": bench_stats.ci95(verified_stated),
-        "stated_claim_precision_mean": bench_stats.mean(stated_precision),
-        "stated_claim_precision_ci95": bench_stats.ci95(stated_precision),
+        "stated_claim_verbatim_extraction_rate_mean": bench_stats.mean(stated_verbatim),
+        "stated_claim_verbatim_extraction_rate_ci95": bench_stats.ci95(stated_verbatim),
     }
 
 
@@ -266,8 +275,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                  f"+/- {agg['extracted_to_verified_rate_ci95']:.3f}")
             print(f"  verified->stated recall:     {agg['verified_to_stated_recall_mean']:.3f} "
                  f"+/- {agg['verified_to_stated_recall_ci95']:.3f}")
-            print(f"  stated-claim precision:      {agg['stated_claim_precision_mean']:.3f} "
-                 f"+/- {agg['stated_claim_precision_ci95']:.3f}")
+            print(f"  verbatim-extraction rate:    {agg['stated_claim_verbatim_extraction_rate_mean']:.3f} "
+                 f"+/- {agg['stated_claim_verbatim_extraction_rate_ci95']:.3f}")
         print(f"== fabricated-arithmetic rate: n_cells_with_evidence_graph="
              f"{fabrication_summary['n_cells_with_evidence_graph']} "
              f"mean={fabrication_summary['mean']} ==")
