@@ -278,6 +278,51 @@ def test_summarize_observability_infra_exposes_failure_rate_for_consumer_judgeme
     assert obs["infra"]["rates"]["http_request"] == pytest.approx(2 / 16)
 
 
+# --- search provenance aggregation (frozen-corpus replay observability) ---
+
+def _search_timing(provenance=None, result_count=1):
+    payload = {"query": "q", "result_count": result_count}
+    if provenance is not None:
+        payload["search_provenance"] = provenance
+    return {"name": "search", "duration": 0.1, "success": True, "payload": payload}
+
+
+def test_summarize_observability_search_block_has_no_provenance_keys_when_absent():
+    """Absent provenance (every non-corpus backend, and every pre-existing stored cell) must
+    stay absent, never default to 0 -- that distinction is the entire point of the field."""
+    telemetry = _TelemetryWithTimings([_search_timing(provenance=None)])
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert "live_fallbacks" not in obs["search"]
+    assert "corpus_hits" not in obs["search"]
+    assert "empty_results" not in obs["search"]
+
+
+def test_summarize_observability_aggregates_search_provenance_counts():
+    telemetry = _TelemetryWithTimings([
+        _search_timing(provenance="corpus"),
+        _search_timing(provenance="corpus"),
+        _search_timing(provenance="live"),
+        _search_timing(provenance="none", result_count=0),
+    ])
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["search"]["corpus_hits"] == 2
+    assert obs["search"]["live_fallbacks"] == 1
+    assert obs["search"]["empty_results"] == 1
+
+
+def test_summarize_observability_search_provenance_mixed_with_unlabelled_timings():
+    """A single provenance-carrying timing among unlabelled ones still surfaces the block --
+    the presence of the key anywhere is what flips it from unknown to counted."""
+    telemetry = _TelemetryWithTimings([
+        _search_timing(provenance=None),
+        _search_timing(provenance="live"),
+    ])
+    obs = summarize_observability({"output": {"final_deliverable": "x"}}, telemetry)
+    assert obs["search"]["live_fallbacks"] == 1
+    assert obs["search"]["corpus_hits"] == 0
+    assert obs["search"]["empty_results"] == 0
+
+
 @pytest.mark.asyncio
 async def test_connector_search_records_io_events():
     config = ConnectorConfig()

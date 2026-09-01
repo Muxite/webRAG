@@ -218,11 +218,21 @@ class AgentIO:
                     },
                 )
         if self.telemetry:
+            payload = {"query": query, "result_count": len(results or [])}
+            # ConnectorSearchCorpus (frozen-corpus replay) appends one entry per served call to
+            # ``provenance`` -- "corpus"/"live"/"none" -- as the last thing it does before
+            # returning, so reading the tail here right after the awaited call completes is
+            # exactly this call's outcome, never a stale one from a concurrent call. No other
+            # backend (serper/brave/searxng) carries this attribute, so this stays a no-op for
+            # them -- never assume the backend is the corpus one.
+            provenance_log = getattr(self.connector_search, "provenance", None)
+            if isinstance(provenance_log, list) and provenance_log:
+                payload["search_provenance"] = provenance_log[-1]
             self.telemetry.record_timing(
                 name="search",
                 started_at=started_at,
                 success=results is not None,
-                payload={"query": query, "result_count": len(results or [])},
+                payload=payload,
             )
         return results
 

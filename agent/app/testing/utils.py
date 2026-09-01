@@ -207,6 +207,30 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
             visit_chars += count_chars(content)
             visit_words += count_words(content)
     
+    # Per-search provenance ("corpus"/"live"/"none"), when a backend records it -- currently
+    # only ConnectorSearchCorpus (agent_io.search folds ``connector_search.provenance`` into
+    # each "search" timing's payload as ``search_provenance``). Every other backend, and every
+    # cell stored before this field existed, carries no such payload key at all: that is
+    # "unknown", not zero, so the block below is only added when at least one timing actually
+    # carries the key.
+    search_live_fallbacks = 0
+    search_corpus_hits = 0
+    search_empty_results = 0
+    search_provenance_seen = False
+    for entry in telemetry.timings:
+        if entry.get("name") != "search":
+            continue
+        provenance = (entry.get("payload") or {}).get("search_provenance")
+        if provenance is None:
+            continue
+        search_provenance_seen = True
+        if provenance == "corpus":
+            search_corpus_hits += 1
+        elif provenance == "live":
+            search_live_fallbacks += 1
+        elif provenance == "none":
+            search_empty_results += 1
+
     fixture_hits = 0
     fixture_misses = 0
     for entry in telemetry.events:
@@ -362,6 +386,11 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
             "chars": search_chars,
             "words": search_words,
             "kilobytes": round(search_chars / 1024, 2),
+            **({
+                "live_fallbacks": search_live_fallbacks,
+                "corpus_hits": search_corpus_hits,
+                "empty_results": search_empty_results,
+            } if search_provenance_seen else {}),
         },
         "visit": {
             "count": visit_count,
