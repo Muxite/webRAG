@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -73,6 +74,7 @@ from agent.app.solver import SolverResult
 from agent.app.testing.execution_sequential import (
     ToolRetry, _EMPTY_PAGE, _call_search_with_retry, _call_tool_with_retry,
 )
+from agent.app.testing.model_metadata import collect_model_metadata
 from agent.app.testing.utils import summarize_observability
 from shared.connector_config import ConnectorConfig
 
@@ -297,6 +299,47 @@ def _coverage_corrective_message(missing: List[str]) -> str:
         "search snippets or memory for these items — open their pages and read the exact "
         "value directly."
     )
+
+
+#: ``LEDGER_ZERO_VISIT_GATE`` — the zero-visit finish gate (default ON). Rides on the same
+#: ``candidate_coverage_gate`` flag as its named-roster sibling (the harness defaults that env
+#: var ON; a caller that opted out of coverage enforcement entirely keeps today's behavior), so
+#: this env var is the kill switch for the new behavior alone.
+_ZERO_VISIT_GATE_ENV = "LEDGER_ZERO_VISIT_GATE"
+
+#: One-time extra recursion budget for the zero-visit nudge — a run that has read nothing needs
+#: roughly one visit plus a little reasoning, not a whole fan-out, so the sibling gate's fixed
+#: floor is more than enough.
+_ZERO_VISIT_EXTENSION_STEPS = 10
+
+#: Fed back as ONE corrective turn when a run is about to finish having fetched zero pages.
+#: Deliberately a NUDGE, not a hard failure: a hard failure converts a weak answer into no
+#: answer at all, and the models this exists for (phi3:mini, qwen2.5:1.5b) do produce an answer
+#: — just an ungrounded one. Applied at most once per run; if the model ignores it, the run
+#: finalizes on whatever it had.
+_ZERO_VISIT_CORRECTIVE_MESSAGE = (
+    "STOP — you have not read a single page yet. Everything you have seen so far is a truncated "
+    "search snippet, which is NOT a source: the numbers you need are usually not in it, and an "
+    "answer built from snippets or from memory cannot be accepted.\n\n"
+    "Before you answer, call the visit tool with a URL copied EXACTLY from your search results, "
+    "and read the value off the page itself. Then give your answer, citing that URL."
+)
+
+
+def _has_visitable_url(messages: List[Any]) -> bool:
+    """True when some TOOL result in ``messages`` contains a URL the model could have opened.
+
+    Guards the gate against punishing a retrieval failure that is not the model's fault: a task
+    with no retrieval step, or a search that came back empty, offers nothing to visit, and
+    nudging there would only burn steps. Only ``ToolMessage`` content counts — a URL the model
+    wrote in its own turn (or one quoted in the mandate) is exactly the invented-URL failure this
+    should not encourage.
+    """
+    for m in (messages or []):
+        if isinstance(m, ToolMessage) and isinstance(m.content, str):
+            if "http://" in m.content or "https://" in m.content:
+                return True
+    return False
 
 
 #: Instruction appended to `_SYSTEM` when `require_finish_tool` is on. `sequential_react`
@@ -1005,6 +1048,15 @@ def _visit_haystacks(messages: List[Any]) -> List["Haystack"]:
     return haystacks
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    """Read a 0/1-style env kill switch. Unset/blank keeps ``default``; anything in the falsey
+    set turns it off. Never raises."""
+    raw = (os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw not in ("0", "false", "no", "off")
+
+
 #: `_trim_for_model`'s truncation scheme — mirrors `execution_sequential.py`'s scratchpad bounds
 #: (last-12-entries / obs[:1500] / synthesis-evidence-capped-at-12000) at a comparable ratio.
 _TRIM_RECENT_TOOL_MESSAGES = 3
@@ -1042,15 +1094,26 @@ def _trim_for_model(state: Dict[str, Any]) -> Dict[str, Any]:
     history (live-caught: a bare drop produced ``ValueError: Found AIMessages with tool_calls
     that do not have a corresponding ToolMessage``, an infra failure on a real benchmark cell).
     """
+    return _trim_messages(
+        state, _TRIM_RECENT_TOOL_MESSAGES, _TRIM_TOOL_CHARS, _TRIM_TOTAL_TOOL_CHARS,
+    )
+
+
+def _trim_messages(
+    state: Dict[str, Any], recent_tool_messages: int, tool_chars: int, total_tool_chars: int,
+) -> Dict[str, Any]:
+    """:func:`_trim_for_model`'s scheme with the three bounds supplied rather than read from the
+    module globals, so :func:`_make_trim_for_model` can scale them to a small model's real
+    window without duplicating the (load-bearing, live-debugged) tool-call-pairing logic."""
     messages = list(state.get("messages") or [])
     tool_indices = [i for i, m in enumerate(messages) if isinstance(m, ToolMessage)]
-    recent = set(tool_indices[-_TRIM_RECENT_TOOL_MESSAGES:]) if tool_indices else set()
+    recent = set(tool_indices[-recent_tool_messages:]) if tool_indices and recent_tool_messages else set()
 
     trimmed: List[Any] = []
     for i, m in enumerate(messages):
         if isinstance(m, ToolMessage) and i not in recent and isinstance(m.content, str):
-            if len(m.content) > _TRIM_TOOL_CHARS:
-                m = m.model_copy(update={"content": m.content[:_TRIM_TOOL_CHARS]})
+            if len(m.content) > tool_chars:
+                m = m.model_copy(update={"content": m.content[:tool_chars]})
         trimmed.append(m)
 
     # Budget governs only the OLDER (already-clipped) tool messages — the protected recent
@@ -1059,11 +1122,11 @@ def _trim_for_model(state: Dict[str, Any]) -> Dict[str, Any]:
         len(m.content) for i, m in enumerate(trimmed)
         if isinstance(m, ToolMessage) and i not in recent and isinstance(m.content, str)
     )
-    if older_total > _TRIM_TOTAL_TOOL_CHARS:
+    if older_total > total_tool_chars:
         drop_order = [i for i, m in enumerate(trimmed) if isinstance(m, ToolMessage) and i not in recent]
         to_drop_ids = set()
         for i in drop_order:
-            if older_total <= _TRIM_TOTAL_TOOL_CHARS:
+            if older_total <= total_tool_chars:
                 break
             m = trimmed[i]
             older_total -= len(m.content) if isinstance(m.content, str) else 0
@@ -1072,6 +1135,85 @@ def _trim_for_model(state: Dict[str, Any]) -> Dict[str, Any]:
             trimmed = _drop_tool_messages_and_matching_calls(trimmed, to_drop_ids)
 
     return {"llm_input_messages": trimmed}
+
+
+#: ``LEDGER_CONTEXT_FIT`` — scale the trim budget above to the model's REAL served window
+#: instead of the fixed 32k-shaped globals. Default ON; it only ever SHRINKS the budget (a
+#: window at or above the size the globals were written for reproduces them exactly, see
+#: :func:`_context_fit_budget`), and it is reachable only on a run that already has
+#: ``context_trim`` on. Set to 0 to reproduce a pre-2026-09-02 measurement.
+_CONTEXT_FIT_ENV = "LEDGER_CONTEXT_FIT"
+
+#: Characters of model view we are willing to fill per token of served window. Ollama's own
+#: tokenizers sit near 4 chars/token on English page text, so budgeting at 2 leaves roughly half
+#: the window for the system message (the entire tool protocol), the mandate and the model's own
+#: turns — the half that ollama's HEAD-first truncation eats first when the prompt overflows.
+_CONTEXT_FIT_CHARS_PER_TOKEN = 2
+#: Share of that char budget the OLDER (clipped) tool messages may occupy.
+_CONTEXT_FIT_OLDER_SHARE = 0.375
+#: Share of it a SINGLE clipped older tool message may occupy.
+_CONTEXT_FIT_PER_MESSAGE_SHARE = 1.0 / 16
+#: Share of it one unclipped recent page may occupy.
+_CONTEXT_FIT_PAGE_SHARE = 0.16
+#: Floors, so a 2k-window model still gets a usable (if tiny) view rather than an empty one.
+_CONTEXT_FIT_MIN_TOOL_CHARS = 400
+_CONTEXT_FIT_MIN_PAGE_CHARS = 800
+
+
+@dataclass(frozen=True)
+class _ContextBudget:
+    """One model's trim budget: how many recent tool results stay unclipped, how big a clipped
+    older one may be, how much the older ones may total, and how much of a page ``visit`` returns
+    in the first place."""
+
+    recent_tool_messages: int
+    tool_chars: int
+    total_tool_chars: int
+    page_chars: int
+
+
+def _context_fit_budget(ctx_tokens: int, page_chars: int) -> _ContextBudget:
+    """The trim budget for a model whose served window is ``ctx_tokens``.
+
+    Monotonic and CLAMPED to today's constants: every dimension is ``min(global_default,
+    scaled)``, so a 32k-or-larger window returns exactly the pre-existing globals and a run on
+    qwen2.5:7b (32768) is byte-identical to before this existed. Only a genuinely small window
+    (gemma2:2b's 8192, tinyllama's 2047) sees anything shrink.
+
+    Evidence: gemma2:2b passed the keystone in 0/11 cells that pinned a call at its 8191-token
+    cap and 8/13 that did not; resizing this budget (plus the matching ``page_chars`` cap) drove
+    cap hits to 0/6 and keystone to 5/6, replicated on a second task set. The config-only route
+    (``page_chars`` alone) was NOT sufficient — the unclipped recent-tool-message allowance is
+    what blows the budget, and that is this code constant.
+    """
+    chars = max(1024, int(ctx_tokens) * _CONTEXT_FIT_CHARS_PER_TOKEN)
+    if ctx_tokens >= 16384:
+        recent = _TRIM_RECENT_TOOL_MESSAGES
+    elif ctx_tokens >= 4096:
+        recent = 2
+    else:
+        recent = 1
+    return _ContextBudget(
+        recent_tool_messages=min(_TRIM_RECENT_TOOL_MESSAGES, recent),
+        tool_chars=min(_TRIM_TOOL_CHARS,
+                       max(_CONTEXT_FIT_MIN_TOOL_CHARS, int(chars * _CONTEXT_FIT_PER_MESSAGE_SHARE))),
+        total_tool_chars=min(_TRIM_TOTAL_TOOL_CHARS, int(chars * _CONTEXT_FIT_OLDER_SHARE)),
+        page_chars=min(page_chars,
+                       max(_CONTEXT_FIT_MIN_PAGE_CHARS, int(chars * _CONTEXT_FIT_PAGE_SHARE))),
+    )
+
+
+def _make_trim_for_model(budget: _ContextBudget):
+    """A ``pre_model_hook`` applying ``budget`` instead of the module-level globals. Identical
+    scheme to :func:`_trim_for_model` — same protected-recent window, same clip-then-drop
+    order, same ``llm_input_messages``-only contract."""
+
+    def _trim(state: Dict[str, Any]) -> Dict[str, Any]:
+        return _trim_messages(
+            state, budget.recent_tool_messages, budget.tool_chars, budget.total_tool_chars,
+        )
+
+    return _trim
 
 
 def _drop_tool_messages_and_matching_calls(messages: List[Any], tool_call_ids: set) -> List[Any]:
@@ -1201,10 +1343,63 @@ class LangGraphSolver:
         #: (parsed in `execution_langgraph.py`) can name more than one.
         self._ledger_host_modules = {str(m).strip().lower() for m in (ledger_host_modules or ()) if str(m).strip()}
         self._ledger_derive_enabled = "derive" in self._ledger_host_modules
+        #: FIX A (`docs/TINY_MODEL_INVESTIGATION.md` §3.1), env-gated by `LEDGER_CONTEXT_FIT`,
+        #: default ON: size the context-trim budget to the model's REAL served window instead of
+        #: the fixed 32k-shaped globals. Reachable only when `context_trim` is on, and clamped so
+        #: a >=32k model reproduces the old constants exactly (see `_context_fit_budget`).
+        self._context_fit = _env_flag(_CONTEXT_FIT_ENV, True)
+        #: FIX B (§3.2), env-gated by `LEDGER_ZERO_VISIT_GATE`, default ON: nudge (once) a run
+        #: that is about to finish having fetched zero pages. Rides on `candidate_coverage_gate`
+        #: (see `_ZERO_VISIT_GATE_ENV`).
+        self._zero_visit_gate = _env_flag(_ZERO_VISIT_GATE_ENV, True)
+        #: Resolved per `solve()` (needs an await); None = unknown window or feature off, in
+        #: which case every budget below stays exactly as configured.
+        self._context_budget: Optional[_ContextBudget] = None
+
+    async def _served_context_tokens(self) -> Optional[int]:
+        """The model's own maximum context window, or None when it cannot be known.
+
+        Reuses the ONE `/api/show` probe this repo already runs per cell (and its cache) rather
+        than adding a second one — the same reason `model_capabilities` reuses it. A hosted
+        model, an unreachable server or a malformed record all resolve to None, which leaves
+        every budget at today's configured value.
+        """
+        try:
+            record = await collect_model_metadata(self._connector_llm, self._model_name)
+            window = (record or {}).get("model_context_length")
+            return int(window) if window else None
+        except Exception as exc:  # noqa: BLE001 — a probe must never fail a run
+            _logger.warning(f"[CONTEXT-FIT] served-window probe failed for {self._model_name}: {exc}")
+            return None
+
+    async def _resolve_context_budget(self) -> None:
+        """Set `self._context_budget` for this run (see `_context_fit_budget`). No-op — and, in
+        particular, NO probe — when trimming or the feature itself is off."""
+        self._context_budget = None
+        if not (self._context_trim and self._context_fit):
+            return
+        window = await self._served_context_tokens()
+        if not window:
+            return
+        budget = _context_fit_budget(window, self._page_chars)
+        if (budget.recent_tool_messages, budget.tool_chars, budget.total_tool_chars, budget.page_chars) == (
+            _TRIM_RECENT_TOOL_MESSAGES, _TRIM_TOOL_CHARS, _TRIM_TOTAL_TOOL_CHARS, self._page_chars
+        ):
+            return  # a roomy window: identical to today, so keep today's exact objects
+        _logger.info(
+            f"[CONTEXT-FIT] {self._model_name} serves {window} tokens; trim budget scaled to "
+            f"recent={budget.recent_tool_messages} tool_chars={budget.tool_chars} "
+            f"total={budget.total_tool_chars} page_chars={budget.page_chars}"
+        )
+        self._context_budget = budget
 
     def _pre_model_hook(self) -> Optional[Any]:
         """The per-turn context-bounding hook for this run, or None (see `_trim_for_model`)."""
-        return _trim_for_model if self._context_trim else None
+        if not self._context_trim:
+            return None
+        if self._context_budget is None:
+            return _trim_for_model
+        return _make_trim_for_model(self._context_budget)
 
     async def _build_transport(
         self, llm: Any, tools: List[Any], system_prompt: str,
@@ -1322,8 +1517,10 @@ class LangGraphSolver:
         retry = ToolRetry.from_settings(settings)
         # None (flag off) reproduces `_make_tools`'s prior signature/behavior exactly -- no
         # `derive` tool, no page registration, and no artifact below.
-        ledger_kit = LedgerToolkit(max_page_chars=self._page_chars) if self._ledger_derive_enabled else None
-        tools = _make_tools(agent_io, self._search_k, self._page_chars, retry,
+        await self._resolve_context_budget()
+        page_chars = self._context_budget.page_chars if self._context_budget else self._page_chars
+        ledger_kit = LedgerToolkit(max_page_chars=page_chars) if self._ledger_derive_enabled else None
+        tools = _make_tools(agent_io, self._search_k, page_chars, retry,
                              require_finish_tool=self._require_finish_tool, ledger_kit=ledger_kit)
         llm = self._build_llm()
         system_prompt = f"{_SYSTEM}\n{_FINISH_TOOL_GUIDANCE}" if self._require_finish_tool else _SYSTEM
@@ -1390,6 +1587,7 @@ class LangGraphSolver:
         # newly-visited evidence if the extension ALSO runs out of budget without a clean
         # final answer.
         if self._candidate_coverage_gate:
+            extended = False
             named = extract_named_candidates(mandate)
             if named:
                 cov = evaluate_candidate_coverage_from_haystacks(_visit_haystacks(state.messages), mandate)
@@ -1404,6 +1602,28 @@ class LangGraphSolver:
                         transport, state, _coverage_corrective_message(cov.missing), extension_steps,
                         label="candidate-coverage",
                     )
+                    extended = True
+
+            # Zero-visit finish gate — the sibling condition the gate above cannot express.
+            # `extract_named_candidates` returns [] for a whole family of tasks (a single
+            # unnamed quantity to look up), so a model that searches, reads the snippet and
+            # answers is stopped by nothing: measured on the ladder02 corpus, `read >=1 page`
+            # and `scored > 0` agreed in 34/34 stored cells, and phi3:mini / qwen2.5:1.5b sat at
+            # 0 visits in every one of theirs. One nudge (never a hard failure), at most once
+            # per run, and only when the transcript actually contains a URL the model could
+            # have opened — a task with no retrieval step or a search that came back empty is
+            # not the model's fault and is left alone.
+            if (self._zero_visit_gate and not extended
+                    and not _visit_haystacks(state.messages)
+                    and _has_visitable_url(state.messages)):
+                _logger.info(
+                    "[ZERO_VISIT] run is finishing with 0 pages read but search results in hand; "
+                    f"granting one-time +{_ZERO_VISIT_EXTENSION_STEPS}-step extension before finalizing"
+                )
+                await _run_extension(
+                    transport, state, _ZERO_VISIT_CORRECTIVE_MESSAGE, _ZERO_VISIT_EXTENSION_STEPS,
+                    label="zero-visit",
+                )
 
         # Imitate sequential_react's explicit finish(answer) discipline: once all extensions
         # above have run, a `finish` call (if any) is the ONLY trusted source of the final

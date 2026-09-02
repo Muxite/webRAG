@@ -13,6 +13,7 @@ from agent.app.langgraph_solver import (
     _STALL_MAX_EPISODES, _STALL_WINDOW, _STEP_EXHAUSTED_TEXT, _TRIM_RECENT_TOOL_MESSAGES,
     _TRIM_TOOL_CHARS, _TRIM_TOTAL_TOOL_CHARS, _candidate_coverage_extension_steps,
     _extract_usage, _finish_answer, _make_tools, _record_io_parity, _trailing_stall_run,
+    _context_fit_budget, _has_visitable_url, _make_trim_for_model,
     _trim_for_model, _visit_haystacks,
 )
 
@@ -1264,3 +1265,271 @@ def test_require_finish_tool_off_by_default_trusts_natural_termination(monkeypat
     result, llm, _stub = _run_solve_with_sequenced_graph(monkeypatch, [messages], "find the fact")
     assert result["final_deliverable"] == "The answer is 42."
     assert llm.calls == []
+
+
+# --- FIX A: context-fit trim budget (docs/TINY_MODEL_INVESTIGATION.md §3.1) ---------------
+# gemma2:2b's served window is 8192 tokens; the fixed global trim budget (3 unclipped recent
+# tool messages at up to page_chars=6000, plus 18,000 chars of clipped older ones) can put
+# ~36,000 chars of tool payload alone in front of a model whose ENTIRE window is ~32,000 chars.
+# Ollama truncates at the HEAD, so what gets dropped is the system message carrying the whole
+# tool protocol — measured: keystone 0/11 in cells that hit the cap, 8/13 in cells that did not.
+
+def test_context_fit_budget_is_a_no_op_for_a_32k_model():
+    """qwen2.5:7b (32768) must see EXACTLY today's constants — the no-harm requirement."""
+    budget = _context_fit_budget(32768, page_chars=6000)
+    assert budget.recent_tool_messages == _TRIM_RECENT_TOOL_MESSAGES
+    assert budget.tool_chars == _TRIM_TOOL_CHARS
+    assert budget.total_tool_chars == _TRIM_TOTAL_TOOL_CHARS
+    assert budget.page_chars == 6000
+
+
+def test_context_fit_budget_never_exceeds_the_configured_page_chars():
+    assert _context_fit_budget(131072, page_chars=6000).page_chars == 6000
+    assert _context_fit_budget(131072, page_chars=2000).page_chars == 2000
+
+
+def test_context_fit_budget_shrinks_every_dimension_for_an_8k_model():
+    budget = _context_fit_budget(8192, page_chars=6000)
+    assert budget.recent_tool_messages < _TRIM_RECENT_TOOL_MESSAGES
+    assert budget.tool_chars < _TRIM_TOOL_CHARS
+    assert budget.total_tool_chars < _TRIM_TOTAL_TOOL_CHARS
+    assert budget.page_chars < 6000
+
+
+def test_context_fit_budget_worst_case_tool_payload_fits_the_window():
+    """The property that actually matters: the WORST-CASE tool payload the trim can emit
+    (unclipped recent window + the older-message budget) must leave room for the system
+    message inside the model's real window, at ~4 chars/token."""
+    for ctx in (2048, 4096, 8192, 16384, 32768):
+        budget = _context_fit_budget(ctx, page_chars=6000)
+        worst_case = budget.recent_tool_messages * budget.page_chars + budget.total_tool_chars
+        assert worst_case <= ctx * 2, (ctx, worst_case)
+
+
+def test_make_trim_for_model_applies_the_scaled_budget():
+    budget = _context_fit_budget(8192, page_chars=2500)
+    trim = _make_trim_for_model(budget)
+    big = "x" * 5000
+    messages = [HumanMessage(content="task")] + _tool_msgs(big, big, big, big, big)
+    out = trim({"messages": messages})["llm_input_messages"]
+    tool_out = [m for m in out if isinstance(m, ToolMessage)]
+    older = tool_out[:-budget.recent_tool_messages]
+    assert all(len(m.content) <= budget.tool_chars for m in older)
+    assert sum(len(m.content) for m in older) <= budget.total_tool_chars
+    # the protected recent window is still unclipped
+    assert all(len(m.content) == 5000 for m in tool_out[-budget.recent_tool_messages:])
+
+
+def _run_solve_with_served_window(monkeypatch, window, **solver_kwargs):
+    """Run `solve()` against the sequenced stub graph with the model's served context window
+    forced to `window` (None = unknown, i.e. a hosted model), capturing what `_make_tools` and
+    `create_react_agent` were given."""
+    from agent.app import langgraph_solver
+
+    captured = {}
+    real_make_tools = langgraph_solver._make_tools
+
+    def _capturing_make_tools(agent_io, search_k, page_chars, *a, **k):
+        captured["page_chars"] = page_chars
+        return real_make_tools(agent_io, search_k, page_chars, *a, **k)
+
+    async def _fake_window(self):
+        return window
+
+    monkeypatch.setattr(langgraph_solver, "_make_tools", _capturing_make_tools)
+    monkeypatch.setattr(LangGraphSolver, "_served_context_tokens", _fake_window)
+
+    stub_graph = _SequencedStubGraph([[HumanMessage(content="task"), AIMessage(content="answer")]])
+
+    def _capturing_create_react_agent(*a, **k):
+        captured.update(k)
+        return stub_graph
+
+    monkeypatch.setattr(langgraph_solver, "create_react_agent", _capturing_create_react_agent)
+    monkeypatch.setattr(LangGraphSolver, "_build_llm", lambda self: _StubLLM())
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="gemma2:2b", **solver_kwargs,
+    )
+    asyncio.run(solver.solve("the task", max_steps=4))
+    return captured
+
+
+def test_context_fit_scales_the_hook_and_page_chars_for_a_small_window(monkeypatch):
+    captured = _run_solve_with_served_window(monkeypatch, 8192, context_trim=True)
+    assert captured["page_chars"] < 6000
+    hook = captured["pre_model_hook"]
+    assert hook is not _trim_for_model  # a budget-scaled closure, not the fixed global one
+    big = "x" * 6000
+    out = hook({"messages": _tool_msgs(big, big, big, big)})["llm_input_messages"]
+    assert len(out[0].content) < _TRIM_TOOL_CHARS
+
+
+def test_context_fit_is_inert_when_the_served_window_is_unknown(monkeypatch):
+    """A hosted model (no /api/show) must keep today's exact hook and page_chars."""
+    captured = _run_solve_with_served_window(monkeypatch, None, context_trim=True)
+    assert captured["page_chars"] == 6000
+    assert captured["pre_model_hook"] is _trim_for_model
+
+
+def test_context_fit_is_inert_for_a_large_window(monkeypatch):
+    captured = _run_solve_with_served_window(monkeypatch, 32768, context_trim=True)
+    assert captured["page_chars"] == 6000
+    assert captured["pre_model_hook"] is _trim_for_model
+
+
+def test_context_fit_env_flag_off_keeps_the_fixed_global_budget(monkeypatch):
+    monkeypatch.setenv("LEDGER_CONTEXT_FIT", "0")
+    captured = _run_solve_with_served_window(monkeypatch, 8192, context_trim=True)
+    assert captured["page_chars"] == 6000
+    assert captured["pre_model_hook"] is _trim_for_model
+
+
+def test_context_fit_does_nothing_when_context_trim_is_off(monkeypatch):
+    captured = _run_solve_with_served_window(monkeypatch, 8192)
+    assert captured["page_chars"] == 6000
+    assert captured["pre_model_hook"] is None
+
+
+def test_context_fit_never_probes_when_context_trim_is_off(monkeypatch):
+    """No extra /api/show round trip on a run that isn't trimming."""
+    from agent.app import langgraph_solver
+
+    calls = []
+
+    async def _counting_metadata(connector_llm, model_name):
+        calls.append(model_name)
+        return {}
+
+    monkeypatch.setattr(langgraph_solver, "collect_model_metadata", _counting_metadata)
+    monkeypatch.setattr(langgraph_solver, "create_react_agent",
+                        lambda *a, **k: _SequencedStubGraph([[AIMessage(content="a")]]))
+    monkeypatch.setattr(LangGraphSolver, "_build_llm", lambda self: _StubLLM())
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="gemma2:2b",
+    )
+    asyncio.run(solver.solve("the task", max_steps=4))
+    assert calls == []
+
+
+def test_served_context_tokens_survives_a_failed_probe(monkeypatch):
+    from agent.app import langgraph_solver
+
+    async def _boom(connector_llm, model_name):
+        raise RuntimeError("probe down")
+
+    monkeypatch.setattr(langgraph_solver, "collect_model_metadata", _boom)
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="gemma2:2b",
+    )
+    assert asyncio.run(solver._served_context_tokens()) is None
+
+
+# --- FIX B: zero-visit finish gate (docs/TINY_MODEL_INVESTIGATION.md §3.2) ----------------
+# phi3:mini emits 98% valid JSON, searches correctly, gets the right page at rank 1 — and then
+# answers straight from the search snippet, never calling `visit`. Three of the four validators
+# on this task family require a real fetch, so such a run scores exactly 0.000 by construction.
+# The existing coverage gate cannot catch it: `extract_named_candidates` returns [] here.
+
+_UNNAMED_MANDATE = "Report the height of the tallest chimney, citing the page you read it from."
+
+
+def _zero_visit_messages(tool_content="1. GRES-2 — https://en.wikipedia.org/wiki/GRES-2\n   215 m"):
+    return [
+        HumanMessage(content=_UNNAMED_MANDATE),
+        AIMessage(content="", tool_calls=[{"name": "search", "args": {"query": "GRES-2"}, "id": "1"}]),
+        ToolMessage(content=tool_content, tool_call_id="1"),
+        AIMessage(content="It is 215 metres."),
+    ]
+
+
+def _visited_messages():
+    return [
+        HumanMessage(content=_UNNAMED_MANDATE),
+        AIMessage(content="", tool_calls=[{"name": "visit", "args": {"url": "https://en.wikipedia.org/wiki/GRES-2"}, "id": "2"}]),
+        ToolMessage(content="SOURCE: https://en.wikipedia.org/wiki/GRES-2\nThe chimney is 419.7 m.", tool_call_id="2"),
+        AIMessage(content="419.7 m (https://en.wikipedia.org/wiki/GRES-2)."),
+    ]
+
+
+def test_zero_visit_gate_nudges_a_run_that_read_no_page(monkeypatch):
+    result, _llm, stub_graph = _run_solve_with_sequenced_graph(
+        monkeypatch, [_zero_visit_messages(), _visited_messages()], _UNNAMED_MANDATE,
+        candidate_coverage_gate=True,
+    )
+    assert len(stub_graph.calls) == 2
+    nudge = stub_graph.calls[1][-1].content
+    assert "visit" in nudge.lower()
+    assert result["final_deliverable"] == "419.7 m (https://en.wikipedia.org/wiki/GRES-2)."
+
+
+def test_zero_visit_gate_is_bounded_to_one_nudge(monkeypatch):
+    """A model that ignores the nudge must not loop — exactly one extra pass, then finalize."""
+    result, _llm, stub_graph = _run_solve_with_sequenced_graph(
+        monkeypatch, [_zero_visit_messages(), _zero_visit_messages()], _UNNAMED_MANDATE,
+        candidate_coverage_gate=True,
+    )
+    assert len(stub_graph.calls) == 2
+    assert result["final_deliverable"] == "It is 215 metres."  # nudged, not hard-failed
+
+
+def test_zero_visit_gate_is_inert_when_nothing_could_have_been_visited(monkeypatch):
+    """A search that returned nothing (or a task with no retrieval step at all) must never be
+    punished for a retrieval failure that is not the model's fault."""
+    _result, _llm, stub_graph = _run_solve_with_sequenced_graph(
+        monkeypatch, [_zero_visit_messages(tool_content="No results found.")], _UNNAMED_MANDATE,
+        candidate_coverage_gate=True,
+    )
+    assert len(stub_graph.calls) == 1
+
+
+def test_zero_visit_gate_is_inert_with_no_tool_calls_at_all(monkeypatch):
+    messages = [HumanMessage(content=_UNNAMED_MANDATE), AIMessage(content="It is 215 metres.")]
+    _result, _llm, stub_graph = _run_solve_with_sequenced_graph(
+        monkeypatch, [messages], _UNNAMED_MANDATE, candidate_coverage_gate=True,
+    )
+    assert len(stub_graph.calls) == 1
+
+
+def test_zero_visit_gate_is_inert_when_a_page_was_read(monkeypatch):
+    _result, _llm, stub_graph = _run_solve_with_sequenced_graph(
+        monkeypatch, [_visited_messages()], _UNNAMED_MANDATE, candidate_coverage_gate=True,
+    )
+    assert len(stub_graph.calls) == 1
+
+
+def test_zero_visit_gate_does_not_double_extend_after_the_coverage_gate(monkeypatch):
+    """When the named-roster coverage gate already spent its one-time extension, the zero-visit
+    gate must not spend a second one on the same run."""
+    _result, _llm, stub_graph = _run_solve_with_sequenced_graph(
+        monkeypatch,
+        [_search_only_fabrication_messages(), _search_only_fabrication_messages()],
+        _TWO_CANDIDATE_MANDATE,
+        candidate_coverage_gate=True,
+    )
+    assert len(stub_graph.calls) == 2
+
+
+def test_zero_visit_gate_env_flag_off_leaves_the_run_untouched(monkeypatch):
+    monkeypatch.setenv("LEDGER_ZERO_VISIT_GATE", "0")
+    _result, _llm, stub_graph = _run_solve_with_sequenced_graph(
+        monkeypatch, [_zero_visit_messages()], _UNNAMED_MANDATE, candidate_coverage_gate=True,
+    )
+    assert len(stub_graph.calls) == 1
+
+
+def test_zero_visit_gate_requires_the_coverage_gate(monkeypatch):
+    """It rides on the same harness flag as its sibling gate, so a caller that opted out of
+    coverage enforcement entirely gets today's behavior unchanged."""
+    _result, _llm, stub_graph = _run_solve_with_sequenced_graph(
+        monkeypatch, [_zero_visit_messages()], _UNNAMED_MANDATE,
+    )
+    assert len(stub_graph.calls) == 1
+
+
+def test_has_visitable_url_ignores_prose_without_links():
+    assert _has_visitable_url(_zero_visit_messages()) is True
+    assert _has_visitable_url(_zero_visit_messages(tool_content="No results found.")) is False
+    assert _has_visitable_url([HumanMessage(content="https://example.com")]) is False
