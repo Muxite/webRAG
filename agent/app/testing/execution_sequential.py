@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 from typing import Dict, Any, List, NamedTuple, Optional
 
+from agent.app.ledger_tools import LedgerToolkit
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
 from agent.app.connector_http import ConnectorHttp
@@ -64,23 +65,55 @@ _SYSTEM = (
 )
 
 
-def _system_prompt(has_sandbox: bool) -> str:
-    """The step prompt, extended with the file surface when the run carries a workdir.
+#: Ledger module names this host can bind, read from ``LEDGER_HOST_MODULES`` (comma-separated,
+#: default OFF). ``derive`` is the only meaningful value today; unrecognized names are ignored
+#: rather than rejected, so the other lane's LangGraph binding can share the same env var without
+#: this host caring what else is listed in it. Deliberately a tiny duplicated ``os.environ`` read
+#: (not shared parsing infrastructure) -- see the task brief on why.
+def _ledger_derive_enabled() -> bool:
+    """True when ``derive`` is present in ``LEDGER_HOST_MODULES``."""
+    modules = {m.strip().lower() for m in os.environ.get("LEDGER_HOST_MODULES", "").split(",")}
+    return "derive" in modules
 
-    Kept byte-identical to ``_SYSTEM`` when there is no sandbox, so every existing web-research
-    cell is unaffected. The sandbox block is added only for closed-environment tasks, where this
-    arm needs the SAME capability surface as the native engine or an arm comparison measures the
-    tool surface rather than the reasoning (see :mod:`agent.app.sandbox_tool_surface`).
+
+#: Prompt text for the ``derive`` action, written for a WEAK model: it names the module's actual
+#: contract (operand must already be read on a page, the tool computes it, a guess is checked not
+#: trusted) rather than just listing the verb.
+_DERIVE_PROMPT_LINE = (
+    "- derive(operation, operands, proposed_value): compute operation (sum|difference|product|"
+    "quotient|ratio) over operands you have already read on a page you visited — give each operand "
+    "exactly as it appears on the page, e.g. \"419.7 metres\". The tool computes the result itself "
+    "in Python; do not trust your own arithmetic. If you already have a guess, pass it as "
+    "proposed_value and the tool will check it against the recomputation rather than accept it.\n"
+)
+
+
+def _system_prompt(has_sandbox: bool, has_derive: bool = False) -> str:
+    """The step prompt, extended with the file surface and/or the ledger's derive action.
+
+    Kept byte-identical to ``_SYSTEM`` when neither extension applies, so every existing
+    web-research cell is unaffected. The sandbox block is added only for closed-environment tasks
+    (see :mod:`agent.app.sandbox_tool_surface`); the derive block is added only when
+    ``LEDGER_HOST_MODULES`` includes ``derive`` (:func:`_ledger_derive_enabled`).
     """
+    prompt = _SYSTEM
+    valid_actions = ["search", "visit", "verify", "finish"]
+    if has_derive:
+        prompt = prompt.replace(
+            "- finish(answer):",
+            _DERIVE_PROMPT_LINE + "- finish(answer):",
+        )
+        valid_actions.insert(-1, "derive")
     if not has_sandbox:
-        return _SYSTEM
+        return prompt
     verbs = "|".join(PARITY_ACTIONS)
+    valid_actions_str = "|".join(valid_actions) + f"|{verbs}"
     return (
-        _SYSTEM
+        prompt
         + "\n\n" + sandbox_menu()
         + "\nFor a file action, use the same JSON shape with the action name and its slots, e.g. "
         + '{"thought": "...", "action": "write_file", "args": {"path": "out.txt", "content": "..."}}.'
-        + f"\nValid actions this run: search|visit|verify|finish|{verbs}."
+        + f"\nValid actions this run: {valid_actions_str}."
     )
 
 
@@ -285,9 +318,11 @@ async def _verify_claim(agent_io: AgentIO, claim: str, evidence: str, model_name
 
 async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps: int,
                      max_tokens: int, retry: Optional[ToolRetry] = None,
-                     context_cap: Optional[SequentialContextCap] = None) -> str:
+                     context_cap: Optional[SequentialContextCap] = None,
+                     ledger_kit: Optional[LedgerToolkit] = None) -> str:
     retry = retry or ToolRetry()  # default: retry OFF -> unchanged behavior
     context_cap = context_cap or SequentialContextCap()  # default: uncapped -> unchanged prompt
+    has_derive = ledger_kit is not None  # default: no bound module -> unchanged prompt/dispatch
     page_chars = int(os.environ.get("IDEA_TEST_SEQ_PAGE_CHARS", "6000"))
     search_k = int(os.environ.get("IDEA_TEST_SEQ_SEARCH_K", "6"))
     dedup_search = os.environ.get("IDEA_TEST_SEQ_DEDUP_SEARCH", "1") not in ("0", "false", "False")
@@ -307,7 +342,7 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
     for step in range(max_steps):
         history = _build_history(scratchpad, context_cap)
         messages = [
-            {"role": "system", "content": _system_prompt(sandbox is not None)},
+            {"role": "system", "content": _system_prompt(sandbox is not None, has_derive)},
             {"role": "user", "content": f"TASK:\n{mandate}\n\nSCRATCHPAD (your prior steps):\n{history}\n\nReturn the next step as JSON."},
         ]
         payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name, temperature=0.1, max_tokens=step_max_tokens)
@@ -380,14 +415,26 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
                 content = (content or "")[:page_chars]
                 evidence.append(f"SOURCE {url}\n{content}")
                 obs = f"PAGE {url}:\n{content}"
+                # Register with the ledger module wherever this host fetches a page, so its text is
+                # eligible as a derive operand. Does not change what visit returns to the model.
+                if ledger_kit is not None:
+                    ledger_kit.register_page(url, content)
         elif action == "verify":
             claim = str(args.get("claim", ""))
             verdict = await _verify_claim(agent_io, claim, "\n\n".join(evidence), model_name)
             obs = f"VERIFY '{claim[:80]}': {verdict}"
+        elif action == "derive" and ledger_kit is not None:
+            operation = str(args.get("operation", ""))
+            operands = args.get("operands")
+            if not isinstance(operands, list):
+                operands = [operands] if operands not in (None, "") else []
+            obs = ledger_kit.derive(operation, operands, proposed_value=args.get("proposed_value"))
         elif action in PARITY_ACTIONS:
             obs = await run_sandbox_action(sandbox, action, args)
         else:
             available = "search/visit/verify/finish"
+            if has_derive:
+                available += "/derive"
             if sandbox is not None:
                 available += "/" + "/".join(PARITY_ACTIONS)
             obs = f"INVALID ACTION. Use {available}."
@@ -452,11 +499,19 @@ async def run_sequential_execution(
     max_tokens = int(os.environ.get("IDEA_TEST_BASELINE_MAX_TOKENS", "8192"))
     retry = ToolRetry.from_settings(idea_settings)
     context_cap = SequentialContextCap.from_settings(idea_settings)
+    # `LEDGER_HOST_MODULES` gates the ledger binding, default OFF. Unset (or `derive` absent from
+    # the list) means `ledger_kit` stays None, `_run_react` gets no new kwarg, and this host's
+    # behavior is unchanged byte-for-byte -- it is the BASELINE half of the host-vs-host+module
+    # comparison and must stay inert with no module bound.
+    ledger_kit = LedgerToolkit() if _ledger_derive_enabled() else None
+    react_kwargs: Dict[str, Any] = {"retry": retry, "context_cap": context_cap}
+    if ledger_kit is not None:
+        react_kwargs["ledger_kit"] = ledger_kit
     started = time.perf_counter()
     deliverable = ""
     try:
         deliverable = await _run_react(agent_io, mandate, model_name, max_steps, max_tokens,
-                                       retry=retry, context_cap=context_cap)
+                                       **react_kwargs)
     except Exception as exc:
         _logger.error(f"Sequential ReAct failed: {exc}", exc_info=True)
 
@@ -466,6 +521,12 @@ async def run_sequential_execution(
         "goal_achieved": None,
         "action_summary": "sequential_react",
     }
+    if ledger_kit is not None:
+        # Same key and shape `execution_evidence_loop` already writes (`ledger.graph.to_dict()`),
+        # so `evidence_graph.reverify_graph` and `claim_metrics.derivation_fabrication_rate` read
+        # this host's artifact unchanged. Absent (not an empty dict) when the module is off, so a
+        # fabricated-arithmetic rate over a module-off cell reads UNKNOWN, never 0.0.
+        output["evidence_graph"] = ledger_kit.artifact()
     telemetry.finish(success=output["success"])
     tracer.close()
 
