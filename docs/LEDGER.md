@@ -12,6 +12,11 @@ thesis, metric order and build order) · **Latest handoff:**
   phase. Frozen metric contract, arm-blind auditor, per-arm confidence channel, graded verdict,
   shared prompted tool transport. Retracts "calibration cannot be retrofitted"; records the
   extraction value gate as a negative result; sets the seeded-A/B protocol.
+- **Methodology: `docs/LEDGER_METHODOLOGY.md`** — how to improve modules, KPIs and measurement
+  here, with each rule tied to the specific failure that produced it, plus ranked alternatives for
+  escaping the ~60-paired-task constraint.
+- **Module experiment: `docs/LEDGER_MODULE_EXPERIMENT.md`** — host vs host + module, replacing the
+  arm-vs-arm framing.
 - **Frozen metric contract: `docs/LEDGER_KPI_SPEC.md`** + `scripts/ledger_kpi_spec.json`
   (hash-guarded by `agent/tests/ledger_kpi_spec_frozen_test.py`). Holdout 213, 217, 221, 224, 227,
   231 is SEALED.
