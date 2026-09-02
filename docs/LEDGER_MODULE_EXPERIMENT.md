@@ -82,3 +82,68 @@ host's artifact with no modification.
 Host bindings are in progress behind `LEDGER_HOST_MODULES`, default OFF, so an unset run
 reproduces today's behaviour exactly and writes no `evidence_graph` key at all (absent, never
 zero — a module-off cell's fabricated-arithmetic rate must read UNKNOWN).
+
+---
+
+# Result: `derive` attached to two hosts (2026-09-02)
+
+Seeded (`LLM_SEED=12345`), qwen2.5:7b, frozen corpus, the 12 derived-arithmetic tasks (210-221),
+1 rep, $0. Four configurations, one `run_id` each (the cfg hash covers only
+`variant_specific_settings`, so env-flag conditions sharing a `run_id` would overwrite each other).
+Analysed with `scripts/module_ab.py`.
+
+| | LangGraph off | LangGraph +derive | ReAct off | ReAct +derive |
+|---|---|---|---|---|
+| cells with a derivation | 0 | **5** | 0 | **4** |
+| machine-computed values | 0 | **8** | 0 | **9** |
+| of those, invalid | 0 | 0 | 0 | **1** |
+| fabricated-arith rate | UNKNOWN | 0.000 | UNKNOWN | **0.111** |
+| distinct operands refused | 0 | 20 | 0 | 25 |
+| replayable cells | 0/0 | 6/6 | 0/0 | 5/5 |
+| overall_score (guard) | 0.938 | 0.863 | 0.646 | 0.671 |
+
+## What this shows
+
+**The categorical change is the result.** Both hosts go from producing no machine-checkable
+derivation at all to producing several, each traceable to operands located on a page the host
+actually read, and each replayable offline. Their fabricated-arithmetic rate moves from UNKNOWN --
+uncomputable by anyone, forever -- to measured. That is not a better score; it is a different kind
+of artifact.
+
+**The module caught a real fabrication.** In the ReAct host, 1 of 9 derived values had the model's
+proposed answer disagree with the Python recomputation (rate 0.111). Without the module that
+number would have entered the answer unflagged and unflaggable.
+
+**The accuracy guard passes, and the score movement is not the module's doing.** In LangGraph,
+cells that USED `derive` moved -0.072 and cells that never called it moved -0.077 -- indistinguishable,
+and the largest single swing (task 216, -0.80) is in a cell that never used the tool. Under a fixed
+seed an ignoring cell would be identical to the off cell except that the tool description is in the
+prompt either way, so this is prompt-perturbation trajectory noise, not a cost of the module's
+behaviour. The ReAct host shows the same pattern (+0.068 used vs +0.004 unused). Neither delta is
+resolvable at n=12 and neither is claimed.
+
+## The honest limitation: adoption
+
+The tool is optional and the model used it in **5 of 12** (LangGraph) and **4 of 12** (ReAct)
+derived-arithmetic cells. On the rest the host did the arithmetic in its head and the module
+delivered nothing. Auditability that depends on the model choosing to be audited is not a
+guarantee.
+
+This is the case for the next module: a finish policy that refuses to accept a computed number in
+the final answer unless it came from `derive`. That converts an optional tool into a structural
+property, which is the difference between "can be audited" and "is audited".
+
+## Two measurement bugs found and fixed en route
+
+Both were the instrumentation measuring itself, and both would have been reported as findings.
+
+1. **Over-refusal on unit spelling.** The page reads `1,470\nm`; the model wrote `"1,470 metres"`;
+   the module refused a value it had genuinely read. `evidence_graph` treats `m` and `metres` as
+   one unit only when the unit is supplied separately from the number, and `_locate` was passing
+   the whole string as a literal. A large share of the first run's "averted fabrications" were
+   this. Fixed in `4c1a45d3`.
+2. **Refusal counts inflated by the page scan.** `_locate` tries every registered page, so one
+   unlocatable operand emitted one rejection record per page -- reading 176 for a run with about
+   five genuinely refused operands. `module_ab.py` now counts distinct refused operands.
+
+The first matrix (`mod_*` run ids) is superseded by the second (`mod2_*`) and should not be cited.
