@@ -25,10 +25,12 @@ so a ReAct loop, a DAG engine or a plain script can bind it the same way.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional, Sequence
 
 from agent.app.testing.evidence_graph import (DerivationError, EvidenceGraph,
-                                              _numbers_agree, extract_unit, numeric_value)
+                                              _numbers_agree, extract_unit, numeric_value,
+                                              parse_quantity, verify_value)
 
 #: Operations the module will recompute. Deliberately the closed set ``evidence_graph.add_arith``
 #: already implements and tests -- a host cannot widen it by passing a new name.
@@ -57,6 +59,87 @@ def _disagrees(proposed: Any, computed: Any) -> bool:
     if left is None or right is None:
         return False
     return not _numbers_agree(left, right)
+
+
+
+#: Unit tokens this module will accept from a page span. A whitelist is REQUIRED rather than
+#: "whatever word follows the number": the corpus is full of `Floors\n104\nCompleted` and
+#: `Population\n8,336,817\nand rising`, and treating an adjacent capitalised word as a unit would
+#: manufacture exactly the false dimension mismatches this reader exists to remove. Measured live:
+#: 8 of 19 UNIT_MISMATCH refusals were already spurious before any of this was added.
+_KNOWN_UNITS = frozenset("""
+    m km cm mm ft feet foot mi mile miles yd in inch inches nmi
+    m2 km2 cm2 ft2 mi2 ha acre acres m3 km3 ft3 l litre litres gal
+    kg g mg t tonne tonnes lb lbs oz
+    s sec secs min mins h hr hrs day days week weeks month months year years
+    k mw gw kw w mwh gwh kwh wh j kj mj v kv a ma hz khz mhz ghz
+    c f pa kpa mpa bar psi
+    metre metres meter meters kilometre kilometres kilometer kilometers
+    percent pct
+""".split())
+
+#: Spelling variants collapsed to one canonical token BEFORE any dimension comparison. This is
+#: orthography, never conversion: no magnitude is ever touched, so the "no unit or currency
+#: conversion, ever" non-goal (`docs/LEDGER_PLAN_2026-09-01.md` section 7) stands untouched.
+_UNIT_CANONICAL = {
+    "metre": "m", "metres": "m", "meter": "m", "meters": "m",
+    "kilometre": "km", "kilometres": "km", "kilometer": "km", "kilometers": "km",
+    "feet": "ft", "foot": "ft", "mile": "mi", "miles": "mi",
+    "inch": "in", "inches": "in", "tonne": "t", "tonnes": "t",
+    "second": "s", "seconds": "s", "sec": "s", "secs": "s",
+    "minute": "min", "minutes": "min", "hour": "h", "hours": "h", "hr": "h", "hrs": "h",
+    "km²": "km2", "m²": "m2", "cm²": "cm2", "ft²": "ft2", "mi²": "mi2",
+    "km³": "km3", "m³": "m3", "percent": "%", "pct": "%",
+}
+
+#: The unit token immediately after a value, plus an optional superscript that Wikipedia's
+#: flattened infoboxes drop onto its own line (``Surface area\n8,372\nkm\n2``).
+_SPAN_UNIT_RE = re.compile(r"\s*([A-Za-z°%µ]{1,10}|°[CF])\s*\n?\s*([23])?\b")
+
+
+def canonical_unit(unit: Any) -> str:
+    """One spelling per unit, lowercased, so `metres` and `m` compare equal.
+
+    SPELLING only. Nothing here rescales a magnitude, so this is not the unit conversion the
+    project forbids -- it is the difference between comparing dimensions and comparing typography.
+    """
+    token = str(unit or "").strip().lower().replace("\n", "")
+    return _UNIT_CANONICAL.get(token, token)
+
+
+def _unit_at_span(page_text: str, start: int, end: int) -> str:
+    """The unit the PAGE gives a located value, or "" when the page states it bare.
+
+    This closes the failure that motivated the phase. Task 221 live: a model derived three ratios,
+    each `derivation_valid=True` and each operand located on a real page, then compared
+    feet-per-floor with metres-per-floor and scored 0.16. The unit guard never fired because the
+    model passed BARE NUMBERS -- the source nodes carried ``unit=''``, so the check had nothing to
+    check. Measured across the corpus, 91.2% of one host's source nodes were unitless, which makes
+    the guard structurally dead in that arm rather than merely weak.
+
+    The unit was never missing from the evidence, only from what the model typed: it sits directly
+    after the span the module already located. The general rule this instances: **every
+    verification input the agent supplies is a surface the agent can disable by omitting it, so
+    derive it from stored evidence instead.**
+
+    Why the token is matched rather than handed to ``parse_quantity`` over a window: that function
+    treats everything trailing as the unit when nothing is left over, so a generous window returns
+    ``'ft\nFloors\n104'`` and a narrow one truncates ``'km'`` to ``'k'``. Neither is a unit.
+
+    :param page_text: raw page text the span indexes into.
+    :param start: span start offset.
+    :param end: span end offset (exclusive).
+    :returns: canonical unit as the page writes it, or "" when there is none to read.
+    """
+    match = _SPAN_UNIT_RE.match(page_text, end)
+    if not match:
+        return ""
+    token = canonical_unit(match.group(1))
+    if match.group(2):
+        squared = f"{token}{match.group(2)}"
+        if squared in _KNOWN_UNITS:
+            return squared
+    return token if token in _KNOWN_UNITS else ""
 
 
 class LedgerToolkit:
@@ -163,8 +246,14 @@ class LedgerToolkit:
         if number and unit:
             attempts.insert(0, (number, unit))
         for page in self._graph.pages():
+            page_text = str(page.get("text") or "")
             for candidate, candidate_unit in attempts:
-                node = self._graph.add_source(page["page_id"], candidate, unit=candidate_unit)
+                match = verify_value(page_text, candidate, unit=candidate_unit)
+                if not match.verified:
+                    continue
+                span_unit = candidate_unit or _unit_at_span(page_text, match.start, match.end)
+                node = self._graph.add_source(
+                    page["page_id"], candidate, unit=span_unit or None)
                 if node is not None:
                     return node.id
         return None

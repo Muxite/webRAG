@@ -109,3 +109,76 @@ def test_an_operand_written_with_a_spelled_out_unit_matches_the_pages_abbreviati
 
     assert "REFUSED" not in observation.upper(), observation
     assert "900" in observation
+
+
+def test_operands_from_pages_in_different_units_refuse_even_when_the_model_omits_units():
+    """Task 221, reproduced. The failure this whole phase exists to close.
+
+    Live on `moduse01`, a model derived three ratios, every one `derivation_valid=True`, every
+    operand located on a real page -- and compared feet-per-floor against metres-per-floor,
+    scoring 0.16:
+
+        18.893617  unit=''  <- 1776.0[] / 94.0[]    (1,776 ft, One WTC)
+         4.937500  unit=''  <- 632.0[]  / 128.0[]   (632 m,   Shanghai Tower)
+
+    The unit-mismatch guard never fired because the model passed BARE NUMBERS. The source nodes
+    carried `unit=''`, so the check had nothing to check -- no malice, no bug, no error message.
+    A verification layer fed by the agent can be silently disabled by the agent omitting the
+    metadata it verifies.
+
+    The unit was never missing from the evidence, only from what the model typed: it sits in the
+    page span the module already locates. Reading it from there makes the guard fire structurally,
+    with no model cooperation required.
+    """
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/wtc", "One World Trade Center\nHeight\n1776\nft")
+    kit.register_page("https://example.com/shanghai", "Shanghai Tower\nHeight\n632\nm")
+
+    observation = kit.derive("difference", ["1776", "632"])
+
+    assert "REFUSED" in observation.upper(), observation
+    assert "UNIT" in observation.upper(), observation
+
+
+@pytest.mark.parametrize("page, value, expected", [
+    ("Max.\ndepth\n1,642\nm (5,387\nft)", "1,642", "m"),        # dual-unit idiom -> leading unit
+    ("Installed\ncapacity\n13,860 MW\nAnnual", "13,860", "mw"),  # canonical form is lowercased
+    ("Surface area\n8,372\nkm\n2\n(3,232\nsq\nmi)", "8,372", "km2"),  # superscript on its own line
+    ("Height\n1776\nft\nFloors\n104", "1776", "ft"),            # next infobox row must not leak in
+    ("Floors\n104\nCompleted\n2013", "104", ""),                # a following WORD is not a unit
+    ("Population\n8,336,817\nand rising", "8,336,817", ""),
+])
+def test_the_unit_is_read_from_the_page_span_not_from_the_model(page, value, expected):
+    """Every one of these shapes appears in the real corpus and each breaks a naive reader.
+
+    `parse_quantity` treats everything after the number as the unit when nothing is left over, so
+    a generous window swallows the next infobox row ("ft\\nFloors\\n104"); a narrow one truncates
+    the token ("k" from "km"). And an adjacent capitalised WORD is not a unit -- accepting one
+    would manufacture the false unit mismatches this fix exists to remove.
+
+    Units canonicalise to lowercase. Whole tokens are matched against a whitelist, so `mw` and `m`
+    stay distinct and no SI prefix is conflated by the case fold.
+    """
+    from agent.app.testing.evidence_graph import verify_value
+
+    from agent.app.ledger_tools import _unit_at_span
+
+    match = verify_value(page, value)
+    assert match.verified, "fixture must locate the value"
+
+    assert _unit_at_span(page, match.start, match.end) == expected
+
+
+def test_the_same_unit_spelled_two_ways_is_not_a_mismatch():
+    """42% of live UNIT_MISMATCH refusals (8 of 19) were pure spelling: 6x ['m','metres'],
+    2x ['km2','km²']. Refusing correct work over an abbreviation is over-refusal, and this guard
+    exists to catch dimension errors, not orthography. Canonicalising SPELLING is not unit
+    CONVERSION -- no magnitude ever changes, and the section 7 non-goal stands untouched."""
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/a", "Tower A\nHeight\n419.7\nmetres")
+    kit.register_page("https://example.com/b", "Tower B\nHeight\n330.0\nm")
+
+    observation = kit.derive("difference", ["419.7", "330.0"])
+
+    assert "REFUSED" not in observation.upper(), observation
+    assert "89.7" in observation
