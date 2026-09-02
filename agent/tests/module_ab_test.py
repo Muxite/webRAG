@@ -73,3 +73,18 @@ def test_the_report_never_presents_the_score_delta_as_a_ranking(tmp_path):
     assert "GUARD" in text
     assert "not a ranking" in text
     assert "tasks that moved at all" in text
+
+
+def test_refusals_count_distinct_operands_not_rejection_records(tmp_path):
+    """The toolkit tries every registered page before refusing an operand, so one unlocatable
+    value emits one rejection record PER PAGE. Counting records made this column read 176 for a
+    run with about five genuinely refused operands — an artifact of the page scan, not a measure
+    of how much the module declined."""
+    graph = {"nodes": [{"kind": "derived", "value": "1", "derivation_valid": True}],
+             "rejections": [{"page_id": "p1", "value": "1,470 metres"},
+                            {"page_id": "p2", "value": "1,470 metres"},
+                            {"page_id": "p3", "value": "1,470 metres"},
+                            {"page_id": "p1", "value": "99 metres"}]}
+    _write(tmp_path, "on", 210, 0.5, graph)
+
+    assert summarize(load_run("on", tmp_path))["refusals"] == 2

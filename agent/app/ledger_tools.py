@@ -28,7 +28,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Sequence
 
 from agent.app.testing.evidence_graph import (DerivationError, EvidenceGraph,
-                                              _numbers_agree, numeric_value)
+                                              _numbers_agree, extract_unit, numeric_value)
 
 #: Operations the module will recompute. Deliberately the closed set ``evidence_graph.add_arith``
 #: already implements and tests -- a host cannot widen it by passing a new name.
@@ -147,11 +147,26 @@ class LedgerToolkit:
         Tries every registered page rather than asking the model which one to use: a weak model
         routinely cites the wrong page for a value it did read, and refusing that would report a
         citation slip as a fabrication.
+
+        The operand is offered BOTH as a split number+unit pair and as the literal string the model
+        wrote. The split form matters: ``evidence_graph`` knows ``m`` and ``metres`` are the same
+        unit, but only when the unit is supplied separately from the number -- its candidate
+        matching is built for that shape. Passing the whole string as a literal instead refuses a
+        page reading ``1,470\nm`` when the model writes ``"1,470 metres"``, which was observed
+        live on task 211 and is over-refusal, not caution: it blocks a value the model genuinely
+        read and inflates the module's own averted-fabrication count with its own parsing failures.
         """
+        text = str(value or "").strip()
+        unit = extract_unit(text)
+        number = text[:len(text) - len(unit)].strip() if unit and text.endswith(unit) else ""
+        attempts = [(text, None)]
+        if number and unit:
+            attempts.insert(0, (number, unit))
         for page in self._graph.pages():
-            node = self._graph.add_source(page["page_id"], value)
-            if node is not None:
-                return node.id
+            for candidate, candidate_unit in attempts:
+                node = self._graph.add_source(page["page_id"], candidate, unit=candidate_unit)
+                if node is not None:
+                    return node.id
         return None
 
     # -- audit surface -------------------------------------------------------------------------

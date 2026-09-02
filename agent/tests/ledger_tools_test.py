@@ -87,3 +87,25 @@ def test_a_late_disagreeing_proposal_is_not_masked_by_an_earlier_correct_derivat
 
     assert "39.7" in observation
     assert "60.0" in observation, "the disagreeing proposal must be surfaced, not swallowed"
+
+
+def test_an_operand_written_with_a_spelled_out_unit_matches_the_pages_abbreviation():
+    """Over-refusal is the failure mode that would make this module worse than useless.
+
+    Observed live (task 211, `mod_sequential_react_on`): the page reads `1,470\\nm (4,820\\nft)`
+    and the model asked to derive from "1,470 metres". The module refused, because it passed the
+    whole operand string to `add_source` as a literal value. `evidence_graph` already treats `m`
+    and `metres` as the same unit -- but only when the unit is supplied SEPARATELY from the number,
+    which is what its candidate matching is built for.
+
+    Refusing a value the model genuinely read is not caution, it is the module blocking legitimate
+    work and inflating its own "averted fabrication" count with its own parsing failures.
+    """
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/lake",
+                      "Max.\ndepth\n1,470\nm (4,820\nft)\nAverage depth\n570\nm (1,870\nft)")
+
+    observation = kit.derive("difference", ["1,470 metres", "570 metres"])
+
+    assert "REFUSED" not in observation.upper(), observation
+    assert "900" in observation

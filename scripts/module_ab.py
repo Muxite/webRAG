@@ -87,8 +87,14 @@ def structural(cell: Dict[str, Any]) -> Dict[str, Any]:
         "derived": len(derived),
         "invalid": len(invalid),
         "fabrication_rate": (len(invalid) / len(derived)) if derived else None,
-        "refusals": len(graph.get("rejections") or []) + sum(
-            (graph.get("refusal_counts") or {}).values()),
+        # DISTINCT operands refused, not rejection RECORDS. The toolkit tries every registered
+        # page before giving up, so one unlocatable operand emits one rejection per page and a
+        # raw record count overstates by the page count -- it read 176 for a run with about five
+        # genuinely refused operands. Counting distinct values keeps this column meaning "how many
+        # things did the module decline to treat as evidence".
+        "refusals": len({r.get("value") for r in (graph.get("rejections") or [])
+                         if isinstance(r, dict)})
+        + sum((graph.get("refusal_counts") or {}).values()),
         "replayable": replayable,
     }
 
