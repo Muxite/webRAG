@@ -378,11 +378,17 @@ def build_index(page_text: Optional[str], *, limit: int = 40) -> List[QuantityRe
     return out[:limit]
 
 
-def render_index(entries: List[QuantityRef], *, max_chars: int = 1200) -> str:
+def render_index(entries: List[QuantityRef], *, max_chars: int = 1200, start: int = 1) -> str:
     """``entries`` rendered as a short ``q<N>: label = value unit`` block for a model prompt.
 
     :param entries: the output of :func:`build_index`, in the order to render (its ``q<N>`` ids
-        are exactly this list's 1-based position, so callers must not reorder before rendering).
+        are exactly this list's 1-based position OFFSET BY ``start``, so callers must not reorder
+        before rendering).
+    :param start: the id to give the first entry. A caller holding several pages MUST offset each
+        page so ids stay unique across the whole run: with every page restarting at ``q1``, a model
+        shown ``q1`` after visiting the second page silently received the FIRST page's quantity
+        instead, and the unit guard then passed on the substituted value -- a confidently wrong
+        number carrying full provenance, which is the failure this module exists to prevent.
     :param max_chars: soft cap on the rendered length — whole lines are dropped from the end
         rather than truncating one mid-line, except when even the FIRST line alone exceeds
         ``max_chars``, which is hard-truncated so the function still returns something bounded.
@@ -393,7 +399,7 @@ def render_index(entries: List[QuantityRef], *, max_chars: int = 1200) -> str:
         return ""
     lines: List[str] = []
     length = 0
-    for position, entry in enumerate(entries, start=1):
+    for position, entry in enumerate(entries, start=max(1, int(start))):
         label_part = f"{entry.label} = " if entry.label else ""
         unit_part = f" {entry.unit}" if entry.unit else ""
         line = f"q{position}: {label_part}{entry.value}{unit_part}"

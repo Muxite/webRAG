@@ -176,6 +176,69 @@ def test_visit_return_value_to_the_model_is_unchanged_when_ledger_kit_bound():
     assert _observation(io, 1) == _observation(io_baseline, 1)
 
 
+# -- quantity index rendered into the visit observation ----------------------------------------
+
+def test_flag_off_visit_observation_has_no_index_text():
+    decisions = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "done", "action": "finish", "args": {"answer": "A"}},
+    ]
+    io = _agent_io(decisions, page_text="Chimney\n419.7\nmetres")
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512))  # no ledger_kit
+
+    assert "QUANTITIES" not in _observation(io, 1).upper()
+
+
+def test_flag_on_visit_observation_appends_the_rendered_index_after_the_page_text():
+    kit = LedgerToolkit()
+    decisions = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "done", "action": "finish", "args": {"answer": "A"}},
+    ]
+    io = _agent_io(decisions, page_text="Chimney\n419.7\nmetres")
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, ledger_kit=kit))
+
+    obs = _observation(io, 1)
+    assert "419.7\nmetres" in obs
+    assert "q1" in obs
+    assert obs.index("q1") > obs.index("419.7\nmetres"), "index must come AFTER the page text"
+
+
+def test_a_page_with_no_extractable_quantity_adds_nothing_to_the_observation():
+    kit = LedgerToolkit()
+    decisions = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "done", "action": "finish", "args": {"answer": "A"}},
+    ]
+    io = _agent_io(decisions, page_text="Nothing quantitative here.")
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=4, max_tokens=512, ledger_kit=kit))
+
+    assert "QUANTITIES" not in _observation(io, 1).upper()
+
+
+def test_derive_prompt_line_mentions_q_ids_as_optional():
+    prompt = _prompt_when_on()
+    lowered = prompt.lower()
+    assert "q2" in lowered or "q<n>" in lowered
+    assert "optional" in lowered or "never required" in lowered or "not required" in lowered
+
+
+def test_a_q_id_operand_resolves_over_the_sequential_host():
+    kit = LedgerToolkit()
+    decisions = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "compute", "action": "derive",
+         "args": {"operation": "difference", "operands": ["q1", "q2"]}},
+        {"thought": "done", "action": "finish", "args": {"answer": "A"}},
+    ]
+    io = _agent_io(decisions, page_text="Chimney\n419.7\nmetres\nAnnex\n380.0\nmetres")
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=6, max_tokens=512, ledger_kit=kit))
+
+    obs = _observation(io, 2)
+    assert "DERIVED" in obs
+    assert "39.7" in obs
+
+
 # -- artifact persistence + round-trip -----------------------------------------------------------
 
 @pytest.mark.asyncio

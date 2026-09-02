@@ -28,6 +28,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Sequence
 
+from agent.app.quantity_index import build_index, lookup, render_index
 from agent.app.testing.evidence_graph import (DerivationError, EvidenceGraph,
                                               _numbers_agree, extract_unit, numeric_value,
                                               parse_quantity, verify_value)
@@ -153,6 +154,15 @@ class LedgerToolkit:
         self._graph = EvidenceGraph()
         self._max_page_chars = int(max_page_chars)
         self._pages = 0
+        #: page_id -> the quantities `quantity_index.build_index` found on that page's text, so a
+        #: `q`-id operand can be resolved without asking the model to retype anything. Built from
+        #: the SAME text handed to `register_page`, so an id's offsets always agree with the page
+        #: `derive`'s literal-operand path already locates against.
+        self._indexes: Dict[str, List] = {}
+        #: (page_id, QuantityRef) in id order. Ids are issued ONCE across the whole
+        #: run and never reused -- see `_resolve_id` for what per-page numbering did.
+        self._entries: List[Any] = []
+        self._index_start: Dict[str, int] = {}
 
     # -- host hooks ---------------------------------------------------------------------------
 
@@ -170,7 +180,23 @@ class LedgerToolkit:
         self._pages += 1
         page_id = f"p{self._pages}"
         self._graph.add_page(page_id, url, text or "", self._max_page_chars)
+        entries = build_index(text or "")
+        self._indexes[page_id] = entries
+        self._index_start[page_id] = len(self._entries) + 1
+        self._entries.extend((page_id, entry) for entry in entries)
         return page_id
+
+    def page_index_text(self, page_id: str, *, max_chars: int = 1200) -> str:
+        """The rendered quantity index for ``page_id``, for a host to show the model.
+
+        :param page_id: id returned by :meth:`register_page`.
+        :param max_chars: forwarded to :func:`quantity_index.render_index`.
+        :returns: the rendered ``q<N>: ...`` block, or ``""`` when the page had nothing extractable
+            (or ``page_id`` is unknown) -- never a header over nothing.
+        """
+        key = str(page_id)
+        entries = self._indexes.get(key) or []
+        return render_index(entries, max_chars=max_chars, start=self._index_start.get(key, 1))
 
     # -- the tool ------------------------------------------------------------------------------
 
@@ -224,12 +250,47 @@ class LedgerToolkit:
         unit = f" {node.unit}" if node.unit else ""
         return f"DERIVED {name} = {node.value}{unit}{detail}"
 
+    #: An operand shape that names a quantity-index entry rather than retyping it: an explicit
+    #: leading ``q``/``Q`` is REQUIRED (unlike `quantity_index._REF_PATTERN`, which also accepts a
+    #: bare number for a model tolerant of dropping the letter). A literal operand routinely IS a
+    #: bare number (a floor count, a year) and must keep working as a literal, so id resolution
+    #: must never claim a bare digit string for itself -- see the HARD RULE in the task brief.
+    _ID_OPERAND_RE = re.compile(r"^\s*[Qq]\s*0*([1-9]\d*)\s*\.?\s*$")
+
+    def _resolve_id(self, value: str):
+        """The ``(page_id, QuantityRef)`` a ``q``-shaped ``value`` names, or ``None``.
+
+        Ids index one FLAT list issued across the whole run, never per page. Per-page numbering
+        was tried and is silently wrong: every page's index restarted at ``q1``, so a model shown
+        ``q1: Height = 1776 ft`` after visiting the SECOND page and passing ``q1`` received the
+        FIRST page's ``1,642 m`` -- ``sum(q1, "541 m")`` returned 2183 (1642+541). The unit guard
+        then PASSED, because the substituted quantity happened to be in metres, masking the ft/m
+        mismatch that should have refused. A confidently wrong number carrying full provenance is
+        exactly what this module exists to prevent, so an id means one thing for the whole run.
+
+        A value that is not ``q``-shaped (a bare number, a year, a floor count) is never attempted
+        here and falls straight through to the literal path.
+        """
+        match = self._ID_OPERAND_RE.match(str(value or ""))
+        if not match:
+            return None
+        position = int(match.group(1))
+        if 1 <= position <= len(self._entries):
+            return self._entries[position - 1]
+        return None
+
     def _locate(self, value: str) -> Optional[str]:
         """The id of a SOURCE node for ``value`` on any registered page, admitting it if needed.
 
         Tries every registered page rather than asking the model which one to use: a weak model
         routinely cites the wrong page for a value it did read, and refusing that would report a
         citation slip as a fabrication.
+
+        A ``q``-shaped operand (:meth:`_resolve_id`) is tried FIRST: it names an entry the
+        quantity index already extracted, complete with the unit AS THE PAGE WROTE IT, so the
+        located node carries that unit even when the model typed no unit at all. When it doesn't
+        resolve (unknown id, or the operand isn't id-shaped), this falls through to the literal
+        path unchanged -- ids are offered, never required.
 
         The operand is offered BOTH as a split number+unit pair and as the literal string the model
         wrote. The split form matters: ``evidence_graph`` knows ``m`` and ``metres`` are the same
@@ -240,6 +301,12 @@ class LedgerToolkit:
         read and inflates the module's own averted-fabrication count with its own parsing failures.
         """
         text = str(value or "").strip()
+        resolved = self._resolve_id(text)
+        if resolved is not None:
+            page_id, entry = resolved
+            node = self._graph.add_source(page_id, entry.value, unit=entry.unit or None)
+            if node is not None:
+                return node.id
         unit = extract_unit(text)
         number = text[:len(text) - len(unit)].strip() if unit and text.endswith(unit) else ""
         attempts = [(text, None)]

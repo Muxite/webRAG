@@ -169,6 +169,101 @@ def test_the_unit_is_read_from_the_page_span_not_from_the_model(page, value, exp
     assert _unit_at_span(page, match.start, match.end) == expected
 
 
+# -- quantity-index ids: reference instead of retype -------------------------------------------
+
+
+def test_register_page_builds_an_index_a_host_can_render():
+    """A host renders `page_index_text` after the page text in its observation (langgraph/sequential
+    both do this) -- so the id it prints must correspond to what `derive` will actually resolve."""
+    kit = LedgerToolkit()
+    page_id = kit.register_page("https://example.com/a", "Height\n419.7\nmetres")
+
+    rendered = kit.page_index_text(page_id)
+
+    assert "q1" in rendered
+    assert "419.7" in rendered
+
+
+def test_a_page_with_no_extractable_quantity_renders_nothing():
+    """Absent is never zero: no header over nothing."""
+    kit = LedgerToolkit()
+    page_id = kit.register_page("https://example.com/a", "Nothing quantitative here at all.")
+
+    assert kit.page_index_text(page_id) == ""
+
+
+def test_a_q_id_operand_resolves_and_carries_the_indexs_unit():
+    """The point of the phase: an id-resolved operand carries the unit the INDEX found, even
+    though the model never typed a unit at all -- so the mismatch guard can still fire."""
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/a", "Chimney\n419.7\nmetres\nAnnex\n380.0\nmetres")
+
+    observation = kit.derive("difference", ["q1", "q2"])
+
+    assert "REFUSED" not in observation.upper(), observation
+    assert "39.7" in observation
+
+
+def test_id_and_literal_operands_can_be_mixed_in_one_derivation():
+    """Ids are offered, not required, per-operand -- a model may reference one and type the other."""
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/a", "Chimney\n419.7\nmetres\nAnnex\n380.0\nmetres")
+
+    observation = kit.derive("difference", ["q1", "380.0 metres"])
+
+    assert "REFUSED" not in observation.upper(), observation
+    assert "39.7" in observation
+
+
+def test_a_literal_operand_still_works_when_the_index_exists():
+    """HARD RULE: ids are OFFERED, never REQUIRED -- a weak model that never uses q-ids must not
+    lose `derive`."""
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/a", "Height\n419.7\nmetres")
+    kit.register_page("https://example.com/b", "Height\n380.0\nmetres")
+
+    observation = kit.derive("difference", ["419.7 metres", "380.0 metres"])
+
+    assert "REFUSED" not in observation.upper(), observation
+    assert "39.7" in observation
+
+
+def test_a_bare_number_operand_is_never_mistaken_for_a_q_id():
+    """A literal numeric operand like "3" must not be silently reinterpreted as an id reference --
+    only an explicit `q`-prefixed string is. Without this, a page whose literal value IS "3" could
+    never be passed as a literal operand again."""
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/a", "Floors\n3\nCompleted\n2013")
+    kit.register_page("https://example.com/b", "Floors\n9\nCompleted\n2015")
+
+    observation = kit.derive("difference", ["3", "9"])
+
+    assert "REFUSED" not in observation.upper(), observation
+    assert "6" in observation
+
+
+def test_two_q_id_operands_in_different_units_refuse():
+    """The id path must not bypass the unit guard -- an id carries whatever unit the INDEX found,
+    even when the model itself typed no unit at all (this is `q1`/`q2`, bare ids)."""
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/tower",
+                      "One World Trade Center\nHeight\n1776\nft\nShanghai Tower\nHeight\n632\nm")
+
+    observation = kit.derive("difference", ["q1", "q2"])
+
+    assert "REFUSED" in observation.upper(), observation
+    assert "UNIT" in observation.upper(), observation
+
+
+def test_an_unresolvable_q_id_falls_back_to_refusal_not_a_crash():
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/a", "Height\n419.7\nmetres")
+
+    observation = kit.derive("difference", ["q99", "419.7 metres"])
+
+    assert "REFUSED" in observation.upper(), observation
+
+
 def test_the_same_unit_spelled_two_ways_is_not_a_mismatch():
     """42% of live UNIT_MISMATCH refusals (8 of 19) were pure spelling: 6x ['m','metres'],
     2x ['km2','km²']. Refusing correct work over an abbreviation is over-refusal, and this guard
@@ -182,3 +277,36 @@ def test_the_same_unit_spelled_two_ways_is_not_a_mismatch():
 
     assert "REFUSED" not in observation.upper(), observation
     assert "89.7" in observation
+
+
+def test_a_quantity_id_means_the_same_thing_on_every_page():
+    """Ids must be globally unique, or they silently substitute the wrong quantity.
+
+    Found by probing the real behaviour rather than the tests: with per-page numbering, a model
+    shown `q1: Height = 1776 ft` after visiting the SECOND page and passing `q1` received the
+    FIRST page's `1,642 m` instead -- `derive("sum", ["q1", "541 m"])` returned 2183, i.e.
+    1642+541. Worse, the unit guard then PASSED (m + m), masking the ft-vs-m mismatch that should
+    have refused, because the substituted quantity happened to be in metres.
+
+    That is the exact failure this module exists to prevent -- a confidently wrong number carrying
+    full provenance -- made harder to see, not easier. Ids are therefore issued monotonically
+    across the whole run and never reused.
+    """
+    kit = LedgerToolkit()
+    first = kit.register_page("https://example.com/lake", "Lake\nMax.\ndepth\n1,642\nm (5,387\nft)")
+    second = kit.register_page("https://example.com/tower", "Tower\nHeight\n1776\nft\nAntenna\n541\nm")
+
+    shown_first = kit.page_index_text(first)
+    shown_second = kit.page_index_text(second)
+
+    ids_first = {line.split(":")[0].strip() for line in shown_first.splitlines() if line.strip()}
+    ids_second = {line.split(":")[0].strip() for line in shown_second.splitlines() if line.strip()}
+    assert not (ids_first & ids_second), (
+        f"ids collide across pages: {sorted(ids_first & ids_second)} -- a model passing one would "
+        f"get whichever page happened to be searched first")
+
+    # And the id the model was actually shown for the tower resolves to the TOWER's value.
+    tower_id = sorted(ids_second)[0]
+    observation = kit.derive("sum", [tower_id, "541 m"])
+    assert "REFUSED" in observation.upper(), (
+        f"{tower_id} is 1776 ft and 541 m is metres; summing them must refuse, got: {observation}")

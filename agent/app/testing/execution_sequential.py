@@ -83,10 +83,23 @@ def _ledger_derive_enabled() -> bool:
 _DERIVE_PROMPT_LINE = (
     "- derive(operation, operands, proposed_value): compute operation (sum|difference|product|"
     "quotient|ratio) over operands you have already read on a page you visited — give each operand "
-    "exactly as it appears on the page, e.g. \"419.7 metres\". The tool computes the result itself "
-    "in Python; do not trust your own arithmetic. If you already have a guess, pass it as "
-    "proposed_value and the tool will check it against the recomputation rather than accept it.\n"
+    "exactly as it appears on the page, e.g. \"419.7 metres\", OR its id from the QUANTITIES list "
+    "shown after that page (e.g. \"q2\") — using an id is optional, never required. The tool "
+    "computes the result itself in Python; do not trust your own arithmetic. If you already have a "
+    "guess, pass it as proposed_value and the tool will check it against the recomputation rather "
+    "than accept it.\n"
 )
+
+
+#: Delimiter appended after the page text in a `visit` observation, ONLY when a `q`-id list was
+#: actually extracted (`LedgerToolkit.page_index_text` returns "" otherwise -- never a header over
+#: nothing). Same wording as `langgraph_solver`'s so a host-vs-host comparison isn't confounded by
+#: two different presentations of the same fact.
+_LEDGER_INDEX_HEADER = "QUANTITIES ON THIS PAGE (reference one in derive as \"q1\", \"q2\", ...):"
+
+#: Cap on the rendered index appended to a `visit` observation -- bounded independently of
+#: `page_chars`, since this text goes straight into a weak model's context alongside the page.
+_LEDGER_INDEX_MAX_CHARS = 1200
 
 
 def _system_prompt(has_sandbox: bool, has_derive: bool = False) -> str:
@@ -415,9 +428,15 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
                 evidence.append(f"SOURCE {url}\n{content}")
                 obs = f"PAGE {url}:\n{content}"
                 # Register with the ledger module wherever this host fetches a page, so its text is
-                # eligible as a derive operand. Does not change what visit returns to the model.
+                # eligible as a derive operand. Also appends the page's rendered quantity index
+                # AFTER the page text, so a `derive` operand can reference an id instead of
+                # retyping a number -- only when the module is bound and the page actually yielded
+                # an extractable quantity (never a header over nothing).
                 if ledger_kit is not None:
-                    ledger_kit.register_page(url, content)
+                    page_id = ledger_kit.register_page(url, content)
+                    index_text = ledger_kit.page_index_text(page_id, max_chars=_LEDGER_INDEX_MAX_CHARS)
+                    if index_text:
+                        obs += f"\n\n{_LEDGER_INDEX_HEADER}\n{index_text}"
         elif action == "verify":
             claim = str(args.get("claim", ""))
             verdict = await _verify_claim(agent_io, claim, "\n\n".join(evidence), model_name)

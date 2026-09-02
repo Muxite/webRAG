@@ -366,10 +366,27 @@ pass proposed_value, it is only checked against the real computed answer, never 
 result. The DERIVED value in the response is always the one you must use, even if it disagrees \
 with your own guess.
 
+Instead of copying a number, you may pass its id from the "QUANTITIES ON THIS PAGE" list shown \
+after a page you visited -- e.g. pass "q2" to mean exactly the value and unit q2 lists. Example: \
+if the page lists "q2: Max. depth = 1,642 m", operands=["q2", "500 m"] works the same as \
+operands=["1,642 m", "500 m"]. Using an id is never required -- a copied value always works too.
+
 operation: one of sum, difference, product, quotient, ratio (plain words like add, subtract, \
 multiply, divide, total, minus, times, per also work).
-operands: two or more value strings, copied exactly from a page you visited.
+operands: two or more value strings, each either copied exactly from a page you visited or a \
+"q<N>" id from that page's quantity list.
 proposed_value: optional -- your own guess at the answer, for a sanity check only."""
+
+
+#: Delimiter the ``visit`` tool appends after the page text, and only when a `q`-id list was
+#: actually extracted (never a header over nothing -- see `LedgerToolkit.page_index_text`).
+#: Distinct enough from the page text itself that a weak model does not mistake it for content.
+_LEDGER_INDEX_HEADER = "QUANTITIES ON THIS PAGE (reference one in derive as \"q1\", \"q2\", ...):"
+
+#: Cap on the rendered index appended to a `visit` observation -- this goes straight into a weak
+#: model's context alongside the page text itself, so it is bounded the same way page text already
+#: is (via `page_chars`), just with its own, smaller budget.
+_LEDGER_INDEX_MAX_CHARS = 1200
 
 
 def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
@@ -427,6 +444,7 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
             return f"VISIT ERROR for {url}: {error}"
         repeat = url in visited
         visited.add(url)
+        index_block = ""
         if ledger_kit is not None:
             # Register EXACTLY the window the model is shown below, never the fuller fetched text.
             # Grounding against text the model could not read would credit a number recalled from
@@ -436,10 +454,16 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
             # implementation, which truncates at fetch (`execution_evidence_loop`:
             # `content = (await agent_io.visit(...))[:page_chars]`), so a host-vs-host comparison
             # is not confounded by one host grounding more permissively than another.
-            ledger_kit.register_page(url, (content or "")[:page_chars])
+            page_id = ledger_kit.register_page(url, (content or "")[:page_chars])
+            # Rendered from the SAME registered window, so an id the model reads here always
+            # resolves against `derive` -- never a header over nothing when the page had no
+            # extractable quantity (`page_index_text` returns "" for that, per its contract).
+            index_text = ledger_kit.page_index_text(page_id, max_chars=_LEDGER_INDEX_MAX_CHARS)
+            if index_text:
+                index_block = f"\n\n{_LEDGER_INDEX_HEADER}\n{index_text}"
         header = f"{_VISIT_REPEAT}\n{_VISIT_SOURCE_PREFIX}{url}" if repeat else f"{_VISIT_SOURCE_PREFIX}{url}"
         # Truncate the CONTENT, not the header, so the attribution survives a long page.
-        return f"{header}\n{(content or _EMPTY_PAGE)[:page_chars]}"
+        return f"{header}\n{(content or _EMPTY_PAGE)[:page_chars]}{index_block}"
 
     tools = [search, visit]
     # Same eight file verbs the native engine gets, and only when the run actually carries a
@@ -711,6 +735,23 @@ async def _invoke_tool(tool: Any, args: Dict[str, Any]) -> str:
     return result if isinstance(result, str) else str(result or "")
 
 
+def _json_telemetry_hook(model_name: str):
+    """Build the ``(raw_text, parsed_ok) -> None`` hook `run_tool_loop` calls once per emulated
+    turn, forwarding to ``agent.app.testing.json_telemetry.record`` under phase
+    ``"prompted_tool_loop"``.
+
+    The import is INSIDE the returned closure, not at this module's top level: `run_tool_loop`
+    already accepted this hook as a parameter, but nothing ever passed one, so this loop's turns
+    have never shown up in the JSON-telemetry stream at all. `agent/app/testing/__init__.py`
+    pulls in `connector_llm` on import, and this module must not acquire that merely by being
+    imported -- only when an emulated turn actually happens.
+    """
+    def hook(raw_text: str, parsed_ok: bool) -> None:
+        from agent.app.testing import json_telemetry as _json_telemetry
+        _json_telemetry.record(model_name, raw_text, True, parsed_ok, phase="prompted_tool_loop")
+    return hook
+
+
 @dataclass
 class _SolveState:
     """Mutable run state threaded through `solve()`'s primary pass and its corrective extensions
@@ -781,8 +822,10 @@ class _EmulatedToolCallTransport:
 
     def __init__(self, llm: Any, tools: List[Any], system_prompt: str,
                  pre_model_hook: Optional[Any] = None,
-                 telemetry: Optional["TelemetrySession"] = None) -> None:
+                 telemetry: Optional["TelemetrySession"] = None,
+                 json_telemetry_hook: Optional[Any] = None) -> None:
         self._llm = llm
+        self._json_telemetry_hook = json_telemetry_hook
         self._tools = list(tools)
         self._by_name = {getattr(t, "name", ""): t for t in self._tools}
         tool_specs = [
@@ -884,6 +927,7 @@ class _EmulatedToolCallTransport:
                 dispatch_tool=dispatch_tool, on_step=on_step, turns=turns,
                 max_malformed_turns=_EMULATION_MAX_MALFORMED_TURNS,
                 thought_chars=_EMULATION_THOUGHT_CHARS, telemetry=self._telemetry,
+                json_telemetry_hook=self._json_telemetry_hook,
             )
         except ToolLoopExhausted as exc:
             raise GraphRecursionError(
@@ -1198,7 +1242,7 @@ class LangGraphSolver:
             )
             return _EmulatedToolCallTransport(
                 llm, tools, system_prompt, pre_model_hook=self._pre_model_hook(),
-                telemetry=telemetry,
+                telemetry=telemetry, json_telemetry_hook=_json_telemetry_hook(self._model_name),
             ), "emulated"
 
         if mode == "native" or not self._tool_call_emulation:
@@ -1221,7 +1265,7 @@ class LangGraphSolver:
             )
             return _EmulatedToolCallTransport(
                 llm, tools, system_prompt, pre_model_hook=self._pre_model_hook(),
-                telemetry=telemetry,
+                telemetry=telemetry, json_telemetry_hook=_json_telemetry_hook(self._model_name),
             ), "emulated"
         graph = create_react_agent(
             llm, tools, prompt=system_prompt, pre_model_hook=self._pre_model_hook(),

@@ -12,7 +12,8 @@ import asyncio
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from agent.app.langgraph_solver import LangGraphSolver, _DERIVE_TOOL_DOC, _make_tools
+from agent.app.langgraph_solver import (LangGraphSolver, _DERIVE_TOOL_DOC, _json_telemetry_hook,
+                                        _make_tools)
 from agent.app.ledger_tools import LedgerToolkit
 from agent.app.testing import evidence_graph
 
@@ -238,6 +239,102 @@ def test_persisted_artifact_round_trips_through_reverify_graph():
     assert report["counts"]["source"] == 2
     assert report["counts"]["derived"] == 1
     assert report["counts"]["failed"] == 0
+
+
+# -- the previously-unwired json_telemetry hook -------------------------------------------------
+
+
+def test_json_telemetry_hook_forwards_to_record_under_prompted_tool_loop_phase(monkeypatch):
+    """`run_tool_loop`'s `json_telemetry_hook` parameter existed but nothing ever passed one, so
+    an emulated run's turns never showed up in the JSON-telemetry stream. This pins the wiring
+    without driving a full emulated run: the hook itself is a pure `(raw_text, parsed_ok)` closure
+    over `model_name`, testable directly."""
+    from agent.app.testing import json_telemetry
+
+    calls = []
+    monkeypatch.setattr(json_telemetry, "record", lambda *a, **k: calls.append((a, k)))
+
+    hook = _json_telemetry_hook("openai/gpt-5-mini")
+    hook("raw model text", True)
+
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert args[0] == "openai/gpt-5-mini"
+    assert args[1] == "raw model text"
+    assert args[3] is True  # parsed_ok
+    assert kwargs.get("phase") == "prompted_tool_loop"
+
+
+def test_json_telemetry_hook_import_is_not_at_module_scope():
+    """`agent/app/testing/__init__.py` pulls in `connector_llm`; `langgraph_solver` must not
+    acquire that merely by being imported. `json_telemetry` (nor its package) must not be bound
+    as a module-level name in `langgraph_solver`."""
+    from agent.app import langgraph_solver
+
+    assert "json_telemetry" not in vars(langgraph_solver)
+
+
+# -- quantity index rendered into the visit observation ----------------------------------------
+
+
+def test_flag_off_visit_observation_has_no_index_text():
+    """Unchanged when no ledger module is bound -- no index text anywhere in the observation."""
+    fake_io = _FakeAgentIO(pages={"https://example.com/a": "Height\n419.7\nmetres"})
+    tools = _make_tools(fake_io, search_k=6, page_chars=6000)
+    _search, visit_tool = tools
+
+    out = asyncio.run(visit_tool.ainvoke({"url": "https://example.com/a"}))
+
+    assert "QUANTITIES" not in out.upper()
+
+
+def test_flag_on_visit_observation_appends_the_rendered_index_after_the_page_text():
+    kit = LedgerToolkit()
+    fake_io = _FakeAgentIO(pages={"https://example.com/a": "Chimney\n419.7\nmetres"})
+    tools = _make_tools(fake_io, search_k=6, page_chars=6000, ledger_kit=kit)
+    _search, visit_tool, _derive_tool = tools
+
+    out = asyncio.run(visit_tool.ainvoke({"url": "https://example.com/a"}))
+
+    assert "419.7\nmetres" in out  # the page text itself, unchanged
+    page_pos = out.index("419.7\nmetres")
+    assert "q1" in out
+    assert out.index("q1") > page_pos, "the index must be appended AFTER the page text"
+
+
+def test_a_page_with_no_extractable_quantity_adds_nothing_to_the_observation():
+    """Absent is never zero: no header over a page with nothing extractable."""
+    kit = LedgerToolkit()
+    fake_io = _FakeAgentIO(pages={"https://example.com/a": "Nothing quantitative here."})
+    tools = _make_tools(fake_io, search_k=6, page_chars=6000, ledger_kit=kit)
+    _search, visit_tool, _derive_tool = tools
+
+    out = asyncio.run(visit_tool.ainvoke({"url": "https://example.com/a"}))
+
+    assert "QUANTITIES" not in out.upper()
+
+
+def test_derive_tool_doc_mentions_q_ids_as_optional():
+    lowered = _DERIVE_TOOL_DOC.lower()
+    assert "q2" in lowered or "q<n>" in lowered
+    assert "never required" in lowered or "not required" in lowered
+
+
+def test_a_q_id_operand_resolves_over_the_langgraph_transport():
+    kit = LedgerToolkit()
+    fake_io = _FakeAgentIO(pages={
+        "https://example.com/a": "Chimney\n419.7\nmetres\nAnnex\n380.0\nmetres",
+    })
+    tools = _make_tools(fake_io, search_k=6, page_chars=6000, ledger_kit=kit)
+    _search, visit_tool, derive_tool = tools
+
+    asyncio.run(visit_tool.ainvoke({"url": "https://example.com/a"}))
+    out = asyncio.run(derive_tool.ainvoke({
+        "operation": "difference", "operands": ["q1", "q2"],
+    }))
+
+    assert "DERIVED" in out
+    assert "39.7" in out
 
 
 def test_a_value_past_the_models_visible_window_is_not_admissible_as_an_operand():
