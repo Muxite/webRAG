@@ -42,7 +42,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Sequence, TYPE_CHECKING
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
@@ -62,6 +62,7 @@ from agent.app.idea_policies.candidate_coverage import (
     extract_named_candidates,
 )
 from agent.app.idea_test_utils import count_chars, count_words
+from agent.app.ledger_tools import LedgerToolkit
 from agent.app.model_capabilities import resolve_tool_transport_mode, supports_native_tool_calling
 from agent.app.prompted_tools import (
     NUDGE as _EMULATION_NUDGE,
@@ -349,9 +350,40 @@ def _finish_answer(messages: List[Any]) -> Optional[str]:
     return None
 
 
+#: `derive`'s model-facing docstring. Written for a WEAK model, not a capable one: it states
+#: plainly that operands must already be read on a page (not recalled or guessed) and that the
+#: tool computes the answer itself rather than trusting the model's own arithmetic.
+_DERIVE_TOOL_DOC = """Compute a number instead of guessing it -- use this for any addition, \
+subtraction, multiplication, division, or ratio the task asks you to do.
+
+Every operand you pass MUST be a value you have already read on a page with the visit tool. Do \
+NOT pass a number from memory, a number you calculated yourself, or a number you are guessing at \
+-- this tool looks for the exact value on the pages you visited and REFUSES if it cannot find it \
+there. Copy the number exactly as it appears on the page (same digits, same punctuation).
+
+This tool then computes the answer itself in code. It does NOT trust your arithmetic: if you \
+pass proposed_value, it is only checked against the real computed answer, never used as the \
+result. The DERIVED value in the response is always the one you must use, even if it disagrees \
+with your own guess.
+
+operation: one of sum, difference, product, quotient, ratio (plain words like add, subtract, \
+multiply, divide, total, minus, times, per also work).
+operands: two or more value strings, copied exactly from a page you visited.
+proposed_value: optional -- your own guess at the answer, for a sanity check only."""
+
+
 def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
-                retry: Optional[ToolRetry] = None, require_finish_tool: bool = False):
-    """Build the search/visit tools bound to ``agent_io``, with native-arm retry parity."""
+                retry: Optional[ToolRetry] = None, require_finish_tool: bool = False,
+                ledger_kit: Optional[LedgerToolkit] = None):
+    """Build the search/visit tools bound to ``agent_io``, with native-arm retry parity.
+
+    :param ledger_kit: ``None`` (default) reproduces today's behavior exactly -- no page
+        registration at the ``visit`` site and no ``derive`` tool. When a :class:`LedgerToolkit`
+        is passed, every successfully fetched page is registered against it so its values become
+        eligible ``derive`` operands, and a ``derive`` tool bound to it is appended to the tool
+        list. The SAME ``tools`` list is handed to both the native and emulated transports (see
+        ``LangGraphSolver._build_transport``), so this needs no per-transport wiring.
+    """
     retry = retry or ToolRetry()  # default: retry OFF -> unchanged behavior
     #: URLs visited by THIS tool instance. ``_make_tools`` is called once per ``solve()``, so the
     #: set is per-run and cannot leak across benchmark cells sharing a solver or connectors.
@@ -395,6 +427,16 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
             return f"VISIT ERROR for {url}: {error}"
         repeat = url in visited
         visited.add(url)
+        if ledger_kit is not None:
+            # Register EXACTLY the window the model is shown below, never the fuller fetched text.
+            # Grounding against text the model could not read would credit a number recalled from
+            # parametric memory as "located on a page you visited" whenever that number happens to
+            # sit past the truncation -- a false-grounding path, and precisely the fabrication this
+            # module exists to catch. It also keeps admission identical to the reference
+            # implementation, which truncates at fetch (`execution_evidence_loop`:
+            # `content = (await agent_io.visit(...))[:page_chars]`), so a host-vs-host comparison
+            # is not confounded by one host grounding more permissively than another.
+            ledger_kit.register_page(url, (content or "")[:page_chars])
         header = f"{_VISIT_REPEAT}\n{_VISIT_SOURCE_PREFIX}{url}" if repeat else f"{_VISIT_SOURCE_PREFIX}{url}"
         # Truncate the CONTENT, not the header, so the attribution survives a long page.
         return f"{header}\n{(content or _EMPTY_PAGE)[:page_chars]}"
@@ -412,6 +454,14 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
             the task. The full text you pass here becomes the submitted answer."""
             return "Answer submitted."
         tools.append(finish)
+    if ledger_kit is not None:
+        @tool
+        async def derive(operation: str, operands: List[str], proposed_value: Optional[str] = None) -> str:
+            """Compute a derived number instead of guessing it. See `_DERIVE_TOOL_DOC` below for
+            the full model-facing description, installed onto this tool right after creation."""
+            return ledger_kit.derive(operation, operands, proposed_value=proposed_value)
+        derive.description = _DERIVE_TOOL_DOC
+        tools.append(derive)
     return tools
 
 
@@ -1024,6 +1074,7 @@ class LangGraphSolver:
         stall_recovery_gate: bool = False,
         require_finish_tool: bool = False,
         tool_call_emulation: bool = True,
+        ledger_host_modules: Optional[Sequence[str]] = None,
     ) -> None:
         self._connector_llm = connector_llm
         self._connector_search = connector_search
@@ -1096,6 +1147,16 @@ class LangGraphSolver:
         #: analysis can stratify on it. Set False to force the native path (and its 400) — e.g.
         #: to reproduce a pre-shim measurement.
         self._tool_call_emulation = bool(tool_call_emulation)
+        #: Default OFF (empty), reproducing today's behavior exactly: no `derive` tool, no page
+        #: registration at the `visit` site, and no `evidence_graph` key on the result (ABSENT,
+        #: not empty -- see `agent/app/ledger_tools.py`'s module docstring for why this arm exists
+        #: at all: every prior experiment measured the ledger as a rival AGENT rather than as an
+        #: attachable module on the SAME host). `"derive"` is the only recognized value today; an
+        #: unrecognized entry is silently ignored rather than raising, since this list is meant to
+        #: grow as more modules attach. Comma-separated so a run's `LEDGER_HOST_MODULES` env var
+        #: (parsed in `execution_langgraph.py`) can name more than one.
+        self._ledger_host_modules = {str(m).strip().lower() for m in (ledger_host_modules or ()) if str(m).strip()}
+        self._ledger_derive_enabled = "derive" in self._ledger_host_modules
 
     def _pre_model_hook(self) -> Optional[Any]:
         """The per-turn context-bounding hook for this run, or None (see `_trim_for_model`)."""
@@ -1215,8 +1276,11 @@ class LangGraphSolver:
         )
         # F16 parity: same three connector_retry_* keys the graph and sequential arms read.
         retry = ToolRetry.from_settings(settings)
+        # None (flag off) reproduces `_make_tools`'s prior signature/behavior exactly -- no
+        # `derive` tool, no page registration, and no artifact below.
+        ledger_kit = LedgerToolkit(max_page_chars=self._page_chars) if self._ledger_derive_enabled else None
         tools = _make_tools(agent_io, self._search_k, self._page_chars, retry,
-                             require_finish_tool=self._require_finish_tool)
+                             require_finish_tool=self._require_finish_tool, ledger_kit=ledger_kit)
         llm = self._build_llm()
         system_prompt = f"{_SYSTEM}\n{_FINISH_TOOL_GUIDANCE}" if self._require_finish_tool else _SYSTEM
         transport, tool_transport = await self._build_transport(llm, tools, system_prompt, telemetry)
@@ -1367,4 +1431,10 @@ class LangGraphSolver:
             result_out["warning"] = f"step budget ({max_steps}) exhausted; answer synthesized from gathered evidence"
         elif state.run_error is not None:
             result_out["warning"] = f"langgraph run error: {type(state.run_error).__name__}: {state.run_error}"
+        if ledger_kit is not None:
+            # Same key and shape `execution_evidence_loop` writes to `output.evidence_graph` --
+            # `evidence_graph.reverify_graph` and `claim_metrics.derivation_fabrication_rate` read
+            # it with no changes. Absent (not this branch) when the module is off, so a
+            # fabricated-arithmetic rate computed over that cell reads UNKNOWN, never 0.0.
+            result_out["evidence_graph"] = ledger_kit.artifact()
         return result_out

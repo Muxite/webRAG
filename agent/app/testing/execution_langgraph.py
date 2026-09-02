@@ -157,6 +157,14 @@ async def run_offtheshelf_execution(
         # The path actually taken is reported as `output.tool_transport`. Opt OUT with
         # IDEA_TEST_LANGGRAPH_TOOL_EMULATION=0 to reproduce a pre-shim measurement.
         tool_call_emulation=os.environ.get("IDEA_TEST_LANGGRAPH_TOOL_EMULATION", "1") not in ("0", "false", "False"),
+        # Default OFF (empty string -> no modules attached), reproducing today's behavior
+        # exactly. Comma-separated list of ledger modules to bind onto this off-the-shelf host --
+        # see `LangGraphSolver.__init__` and `agent/app/ledger_tools.py`. `"derive"` is the only
+        # recognized value today. This is what makes the honest experiment possible: host vs
+        # host + module, one change, same system -- not the ledger measured as a rival agent.
+        ledger_host_modules=[
+            m.strip() for m in os.environ.get("LEDGER_HOST_MODULES", "").split(",") if m.strip()
+        ],
     )
 
     started = time.perf_counter()
@@ -185,6 +193,14 @@ async def run_offtheshelf_execution(
     warning = solver_result.get("warning")
     if warning:
         output["warning"] = warning
+    # Present ONLY when a ledger module was actually bound (see `ledger_host_modules` above) --
+    # absent, not empty, when the module is off, so a fabricated-arithmetic rate computed over
+    # that cell reads UNKNOWN rather than a false 0.0. Same key/shape `execution_evidence_loop`
+    # already writes; `evidence_graph.reverify_graph` and `claim_metrics` read either with no
+    # changes.
+    evidence_graph = solver_result.get("evidence_graph")
+    if evidence_graph is not None:
+        output["evidence_graph"] = evidence_graph
     telemetry.finish(success=output["success"])
     tracer.close()
 
