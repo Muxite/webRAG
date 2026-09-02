@@ -300,6 +300,23 @@ reported as not replicated. It is not a second experiment and confers no ranking
 
 ## Amendments
 
+### 2026-09-02 — clarification, no definition changed (spec JSON untouched, hash unchanged)
+
+**L8's character view must not dedup by `content_hash` on a live-fetched run.** Swept all 6,438
+stored cells: 3 contain the same URL stored under two DIFFERENT content hashes within a single
+cell (`ledgernum22` x2, `gpu0831` x1) — same head text, same 6,000 chars, different hash, because
+a live page's rotating content changes bytes between two visits seconds apart. Where that happens
+the character view sees two distinct pages and UNDERCOUNTS redundancy.
+
+All three are live-fetch runs. Zero occurrences in any frozen-corpus run
+(`ledgerfinal01`, `mod2_*`, `tinyfix*`, `phi3_both`, `ladder02`), where replay makes the bytes
+deterministic. So the metric is sound as used, and this is a constraint on where it may be used:
+**dedup by normalized URL, not by content hash, for any run that fetched live.**
+
+Recorded as a clarification rather than an amendment because no formula in
+`scripts/ledger_kpi_spec.json` changed — the frozen hash is intentionally untouched.
+
+
 ### 2026-09-01 — v1.0.0 to v1.1.0: operands must appear in the answer
 
 **Changed.** `support.operands_must_appear_in_answer: true` added. A claim is `recomputable` only
