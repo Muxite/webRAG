@@ -244,6 +244,30 @@ class TelemetrySession:
             "decisions": self.decisions,
         }
 
+    def ledger_trace(self):
+        """This session's timings and decisions as a :mod:`agent.app.ledger_trace` trace.
+
+        The TIMING half of the ledger trace, available in-process. The other half -- the
+        cross-reference from a ``derive`` step to the evidence-node ids it consumed and produced,
+        and from a ``visit`` to the ``page_id`` it stored -- cannot be built here: a
+        ``TelemetrySession`` never sees the evidence graph, which is assembled downstream in the
+        execution variant, after the session has already recorded everything it will record. So
+        the full trace stays a PROJECTION (:func:`agent.app.ledger_trace.project_cell` over a
+        stored cell, or :func:`~agent.app.ledger_trace.project` over
+        ``summary()`` plus the graph); wiring a second writer here would emit a strictly poorer
+        trace and add a second encoding of the timings, which is the thing the trace exists to
+        remove.
+
+        Import is deferred to keep :mod:`agent.app.ledger_trace` -- and the connector package it
+        reaches through -- off this module's import path.
+
+        :returns: a ``LedgerTrace`` over this session's timings and decisions, with no evidence
+            cross-references.
+        """
+        from agent.app.ledger_trace import project
+
+        return project(self.summary(), None)
+
     def finish(self, success: Optional[bool] = None) -> None:
         """
         Finalize the session and write summary.
