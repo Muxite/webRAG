@@ -90,9 +90,11 @@ class ToolLoopExhausted(Exception):
 class ToolLoopStep:
     """One step's outcome, message-free — the caller turns this into its own transcript shape.
 
-    :ivar kind: One of ``"tool_call"``, ``"finish"``, ``"invalid_action"``, ``"malformed_nudge"``
-        (unparseable output, budget remains — a nudge should be appended), or
-        ``"malformed_give_up"`` (unparseable output, budget exhausted — the loop is returning
+    :ivar kind: One of ``"tool_call"``, ``"finish"``, ``"invalid_action"`` (unrecognized tool
+        name, budget remains), ``"invalid_action_give_up"`` (unrecognized tool name, budget
+        exhausted — mirrors ``"malformed_give_up"`` for the invalid-action counter),
+        ``"malformed_nudge"`` (unparseable output, budget remains — a nudge should be appended),
+        or ``"malformed_give_up"`` (unparseable output, budget exhausted — the loop is returning
         the model's last prose as the transcript's tail).
     :ivar raw_text: The model's raw completion this step.
     :ivar usage: Whatever token-usage object ``call_model`` returned alongside the text (passed
@@ -105,6 +107,8 @@ class ToolLoopStep:
     :ivar call_id: A step-scoped id the caller can use to correlate a call with its observation.
     :ivar malformed_count: Consecutive unparseable turns so far, including this one (only
         meaningful when ``kind`` starts with ``"malformed"``).
+    :ivar invalid_count: Consecutive unrecognized-action turns so far, including this one (only
+        meaningful when ``kind`` starts with ``"invalid_action"``).
     """
 
     kind: str
@@ -116,6 +120,7 @@ class ToolLoopStep:
     extraction: Optional[JsonExtraction] = None
     call_id: str = ""
     malformed_count: int = 0
+    invalid_count: int = 0
 
 
 CallModel = Callable[[str], Awaitable[Tuple[str, Any]]]
@@ -215,6 +220,47 @@ def _balanced_span(text: str, start: int) -> Optional[str]:
     return None
 
 
+_WRAPPER_TAG_RE = re.compile(r"</?tool_call>", re.IGNORECASE)
+_SPECIAL_TOKEN_RE = re.compile(r"<\|[^<>|]*\|>")
+
+
+def _strip_wrapper_tags(text: str) -> str:
+    """``<tool_call>``/``</tool_call>`` and chat-template special tokens (``<|start_header_id|>``
+    and friends) leaking into a completion — stripped unconditionally, like the curly-quote
+    translation, since neither ever appears inside a legitimate decision."""
+    text = _WRAPPER_TAG_RE.sub("", text)
+    text = _SPECIAL_TOKEN_RE.sub("", text)
+    return text
+
+
+def _extract_fenced_block(text: str) -> Tuple[str, bool]:
+    """The content of a ```/```json fence, tolerating a fence that is never closed (the model ran
+    out of tokens mid-block). Returns ``(content_or_original_text, was_fenced)``.
+
+    A closed fence behaves exactly as the previous regex-based extraction did (first ``` to the
+    next ```, optional ``json`` language tag skipped). An unterminated fence — opened but never
+    closed — takes everything after the opening marker instead of falling through to the
+    generic balanced-span search, which would have found the JSON but mislabeled the source
+    ``"span"`` instead of ``"fenced"``.
+    """
+    open_idx = text.find("```")
+    if open_idx == -1:
+        return text, False
+    after_open = open_idx + 3
+    lang_match = re.match(r"[A-Za-z]*\s*", text[after_open:])
+    content_start = after_open + lang_match.end()
+    close_idx = text.find("```", content_start)
+    if close_idx != -1:
+        return text[content_start:close_idx].strip(), True
+    # Unterminated fence: only trust it as THE decision when nothing but whitespace precedes the
+    # opening marker. Discarding a prefix that has real content in it (prose, an earlier `k={}`
+    # span, ...) could throw away a better candidate; a stray ``` deep in a long completion with
+    # no closer is more likely noise than a truncated real answer.
+    if text[:open_idx].strip():
+        return text, False
+    return text[content_start:].strip(), True
+
+
 def _json_candidates(text: str) -> List[str]:
     """``text`` itself, then each balanced JSON span inside it (most likely first)."""
     out = [text]
@@ -240,9 +286,63 @@ def _parse_dict(candidate: str) -> Optional[Dict[str, Any]]:
 
 
 def _fix_trailing_comma(text: str) -> Optional[str]:
-    """``{"a": 1,}`` / ``[1, 2,]`` -> drop the comma before the closer."""
-    fixed = re.sub(r",(\s*[}\]])", r"\1", text)
-    return fixed if fixed != text else None
+    """``{"a": 1,}`` / ``[1, 2,]`` -> drop the comma before the closer.
+
+    String-aware: a comma only counts as "trailing" when it sits outside any quoted string, so a
+    literal ``", }"`` inside an argument value (e.g. a quoted query ending in a comma) is never
+    mistaken for a dropped-comma defect and rewritten.
+    """
+    out: List[str] = []
+    changed = False
+    in_string = False
+    escaped = False
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == ",":
+            j = i + 1
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j < n and text[j] in "}]":
+                changed = True
+                i += 1
+                continue  # drop the comma; whitespace + closer fall through untouched
+        out.append(ch)
+        i += 1
+    fixed = "".join(out)
+    return fixed if changed else None
+
+
+_CURLY_QUOTE_TRANSLATION = str.maketrans({"“": '"', "”": '"', "‘": "'", "’": "'"})
+
+
+def _fix_curly_quotes(text: str) -> Optional[str]:
+    """A completion that used curly/smart quotes throughout instead of straight ones — same
+    guard as :func:`_fix_single_quotes`: only fires when there is no ASCII ``"`` anywhere in the
+    text, so a completion that is properly ASCII-quoted but merely CONTAINS a curly quote as
+    ordinary punctuation inside a string value (e.g. a quoted sentence using “smart quotes”) is
+    left untouched — translating those unconditionally would splice a legitimate string open,
+    turning a recoverable unterminated-string defect into unrecoverable garbage.
+    """
+    if '"' in text or not any(c in text for c in "“”‘’"):
+        return None
+    return text.translate(_CURLY_QUOTE_TRANSLATION)
 
 
 def _fix_single_quotes(text: str) -> Optional[str]:
@@ -325,12 +425,150 @@ def _fix_bare_action_line(text: str) -> Optional[str]:
     return json.dumps({"action": match.group(1).lower()})
 
 
+_PYTHON_LITERALS = {"True": "true", "False": "false", "None": "null"}
+
+
+def _fix_python_literals(text: str) -> Optional[str]:
+    """Bare Python ``True``/``False``/``None`` tokens (a model that thinks in Python syntax
+    instead of JSON) -> their JSON equivalents ``true``/``false``/``null``.
+
+    String- and word-boundary-aware: a token is only replaced outside a quoted string and only
+    when it is not part of a longer identifier, so a query VALUE like ``"True Grit movie"`` is
+    left untouched (there is no bare ``True`` token there — it's string content, not JSON
+    syntax), matching the same discipline as :func:`_fix_trailing_comma`.
+    """
+    out: List[str] = []
+    changed = False
+    in_string = False
+    escaped = False
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+            continue
+        matched = None
+        for word in ("True", "False", "None"):
+            if text.startswith(word, i):
+                before_ok = i == 0 or not (text[i - 1].isalnum() or text[i - 1] == "_")
+                after = i + len(word)
+                after_ok = after >= n or not (text[after].isalnum() or text[after] == "_")
+                if before_ok and after_ok:
+                    matched = word
+                    break
+        if matched:
+            out.append(_PYTHON_LITERALS[matched])
+            changed = True
+            i += len(matched)
+            continue
+        out.append(ch)
+        i += 1
+    fixed = "".join(out)
+    return fixed if changed else None
+
+
+_KV_LINE_HEAD_RE = re.compile(
+    r'^(?:ACTION|action|ACT|act|TOOL|tool)\s*[:=]\s*"?([A-Za-z_][\w\-]*)"?', re.IGNORECASE,
+)
+_KV_LINE_ARGS_RE = re.compile(r"^args\s*[:=]\s*(\{.*)", re.IGNORECASE)
+_KV_LINE_SLOT_RE = re.compile(r"^([A-Za-z_][\w\-]*)\s*[:=]\s*(.+)$")
+
+
+def _fix_kv_line_form(text: str) -> Optional[str]:
+    """The kv-line action form ported from ``badmodel-lab/localagent/ir.py::parse_block``'s
+    tolerant line-based fallback grammar: the first meaningful line names the action (a bare
+    identifier, optionally prefixed with ``action:``/``action=``/``ACTION:``/``tool=``/...), and
+    every following ``key: value`` or ``key=value`` line fills a slot — either ``args={...}`` (a
+    JSON object taken verbatim) or a bare ``key=value`` pair collected into ``args``.
+
+    Only fires when the FIRST line actually names an action this way; a text that starts with
+    ``{`` (already JSON, however broken) never matches, so this cannot compete with or corrupt
+    the brace-based repair path for near-miss JSON.
+    """
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    if not lines:
+        return None
+    # A model's malformed reply often carries a preamble before the action line ("STEP 9:",
+    # restated context, ...) — scan for the FIRST line that names an action, rather than
+    # requiring it to be lines[0], so that preamble doesn't sink the whole repair.
+    head_idx = None
+    match = None
+    for idx, line in enumerate(lines):
+        candidate_match = _KV_LINE_HEAD_RE.match(line)
+        if candidate_match:
+            head_idx = idx
+            match = candidate_match
+            break
+    if match is None:
+        return None
+    head = lines[head_idx]
+    action = match.group(1).lower()
+    rest_of_head = head[match.end():].strip()
+    # Stop at the next action-naming line (a later step in the same completion) so its slots
+    # don't bleed into THIS action's args.
+    end_idx = len(lines)
+    for idx in range(head_idx + 1, len(lines)):
+        if _KV_LINE_HEAD_RE.match(lines[idx]):
+            end_idx = idx
+            break
+    remaining = ([rest_of_head] if rest_of_head else []) + lines[head_idx + 1:end_idx]
+
+    args_obj: Dict[str, Any] = {}
+    found_anything = False
+    for line in remaining:
+        args_match = _KV_LINE_ARGS_RE.match(line)
+        if args_match:
+            span = _balanced_span(args_match.group(1), 0)
+            candidate = span if span is not None else args_match.group(1)
+            parsed = _parse_dict(candidate)
+            if parsed is not None:
+                args_obj.update(parsed)
+                found_anything = True
+            continue
+        slot_match = _KV_LINE_SLOT_RE.match(line)
+        if not slot_match:
+            continue
+        key = slot_match.group(1).strip().lower()
+        if key in ("action", "thought"):
+            continue
+        value = slot_match.group(2).strip()
+        if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+            value = value[1:-1]
+        args_obj[key] = value
+        found_anything = True
+
+    if not found_anything and len(remaining) > 0:
+        # every remaining line failed to parse as a slot — too little signal to trust this shape
+        return None
+
+    decision: Dict[str, Any] = {"action": action}
+    if args_obj:
+        decision["args"] = args_obj
+    return json.dumps(decision)
+
+
 #: Applied in order; each fixer sees the previous fixer's output, so composite damage (e.g. a
 #: trailing comma AND a truncated close) can be repaired in one pass. A fixer returns None when
 #: it finds nothing to change, never when it "fixes" nothing.
 _REPAIR_FIXERS: Tuple[Callable[[str], Optional[str]], ...] = (
     _fix_bare_action_line,
+    _fix_kv_line_form,
+    _fix_python_literals,
     _fix_trailing_comma,
+    _fix_curly_quotes,
     _fix_single_quotes,
     _fix_unterminated_string,
     _fix_unbalanced_brackets,
@@ -379,10 +617,9 @@ def extract_decision(raw: Optional[str]) -> JsonExtraction:
     if not text:
         return JsonExtraction(None, "failed")
 
-    fenced_match = re.search(r"```(?:json)?\s*(.+?)```", text, re.DOTALL)
-    was_fenced = fenced_match is not None
-    if fenced_match:
-        text = fenced_match.group(1).strip()
+    text = _strip_wrapper_tags(text).strip()
+
+    text, was_fenced = _extract_fenced_block(text)
     whole_source = "fenced" if was_fenced else "direct"
 
     candidates = _json_candidates(text)
@@ -454,6 +691,88 @@ def _record_tool_turn_timing(
         _logger.warning("[TOOL-EMULATION] telemetry.record_timing failed: %s", exc)
 
 
+def _record_json_telemetry(hook: Any, raw_text: str, parsed_ok: bool) -> None:
+    """Best-effort call into a caller-supplied json-telemetry hook — see ``json_telemetry_hook``
+    on :func:`run_tool_loop`. Never raises to the loop it observes.
+    """
+    if hook is None:
+        return
+    try:
+        hook(raw_text, parsed_ok)
+    except Exception as exc:  # noqa: BLE001 — telemetry must never fail a run
+        _logger.warning("[TOOL-EMULATION] json_telemetry_hook failed: %s", exc)
+
+
+def _split_inline_action_argument(
+    action: str, args: Dict[str, Any], tools_by_name: Dict[str, "ToolSpec"],
+) -> Tuple[str, Dict[str, Any]]:
+    """``{"action": "visit https://en.wikipedia.org/wiki/X"}`` -> ``action="visit"``,
+    ``args={"url": "https://en.wikipedia.org/wiki/X"}``.
+
+    Conservative by construction: only fires when (1) the action string splits into a known tool
+    name plus a non-empty remainder, (2) that tool has EXACTLY one arg slot (so there is no
+    ambiguity about which slot the remainder belongs to), and (3) that slot isn't already
+    explicitly filled by ``args`` (an explicit value always wins over a guessed one).
+
+    ``action`` should be the RAW (not lower-cased) action string — the remainder is a URL or
+    query and must keep its original case; only the leading tool-name token is matched
+    case-insensitively.
+    """
+    parts = action.split(None, 1)
+    if len(parts) != 2:
+        return action.lower(), args
+    name, rest = parts[0].lower(), parts[1].strip()
+    if not rest:
+        return action.lower(), args
+    spec = tools_by_name.get(name)
+    if spec is None or len(spec.arg_names) != 1:
+        return action.lower(), args
+    slot = spec.arg_names[0]
+    new_args = dict(args)
+    if not args.get(slot):
+        new_args[slot] = rest  # an explicit value already present always wins over a guess
+    return name, new_args
+
+
+def _fuzzy_match_action(action: str, tool_names: Sequence[str]) -> Optional[str]:
+    """A conservative fuzzy match of an unrecognized action name against the bound tool names —
+    tried before counting a turn as a genuine invalid action.
+
+    Handles: a trailing plural ``s`` (``searches`` -> ``search``), and an underscore-joined alias
+    whose first or last token names a real tool (``search_web`` / ``web_search`` -> ``search``).
+    Returns None — never a guess — when more than one tool name would match equally well, or when
+    nothing matches at all.
+    """
+    if not action:
+        return None
+    names = set(tool_names)
+    if action in names:
+        return action
+    candidates = set()
+    if action.endswith("es") and action[:-2] in names:
+        candidates.add(action[:-2])  # "searches" -> "search"
+    if action.endswith("s") and action[:-1] in names:
+        candidates.add(action[:-1])  # "visits" -> "visit"
+    if (action + "s") in names:
+        candidates.add(action + "s")
+    if "_" in action:
+        tokens = action.split("_")
+        if tokens[0] in names:
+            candidates.add(tokens[0])
+        if tokens[-1] in names:
+            candidates.add(tokens[-1])
+    if len(candidates) == 1:
+        return next(iter(candidates))
+    return None
+
+
+#: Consecutive turns naming an unrecognized action (after the inline-argument split and fuzzy
+#: match both fail) tolerated before the loop gives up — same shape as
+#: :data:`MAX_MALFORMED_TURNS_DEFAULT`, so a model stuck repeating a wrong tool name cannot burn
+#: the entire step budget either.
+MAX_INVALID_ACTIONS_DEFAULT = 3
+
+
 async def run_tool_loop(
     *,
     tools: Sequence[ToolSpec],
@@ -463,8 +782,10 @@ async def run_tool_loop(
     on_step: OnStep,
     turns: int,
     max_malformed_turns: int = MAX_MALFORMED_TURNS_DEFAULT,
+    max_invalid_actions: int = MAX_INVALID_ACTIONS_DEFAULT,
     thought_chars: int = THOUGHT_CHARS_DEFAULT,
     telemetry: Any = None,
+    json_telemetry_hook: Optional[Callable[[str, bool], None]] = None,
 ) -> None:
     """Run the think -> act -> observe loop until ``finish``, a malformed give-up, or the turn
     budget runs out.
@@ -489,15 +810,27 @@ async def run_tool_loop(
         caller's transcript (this loop calls ``render_view`` again next turn expecting that).
     :param turns: Maximum number of model turns.
     :param max_malformed_turns: Consecutive unparseable turns tolerated before giving up.
+    :param max_invalid_actions: Consecutive unrecognized-tool-name turns tolerated (after the
+        inline-argument split and fuzzy match both fail to resolve the name) before giving up —
+        the same shape as ``max_malformed_turns``, so a model stuck repeating a wrong tool name
+        cannot burn the entire step budget either.
     :param thought_chars: How much of a parsed ``thought`` field survives into the step.
     :param telemetry: Optional duck-typed object exposing ``record_timing`` (see
         :func:`_record_tool_turn_timing`); None records nothing.
+    :param json_telemetry_hook: Optional ``(raw_text, parsed_ok) -> None`` called once per turn.
+        Deliberately duck-typed rather than a hard import of
+        :mod:`agent.app.testing.json_telemetry` — this module stays framework/testing-infra-free;
+        a caller that wants the fault corpus populated binds the real ``record`` function's other
+        arguments (model name, ``phase="prompted_tool_loop"``) itself and passes the two-argument
+        closure here. None records nothing (matches ``telemetry``'s own default).
     :raises ToolLoopExhausted: When ``turns`` is spent without a ``finish`` action or a
         malformed-output give-up. The caller translates this into whatever step-budget exception
         its own runtime expects.
     """
     tool_names = {t.name for t in tools}
+    tools_by_name = {t.name: t for t in tools}
     malformed = 0
+    invalid_streak = 0
 
     for step in range(turns):
         started_at = time.perf_counter()
@@ -505,6 +838,7 @@ async def run_tool_loop(
         raw_text, usage = await call_model(prompt_text)
         extraction = extract_decision(raw_text)
         call_id = f"emu_{step}"
+        _record_json_telemetry(json_telemetry_hook, raw_text, extraction.value is not None)
 
         if extraction.value is None:
             malformed += 1
@@ -528,7 +862,8 @@ async def run_tool_loop(
 
         malformed = 0
         decision = extraction.value
-        action = str(decision.get("action", "")).strip().lower()
+        raw_action = str(decision.get("action", "")).strip()
+        action = raw_action.lower()
         args = decision.get("args")
         if not isinstance(args, dict):
             args = {}
@@ -548,17 +883,37 @@ async def run_tool_loop(
             return
 
         if action not in tool_names:
+            action, args = _split_inline_action_argument(raw_action, args, tools_by_name)
+
+        if action not in tool_names:
+            match = _fuzzy_match_action(action, tool_names)
+            if match is not None:
+                action = match
+
+        if action not in tool_names:
+            invalid_streak += 1
+            give_up = invalid_streak >= max_invalid_actions
             call = ToolCall(name=action, args=args, thought=thought)
             on_step(ToolLoopStep(
-                kind="invalid_action", raw_text=raw_text, usage=usage, thought=thought,
+                kind="invalid_action_give_up" if give_up else "invalid_action",
+                raw_text=raw_text, usage=usage, thought=thought,
                 call=call, extraction=extraction, call_id=call_id,
+                invalid_count=invalid_streak,
             ))
             _record_tool_turn_timing(
                 telemetry, started_at, action=action, extraction=extraction,
                 invalid=True, success=False,
             )
+            if give_up:
+                _logger.warning(
+                    "[TOOL-EMULATION] %d consecutive unrecognized-action turns; giving up "
+                    "instead of burning the remaining budget on a wrong tool name.",
+                    invalid_streak,
+                )
+                return
             continue
 
+        invalid_streak = 0
         observation = await dispatch_tool(action, args)
         call = ToolCall(name=action, args=args, thought=thought)
         on_step(ToolLoopStep(

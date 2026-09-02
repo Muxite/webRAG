@@ -108,6 +108,101 @@ def test_extract_decision_repairs_a_bare_action_line():
     assert result.repaired is True
 
 
+# ------------------------------------------------------------------- kv-line form (Task 2.1)
+
+
+def test_extract_decision_repairs_action_equals_args_equals_kv_line():
+    result = extract_decision('action=search args={"query": "mont blanc"}')
+    assert result.value == {"action": "search", "args": {"query": "mont blanc"}}
+    assert result.repaired is True
+
+
+def test_extract_decision_repairs_action_colon_prefix_with_kv_slot_lines():
+    result = extract_decision("ACTION: visit\nurl: https://en.wikipedia.org/wiki/Mont_Blanc")
+    assert result.value["action"] == "visit"
+    assert result.value["args"]["url"] == "https://en.wikipedia.org/wiki/Mont_Blanc"
+    assert result.repaired is True
+
+
+def test_extract_decision_repairs_bare_action_equals_multiline_kv():
+    result = extract_decision("action=search\nquery=mont blanc")
+    assert result.value == {"action": "search", "args": {"query": "mont blanc"}}
+    assert result.repaired is True
+
+
+# --------------------------------------------------------------- curly quotes (Task 2.3)
+
+
+def test_extract_decision_repairs_curly_quotes_in_a_full_object():
+    raw = "{“action”: “search”, “args”: {“query”: “q”}}"
+    result = extract_decision(raw)
+    assert result.value == {"action": "search", "args": {"query": "q"}}
+
+
+def test_extract_decision_repairs_curly_single_quotes():
+    raw = "{‘action’: ‘search’, ‘args’: {‘query’: ‘q’}}"
+    result = extract_decision(raw)
+    assert result.value == {"action": "search", "args": {"query": "q"}}
+
+
+# --------------------------------------------------------------- python literals (Task 2.4)
+
+
+def test_extract_decision_repairs_python_true_false_none():
+    result = extract_decision(
+        '{"action": "search", "args": {"query": "q", "strict": True, "cursor": None}}'
+    )
+    assert result.value == {
+        "action": "search", "args": {"query": "q", "strict": True, "cursor": None},
+    }
+    assert result.repaired is True
+
+
+def test_extract_decision_python_literal_fix_does_not_touch_string_contents():
+    """A literal string VALUE containing the word True must not be corrupted."""
+    result = extract_decision('{"action": "search", "args": {"query": "True Grit movie"}}')
+    assert result.value == {"action": "search", "args": {"query": "True Grit movie"}}
+    assert result.repaired is False  # already valid JSON — nothing to repair
+
+
+# --------------------------------------------------------------- tool_call wrapper (Task 2.5)
+
+
+def test_extract_decision_strips_tool_call_wrapper_tags():
+    raw = '<tool_call>{"action": "search", "args": {"query": "q"}}</tool_call>'
+    result = extract_decision(raw)
+    assert result.value == {"action": "search", "args": {"query": "q"}}
+
+
+def test_extract_decision_strips_special_token_wrappers():
+    raw = '<|start_header_id|>assistant<|end_header_id|>\n{"action": "search", "args": {}}'
+    result = extract_decision(raw)
+    assert result.value == {"action": "search", "args": {}}
+
+
+# --------------------------------------------------------------- unterminated fence (Task 2.6)
+
+
+def test_extract_decision_recovers_an_unterminated_code_fence():
+    raw = '```json\n{"action": "search", "args": {"query": "q"}}'
+    result = extract_decision(raw)
+    assert result.value == {"action": "search", "args": {"query": "q"}}
+    assert result.source == "fenced"
+
+
+# --------------------------------------------------------------- trailing comma string-safety
+
+
+def test_fix_trailing_comma_does_not_touch_a_quoted_comma_brace_sequence():
+    """A literal `", }"` inside a quoted string value must survive untouched — the old
+    regex-based fixer was not string-aware and would have rewritten it."""
+    text = '{"action": "search", "args": {"query": "wait, }"}}'
+    assert repair_json_text(text) is None  # already valid JSON, nothing to fix
+    result = extract_decision(text)
+    assert result.value == {"action": "search", "args": {"query": "wait, }"}}
+    assert result.repaired is False
+
+
 # --------------------------------------------------------------------------- repair idempotency
 
 
@@ -116,6 +211,9 @@ def test_extract_decision_repairs_a_bare_action_line():
     '{"action": "finish", "args": {"answer": "1786"}}',
     '{"thought": "ok", "action": "visit", "args": {"url": "https://example.com/a?x=1"}}',
     '{"action": "search", "args": {"query": "a, b, c"}}',
+    '{"action": "search", "args": {"strict": true, "cursor": null, "ok": false}}',
+    '{"action": "search", "args": {"query": "True Grit movie"}}',
+    '{"action": "search", "args": {"query": "wait, }"}}',
 ])
 def test_repair_json_text_is_a_noop_on_well_formed_input(valid_json):
     """A valid call must never be rewritten into a different valid call — repair only ever fires
@@ -336,4 +434,146 @@ def test_telemetry_record_timing_failure_does_not_break_the_run():
     rec, _prompts, _calls, error = _run([
         '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
     ], telemetry=_Boom())
+    assert error is None
+
+
+# --------------------------------------------------------------------------- inline argument (Task 2.2)
+
+
+def test_loop_splits_an_inline_argument_from_the_action_field():
+    rec, _prompts, calls, error = _run([
+        '{"thought": "x", "action": "visit https://en.wikipedia.org/wiki/X", "args": {}}',
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ], tools=[ToolSpec(name="visit", arg_names=("url",))])
+    assert error is None
+    assert calls == [("visit", {"url": "https://en.wikipedia.org/wiki/X"})]
+    assert rec.transcript[0].kind == "tool_call"
+
+
+def test_loop_does_not_split_inline_argument_when_tool_has_multiple_slots():
+    """Conservative: only maps the remainder when the named tool has EXACTLY one arg slot — a
+    multi-slot tool is too ambiguous to guess which slot the trailing text belongs to."""
+    rec, _prompts, calls, error = _run([
+        '{"thought": "x", "action": "search extra text", "args": {}}',
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ], tools=[ToolSpec(name="search", arg_names=("query", "limit"))])
+    assert error is None
+    assert calls == []
+    assert rec.transcript[0].kind == "invalid_action"
+
+
+def test_loop_inline_argument_split_does_not_override_an_explicit_arg():
+    rec, _prompts, calls, error = _run([
+        '{"thought": "x", "action": "visit ignored-text", "args": {"url": "https://real"}}',
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ], tools=[ToolSpec(name="visit", arg_names=("url",))])
+    assert error is None
+    assert calls == [("visit", {"url": "https://real"})]
+
+
+# --------------------------------------------------------------------------- bounded invalid-action loop (Task 3)
+
+
+def test_loop_gives_up_after_max_invalid_actions_without_raising():
+    rec, _prompts, calls, error = _run(
+        ['{"thought": "x", "action": "teleport", "args": {}}'] * 6,
+        max_invalid_actions=3,
+    )
+    assert error is None
+    assert calls == []
+    assert rec.transcript[-1].kind == "invalid_action_give_up"
+    assert len(rec.transcript) == 3
+
+
+def test_loop_invalid_action_streak_resets_on_a_successful_tool_call():
+    rec, _prompts, calls, error = _run([
+        '{"thought": "x", "action": "teleport", "args": {}}',
+        '{"thought": "x", "action": "teleport", "args": {}}',
+        '{"thought": "look", "action": "search", "args": {"query": "q"}}',
+        '{"thought": "x", "action": "teleport", "args": {}}',
+        '{"thought": "x", "action": "teleport", "args": {}}',
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ], max_invalid_actions=3)
+    assert error is None
+    assert calls == [("search", {"query": "q"})]
+    assert rec.transcript[-1].kind == "finish"
+
+
+def test_loop_fuzzy_matches_a_plural_action_name():
+    rec, _prompts, calls, error = _run([
+        '{"thought": "x", "action": "searches", "args": {"query": "q"}}',
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ])
+    assert error is None
+    assert calls == [("search", {"query": "q"})]
+    assert rec.transcript[0].kind == "tool_call"
+
+
+def test_loop_fuzzy_matches_a_web_prefixed_alias():
+    rec, _prompts, calls, error = _run([
+        '{"thought": "x", "action": "search_web", "args": {"query": "q"}}',
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ])
+    assert error is None
+    assert calls == [("search", {"query": "q"})]
+    assert rec.transcript[0].kind == "tool_call"
+
+
+def test_loop_fuzzy_match_does_not_guess_when_ambiguous():
+    """`search`-or-`visit` style ambiguity must never be silently resolved — an action name
+    that doesn't clearly reduce to exactly one known tool still counts as invalid."""
+    rec, _prompts, calls, error = _run([
+        '{"thought": "x", "action": "lookup", "args": {}}',
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ], tools=[ToolSpec(name="search", arg_names=("query",)), ToolSpec(name="visit", arg_names=("url",))])
+    assert error is None
+    assert calls == []
+    assert rec.transcript[0].kind == "invalid_action"
+
+
+# --------------------------------------------------------------------------- json_telemetry hook (Task 4)
+
+
+def test_loop_calls_json_telemetry_hook_once_per_turn_with_raw_text_and_parsed_ok():
+    calls = []
+
+    def hook(raw_text, parsed_ok):
+        calls.append((raw_text, parsed_ok))
+
+    rec, _prompts, _calls, error = _run([
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ], json_telemetry_hook=hook)
+    assert error is None
+    assert calls == [('{"thought": "ok", "action": "finish", "args": {"answer": "done"}}', True)]
+
+
+def test_loop_json_telemetry_hook_sees_malformed_turns_as_not_parsed():
+    calls = []
+
+    def hook(raw_text, parsed_ok):
+        calls.append((raw_text, parsed_ok))
+
+    rec, _prompts, _calls, error = _run([
+        "not json at all",
+        '{"thought": "ok", "action": "finish", "args": {"answer": "recovered"}}',
+    ], json_telemetry_hook=hook)
+    assert error is None
+    assert calls[0] == ("not json at all", False)
+    assert calls[1][1] is True
+
+
+def test_loop_json_telemetry_hook_failure_does_not_break_the_run():
+    def hook(raw_text, parsed_ok):
+        raise RuntimeError("boom")
+
+    rec, _prompts, _calls, error = _run([
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ], json_telemetry_hook=hook)
+    assert error is None
+
+
+def test_loop_with_no_json_telemetry_hook_does_not_raise():
+    rec, _prompts, _calls, error = _run([
+        '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
+    ])
     assert error is None
