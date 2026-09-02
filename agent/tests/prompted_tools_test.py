@@ -616,3 +616,55 @@ def test_loop_with_no_json_telemetry_hook_does_not_raise():
         '{"thought": "ok", "action": "finish", "args": {"answer": "done"}}',
     ])
     assert error is None
+
+
+# ------------------------------------------------------- tolerant finish-argument reading
+
+
+def _finish_loop(decision_json: str):
+    """Run one turn that finishes, returning the ToolCall the loop produced."""
+    steps = []
+
+    async def call_model(_prompt):
+        return decision_json, None
+
+    async def dispatch(_name, _args):  # pragma: no cover - finish never dispatches
+        raise AssertionError("finish must not dispatch a tool")
+
+    asyncio.run(run_tool_loop(
+        tools=[ToolSpec(name="finish", description="submit", arg_names=("answer",))],
+        render_view=lambda: "view", call_model=call_model, dispatch_tool=dispatch,
+        on_step=steps.append, turns=2,
+    ))
+    return steps[-1]
+
+
+def test_a_finish_that_names_its_answer_slots_differently_is_not_silently_discarded():
+    """Measured on phi3:mini: it emits 98% valid JSON, does the work, and finishes with
+    ``args: {"answer1": ..., "answer2": ...}``. The loop read only ``args["answer"]``, so the
+    submission was dropped and the cell scored zero -- the model was penalised for naming a slot,
+    not for being wrong. Every plausible answer slot is read, in sorted key order, so a two-part
+    answer survives intact."""
+    step = _finish_loop('{"action": "finish", "args": {"answer1": "419.7 m", "answer2": "330 m"}}')
+
+    assert step.kind == "finish"
+    assert "419.7 m" in step.call.args["answer"]
+    assert "330 m" in step.call.args["answer"]
+
+
+def test_a_plain_answer_slot_still_wins_over_any_alias():
+    """An explicit ``answer`` is the model's own choice and must never be diluted by joining it
+    with other keys that happen to be present."""
+    step = _finish_loop(
+        '{"action": "finish", "args": {"answer": "the real one", "note": "ignore me"}}')
+
+    assert step.call.args["answer"] == "the real one"
+
+
+def test_a_finish_with_no_answerish_slot_at_all_still_finishes_empty():
+    """Absent is not invented: a finish carrying nothing answer-shaped submits an empty answer
+    rather than scraping an unrelated field into one."""
+    step = _finish_loop('{"action": "finish", "args": {"confidence": "high"}}')
+
+    assert step.kind == "finish"
+    assert step.call.args["answer"] == ""

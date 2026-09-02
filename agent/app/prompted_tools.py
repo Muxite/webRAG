@@ -693,6 +693,37 @@ def extract_decision(raw: Optional[str]) -> JsonExtraction:
 # --------------------------------------------------------------------------- the loop
 
 
+
+#: Slot names a model plausibly puts its final answer in, beyond the documented ``answer``.
+#: Measured on phi3:mini, which emits 98% valid JSON and finishes with ``{"answer1": ...,
+#: "answer2": ...}`` on a two-part question -- the loop read only ``answer`` and silently dropped
+#: the submission, so a model that had done the work scored zero for naming a slot.
+_ANSWER_KEY_RE = re.compile(r"^(?:final_?)?(?:answer|response|result|output|text)_?\d*$", re.I)
+
+
+def _finish_answer(args: Dict[str, Any]) -> str:
+    """The answer a ``finish`` call is submitting, however the model named its slots.
+
+    An explicit ``answer`` always wins outright and is never diluted by joining it with other
+    keys -- that is the model's own choice of slot. Only when there is no ``answer`` at all are
+    answer-shaped slots gathered, in SORTED key order so a two-part answer (``answer1``,
+    ``answer2``) reassembles in the order the model numbered it rather than in dict order.
+
+    Nothing is invented: a ``finish`` carrying no answer-shaped slot submits an empty answer
+    rather than scraping an unrelated field (``confidence``, ``sources``) into one. Being lenient
+    about a slot NAME is not the same as guessing at content.
+
+    :param args: the parsed ``args`` object of a finish decision.
+    :returns: the answer text, possibly empty.
+    """
+    direct = args.get("answer")
+    if isinstance(direct, str) and direct.strip():
+        return direct
+    parts = [str(args[key]) for key in sorted(args)
+             if _ANSWER_KEY_RE.match(str(key)) and str(args[key] or "").strip()]
+    return "\n".join(parts) if parts else str(direct or "")
+
+
 def _record_tool_turn_timing(
     telemetry: Any, started_at: float, *, action: str, extraction: JsonExtraction,
     invalid: bool, success: bool,
@@ -903,7 +934,7 @@ async def run_tool_loop(
         thought = str(decision.get("thought", ""))[:thought_chars]
 
         if action == "finish":
-            answer = str(args.get("answer", "") or "")
+            answer = _finish_answer(args)
             call = ToolCall(name="finish", args={"answer": answer}, thought=thought)
             on_step(ToolLoopStep(
                 kind="finish", raw_text=raw_text, usage=usage, thought=thought,

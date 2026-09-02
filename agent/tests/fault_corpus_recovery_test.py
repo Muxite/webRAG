@@ -173,9 +173,21 @@ def test_the_fault_corpus_is_a_growing_measurement_not_a_fixed_fixture():
 
     assert report["overall"]["total"] >= 952, (
         "the corpus should only ever grow; a shrink means telemetry files were deleted")
-    # The floor is the pre-repair baseline measured over the original 952 records. A parser change
-    # that drops below it is a regression regardless of how much the corpus has since grown.
-    assert report["overall"]["recovered"] / report["overall"]["total"] >= 0.74
+
+    # The invariant is the RECOVERED COUNT, not the rate. Corpus growth can only add faults, so a
+    # parser regression is the one thing that can make this number fall -- while the rate falls
+    # for a reason that has nothing to do with the parser.
+    #
+    # This test has now been re-derived twice against live data, which is the lesson worth keeping:
+    #   total 952  -> recovered 774 (81.3%)
+    #   total 1005 -> recovered 774 (77.0%)   weak-model prose faults arrived
+    #   total 1066 -> recovered 774 (72.6%)   gemma2:2b's bare-``` faults took `fenced` 15 -> 64
+    # The numerator never moved. The rate fell 9 points purely because newly captured weak-model
+    # faults are less recoverable than the old mix -- a finding about those models, and one a
+    # rate-based assertion would have mislabelled as a parser regression three times over.
+    assert report["overall"]["recovered"] >= 774, (
+        "recovered fault count fell -- that is a real `extract_decision` regression, because "
+        "corpus growth can only ever ADD faults")
     for name in ("prose", "truncated_json", "malformed_json", "fenced_json"):
         assert report["per_class"][name]["total"] > 0, f"{name} vanished from the corpus"
 
