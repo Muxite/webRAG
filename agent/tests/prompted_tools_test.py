@@ -145,6 +145,31 @@ def test_extract_decision_repairs_curly_single_quotes():
     assert result.value == {"action": "search", "args": {"query": "q"}}
 
 
+def test_fix_curly_quotes_is_a_noop_when_ascii_quotes_are_already_present():
+    """Regression pin: a completion that is properly ASCII-quoted but merely CONTAINS a curly
+    quote as ordinary punctuation inside a string value (e.g. a quoted sentence using “smart
+    quotes”) must be left untouched by the curly-quote fixer — translating those unconditionally
+    would splice a legitimate open string, turning a recoverable unterminated-string defect into
+    unrecoverable garbage. Caught live against corpus record 070/tinyllama during development;
+    this pins it permanently."""
+    text = '{"thought": "“Though” is used like “even though”"}'
+    assert repair_json_text(text) is None  # already valid JSON — the curly quotes are content
+    result = extract_decision(text)
+    assert result.value == {"thought": "“Though” is used like “even though”"}
+    assert result.repaired is False
+
+
+def test_fix_curly_quotes_does_not_corrupt_an_unterminated_string_with_curly_content():
+    """The failure mode that motivated the guard above: an ASCII-opened string that never closes
+    (truncated completion) and happens to contain curly-quote punctuation. Unconditional
+    translation would turn the curly quotes into fresh ASCII string delimiters and destroy the
+    span the unterminated-string fixer would otherwise recover cleanly."""
+    text = '{"thought": "“Though” is a preposition, and it doesn\'t add value. Use "'
+    result = extract_decision(text)
+    assert result.value is not None
+    assert result.value.get("thought", "").startswith("“Though”")
+
+
 # --------------------------------------------------------------- python literals (Task 2.4)
 
 
@@ -178,6 +203,17 @@ def test_extract_decision_strips_special_token_wrappers():
     raw = '<|start_header_id|>assistant<|end_header_id|>\n{"action": "search", "args": {}}'
     result = extract_decision(raw)
     assert result.value == {"action": "search", "args": {}}
+
+
+def test_wrapper_tag_stripping_does_not_corrupt_a_legitimate_value_mentioning_the_tag():
+    """Regression pin: a query that genuinely asks ABOUT `<tool_call>`/`<|...|>` syntax must
+    survive completely intact — stripping is only ever safe OUTSIDE a quoted JSON string."""
+    raw = '{"action": "search", "args": {"query": "what is a <tool_call> tag in llama.cpp"}}'
+    result = extract_decision(raw)
+    assert result.value == {
+        "action": "search", "args": {"query": "what is a <tool_call> tag in llama.cpp"},
+    }
+    assert result.repaired is False
 
 
 # --------------------------------------------------------------- unterminated fence (Task 2.6)
@@ -214,6 +250,9 @@ def test_fix_trailing_comma_does_not_touch_a_quoted_comma_brace_sequence():
     '{"action": "search", "args": {"strict": true, "cursor": null, "ok": false}}',
     '{"action": "search", "args": {"query": "True Grit movie"}}',
     '{"action": "search", "args": {"query": "wait, }"}}',
+    # a value that itself looks like a kv-line ("action=...") must not trip the kv-line fixer —
+    # it only ever inspects the FIRST line of the raw text, and this text's first line is `{`.
+    '{"action": "search", "args": {"query": "action=search args={\\"x\\": 1}"}}',
 ])
 def test_repair_json_text_is_a_noop_on_well_formed_input(valid_json):
     """A valid call must never be rewritten into a different valid call — repair only ever fires

@@ -226,11 +226,44 @@ _SPECIAL_TOKEN_RE = re.compile(r"<\|[^<>|]*\|>")
 
 def _strip_wrapper_tags(text: str) -> str:
     """``<tool_call>``/``</tool_call>`` and chat-template special tokens (``<|start_header_id|>``
-    and friends) leaking into a completion — stripped unconditionally, like the curly-quote
-    translation, since neither ever appears inside a legitimate decision."""
-    text = _WRAPPER_TAG_RE.sub("", text)
-    text = _SPECIAL_TOKEN_RE.sub("", text)
-    return text
+    and friends) leaking into a completion — stripped, but ONLY outside a quoted JSON string.
+
+    String-aware for the same reason as :func:`_fix_trailing_comma`: a legitimate argument value
+    can genuinely contain the substring ``<tool_call>`` as content (e.g. a query ABOUT chat
+    templates), and stripping it there would silently corrupt an otherwise well-formed decision
+    instead of merely failing to help one. Every real occurrence in the fault corpus sits outside
+    any quoted string (the tags wrap or precede the JSON, they never appear inside a value), so
+    this loses no recovery.
+    """
+    out: List[str] = []
+    i = 0
+    n = len(text)
+    in_string = False
+    escaped = False
+    while i < n:
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+            continue
+        match = _WRAPPER_TAG_RE.match(text, i) or _SPECIAL_TOKEN_RE.match(text, i)
+        if match:
+            i = match.end()
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def _extract_fenced_block(text: str) -> Tuple[str, bool]:
