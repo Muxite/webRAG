@@ -153,17 +153,31 @@ def test_recovery_never_regresses_below_the_pre_repair_baseline():
     assert report["per_class"]["fenced_json"]["recovered"] >= 6
 
 
-def test_baseline_recovery_matches_measured_952_fault_corpus():
-    """Pins the exact baseline reported in the handoff brief: 703/952 = 74% overall, with the
-    per-class breakdown prose 331/500, truncated 268/316, malformed 98/121, fenced 6/15. This is
-    the number that must be reproduced FIRST, before any repair rule changes `extract_decision`."""
+def test_the_fault_corpus_is_a_growing_measurement_not_a_fixed_fixture():
+    """An absolute corpus SIZE must never be asserted here, and this test says why.
+
+    The original version of this test pinned ``total == 952``, the count measured on 2026-09-02.
+    It broke the same day: any run with ``IDEA_TEST_JSON_TELEMETRY=1`` appends new records, and a
+    weak-model investigation took the corpus to 1005. Pinning a count from a directory that grows
+    whenever anyone collects data makes a green suite depend on NOT doing the thing the corpus
+    exists for.
+
+    What is worth pinning is the recovery RATE floor, which survives growth and still fails on a
+    real parser regression. Note the rate legitimately MOVES as the corpus grows -- it fell from
+    81.3% (952 records) to 77.0% (1005) purely because the newly captured weak-model faults are
+    harder than the existing mix, which is a finding about those models rather than about
+    ``extract_decision``.
+    """
     records = load_fault_records()
     report = measure_recovery(records)
-    assert report["overall"]["total"] == 952
-    assert report["per_class"]["prose"]["total"] == 500
-    assert report["per_class"]["truncated_json"]["total"] == 316
-    assert report["per_class"]["malformed_json"]["total"] == 121
-    assert report["per_class"]["fenced_json"]["total"] == 15
+
+    assert report["overall"]["total"] >= 952, (
+        "the corpus should only ever grow; a shrink means telemetry files were deleted")
+    # The floor is the pre-repair baseline measured over the original 952 records. A parser change
+    # that drops below it is a regression regardless of how much the corpus has since grown.
+    assert report["overall"]["recovered"] / report["overall"]["total"] >= 0.74
+    for name in ("prose", "truncated_json", "malformed_json", "fenced_json"):
+        assert report["per_class"][name]["total"] > 0, f"{name} vanished from the corpus"
 
 
 # --------------------------------------------------------------------------- CLI
