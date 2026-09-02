@@ -39,6 +39,20 @@ Measured effects, all categorical:
 - **Fault recovery**: 703 -> 774 of the then-952 stored faults; verified 71 newly recovered,
   **0 regressed**. The three native loops went from recovering **0%** of their faults to 72.1%
   (`sequential_react`, 681 faults) and 92.6% (`evidence_loop`, 94).
+
+  **QUALIFIED, post-hoc.** Attributing the gain per model: **all 71 newly recovered records belong
+  to `meta-llama/llama-3.2-1b-instruct`** (10% of that one model's faults). Zero came from any
+  other model. That model is also **68.1% of the whole 1069-record corpus** and recovers at 77.1%,
+  while every local model recovers at 93-100%. So the pooled recovery RATE is largely a
+  measurement of one hosted 1B model's output from one 2026-08-15 campaign, not a general
+  parser-quality signal. **Stratify by model before quoting a recovery rate.**
+
+  Two further caveats on the same metric. `raw_head` is capped at 300 chars, and 83.7% of
+  unrecovered `truncated_json` and 78.3% of unrecovered `malformed_json` records were never shown
+  their full completion — so those class rates are FLOORS, not measurements. And `tinyllama` and
+  `tinyllama:latest` are logged as distinct model strings with 0.0% and 93.9% recovery; nothing in
+  the record disambiguates whether they are the same weights, so a query matching one string
+  rather than the other moves the number by ~94 points.
 - **Quantity index**: covers 67.4% of the values models actually typed (denominator = values that
   are quantities; dates and URLs excluded).
 
@@ -115,6 +129,38 @@ Two real causes were found:
 
 `scripts/run_campaign.sh` now makes gate 5 hard to skip: own process group and session, PID file,
 singleton lock (gate 3), and stop-by-process-group-id, never by name pattern.
+
+## 6b. Bugs found by the post-run analysis (not yet fixed)
+
+1. **A tool-validation failure loop that reports success.** `phi3_both_210`: 35 emulated turns,
+   every one `action: search`, every one flagged `success: True`, and **zero search timings** — the
+   tool never ran. The model's args fail the tool's schema, `_invoke_tool` turns each failure into
+   a `TOOL ERROR` observation, and `run_tool_loop` counts the turn as successful because an action
+   PARSED. The whole step budget burns while the telemetry says everything is fine. The `success`
+   flag should reflect whether the tool EXECUTED, and a repeated identical validation failure needs
+   the same bounded give-up the malformed and invalid-action paths already have.
+2. **The zero-visit gate can backfire.** 6 of 12 flag-ON phi3 cells never achieve a visit despite
+   the gate firing, and burn 2x-13x more turns for an identical 0.0. The nudge says "visit a page"
+   and phi3 responds by searching more.
+3. **The gate does not fix answering from a stale snippet.** `tinyfixon_210`: the gate got the model
+   to visit the correct page and receive 419.7 m in its transcript, and it still answered with a
+   fabricated 215 m from an earlier search snippet.
+4. **The tolerant `finish` read is too narrow.** 7 of 12 ON-group phi3 cells leave raw JSON as the
+   `final_deliverable` (`answer_part1` / `answer_part2`, split across or outside `args`); two lose
+   points specifically because the leaked format defeats the grep validators, not because the value
+   was wrong.
+5. **`observability.llm.calls` is inflated ~1.4-2x** (70 reported for 35 real turns) — the same
+   failure class as the known `observability.search.count` trap. Count `telemetry_raw.timings`.
+6. **gemma2:2b's visits roughly tripled** post-fix (3-7 -> 7-21), always re-fetching the same 1-2
+   URLs. Invisible to the current KPI because it only checks `visit_count >= 1`.
+
+Two corrections to figures stated earlier in this document:
+- The "34/34 concordance" between reading a page and scoring above zero holds only when "read a
+  page" means a visit that returned status 200 and stored a page. Raw visit-count gives 33/34
+  (`llama3.2:3b` task 215 issued two 404s from a garbled accented-character URL).
+- `docs/TINY_MODEL_INVESTIGATION.md` reports gemma's 210-212 baseline as 1/3 pinned at the 8191
+  cap; recomputing from stored `llm_usage.usage.prompt_tokens` gives 2/3. The keystone half of that
+  claim (0/3) is confirmed.
 
 ## 7. Open queue
 
