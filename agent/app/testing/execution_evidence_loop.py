@@ -1816,7 +1816,15 @@ async def run_evidence_loop_execution(
         # in `output` is also what makes it free to audit offline -- `reverify_cell` already
         # reads from there, and `evidence_graph.reverify_graph` re-checks this payload with no
         # model, no network and no GPU.
-        "evidence_graph": ledger.graph.to_dict() if ledger.graph is not None else None,
+        #
+        # `include_page_text=False`: the fetched page text already lives verbatim in `pages`
+        # (above), so embedding it a second time here was pure duplication -- measured at 5.7MB
+        # across 247 stored cells, the single largest redundancy in the artifact. Standalone audit
+        # (no cell around it, just this `evidence_graph` payload) still works: `reverify_graph`
+        # takes an optional `pages=` argument to supply the text back in from this cell's own
+        # `pages` list, and `scripts/reverify.py` does exactly that.
+        "evidence_graph": (ledger.graph.to_dict(include_page_text=False)
+                           if ledger.graph is not None else None),
         "derivation_gate": derivation_gate_enabled(),
         "derivation_validity": (ledger.graph.derivation_validity()
                                 if ledger.graph is not None else None),

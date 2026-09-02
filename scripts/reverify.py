@@ -82,7 +82,13 @@ def run_reverify(cell: Dict[str, Any]) -> Dict[str, Any]:
     output = resolve_output(cell)
     artifact = output.get("evidence_graph")
     if isinstance(artifact, dict) and artifact:
-        graph_report: Optional[Dict[str, Any]] = reverify_graph(artifact)
+        # `pages=`: an `evidence_loop` cell no longer embeds page text a second time inside
+        # `evidence_graph.pages` (it lives once, in `output.pages`); supplying it here keeps
+        # this CLI able to reverify both the old (text-embedded) and new (text-stripped) cell
+        # shapes identically. A cell without `pages` (or an older shape that never had them)
+        # still works exactly as before -- `reverify_graph` falls back to whatever text is
+        # already embedded in the artifact, if any.
+        graph_report: Optional[Dict[str, Any]] = reverify_graph(artifact, pages=output.get("pages"))
         graph_status = GRAPH_STATUS_OK
     else:
         graph_report = None

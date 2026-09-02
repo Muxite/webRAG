@@ -1436,16 +1436,31 @@ class EvidenceGraph:
             "rejected_absent": absent, "rejected_unchecked": len(self.rejections) - absent,
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, *, include_page_text: bool = True) -> Dict[str, Any]:
         """The whole graph as a JSON-serializable artifact, pages included.
 
+        :param include_page_text: when True (the default, and the only behavior before this
+            parameter existed), each page dict carries its full ``text`` — this is what every
+            already-stored cell has, and :func:`reverify_graph` needs nothing else to audit it.
+            When False, each page keeps every OTHER field (``page_id``, ``url``, ``content_hash``,
+            ``chars``, ``stored_chars``, ``truncated``) and drops ``text``. That is the shape an
+            ``evidence_loop`` cell now writes: the same fetched text already lives verbatim in the
+            cell's own ``output.pages`` (see :func:`~agent.app.testing.execution_evidence_loop.
+            store_page`), so embedding it a second time here was pure duplication — measured at
+            5.7MB across 247 stored cells. ``content_hash`` still covers the WHOLE fetched text and
+            always survives, since it is how page drift is detected and the one field that has to
+            outlive the text itself. Call :func:`reverify_graph` with ``pages=`` (the sibling
+            ``output.pages`` list) to hand the text back in for a standalone audit.
         :returns: ``{"pages", "nodes", "rejections", "derivation_refusals", "counts",
-            "refusal_counts"}``. Pages carry their text and SHA-256, so :func:`reverify_graph`
-            needs nothing else.
+            "refusal_counts"}``.
         :raises: nothing.
         """
+        pages = [dict(page) for page in self._pages.values()]
+        if not include_page_text:
+            for page in pages:
+                page.pop("text", None)
         return {
-            "pages": [dict(page) for page in self._pages.values()],
+            "pages": pages,
             "nodes": [node.as_dict() for node in self._nodes.values()],
             "rejections": [dict(row) for row in self.rejections],
             "derivation_refusals": [dict(row) for row in self.derivation_refusals],
@@ -1479,7 +1494,44 @@ class EvidenceGraph:
         return graph
 
 
-def reverify_graph(artifact: Dict[str, Any]) -> Dict[str, Any]:
+def _page_with_supplied_text(page: Dict[str, Any],
+                             supplied: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """``page`` unchanged if it already carries ``text`` (the old, embedded shape); otherwise
+    ``text`` filled in from ``supplied`` IF AND ONLY IF a page of the same ``page_id`` is found
+    there whose OWN ``content_hash`` matches this page's recorded one.
+
+    The hash check is load-bearing, not decorative: ``content_hash`` is computed over the whole
+    fetched text regardless of any storage window, so two independently-stored copies of the same
+    page (``output.pages`` and a stripped ``evidence_graph.pages``) always agree on it even when
+    their truncation windows differ. A caller handing in text for the wrong page — or tampered
+    text — fails this check and the page is left exactly as if nothing had been supplied: absent,
+    not silently trusted.
+
+    :param page: one page dict from the artifact, as restored by :meth:`EvidenceGraph.from_dict`.
+    :param supplied: ``{page_id: page_dict}`` built from an optional ``pages=`` argument.
+    :returns: ``page`` if no (trustworthy) text is available, else a copy with ``text`` (and the
+        matching ``truncated`` / ``stored_chars`` describing THAT text) filled in.
+    :raises: nothing.
+    """
+    if str(page.get("text") or ""):
+        return page
+    candidate = supplied.get(str(page.get("page_id")))
+    if not isinstance(candidate, dict):
+        return page
+    text = str(candidate.get("text") or "")
+    if not text:
+        return page
+    if str(candidate.get("content_hash") or "") != str(page.get("content_hash") or ""):
+        return page
+    merged = dict(page)
+    merged["text"] = text
+    merged["truncated"] = bool(candidate.get("truncated", False))
+    merged["stored_chars"] = candidate.get("stored_chars", len(text))
+    return merged
+
+
+def reverify_graph(artifact: Dict[str, Any],
+                   pages: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Re-derive every node's verification from a stored artifact alone, offline.
 
     The audit path, mirroring ``execution_evidence_loop.reverify_cell``: no network, no model, no
@@ -1489,13 +1541,30 @@ def reverify_graph(artifact: Dict[str, Any]) -> Dict[str, Any]:
     it transitively rests on re-verifies — the derivation's own arithmetic is the sibling half's
     check, not this one's.
 
-    :param artifact: a :meth:`EvidenceGraph.to_dict` payload.
+    :param artifact: a :meth:`EvidenceGraph.to_dict` payload. An OLD artifact (``to_dict()``'s
+        default) carries page ``text`` embedded and this function needs nothing else, exactly as
+        before this parameter existed. A NEW artifact (``to_dict(include_page_text=False)``) has
+        that text stripped from its pages; supply it via ``pages=``.
+    :param pages: optional — the sibling ``output.pages`` list (or anything shaped like it: dicts
+        with ``page_id`` / ``content_hash`` / ``text``) to supply page text back in for a page
+        whose artifact entry lacks it. Matched by ``page_id`` AND verified by ``content_hash``, so
+        mismatched or tampered text is refused rather than trusted (see
+        :func:`_page_with_supplied_text`). When a page's text is neither embedded in the artifact
+        nor found (and verified) here, every check resting on it comes back UNKNOWN — ``verified
+        is None``, tallied under ``counts["unchecked"]`` — never a silent ``False`` and never
+        dropped from the count.
     :returns: ``{"pages", "nodes": [{node_id, kind, value, page_id, url, verified, fail_reason,
         drifted}], "counts": {"verified", "failed", "unchecked", "source", "derived",
         "page_drift"}}``.
     :raises: nothing — an artifact with no nodes reports zeroes.
     """
     graph = EvidenceGraph.from_dict(artifact or {})
+    if pages:
+        supplied = {str(p.get("page_id")): p for p in pages
+                    if isinstance(p, dict) and p.get("page_id") is not None}
+        if supplied:
+            for page_id, page in list(graph._pages.items()):
+                graph._pages[page_id] = _page_with_supplied_text(page, supplied)
     counts = {"verified": 0, "failed": 0, "unchecked": 0, "source": 0, "derived": 0,
               "page_drift": 0}
     rows: List[Dict[str, Any]] = []
@@ -1507,8 +1576,13 @@ def reverify_graph(artifact: Dict[str, Any]) -> Dict[str, Any]:
         counts["source"] += 1
         page = graph.page(node.page_id)
         match = verify_value_against_stored_page(page, node.value)
-        drifted = bool(page) and not page.get("truncated") and hash_page_text(
-            str(page.get("text", ""))) != str(page.get("content_hash", ""))
+        # Drift is a claim about text IN HAND disagreeing with what was recorded, never about
+        # text that simply isn't there (a new-shape artifact whose text was neither embedded nor
+        # supplied via `pages=`) -- that is unverifiable, not drifted, and must not masquerade as
+        # a finding here (see `_page_with_supplied_text` / the `pages=` argument above).
+        page_text = str((page or {}).get("text") or "")
+        drifted = (bool(page) and bool(page_text) and not page.get("truncated")
+                  and hash_page_text(page_text) != str(page.get("content_hash", "")))
         if drifted:
             counts["page_drift"] += 1
         verdicts[node.id] = match.verified
