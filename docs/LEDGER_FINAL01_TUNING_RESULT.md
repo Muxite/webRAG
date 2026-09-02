@@ -31,7 +31,13 @@ selective classifiers, risk falling with confidence: 0.750->0.733->0.667 (eviden
 
 ## Secondary: the frozen KPI set is computable for every arm, with no silent n/a
 
-| arm | L4 unsupported | L8 repeat-visit | L6 tokens | L6 calls | L6 secs | anchor score |
+L8 below is the **per-cell mean** of `1 - distinct/total` visits. Stating the estimator matters:
+the POOLED rate (total redundant visits over total visits) gives 0.338 / 0.091 / 0.143 for the
+same cells. Both are correct and they agree on ordering, but they differ by up to 12 points, and
+an analyst recomputing these figures without knowing which one was used will conclude the numbers
+do not reproduce — one did.
+
+| arm | L4 unsupported | L8 repeat-visit (per-cell mean) | L6 tokens | L6 calls | L6 secs | anchor score |
 |---|---|---|---|---|---|---|
 | evidence_loop | **0.081** | 0.221 | 84,706 | 49.3 | 43.8 | 0.627 |
 | langgraph_react | 0.327 | 0.075 | 33,085 | 17.2 | 18.1 | 0.613 |

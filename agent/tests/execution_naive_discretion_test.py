@@ -139,6 +139,11 @@ async def test_run_complete_test_dispatches_to_the_naive_discretion_runner(monke
     assert dispatched.await_args.kwargs["idea_settings"] == {"tools_calculator_pack_enabled": True}
     assert set(result) == {
         "test_metadata", "model", "model_metadata", "validation_model", "execution",
+        # `run_config` records the behaviour-changing env a cell was produced under. Added
+        # deliberately: post-run analysis could not determine which env-gated modules were live in
+        # a run, because the filename's cfg hash covers only `variant_specific_settings`, and had
+        # to report a comparison as unresolvable. See `runner.capture_run_config`.
+        "run_config",
         "validation", "infra_failed", "timestamp",
     }
     assert result["execution"] is execution_result

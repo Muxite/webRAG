@@ -7,7 +7,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Mapping, Optional
 
 import logging
 
@@ -89,6 +89,47 @@ def discover_test_modules() -> List[Path]:
     if not tests_dir.exists():
         return []
     return sorted(tests_dir.glob("test_*.py"))
+
+
+#: Env prefixes that switch behaviour and therefore belong in a cell's provenance. The filename's
+#: cfg hash covers only ``variant_specific_settings`` (``idea_test_runner.py``), and every module
+#: added in the 2026-09 phase is switched by an env var — so without this, two cells produced by
+#: materially different systems are indistinguishable after the fact. A post-run analyst hit
+#: exactly that: they could not determine which mechanisms were live in a run and had to report
+#: the comparison as unresolvable.
+_RUN_CONFIG_PREFIXES = ("LEDGER_", "IDEA_TEST_")
+
+#: Individually watched vars that carry no prefix but change what a run IS.
+_RUN_CONFIG_EXTRAS = ("LLM_SEED", "LLM_PROVIDER", "SEARCH_PROVIDER")
+
+#: Substrings that disqualify a variable however it is named. A provenance block travels inside a
+#: result file that gets shared, diffed and pasted into handoffs, so nothing key-shaped may enter
+#: it — a rule worth keeping even though no watched prefix carries a secret today.
+_RUN_CONFIG_FORBIDDEN = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "AUTH")
+
+
+def capture_run_config(environ: Optional[Mapping[str, str]] = None) -> Dict[str, str]:
+    """The behaviour-changing environment this cell was produced under.
+
+    Telemetry only — nothing reads it back. It exists so a stored cell can answer "what
+    configuration made you?", which the filename's cfg hash cannot: that hash covers only
+    ``variant_specific_settings``, while the modules this project ships are env-gated.
+
+    An UNSET flag is omitted rather than recorded as its default. Writing ``"0"`` would assert the
+    run took the off-path when in truth the code's own default decided, and that default may
+    since have changed — absent is not zero.
+
+    :param environ: environment to read; defaults to the real one.
+    :returns: ``{name: value}`` for watched, non-secret variables that are actually set.
+    """
+    source = os.environ if environ is None else environ
+    captured: Dict[str, str] = {}
+    for name, value in source.items():
+        if any(bad in name.upper() for bad in _RUN_CONFIG_FORBIDDEN):
+            continue
+        if name.startswith(_RUN_CONFIG_PREFIXES) or name in _RUN_CONFIG_EXTRAS:
+            captured[name] = str(value)
+    return dict(sorted(captured.items()))
 
 
 async def run_complete_test(
@@ -322,5 +363,8 @@ async def run_complete_test(
         "execution": execution_result,
         "validation": validation_result,
         "infra_failed": infra_failed,
+        # What configuration produced this cell. See `capture_run_config`: without it, an
+        # env-gated module leaves no trace and a later comparison cannot be validated.
+        "run_config": capture_run_config(),
         "timestamp": datetime.utcnow().isoformat(),
     }
