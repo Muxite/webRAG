@@ -96,27 +96,42 @@ class AgentIO:
         :returns: Response text or None.
         """
         started_at = time.perf_counter()
-        success = False
-        error_text = None
         try:
-            response = await self._with_timeout(
+            return await self._with_timeout(
                 self.connector_llm.query_llm(payload, model_name=model_name),
                 timeout_seconds,
             )
-            success = response is not None
-            return response
-        except Exception as exc:
-            error_text = str(exc)
-            raise
-        finally:
+        except asyncio.TimeoutError as exc:
+            # Bug: this method used to record its OWN ``"llm_call"`` timing unconditionally in a
+            # ``finally`` block, on top of the one ``ConnectorLLM.query_llm`` already records
+            # internally for every call it completes (success or a caught failure) -- doubling
+            # every real call into two "llm_call" timing entries in ``telemetry.timings``.
+            # Verified live: several ``ledgerfinal01_*`` cells (e.g. the
+            # ``sequential_react_extract``/``evidence_loop`` arms) show exactly 2x as many
+            # "llm_call" timings as real calls (``telemetry.llm_usage`` entries). This did NOT
+            # feed ``observability.llm.calls`` itself (that field reads ``connector_io`` "out"
+            # events, which ``ConnectorLLM`` only ever logs once per call -- see
+            # ``summarize_observability``'s comment on ``llm_calls``), but it did double
+            # ``obs["timings"]["llm_call"]["count"]`` and everything derived from
+            # ``telemetry.timings`` by that name (e.g. ``_summarize_infra``'s per-op counts).
+            #
+            # This except branch is the one case ``ConnectorLLM``'s own instrumentation CANNOT
+            # cover: ``self._with_timeout``'s ``asyncio.wait_for`` cancels the inner
+            # ``connector_llm.query_llm`` coroutine on timeout, throwing a ``CancelledError``
+            # into it -- a ``BaseException``, not caught by connector_llm's own
+            # ``except Exception`` block, so nothing downstream records this call at all unless
+            # this wrapper does. Every other outcome (normal success, or any exception
+            # ``ConnectorLLM`` itself catches and turns into a `None` return) is already recorded
+            # exactly once, by ``ConnectorLLM``, so this method must not also record those.
             if self.telemetry:
                 self.telemetry.record_timing(
                     name="llm_call",
                     started_at=started_at,
-                    success=success,
+                    success=False,
                     payload={"model": model_name or payload.get("model") or self.connector_llm.get_model()},
-                    error=error_text,
+                    error=str(exc),
                 )
+            raise
 
     async def query_llm_with_fallback(
         self,

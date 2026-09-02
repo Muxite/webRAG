@@ -29,7 +29,7 @@ import re
 import time
 from dataclasses import dataclass
 from typing import (
-    Any, Awaitable, Callable, Dict, List, Optional, Sequence, Tuple,
+    Any, Awaitable, Callable, Dict, List, Optional, Sequence, Tuple, Union,
 )
 
 _logger = logging.getLogger(__name__)
@@ -94,21 +94,38 @@ class ToolLoopStep:
         name, budget remains), ``"invalid_action_give_up"`` (unrecognized tool name, budget
         exhausted — mirrors ``"malformed_give_up"`` for the invalid-action counter),
         ``"malformed_nudge"`` (unparseable output, budget remains — a nudge should be appended),
-        or ``"malformed_give_up"`` (unparseable output, budget exhausted — the loop is returning
-        the model's last prose as the transcript's tail).
+        ``"malformed_give_up"`` (unparseable output, budget exhausted — the loop is returning
+        the model's last prose as the transcript's tail), or ``"tool_error_give_up"`` (a
+        recognized action dispatched cleanly but the tool itself failed to execute, on
+        ``max_tool_errors`` CONSECUTIVE such turns — mirrors ``"malformed_give_up"`` for the
+        tool-error counter). A tool call whose dispatch errored but hasn't yet hit that streak
+        stays ``kind == "tool_call"`` (so an unmodified caller keeps showing the model the
+        observation and keeps looping) — check :attr:`executed` to tell it apart from a real
+        success.
     :ivar raw_text: The model's raw completion this step.
     :ivar usage: Whatever token-usage object ``call_model`` returned alongside the text (passed
         through untouched; this module never inspects its shape).
     :ivar thought: The parsed ``thought`` field, truncated to the loop's ``thought_chars`` limit.
     :ivar call: The parsed action, when ``kind`` is ``"tool_call"``, ``"finish"``, or
         ``"invalid_action"``.
-    :ivar observation: The tool's result text, when ``kind == "tool_call"``.
+    :ivar observation: The tool's result text, when ``kind == "tool_call"`` or
+        ``"tool_error_give_up"`` — for a failed dispatch this is
+        :func:`tool_error_observation`'s concrete, streak-aware message, not the raw exception
+        text repeated turn after turn.
     :ivar extraction: The :class:`JsonExtraction` this step's decision came from.
     :ivar call_id: A step-scoped id the caller can use to correlate a call with its observation.
     :ivar malformed_count: Consecutive unparseable turns so far, including this one (only
         meaningful when ``kind`` starts with ``"malformed"``).
     :ivar invalid_count: Consecutive unrecognized-action turns so far, including this one (only
         meaningful when ``kind`` starts with ``"invalid_action"``).
+    :ivar executed: Whether a DISPATCHED tool call actually ran. ``True`` (ran and returned a
+        result), ``False`` (dispatched but the tool itself errored — see
+        :func:`_resolve_dispatch`), or ``None`` when no dispatch happened this step at all
+        (``"finish"``, a malformed turn, an invalid action). This is the field that
+        distinguishes "parsed and executed" from "parsed but the tool errored" from "never
+        parsed" — ``kind`` alone conflates the first two under ``"tool_call"``.
+    :ivar tool_error_count: Consecutive tool-dispatch failures so far, including this one (only
+        meaningful when ``executed is False``).
     """
 
     kind: str
@@ -121,10 +138,22 @@ class ToolLoopStep:
     call_id: str = ""
     malformed_count: int = 0
     invalid_count: int = 0
+    executed: Optional[bool] = None
+    tool_error_count: int = 0
 
 
 CallModel = Callable[[str], Awaitable[Tuple[str, Any]]]
-DispatchTool = Callable[[str, Dict[str, Any]], Awaitable[str]]
+#: A dispatcher may return either shape:
+#:   - ``str`` (the ORIGINAL contract) -- the tool's observation text. Whether the tool actually
+#:     EXECUTED is then inferred from :data:`TOOL_ERROR_PREFIX` sentinel-sniffing (see
+#:     :func:`_resolve_dispatch`), because that is the only signal available from a caller that
+#:     has not been updated to the explicit shape below.
+#:   - ``Tuple[str, bool]`` (explicit, PREFERRED) -- ``(observation, executed)``, where
+#:     ``executed`` is True only when the tool call actually ran without raising. A caller that
+#:     can tell the difference itself (e.g. by catching the dispatch exception rather than
+#:     stringifying it into the observation) should return this shape instead of relying on
+#:     prefix-sniffing, which is a heuristic, not a guarantee.
+DispatchTool = Callable[[str, Dict[str, Any]], Awaitable[Union[str, Tuple[str, bool]]]]
 RenderView = Callable[[], str]
 OnStep = Callable[[ToolLoopStep], None]
 
@@ -726,13 +755,21 @@ def _finish_answer(args: Dict[str, Any]) -> str:
 
 def _record_tool_turn_timing(
     telemetry: Any, started_at: float, *, action: str, extraction: JsonExtraction,
-    invalid: bool, success: bool,
+    invalid: bool, success: bool, executed: Optional[bool] = None,
 ) -> None:
     """One ``telemetry.record_timing(...)`` per tool turn, following this repo's existing
     convention (see e.g. ``agent_io.py``'s ``llm_call`` timings) — a new payload shape, not a
     parallel telemetry mechanism. ``telemetry`` is duck-typed (only ``.record_timing`` is used)
     so this module never needs to import :mod:`agent.app.telemetry`.
 
+    :param success: The step's OVERALL outcome (parsed AND, if a tool was dispatched, executed
+        cleanly) — this is what a turn-level pass/fail reader wants.
+    :param executed: Whether a tool was actually dispatched and ran: ``True``/``False`` when a
+        recognized action was dispatched this turn, ``None`` when it never got that far
+        (malformed output, an unrecognized action, or a bare ``finish``). Recorded in the
+        payload alongside ``success`` so an analyst can tell "parsed and executed" apart from
+        "parsed but the tool itself errored" apart from "never parsed" — three cases ``success``
+        alone collapses into two.
     :raises: Never — telemetry must not fail the run it is observing.
     """
     if telemetry is None:
@@ -749,10 +786,68 @@ def _record_tool_turn_timing(
                 "repaired": extraction.repaired,
                 "repair_attempts": extraction.repair_attempts,
                 "invalid_action": invalid,
+                "executed": executed,
             },
         )
     except Exception as exc:  # noqa: BLE001 — telemetry must never fail a run
         _logger.warning("[TOOL-EMULATION] telemetry.record_timing failed: %s", exc)
+
+
+#: The prefix ``_invoke_tool`` (``agent/app/langgraph_solver.py``) already puts on any observation
+#: it produces from a caught dispatch exception, per its own docstring ("returns the tool's
+#: string result, or a ``TOOL ERROR: ...`` observation"). Until a caller migrates its
+#: ``DispatchTool`` to the explicit ``(text, executed)`` shape, this sentinel is the only channel
+#: this module has for telling "the tool ran and returned this" apart from "the tool never ran,
+#: here is why" when a dispatcher returns a bare string.
+TOOL_ERROR_PREFIX = "TOOL ERROR:"
+
+#: Consecutive tool-dispatch FAILURES (recognized action, but the tool itself errored) tolerated
+#: before the loop gives up — same shape as :data:`MAX_MALFORMED_TURNS_DEFAULT` and
+#: :data:`MAX_INVALID_ACTIONS_DEFAULT`, so a model stuck repeating the same broken call (e.g. one
+#: that always fails a search backend's schema validation) cannot burn the entire step budget on
+#: turns that were never going to produce a result either.
+MAX_TOOL_ERRORS_DEFAULT = 3
+
+
+async def _resolve_dispatch(
+    dispatch_tool: "DispatchTool", action: str, args: Dict[str, Any],
+) -> Tuple[str, bool]:
+    """Call ``dispatch_tool`` and resolve whether the tool actually executed.
+
+    Accepts either return shape documented on :data:`DispatchTool`: a plain ``str`` (executed
+    inferred via :data:`TOOL_ERROR_PREFIX` sentinel-sniffing) or an explicit
+    ``Tuple[str, bool]``.
+
+    :returns: ``(observation_text, executed)``.
+    """
+    result = await dispatch_tool(action, args)
+    if isinstance(result, tuple):
+        observation, executed = result
+        return str(observation), bool(executed)
+    observation = str(result)
+    return observation, not observation.startswith(TOOL_ERROR_PREFIX)
+
+
+def tool_error_observation(action: str, raw_observation: str, streak: int) -> str:
+    """A concrete, actionable observation for a turn whose dispatched tool call did NOT execute
+    — instead of the caller's raw exception text, repeated verbatim turn after turn with nothing
+    telling the model it is repeating or what to change, which is what a step budget silently
+    burned on identical failing turns looks like from the trace.
+
+    :param action: The tool name that was dispatched.
+    :param raw_observation: What the dispatcher actually returned (e.g. ``_invoke_tool``'s
+        ``"TOOL ERROR: ValidationError: ..."`` text).
+    :param streak: How many CONSECUTIVE turns (including this one) ``action`` has failed to
+        execute — included so a model repeating the same broken call can see that it IS
+        repeating, not just what broke this one time.
+    :returns: A model-facing observation naming the tool, the failure, and the streak.
+    """
+    detail = (raw_observation or "").strip() or "no detail returned"
+    return (
+        f"TOOL EXECUTION FAILED — '{action}' did NOT run (attempt {streak} in a row): {detail}. "
+        "This is not a result to build on. Check the argument names/types this tool expects and "
+        "issue a corrected call, or use a different tool."
+    )
 
 
 def _record_json_telemetry(hook: Any, raw_text: str, parsed_ok: bool) -> None:
@@ -847,6 +942,7 @@ async def run_tool_loop(
     turns: int,
     max_malformed_turns: int = MAX_MALFORMED_TURNS_DEFAULT,
     max_invalid_actions: int = MAX_INVALID_ACTIONS_DEFAULT,
+    max_tool_errors: int = MAX_TOOL_ERRORS_DEFAULT,
     thought_chars: int = THOUGHT_CHARS_DEFAULT,
     telemetry: Any = None,
     json_telemetry_hook: Optional[Callable[[str, bool], None]] = None,
@@ -867,9 +963,10 @@ async def run_tool_loop(
         next (before this loop's own :data:`STEP_SUFFIX` is appended).
     :param call_model: ``(user_prompt) -> (raw_completion_text, usage)``. The system/protocol
         prompt is the caller's concern (fixed for the whole loop), not this function's.
-    :param dispatch_tool: ``(action_name, args) -> observation_text``. Called only for a
-        recognized non-``finish`` action; never raises to this loop's caller (a tool failure is
-        the dispatcher's own concern to turn into an observation string).
+    :param dispatch_tool: ``(action_name, args) -> observation_text`` (or ``(observation, executed)``
+        — see :data:`DispatchTool`). Called only for a recognized non-``finish`` action; never
+        raises to this loop's caller (a tool failure is the dispatcher's own concern to turn into
+        an observation string, or an explicit ``executed=False``).
     :param on_step: Called once per step with a :class:`ToolLoopStep`; must apply the step to the
         caller's transcript (this loop calls ``render_view`` again next turn expecting that).
     :param turns: Maximum number of model turns.
@@ -878,6 +975,9 @@ async def run_tool_loop(
         inline-argument split and fuzzy match both fail to resolve the name) before giving up —
         the same shape as ``max_malformed_turns``, so a model stuck repeating a wrong tool name
         cannot burn the entire step budget either.
+    :param max_tool_errors: Consecutive tool-dispatch FAILURES (recognized action, but the tool
+        itself errored — see :func:`_resolve_dispatch`) tolerated before the loop gives up, the
+        same shape again for a model stuck repeating a call that never executes.
     :param thought_chars: How much of a parsed ``thought`` field survives into the step.
     :param telemetry: Optional duck-typed object exposing ``record_timing`` (see
         :func:`_record_tool_turn_timing`); None records nothing.
@@ -895,6 +995,7 @@ async def run_tool_loop(
     tools_by_name = {t.name: t for t in tools}
     malformed = 0
     invalid_streak = 0
+    tool_error_streak = 0
 
     for step in range(turns):
         started_at = time.perf_counter()
@@ -914,7 +1015,7 @@ async def run_tool_loop(
             ))
             _record_tool_turn_timing(
                 telemetry, started_at, action="", extraction=extraction,
-                invalid=False, success=False,
+                invalid=False, success=False, executed=None,
             )
             if give_up:
                 _logger.warning(
@@ -942,7 +1043,7 @@ async def run_tool_loop(
             ))
             _record_tool_turn_timing(
                 telemetry, started_at, action="finish", extraction=extraction,
-                invalid=False, success=True,
+                invalid=False, success=True, executed=None,
             )
             return
 
@@ -966,7 +1067,7 @@ async def run_tool_loop(
             ))
             _record_tool_turn_timing(
                 telemetry, started_at, action=action, extraction=extraction,
-                invalid=True, success=False,
+                invalid=True, success=False, executed=None,
             )
             if give_up:
                 _logger.warning(
@@ -978,15 +1079,49 @@ async def run_tool_loop(
             continue
 
         invalid_streak = 0
-        observation = await dispatch_tool(action, args)
+        raw_observation, executed = await _resolve_dispatch(dispatch_tool, action, args)
         call = ToolCall(name=action, args=args, thought=thought)
+
+        if executed:
+            tool_error_streak = 0
+            on_step(ToolLoopStep(
+                kind="tool_call", raw_text=raw_text, usage=usage, thought=thought,
+                call=call, observation=raw_observation, extraction=extraction, call_id=call_id,
+                executed=True,
+            ))
+            _record_tool_turn_timing(
+                telemetry, started_at, action=action, extraction=extraction,
+                invalid=False, success=True, executed=True,
+            )
+            continue
+
+        # The action parsed and dispatched, but the tool itself did not execute (schema error,
+        # backend exception, ...) -- bounded the same way malformed/invalid streaks are, so a
+        # model stuck repeating one broken call cannot silently burn the whole step budget on
+        # turns that were never going to produce a result. Kept at ``kind == "tool_call"`` while
+        # under the streak limit (not a new kind) so an UNMODIFIED caller keeps appending the
+        # observation to its transcript and keeps looping exactly as it already does for a
+        # successful call -- only ``executed``/``success`` and the observation TEXT distinguish
+        # this from a real success; only the terminal give-up gets a distinct kind.
+        tool_error_streak += 1
+        give_up = tool_error_streak >= max_tool_errors
+        clear_observation = tool_error_observation(action, raw_observation, tool_error_streak)
         on_step(ToolLoopStep(
-            kind="tool_call", raw_text=raw_text, usage=usage, thought=thought,
-            call=call, observation=observation, extraction=extraction, call_id=call_id,
+            kind="tool_error_give_up" if give_up else "tool_call",
+            raw_text=raw_text, usage=usage, thought=thought,
+            call=call, observation=clear_observation, extraction=extraction, call_id=call_id,
+            executed=False, tool_error_count=tool_error_streak,
         ))
         _record_tool_turn_timing(
             telemetry, started_at, action=action, extraction=extraction,
-            invalid=False, success=True,
+            invalid=False, success=False, executed=False,
         )
+        if give_up:
+            _logger.warning(
+                "[TOOL-EMULATION] %d consecutive tool-execution failures on action %r; giving "
+                "up instead of burning the remaining budget on a call that keeps not running: %s",
+                tool_error_streak, action, raw_observation,
+            )
+            return
 
     raise ToolLoopExhausted(f"tool loop exhausted after {turns} turn(s) without a finish action")

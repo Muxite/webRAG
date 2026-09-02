@@ -144,8 +144,33 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
     llm_completion_words = 0
     llm_prompt_tokens = 0
     llm_completion_tokens = 0
+
+    # Bug: this used to increment ``llm_calls`` once for EVERY ``connector_io`` event tagged
+    # ``connector == "ConnectorLLM"`` -- but a real call always logs a MATCHED PAIR of those, one
+    # "in" (before the call) and one "out" (after it): see ``ConnectorLLM.query_llm``'s own
+    # ``_record_io`` calls (both its success and its caught-failure branch each log exactly one
+    # "in" and one "out"), and ``langgraph_solver._record_io_parity``'s synthesized "in"/"out"
+    # pair per assistant turn (covers BOTH LangGraph transports -- native tool-calling and the
+    # emulated prompted-JSON loop -- neither of which touches ``ConnectorLLM`` directly). So the
+    # old count was always exactly 2x the real number of calls. Verified live: `phi3_both_210`
+    # (agent/idea_test_results/phi3_both_210_phi3:mini_langgraph_react_*.json) has 35 real model
+    # turns and reported ``llm.calls: 70``.
+    #
+    # Counting only the "out" direction (every call logs exactly one, success or failure alike)
+    # gives the true call count directly -- confirmed against ``telemetry.llm_usage`` (also one
+    # entry per real call) on every transport this repo has: the native AgentIO/ConnectorLLM
+    # engine, LangGraph's native tool-calling arm, and the emulated arm.
+    #
+    # (``telemetry.timings`` -- the ground truth for every OTHER count in this function -- was
+    # considered here too, but it has two gaps this field can't afford: LangGraph's native
+    # tool-calling transport records no per-call timing at all (only the synthesized
+    # ``connector_io`` parity events exist for it, which would read as a hard 0, not "unknown"),
+    # and a SEPARATE bug -- fixed at its source in ``agent_io.py``'s ``AgentIO.query_llm``, which
+    # used to record its own redundant ``"llm_call"`` timing on top of ``ConnectorLLM``'s own --
+    # left already-stored cells with a doubled ``"llm_call"`` timing count that this function
+    # cannot retroactively de-duplicate. The ``connector_io`` "out" events are not affected by
+    # either gap: ``ConnectorLLM`` logs them itself, once per call, independent of ``AgentIO``.)
     llm_calls = 0
-    
     for entry in telemetry.events:
         if entry.get("event") != "connector_io":
             continue
@@ -153,12 +178,16 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
         if payload.get("connector") != "ConnectorLLM":
             continue
         io_payload = payload.get("payload") or {}
+        if payload.get("direction") == "out":
+            llm_calls += 1
+        # char/word totals are NOT part of this bug -- "in" carries prompt_chars/words, "out"
+        # carries completion_chars/words, so summing both directions' payloads was already
+        # additive, never doubled.
         llm_prompt_chars += int(io_payload.get("prompt_chars", 0))
         llm_prompt_words += int(io_payload.get("prompt_words", 0))
         llm_completion_chars += int(io_payload.get("completion_chars", 0))
         llm_completion_words += int(io_payload.get("completion_words", 0))
-        llm_calls += 1
-    
+
     for usage in telemetry.llm_usage:
         usage_payload = usage.get("usage") or {}
         llm_prompt_tokens += int(usage_payload.get("prompt_tokens", 0))
@@ -184,29 +213,50 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
             chroma_retrieve_chars += count_chars(doc)
             chroma_retrieve_words += count_words(doc)
     
-    search_count = 0
-    search_chars = 0
-    search_words = 0
+    # Bug: this was published as ``search["count"]`` -- read by several scripts (see the
+    # observability-counters report) as though it were the number of SEARCH CALLS made. It is
+    # not: it is the number of RESULT DOCUMENTS seen across every search call (one
+    # ``record_document_seen`` per result item -- see ``AgentIO.search``'s loop over
+    # ``results``), so it scales with each call's result count, not the call count. Verified
+    # live against ``agent/idea_test_results/ledgerfinal01_*`` cells: every one of them has
+    # this value at EXACTLY 6x the real number of ``search`` timing entries (6 results/call).
+    # Kept, honestly named, as ``search["documents_seen"]`` below -- it is a real and useful
+    # number, just not a call count.
+    search_documents_seen_count = 0
+    search_documents_seen_chars = 0
+    search_documents_seen_words = 0
     visit_count = 0
     visit_chars = 0
     visit_words = 0
-    
+
     for entry in telemetry.documents_seen:
         source = entry.get("source")
         document = entry.get("document") or {}
         if source == "search":
-            search_count += 1
+            search_documents_seen_count += 1
             text = " ".join(
                 str(value) for value in [document.get("title"), document.get("url"), document.get("description")] if value
             )
-            search_chars += count_chars(text)
-            search_words += count_words(text)
+            search_documents_seen_chars += count_chars(text)
+            search_documents_seen_words += count_words(text)
         elif source == "visit":
+            # Unlike search, one visit call records exactly one document (the page itself --
+            # see ``AgentIO.visit``'s single ``record_document_seen`` call), so this count is
+            # already 1:1 with real visit calls and needs no analogous fix.
             visit_count += 1
             content = document.get("content") or ""
             visit_chars += count_chars(content)
             visit_words += count_words(content)
-    
+
+    # The TRUE call count: one ``telemetry.record_timing(name="search", ...)`` per real search
+    # operation (``AgentIO.search``), success or failure alike -- see ``timings_summary`` below,
+    # built from the same ground truth. Computed directly here (not read off
+    # ``timings_summary``) so this block does not depend on that dict's construction order.
+    # Absent is legitimately 0 here, not unknown: ``telemetry.timings`` is the complete log of
+    # every operation a run performed, so no "search" entries in it means no search call
+    # happened, not that the count couldn't be computed.
+    search_call_count = sum(1 for entry in telemetry.timings if entry.get("name") == "search")
+
     # Per-search provenance ("corpus"/"live"/"none"), when a backend records it -- currently
     # only ConnectorSearchCorpus (agent_io.search folds ``connector_search.provenance`` into
     # each "search" timing's payload as ``search_provenance``). Every other backend, and every
@@ -382,10 +432,20 @@ def summarize_observability(result: Dict[str, Any], telemetry, model_name: str =
             },
         },
         "search": {
-            "count": search_count,
-            "chars": search_chars,
-            "words": search_words,
-            "kilobytes": round(search_chars / 1024, 2),
+            # The real call count -- see ``search_call_count``'s definition above. This is the
+            # field every existing reader (``scripts/bench_common.py``, ``analyze_dag_mechanism.py``,
+            # ``replay_chain_failures.py``, ``capspec_report.py``, ``agent/app/testing/rubric.py``)
+            # already reads as a call count; it was simply wrong before this fix, not renamed.
+            "count": search_call_count,
+            # Renamed from the old (wrong) ``count`` -- the number of RESULT DOCUMENTS seen
+            # across every search call, not a call count. See the comment above
+            # ``search_documents_seen_count`` for how this was verified.
+            "documents_seen": {
+                "count": search_documents_seen_count,
+                "chars": search_documents_seen_chars,
+                "words": search_documents_seen_words,
+                "kilobytes": round(search_documents_seen_chars / 1024, 2),
+            },
             **({
                 "live_fallbacks": search_live_fallbacks,
                 "corpus_hits": search_corpus_hits,
