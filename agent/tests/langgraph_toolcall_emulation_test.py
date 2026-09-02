@@ -594,3 +594,31 @@ def test_offtheshelf_execution_emulation_can_be_disabled_by_env(monkeypatch):
     _result, captured = _run_offtheshelf(monkeypatch, {
         "final_deliverable": "a", "success": True, "observability": {}})
     assert captured["tool_call_emulation"] is False
+
+
+def test_a_give_up_turn_is_not_silently_dropped_from_the_transcript():
+    """`on_step` dispatched on a closed set of kinds and appended NOTHING for the rest.
+
+    `prompted_tools` grew two give-up kinds (`invalid_action_give_up`, `tool_error_give_up`) for
+    bounded failure loops. Neither had a branch here, so when the loop gave up, the model's last
+    output vanished from the transcript that `_final_answer` then reads — the run's answer came
+    from some earlier turn, or from nothing. The kind that already had a branch
+    (`malformed_give_up`) shows the intended shape: keep the model's own words.
+
+    The assertion is deliberately about an UNKNOWN kind rather than the two current ones: a
+    handler that drops what it does not recognise will lose the next kind somebody adds, which is
+    exactly how these two were lost.
+    """
+    from agent.app.langgraph_solver import _transcript_messages_for_step
+    from agent.app.prompted_tools import ToolLoopStep
+
+    for kind in ("invalid_action_give_up", "tool_error_give_up", "some_future_kind"):
+        step = ToolLoopStep(kind=kind, raw_text="the model's final words", usage=None,
+                            thought="", call=None, observation="", extraction=None,
+                            call_id="emu_9", malformed_count=0)
+
+        messages = _transcript_messages_for_step(step, invalid_names=["search"], nudge="n")
+
+        assert messages, f"{kind} produced no transcript messages at all"
+        assert any("the model's final words" in str(getattr(m, "content", "")) for m in messages), (
+            f"{kind} dropped the model's own output from the transcript")

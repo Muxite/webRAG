@@ -843,6 +843,46 @@ class _NativeGraphTransport:
                 state.messages = graph_state["messages"]
 
 
+
+def _transcript_messages_for_step(step: "ToolLoopStep", *, invalid_names, nudge: str,
+                                  finish_messages=None):
+    """The transcript messages one `ToolLoopStep` contributes, for EVERY kind.
+
+    Extracted from the inline handler and made total. The inline version dispatched on a closed
+    set and appended nothing for anything else, so when `prompted_tools` grew bounded give-ups
+    (`invalid_action_give_up`, `tool_error_give_up`) the model's last output silently vanished
+    from the transcript `_final_answer` reads — a give-up produced an answer drawn from some
+    earlier turn, or from nothing at all.
+
+    The default branch therefore KEEPS the model's own words rather than discarding them: a kind
+    this function has never heard of is still a turn the model spent, and losing it is strictly
+    worse than rendering it plainly.
+
+    :param step: the loop step to render.
+    :param invalid_names: tool names offered to the model, for the invalid-action message.
+    :param nudge: the text appended after an unparseable turn.
+    :param finish_messages: callable building the finish messages, when a finish is possible.
+    :returns: messages to append, in order. Never empty for a step carrying any text.
+    """
+    if step.kind == "malformed_nudge":
+        return [AIMessage(content=step.raw_text, usage_metadata=step.usage),
+                HumanMessage(content=nudge)]
+    if step.kind == "finish" and finish_messages is not None:
+        answer = str((step.call.args or {}).get("answer", "") or "")
+        return list(finish_messages(answer, step.call_id, step.usage))
+    if step.kind == "invalid_action":
+        return [AIMessage(content=step.thought or step.raw_text, usage_metadata=step.usage),
+                HumanMessage(content=invalid_action_message(list(invalid_names)))]
+    if step.kind == "tool_call" and step.call is not None:
+        return [AIMessage(content=step.thought, usage_metadata=step.usage,
+                          tool_calls=[{"name": step.call.name, "args": step.call.args,
+                                       "id": step.call_id}]),
+                ToolMessage(content=step.observation, tool_call_id=step.call_id,
+                            name=step.call.name)]
+    # Every give-up, and anything added later: preserve what the model actually said.
+    return [AIMessage(content=step.thought or step.raw_text, usage_metadata=step.usage)]
+
+
 class _EmulatedToolCallTransport:
     """The same ReAct loop over a text/JSON protocol, for models with no tool-calling endpoint.
 
@@ -939,28 +979,12 @@ class _EmulatedToolCallTransport:
             return await _invoke_tool(self._by_name.get(action), args)
 
         def on_step(step: ToolLoopStep) -> None:
-            if step.kind == "malformed_nudge":
-                transcript.append(AIMessage(content=step.raw_text, usage_metadata=step.usage))
-                transcript.append(HumanMessage(content=_EMULATION_NUDGE))
-            elif step.kind == "malformed_give_up":
-                transcript.append(AIMessage(content=step.raw_text, usage_metadata=step.usage))
-            elif step.kind == "finish":
-                answer = str((step.call.args or {}).get("answer", "") or "")
-                transcript.extend(self._finish_messages(answer, step.call_id, step.usage))
-            elif step.kind == "invalid_action":
-                transcript.append(AIMessage(
-                    content=step.thought or step.raw_text, usage_metadata=step.usage,
-                ))
-                transcript.append(HumanMessage(content=invalid_action_message(
-                    [n for n in self._by_name if n != "finish"])))
-            elif step.kind == "tool_call":
-                transcript.append(AIMessage(
-                    content=step.thought, usage_metadata=step.usage,
-                    tool_calls=[{"name": step.call.name, "args": step.call.args, "id": step.call_id}],
-                ))
-                transcript.append(ToolMessage(
-                    content=step.observation, tool_call_id=step.call_id, name=step.call.name,
-                ))
+            transcript.extend(_transcript_messages_for_step(
+                step,
+                invalid_names=[n for n in self._by_name if n != "finish"],
+                nudge=_EMULATION_NUDGE,
+                finish_messages=self._finish_messages,
+            ))
             state.messages = transcript
 
         turns = max(1, int(recursion_limit) // 2)
