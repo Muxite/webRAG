@@ -105,6 +105,21 @@ def test_a_failed_visit_does_not_extract():
     assert result.extractions == [] and result.pages == []
 
 
+def test_fenced_decision_is_recovered():
+    # A model that wraps its decision in a ```json fence must still be parsed via
+    # prompted_tools.extract_decision, not dropped as invalid JSON (matches the control's fix).
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(side_effect=lambda **kw: {"messages": kw.get("messages", [])})
+    fenced = '```json\n{"thought": "fenced", "action": "finish", "args": {"answer": "FENCED ANSWER"}}\n```'
+    io.query_llm = AsyncMock(side_effect=[fenced])
+    io.search = AsyncMock(return_value=[])
+    io.visit = AsyncMock(return_value="")
+    result = asyncio.run(sxe._run_react_extract(io, TASK, "m", max_steps=6, max_tokens=512))
+    assert result.deliverable == "FENCED ANSWER"
+    io.search.assert_not_awaited()
+    io.visit.assert_not_awaited()
+
+
 def test_forced_synthesis_when_the_model_never_finishes():
     decisions = [{"thought": "search", "action": "search", "args": {"query": "q"}}]
     io = _io(decisions, synth="FORCED SYNTHESIS")

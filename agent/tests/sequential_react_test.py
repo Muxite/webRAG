@@ -87,6 +87,21 @@ def test_react_invalid_json_does_not_crash():
     assert out == "FINAL"  # invalid decision on the last step -> forced synthesis
 
 
+def test_react_fenced_decision_is_recovered():
+    # A model that wraps its decision in a ```json fence (no bare-JSON reply at all) must
+    # still be parsed via prompted_tools.extract_decision, not dropped as invalid JSON.
+    io = MagicMock()
+    io.build_llm_payload = MagicMock(return_value={})
+    fenced = '```json\n{"thought": "fenced", "action": "finish", "args": {"answer": "FENCED ANSWER"}}\n```'
+    io.query_llm = AsyncMock(side_effect=[fenced])
+    io.search = AsyncMock(return_value=[])
+    io.visit = AsyncMock(return_value="")
+    out = asyncio.run(seq._run_react(io, "task", "m", max_steps=6, max_tokens=512))
+    assert out == "FENCED ANSWER"
+    io.search.assert_not_awaited()
+    io.visit.assert_not_awaited()
+
+
 def test_react_list_shaped_decision_does_not_crash():
     # Reasoning models sometimes return the step as a LIST (e.g. [{...}]) instead of a
     # dict; the loop must take the first dict and act on it, not crash on .get().

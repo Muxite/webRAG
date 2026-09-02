@@ -47,6 +47,7 @@ from agent.app.testing.execution_sequential import (
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.testing import json_telemetry as _json_telemetry
+from agent.app.prompted_tools import extract_decision
 
 _logger = logging.getLogger(__name__)
 
@@ -114,12 +115,10 @@ async def _run_react_extract(agent_io: AgentIO, mandate: str, model_name: str, m
         ]
         payload = agent_io.build_llm_payload(messages=messages, json_mode=True, model_name=model_name, temperature=0.1, max_tokens=step_max_tokens)
         raw = await agent_io.query_llm(payload, model_name=model_name)
-        try:
-            decision = json.loads(raw or "{}")
-            _parsed_ok = True
-        except (json.JSONDecodeError, TypeError):
+        decision = extract_decision(raw).value
+        _parsed_ok = decision is not None
+        if decision is None:
             decision = {}
-            _parsed_ok = False
         _json_telemetry.record(model_name, raw, True, _parsed_ok, phase="sequential_react_extract")
         if isinstance(decision, list):
             decision = next((item for item in decision if isinstance(item, dict)), {})

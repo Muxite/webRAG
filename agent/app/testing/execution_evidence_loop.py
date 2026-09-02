@@ -85,6 +85,8 @@ from agent.app.testing.execution import _empty_graph
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.trace_recorder import TraceRecorder, build_trace_path, traces_retained
+from agent.app.prompted_tools import _json_candidates as _pt_json_candidates
+from agent.app.prompted_tools import repair_json_text as _pt_repair_json_text
 
 _logger = logging.getLogger(__name__)
 
@@ -1092,21 +1094,63 @@ def compose_user_prompt(mandate: str, ledger: Ledger, scratchpad: List[str]) -> 
     )
 
 
+#: Same `````json`` fence prompted_tools.extract_decision strips before looking for JSON.
+_FENCE_RE = re.compile(r"```(?:json)?\s*(.+?)```", re.DOTALL)
+
+
 def _loads_first_object(raw: Any) -> Any:
-    """Parse ``raw`` as JSON, tolerating a code fence or surrounding prose. ``None`` on failure."""
+    """Parse ``raw`` as JSON, tolerating a code fence, surrounding prose, or a small
+    deterministic defect (trailing comma, single quotes, unterminated string, unbalanced
+    brackets). ``None`` on failure.
+
+    Reuses ``prompted_tools``'s string-aware balanced-span candidate finder and repair, so this
+    is no longer the greedy ``re.search(r"[\\[{].*[\\]}]")`` that spanned from the FIRST opener to
+    the LAST closer (over-capturing across unrelated JSON-looking fragments). It deliberately does
+    NOT go through ``extract_decision`` itself: that function collapses a bare JSON list to its
+    first dict item, which is right for a single-decision reply but wrong here — one of this
+    module's two callers (:func:`extract_from_page`) legitimately expects a bare list of MANY
+    extraction records when a model drops the ``{"extractions": [...]}`` wrapper (see
+    ``_records_from_payload``), so the parsed shape (dict, list, or scalar) must pass through
+    unchanged.
+    """
     if not isinstance(raw, str) or not raw.strip():
         return None
+    text = raw.strip()
+    fenced_match = _FENCE_RE.search(text)
+    if fenced_match:
+        text = fenced_match.group(1).strip()
+
+    candidates = _pt_json_candidates(text)
+    whole = candidates[0]
+
     try:
-        return json.loads(raw)
+        return json.loads(whole)
     except (json.JSONDecodeError, TypeError):
         pass
-    match = re.search(r"[\[{].*[\]}]", raw, re.DOTALL)
-    if not match:
-        return None
-    try:
-        return json.loads(match.group(0))
-    except (json.JSONDecodeError, TypeError):
-        return None
+
+    repaired_whole = _pt_repair_json_text(whole)
+    if repaired_whole is not None:
+        try:
+            return json.loads(repaired_whole)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    for candidate in candidates[1:]:
+        try:
+            return json.loads(candidate)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    for candidate in candidates[1:]:
+        repaired = _pt_repair_json_text(candidate)
+        if repaired is None:
+            continue
+        try:
+            return json.loads(repaired)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    return None
 
 
 def _check_value(page_text: str, value: str, unit: str):

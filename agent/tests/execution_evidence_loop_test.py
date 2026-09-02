@@ -445,6 +445,35 @@ def test_malformed_decision_json_does_not_crash_the_loop():
     io.search.assert_not_awaited()
 
 
+def test_fenced_decision_is_recovered():
+    # A model that wraps its decision in a ```json fence must still be parsed via the
+    # improved _loads_first_object (no longer a bare json.loads / greedy-regex fallback).
+    io = _io([], page_text="")
+    fenced = '```json\n{"thought": "fenced", "action": "finish", "args": {"answer": "FENCED ANSWER"}}\n```'
+    io.query_llm = AsyncMock(side_effect=[fenced])
+    result = asyncio.run(el.run_evidence_loop(io, "task", "m", max_steps=6, max_tokens=512))
+    assert "FENCED ANSWER" in result.deliverable
+    io.search.assert_not_awaited()
+    io.visit.assert_not_awaited()
+
+
+def test_fenced_extraction_json_is_recovered():
+    # Same fence-recovery fix on the extraction call site (phase="evidence_loop_extract").
+    ledger = el.Ledger.mint("Who wrote Beloved?")
+    page = "Beloved was written by Toni Morrison in 1987."
+    io = _io([], page_text=page)
+    fenced = (
+        '```json\n{"extractions": [{"entity": "' + ledger.rows[0].entity + '", "field": "'
+        + ledger.rows[0].field + '", "value": "Toni Morrison", "verdict": "SUPPORTED", '
+        '"quote": "written by Toni Morrison"}]}\n```'
+    )
+    io.query_llm = AsyncMock(return_value=fenced)
+    records = asyncio.run(el.extract_from_page(io, "m", "Who wrote Beloved?", ledger, page_id="p1",
+                                               page_url="https://a.example", page_text=page))
+    assert len(records) == 1
+    assert records[0].value == "Toni Morrison"
+
+
 def test_a_repeated_search_nudges_instead_of_researching():
     decisions = [
         {"action": "search", "args": {"query": "deepest lake"}},
