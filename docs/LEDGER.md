@@ -3,8 +3,8 @@
 **Codename:** `ledger` · **Status:** pivot declared 2026-08-31 · **Repo:** webRAG (unchanged)
 **Operative plan:** `docs/LEDGER_PLAN_2026-09-01.md` (supersedes the DAG v3 master plan's
 thesis, metric order and build order) · **Latest handoff:**
-`docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md` (prior:
-`docs/handoffs/LEDGER_HANDOFF_2026-09-01.md`)
+`docs/handoffs/LEDGER_TINY_MODEL_PHASE_2026-09-02.md` (prior:
+`docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md`)
 
 ## Operative plan
 
@@ -12,6 +12,8 @@ thesis, metric order and build order) · **Latest handoff:**
   phase. Frozen metric contract, arm-blind auditor, per-arm confidence channel, graded verdict,
   shared prompted tool transport. Retracts "calibration cannot be retrofitted"; records the
   extraction value gate as a negative result; sets the seeded-A/B protocol.
+- **Tiny-model viability: `docs/TINY_MODEL_INVESTIGATION.md`** — why the smallest models scored
+  exactly 0.000 (they read zero pages), and the fixes that moved phi3:mini from 0/6 to 4/6 cells.
 - **Methodology: `docs/LEDGER_METHODOLOGY.md`** — how to improve modules, KPIs and measurement
   here, with each rule tied to the specific failure that produced it, plus ranked alternatives for
   escaping the ~60-paired-task constraint.
