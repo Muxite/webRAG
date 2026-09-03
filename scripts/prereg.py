@@ -165,10 +165,18 @@ def _live_fallbacks(landed_paths: Sequence[Path]) -> Tuple[int, int]:
     a property of the whole run ("this run must not have reached live search at all"), and a
     per-cell rule would let many small leaks pass while each one looked individually harmless.
 
+    A cell that made NO search call at all is a genuine zero, not a missing reading. The block is
+    only populated when a search backend is touched, so a model that never searches (qwen2.5:0.5b
+    invents URLs instead of searching) leaves the key absent while its true live-fallback count is
+    provably 0 -- you cannot fall back on a search you never made. That is read from
+    ``telemetry_raw.timings``, never from ``observability.search.count``, which counted result
+    DOCUMENTS rather than calls before commit 0fa6e733. Without this the gate reports UNKNOWN for
+    exactly the weakest models on the ladder, and blames stale code for it.
+
     :param landed_paths: the cells that actually landed.
-    :returns: ``(total_live_fallbacks, cells_missing_the_field)``. A cell missing the field is
-        counted as MISSING, never as zero -- folding it in as 0 would manufacture a pass the data
-        cannot support.
+    :returns: ``(total_live_fallbacks, cells_missing_the_field)``. A cell missing the field for any
+        OTHER reason is counted as MISSING, never as zero -- folding it in as 0 would manufacture a
+        pass the data cannot support.
     """
     total = 0
     missing = 0
@@ -180,6 +188,15 @@ def _live_fallbacks(landed_paths: Sequence[Path]) -> Tuple[int, int]:
             continue
         search = (((cell.get("execution") or {}).get("observability") or {}).get("search") or {})
         if "live_fallbacks" not in search:
+            # A genuine zero requires POSITIVE evidence that no search ran, which means the
+            # timings block must be PRESENT and search-free. An absent block proves nothing --
+            # telemetry may simply not have been captured -- and folding that in as 0 would be
+            # the "absent is never zero" mistake this gate exists to prevent.
+            telemetry = ((cell.get("execution") or {}).get("telemetry_raw") or {})
+            timings = telemetry.get("timings")
+            if isinstance(timings, list) and not any(
+                    t.get("name") == "search" for t in timings if isinstance(t, dict)):
+                continue      # captured, and no search ran: a real 0
             missing += 1
             continue
         try:
@@ -230,8 +247,10 @@ def _evaluate_abort_conditions(spec: Dict[str, Any], completion_rate: float,
                     "status": "unknown",
                     "threshold": threshold,
                     "value": None,
-                    "detail": (f"{missing} of {len(landed_paths)} cells carry no search-provenance "
-                               "block (written before 88a57429); absent is not zero, so this gate "
+                    "detail": (f"{missing} of {len(landed_paths)} cells made a search but carry "
+                               "no search-provenance block (written before 88a57429); a cell that "
+                               "made no search at all is counted as a real 0, not as missing; "
+                               "absent is not zero, so this gate "
                                "cannot be evaluated for this run"),
                 }
             else:

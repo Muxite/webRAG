@@ -260,6 +260,51 @@ def _cell_with_search(tmp_path, name, *, live=None):
     return path
 
 
+def _spec_of_cells_without_provenance(tmp_path, *, timings):
+    """The full 8-cell grid, every cell lacking the provenance block. ``timings=None`` omits the
+    telemetry block entirely; otherwise it is written verbatim."""
+    execution = {"observability": {"search": {"count": 0}}}
+    if timings is not None:
+        execution["telemetry_raw"] = {"timings": timings}
+    for task in ("122", "130"):
+        for variant in ("evidence_loop", "langgraph_react"):
+            for rep in (1, 2):
+                name = f"ledger001_{task}_qwen2.5:7b_{variant}_cfgdeadbeef_r{rep}.json"
+                (tmp_path / name).write_text(json.dumps({
+                    "test_metadata": {"test_id": task},
+                    "execution": execution,
+                    "infra_failed": False,
+                }), encoding="utf-8")
+    return {**SPEC, "tasks": ["122", "130"], "arms": ["evidence_loop", "langgraph_react"],
+            "reps": 2, "abort_conditions": {"max_live_fallbacks": 0}}
+
+
+def test_live_fallback_gate_counts_a_cell_that_never_searched_as_a_real_zero(tmp_path):
+    """The provenance block is only written when a search backend is touched, so a model that
+    never searches (qwen2.5:0.5b invents URLs instead) leaves the key absent while its true
+    live-fallback count is provably 0 — you cannot fall back on a search you never made.
+    Without this the gate reports UNKNOWN for exactly the weakest models on the ladder."""
+    spec = _spec_of_cells_without_provenance(tmp_path, timings=[{"name": "visit"}])
+    gate = prereg.audit(spec, str(tmp_path))["gates"]["max_live_fallbacks"]
+    assert gate["status"] == "pass", gate
+
+
+def test_live_fallback_gate_is_unknown_when_telemetry_is_absent_entirely(tmp_path):
+    """Absent is never zero. A missing timings block proves nothing about whether a search ran —
+    telemetry may simply not have been captured — so it must NOT be folded in as a genuine 0."""
+    spec = _spec_of_cells_without_provenance(tmp_path, timings=None)
+    gate = prereg.audit(spec, str(tmp_path))["gates"]["max_live_fallbacks"]
+    assert gate["status"] == "unknown", gate
+
+
+def test_live_fallback_gate_is_unknown_when_a_search_ran_but_left_no_provenance(tmp_path):
+    """The original stale-code case must still read UNKNOWN: a search DID run, so its
+    live-fallback count is a real unknown rather than a provable zero."""
+    spec = _spec_of_cells_without_provenance(tmp_path, timings=[{"name": "search"}])
+    gate = prereg.audit(spec, str(tmp_path))["gates"]["max_live_fallbacks"]
+    assert gate["status"] == "unknown", gate
+
+
 def test_live_fallback_gate_passes_when_every_cell_recorded_zero(tmp_path):
     """The gate became checkable when 88a57429 persisted per-search provenance.
 
