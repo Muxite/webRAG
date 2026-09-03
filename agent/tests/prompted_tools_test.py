@@ -668,3 +668,141 @@ def test_a_finish_with_no_answerish_slot_at_all_still_finishes_empty():
 
     assert step.kind == "finish"
     assert step.call.args["answer"] == ""
+
+
+# ------------------------------------------- widened answer-slot reading (2026-09-03, FIX 1)
+
+
+def test_a_finish_with_numbered_part_suffixed_answer_slots_is_recovered():
+    """The shape phi3:mini actually emits (`phi3_both_213`, a real stored cell) is
+    `answer_part1`/`answer_part2`, not the bare `answer1`/`answer2` the old regex matched. Both
+    parts must survive, in the order the model numbered them."""
+    step = _finish_loop(
+        '{"action": "finish", "args": '
+        '{"answer_part1": "419.7 m", "final_answer_2": "330 m"}}'
+    )
+
+    assert step.kind == "finish"
+    assert "419.7 m" in step.call.args["answer"]
+    assert "330 m" in step.call.args["answer"]
+    assert step.call.args["answer"].index("419.7 m") < step.call.args["answer"].index("330 m")
+
+
+def test_the_widened_regex_still_rejects_a_word_that_merely_contains_answer_as_a_substring():
+    """Widening which slot NAME is read must not turn into matching any identifier that happens
+    to contain one of the tracked words -- `answerable`/`output_format`/`resultset` are not
+    answer slots and must not be scraped."""
+    step = _finish_loop(
+        '{"action": "finish", "args": '
+        '{"answerable": "not this", "output_format": "not this either", "resultset": "nope"}}'
+    )
+
+    assert step.kind == "finish"
+    assert step.call.args["answer"] == ""
+
+
+def test_a_finish_answer_slot_shaped_as_a_dict_yields_its_text_not_its_repr():
+    """Measured on `phi3_both_213`: phi3:mini's answer_part slots were dicts, `{"text": ...,
+    "source": ...}`. Reading the dict's own `repr` would leak `{'text': ...}` literally into the
+    submitted answer; only the `text` field is the actual answer content."""
+    step = _finish_loop(
+        '{"action": "finish", "args": {"answer_part1": '
+        '{"text": "Wood Buffalo National Park is approximately 44,741 square kilometers.", '
+        '"source": "https://en.wikipedia.org/wiki/Wood_Buffalo_National_Park"}}}'
+    )
+
+    assert step.kind == "finish"
+    assert step.call.args["answer"] == (
+        "Wood Buffalo National Park is approximately 44,741 square kilometers."
+    )
+    assert "{" not in step.call.args["answer"]
+    assert "source" not in step.call.args["answer"]
+
+
+def test_a_finish_answer_slot_shaped_as_a_dict_with_no_text_field_yields_nothing():
+    """Nothing invented: a dict slot with no `text` field must not fall back to some other field
+    or to the dict's `repr` -- that would be guessing at content, not just being lenient about a
+    slot name."""
+    step = _finish_loop(
+        '{"action": "finish", "args": {"answer_part1": {"source": "https://example.com"}}}'
+    )
+
+    assert step.kind == "finish"
+    assert step.call.args["answer"] == ""
+
+
+def test_a_sibling_answer_shaped_key_outside_args_is_recovered_only_for_finish():
+    """A real stored cell (`phi3_both_213`) put `answer_part2` OUTSIDE `args` entirely, sibling
+    to `args` itself, after a malformed turn closed `args` early. Since this path only ever runs
+    from the `action == "finish"` branch, treating that sibling key as more answer content is
+    safe -- it can never be mistaken for a tool call's own arguments, which go through a
+    completely different branch of the loop."""
+    step = _finish_loop(
+        '{"action": "finish", "args": {"answer_part1": "part one"}, '
+        '"answer_part2": "part two"}'
+    )
+
+    assert step.kind == "finish"
+    assert "part one" in step.call.args["answer"]
+    assert "part two" in step.call.args["answer"]
+
+
+def test_an_explicit_answer_in_args_still_wins_over_a_sibling_top_level_key():
+    """The hard constraint from `test_a_plain_answer_slot_still_wins_over_any_alias` extended to
+    the new sibling path: an explicit `args["answer"]` must never be diluted by ANYTHING else,
+    including a sibling top-level key that looks answer-shaped."""
+    step = _finish_loop(
+        '{"action": "finish", "args": {"answer": "the real one"}, '
+        '"answer_part2": "must not appear"}'
+    )
+
+    assert step.call.args["answer"] == "the real one"
+
+
+def test_extract_decision_and_finish_answer_recover_the_phi3_both_213_shape():
+    """End-to-end reproduction of the real stored cell that motivated this fix: a malformed
+    finish whose `args` closed early with a stray period, leaving `answer_part2` stranded at the
+    top level. Before this fix, `extract_decision` locked onto an unrelated inner span (losing
+    the `action` key entirely) and the raw JSON string leaked into the deliverable."""
+    raw = (
+        '{\n "thought": "I have found two Wikipedia pages with accurate area data.",\n'
+        ' "action": "finish",\n "args": {\n'
+        '   "answer_part1": {"text": "Wood Buffalo National Park is approximately 44,741 square'
+        ' kilometers in size.", "source": "https://en.wikipedia.org/wiki/Wood_Buffalo_National_'
+        'Park"}.\n },\n'
+        ' "answer_part2": {"text": "Kruger National Park covers an area of 19,623 km^2", '
+        '"source": "https://en.wikipedia.org/wiki/Kruger_National_Park"}.\n }\n}'
+    )
+
+    extraction = extract_decision(raw)
+
+    assert extraction.value is not None
+    assert extraction.value["action"] == "finish"
+    assert extraction.value["args"]["answer_part1"]["text"].startswith("Wood Buffalo")
+    assert extraction.value["answer_part2"]["text"].startswith("Kruger")
+
+    from agent.app.prompted_tools import _finish_answer
+
+    answer = _finish_answer(extraction.value["args"], extraction.value)
+    assert "Wood Buffalo National Park is approximately 44,741 square kilometers" in answer
+    assert "Kruger National Park covers an area of 19,623 km^2" in answer
+    assert not answer.startswith("{")
+
+
+# ------------------------------------------- stray-period repair (2026-09-03, FIX 1)
+
+
+def test_extract_decision_repairs_a_stray_period_before_a_closer():
+    result = extract_decision('{"action": "finish", "args": {"answer": "42"}.\n}')
+    assert result.value == {"action": "finish", "args": {"answer": "42"}}
+    assert result.repaired is True
+
+
+def test_fix_stray_period_does_not_touch_a_sentence_ending_period_inside_a_string():
+    """A legitimate sentence-ending period inside a string value (followed by more string
+    content and a closing quote, never directly by a closer) must survive untouched."""
+    text = '{"action": "finish", "args": {"answer": "It is big. Very big."}}'
+    assert repair_json_text(text) is None  # already valid JSON -- nothing to fix
+    result = extract_decision(text)
+    assert result.value == {"action": "finish", "args": {"answer": "It is big. Very big."}}
+    assert result.repaired is False

@@ -391,6 +391,54 @@ def _fix_trailing_comma(text: str) -> Optional[str]:
     return fixed if changed else None
 
 
+def _fix_stray_period_before_closer(text: str) -> Optional[str]:
+    """``{"a": {...}.\n}`` -> drop the stray ``.`` before the closer, same shape as
+    :func:`_fix_trailing_comma` but for a period a model dropped in place of (or in addition to)
+    the comma/closer it meant, seen in a real stored cell (``phi3_both_213``) that closed a
+    nested answer object with ``}.`` instead of plain ``}``.
+
+    String-aware: a period only counts as "stray" when it sits OUTSIDE any quoted string and is
+    immediately (modulo whitespace) followed by a closer, so a sentence ending in a period inside
+    a legitimate string value (e.g. ``"...in size."``) is left completely untouched -- that
+    period is followed by more string content and a closing quote, never directly by ``}``/``]``.
+    """
+    out: List[str] = []
+    changed = False
+    in_string = False
+    escaped = False
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == ".":
+            j = i + 1
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j < n and text[j] in "}]":
+                changed = True
+                i += 1
+                continue  # drop the stray period; whitespace + closer fall through untouched
+        out.append(ch)
+        i += 1
+    fixed = "".join(out)
+    return fixed if changed else None
+
+
 _CURLY_QUOTE_TRANSLATION = str.maketrans({"“": '"', "”": '"', "‘": "'", "’": "'"})
 
 
@@ -630,6 +678,7 @@ _REPAIR_FIXERS: Tuple[Callable[[str], Optional[str]], ...] = (
     _fix_kv_line_form,
     _fix_python_literals,
     _fix_trailing_comma,
+    _fix_stray_period_before_closer,
     _fix_curly_quotes,
     _fix_single_quotes,
     _fix_unterminated_string,
@@ -695,19 +744,28 @@ def extract_decision(raw: Optional[str]) -> JsonExtraction:
     if value is not None:
         return JsonExtraction(value, whole_source)
 
+    attempts = 0
     repaired_whole = repair_json_text(whole)
     if repaired_whole is not None:
+        attempts += 1
         value = _parse_dict(repaired_whole)
         if value is not None:
-            return JsonExtraction(value, whole_source, repaired=True, repair_attempts=1)
+            return JsonExtraction(value, whole_source, repaired=True, repair_attempts=attempts)
 
+    # Each OTHER candidate is tried in full -- literal parse, then repair -- before moving to the
+    # next one, rather than one literal-only pass over every candidate followed by a second
+    # repair-only pass. `_json_candidates` orders candidates by where they open in the text, so
+    # an earlier, more-complete span (e.g. the whole decision minus one stray trailing brace) is
+    # preferred once repaired over a later, smaller span that happens to already parse without
+    # any repair (e.g. one argument's own nested value, which parses trivially on its own but
+    # is not the decision). Trying literal-parse-then-repair per candidate, in order, is what
+    # makes that preference hold -- the old two-pass version let ANY unrepaired inner span beat
+    # an outer span that needed only a one-character fix, which is how a real stored cell
+    # (`phi3_both_213`) ended up reading a random nested field as if it were the whole decision.
     for candidate in candidates[1:]:
         value = _parse_dict(candidate)
         if value is not None:
             return JsonExtraction(value, "span")
-
-    attempts = 1 if repaired_whole is not None else 0
-    for candidate in candidates[1:]:
         repaired_text = repair_json_text(candidate)
         if repaired_text is None:
             continue
@@ -727,29 +785,86 @@ def extract_decision(raw: Optional[str]) -> JsonExtraction:
 #: Measured on phi3:mini, which emits 98% valid JSON and finishes with ``{"answer1": ...,
 #: "answer2": ...}`` on a two-part question -- the loop read only ``answer`` and silently dropped
 #: the submission, so a model that had done the work scored zero for naming a slot.
-_ANSWER_KEY_RE = re.compile(r"^(?:final_?)?(?:answer|response|result|output|text)_?\d*$", re.I)
+#:
+#: Widened 2026-09-03 to also match a NUMBERED-part shape (``answer_part1``, ``final_answer_2``)
+#: -- the shape a real stored cell (``phi3_both_213``) actually emitted, with an underscore
+#: before ``part`` and/or before the trailing digits. Deliberately still does NOT match a slot
+#: that merely CONTAINS one of these words as a substring of a longer, unrelated identifier (e.g.
+#: ``answerable``, ``output_format``, ``resultset``) -- the ``$`` anchor means only the base word,
+#: an optional ``part``, and trailing digits are accepted, nothing else.
+_ANSWER_KEY_RE = re.compile(
+    r"^(?:final_?)?(?:answer|response|result|output|text)(?:_?part)?_?\d*$", re.I,
+)
 
 
-def _finish_answer(args: Dict[str, Any]) -> str:
-    """The answer a ``finish`` call is submitting, however the model named its slots.
+def _answer_slot_text(value: Any) -> str:
+    """The literal text one answer-shaped slot carries, however the model shaped the VALUE.
+
+    A plain string is returned as-is. A dict -- the shape phi3:mini used for
+    ``answer_part1``/``answer_part2`` in the real ``phi3_both_213`` cell, e.g. ``{"text": "...",
+    "source": "..."}`` -- yields its own ``"text"`` field, never the dict's ``repr`` (which would
+    have leaked ``{'text': ..., 'source': ...}`` literally into the answer). A dict with no
+    ``"text"`` field yields nothing: reading some OTHER field would be guessing at content, which
+    this function refuses to do -- only the slot NAME is read leniently, never the value shape.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        text = value.get("text")
+        return text if isinstance(text, str) else ""
+    return ""
+
+
+def _collect_answer_parts(mapping: Dict[str, Any]) -> List[str]:
+    """Every answer-shaped key in ``mapping``, in SORTED key order, with non-empty text."""
+    parts = []
+    for key in sorted(mapping):
+        if not _ANSWER_KEY_RE.match(str(key)):
+            continue
+        text = _answer_slot_text(mapping[key]).strip()
+        if text:
+            parts.append(text)
+    return parts
+
+
+def _finish_answer(args: Dict[str, Any], decision: Optional[Dict[str, Any]] = None) -> str:
+    """The answer a ``finish`` call is submitting, however the model named or placed its slots.
 
     An explicit ``answer`` always wins outright and is never diluted by joining it with other
     keys -- that is the model's own choice of slot. Only when there is no ``answer`` at all are
-    answer-shaped slots gathered, in SORTED key order so a two-part answer (``answer1``,
-    ``answer2``) reassembles in the order the model numbered it rather than in dict order.
+    answer-shaped slots gathered, in SORTED key order so a two-part answer (``answer_part1``,
+    ``answer_part2``) reassembles in the order the model numbered it rather than in dict order.
 
-    Nothing is invented: a ``finish`` carrying no answer-shaped slot submits an empty answer
-    rather than scraping an unrelated field (``confidence``, ``sources``) into one. Being lenient
-    about a slot NAME is not the same as guessing at content.
+    ``decision`` -- the FULL parsed ``{"thought", "action", "args"}`` object, when the caller has
+    it -- lets a sibling answer-shaped key that landed OUTSIDE ``args`` entirely (a real stored
+    cell had the model close ``args`` early on a malformed turn and put ``answer_part2`` at the
+    top level, sibling to ``args`` itself) still be picked up. This is safe specifically because
+    this function is only ever called from the ``action == "finish"`` branch of the tool loop --
+    a top-level key can only ever be additional answer content here, never bleed into a tool
+    call's own arguments (those go through a completely different branch), and ``thought``/
+    ``action``/``args`` themselves are excluded from consideration so they can never be
+    mistaken for answer text.
+
+    Nothing is invented: a ``finish`` carrying no answer-shaped slot anywhere submits an empty
+    answer rather than scraping an unrelated field (``confidence``, ``sources``) into one. Being
+    lenient about a slot NAME or its LOCATION is not the same as guessing at content.
 
     :param args: the parsed ``args`` object of a finish decision.
+    :param decision: the full parsed decision object ``args`` came from, when available.
     :returns: the answer text, possibly empty.
     """
     direct = args.get("answer")
     if isinstance(direct, str) and direct.strip():
         return direct
-    parts = [str(args[key]) for key in sorted(args)
-             if _ANSWER_KEY_RE.match(str(key)) and str(args[key] or "").strip()]
+
+    merged = dict(args)
+    if decision:
+        for key, value in decision.items():
+            if key in ("thought", "action", "args"):
+                continue
+            merged.setdefault(key, value)  # an args value with the same name always wins
+
+    parts = _collect_answer_parts(merged)
     return "\n".join(parts) if parts else str(direct or "")
 
 
@@ -1035,7 +1150,7 @@ async def run_tool_loop(
         thought = str(decision.get("thought", ""))[:thought_chars]
 
         if action == "finish":
-            answer = _finish_answer(args)
+            answer = _finish_answer(args, decision)
             call = ToolCall(name="finish", args={"answer": answer}, thought=thought)
             on_step(ToolLoopStep(
                 kind="finish", raw_text=raw_text, usage=usage, thought=thought,

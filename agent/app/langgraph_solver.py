@@ -66,6 +66,8 @@ from agent.app.idea_test_utils import count_chars, count_words
 from agent.app.ledger_tools import LedgerToolkit
 from agent.app.model_capabilities import resolve_tool_transport_mode, supports_native_tool_calling
 from agent.app.prompted_tools import (
+    MAX_INVALID_ACTIONS_DEFAULT as _PROMPTED_MAX_INVALID_ACTIONS_DEFAULT,
+    MAX_TOOL_ERRORS_DEFAULT as _PROMPTED_MAX_TOOL_ERRORS_DEFAULT,
     NUDGE as _EMULATION_NUDGE,
     ToolLoopExhausted, ToolLoopStep, ToolSpec,
     build_protocol, extract_decision, invalid_action_message, run_tool_loop,
@@ -718,6 +720,15 @@ _EMULATION_THOUGHT_CHARS = 300
 #: burn its whole step budget on nudges and deliver nothing, which is the hard 0 this transport
 #: exists to prevent; ``create_react_agent`` likewise treats any tool-call-free turn as final.
 _EMULATION_MAX_MALFORMED_TURNS = 3
+#: Consecutive unrecognized-action / tool-dispatch-failure turns tolerated before the emulated
+#: loop gives up -- same shape as `_EMULATION_MAX_MALFORMED_TURNS`. `run_tool_loop` defaults both
+#: of these itself, but this is the ONE production caller (`tool_transport == "emulated"` has 256
+#: real stored cells; the other callers are tests), so the bound is made explicit here rather than
+#: left implicit in the callee -- an unbounded failure loop already burned a whole 35-turn budget
+#: in one observed cell. Held equal to `run_tool_loop`'s own defaults: this is about making the
+#: bound explicit and tunable from the one real caller, not about changing behaviour silently.
+_EMULATION_MAX_INVALID_ACTIONS = _PROMPTED_MAX_INVALID_ACTIONS_DEFAULT
+_EMULATION_MAX_TOOL_ERRORS = _PROMPTED_MAX_TOOL_ERRORS_DEFAULT
 
 
 def _extract_json_object(raw: Optional[str]) -> Optional[Dict[str, Any]]:
@@ -993,6 +1004,8 @@ class _EmulatedToolCallTransport:
                 tools=self._tool_specs, render_view=render_view, call_model=call_model,
                 dispatch_tool=dispatch_tool, on_step=on_step, turns=turns,
                 max_malformed_turns=_EMULATION_MAX_MALFORMED_TURNS,
+                max_invalid_actions=_EMULATION_MAX_INVALID_ACTIONS,
+                max_tool_errors=_EMULATION_MAX_TOOL_ERRORS,
                 thought_chars=_EMULATION_THOUGHT_CHARS, telemetry=self._telemetry,
                 json_telemetry_hook=self._json_telemetry_hook,
             )

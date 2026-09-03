@@ -622,3 +622,54 @@ def test_a_give_up_turn_is_not_silently_dropped_from_the_transcript():
         assert messages, f"{kind} produced no transcript messages at all"
         assert any("the model's final words" in str(getattr(m, "content", "")) for m in messages), (
             f"{kind} dropped the model's own output from the transcript")
+
+
+# ------------------------------------------- explicit invalid/tool-error bounds (2026-09-03)
+
+
+def test_emulation_max_invalid_actions_matches_prompted_tools_default():
+    """`run_tool_loop` accepts `max_invalid_actions`/`max_tool_errors` with defaults, but the
+    ONE production caller (`_EmulatedToolCallTransport.run`) used to pass neither, so a real
+    stored cell could only rely on the callee's implicit default rather than an explicit,
+    tunable bound. This pins the solver's own constants to the values it wires through, and to
+    `prompted_tools`'s defaults, so a future change to either can't silently drift apart."""
+    from agent.app import langgraph_solver as solver_mod
+    from agent.app.prompted_tools import MAX_INVALID_ACTIONS_DEFAULT, MAX_TOOL_ERRORS_DEFAULT
+
+    assert solver_mod._EMULATION_MAX_INVALID_ACTIONS == MAX_INVALID_ACTIONS_DEFAULT
+    assert solver_mod._EMULATION_MAX_TOOL_ERRORS == MAX_TOOL_ERRORS_DEFAULT
+
+
+def test_emulation_max_invalid_actions_is_actually_wired_through(monkeypatch):
+    """Proves the bound is genuinely PASSED to `run_tool_loop`, not merely defined and ignored:
+    lowering the solver's constant must change observed behaviour (give up sooner), which can
+    only happen if the value actually reaches the callee."""
+    from agent.app import langgraph_solver as solver_mod
+
+    monkeypatch.setattr(solver_mod, "_EMULATION_MAX_INVALID_ACTIONS", 1)
+    state, llm, io, error = _run_emulated(
+        ['{"thought": "hmm", "action": "teleport", "args": {}}'] * 6,
+    )
+    assert error is None
+    assert io.search_calls == []
+    # Gave up after the FIRST unrecognized action instead of tolerating the usual 3.
+    assert len(llm.prompts) == 1
+    assert any("the model's final words" not in str(getattr(m, "content", ""))
+               for m in state.messages)
+
+
+def test_emulation_max_tool_errors_is_actually_wired_through(monkeypatch):
+    """Same proof as above, for the tool-dispatch-failure bound: a model whose recognized calls
+    keep failing to execute must give up after the solver's configured streak, not the callee's
+    implicit default."""
+    from agent.app import langgraph_solver as solver_mod
+
+    monkeypatch.setattr(solver_mod, "_EMULATION_MAX_TOOL_ERRORS", 1)
+    state, llm, io, error = _run_emulated(
+        ['{"thought": "oops", "action": "search", "args": {"wrong_slot": "q"}}'] * 6,
+    )
+    assert error is None
+    assert io.search_calls == []
+    # Gave up after the FIRST tool-dispatch failure instead of tolerating the usual 3.
+    assert len(llm.prompts) == 1
+    assert any("oops" in str(getattr(m, "content", "")) for m in state.messages)
