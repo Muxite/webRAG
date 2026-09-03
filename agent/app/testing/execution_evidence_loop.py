@@ -67,7 +67,7 @@ import re
 import time
 from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Optional
+from typing import Any, Dict, FrozenSet, List, NamedTuple, Optional
 
 from agent.app.agent_io import AgentIO
 from agent.app.connector_chroma import ConnectorChroma
@@ -219,6 +219,50 @@ def derivation_gate_enabled() -> bool:
     :raises: nothing.
     """
     return _flag("LEDGER_DERIVATION_GATE", default="0")
+
+
+def unified_verdict_enabled() -> bool:
+    """True when :func:`unified_verdict` is computed and emitted alongside :meth:`Ledger.verdict`
+    (default OFF).
+
+    ``Ledger.verdict`` is RESOLUTION-only by its own docstring: a row whose quote FAILED
+    verification, or whose derivation is KNOWN invalid, is still ``ANSWER`` unless the separate
+    ``roster_gate_enabled`` / ``derivation_gate_enabled`` levers are individually flipped --
+    and neither of those two levers ever looks at quote verification at all. A run in which
+    every row resolved but every one of its quotes failed verification returns ``VERDICT: ANSWER``
+    today; that is the exact defect S3 exists to surface, not fix by replacement.
+
+    This flag adds a SECOND field, ``output["unified_verdict"]`` -- it never changes
+    ``output["ledger_verdict"]`` or any of the four existing verdict computations, which stay
+    exactly as they were so every stored cell, dashboard and A/B comparator built on
+    ``ledger_verdict`` keeps working unmodified. Opt-in on the same precedent as
+    ``roster_gate_enabled`` / ``derivation_gate_enabled``: it must be measured on real cells
+    before anything downstream is asked to read it.
+
+    :returns: the value of ``IDEA_TEST_EVIDENCE_LOOP_UNIFIED_VERDICT``, defaulting to disabled.
+    :raises: nothing.
+    """
+    return _flag("IDEA_TEST_EVIDENCE_LOOP_UNIFIED_VERDICT", default="0")
+
+
+def unbacked_number_check_enabled() -> bool:
+    """True when :func:`unified_verdict` also checks the deliverable's own numeric claims against
+    the ledger's rows and evidence graph (default OFF; inert unless :func:`unified_verdict_enabled`
+    is also True).
+
+    Catches the shape ``Ledger.verdict`` and the other three verdict computations all miss: a
+    number stated in prose that is arithmetic the MODEL did silently (e.g. "163 floors (154 + 9
+    maintenance)") rather than a value read off a page or produced through the typed ``derive``
+    action. Nothing backs "163" -- not a row, not a SOURCE node, not a DERIVED node -- yet a run
+    can resolve every row with a verified quote and still say it. See
+    :func:`unbacked_numeric_claims` for the exact (mechanical, non-fuzzy) matching rule and its
+    known false-positive risk before enabling this in anything that gates a KPI.
+
+    :returns: the value of ``IDEA_TEST_EVIDENCE_LOOP_UNBACKED_NUMBER_CHECK``, defaulting to
+        disabled.
+    :raises: nothing.
+    """
+    return _flag("IDEA_TEST_EVIDENCE_LOOP_UNBACKED_NUMBER_CHECK", default="0")
 
 
 #: Operations ``derive`` accepts, mapped to the graph method that RECOMPUTES each one. The
@@ -1387,6 +1431,149 @@ def quote_verification_counts(ledger: Ledger) -> Dict[str, int]:
     return counts
 
 
+#: Standalone numeric token, reused verbatim from ``arm_verdict._claims`` -- both modules need
+#: the SAME extraction rule so a number is never a "claim" under one and noise under the other.
+_UNIFIED_NUMBER_RE = re.compile(r"-?\d[\d,]*\.?\d*")
+#: A bare numeric token below this many digits is noise (row indices, single-digit counts) rather
+#: than a checkable claim -- same threshold and same reasoning as ``arm_verdict._MIN_CLAIM_DIGITS``.
+_UNIFIED_MIN_CLAIM_DIGITS = 2
+
+
+def _numeric_claims(text: str) -> FrozenSet[str]:
+    """Standalone numeric tokens (>= 2 digits) in ``text``, comma-normalized for matching."""
+    claims = set()
+    for match in _UNIFIED_NUMBER_RE.finditer(text or ""):
+        token = match.group(0)
+        digits_only = token.replace(",", "").replace(".", "").lstrip("-")
+        if len(digits_only) >= _UNIFIED_MIN_CLAIM_DIGITS:
+            claims.add(token.replace(",", ""))
+    return frozenset(claims)
+
+
+def unbacked_numeric_claims(deliverable: str, ledger: Ledger) -> List[str]:
+    """Numeric claims in ``deliverable`` that match NEITHER a resolved row's value NOR any node
+    (SOURCE or DERIVED) in the run's evidence graph, by exact normalized-token containment.
+
+    This is deliberately the narrowest possible check, not a paraphrase of :func:`derive_verdict`'s
+    corpus-literal rule: it grounds a claim against the run's OWN typed artifacts (rows, SOURCE
+    nodes, DERIVED nodes) rather than against raw page text, so a number the model correctly
+    obtained through the ``derive`` action (and is therefore a real ``D``-handle in the graph) is
+    credited, while a number the model computed silently IN PROSE -- never minted as a row value
+    and never passed through ``derive`` -- is not. That second case is exactly the "163" defect
+    this module's S3 report exists to name: "The Burj Khalifa has 163 floors (154 + 9
+    maintenance)" resolves its one row to ``154 + 9 maintenance`` (both 154 and 9 are backed,
+    literally, by that row's own value string) and never derives 163 through the typed ``derive``
+    action, so 163 matches nothing here.
+
+    Matching is exact digit-normalized token containment ONLY -- no fuzzy, edit-distance or
+    token-overlap matching, and no model judgment, on the same principle :func:`verify_quote`
+    already states for quotes. Known, stated limitation: a number that is genuinely backed but
+    rendered in a shape this function does not normalize (e.g. spelled out, "one hundred
+    sixty-three") is reported unbacked even though a human would accept it -- and the reverse, an
+    incidental number in the deliverable that was never meant as a checkable claim (a year, a
+    footnote index) can be flagged as "unbacked" when it happens to coincide with no row or node.
+    That is why :func:`unbacked_number_check_enabled` defaults OFF and why this function is a
+    diagnostic signal folded into :func:`unified_verdict`, not a replacement for it.
+
+    :param deliverable: the run's final answer text.
+    :param ledger: the run's ledger; both :attr:`Ledger.rows` and :attr:`Ledger.graph` (when
+        built) are consulted.
+    :returns: the unbacked claims, sorted, empty when there are none (including when
+        ``deliverable`` has no numeric claim at all -- nothing to accuse).
+    :raises: nothing.
+    """
+    claims = _numeric_claims(deliverable)
+    if not claims:
+        return []
+    backed: set = set()
+    for row in ledger.rows:
+        if row.value:
+            backed |= _numeric_claims(row.value)
+    if ledger.graph is not None:
+        for node in ledger.graph.nodes():
+            backed |= _numeric_claims(str(node.value))
+    return sorted(claim for claim in claims if claim not in backed)
+
+
+def unified_verdict(ledger: Ledger, quote_counts: Dict[str, int], deliverable: str = "",
+                    check_unbacked_numbers: Optional[bool] = None) -> Dict[str, Any]:
+    """ANSWER / PARTIAL / ABSTAIN from RESOLUTION, VERIFICATION and DERIVATION together.
+
+    :meth:`Ledger.verdict` is RESOLUTION-only by its own docstring: a row whose quote FAILED
+    verification is still ``ANSWER`` unless a caller separately reads ``resolution_counts``, and a
+    KNOWN-invalid derivation only downgrades when the opt-in :func:`derivation_gate_enabled` lever
+    is flipped. This function folds the same signals :meth:`Ledger.verdict` already carries in
+    ``output`` -- quote verification, derivation validity, derivation refusals, resolution -- into
+    ONE decision, unconditionally (never gated by :func:`roster_gate_enabled` /
+    :func:`derivation_gate_enabled`, which govern only the legacy verdict's own downgrades). It is
+    computed ALONGSIDE :meth:`Ledger.verdict`, never in place of it -- see
+    :func:`unified_verdict_enabled` for the flag that controls whether it is even computed, default
+    OFF, so no default behavior changes by this function merely existing.
+
+    Tri-state discipline, kept exactly as :func:`verify_quote` states it: a quote that could not be
+    checked at all (``quote_counts["unchecked"]`` -- no page, or an empty quote) is NOT a failure
+    and does not, by itself, downgrade the verdict here. Only a quote mechanically found ABSENT
+    from a page in hand (``quote_counts["failed"]``) does. The same split applies to derivation:
+    an UNASSESSED derived node (``derivation_valid is None``) does not downgrade; a node KNOWN
+    invalid (``derivation_valid is False``, via :meth:`Ledger.has_invalid_derivation`) does.
+
+    Rule, checked in order, first match wins:
+
+    1. No row obtained anything at all (mirrors :meth:`Ledger.verdict`'s own ABSTAIN clause,
+       verbatim) -> ``ABSTAIN``.
+    2. Not every row resolved -> ``PARTIAL``, reason ``"unresolved_rows"``.
+    3. Any extraction's quote verification FAILED -- ``quote_counts["failed"] > 0`` -> ``PARTIAL``,
+       reason ``"quote_failed"``. Counted over ALL of this run's extractions, not only the ones
+       that ended up resolving a row: a fabricated quote earlier in the run is itself evidence
+       about the model's behavior even when a later, verified record superseded that row.
+    4. Any DERIVED node is known invalid (:meth:`Ledger.has_invalid_derivation`) -> ``PARTIAL``,
+       reason ``"invalid_derivation"``.
+    5. Any derivation was refused (``ledger.graph.derivation_refusals`` non-empty) -> ``PARTIAL``,
+       reason ``"derivation_refused"``.
+    6. ``check_unbacked_numbers`` (default :func:`unbacked_number_check_enabled`) and
+       :func:`unbacked_numeric_claims` finds at least one -> ``PARTIAL``, reason
+       ``"unbacked_numeric_claim"``, with the offending numbers attached.
+    7. Otherwise -> ``ANSWER``.
+
+    Deliberately NOT covered: a resolved row whose quote could not be CHECKED at all (no page
+    text, or an empty quote) never downgrades here on its own -- ``Ledger.verdict``'s own
+    ``resolved_unverified`` tier already reports that case in the deliverable, and this function
+    does not re-litigate it into a claim of failure it never made.
+
+    :param ledger: the run's ledger.
+    :param quote_counts: :func:`quote_verification_counts` (``ledger`` argument), passed in
+        rather than recomputed so a caller that already has it pays for it once.
+    :param deliverable: the run's final answer text; consulted only when the unbacked-number
+        check is active.
+    :param check_unbacked_numbers: overrides :func:`unbacked_number_check_enabled`, for tests;
+        ``None`` reads the flag.
+    :returns: ``{"verdict", "reason"}`` -- ``reason`` is ``None`` on ``ANSWER`` and ``ABSTAIN``;
+        ``"unbacked_numbers"`` is present only when reason is ``"unbacked_numeric_claim"``.
+    :raises: nothing.
+    """
+    resolved = sum(1 for row in ledger.rows if row.resolved)
+    obtained = sum(1 for row in ledger.rows
+                   if row.resolved or row.status == STATUS_CONFLICTED)
+    if not ledger.rows or obtained == 0:
+        return {"verdict": VERDICT_ABSTAIN, "reason": None}
+    if resolved != len(ledger.rows):
+        return {"verdict": VERDICT_PARTIAL, "reason": "unresolved_rows"}
+    if quote_counts.get("failed", 0) > 0:
+        return {"verdict": VERDICT_PARTIAL, "reason": "quote_failed"}
+    if ledger.has_invalid_derivation():
+        return {"verdict": VERDICT_PARTIAL, "reason": "invalid_derivation"}
+    if ledger.graph is not None and ledger.graph.derivation_refusals:
+        return {"verdict": VERDICT_PARTIAL, "reason": "derivation_refused"}
+    check_numbers = (unbacked_number_check_enabled() if check_unbacked_numbers is None
+                     else check_unbacked_numbers)
+    if check_numbers:
+        unbacked = unbacked_numeric_claims(deliverable, ledger)
+        if unbacked:
+            return {"verdict": VERDICT_PARTIAL, "reason": "unbacked_numeric_claim",
+                    "unbacked_numbers": unbacked}
+    return {"verdict": VERDICT_ANSWER, "reason": None}
+
+
 def reverify_cell(cell: Dict[str, Any]) -> Dict[str, Any]:
     """Re-check every stored extraction of a finished cell against its PERSISTED page, offline.
 
@@ -1853,6 +2040,15 @@ async def run_evidence_loop_execution(
         "derivation_refusals": (ledger.graph.refusal_counts()
                                 if ledger.graph is not None else None),
     }
+    # S3: a SECOND verdict, computed alongside `ledger_verdict` and never replacing it, so it can
+    # be measured on real cells before anything downstream is asked to read it. Off by default --
+    # see `unified_verdict_enabled`.
+    if unified_verdict_enabled():
+        unified = unified_verdict(ledger, quote_counts, deliverable=deliverable)
+        output["unified_verdict"] = unified["verdict"]
+        output["unified_verdict_reason"] = unified["reason"]
+        if "unbacked_numbers" in unified:
+            output["unified_verdict_unbacked_numbers"] = unified["unbacked_numbers"]
     # The confidence/abstain channel every arm reports (see `confidence_channel` module docstring):
     # for this arm it is a direct re-export of the ledger verdict already computed above.
     channel = confidence_channel.from_evidence_loop_verdict(output["ledger_verdict"])
