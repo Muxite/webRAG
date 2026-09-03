@@ -1,6 +1,13 @@
 # webRAG / Euglena — Session Handoff (2026-08-10)
 
-> **Latest phase (2026-09-03): `docs/handoffs/LEDGER_COMPONENT_PHASE_2026-09-03.md`** — the
+> **Latest phase (2026-09-03, later): `docs/handoffs/WEAK_MODEL_LADDER_PHASE_2026-09-03.md`**
+> — `LLM_SEED` never reached the `langgraph_react` arm until this phase, so every "seeded" A/B on
+> it was sampling. Read `docs/analysis/SEEDING_AUDIT_2026-09-03.md` before citing any
+> `langgraph_react` null: the affected ones include the parity measurement quoted as the rationale
+> for the project's scope pivot. A 336-cell ladder was left running — §6 says how to resume and
+> analyse it.
+
+> **Previous phase (2026-09-03): `docs/handoffs/LEDGER_COMPONENT_PHASE_2026-09-03.md`** — the
 > ledger becomes a callable component; three of four proposed capabilities stopped by
 > measurement; next step is multi-hostname visiting. Read its "extra things to check"
 > section before doing any corpus measurement — it lists seven traps that produced wrong
