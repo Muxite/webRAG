@@ -60,23 +60,48 @@ The conclusion — attaching the module costs no accuracy — **is unchanged, an
 strengthened**: the movement has a more mundane explanation than prompt perturbation. It was
 unseeded sampling. The named mechanism should be corrected; the finding should not.
 
-## The "trajectory chaos floor" needs its arm identified
+## The "trajectory chaos floor" — RESOLVED, the claim stands
+
+This was flagged as open in the first version of this document. It is now closed.
 
 `LEDGER_METHODOLOGY.md:132` — "seeding does not remove trajectory chaos; one mechanism flip left
-12/16 tasks byte-identical and swung 2 by ~0.6" — is cited in **seven documents** and underwrites
-the standing "no mean-score ranking" rule. Its primary statement
-(`LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md:97`, movements `[0.125, 0.125, 0.600, 0.640]`) does not
-name the arm it was measured on, and I could not establish it from the surviving records.
+12/16 tasks byte-identical and swung 2 by ~0.6" — is cited in seven documents and underwrites the
+standing "no mean-score ranking" rule. The worry was that if it had been measured on
+`langgraph_react`, what was attributed to chaos *despite* seeding would have been ordinary
+unseeded sampling, and the real floor would be lower than believed.
 
-- If it was measured on a `ConnectorLLM` arm, it stands as written.
-- If it was measured on `langgraph_react`, then what was attributed to trajectory chaos *despite*
-  seeding was partly ordinary unseeded sampling, and **the real floor may be lower than believed**
-  — which would make future A/Bs on that arm more sensitive, not less.
+**It was measured on `evidence_loop`, which was genuinely seeded.** The A/B is the
+extraction-value-gate pair `ledgergateS0` vs `ledgergateS1` (`LLM_SEED=12345`, 16 tuning tasks),
+described at `LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md` §4. Re-derived from the 32 raw cells:
 
-This is flagged, not resolved. It does not change the "no mean-score ranking" rule, which rests
-independently on the power table (22 paired tasks against 61-111 required) and on measured
-subset-inversion. But the floor's size is now an open question, and `ladder03` will produce
-seeded evidence bearing on it.
+- `execution_variant` is `evidence_loop` on **32/32** cells, read from the JSON body.
+- 12 of 16 paired tasks have a score delta of exactly 0.
+- The 4 movers are 214 `-0.125`, 218 `+0.600`, 219 `-0.640`, 225 `+0.125` — sorted magnitudes
+  `[0.125, 0.125, 0.600, 0.640]`, an exact match to the handoff, with the two-up/two-down split
+  that explains how the aggregate stayed near zero (0.6207 -> 0.6182).
+
+`langgraph_react` is not involved. The chaos floor is not lower than believed, and no document
+citing it needs amending.
+
+## Additional at-risk conclusions found on a second sweep
+
+All are `langgraph_react` **nulls**, the category the rule above flags as possible false
+negatives. None is a confirmed error; each needs re-running seeded before being treated as settled.
+
+| doc:line | claim | why at risk |
+|---|---|---|
+| `EVIDENCE_STACK_NIGHT_2026-08-31.md:29-31` | `gpu0831`, n=24: `lg-el +0.0906 (t=1.58)`, `lg-sre +0.0920 (t=1.66)`, neither clears `\|t\|>2.07` | langgraph scored highest on ~40% fewer tokens but missed significance; the extra unseeded variance could be suppressing a real effect |
+| `EVIDENCE_STACK_NIGHT_2026-08-31.md:135-137` | `gpu0831b`, n=24: "under local search the three arms are statistically indistinguishable" | a bare null on the noisier arm — exactly the shape the rule says to re-open |
+| `EVIDENCE_STACK_NIGHT_2026-08-31.md:162-164`, restated `LEDGER.md:171` | "breadth is a DEAD TIE (-0.002, -0.007) [...] treat breadth parity as **established**" | doubly weak: already flagged in-doc as underpowered per-shape (n=6/shape, per-task reliability ~0.11) and now also built on an unseeded arm. The *retirement* of the earlier "graph collapses on fan-out" result is unaffected (that was graph vs `sequential_react`), but the replacement parity claim should not be called established |
+| `AGGREGATION_SHAPE_FINDING_2026-08-30.md:45` | suite59: `sequential_react vs langgraph_react -0.080 (t=-1.76)`, n.s. | possible false negative; impact looks contained (it sits in a table beside two significant rows) but "these two arms are indistinguishable" should not be cited from it |
+
+Surviving on the same rule, noted for completeness: `AGGREGATION_SHAPE_FINDING_2026-08-30.md:44`,
+`graph vs langgraph_react -0.268 (t=-5.03)` — a significant result that cleared a higher noise bar
+than intended.
+
+Confirmed unaffected: `RESEARCH_QUESTIONS_2026-08-30.md:38-46`'s null bullets, the wide-breadth
+`bfix` A/B, and the graph-pooled 0.327 -> 0.448 result are all within-`graph`-arm comparisons with
+no `langgraph_react` term.
 
 ## Not affected
 
