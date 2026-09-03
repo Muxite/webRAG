@@ -6,6 +6,7 @@ import json
 from collections import Counter
 from typing import Dict, Any, List
 
+from agent.app.agent_io import is_malformed_url_text
 from agent.app.idea_test_utils import count_words, count_chars
 from agent.app.model_costs import estimate_cost, format_cost
 
@@ -34,7 +35,33 @@ _INFRA_FAILURE_RATE_THRESHOLD = 0.5
 
 
 def _is_infra_timing(timing: Dict[str, Any]) -> bool:
-    """Classify a failed telemetry timing as infra failure or task/model failure."""
+    """Classify a failed telemetry timing as infra failure or task/model failure.
+
+    A malformed/invented URL, or a coerced-and-still-broken tool argument, fails BEFORE any
+    HTTP status exists -- landing in the (formerly unconditional) "status is None -> assume
+    infra" branch below and hiding the model's own mistake from its score: the more a model
+    mangles a URL, the more of its own failures used to vanish from analysis. Two layers fix
+    that, cheapest/most-confident first:
+
+    1. ``payload["failure_class"]`` -- set by ``AgentIO.search``/``.visit`` (agent_io.py) going
+       forward, once per call, from a signal richer than what any stored cell has ever
+       persisted (the coercion outcome, and for a network-level failure, the underlying
+       exception text). ``"model"``/``"infra"`` here are authoritative; ``"unknown"`` means
+       even that richer signal couldn't tell, and falls through exactly like no signal at all.
+    2. For a ``visit`` timing recorded before that field existed (no ``failure_class`` key at
+       all), the raw ``url`` text is still enough to catch the unambiguous case: empty, or
+       still shaped like a Python list/dict repr (``is_malformed_url_text``, shared with
+       agent_io.py so both places agree on what "unambiguous" means). That is what makes the
+       per-model infra-failed table re-measurable against every cell already on disk, not just
+       cells recorded after this fix ships.
+
+    Deliberately does NOT try to reclassify the ambiguous case (a syntactically valid URL that
+    still failed with no status) for old data: a DNS failure on an invented host and a genuine
+    transient network failure produce the identical persisted shape (url, status=None, no
+    exception text), and guessing either way would either hide a real model failure or
+    wrongly un-quarantine a real infra failure. That case keeps the pre-existing (and, for
+    genuine infra, correct) any-status-None-on-visit/search-is-infra heuristic.
+    """
     if timing.get("success"):
         return False
     payload = timing.get("payload") or {}
@@ -42,6 +69,18 @@ def _is_infra_timing(timing: Dict[str, Any]) -> bool:
         return True
     name = timing.get("name")
     status = payload.get("status")
+
+    failure_class = payload.get("failure_class")
+    if failure_class == "model":
+        return False
+    if failure_class == "infra":
+        return True
+
+    if name == "visit" and status is None:
+        url = payload.get("url")
+        if isinstance(url, str) and is_malformed_url_text(url):
+            return False
+
     if status is None:
         return name in _INFRA_TIMING_NAMES
     try:

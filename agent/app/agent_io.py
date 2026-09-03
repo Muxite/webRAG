@@ -1,8 +1,10 @@
+import ast
 import asyncio
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
@@ -13,6 +15,182 @@ from agent.app.observation import clean_operation
 from agent.app.telemetry import TelemetrySession
 
 _logger = logging.getLogger(__name__)
+
+
+# --- Wrapped tool-argument coercion ------------------------------------------------------
+#
+# Both benchmark arms stringify whatever the model put in the `query`/`url` slot before it
+# reaches this module -- `str(query)` in `idea_policies/actions.py`'s `SearchLeafAction`, and
+# pydantic's `str` coercion at the LangGraph `@tool` boundary in `langgraph_solver.py` -- so a
+# model that wrapped a correct argument in a list or dict never arrives here as an actual
+# list/dict object, it arrives as that object's Python repr baked into a string (e.g.
+# "['Lake Matano maximum depth']"). Measured across every stored cell in
+# agent/idea_test_results/ (reproduction + counts in
+# agent/tests/tool_argument_coercion_test.py's module docstring): 158 search-timing queries and
+# 70 visit-timing urls arrived in this wrapped-string shape (61 of the 70 unwrap to a single
+# valid URL), and 89 visits arrived with an empty url.
+#
+# `AgentIO.search()`/`.visit()` are the one seam every arm reaches, so unwrapping happens here,
+# once. This is deliberately UNWRAPPING ONLY, never repair: a query/url this can't confidently
+# resolve to a single value is left exactly as given and allowed to fail on its own terms,
+# visibly (`arg_coerced` in the call's telemetry payload), rather than guessed at.
+
+def _maybe_literal_eval(text: str) -> Any:
+    """Parse a Python list/tuple/dict *repr* string back into the object it reprs, if it is one.
+
+    Only strings that already look like one (start with ``[``/``{``/``(``) are attempted --
+    running ``ast.literal_eval`` on an arbitrary search query would be wasted work at best and
+    a confusing exception to catch at worst. Returns ``None`` on anything that doesn't parse,
+    including things that never looked like a wrapper.
+    """
+    stripped = text.strip()
+    if not stripped or stripped[0] not in "[{(":
+        return None
+    try:
+        return ast.literal_eval(stripped)
+    except (ValueError, SyntaxError, MemoryError, RecursionError, TypeError):
+        return None
+
+
+def _coerce_search_query(query: Any) -> Tuple[str, Optional[str], Optional[List[str]]]:
+    """Unwrap a model-wrapped search query.
+
+    :returns: ``(query_to_use, arg_coerced, dropped_queries)``.
+
+        * ``arg_coerced`` is ``"list"`` for a single-item list/tuple wrapper, ``"dict"`` for a
+          dict carrying a ``query``/``q`` key, ``"list_multi"`` for a genuinely multi-item list
+          (see below), or ``None`` when nothing recognizable was unwrapped.
+        * ``dropped_queries`` is only non-``None`` for the ``"list_multi"`` case: the queries
+          that were NOT used, so the loss stays visible in telemetry instead of silent.
+    """
+    obj = query
+    if isinstance(query, str):
+        parsed = _maybe_literal_eval(query)
+        if parsed is not None:
+            obj = parsed
+    if isinstance(obj, (list, tuple)):
+        if len(obj) == 1:
+            return str(obj[0]), "list", None
+        if len(obj) > 1:
+            # A multi-element list is a genuinely different intent -- the model asked several
+            # questions in one call. Joining them into one query is a silent semantic change
+            # (a merged query over-constrains and often matches none of the individual
+            # questions); taking only the first silently drops the rest. Neither option is
+            # free of a judgment call, so this takes the first -- searching for at least one of
+            # the questions actually asked, rather than a compound string unlikely to match any
+            # of them -- and records what got dropped (`dropped_queries`) so the loss is a
+            # measurable, auditable fact rather than a silent one.
+            return str(obj[0]), "list_multi", [str(item) for item in obj[1:]]
+        # Empty list/tuple: nothing to extract -- falls through to "anything else" below.
+    elif isinstance(obj, dict):
+        for key in ("query", "q"):
+            value = obj.get(key)
+            if value not in (None, ""):
+                return str(value), "dict", None
+        # Dict without a recognized key: don't guess which value is the query.
+    # Anything else (unparseable text, an empty wrapper, a dict without a known key, or a query
+    # that was never wrapped to begin with) stays exactly as given.
+    return str(query), None, None
+
+
+def _coerce_visit_url(url: Any) -> Tuple[str, Optional[str]]:
+    """Unwrap a model-wrapped visit url.
+
+    :returns: ``(url_to_use, arg_coerced)`` -- ``"list"`` for a single-item list/tuple wrapper,
+        ``"dict"`` for a dict carrying a ``url``/``link``/``href`` key. Anything else (a
+        multi-item list -- there is no principled way to guess which of several URLs the model
+        meant, unlike search there is no "take one and note the rest" available since a visit
+        fetches exactly one page -- a dict without a recognized key, unparseable text, or a url
+        that was never wrapped) is returned unchanged with ``arg_coerced=None``: never guess at
+        a URL's content, only unwrap an unambiguous wrapper.
+    """
+    obj = url
+    if isinstance(url, str):
+        parsed = _maybe_literal_eval(url)
+        if parsed is not None:
+            obj = parsed
+    if isinstance(obj, (list, tuple)) and len(obj) == 1:
+        return str(obj[0]), "list"
+    if isinstance(obj, dict):
+        for key in ("url", "link", "href"):
+            value = obj.get(key)
+            if value:
+                return str(value), "dict"
+    return (url if isinstance(url, str) else str(url)), None
+
+
+def is_malformed_url_text(url: Any) -> bool:
+    """True when ``url`` could never be a fetchable http(s) URL, judged from its text alone.
+
+    Covers the empty-url case (89 measured) and anything still shaped like a Python
+    list/dict/tuple repr after ``_coerce_visit_url`` gave up on it -- both are model-side
+    formatting failures, not something a network call could ever succeed against, so a visit
+    that hits this never needs to be dispatched at all.
+
+    Exported (not underscore-prefixed) because ``testing/utils.py``'s infra-vs-model failure
+    classifier reuses it verbatim to reclassify a ``visit`` timing recorded before this field
+    existed, from the one signal such a cell already persisted: the raw ``url`` text.
+    """
+    if not isinstance(url, str):
+        return True
+    stripped = url.strip()
+    if not stripped:
+        return True
+    if stripped[0] in "[{(":
+        return True
+    try:
+        parsed = urlparse(stripped)
+    except ValueError:
+        return True
+    return not (parsed.scheme in ("http", "https") and bool(parsed.netloc))
+
+
+# Substrings (matched case-insensitively) that only ever appear on an aiohttp
+# `ClientConnectorDNSError` -- i.e. DNS resolution itself failed for the given host. A model
+# that invents a host that has never existed produces exactly this signature; a real outage on
+# a real host does not. See `_classify_network_failure`.
+_DNS_FAILURE_MARKERS = (
+    "name or service not known",
+    "nodename nor servname provided",
+    "temporary failure in name resolution",
+    "no address associated with hostname",
+    "getaddrinfo failed",
+)
+
+# Substrings for a transport-level failure against a host that DID resolve: the connection was
+# refused/reset/aborted, or the peer disconnected mid-request. This is infrastructure trouble
+# (a dead or overloaded backend), not anything the model's argument caused.
+_INFRA_TRANSPORT_MARKERS = (
+    "connection reset",
+    "connection refused",
+    "connect call failed",
+    "connection aborted",
+    "server disconnected",
+)
+
+
+def _classify_network_failure(error_text: Optional[str]) -> str:
+    """Best-effort model/infra/unknown split for a visit failure that reached the network.
+
+    Only meaningful once the url has already passed ``is_malformed_url_text`` -- i.e. this is a
+    syntactically real http(s) URL that still failed with no HTTP status at all. A DNS
+    resolution failure on that host (`_DNS_FAILURE_MARKERS`) means the model invented a host
+    that does not exist -- still a model failure, not infrastructure's fault. A connection
+    reset/refused, or an unreachable backend (`_INFRA_TRANSPORT_MARKERS`), is infrastructure.
+
+    Anything else -- including a blank message, which is what a bare ``asyncio.TimeoutError``
+    stringifies to -- is reported ``"unknown"`` rather than guessed into either bucket:
+    ``testing.utils._is_infra_timing`` treats ``"unknown"`` exactly like no signal at all (the
+    pre-existing "status is None on visit/search -> infra" heuristic), so a genuine but
+    textually-blank timeout is still counted as infra downstream -- this function just declines
+    to claim more confidence than the message actually supports.
+    """
+    text = (error_text or "").lower()
+    if any(marker in text for marker in _DNS_FAILURE_MARKERS):
+        return "model"
+    if any(marker in text for marker in _INFRA_TRANSPORT_MARKERS):
+        return "infra"
+    return "unknown"
 
 
 class AgentIO:
@@ -195,17 +373,22 @@ class AgentIO:
 
     async def search(
         self,
-        query: str,
+        query: Any,
         count: int = 10,
         timeout_seconds: Optional[float] = None,
     ) -> Optional[List[Dict[str, str]]]:
         """
         Web search via Brave Search API.
-        :param query: Search query string.
+        :param query: Search query string. A model-wrapped value (a single-item list/tuple, or
+            a dict carrying a ``query``/``q`` key) is unwrapped before it is used -- see
+            ``_coerce_search_query``. A multi-item list is a genuinely different intent (several
+            questions asked at once): the first is used and the rest are recorded, never
+            silently dropped or merged. Anything else is used exactly as given.
         :param count: Max results.
         :returns: List of dicts with title, url, description.
         """
         started_at = time.perf_counter()
+        query, arg_coerced, dropped_queries = _coerce_search_query(query)
         try:
             results = await self._with_timeout(
                 self.connector_search.query_search(query, count=count),
@@ -213,11 +396,14 @@ class AgentIO:
             )
         except Exception as exc:
             if self.telemetry:
+                payload = {"query": query, "result_count": 0, "arg_coerced": arg_coerced}
+                if dropped_queries:
+                    payload["dropped_queries"] = dropped_queries
                 self.telemetry.record_timing(
                     name="search",
                     started_at=started_at,
                     success=False,
-                    payload={"query": query, "result_count": 0},
+                    payload=payload,
                     error=str(exc),
                 )
             raise
@@ -233,7 +419,12 @@ class AgentIO:
                     },
                 )
         if self.telemetry:
-            payload = {"query": query, "result_count": len(results or [])}
+            # ``arg_coerced`` is always present (even when ``None``) so the coercion frequency
+            # stays measurable after this fix, rather than only showing up on the calls where
+            # it happened to fire.
+            payload = {"query": query, "result_count": len(results or []), "arg_coerced": arg_coerced}
+            if dropped_queries:
+                payload["dropped_queries"] = dropped_queries
             # ConnectorSearchCorpus (frozen-corpus replay) appends one entry per served call to
             # ``provenance`` -- "corpus"/"live"/"none" -- as the last thing it does before
             # returning, so reading the tail here right after the awaited call completes is
@@ -251,7 +442,7 @@ class AgentIO:
             )
         return results
 
-    async def visit(self, url: str, timeout_seconds: Optional[float] = None,
+    async def visit(self, url: Any, timeout_seconds: Optional[float] = None,
                     prepend_infobox: bool = False) -> str:
         """
         Fetch a URL, clean the HTML, return extracted text.
@@ -261,18 +452,47 @@ class AgentIO:
         or on any transport-level failure (status is None: timeout, DNS/connect error,
         or the HTTP request raised) — cases a differently-routed headless render can recover.
 
-        :param url: Target URL.
+        :param url: Target URL. A model-wrapped value (a single-item list/tuple, or a dict
+            carrying a ``url``/``link``/``href`` key) is unwrapped before it is used -- see
+            ``_coerce_visit_url``. Anything that is still not a fetchable http(s) URL after that
+            (empty, or an unresolved wrapper) fails immediately with no network attempt, tagged
+            as a model-caused failure -- never dispatched on a guess.
         :param timeout_seconds: Optional per-call timeout.
         :param prepend_infobox: Prefix the page's infobox as ``Label: Value`` lines (opt-in;
             same single fetch, no extra round-trip — see :func:`observation.clean_operation`).
         :returns: Cleaned page text.
-        :raises RuntimeError: On HTTP failure after all attempts.
+        :raises RuntimeError: On HTTP failure after all attempts, or on an unfetchable url.
         """
         started_at = time.perf_counter()
         used_browser = False
         result = None
         http_result = None
         http_error = None
+
+        url, arg_coerced = _coerce_visit_url(url)
+        if is_malformed_url_text(url):
+            # Never dispatch a network call for a url that could not possibly succeed -- an
+            # empty string (89 measured) or a wrapper `_coerce_visit_url` could not confidently
+            # resolve. This is unambiguously the model's fault, not infrastructure's: see
+            # `agent/app/testing/utils.py::_is_infra_timing`, which reads `failure_class` here
+            # to stop crediting infra with a URL the model itself never wrote correctly.
+            error_text = f"Invalid or unresolvable URL: {url!r}"
+            if self.telemetry:
+                self.telemetry.record_timing(
+                    name="visit",
+                    started_at=started_at,
+                    success=False,
+                    payload={
+                        "url": url,
+                        "status": None,
+                        "used_browser": False,
+                        "arg_coerced": arg_coerced,
+                        "failure_class": "model",
+                    },
+                    error=error_text,
+                )
+            raise RuntimeError(error_text)
+
         try:
             http_result = await self._with_timeout(
                 self.connector_http.request("GET", url, retries=2),
@@ -305,12 +525,25 @@ class AgentIO:
 
         if result.error:
             error_text = f"HTTP visit failed: {url} status={result.status}"
+            payload = {
+                "url": url,
+                "status": result.status,
+                "used_browser": used_browser,
+                "arg_coerced": arg_coerced,
+            }
+            if result.status is None:
+                # A real HTTP status means the target answered -- not a URL-format question at
+                # all, so the existing status-code-based classification in
+                # `testing/utils.py::_is_infra_timing` already handles it correctly. Only the
+                # no-status case is the ambiguous one this fix targets (see
+                # `_classify_network_failure`).
+                payload["failure_class"] = _classify_network_failure(str(getattr(result, "data", "") or ""))
             if self.telemetry:
                 self.telemetry.record_timing(
                     name="visit",
                     started_at=started_at,
                     success=False,
-                    payload={"url": url, "status": result.status, "used_browser": used_browser},
+                    payload=payload,
                     error=error_text,
                 )
             raise RuntimeError(error_text)
@@ -330,7 +563,12 @@ class AgentIO:
                     name="visit",
                     started_at=started_at,
                     success=False,
-                    payload={"url": url, "status": result.status, "used_browser": used_browser},
+                    payload={
+                        "url": url,
+                        "status": result.status,
+                        "used_browser": used_browser,
+                        "arg_coerced": arg_coerced,
+                    },
                     error=error_text,
                 )
             raise
@@ -344,7 +582,12 @@ class AgentIO:
                 name="visit",
                 started_at=started_at,
                 success=True,
-                payload={"url": url, "status": result.status, "used_browser": used_browser},
+                payload={
+                    "url": url,
+                    "status": result.status,
+                    "used_browser": used_browser,
+                    "arg_coerced": arg_coerced,
+                },
             )
         return summary
 

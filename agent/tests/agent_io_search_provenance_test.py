@@ -110,7 +110,10 @@ async def test_non_corpus_backend_records_no_provenance_key_and_is_unchanged():
     search_timings = [t for t in telemetry.timings if t["name"] == "search"]
     assert len(search_timings) == 1
     assert "search_provenance" not in search_timings[0]["payload"]
-    assert search_timings[0]["payload"] == {"query": "query", "result_count": 1}
+    # `arg_coerced` is new (tool-argument-coercion fix): always present, `None` here since
+    # "query" was never a wrapped list/dict -- see agent_io.py's `_coerce_search_query` and
+    # agent/tests/tool_argument_coercion_test.py.
+    assert search_timings[0]["payload"] == {"query": "query", "result_count": 1, "arg_coerced": None}
 
 
 @pytest.mark.asyncio
