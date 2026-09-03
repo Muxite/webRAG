@@ -125,7 +125,7 @@ import math
 import operator
 import re
 import unicodedata
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass, field as dataclass_field, replace as dataclass_replace
 from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Tuple
 
 from agent.app.evidence_store import canonicalize_url
@@ -190,6 +190,18 @@ class NonNumeric(DerivationError):
     """An operand's value carries no number, so it cannot enter an arithmetic operation."""
 
     code = "NON_NUMERIC"
+
+
+class NonNumericInterval(NonNumeric):
+    """A NonNumeric refusal whose operand is specifically a genuine RANGE, not unparseable
+    prose. Subclasses :class:`NonNumeric` -- every existing ``except NonNumeric`` /
+    ``except DerivationError`` handler keeps working unmodified -- so this exists purely to let
+    a refusal read as "this is a range, ranges don't combine" rather than "this is
+    unparseable", which is a different, more actionable fact for whoever reads
+    ``derivation_detail`` later. Interval arithmetic itself is out of scope; see
+    ``docs/design/TEMPORAL_RANGES_DESIGN.md``, "What I am NOT proposing"."""
+
+    code = "NON_NUMERIC_INTERVAL"
 
 
 class DivisionByZero(DerivationError):
@@ -651,6 +663,203 @@ def parse_quantity(text: Any) -> Quantity:
     return Quantity(magnitude, currency, tail, scale_name, restatement, "", raw)
 
 
+#: Two-sided separators `parse_interval` will actually SPLIT on. `_RANGE_MARKERS` above only
+#: gates whether it is worth trying at all (approximation markers like `~` / `±` are included
+#: there because `parse_quantity` must still refuse them); an approximation has no second
+#: operand to split against, so it is deliberately absent from this list and falls through to a
+#: refusal, matching `TestParseQuantityRanges`'s `"~5.6"` / `"±3"` cases.
+_INTERVAL_BETWEEN = re.compile(r"^between\s+(?P<low>.+?)\s+and\s+(?P<high>.+)$", re.IGNORECASE)
+_INTERVAL_DASH = re.compile(r"^(?P<low>.+?)\s*[–—]\s*(?P<high>.+)$")
+_INTERVAL_TO = re.compile(r"^(?P<low>.+?)\s+to\s+(?P<high>.+)$", re.IGNORECASE)
+_INTERVAL_HYPHEN = re.compile(r"^(?P<low>.+?)\s-\s(?P<high>.+)$")
+_INTERVAL_SPLITTERS = (_INTERVAL_BETWEEN, _INTERVAL_DASH, _INTERVAL_TO, _INTERVAL_HYPHEN)
+
+
+@dataclass(frozen=True)
+class Interval:
+    """A closed numeric range read verbatim off a page.
+
+    NOT a :class:`Quantity`: it never has a single magnitude, and nothing downstream of
+    :meth:`EvidenceGraph.add_arith` may consume it -- an interval-valued node refuses arithmetic
+    via :class:`NonNumericInterval`, deliberately, forever (see
+    ``docs/design/TEMPORAL_RANGES_DESIGN.md``, "What I am NOT proposing").
+    """
+
+    low: float
+    high: float
+    currency: str = ""
+    unit: str = ""
+    scale_name: str = ""
+    source_text: str = ""
+
+    @property
+    def ok(self) -> bool:
+        """True when the interval is well-formed (``low <= high``)."""
+        return self.low <= self.high
+
+    def contains(self, point: float, *, tolerance: float = 0.0) -> bool:
+        """True when ``point`` lies within ``[low - tolerance, high + tolerance]``.
+
+        Exact float comparison -- no fuzzy matching. ``tolerance`` defaults to 0.0, so the
+        default call is a literal closed-interval containment check.
+        """
+        return (self.low - tolerance) <= point <= (self.high + tolerance)
+
+
+def _bare_dimension(quantity: "Quantity") -> bool:
+    """True when ``quantity`` carries no unit, scale word or currency -- i.e. it is a plain
+    number that inherits its dimension from whatever it is paired with in a range."""
+    return not (quantity.unit or quantity.scale_name or quantity.currency)
+
+
+def _inherit_shared_dimension(bare: "Quantity", donor: "Quantity") -> "Quantity":
+    """Apply ``donor``'s trailing scale/unit/currency to a fully bare ``bare`` quantity.
+
+    The Wikipedia range idiom states the scale once, on the LAST number only: "100-400 billion"
+    means the low bound is 100 BILLION, not literally 100. Skipping this would silently under-
+    scale one side of the interval by the very magnitude the scale word carries -- exactly the
+    class of silent loss ``parse_quantity`` itself was hardened against in commit ``8981c13d``.
+    Only applies when ``bare`` is completely undecorated, so a side that already stated its own
+    unit or scale is never overridden.
+    """
+    if not _bare_dimension(bare) or _bare_dimension(donor):
+        return bare
+    magnitude = bare.magnitude
+    if donor.scale_name:
+        factor = _SCALE_WORDS.get(donor.scale_name, _SCALE_ABBREVIATIONS.get(donor.scale_name))
+        if factor:
+            magnitude = magnitude * factor
+    return dataclass_replace(bare, magnitude=magnitude, unit=donor.unit,
+                              scale_name=donor.scale_name, currency=donor.currency)
+
+
+def parse_interval(text: Any) -> Optional["Interval"]:
+    """Decompose ``text`` into an :class:`Interval`, or refuse it with ``None``.
+
+    A SEPARATE grammar from :func:`parse_quantity` -- it never widens that parser's refusal of
+    range text (locked by ``TestParseQuantityRanges``). Triggered only when
+    :data:`_RANGE_MARKERS` matches at all; the actual split is tried against a small, closed set
+    of two-sided separators (`between ... and`, an en/em dash, ` to `, ` - `). Each side is then
+    independently required to parse via :func:`parse_quantity` (reused, not reinvented) and to
+    agree in :attr:`Quantity.dimension` (reused, not reinvented) after a bare side inherits the
+    other's trailing scale/unit/currency.
+
+    :param text: the value text as read off a page.
+    :returns: an :class:`Interval`, or ``None`` when ``text`` is not a genuine two-sided range
+        of one dimension -- dimension disagreement, multi-marker prose
+        (``"between 5 and 9 or maybe 10"``), an approximation marker with no second operand, or
+        plain non-range text.
+    :raises: nothing -- an unparseable range is a refusal, never an exception.
+    """
+    raw = str(text if text is not None else "").strip()
+    if not raw or not _RANGE_MARKERS.search(raw):
+        return None
+    for pattern in _INTERVAL_SPLITTERS:
+        match = pattern.match(raw)
+        if not match:
+            continue
+        low_text = match.group("low").strip()
+        high_text = match.group("high").strip()
+        if not low_text or not high_text:
+            continue
+        # A third marker on either side means a three-part sentence ("between 5 and 9 or maybe
+        # 10"), not a two-sided range.
+        if _RANGE_MARKERS.search(low_text) or _RANGE_MARKERS.search(high_text):
+            continue
+        low_q = parse_quantity(low_text)
+        high_q = parse_quantity(high_text)
+        if not low_q.ok or not high_q.ok:
+            continue
+        low_q = _inherit_shared_dimension(low_q, high_q)
+        high_q = _inherit_shared_dimension(high_q, low_q)
+        if low_q.dimension != high_q.dimension:
+            continue
+        return Interval(
+            low=low_q.magnitude, high=high_q.magnitude,
+            currency=low_q.currency or high_q.currency,
+            unit=low_q.unit or high_q.unit,
+            scale_name=low_q.scale_name or high_q.scale_name,
+            source_text=raw,
+        )
+    return None
+
+
+class IntervalMatch(NamedTuple):
+    """The result of :func:`verify_interval_containment` -- a SEPARATE, tri-state signal.
+
+    Never merged into :class:`ValueMatch`, ``quote_verified`` or ``value_verified``: a page
+    saying "8.3-8.4 million" does not make a claim of "8.35 million" ``verified=True`` -- the
+    page never asserted 8.35. Containment is a mechanically weaker, differently-named claim.
+
+    :param status: ``"contained"`` / ``"outside"`` / ``"unverifiable"``. ``"unverifiable"`` --
+        never ``"outside"`` -- covers every case where no genuine, page-located interval of the
+        matching dimension could be established: no hint given, the hint is not itself a range,
+        the hint does not appear on the page, the claimed value is not numeric, or the two sides
+        disagree in dimension. "Absent is never zero."
+    :param low: the located interval's low bound, or ``None`` when unverifiable before an
+        interval was even parsed.
+    :param high: the located interval's high bound, or ``None`` under the same condition.
+    :param point: the claimed value's numeric magnitude, or ``None`` when it was not numeric.
+    :param reason: a short machine-readable reason, set whenever ``status`` is not
+        ``"contained"``/``"outside"`` with both bounds known.
+    """
+
+    status: str
+    low: Optional[float] = None
+    high: Optional[float] = None
+    point: Optional[float] = None
+    reason: Optional[str] = None
+
+
+def verify_interval_containment(page_text: Any, value: Any, *,
+                                interval_hint: Any = None) -> IntervalMatch:
+    """Does a page-located interval CONTAIN ``value``? A mechanical, exact-float question.
+
+    This is not :func:`verify_value`: it does not ask whether ``value`` itself is on the page
+    (usually it is not -- "8.35 million" is not literal text in "8.3-8.4 million"). It asks
+    whether a genuine range that IS mechanically located on the page brackets a numeric claim.
+    No fuzzy matching, no judgment: once the interval is located, containment is
+    ``low <= point <= high``, exact float comparison.
+
+    :param page_text: the stored page text.
+    :param value: the claimed point value to check.
+    :param interval_hint: the range text to look for on the page (e.g. ``"2.3 million to 4.0
+        million"``). Required -- this function does not search the page for a range on its own;
+        a caller that wants this signal already knows which interval it is asking about (the
+        same "opt-in, called by a caller that already knows it wants interval semantics"
+        contract :func:`parse_interval` documents).
+    :returns: an :class:`IntervalMatch`. ``status`` is ``"unverifiable"`` whenever the interval
+        could not be established as genuinely present on the page in the same dimension as
+        ``value`` -- never ``"outside"`` for an absent or unlocatable interval.
+    :raises: nothing.
+    """
+    point = numeric_value(value)
+    if point is None:
+        return IntervalMatch("unverifiable", reason="value_not_numeric")
+    interval = parse_interval(interval_hint)
+    if interval is None or not interval.ok:
+        return IntervalMatch("unverifiable", point=point, reason="no_interval")
+
+    value_quantity = parse_quantity(value)
+    if value_quantity.ok:
+        value_dimension = value_quantity.dimension
+        interval_dimension = (interval.currency,
+                              normalize_for_match(_unit_leading_token(interval.unit)))
+        if value_dimension != interval_dimension:
+            return IntervalMatch("unverifiable", low=interval.low, high=interval.high,
+                                 point=point, reason="dimension_mismatch")
+
+    located = verify_value(page_text, interval_hint)
+    if located.verified is not True:
+        return IntervalMatch("unverifiable", low=interval.low, high=interval.high,
+                             point=point, reason="interval_not_located")
+
+    if interval.contains(point):
+        return IntervalMatch("contained", low=interval.low, high=interval.high, point=point)
+    return IntervalMatch("outside", low=interval.low, high=interval.high, point=point,
+                         reason="outside_bounds")
+
+
 def _adjacent(offsets: Optional[List[int]], raw: str, left: int, right: int) -> bool:
     """True when nothing that constitutes a boundary separated two normalized positions in RAW.
 
@@ -943,6 +1152,14 @@ class EvidenceNode:
     #: proposed and recomputed value, or which upstream node made this one invalid. ``""`` when
     #: there is nothing to report.
     derivation_detail: str = ""
+    #: ``"point"`` (the default -- every existing call site produces this) or ``"interval"`` for
+    #: a SOURCE node built from a located range span via :meth:`EvidenceGraph.add_source_interval`.
+    #: Purely additive: no existing construction site names this, so every one keeps its default.
+    value_kind: str = "point"
+    #: The interval's bounds when :attr:`value_kind` is ``"interval"``, else ``None``. Never
+    #: consumed by :meth:`EvidenceGraph.add_arith` -- see :class:`NonNumericInterval`.
+    interval_low: Optional[float] = None
+    interval_high: Optional[float] = None
 
     def as_dict(self) -> Dict[str, Any]:
         """This node as a JSON-serializable dict."""
@@ -956,6 +1173,8 @@ class EvidenceNode:
             "operation": self.operation, "input_ids": list(self.input_ids),
             "unit": self.unit, "derivation_valid": self.derivation_valid,
             "derivation_detail": self.derivation_detail,
+            "value_kind": self.value_kind, "interval_low": self.interval_low,
+            "interval_high": self.interval_high,
         }
 
     @classmethod
@@ -976,6 +1195,9 @@ class EvidenceNode:
             unit=str(data.get("unit", "")),
             derivation_valid=data.get("derivation_valid"),
             derivation_detail=str(data.get("derivation_detail", "")),
+            value_kind=str(data.get("value_kind", "point") or "point"),
+            interval_low=data.get("interval_low"),
+            interval_high=data.get("interval_high"),
         )
 
 
@@ -1118,6 +1340,68 @@ class EvidenceGraph:
         self._nodes[node_id] = node
         return node
 
+    def add_source_interval(self, page_id: str, value: str, quote: str = "", contract: Any = None,
+                            label: Any = None,
+                            refuse_ambiguous: bool = False) -> Optional[EvidenceNode]:
+        """Admit an interval-valued SOURCE node for a genuine range read off a page.
+
+        A sibling of :meth:`add_source`, not a variant of it -- kept as a separate method (rather
+        than a new argument on ``add_source``) precisely so a plain point-source call site can
+        never accidentally produce an ambiguous node. Two things must both hold: ``value`` must
+        parse as a genuine range (:func:`parse_interval`), and that range text must be
+        mechanically LOCATED on the stored page, exactly like :meth:`add_source` requires for a
+        point value -- a value read off no page is not evidence either way.
+
+        :param page_id: id of a page already added with :meth:`add_page`.
+        :param value: the range text as claimed to have been read off that page, e.g.
+            ``"2.3 million to 4.0 million"``.
+        :param quote: the model's supporting quote, optional; verified independently, same as
+            :meth:`add_source`.
+        :param contract: an optional ``StepContract``, same page-identity guard as
+            :meth:`add_source`.
+        :param label: an optional field label used to prefer a vouched-for occurrence.
+        :param refuse_ambiguous: opt-in refusal of a repeated span with no label nearby.
+        :returns: the admitted (or already-present, content-identical) node with
+            ``value_kind="interval"``, else None with an entry appended to :attr:`rejections` --
+            either because ``value`` is not a genuine two-sided range of one dimension, or
+            because it could not be located on the page.
+        :raises: nothing.
+        """
+        interval = parse_interval(value)
+        if interval is None or not interval.ok:
+            self.rejections.append({
+                "page_id": str(page_id), "value": str(value or ""),
+                "verified": None, "fail_reason": "not_an_interval",
+            })
+            return None
+        page = self.page(page_id)
+        if contract is not None and page is not None and not page_identity_ok(
+                contract, {"url": page.get("url", ""), "source_url": page.get("url", "")}):
+            return self._reject(page_id, value, ValueMatch(None, -1, -1,
+                                                           VALUE_FAIL_PAGE_IDENTITY))
+        match = verify_value_against_stored_page(
+            page, value, label=label, refuse_ambiguous=refuse_ambiguous)
+        if match.verified is not True:
+            return self._reject(page_id, value, match)
+
+        node_id = source_node_id(str(page_id), match.start, match.end, str(value))
+        existing = self._nodes.get(node_id)
+        if existing is not None:
+            return existing
+        quote_match = verify_against_stored_page(page, quote)
+        unit_text = interval.unit or extract_unit(value)
+        node = EvidenceNode(
+            id=node_id, kind=KIND_SOURCE, value=str(value), page_id=str(page_id),
+            source_url=str((page or {}).get("url", "")), start=match.start, end=match.end,
+            quote=str(quote or ""), quote_verified=quote_match.verified,
+            quote_fail_reason=quote_match.fail_reason, verified=True,
+            occurrences=match.occurrences, unit_bearing=match.unit_bearing,
+            label_nearby=match.label_nearby, unit=unit_text,
+            value_kind="interval", interval_low=interval.low, interval_high=interval.high,
+        )
+        self._nodes[node_id] = node
+        return node
+
     def add_derived(self, value: str, operation: str, input_ids: Iterable[str], *,
                     unit: str = "", derivation_valid: Optional[bool] = None,
                     derivation_detail: str = "") -> EvidenceNode:
@@ -1164,9 +1448,21 @@ class EvidenceGraph:
         return node
 
     def _require_numeric(self, node: EvidenceNode) -> float:
-        """``node``'s value as a float, or a loud ``ValueError`` when it has no number."""
+        """``node``'s value as a float, or a loud ``ValueError`` when it has no number.
+
+        ``parse_quantity`` already refuses range text by design (Part B,
+        ``docs/design/TEMPORAL_RANGES_DESIGN.md``), so this raises correctly with no new logic
+        for that case. The only addition here is diagnostic: a node explicitly marked
+        ``value_kind="interval"`` raises the more specific :class:`NonNumericInterval` instead of
+        the generic :class:`NonNumeric`, so a refusal reads as "this is a range" rather than
+        "this is unparseable" -- interval arithmetic itself stays unsupported either way.
+        """
         value = numeric_value(node.value, node.unit)
         if value is None:
+            if node.value_kind == "interval":
+                raise NonNumericInterval(
+                    f"node {node.id!r} value {node.value!r} is a range; arithmetic over "
+                    "intervals is not supported")
             raise NonNumeric(f"node {node.id!r} value {node.value!r} is not numeric")
         return value
 
