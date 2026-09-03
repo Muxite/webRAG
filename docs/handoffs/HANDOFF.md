@@ -1,5 +1,11 @@
 # webRAG / Euglena — Session Handoff (2026-08-10)
 
+> **Latest phase (2026-09-03): `docs/handoffs/LEDGER_COMPONENT_PHASE_2026-09-03.md`** — the
+> ledger becomes a callable component; three of four proposed capabilities stopped by
+> measurement; next step is multi-hostname visiting. Read its "extra things to check"
+> section before doing any corpus measurement — it lists seven traps that produced wrong
+> numbers this phase.
+
 > Supersedes the 2026-07-10 version below this line's era entirely — that content (the adaptive
 > distillation research line, Phases 1-5) is now historical; see
 > `agent/app/ADAPTIVE_DISTILLATION_HANDOFF.md` if you need it. **Start here for current state.**
