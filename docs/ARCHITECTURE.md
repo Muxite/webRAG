@@ -6,7 +6,7 @@
 |-----------|-------------|
 | `frontend/` | React UI with Supabase auth, task submission, and task history |
 | `services/gateway/` | FastAPI gateway, task intake, Supabase sync, health monitoring |
-| `agent/` | Graph-of-Thought reasoning agent with web crawling and RAG |
+| `agent/` | Graph-of-Thought reasoning agent with web crawling and RAG, now also home to the Euglena Ledger evidence compiler (see below) |
 | `services/shared/` | Shared connectors, models, storage helpers, message contracts |
 | `services/_legacy-aws/metrics/` | CloudWatch queue-depth publisher for autoscaling (unused in current compose stack) |
 | `services/_legacy-aws/lambda_autoscaling/` | Lambda-based ECS autoscaler (deployment only, unused in current compose stack) |
@@ -37,6 +37,32 @@ See [Agent Architecture](../agent/app/AGENT_ARCHITECTURE.md) for full details, o
 deeper, line-cited [Idea Engine](../agent/app/IDEA_ENGINE.md) and
 [Adaptive Engine](../agent/app/ADAPTIVE_ENGINE.md) docs for the DAG controller and the
 adaptive loop respectively.
+
+## Euglena Ledger (pivot, declared 2026-08-31)
+
+The paragraphs above describe the general-purpose agentic engine this project was built around
+through DAG v2. As of 2026-08-31, active development narrowed scope: instead of competing with
+general agentic frameworks (LangGraph et al.) on breadth of task-planning capability, the project
+now builds **Euglena Ledger** — an auditable evidence compiler. Given a question and a set of
+sources, it returns a ledger of atomic claims, each pinned to a verbatim span on a fetched page,
+plus any values derived from those claims by deterministic computation, plus a verdict of
+ANSWER / PARTIAL / ABSTAIN derived in code (never asked of the model) from what was actually
+obtained. It is a component the DAG engine, LangGraph, or a plain script can call — not a
+replacement agent loop.
+
+The execution variant implementing this is `evidence_loop`
+(`agent/app/testing/execution_evidence_loop.py`): a flat ReAct-style loop
+(`search` / `visit` / `derive` / `verify` / `finish`) over a typed ledger with a mechanical,
+quote-offset grounding check and a deterministic derivation graph
+(`agent/app/testing/evidence_graph.py`) that refuses cross-unit arithmetic rather than silently
+computing a wrong answer. It is one of several execution variants the test harness can run
+(`agent/app/testing/runner.py`); the DAG engine (`graph`/`sequential`, described above) and the
+off-the-shelf `langgraph_react` arm remain live comparison baselines, not deprecated code.
+
+The KPIs this pivot is judged on are **not** mean task score: risk-coverage (does the arm's own
+confidence track its actual accuracy), claim-level precision/recall per pipeline stage,
+fabricated-arithmetic rate, and replay fidelity. Full plan, current metric contract, and the
+experiment history behind this scope change: [`docs/LEDGER.md`](LEDGER.md).
 
 ## Message Flow
 

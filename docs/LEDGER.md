@@ -3,12 +3,18 @@
 **Codename:** `ledger` · **Status:** pivot declared 2026-08-31 · **Repo:** webRAG (unchanged)
 **Operative plan:** `docs/LEDGER_PLAN_2026-09-01.md` (supersedes the DAG v3 master plan's
 thesis, metric order and build order) · **Latest handoff:**
-`docs/handoffs/LEDGER_TINY_MODEL_PHASE_2026-09-02.md` (prior:
-`docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md`)
+`docs/handoffs/LEDGER_TINY_MODEL_PHASE_2026-09-02.md` (2026-09-03: also see
+`docs/handoffs/BUGHUNT01_RESULT_2026-09-03.md`, which answers that handoff's own open-queue
+item 1) (prior: `docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md`)
 
 ## Operative plan
 
-- **Phase handoff (latest): `docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md`** — the KPI
+- **2026-09-03 note:** the two lines above and the bullet below disagreed about which handoff is
+  "latest" — this document named `LEDGER_TINY_MODEL_PHASE_2026-09-02.md` in its header and
+  `LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md` eight lines later in its body. Fixed: the header line
+  is now the single source of truth, and it is chronologically correct — `..._2026-09-02.md`
+  postdates `..._2026-09-01.md`. `BUGHUNT01_RESULT_2026-09-03.md` postdates both.
+- **Phase handoff: `docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md`** — the KPI
   phase. Frozen metric contract, arm-blind auditor, per-arm confidence channel, graded verdict,
   shared prompted tool transport. Retracts "calibration cannot be retrofitted"; records the
   extraction value gate as a negative result; sets the seeded-A/B protocol.
@@ -107,7 +113,7 @@ Each gets its own spec and its own cycle. Several exist in partial form today.
 |---|---|---|
 | 1 | Typed action queue + parallel scheduler | partial — engine has parallel visits |
 | 2 | DAG evidence-dependency analysis | partial — DAG v2 planning to be re-scoped |
-| 3 | Deterministic derivation + unit refusal + abstain | **WIRED AND LIVE-MEASURED** (`evidence_graph.py` via `execution_evidence_loop.py`); typed `derive` action, verdict gate `LEDGER_DERIVATION_GATE` default OFF; live cell 210-231 run: 21/22 cells carry a graph artifact, 109 source + 16 derived nodes, zero invalid derivations, fabricated-arithmetic rate 0.0 (n=8) |
+| 3 | Deterministic derivation + unit refusal + abstain | **WIRED AND LIVE-MEASURED** (`evidence_graph.py` via `execution_evidence_loop.py`); typed `derive` action, verdict gate `LEDGER_DERIVATION_GATE` default OFF; **[2026-08-31, `LEDGER_PROGRAM_HANDOFF_2026-08-31.md`, superseded below]** live cell 210-231 run: 21/22 cells carry a graph artifact, 109 source + 16 derived nodes, zero invalid derivations, fabricated-arithmetic rate 0.0 (n=8); **[2026-08-31/09-01, `ledgernum22r3`, `LEDGER_HANDOFF_2026-09-01.md` §3, current]** 66 cells: 65 carry a graph artifact, 58 admit >=1 verified source node, 26 emit >=1 derived node, 248 source + 57 derived nodes, zero invalid derivations, fabricated-arithmetic rate 0.0 |
 | 4 | Per-call audit log: prompt, response, timing, cost | **shipped** — `call_id` pairing (was file-order, broke under 32-way concurrency), `stage`/`node_id`, sampling params + `seed`, retry `attempts`, `scripts/trace_read.py`; `seed` is Ollama-only, no-op elsewhere (Anthropic has no such parameter) |
 | 5 | Record/replay + counterfactual re-run | **corpus replay LIVE** (`connector_search_corpus.py` + `scripts/build_corpus.py`, 313 docs / $0.11 for the numeric suite) **+ counterfactual replay tooling shipped, provider-limited**: `scripts/replay_call.py` refuses replay without full-capture text rather than reconstructing lossily; `scripts/reverify.py` re-checks quotes/derivations offline, $0. Honest limit: without a seed a re-run is not comparable to its original — true on Anthropic by construction, and even seeded Ollama showed one cold-start exception (first call after model load) |
 | 6 | Leak-resistant benchmark construction | keystone gates exist; 046/047 asymmetry fixed; **all 12 verify-leaf `optional_url` leaks now closed** (six fixed 2026-08-31 to match the two fixed earlier); `[LEAK]` lint severity in `scripts/validator_lint.py` makes it un-reintroducible, gated by `validator_lint_test.py` over `ACTIVE_SUITE_IDS` (still 59 — the numeric suite 210-231 is deliberately not promoted) |
@@ -237,11 +243,19 @@ provenance on operands, no abstain when an operand is missing. That is open spac
 
 ## Next
 
+**2026-09-03 note: this "Next" section is the 2026-08-31 queue, now four handoffs stale** —
+`LEDGER_HANDOFF_2026-09-01.md`, `LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md`,
+`LEDGER_TINY_MODEL_PHASE_2026-09-02.md` and `BUGHUNT01_RESULT_2026-09-03.md` have all shipped
+since. It is kept below for history, not as the live queue. **The current open queue is
+`LEDGER_TINY_MODEL_PHASE_2026-09-02.md` §7**, items 2-5 (item 1 is now answered — see
+`BUGHUNT01_RESULT_2026-09-03.md`: pages-read does NOT convert to keystone for phi3:mini; the
+zero-visit gate closed the wrong gap).
+
 Items 1-4 below are **done** as of 2026-08-31 (see
 `docs/handoffs/LEDGER_PROGRAM_HANDOFF_2026-08-31.md`): search-result fixtures (corpus replay),
 the derivation layer wired and live-measured, the 22-task numeric suite (210-231, out of
 `ACTIVE_SUITE_IDS`), and a fresh three-arm run with evidence persistence (`ledgernum22`,
-66/66 cells, superseding the old 046/047 gap). Open queue:
+66/66 cells, superseding the old 046/047 gap). Open queue, as it stood 2026-08-31:
 
 1. `sequential_react`'s evidence-persistence gap (fixed for `langgraph_react`, not this arm).
 2. Powered re-measurement — n=22 rep=1 settles nothing against this repo's own n=61-111 power

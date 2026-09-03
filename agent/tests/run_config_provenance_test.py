@@ -48,3 +48,62 @@ def test_a_secret_is_never_captured_even_under_a_watched_prefix(monkeypatch):
     assert not any("do-not-store-me" in str(v) for v in captured.values())
     for name in ("LEDGER_API_KEY", "IDEA_TEST_AUTH_TOKEN", "LEDGER_SEARCH_SECRET"):
         assert name not in captured
+
+
+# 2026-09-03: capture_run_config only watched LEDGER_/IDEA_TEST_ (plus a handful of individually
+# named extras), so AGENT_*, BROWSER_* and IDEA_CHECKPOINT_* flags -- real, behaviour-changing env
+# vars read by agent/app/agent.py, agent/app/interface_agent.py and agent/app/idea_checkpointer.py
+# -- were invisible to provenance forever. This only improves cells produced from here on; nothing
+# is retrofitted onto the ~10,400 already stored (only 144 of which carry a run_config block at all).
+
+
+def test_agent_prefixed_flags_are_recorded(monkeypatch):
+    monkeypatch.setenv("AGENT_USE_IDEA_DAG", "1")
+    monkeypatch.setenv("AGENT_BLOCKED_LIMIT", "5")
+
+    captured = capture_run_config()
+
+    assert captured["AGENT_USE_IDEA_DAG"] == "1"
+    assert captured["AGENT_BLOCKED_LIMIT"] == "5"
+
+
+def test_browser_prefixed_flags_are_recorded(monkeypatch):
+    monkeypatch.setenv("BROWSER_HEADLESS", "0")
+
+    captured = capture_run_config()
+
+    assert captured["BROWSER_HEADLESS"] == "0"
+
+
+def test_idea_checkpoint_prefixed_flags_are_recorded(monkeypatch):
+    monkeypatch.setenv("IDEA_CHECKPOINT_ENABLED", "1")
+    monkeypatch.setenv("IDEA_CHECKPOINT_BACKEND", "redis")
+
+    captured = capture_run_config()
+
+    assert captured["IDEA_CHECKPOINT_ENABLED"] == "1"
+    assert captured["IDEA_CHECKPOINT_BACKEND"] == "redis"
+
+
+def test_an_unset_new_prefix_flag_is_still_absent_rather_than_defaulted(monkeypatch):
+    monkeypatch.delenv("AGENT_BLOCKED_LIMIT", raising=False)
+    monkeypatch.delenv("BROWSER_HEADLESS", raising=False)
+    monkeypatch.delenv("IDEA_CHECKPOINT_ENABLED", raising=False)
+
+    captured = capture_run_config()
+
+    assert "AGENT_BLOCKED_LIMIT" not in captured
+    assert "BROWSER_HEADLESS" not in captured
+    assert "IDEA_CHECKPOINT_ENABLED" not in captured
+
+
+def test_a_secret_under_a_new_prefix_is_never_captured(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "sk-do-not-store-me")
+    monkeypatch.setenv("BROWSER_AUTH_TOKEN", "t-do-not-store-me")
+    monkeypatch.setenv("IDEA_CHECKPOINT_SECRET", "s-do-not-store-me")
+
+    captured = capture_run_config()
+
+    assert not any("do-not-store-me" in str(v) for v in captured.values())
+    for name in ("AGENT_API_KEY", "BROWSER_AUTH_TOKEN", "IDEA_CHECKPOINT_SECRET"):
+        assert name not in captured

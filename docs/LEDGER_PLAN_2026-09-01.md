@@ -5,6 +5,11 @@
 order and §1 primary metric. The master plan's non-goals (§9) and adversarial risks (§7) stand
 unchanged and are re-adopted here verbatim in spirit.
 
+**Partially superseded itself, 2026-09-03:** §2's "calibration cannot be retrofitted" claim was
+retracted the same day it was written, in
+`docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md` §3. The retraction is marked in place
+below rather than deleted. The primary-metric ordering in §3 is unaffected.
+
 ---
 
 ## 1. Where the master plan turned out to be right, and where it did not
@@ -49,15 +54,37 @@ Risk-coverage over the same 198 cells, at threshold 0.5:
 | langgraph_react (derived verdict) | 0.591 | 0.629 | **0.273** (n=11) |
 | sequential_react_extract (derived verdict) | 0.576 | 0.585 | **0.231** (n=13) |
 
-`evidence_loop` is **monotone**: the more it declines to answer, the more often it is right when it
-does. Both arms using the post-hoc *derived* verdict are **inverted at their most confident tier** —
+`evidence_loop` is **monotone** on this 198-cell campaign (`ledgernum22r3`). **Correction,
+2026-09-03:** `docs/LEDGER_FINAL01_TUNING_RESULT.md` runs the same monotonicity check on a
+different campaign (`ledgerfinal01`, seeded, tuning/holdout split) and finds `evidence_loop`
+**NOT monotone on the tuning split** (0.634 PARTIAL -> 0.623 ANSWER) and monotone only on the
+holdout — while `langgraph_react` and `sequential_react_extract`, monotone on the tuning split,
+both flip on the SAME holdout. Two campaigns, two different verdicts on whether `evidence_loop`
+is monotone. The honest position: at this n, monotonicity for any one arm is a split artifact,
+not a settled property of the arm. Don't cite "evidence_loop is monotone" as a standing fact from
+either campaign alone.
+
+Both arms using the post-hoc *derived* verdict are **inverted at their most confident tier**, on
+`ledgernum22r3` specifically —
 their ANSWER cells score materially *worse* than their own average. That inversion reproduced and
 strengthened from the earlier n=4–5 sample to n=11 and n=13.
 
-The operative conclusion: **calibration cannot be retrofitted onto an arm that did not maintain a
-ledger while it ran.** The ledger is not a scoring trick; it is the thing that makes "I am
-confident here and not there" mean anything. That is a defensible differentiator in a way that
-"+0.02 mean score" never was.
+~~The operative conclusion: **calibration cannot be retrofitted onto an arm that did not maintain a
+ledger while it ran.**~~ **RETRACTED 2026-09-01, same day, in
+`docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md` §3**: a post-hoc, arm-blind audit of only
+`output.pages` + final text produces a monotone risk-coverage channel for ALL three arms,
+including the two that kept no ledger — `evidence_loop`'s own native channel
+(0.200/0.354/0.658) is not clearly better than an audit of its own artifacts (0.000/0.408/0.613)
+at that n. `agent/app/testing/claim_audit.py` and `confidence_channel.py` implement exactly that
+audit-from-artifacts path; the code agrees with the retraction, not with the sentence above. What
+survives instead: a *replayable derivation graph* — source and derived nodes that re-verify
+offline with 0 failures and 0 page-drift — which no arm-blind auditor can manufacture after the
+fact from prose an arm never wrote. See that handoff for the current position; this document is
+kept as written for history, not as the operative claim.
+
+The ledger is not a scoring trick; it is the thing that makes "I am confident here and not
+there" mean anything for the arm that keeps one. Whether that is *uniquely* achievable, or only
+*more convenient*, is what the retraction above changes.
 
 A likely mechanism, stated as a hypothesis rather than a finding: the derived rule marks ANSWER
 when every checkable claim is grounded, so it selects for **claim-poor** answers — a terse

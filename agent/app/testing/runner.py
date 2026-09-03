@@ -97,7 +97,7 @@ def discover_test_modules() -> List[Path]:
 #: materially different systems are indistinguishable after the fact. A post-run analyst hit
 #: exactly that: they could not determine which mechanisms were live in a run and had to report
 #: the comparison as unresolvable.
-_RUN_CONFIG_PREFIXES = ("LEDGER_", "IDEA_TEST_")
+_RUN_CONFIG_PREFIXES = ("LEDGER_", "IDEA_TEST_", "AGENT_", "BROWSER_", "IDEA_CHECKPOINT_")
 
 #: Individually watched vars that carry no prefix but change what a run IS.
 _RUN_CONFIG_EXTRAS = ("LLM_SEED", "LLM_PROVIDER", "SEARCH_PROVIDER")
