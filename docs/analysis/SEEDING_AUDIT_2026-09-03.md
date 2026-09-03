@@ -1,4 +1,10 @@
-# Which prior conclusions survive the seeding gap
+# Which prior conclusions still hold
+
+Two lenses: the arm that was never seeded, and the counter that counted the wrong noun.
+
+---
+
+# Lens 1 — seeding
 
 `LLM_SEED` never reached `langgraph_react` until `adeeffa5`. This is a pass over conclusions
 already on record, asking which still hold.
@@ -77,3 +83,37 @@ seeded evidence bearing on it.
 Anything from the paid runs' *availability* findings, the corpus-replay determinism of search
 (pure-Python BM25, byte-identical by construction), and every categorical/structural outcome.
 Score-based conclusions on `ConnectorLLM` arms are untouched.
+
+---
+
+# Lens 2 — `search.count` counted documents, not calls
+
+`LEDGER_TINY_MODEL_PHASE_2026-09-02.md` §7.4 left this open: "anything that cited search counts
+should be re-checked." Doing that now.
+
+Before `0fa6e733`, `observability.search.count` was incremented once per **result document**
+(`agent_io.py:410-418`), not once per call. With `search_k=6` the inflation is exactly 6x, and the
+stored data is consistent with that: 12 against 2 real timings, 18 against 3, 30 against 5. The
+correct value was renamed to `search.documents_seen.count` and `search.count` now counts timings.
+
+Every cell written before 2026-09-02 23:18 carries the old meaning. Two conclusions rest on it:
+
+**1. `docs/LEDGER.md:207` — the backend policy.** "SearXNG [...] 4.00 searches/cell against
+Serper's 21.85." Those are document counts; the real figures are ~0.67 and ~3.64 calls/cell. The
+*conclusion* — SearXNG is measurably worse — survives and is arguably strengthened, because the
+number is really "documents returned per cell", which is a more direct measure of retrieval
+quality than call count. But the label is wrong and 4.00 "searches/cell" should not be quoted.
+The `visits/cell 6.67 -> 4.82` half is unaffected: `visit.count` is 1:1 with successful visits.
+
+**2. `DAG_V2_HONEST_SCOREBOARD_AND_BREADTH_UNBLOCK_20260824.md:193` — a live inference.** "79.5
+searches per cell is high enough to suggest B1+B2 are still pouring budget into searches [...]
+Worth attacking next." The real figure is ~13 calls/cell. Still high, but the inference was drawn
+from a 6x-inflated number and the "worth attacking next" priority should be re-derived before
+anyone acts on it.
+
+**Unaffected:** every "0 searches" statement (zero is zero under either meaning), which covers the
+whole tinyllama diagnosis; `RESEARCH_QUESTIONS_2026-08-30.md:55`'s "5.5 vs 1.7" as a *ratio*,
+though both absolutes are 6x high; and the `_visit_haystacks` docstring's "42 searches, 0 visits",
+whose point (many searches, no visits) survives at ~7 real calls.
+
+`CAPABILITY_SPECTRUM_PREREG_2026-08-15.md:111` already warned about exactly this and was right.
