@@ -154,6 +154,21 @@ class BM25Index:
         return [row[2] for row in scored[:max(0, int(count))]]
 
 
+def as_corpus_document(item: Any, text_chars: int = DEFAULT_TEXT_CHARS) -> CorpusDocument:
+    """Coerce one supplied document into a :class:`CorpusDocument`.
+
+    Accepts a ``CorpusDocument`` unchanged, or a mapping carrying any of ``url`` / ``title`` /
+    ``description`` / ``text``. Missing keys become empty strings rather than raising, matching
+    :func:`load_documents`, which already degrades a malformed row instead of aborting a run.
+    """
+    if isinstance(item, CorpusDocument):
+        return item
+    row = item if isinstance(item, dict) else {}
+    return CorpusDocument(url=row.get("url", ""), title=row.get("title", ""),
+                          description=row.get("description", ""), text=row.get("text", ""),
+                          text_chars=text_chars)
+
+
 def load_documents(corpus_dir: str, text_chars: int = DEFAULT_TEXT_CHARS) -> List[CorpusDocument]:
     """Read ``documents.jsonl`` from ``corpus_dir``; malformed lines are skipped, not fatal.
 
@@ -192,9 +207,17 @@ class ConnectorSearchCorpus(ConnectorSearch):
 
     def __init__(self, connector_config, corpus_dir: Optional[str] = None,
                  fallback: Optional[Any] = None,
-                 max_live_fallbacks: Optional[int] = None) -> None:
+                 max_live_fallbacks: Optional[int] = None,
+                 documents: Optional[List[Any]] = None) -> None:
         """
         :param corpus_dir: directory holding ``documents.jsonl``; defaults to ``LEDGER_CORPUS_DIR``.
+        :param documents: in-memory documents to index IN ADDITION to whatever ``corpus_dir``
+            holds. Each is a :class:`CorpusDocument` or a ``{"url", "title", "description",
+            "text"}`` mapping. This is what lets a caller hand the component a source SET
+            directly (``ledger_api.run(question, sources=...)``) instead of pointing it at a
+            recorded directory: search then ranks exactly those documents and nothing else. When
+            both are given, both are indexed; when neither is, the corpus is empty and, with no
+            ``fallback``, every query honestly returns nothing.
         :param fallback: optional live backend consulted when the corpus holds no match. Injected
             rather than constructed here so a test can prove the network is never reached.
         :param max_live_fallbacks: hard cap on live calls; defaults to ``LEDGER_MAX_LIVE_FALLBACKS``
@@ -202,8 +225,15 @@ class ConnectorSearchCorpus(ConnectorSearch):
             an unattended run cannot do.
         """
         super().__init__(connector_config)
-        self.corpus_dir = corpus_dir or os.environ.get("LEDGER_CORPUS_DIR", "")
+        # An explicit ``documents=`` set is a complete corpus on its own, so the env default
+        # must not sneak a recorded directory in alongside it -- that would widen retrieval past
+        # the sources the caller supplied, which is the one thing this parameter exists to bound.
+        if corpus_dir is None and documents is not None:
+            self.corpus_dir = ""
+        else:
+            self.corpus_dir = corpus_dir or os.environ.get("LEDGER_CORPUS_DIR", "")
         self.documents = load_documents(self.corpus_dir) if self.corpus_dir else []
+        self.documents.extend(as_corpus_document(item) for item in (documents or []))
         self.index = BM25Index(self.documents)
         self.fallback = fallback
         self.max_live_fallbacks = (max_live_fallbacks if max_live_fallbacks is not None

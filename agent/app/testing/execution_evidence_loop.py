@@ -623,6 +623,17 @@ class LedgerRow:
     quote: str = ""
     quote_verified: bool = False
     unit: str = ""
+    #: The pin back into the fetched text, carried over from the :class:`Extraction` this row was
+    #: written from. These four fields already existed on the record; a consumer reading a row had
+    #: to re-find its record by fuzzy ``(entity, field)`` string matching to get them, which is
+    #: guesswork about the provenance of a claim the product exists to pin exactly. Empty / ``-1``
+    #: on an unresolved row, and on a resolved row whose record never located its span.
+    page_id: str = ""
+    quote_start: int = -1
+    quote_end: int = -1
+    #: Id of the SOURCE node this row's value was admitted as, or ``""`` when the value never
+    #: became a node — which is the same thing as saying it was never mechanically located.
+    evidence_node_id: str = ""
 
     @property
     def resolved(self) -> bool:
@@ -657,6 +668,8 @@ class LedgerRow:
             "value": self.value, "source_url": self.source_url, "quote": self.quote,
             "quote_verified": self.quote_verified, "resolved": self.resolved,
             "confidence_tier": self.confidence_tier, "unit": self.unit,
+            "page_id": self.page_id, "quote_start": self.quote_start,
+            "quote_end": self.quote_end, "evidence_node_id": self.evidence_node_id,
         }
 
 
@@ -918,6 +931,12 @@ class Ledger:
         row.quote = record.quote
         row.quote_verified = record.quote_verified is True
         row.unit = record.unit
+        # The pin travels with the value it pins. Writing it anywhere but here would let a row's
+        # value and its offsets come from two different records.
+        row.page_id = record.page_id
+        row.quote_start = record.quote_start
+        row.quote_end = record.quote_end
+        row.evidence_node_id = record.evidence_node_id
 
     def _resolve(self, row: LedgerRow, record: Extraction, wildcard: bool = False) -> None:
         """Fold a value-carrying ``SUPPORTED`` record into ``row`` (see :meth:`apply`)."""
