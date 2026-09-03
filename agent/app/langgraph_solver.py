@@ -1554,11 +1554,23 @@ class LangGraphSolver:
                 "/ OPENAI_API_KEY via ConnectorConfig). Refusing to start a run that would fail "
                 "at the first call."
             )
+        # LLM_SEED reaches every OTHER arm through llm_backends; this one builds its own client
+        # and so was sampling unseeded, which voids the "determinism verified byte-identical, so
+        # reps=1 suffices" justification in ladder02's own preregistration. Measured against this
+        # host's ollama /v1 on 2026-09-03: same seed -> byte-identical completions, different
+        # seeds -> different completions, no seed -> 2 distinct outputs in 3 draws at
+        # temperature 0.1. Unlike `num_ctx` (an ollama-specific option the shim drops), `seed` is
+        # a standard OpenAI field and IS honored. Reuses llm_backends' parser so "how LLM_SEED is
+        # read" has exactly one definition; None (unset) leaves sampling exactly as it was.
+        from agent.app.llm_backends import OllamaNativeBackend
+
+        seed = OllamaNativeBackend._parse_seed(getattr(cfg, "llm_seed", None))
         return ChatOpenAI(
             base_url=cfg.llm_api_url,
             api_key=cfg.llm_api_key,
             model=self._model_name,
             temperature=0.1,
+            seed=seed,
         )
 
     async def solve(

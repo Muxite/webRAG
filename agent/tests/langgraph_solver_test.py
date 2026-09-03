@@ -182,6 +182,40 @@ def test_search_dedup_does_not_leak_between_tool_builds():
     assert not second.startswith("ALREADY SEARCHED")
 
 
+def test_build_llm_sends_the_configured_seed(monkeypatch):
+    """LLM_SEED reaches every other arm through llm_backends; this one builds its own
+    ChatOpenAI, so it sampled unseeded — which voids ladder02's own "determinism verified
+    byte-identical, so reps=1 suffices" justification for this arm."""
+    from agent.app.langgraph_solver import LangGraphSolver
+
+    monkeypatch.setenv("LLM_SEED", "12345")
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy")
+    llm = LangGraphSolver.__new__(LangGraphSolver)
+    llm._model_name = "qwen2.5:1.5b"
+    assert LangGraphSolver._build_llm(llm).seed == 12345
+
+
+def test_build_llm_leaves_sampling_alone_when_no_seed_is_set(monkeypatch):
+    """Unset must stay unset: an unseeded run has to behave exactly as it did before."""
+    from agent.app.langgraph_solver import LangGraphSolver
+
+    monkeypatch.delenv("LLM_SEED", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy")
+    llm = LangGraphSolver.__new__(LangGraphSolver)
+    llm._model_name = "qwen2.5:1.5b"
+    assert LangGraphSolver._build_llm(llm).seed is None
+
+
+def test_build_llm_ignores_an_unparsable_seed(monkeypatch):
+    from agent.app.langgraph_solver import LangGraphSolver
+
+    monkeypatch.setenv("LLM_SEED", "not-a-number")
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy")
+    llm = LangGraphSolver.__new__(LangGraphSolver)
+    llm._model_name = "qwen2.5:1.5b"
+    assert LangGraphSolver._build_llm(llm).seed is None
+
+
 def test_observation_executed_reports_a_deduped_search_as_not_executed():
     """probe1 (2026-09-03): phi3:mini spent 10 of 12 dispatches on deduped repeats against 2 real
     calls. The refusal carries no TOOL ERROR prefix, so run_tool_loop's sniffing counted it as a
