@@ -50,8 +50,24 @@ calibrated. Risk-coverage at threshold 0.5:
 
 `evidence_loop` is monotone. Both derived-verdict arms are **inverted at their most confident
 tier** — and that inversion, previously n=4–5 and flagged as too small to call, reproduced and
-strengthened at n=11 and n=13. **Calibration cannot be retrofitted onto an arm that kept no ledger
-while it ran.** That is the defensible differentiator.
+strengthened at n=11 and n=13. ~~**Calibration cannot be retrofitted onto an arm that kept no
+ledger while it ran.** That is the defensible differentiator.~~
+
+> **RETRACTED 2026-09-03.** Both claims in this section are superseded and must not be cited.
+>
+> *"Calibration cannot be retrofitted"* was refuted the same day it was written, in
+> `LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md` §3: a post-hoc, arm-blind audit reading only
+> `output.pages` and the final text produces a MONOTONE channel for arms that kept no ledger at
+> all. The code agrees — `agent/app/testing/claim_audit.py` and `confidence_channel.py` do exactly
+> that, and the inversion above turned out to be an artifact of the old literal-match support
+> rule, not a property of the arms.
+>
+> *"`evidence_loop` is monotone"* did not survive either. `docs/LEDGER_FINAL01_TUNING_RESULT.md`
+> finds it NOT monotone on the tuning split (0.634 -> 0.623) and monotone on the sealed holdout,
+> while the other two arms flip the other way. Monotonicity is a split artifact at this n, not a
+> settled property of any arm.
+>
+> The numbers in the table are left exactly as measured; only their interpretation is withdrawn.
 
 ## 3. Layer 4 (the derivation graph) — working
 
@@ -94,8 +110,10 @@ parentheticals, currency prefixes); 2 newly refused, both previously silent lowe
 ## 5. May and may not be claimed
 
 **May:** the derivation layer admits re-verifiable evidence and recomputes values with zero invalid
-derivations; fabricated-arithmetic rate is 0 on this suite; `evidence_loop`'s native verdict is
-monotone against ground truth while both derived verdicts are inverted at ANSWER; the numeric suite
+derivations; fabricated-arithmetic rate is 0 on this suite; ~~`evidence_loop`'s native verdict is
+monotone against ground truth while both derived verdicts are inverted at ANSWER~~ (**RETRACTED
+2026-09-03 — see §2**: the inversion was an artifact of the literal-match support rule, and
+`evidence_loop`'s own monotonicity does not hold on the FINAL01 tuning split); the numeric suite
 is leak-free (parametric floor 0.015 overall, exactly 0.000 on 18 of 22 tasks, against 0.48–0.61
 with tools); `evidence_loop` costs ~3× wall clock and ~+47k tokens per cell versus
 `langgraph_react`.
