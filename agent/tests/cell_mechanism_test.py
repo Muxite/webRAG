@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
 
 import cell_mechanism as cm  # noqa: E402
 import run_diff  # noqa: E402
+import ladder_plots  # noqa: E402
 
 
 def _cell(tmp_path, name, *, timings=None, emu=None, llm_turns=1, checks=None,
@@ -115,3 +116,33 @@ def test_run_diff_can_select_one_condition_by_run_suffix(tmp_path):
     _cell(tmp_path, "sweep_a_derive_lg_210_m_langgraph_react_cfg1_r1.json", answer="on")
     only_off = run_diff.gather("sweep_", str(tmp_path), run_suffix="_off_lg")
     assert [v["answer"] for v in only_off.values()] == ["off"]
+
+
+def test_outcome_resolves_solved_even_when_the_url_was_invented(tmp_path):
+    """The failure taxonomy tests the retrieval PATH before the OUTCOME, so a cell that guessed a
+    URL, read it and solved comes back URL_INVENTED_OK. That is right for "what went wrong" and
+    wrong for "how far did it get" — the plot resolves the outcome itself. Caught by rendering the
+    chart: qwen2.5:0.5b showed 0 solved when it had solved cells."""
+    guessed_and_solved = _cell(tmp_path, "r_210_m_langgraph_react_cfg1_r1.json",
+                               timings=[_visit(200)],
+                               checks=[{"check": "keystone_210", "passed": True}])
+    assert cm.classify(cm.facts(guessed_and_solved)) == "URL_INVENTED_OK"
+    assert ladder_plots.outcome(cm.facts(guessed_and_solved)) == "solved"
+
+
+def test_outcome_stages_are_ordered_worst_to_best_with_distinct_hues(tmp_path):
+    """Stacked segments must be readable as a progression, and no two stages may share a hue —
+    a first draft folded 11 classes into 8 palette slots and produced three identical swatches."""
+    keys = [k for k, _, _ in ladder_plots.STAGES]
+    assert keys[:2] == ["never_acted", "never_read"]
+    assert keys[-2] == "solved"
+    hues = [h for _, _, h in ladder_plots.STAGES]
+    assert len(set(hues)) == len(hues), hues
+
+
+def test_outcome_reports_a_page_that_was_read_but_never_used(tmp_path):
+    read_ignored = _cell(tmp_path, "r_211_m_langgraph_react_cfg1_r1.json",
+                         timings=[{"name": "search"}, _visit(200)],
+                         checks=[{"check": "keystone_211", "passed": False},
+                                 {"check": "coverage", "score": 0.0}])
+    assert ladder_plots.outcome(cm.facts(read_ignored)) == "read_ignored"
