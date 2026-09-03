@@ -136,12 +136,16 @@ seeded, `reps=1`, **$0**.
 
 ```bash
 # progress
-ls agent/idea_test_results/ladder03_*_r1.json | wc -l          # of 336
-grep -E "done in|ALL DONE|!!!" agent/idea_test_results/_campaigns/../../../..  # driver log path below
-tail -f /tmp/.../scratchpad/ladder03_driver.log                 # session-local; see note
+ls agent/idea_test_results/ladder03_*_r1.json | wc -l           # of 336
+ls -t agent/idea_test_results/_campaigns/ladder03_*.log | head  # per-campaign logs, newest first
 
-# is it alive?
-cat agent/idea_test_results/_campaigns/campaign.lock            # then: kill -0 <pid>
+# is it alive?  (empty or a dead pid means it is not)
+pid=$(cat agent/idea_test_results/_campaigns/campaign.lock 2>/dev/null); kill -0 "$pid" 2>/dev/null \
+    && echo "running (pgid $pid)" || echo "not running"
+
+# resume from wherever it stopped — campaigns with cells are skipped
+setsid nohup bash scripts/run_ladder03.sh \
+    agent/idea_test_results/prereg/ladder03_order.json < /dev/null > ladder03.log 2>&1 & disown
 
 # drift self-check — 15 ladder cells duplicate probe3 exactly and must stay byte-identical
 PYTHONPATH=.:services:agent ./.venv/bin/python scripts/run_diff.py probe3_ ladder03_ \
@@ -154,12 +158,12 @@ PYTHONPATH=.:services:agent ./.venv/bin/python scripts/prereg.py audit --run-id 
 PYTHONPATH=.:services:agent ./.venv/bin/python scripts/ladder_curve.py        # --split dev is the default
 ```
 
-**Resuming.** The driver skips any campaign that already has cells, so re-running it continues
-from where it stopped. The driver script itself lives in this session's scratchpad; if it is gone,
-the 28 preregs in `agent/idea_test_results/prereg/ladder03_*.json` carry the full design
-(model, tasks, arm, module state) and `_campaigns/ladder03_*.env` carries the exact launch
-environment of every campaign that started. Rebuild the loop from those; launch only via
-`scripts/run_campaign.sh` and **never `pkill -f`** — use `--stop <run_id>`.
+**Resuming.** `scripts/run_ladder03.sh` skips any campaign that already has cells, so re-running
+it continues from where it stopped, and it waits for the singleton lock rather than racing it. Its
+campaign order is `agent/idea_test_results/prereg/ladder03_order.json`; the 28 preregs alongside
+carry the full design and `_campaigns/ladder03_*.env` records the exact launch environment (and
+git SHA) of every campaign that started. **Never `pkill -f`** — it matches the shell running it;
+use `scripts/run_campaign.sh --stop <run_id>`, or kill the driver by process group.
 
 **Do not edit code while it runs.** Round 2 of the probe phase was aborted for exactly this: a
 mid-sweep edit would have run different code for a campaign's first models than its last. Analysis
