@@ -1,6 +1,6 @@
 # Weak-model floor + ladder phase — handoff (2026-09-03)
 
-Branch `dagv2-evidence-ledger`, 10 commits on top of `19c28ad2`, tree clean, offline suite
+Branch `dagv2-evidence-ledger`, 12 commits on top of `19c28ad2`, tree clean, offline suite
 **9079 passed / 19 skipped / 0 failed** (`PYTHONPATH=.:services:agent ./.venv/bin/python -m
 pytest -q agent/tests`), run by the coordinator.
 
