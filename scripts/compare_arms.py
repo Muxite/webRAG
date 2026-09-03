@@ -216,7 +216,14 @@ def load_arm(run_id, results_dir=RESULTS_DIR, exact=False, variant=None):
         if rid:
             files.update(_result_files_for_id(rid, results_dir, exact))
     for f in sorted(files):
-        if f.endswith("_summary.json"):
+        # `_summary.json` re-embeds cells; `_report_v<N>.json` is the verbosity>=3 render, a
+        # DIFFERENT schema entirely (final_output/node_table/raw_events, no test_metadata and no
+        # validation). Both match the loose `{run_id}_*_*.json` glob above. Loading a report as a
+        # cell yields a junk row -- test_id "?", score None, variant None -- so an unfiltered arm
+        # reports 2x its real cell count with half the scores missing. Measured on probe3: 6 rows
+        # for 3 cells. `bench_common.py:59` already carries this guard; this mirrors it.
+        base = os.path.basename(f)
+        if base.endswith("_summary.json") or "_report_" in base:
             continue
         try:
             d = json.load(open(f))

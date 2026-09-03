@@ -163,7 +163,10 @@ def load_cells(prefixes, results_dir=RESULTS_DIR):
     for prefix in prefixes:
         files.update(glob.glob(f"{results_dir}/{prefix}_*_*.json"))
     for f in sorted(files):
-        if f.endswith("_summary.json"):
+        # See compare_arms.load_arm: `_report_v<N>.json` (verbosity>=3) matches the glob above but
+        # is a different schema, and loading it as a cell doubles the count with score=None rows.
+        base = os.path.basename(f)
+        if base.endswith("_summary.json") or "_report_" in base:
             continue
         try:
             data = json.load(open(f))

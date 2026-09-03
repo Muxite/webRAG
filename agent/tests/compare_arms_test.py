@@ -99,6 +99,21 @@ def test_load_arm_reads_cells_and_skips_summary(tmp_path):
     assert {r["score"] for r in rows} == {0.8, 0.6}
 
 
+def test_load_arm_skips_the_verbosity_3_report_render(tmp_path):
+    """`IDEA_TEST_REPORT_VERBOSITY=3` writes `<cell>_report_v3.json` beside every cell. It matches
+    the loose `{run_id}_*_*.json` glob but is a different schema, so loading it as a cell yields a
+    junk row (test_id "?", score None) and doubles the arm's cell count. Measured on probe3
+    before the fix: 6 rows for 3 real cells."""
+    _write_cell(tmp_path, "runA", 1, "100", score=0.8)
+    with open(tmp_path / "runA_rep1_100_model_engine_cfgabc_r1_report_v3.json", "w") as fh:
+        json.dump({"final_output": "x", "node_table": [], "raw_events": [],
+                   "verbosity_level": 3}, fh)
+    rows, unreadable = ca.load_arm("runA", results_dir=str(tmp_path))
+    assert len(rows) == 1, [r["file"] for r in rows]
+    assert unreadable == []
+    assert rows[0]["score"] == 0.8
+
+
 def test_load_arm_reports_unreadable_json(tmp_path):
     _write_cell(tmp_path, "runA", 1, "100", score=0.8)
     with open(tmp_path / "runA_rep2_100_model_engine_cfgabc_r1.json", "w") as fh:

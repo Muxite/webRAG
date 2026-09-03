@@ -116,6 +116,18 @@ def test_load_cells_reads_and_skips_summary(tmp_path):
     assert unreadable == []
 
 
+def test_load_cells_skips_the_verbosity_3_report_render(tmp_path):
+    """The verbosity>=3 `_report_v3.json` render matches load_cells' glob but is a different
+    schema. Counting it as a cell doubles the denominator with score-less rows, which would move
+    every KPI computed downstream — trust_kpi_dashboard reads through this loader."""
+    _write(tmp_path, "runA", "100")
+    with open(tmp_path / "runA_100_m_v_cfg1_r1_report_v3.json", "w") as fh:
+        json.dump({"final_output": "x", "node_table": [], "verbosity_level": 3}, fh)
+    cells, unreadable = kd.load_cells(["runA"], results_dir=str(tmp_path))
+    assert len(cells) == 1, [c["file"] for c in cells]
+    assert unreadable == []
+
+
 def test_load_cells_reports_unreadable(tmp_path):
     _write(tmp_path, "runA", "100")
     with open(tmp_path / "runA_graph_999_model_engine_cfgabc_r1.json", "w") as fh:
