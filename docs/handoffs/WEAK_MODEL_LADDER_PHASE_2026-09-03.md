@@ -99,6 +99,35 @@ will bite you again:
    gate to treat a search-free cell as a real 0 and broke three tests, because absent telemetry is
    not proof that no search ran. A genuine zero needs a PRESENT, search-free timings block.
 
+### Correction found after the ladder started: the give-up is per INVOCATION, not per cell
+
+The repeat-refusal give-up bounds `max_tool_errors` (3) CONSECUTIVE failed dispatches **within one
+`run_tool_loop` invocation**. A cell runs the main pass plus up to three `_run_extension` passes
+(`langgraph_solver.py:1661,1688,1710`), and each calls `transport.run(...)` -> a fresh
+`run_tool_loop` with `tool_error_streak = 0`. So a CELL can legitimately show more than 3
+consecutive failures: `ladder03_phi3_mini_off_lg` task 219 shows a run of **6**, which is two
+invocations of 3.
+
+This is not a defect in the fix and not a reason to change it, but it corrects two things stated
+earlier: the probe phase's C2 criterion ("worst streak 3 vs bound 3") is a per-invocation bound
+that passed on probe3 only because those cells did not take an extension with failures in it, and
+the improvement is "at most 3 per pass" rather than "at most 3 per cell". The original pathology —
+burning the ENTIRE step budget on refused calls — is still closed, since each pass is bounded.
+
+Open question for whoever revisits this: should the streak persist across extension passes? An
+argument either way. A corrective extension is a deliberate second chance, so resetting is
+defensible; but a model that fails three calls, gets nudged, and fails three more has not been
+bounded in any way a user would recognise.
+
+### Infra failures land as files, so completion is not the same as data
+
+`ladder03_phi3_mini_off_lg` task 218: `infra_failed: True`, one `llm_call` that failed after
+**1555s** with zero LLM turns — an ollama stall. The harness classified it correctly, and
+`prereg.audit`'s `min_completion_rate` still passes because the FILE landed. A cell can therefore
+be complete and scientifically absent at the same time. Watch `max_infra_failed_rate` (set to 0.34
+here), not completion alone. Rate at 38 cells: **2.6%**, so this looks like an outlier rather than
+a systemic stall; projected wall time at that pace is ~6.7h.
+
 ---
 
 ## 5. EXTRA THINGS TO LOOK FOR — open and unverified
