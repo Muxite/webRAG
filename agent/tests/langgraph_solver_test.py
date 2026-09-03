@@ -5,6 +5,8 @@ result-mapping logic in isolation.
 import asyncio
 import inspect
 
+import pytest
+
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.errors import GraphRecursionError
 
@@ -178,6 +180,93 @@ def test_search_dedup_does_not_leak_between_tool_builds():
     s2, _v2 = _make_tools(fake_io, search_k=6, page_chars=6000)
     second = asyncio.run(s2.ainvoke({"query": "same query"}))
     assert not second.startswith("ALREADY SEARCHED")
+
+
+def test_observation_executed_reports_a_deduped_search_as_not_executed():
+    """probe1 (2026-09-03): phi3:mini spent 10 of 12 dispatches on deduped repeats against 2 real
+    calls. The refusal carries no TOOL ERROR prefix, so run_tool_loop's sniffing counted it as a
+    successful execution and no give-up could bound the loop."""
+    from agent.app.langgraph_solver import _observation_executed, _already_searched_message
+
+    assert _observation_executed(_already_searched_message("Mont Blanc")) is False
+
+
+def test_observation_executed_still_reports_a_tool_error_as_not_executed():
+    """Regression guard: returning the explicit (text, executed) tuple DISABLES
+    _resolve_dispatch's TOOL_ERROR_PREFIX sniffing, so dropping this half would report a genuine
+    dispatch failure as executed and silently undo 0fa6e733."""
+    from agent.app.langgraph_solver import _observation_executed
+    from agent.app.prompted_tools import TOOL_ERROR_PREFIX
+
+    assert _observation_executed(f"{TOOL_ERROR_PREFIX} ValidationError: bad args") is False
+
+
+def test_observation_executed_reports_a_real_result_as_executed():
+    from agent.app.langgraph_solver import _observation_executed
+
+    assert _observation_executed("1. Mont Blanc - https://example.com/a\n   desc A") is True
+
+
+def test_repeated_deduped_search_gives_up_instead_of_burning_the_step_budget():
+    """Three CONSECUTIVE refusals trip the existing max_tool_errors give-up. Without the
+    executed=False signal the loop ran until the step budget was gone."""
+    import agent.app.prompted_tools as pt
+    from agent.app.langgraph_solver import _observation_executed, _already_searched_message
+
+    dispatched = []
+
+    async def dispatch_tool(action, args):
+        dispatched.append(args.get("query"))
+        obs = _already_searched_message(args.get("query", ""))
+        return obs, _observation_executed(obs)
+
+    async def call_model(_view):
+        return '{"thought": "again", "action": "search", "args": {"query": "same"}}', None
+
+    steps = []
+    asyncio.run(pt.run_tool_loop(
+        tools=[pt.ToolSpec(name="search", description="d", arg_names=("query",))],
+        render_view=lambda: "view", call_model=call_model,
+        dispatch_tool=dispatch_tool, on_step=steps.append, turns=25,
+    ))
+
+    # The loop returns on the give-up rather than raising; what matters is that it is bounded
+    # by max_tool_errors (3) and not by the 25-turn step budget.
+    assert steps[-1].kind == "tool_error_give_up", [s.kind for s in steps]
+    assert len(dispatched) == pt.MAX_TOOL_ERRORS_DEFAULT, dispatched
+
+
+def test_interleaving_a_real_search_resets_the_give_up_streak():
+    """A model that alternates a fresh query with a repeat is exploring, not looping, and must
+    not be cut off."""
+    import agent.app.prompted_tools as pt
+    from agent.app.langgraph_solver import _observation_executed, _already_searched_message
+
+    seen, queries = set(), iter(["a", "a", "b", "b", "c", "c", "d", "d"])
+
+    async def dispatch_tool(action, args):
+        q = args.get("query", "")
+        if q in seen:
+            obs = _already_searched_message(q)
+        else:
+            seen.add(q)
+            obs = f"1. result for {q}"
+        return obs, _observation_executed(obs)
+
+    async def call_model(_view):
+        try:
+            q = next(queries)
+        except StopIteration:
+            return '{"thought": "done", "action": "finish", "args": {"answer": "x"}}', None
+        return ('{"thought": "t", "action": "search", "args": {"query": "%s"}}' % q), None
+
+    steps = []
+    asyncio.run(pt.run_tool_loop(
+        tools=[pt.ToolSpec(name="search", description="d", arg_names=("query",))],
+        render_view=lambda: "view", call_model=call_model,
+        dispatch_tool=dispatch_tool, on_step=steps.append, turns=25,
+    ))
+    assert not any(s.kind == "tool_error_give_up" for s in steps), [s.kind for s in steps]
 
 
 def test_visit_tool_delegates_to_agent_io_and_truncates():

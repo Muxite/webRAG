@@ -43,7 +43,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
@@ -69,6 +69,7 @@ from agent.app.prompted_tools import (
     MAX_INVALID_ACTIONS_DEFAULT as _PROMPTED_MAX_INVALID_ACTIONS_DEFAULT,
     MAX_TOOL_ERRORS_DEFAULT as _PROMPTED_MAX_TOOL_ERRORS_DEFAULT,
     NUDGE as _EMULATION_NUDGE,
+    TOOL_ERROR_PREFIX as _PROMPTED_TOOL_ERROR_PREFIX,
     ToolLoopExhausted, ToolLoopStep, ToolSpec,
     build_protocol, extract_decision, invalid_action_message, run_tool_loop,
 )
@@ -185,9 +186,38 @@ _SEARCH_VISITED_MARK = " [ALREADY VISITED]"
 #: opt-in flag): mirrors how the existing visit/search "ALREADY VISITED" markers above already
 #: ship unconditionally — this is arm-fairness hygiene (never worse, only prevents a wasted call),
 #: not a scored experiment.
+#: Leading marker on :func:`_already_searched_message`. ``dispatch_tool`` tests for it to report
+#: ``executed=False``, because a deduped query genuinely did NOT run — ``agent_io.search`` is
+#: never called and no results are produced. Without that, ``_resolve_dispatch`` sniffs the
+#: refusal as a normal observation (it carries no ``TOOL ERROR:`` prefix) and the loop has no
+#: bounded give-up for a model that keeps re-issuing a query it was already refused. Measured on
+#: probe1 (2026-09-03): phi3:mini task 210 spent 10 of 12 dispatches on deduped repeats against
+#: 2 real calls, and task 211 spent 9 of 11 — the same step-budget burn ``MAX_TOOL_ERRORS``
+#: closes for failed dispatches, one mechanism to its left.
+_ALREADY_SEARCHED_MARK = "ALREADY SEARCHED "
+
+
+def _observation_executed(observation: str) -> bool:
+    """Did the tool behind ``observation`` actually run?
+
+    ``run_tool_loop`` infers this from :data:`prompted_tools.TOOL_ERROR_PREFIX` when a dispatcher
+    returns a bare string. Returning the explicit ``(text, executed)`` tuple turns that sniffing
+    OFF, so this reproduces the sentinel check AND adds the one the sniffing cannot see: a
+    deduped repeat search (:func:`_already_searched_message`) never reaches ``agent_io.search``
+    and produces no results, so it did not execute either. Reporting that truthfully lets the
+    loop's ``max_tool_errors`` streak bound a model that keeps re-issuing a refused query, the
+    way it already bounds one repeating a call that fails a tool's schema.
+
+    Dropping the ``TOOL ERROR`` half would report a genuine dispatch failure as executed and
+    silently undo ``0fa6e733``; it is kept here for exactly that reason.
+    """
+    return not (observation.startswith(_PROMPTED_TOOL_ERROR_PREFIX)
+                or observation.startswith(_ALREADY_SEARCHED_MARK))
+
+
 def _already_searched_message(query: str) -> str:
     return (
-        f"ALREADY SEARCHED '{query[:80]}'. Its results are in an earlier tool message above — "
+        f"{_ALREADY_SEARCHED_MARK}'{query[:80]}'. Its results are in an earlier tool message above — "
         "visit one of those result URLs, or search something DIFFERENT. Do not repeat a search "
         "you have already run."
     )
@@ -986,8 +1016,16 @@ class _EmulatedToolCallTransport:
             ])
             return _msg_text(response), getattr(response, "usage_metadata", None)
 
-        async def dispatch_tool(action: str, args: Dict[str, Any]) -> str:
-            return await _invoke_tool(self._by_name.get(action), args)
+        async def dispatch_tool(action: str, args: Dict[str, Any]) -> Tuple[str, bool]:
+            """Returns ``run_tool_loop``'s explicit ``(observation, executed)`` shape.
+
+            A deduped repeat search reports ``executed=False``: the tool really did not run, so
+            the loop's ``max_tool_errors`` streak counts it and gives up after three CONSECUTIVE
+            refusals instead of letting the model re-issue the same query until the step budget
+            is gone. A real call in between resets the streak, so an interleaved repeat is free.
+            """
+            observation = await _invoke_tool(self._by_name.get(action), args)
+            return observation, _observation_executed(observation)
 
         def on_step(step: ToolLoopStep) -> None:
             transcript.extend(_transcript_messages_for_step(
