@@ -147,24 +147,24 @@ class ConnectorConfig:
 
         :returns: API key string or None.
         """
-        general = os.environ.get("LLM_API_KEY")
-        if general and str(general).strip():
-            return str(general).strip()
+        general = _clean_secret(os.environ.get("LLM_API_KEY"))
+        if general:
+            return general
         if self.llm_provider == "openrouter":
-            ak = os.environ.get("OPENROUTER_API_KEY")
-            if ak and str(ak).strip():
-                return str(ak).strip()
+            ak = _clean_secret(os.environ.get("OPENROUTER_API_KEY"))
+            if ak:
+                return ak
         if self.llm_provider == "anthropic":
-            ak = os.environ.get("ANTHROPIC_API_KEY")
-            if ak and str(ak).strip():
-                return str(ak).strip()
+            ak = _clean_secret(os.environ.get("ANTHROPIC_API_KEY"))
+            if ak:
+                return ak
         if self.llm_provider == "openai_compatible":
-            ak = os.environ.get("OPENAI_API_KEY")
-            if ak and str(ak).strip():
-                return str(ak).strip()
-        ak = os.environ.get("OPENAI_API_KEY")
-        if ak and str(ak).strip():
-            return str(ak).strip()
+            ak = _clean_secret(os.environ.get("OPENAI_API_KEY"))
+            if ak:
+                return ak
+        ak = _clean_secret(os.environ.get("OPENAI_API_KEY"))
+        if ak:
+            return ak
         return None
 
     def _resolve_llm_api_url(self) -> str | None:

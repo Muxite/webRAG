@@ -83,3 +83,29 @@ def test_a_non_serper_provider_reads_only_the_generic_var(monkeypatch):
 ])
 def test_clean_secret_edge_cases(value, expected):
     assert _clean_secret(value) == expected
+
+
+@pytest.mark.parametrize("raw", [
+    KEY,
+    KEY + "\r",
+    f'"{KEY}"',
+    f"'{KEY}'",
+    f' "{KEY}"\r\n',
+])
+def test_the_llm_key_is_cleaned_of_quotes_too(monkeypatch, raw):
+    """`_resolve_llm_api_key` only `.strip()`ed, so a quoted key from keys.env reached the
+    provider with its quotes attached and authenticated as garbage (observed live 2026-09-04:
+    OpenRouter 401 until run_api.sh stripped quotes shell-side as a workaround). The config
+    layer must own this, same as the search key path."""
+    for name in ("LLM_API_KEY", "OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("LLM_API_KEY", raw)
+    assert ConnectorConfig()._resolve_llm_api_key() == KEY
+
+
+def test_a_quoted_provider_specific_llm_key_is_cleaned(monkeypatch):
+    for name in ("LLM_API_KEY", "OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    monkeypatch.setenv("OPENROUTER_API_KEY", f'"{KEY}"\r\n')
+    assert ConnectorConfig()._resolve_llm_api_key() == KEY

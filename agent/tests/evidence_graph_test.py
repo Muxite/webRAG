@@ -1341,3 +1341,170 @@ class TestParseQuantityWiring:
         b = graph.add_source("p1", "£7,481,396")
         node = graph.add_arith("sum", [a.id, b.id])
         assert float(node.value) == 2395000 + 7481396
+
+
+class TestQuotientDimensionalAnnotation:
+    """W1: quotient/ratio stays exempt from `UnitMismatch` (a rate is the point), but is no
+    longer silent about its own dimensions -- `derivation_detail` carries a machine-readable
+    `unit_note` and, for a same-dimension ratio, the composed unit is corrected to dimensionless.
+    None of this ever touches `derivation_valid`: annotation, not refusal."""
+
+    def test_same_dimension_ratio_is_flagged_dimensionless(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x", "Plant A generates 500 MW. Plant B generates 250 MW.")
+        a = graph.add_source("p1", "500 MW")
+        b = graph.add_source("p1", "250 MW")
+        node = graph.add_arith("ratio", [a.id, b.id])
+        assert node.unit == ""
+        assert "unit_note=same_dimension_ratio" in node.derivation_detail
+        assert "MW/MW" in node.derivation_detail
+        assert node.derivation_valid is True
+
+    def test_cross_dimension_quotient_is_flagged_not_refused(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x", "Cost was £500. Length was 10 m.")
+        cost = graph.add_source("p1", "£500")
+        length = graph.add_source("p1", "10 m")
+        node = graph.add_arith("quotient", [cost.id, length.id])
+        assert node.value == "50"
+        assert "unit_note=cross_dimension_quotient" in node.derivation_detail
+        assert node.derivation_valid is True
+
+    def test_missing_unit_on_either_side_is_flagged_unassessed(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x", "A is 500. B is 20 m.")
+        a = graph.add_source("p1", "500")
+        b = graph.add_source("p1", "20 m")
+        node = graph.add_arith("quotient", [a.id, b.id])
+        assert "unit_note=unassessed_units" in node.derivation_detail
+        assert node.derivation_valid is True
+
+    def test_both_sides_missing_units_is_also_unassessed(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x", "A is 500. B is 20.")
+        a = graph.add_source("p1", "500")
+        b = graph.add_source("p1", "20")
+        node = graph.add_arith("quotient", [a.id, b.id])
+        assert "unit_note=unassessed_units" in node.derivation_detail
+
+    def test_a_genuine_disagreement_still_composes_with_the_unit_note(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x", "Cost was £500. Length was 10 m.")
+        cost = graph.add_source("p1", "£500")
+        length = graph.add_source("p1", "10 m")
+        node = graph.add_arith("quotient", [cost.id, length.id], proposed_value="99")
+        assert node.derivation_valid is False
+        assert "disagrees" in node.derivation_detail
+        assert "unit_note=cross_dimension_quotient" in node.derivation_detail
+
+
+class TestScaleWordNeverSurvivesAsUnit:
+    """The live bug: a model derived `381 - 25` where `25` came from `25 million`, and the pair
+    passed as unit-consistent because the scale word was split off and dropped before the value
+    ever reached `parse_quantity`. `extract_unit` is the split point (used directly by
+    `LedgerToolkit._locate`), so a scale word must never come back as its unit."""
+
+    def test_a_bare_scale_word_is_not_a_unit(self):
+        assert extract_unit("25 million") == ""
+
+    def test_a_scale_word_followed_by_a_real_unit_keeps_only_the_unit(self):
+        assert extract_unit("1.5 million tonnes") == "tonnes"
+
+    def test_a_real_unit_is_unaffected(self):
+        assert extract_unit("330 m") == "m"
+        assert extract_unit("1,991 metres") == "metres"
+
+    def test_25_million_parses_to_its_full_magnitude(self):
+        assert numeric_value("25 million") == 25_000_000.0
+
+    def test_381_million_minus_25_million_is_computed_at_full_scale(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://e.org/x",
+                       "Alpha revenue was 381 million dollars. Beta revenue was 25 million dollars.")
+        a = graph.add_source("p1", "381 million")
+        b = graph.add_source("p1", "25 million")
+        node = graph.add_arith("difference", [a.id, b.id])
+        assert node.value == "356000000"
+
+    def test_ledger_toolkit_locate_keeps_the_scale_word_with_the_number(self):
+        """Regression for the exact live shape: `LedgerToolkit.derive` splitting a literal operand
+        on `extract_unit` used to mint a SOURCE node holding only `"25"`, discarding the x10^6."""
+        from agent.app.ledger_tools import LedgerToolkit
+
+        toolkit = LedgerToolkit()
+        toolkit.register_page(
+            "https://e.org/x",
+            "Alpha revenue was 25 million dollars. Beta revenue was 381 million dollars.")
+        observation = toolkit.derive("difference", ["381 million", "25 million"])
+        assert "356000000" in observation
+        node = toolkit._graph.nodes()[-1]
+        assert node.value == "356000000"
+        assert node.derivation_valid is True
+
+
+class TestOperandSupported:
+    """A DERIVED node's `operand_supported` is a separate axis from `derivation_valid`: it asks
+    whether the operands are still grounded in located page text, not whether the arithmetic
+    checked out."""
+
+    def test_a_freshly_minted_derivation_is_supported(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        node = graph.add_arith("sum", [a.id, b.id])
+        assert node.operand_supported is True
+        assert graph.operand_support_rate() == 1.0
+
+    def test_a_graph_with_no_derived_nodes_reports_none(self):
+        graph = _arith_graph()
+        assert graph.operand_support_rate() is None
+
+    def test_as_dict_round_trips_operand_supported(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        node = graph.add_arith("sum", [a.id, b.id])
+        restored = eg.EvidenceNode.from_dict(node.as_dict())
+        assert restored.operand_supported is True
+
+    def test_missing_field_deserializes_gracefully(self):
+        """An artifact minted before this field existed has no `operand_supported` key at all."""
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        node = graph.add_arith("sum", [a.id, b.id])
+        data = node.as_dict()
+        del data["operand_supported"]
+        restored = eg.EvidenceNode.from_dict(data)
+        assert restored.operand_supported is None
+
+    def test_reverify_graph_recomputes_operand_supported_on_a_legacy_artifact(self):
+        """A stored artifact from before this field existed carries no `operand_supported` on its
+        DERIVED node, and reverification must fill in the real answer rather than leave it None."""
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        graph.add_arith("sum", [a.id, b.id])
+        artifact = graph.to_dict()
+        for node_data in artifact["nodes"]:
+            node_data.pop("operand_supported", None)
+
+        result = reverify_graph(artifact)
+        derived_rows = [row for row in result["nodes"] if row["kind"] == KIND_DERIVED]
+        assert len(derived_rows) == 1
+        assert derived_rows[0]["operand_supported"] is True
+        assert result["operand_support_rate"] == 1.0
+
+    def test_reverify_graph_reports_false_when_a_source_no_longer_verifies(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        graph.add_arith("sum", [a.id, b.id])
+        artifact = graph.to_dict()
+        artifact["pages"][0]["text"] = "This page no longer mentions either figure."
+        artifact["pages"][0]["truncated"] = False
+
+        result = reverify_graph(artifact)
+        derived_rows = [row for row in result["nodes"] if row["kind"] == KIND_DERIVED]
+        assert derived_rows[0]["operand_supported"] is False
+        assert result["operand_support_rate"] == 0.0

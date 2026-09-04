@@ -310,3 +310,88 @@ def test_a_quantity_id_means_the_same_thing_on_every_page():
     observation = kit.derive("sum", [tower_id, "541 m"])
     assert "REFUSED" in observation.upper(), (
         f"{tower_id} is 1776 ft and 541 m is metres; summing them must refuse, got: {observation}")
+
+
+# -- quote capture: `_locate` must mint SOURCE nodes with a verified, non-empty quote -----------
+#
+# `docs/analysis/QUOTE_CAPTURE_GAP_2026-09-04.md`: `EvidenceGraph.add_source` has always supported
+# an independently-re-verified `quote=`, but `LedgerToolkit._locate` never passed one, so every
+# SOURCE node this module ever minted carried `quote=""`, `quote_verified=None`,
+# `quote_fail_reason="empty"` -- starving the risk-coverage certify chain's quote clause to 0%
+# coverage no matter what a host or model did. The fix is mechanical: derive the quote from the
+# span already located, never from the model.
+
+def _source_nodes(kit):
+    return [node for node in kit.artifact()["nodes"] if node["kind"] == "source"]
+
+
+def test_a_literal_operand_source_node_carries_a_verified_quote(kit):
+    """The page-scan literal path (`_locate`'s second `add_source` call). `kit`'s page is one
+    line, so the mechanical quote is that whole sentence -- and it must contain the operand
+    literal, not just some unrelated span of the same page."""
+    kit.derive("difference", ["419.7 metres", "380.0 metres"])
+
+    sources = _source_nodes(kit)
+    assert len(sources) == 2, sources
+    for node in sources:
+        assert node["quote"], node
+        assert node["quote_verified"] is True, node
+        assert node["quote_fail_reason"] is None, node
+        assert node["value"] in node["quote"], node
+        # Byte-verbatim: the stored quote must be an exact substring of the stored page text, not
+        # a normalized/rewritten copy of it.
+        assert kit.artifact()["pages"][0]["text"].find(node["quote"]) >= 0, node
+
+
+def test_a_q_id_operand_source_node_carries_a_verified_quote():
+    """The id-resolved path (`_locate`'s first `add_source` call, taken before the literal-scan
+    fallback) must be covered separately -- it reads `QuantityRef.start`/`.end` and a page fetched
+    through `self._graph.page(page_id)`, a different code path from the literal scan above."""
+    kit = LedgerToolkit()
+    page_id = kit.register_page(
+        "https://example.com/a", "Chimney\n419.7\nmetres\nAnnex\n380.0\nmetres")
+
+    kit.derive("difference", ["q1", "q2"])
+
+    sources = _source_nodes(kit)
+    assert len(sources) == 2, sources
+    stored_text = kit.artifact()["pages"][0]["text"]
+    assert kit.artifact()["pages"][0]["page_id"] == page_id
+    for node in sources:
+        assert node["quote"], node
+        assert node["quote_verified"] is True, node
+        assert node["value"] in node["quote"], node
+        assert stored_text.find(node["quote"]) >= 0, node
+
+
+def test_a_value_on_an_extremely_long_line_still_yields_a_verified_bare_span_quote():
+    """Pathological page: the operand sits on one line hundreds of characters long. Expanding to
+    the containing line would blow past any reasonable quote length, so the bare value span must
+    be used instead -- and it must STILL verify, since it is still a literal substring."""
+    kit = LedgerToolkit()
+    padding = "x" * 400
+    page_text = f"{padding} 419.7 metres tall {padding}"
+    kit.register_page("https://example.com/a", page_text)
+    kit.register_page("https://example.com/b", "Height\n380.0\nmetres")
+
+    kit.derive("difference", ["419.7 metres", "380.0 metres"])
+
+    sources = _source_nodes(kit)
+    long_line_source = next(n for n in sources if "419.7" in n["value"])
+    assert long_line_source["quote"], long_line_source
+    assert len(long_line_source["quote"]) <= 300, long_line_source
+    assert long_line_source["quote_verified"] is True, long_line_source
+    assert page_text.find(long_line_source["quote"]) >= 0, long_line_source
+
+
+def test_the_certify_chain_reads_quote_verified_true_off_the_serialized_artifact(kit):
+    """End-to-end through the exact surface risk-coverage's certify clause reads: a graph built
+    through `LedgerToolkit`, serialized with `artifact()` (== `EvidenceGraph.to_dict`), must carry
+    `quote_verified: True` on its SOURCE nodes -- not just on the live in-memory node objects."""
+    kit.derive("difference", ["419.7 metres", "380.0 metres"])
+
+    serialized = kit.artifact()
+    sources = [n for n in serialized["nodes"] if n["kind"] == "source"]
+    assert sources, serialized
+    assert all(n["quote_verified"] is True for n in sources), sources
+    assert all(n["quote_fail_reason"] is None for n in sources), sources

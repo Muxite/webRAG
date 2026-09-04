@@ -208,6 +208,7 @@
   "native_vote_k_local_large": 1,
   "final_require_grounding": false,
   "final_require_grounding_page_identity": false,
+  "final_require_derivation_for_numeric": false,
   "final_answer_contract_enabled": true,
   "final_answer_slot_enabled": false,
   "final_citation_echo_enforcement_enabled": false,
