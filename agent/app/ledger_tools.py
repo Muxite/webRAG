@@ -143,6 +143,50 @@ def _unit_at_span(page_text: str, start: int, end: int) -> str:
     return token if token in _KNOWN_UNITS else ""
 
 
+#: Cap on a line-expanded quote. A whole line is usually a short infobox row or one prose
+#: sentence, but nothing bounds how long a REAL line can be, so a runaway line falls back to the
+#: bare value span rather than handing `EvidenceGraph.add_source` (and, downstream, a human
+#: auditor) an unbounded string.
+_MAX_QUOTE_CHARS = 300
+
+
+def _quote_for_span(page_text: str, start: int, end: int, *, max_chars: int = _MAX_QUOTE_CHARS) -> str:
+    """A verbatim, independently-verifiable quote for the span ``page_text[start:end]``.
+
+    Mechanical only -- no model call, no rewriting. Expands the located value span to its
+    containing line (split on ``"\\n"``, the same line shape ``quantity_index`` already reads
+    this corpus with) so the stored quote is a checkable sentence or infobox row rather than bare
+    digits, then falls back to the bare span when that line is too long to be a useful "quote"
+    (``max_chars``). Either way the return value is a literal substring of ``page_text`` --
+    :func:`~agent.app.testing.execution_evidence_loop.verify_quote`'s exact-substring check is
+    therefore guaranteed to pass, so this never manufactures a `quote_fail_reason`.
+
+    :param page_text: the SAME text the span's offsets were computed against (a graph's stored,
+        possibly-truncated page window -- never a different copy of the page).
+    :param start: span start offset, inclusive.
+    :param end: span end offset, exclusive.
+    :param max_chars: line-length cap before falling back to the bare span.
+    :returns: a non-empty literal substring of ``page_text`` on success, or ``""`` when
+        ``start``/``end`` do not index into ``page_text`` at all (e.g. an id resolved against a
+        page whose stored window was truncated shorter than the offset it recorded).
+    :raises: nothing.
+    """
+    text = page_text if isinstance(page_text, str) else ""
+    if not (0 <= start <= end <= len(text)):
+        return ""
+    span = text[start:end]
+    if not span:
+        return ""
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    if line_end < 0:
+        line_end = len(text)
+    line = text[line_start:line_end].strip()
+    if line and len(line) <= max_chars:
+        return line
+    return span
+
+
 class LedgerToolkit:
     """Per-run ledger state a host binds one or more tools to.
 
@@ -304,7 +348,10 @@ class LedgerToolkit:
         resolved = self._resolve_id(text)
         if resolved is not None:
             page_id, entry = resolved
-            node = self._graph.add_source(page_id, entry.value, unit=entry.unit or None)
+            page = self._graph.page(page_id)
+            page_text = str((page or {}).get("text") or "")
+            quote = _quote_for_span(page_text, entry.start, entry.end)
+            node = self._graph.add_source(page_id, entry.value, quote=quote, unit=entry.unit or None)
             if node is not None:
                 return node.id
         unit = extract_unit(text)
@@ -319,8 +366,9 @@ class LedgerToolkit:
                 if not match.verified:
                     continue
                 span_unit = candidate_unit or _unit_at_span(page_text, match.start, match.end)
+                quote = _quote_for_span(page_text, match.start, match.end)
                 node = self._graph.add_source(
-                    page["page_id"], candidate, unit=span_unit or None)
+                    page["page_id"], candidate, quote=quote, unit=span_unit or None)
                 if node is not None:
                     return node.id
         return None
