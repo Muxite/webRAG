@@ -13,12 +13,24 @@ class TestInfobox:
     def test_max_depth_slice_yields_label_value_unit(self):
         text = "Max.\ndepth\n1,642\nm (5,387\nft)"
         entries = build_index(text)
-        assert len(entries) == 1
         entry = entries[0]
         assert entry.label == "Max. depth"
         assert entry.value == "1,642"
         assert entry.unit == "m"
         assert entry.source == "infobox"
+
+    def test_max_depth_parenthetical_secondary_unit_also_indexed(self):
+        # Both values are literally on the page -- capture, not conversion (see module
+        # docstring). The primary "m" entry stays first; the parenthetical "ft" restatement
+        # is now ALSO indexed as its own entry, not silently discarded.
+        text = "Max.\ndepth\n1,642\nm (5,387\nft)"
+        entries = build_index(text)
+        assert len(entries) == 2
+        assert entries[1].label == "Max. depth"
+        assert entries[1].value == "5,387"
+        assert entries[1].unit == "ft"
+        assert entries[1].source == "infobox"
+        assert text[entries[1].start:entries[1].end] == "5,387"
 
     def test_max_depth_offsets_point_at_raw_value_span(self):
         text = "Max.\ndepth\n1,642\nm (5,387\nft)"
@@ -41,10 +53,11 @@ class TestInfobox:
     def test_single_line_label(self):
         text = "Average depth\n744.4\nm (2,442\nft)"
         entries = build_index(text)
-        assert len(entries) == 1
         assert entries[0].label == "Average depth"
         assert entries[0].value == "744.4"
         assert entries[0].unit == "m"
+        # Parenthetical restatement is captured too (see TestParentheticalCapture below).
+        assert len(entries) == 2
 
     def test_bare_count_row_with_no_unit_yields_nothing(self):
         # "Ward(s)\n46" — an infobox row that is genuinely unit-less; the index must not
@@ -63,9 +76,78 @@ class TestInfobox:
     def test_two_infobox_rows_both_recovered(self):
         text = "Max.\nlength\n28\nkm (17\nmi)\nMax.\nwidth\n8\nkm (5.0\nmi)"
         entries = build_index(text)
-        assert [e.value for e in entries] == ["28", "8"]
-        assert [e.unit for e in entries] == ["km", "km"]
-        assert [e.label for e in entries] == ["Max. length", "Max. width"]
+        primary = [e for e in entries if e.source == "infobox" and e.unit == "km"]
+        assert [e.value for e in primary] == ["28", "8"]
+        assert [e.label for e in primary] == ["Max. length", "Max. width"]
+        # Both parenthetical restatements are captured too.
+        secondary = [e for e in entries if e.unit == "mi"]
+        assert [e.value for e in secondary] == ["17", "5.0"]
+        assert [e.label for e in secondary] == ["Max. length", "Max. width"]
+
+
+class TestEmbeddedExtraNumberRow:
+    """Item 2: an embedded second number on the unit line must not sink the whole row."""
+
+    def test_humber_bridge_shape_recovers_all_three_values(self):
+        text = "Total\nlength\n7,280\nft; 1.38\nmi (2,220\nm)"
+        entries = build_index(text)
+        values_units = {(e.value, e.unit) for e in entries}
+        assert ("7,280", "ft") in values_units
+        assert ("1.38", "mi") in values_units
+        assert ("2,220", "m") in values_units
+
+    def test_primary_value_offset_still_correct(self):
+        text = "Total\nlength\n7,280\nft; 1.38\nmi (2,220\nm)"
+        entries = build_index(text)
+        primary = next(e for e in entries if e.value == "7,280")
+        assert text[primary.start:primary.end] == "7,280"
+
+
+class TestTrailingAnnexRow:
+    """Item 3: a trailing non-quantity annex degrades to the longest leading quantity."""
+
+    def test_floor_count_with_maintenance_annex_yields_leading_number(self):
+        text = "Floor count\n154 + 9 maintenance"
+        entries = build_index(text)
+        assert len(entries) == 1
+        assert entries[0].value == "154"
+        assert entries[0].label == "Floor count"
+
+
+class TestCompoundDuration:
+    """Item 4: an "N hours M minutes" phrase folds into one decimal-hours quantity."""
+
+    def test_two_hours_twenty_one_minutes_becomes_decimal_hours(self):
+        text = "The train took 2 hours 21 minutes for the journey."
+        entries = build_index(text)
+        combined = [e for e in entries if e.unit == "h"]
+        assert len(combined) == 1
+        assert combined[0].value == "2.35"
+
+
+class TestConservativeLabeledCounts:
+    """Item 5: bare unit-less counts are indexed only under a whitelisted label."""
+
+    def test_stadium_capacity_bare_count_is_indexed(self):
+        text = "Capacity\n67,215"
+        entries = build_index(text)
+        assert len(entries) == 1
+        assert entries[0].value == "67,215"
+        assert entries[0].unit == "count"
+        assert entries[0].label == "Capacity"
+
+    def test_floor_count_bare_count_is_indexed(self):
+        text = "Floor count\n154"
+        entries = build_index(text)
+        assert len(entries) == 1
+        assert entries[0].value == "154"
+        assert entries[0].unit == "count"
+
+    def test_unwhitelisted_label_bare_count_still_yields_nothing(self):
+        # Regression guard for the wildcard-suppression concern: an arbitrary label must NOT
+        # newly qualify for bare-count capture.
+        text = "Ward(s)\n46\nEstablished\n1866\nNamed after\n'Champak'"
+        assert build_index(text) == []
 
 
 class TestProse:
@@ -148,7 +230,7 @@ class TestRender:
         text = "Max.\ndepth\n1,642\nm (5,387\nft)"
         entries = build_index(text)
         rendered = render_index(entries)
-        assert rendered == "q1: Max. depth = 1,642 m"
+        assert rendered == "q1: Max. depth = 1,642 m\nq2: Max. depth = 5,387 ft"
 
     def test_render_respects_max_chars(self):
         rows = "\n".join(f"Row{i}\n{i}\nm" for i in range(1, 50))
@@ -189,7 +271,10 @@ class TestLookup:
 
 class TestNoUnitConversion:
     def test_dual_unit_restatement_reports_only_primary_unit_as_written(self):
-        # Non-goal: never convert ft to m or vice versa; the restatement is dropped entirely.
+        # Non-goal: never convert ft to m or vice versa. The restatement is now ALSO indexed
+        # (see TestInfobox.test_max_depth_parenthetical_secondary_unit_also_indexed) as its own
+        # entry in ITS OWN written unit -- but the primary entry's unit is never rewritten to
+        # (or blended with) the restatement's, and no entry ever holds a computed conversion.
         text = "Max.\ndepth\n1,642\nm (5,387\nft)"
         entries = build_index(text)
         assert entries[0].unit == "m"

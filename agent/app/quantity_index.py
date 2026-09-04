@@ -50,9 +50,11 @@ is covered (length/area/volume/mass/speed/temperature/time/percent, in both abbr
 spelled-out English forms).
 
 Non-goal (``docs/LEDGER_PLAN_2026-09-01.md`` §7): no unit conversion, ever. A dual-unit
-restatement (``"1,642 m (5,387 ft)"``) is parsed only far enough to discard the parenthetical and
-keep the primary ``"m"`` — the ``"5,387 ft"`` half is never surfaced, and nothing here ever turns
-one unit into another.
+restatement (``"1,642 m (5,387 ft)"``) is parsed into a primary ``"m"`` quantity and a separate
+``"5,387 ft"`` restatement quantity, and :func:`_scan_infobox` indexes BOTH as their own entries —
+this is capture (two numbers that are both literally printed on the page), never conversion:
+nothing here computes one from the other, each keeps exactly the unit it was written with, and a
+``q<N>`` id always resolves to one written value, never a computed alternate.
 """
 from __future__ import annotations
 
@@ -159,6 +161,65 @@ def _accept(quantity: _ParsedQuantity) -> bool:
     return False
 
 
+#: Infobox row LABELS under which a bare (unit-less) integer count is trustworthy enough to
+#: index anyway, as its own dimension token ``"count"`` (never ``""`` -- see the module
+#: docstring's ambiguity-discipline note: an empty unit would read as dimension-compatible with
+#: every OTHER unit-less entry in ``LedgerToolkit``'s diff/sum/quotient compatibility checks,
+#: which compare ``canonical_unit(a) == canonical_unit(b)`` and treat two blank strings as equal.
+#: ``"count"`` is a real, unmapped token (:func:`~evidence_graph.canonical_unit` passes it through
+#: unchanged), so two counts still compare compatible with EACH OTHER -- which is intended, a
+#: stadium capacity minus a floor count is nonsense but the toolkit's own KEYSTONE gates cover the
+#: rest -- while never colliding with a genuine physical unit. Deliberately narrow: this is the
+#: ONLY way an entry with ``unit`` non-whitelisted gets indexed at all; every other label still
+#: goes through the unit-mandatory gate in :func:`_accept`. See the module docstring and
+#: ``project_wildcard_suppression_load_bearing`` -- ambiguity inflation from over-eager bare-number
+#: capture is a known, previously-measured failure mode in this repo.
+_COUNT_LABEL_WHITELIST = frozenset({"capacity", "floor count", "floors", "seats", "population"})
+
+
+def _label_allows_bare_count(label: str) -> bool:
+    """True when ``label`` (as :func:`_infer_label` inferred it) licenses a unit-less count entry.
+
+    Matches the whole normalized label first (``"Capacity"``), then falls back to a whole-word
+    hit against the whitelist (``"Seating capacity"`` contains the word ``"capacity"``) so a
+    slightly longer real-world label still qualifies -- still conservative, since the check is
+    against a fixed five-word list, not free containment of arbitrary substrings.
+    """
+    norm = normalize_for_match(label)
+    if not norm:
+        return False
+    if norm in _COUNT_LABEL_WHITELIST:
+        return True
+    words = set(norm.split())
+    return any(keyword in words or keyword in norm for keyword in _COUNT_LABEL_WHITELIST)
+
+
+def _bare_count_label(lines: List[Tuple[str, int, int]], index: int) -> Optional[str]:
+    """The label text that licenses a bare-count entry for the value line at ``index``, or
+    ``None``.
+
+    Checks the immediate preceding label line first (:func:`_label_allows_bare_count`), then --
+    because :func:`_infer_label`'s two-line stitch only fires when the earlier line ends in ``"."``
+    (the ``"Max."`` abbreviation shape), which a plain two-word label split across lines
+    (``"Floor\\ncount"``) does NOT -- also tries the two immediate label lines joined
+    (``"Floor" + "count"`` -> ``"Floor count"``), independently of that period rule, since a
+    generic two-line infobox label split is common and this whitelist is narrow enough on its own
+    to gate admission safely either way.
+    """
+    if index == 0:
+        return None
+    immediate = lines[index - 1][0].strip()
+    if _label_allows_bare_count(immediate):
+        return immediate
+    if index >= 2:
+        earlier = lines[index - 2][0].strip()
+        if _looks_like_label(earlier) and _looks_like_label(immediate):
+            combined = f"{earlier} {immediate}"
+            if _label_allows_bare_count(combined):
+                return combined
+    return None
+
+
 #: A line that is nothing but a (possibly negative, possibly decimal, possibly comma-grouped)
 #: number. Deliberately simple: this only decides which lines are VALUE-line CANDIDATES.
 #: Correctness of the number itself is `parse_quantity`'s job, not this regex's.
@@ -226,9 +287,24 @@ def _infer_label(lines: List[Tuple[str, int, int]], index: int) -> str:
     return " ".join(parts)
 
 
-def _forward_unit(lines: List[Tuple[str, int, int]], index: int,
-                   value_text: str) -> Optional[str]:
-    """The unit text for the value line at ``index``, or ``None`` when no valid unit follows.
+@dataclass(frozen=True)
+class _ForwardMatch:
+    """What :func:`_forward_quantity` found: the accepted primary :class:`Quantity`, the RAW
+    text window it was hunted across (for locating any further quantities inside that same
+    window), and a leftover ``tail`` when the primary was only recoverable by splitting off a
+    second, unrelated quantity chained onto the same unit line (see :func:`_forward_quantity`).
+    """
+
+    parsed: _ParsedQuantity
+    window_start: int
+    window_end: int
+    tail: str
+    unit_fallback: str
+
+
+def _forward_quantity(lines: List[Tuple[str, int, int]], index: int,
+                       value_text: str) -> Optional[_ForwardMatch]:
+    """The accepted :class:`Quantity` for the value line at ``index``, or ``None``.
 
     Grows a candidate unit region one line at a time (joined with single spaces) and re-parses
     ``value_text + " " + candidate`` on every growth step via :func:`parse_quantity`, so a
@@ -237,6 +313,18 @@ def _forward_unit(lines: List[Tuple[str, int, int]], index: int,
     NOT merely at the first clean parse, since a garbage word like ``"Motihari"`` also parses
     cleanly (letters-only tails are syntactically valid units to ``parse_quantity``) but is not
     whitelisted and must not stop the search.
+
+    When growth on a given step carries a ``";"`` and still fails whole, one more attempt is made
+    at THAT step: split on the FIRST ``";"`` and re-check just the ``value_text + " " + head``
+    half. This recovers rows the flattener wrote as a chain of two quantities on one unit line
+    (``"7,280\\nft; 1.38\\nmi (2,220\\nm)"`` — the embedded ``"1.38"`` breaks every whole-join
+    parse, silently dropping even the primary ``"7,280 ft"`` under the old all-or-nothing growth).
+    Once the primary half is recovered this way, the text after the ``";"`` is grown FORWARD, one
+    further line at a time, independently, until IT parses as a complete quantity on its own —
+    exactly mirroring the primary's own growth discipline, so this does not over-consume past the
+    row's natural end into the NEXT unrelated infobox row when the flattened text has no blank
+    line between rows (the corpus shape has none). That grown tail is returned for the caller to
+    mine as its own quantity chain, not discarded.
     """
     parts: List[str] = []
     stop = min(len(lines), index + 1 + _FORWARD_UNIT_LINES)
@@ -247,9 +335,118 @@ def _forward_unit(lines: List[Tuple[str, int, int]], index: int,
         parts.append(segment)
         candidate = " ".join(parts)
         parsed = parse_quantity(f"{value_text} {candidate}")
+        if not (parsed.ok and _accept(parsed)):
+            # A trailing punctuation mark glued onto a closing parenthesis by the flattener
+            # ("... km\n2\n):" -- a sentence colon landing right after the restatement's own
+            # close-paren, no line break between them) hides the parenthetical from
+            # `parse_quantity`, which requires the restatement to be the literal LAST thing in
+            # the string. Stripping trailing sentence punctuation (never letters/digits) mirrors
+            # what `_scan_prose` already does for the same reason and is retried, never preferred
+            # over the raw candidate.
+            trimmed = candidate.rstrip(":;,.")
+            if trimmed != candidate:
+                parsed = parse_quantity(f"{value_text} {trimmed}")
         if parsed.ok and _accept(parsed):
-            return parsed.unit if parsed.unit else candidate
+            window_start = lines[index + 1][1]
+            window_end = lines[index + len(parts)][2]
+            return _ForwardMatch(parsed, window_start, window_end, "", candidate)
+        if ";" in candidate:
+            head, _sep, tail_start = candidate.partition(";")
+            head_parsed = parse_quantity(f"{value_text} {head.strip()}")
+            if not (head_parsed.ok and _accept(head_parsed)):
+                continue
+            window_start = lines[index + 1][1]
+            tail_parts = [tail_start.strip()] if tail_start.strip() else []
+            tail_stop_index = k
+            for k2 in range(k + 1, stop):
+                segment2 = lines[k2][0].strip()
+                if not segment2:
+                    break
+                tail_parts.append(segment2)
+                tail_stop_index = k2
+                tail_candidate = " ".join(p for p in tail_parts if p)
+                if parse_quantity(tail_candidate).ok:
+                    break
+            window_end = lines[tail_stop_index][2]
+            tail_candidate = " ".join(p for p in tail_parts if p)
+            return _ForwardMatch(head_parsed, window_start, window_end, tail_candidate,
+                                  head.strip())
     return None
+
+
+def _raw_offset(window_raw: str, raw_start: int, value_str: str,
+                 cursor: int) -> Optional[Tuple[int, int]]:
+    """Where ``value_str`` (a number token from an already-parsed sub-quantity's own
+    ``source_text``) sits in the RAW page text, given the RAW window it was found inside.
+
+    Searches from ``cursor`` first (so repeated growth-chain lookups march forward through the
+    window instead of re-finding an earlier occurrence of the same digits), falling back to a
+    from-the-start search so a single lookup still succeeds.
+    """
+    idx = window_raw.find(value_str, cursor)
+    if idx == -1:
+        idx = window_raw.find(value_str)
+    if idx == -1:
+        return None
+    start = raw_start + idx
+    return start, start + len(value_str)
+
+
+def _emit_restatement_chain(quantity: _ParsedQuantity, window_raw: str, raw_start: int,
+                             cursor: int, label: str) -> List[QuantityRef]:
+    """Every quantity in ``quantity.restatement``'s chain, as its own :class:`QuantityRef`.
+
+    A dual-unit restatement (``"1,642 m (5,387 ft)"``) is parsed only far enough by
+    ``parse_quantity`` to discard the parenthetical into :attr:`Quantity.restatement`; this is
+    where that discarded half gets its own index entry instead — capture, not conversion, per the
+    module docstring: BOTH values are literally on the page, nothing here computes ``ft`` from
+    ``m`` or vice versa. Walks the WHOLE chain (a restatement can itself carry a restatement) so
+    none of it is silently dropped.
+    """
+    entries: List[QuantityRef] = []
+    current = quantity.restatement
+    while current is not None:
+        match = _LEADING_NUMBER.match(current.source_text.strip())
+        if match:
+            value_str = match.group(0)
+            located = _raw_offset(window_raw, raw_start, value_str, cursor)
+            if located is not None:
+                start, end = located
+                unit = current.unit if current.unit else (current.scale_name or "")
+                entries.append(QuantityRef(label=label, value=value_str, unit=unit,
+                                            start=start, end=end, source="infobox"))
+                cursor = end - raw_start
+        current = current.restatement
+    return entries
+
+
+def _emit_tail_chain(tail_text: str, window_raw: str, raw_start: int, cursor: int,
+                      label: str) -> List[QuantityRef]:
+    """Every quantity chained after a ``";"`` split (see :func:`_forward_quantity`), each with its
+    own restatement chain (:func:`_emit_restatement_chain`) also mined out.
+    """
+    entries: List[QuantityRef] = []
+    for segment in tail_text.split(";"):
+        segment = segment.strip()
+        if not segment:
+            continue
+        parsed = parse_quantity(segment)
+        if not parsed.ok:
+            continue
+        match = _LEADING_NUMBER.match(parsed.source_text.strip())
+        if match:
+            value_str = match.group(0)
+            located = _raw_offset(window_raw, raw_start, value_str, cursor)
+            if located is not None:
+                start, end = located
+                unit = parsed.unit if parsed.unit else (parsed.scale_name or "")
+                entries.append(QuantityRef(label=label, value=value_str, unit=unit,
+                                            start=start, end=end, source="infobox"))
+                cursor = end - raw_start
+        entries.extend(_emit_restatement_chain(parsed, window_raw, raw_start, cursor, label))
+        if entries:
+            cursor = entries[-1].end - raw_start
+    return entries
 
 
 #: The leading number of a line that is NOT purely numeric — the ``"13,860 MW"`` shape, where the
@@ -257,39 +454,96 @@ def _forward_unit(lines: List[Tuple[str, int, int]], index: int,
 _LEADING_NUMBER = re.compile(r"^-?\d[\d,]*(?:\.\d+)?")
 
 
+def _leading_quantity(stripped: str) -> Optional[Tuple[str, _ParsedQuantity, str]]:
+    """The longest valid leading ``"NUMBER [unit]"`` prefix of ``stripped``, or ``None``.
+
+    Tries the WHOLE line first (the original all-or-nothing check), then progressively shorter
+    word-prefixes, so a trailing annex the flattener appended (``"154 + 9 maintenance"``) no
+    longer sinks the whole row — the row degrades to its longest still-valid leading quantity
+    (``"154"``) instead of being dropped outright. Still gated by :func:`_accept` throughout, so
+    this can only ever return a unit/currency/scale-bearing parse; it is not a route to admitting
+    an unqualified bare number (see :func:`_label_allows_bare_count` for that separate, narrower,
+    label-gated path).
+
+    :returns: ``(value_text, parsed, matched_text)``, where ``matched_text`` is the exact prefix
+        that parsed (so a caller can recover a literal-text unit fallback the way the whole-line
+        check always could), or ``None`` when no leading prefix parses as an accepted quantity.
+    """
+    words = stripped.split()
+    for take in range(len(words), 0, -1):
+        prefix = " ".join(words[:take])
+        number = _LEADING_NUMBER.match(prefix)
+        if not number:
+            continue
+        parsed = parse_quantity(prefix)
+        if parsed.ok and _accept(parsed):
+            return number.group(0), parsed, prefix
+    return None
+
+
 def _scan_infobox(text: str) -> List[QuantityRef]:
     """Every ``label / value / unit`` infobox row in ``text`` (see the module docstring)."""
     lines = _line_spans(text)
     entries: List[QuantityRef] = []
-    for index, (raw_line, line_start, _line_end) in enumerate(lines):
+    for index, (raw_line, line_start, line_end) in enumerate(lines):
         stripped = raw_line.strip()
         if not stripped:
             continue
+        label = _infer_label(lines, index)
+        leading_ws = len(raw_line) - len(raw_line.lstrip())
+        line_value_start = line_start + leading_ws
         if _NUM_ONLY_LINE.fullmatch(stripped):
-            value_text = stripped
-            unit = _forward_unit(lines, index, stripped)
+            match = _forward_quantity(lines, index, stripped)
+            if match is None:
+                # No unit found anywhere in the forward window at all -- a genuinely unit-less
+                # row, admitted ONLY under a whitelisted count label (see _bare_count_label).
+                count_label = _bare_count_label(lines, index)
+                if count_label is not None:
+                    entries.append(QuantityRef(
+                        label=count_label, value=stripped, unit="count",
+                        start=line_value_start, end=line_value_start + len(stripped),
+                        source="infobox",
+                    ))
+                continue
+            unit = match.parsed.unit if match.parsed.unit else match.unit_fallback
+            entries.append(QuantityRef(
+                label=label, value=stripped, unit=unit,
+                start=line_value_start, end=line_value_start + len(stripped),
+                source="infobox",
+            ))
+            window_raw = text[match.window_start:match.window_end]
+            entries.extend(_emit_restatement_chain(
+                match.parsed, window_raw, match.window_start, 0, label))
+            if match.tail:
+                entries.extend(_emit_tail_chain(
+                    match.tail, window_raw, match.window_start, 0, label))
         else:
             # A row whose value and unit share one line ("13,860 MW") rather than being split
-            # across two — only accepted when the WHOLE line is exactly that quantity, so a
-            # prose sentence that happens to start with a number is not mistaken for a row.
-            number = _LEADING_NUMBER.match(stripped)
-            parsed = parse_quantity(stripped) if number else None
-            if not (number and parsed is not None and parsed.ok and _accept(parsed)):
+            # across two — accepted for the longest valid leading quantity prefix (see
+            # _leading_quantity), so a trailing non-quantity annex degrades gracefully instead of
+            # sinking the whole row.
+            found = _leading_quantity(stripped)
+            if found is None:
+                number_only = _LEADING_NUMBER.match(stripped)
+                count_label = _bare_count_label(lines, index) if number_only else None
+                if count_label is not None:
+                    bare_value = number_only.group(0)
+                    entries.append(QuantityRef(
+                        label=count_label, value=bare_value, unit="count",
+                        start=line_value_start, end=line_value_start + len(bare_value),
+                        source="infobox",
+                    ))
                 continue
-            value_text = number.group(0)
-            unit = parsed.unit if parsed.unit else stripped[len(value_text):].strip()
-        if unit is None:
-            continue
-        leading_ws = len(raw_line) - len(raw_line.lstrip())
-        value_start = line_start + leading_ws
-        entries.append(QuantityRef(
-            label=_infer_label(lines, index),
-            value=value_text,
-            unit=unit,
-            start=value_start,
-            end=value_start + len(value_text),
-            source="infobox",
-        ))
+            value_text, parsed, matched_text = found
+            unit = parsed.unit if parsed.unit else matched_text[len(value_text):].strip()
+            entries.append(QuantityRef(
+                label=label, value=value_text, unit=unit,
+                start=line_value_start, end=line_value_start + len(value_text),
+                source="infobox",
+            ))
+            line_window_start = line_value_start + len(value_text)
+            entries.extend(_emit_restatement_chain(
+                parsed, text[line_window_start:line_end], line_window_start, 0, label))
     return entries
 
 
@@ -340,6 +594,56 @@ def _scan_prose(text: str) -> List[QuantityRef]:
     return entries
 
 
+#: The ``"N hours M minutes"`` / ``"N h M min"`` idiom — never captured as ONE quantity by
+#: :func:`_scan_prose` because "2 hours 21 minutes" is two independent ``NUMBER unit`` mentions to
+#: it, with no shared dimension between "hours" and "minutes" for anything downstream to combine.
+#: A rail-average-speed derivation needs a single duration in one unit (``distance / time``), so
+#: this idiom is recognized here and folded into one decimal-hours quantity.
+_COMPOUND_DURATION = re.compile(
+    r"(?<!\d)(?P<h>\d+(?:\.\d+)?)[^\S\n]*(?:hours?|hrs?|h)\b[^\S\n]*"
+    r"(?P<m>\d+(?:\.\d+)?)[^\S\n]*(?:minutes?|mins?|min)\b",
+    re.IGNORECASE,
+)
+
+
+def _format_decimal(value: float) -> str:
+    """``value`` rounded to 2 decimal places, without a trailing ``".00"``/``".50"`` zero run."""
+    text = f"{value:.2f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _scan_durations(text: str) -> List[QuantityRef]:
+    """Every ``"N hours M minutes"`` phrase in ``text``, folded into one decimal-hours quantity.
+
+    Unlike every other entry in this index, :attr:`QuantityRef.value` here is COMPUTED (``"2
+    hours 21 minutes"`` -> ``"2.35"``), not copied verbatim from the page — a deliberate, narrow
+    exception to the module's general "never normalized" rule, made only for this one two-part
+    duration idiom because nothing downstream can otherwise combine an "hours" quantity with a
+    "minutes" quantity into a single time-of-journey figure. ``start``/``end`` still span the
+    ORIGINAL phrase in the page text, so a quote built from them remains a literal, verifiable
+    substring even though the stored ``value`` is not.
+    """
+    entries: List[QuantityRef] = []
+    for match in _COMPOUND_DURATION.finditer(text):
+        try:
+            hours = float(match.group("h"))
+            minutes = float(match.group("m"))
+        except ValueError:
+            continue
+        decimal_hours = hours + minutes / 60.0
+        entries.append(QuantityRef(
+            label="",
+            value=_format_decimal(decimal_hours),
+            unit="h",
+            start=match.start(),
+            end=match.end(),
+            source="prose",
+        ))
+    return entries
+
+
 def build_index(page_text: Optional[str], *, limit: int = 40) -> List[QuantityRef]:
     """Every quantity :func:`_scan_infobox` / :func:`_scan_prose` can extract from ``page_text``.
 
@@ -350,14 +654,13 @@ def build_index(page_text: Optional[str], *, limit: int = 40) -> List[QuantityRe
     :func:`build_index` rather than in either scanner. Capped at ``limit`` because the render goes
     into a weak model's prompt.
 
-    A dual-unit restatement (``"1,642 m (5,387 ft)"``) surfaces only its PRIMARY half here —
-    ``parse_quantity`` reads the ``"(5,387 ft)"`` parenthetical and discards it into
-    ``.restatement`` precisely so it never contaminates the outer ``unit``, and this index does
-    not mine the discarded half out as a second entry either: doing so would put a
-    unit-conversion pair (the same physical quantity in two units) one reference-hop apart in the
-    prompt, which is a standing invitation for a weak model to grab whichever one is more
-    convenient — silently defeating the "no conversion" guarantee at the call site even though no
-    line of code here ever divides by 3.281. See the module docstring's "what is dropped" note.
+    A dual-unit restatement (``"1,642 m (5,387 ft)"``) surfaces BOTH halves here — ``parse_quantity``
+    reads the ``"(5,387 ft)"`` parenthetical and separates it into ``.restatement`` precisely so it
+    never contaminates the outer ``unit``, and :func:`_scan_infobox` mines that discarded half out
+    as its OWN entry rather than leaving it invisible. This is capture, not conversion: both
+    ``"1,642"`` and ``"5,387"`` are literally on the page in their own units; nothing here ever
+    divides by 3.281 or otherwise turns one into the other, and a lookup by ``q<N>`` id still
+    resolves to exactly one unit, never a computed alternate. See the module docstring.
 
     :param page_text: the raw page text, or ``None``/``""``.
     :param limit: maximum entries returned.
@@ -369,7 +672,7 @@ def build_index(page_text: Optional[str], *, limit: int = 40) -> List[QuantityRe
         return []
     seen = set()
     out: List[QuantityRef] = []
-    for entry in _scan_infobox(text) + _scan_prose(text):
+    for entry in _scan_infobox(text) + _scan_prose(text) + _scan_durations(text):
         key = (normalize_for_match(entry.value), normalize_for_match(entry.unit))
         if key in seen:
             continue
