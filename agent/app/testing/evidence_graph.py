@@ -95,9 +95,17 @@ that is a deliberate, documented limitation rather than an oversight (see
 :meth:`EvidenceGraph._check_common_unit`). A missing unit on one side is not treated as a
 mismatch — only two PRESENT, DIFFERENT units refuse — so a genuinely unitless extraction paired
 with a unit-bearing one is not caught by this check; that is the honest edge this module leaves
-open. ``quotient`` / ``ratio`` are exempt from the check (dividing metres by seconds is the point
-of a rate) and instead compose a new unit string, ``"<numerator>/<denominator>"``, when both
-inputs carry one.
+open. ``quotient`` / ``ratio`` are exempt from the refusal (dividing metres by seconds is the
+point of a rate) and instead compose a new unit string, ``"<numerator>/<denominator>"``, when both
+inputs carry one — but they are NOT exempt from being looked at: :meth:`EvidenceGraph.add_arith`
+annotates every quotient/ratio with a machine-readable ``unit_note`` in ``derivation_detail``
+(``"unassessed_units"`` when either side's dimension is unrecognized, ``"cross_dimension_quotient
+(...)"`` when both are present and differ — a legitimate rate, flagged rather than refused —
+or ``"same_dimension_ratio (...)"`` when both sides share one, in which case the composed unit is
+overridden to ``""``: ``500 MW / 500 MW`` is a dimensionless fraction, not "megawatts per
+megawatt"). This is annotation, never refusal — ``derivation_valid`` is untouched by it — because
+an earlier gate that DID refuse on this shape blocked 46 of 48 cells in a live run, including
+perfect ones, so flagging is deliberately preferred over gating here.
 
 Tolerance. :data:`ARITH_RELATIVE_TOLERANCE` (``1e-6``, relative, via ``math.isclose``) exists to
 absorb float round-trip noise from the Python arithmetic ITSELF (e.g. a division that lands on
@@ -116,6 +124,19 @@ propagate as invalid; it is simply unknown, and unknown is not the same claim as
 :meth:`EvidenceGraph.derivation_validity` reports the fraction of DERIVED nodes whose postcondition
 is known to hold (``derivation_valid is True``) over all DERIVED nodes — an unassessed node counts
 against the ratio, the same as a failed one, because "never checked" is not "passed".
+
+Operand support is a SEPARATE axis from validity, on purpose: :attr:`EvidenceNode.operand_supported`
+asks whether a DERIVED node's operands are still traceable to located page text, not whether its
+arithmetic postcondition held — a node can be ``derivation_valid=True`` (the recomputation is
+internally consistent) while ``operand_supported=False`` (the page one of its operands came from
+is gone). It is computed at mint time in :meth:`EvidenceGraph.add_derived` (trivially True there,
+since only already-verified SOURCE nodes can exist in a live graph) and RECOMPUTED by
+:func:`reverify_graph` against the artifact's stored or supplied page text — which is where a
+drifted or vanished page actually shows up. An artifact serialized before this field existed
+deserializes it as ``None`` via :meth:`EvidenceNode.from_dict` rather than raising; reverification
+is what fills in the real answer for such a graph, not silent trust in an absent value.
+:meth:`EvidenceGraph.operand_support_rate` mirrors :meth:`derivation_validity`'s ratio and the same
+"unassessed counts against it" rule.
 """
 
 from __future__ import annotations
@@ -486,12 +507,30 @@ _NUMBER_UNIT_SPLIT = re.compile(
 def extract_unit(value: Any) -> str:
     """The unit suffix of a number-with-unit value (``"330 m"`` -> ``"m"``).
 
+    A leading SCALE WORD (``"million"``, ``"crore"``, ...) is never returned as the unit: it is
+    magnitude, not dimension (see :data:`_SCALE_WORDS` and :func:`parse_quantity`). The defect
+    this closes is upstream of the parser itself -- a caller that splits a value into
+    ``(number, unit)`` using this function (:class:`~agent.app.ledger_tools.LedgerToolkit`'s
+    ``_locate`` does exactly this) used to get ``("25", "million")`` back for ``"25 million"``,
+    then minted a SOURCE node holding only ``"25"`` -- the x10^6 was silently dropped before the
+    value ever reached :func:`parse_quantity`, which would have handled it correctly. A trailing
+    real unit AFTER a scale word (``"1.5 million tonnes"``) still comes back (``"tonnes"``); a
+    scale word alone (``"25 million"``) comes back empty, so a caller that only splits when a unit
+    is present keeps the whole ``"25 million"`` together as one literal.
+
     :param value: the candidate value.
-    :returns: the trimmed unit text, or ``""`` when ``value`` is not :func:`is_unit_bearing`.
+    :returns: the trimmed unit text, or ``""`` when ``value`` is not :func:`is_unit_bearing`, or
+        when the whole trailing token is a scale word.
     :raises: nothing.
     """
     match = _NUMBER_UNIT_SPLIT.fullmatch(str(value or "").strip())
-    return match.group("unit").strip() if match else ""
+    if not match:
+        return ""
+    unit = match.group("unit").strip()
+    head, _, remainder = unit.partition(" ")
+    if head.lower().rstrip(".,") in _SCALE_WORDS:
+        return remainder.strip()
+    return unit
 
 
 #: Scale multipliers that ALWAYS apply, whatever precedes them. Short scale throughout
@@ -1160,6 +1199,22 @@ class EvidenceNode:
     #: consumed by :meth:`EvidenceGraph.add_arith` -- see :class:`NonNumericInterval`.
     interval_low: Optional[float] = None
     interval_high: Optional[float] = None
+    #: DERIVED nodes only. True iff every SOURCE node this one transitively rests on
+    #: (:meth:`EvidenceGraph.sources_of`) resolves to a verified span on a page currently held in
+    #: the graph; False when at least one does not; None when unassessed (no sources to check, or
+    #: an upstream DERIVED input whose own support is unknown). A SEPARATE axis from
+    #: :attr:`derivation_valid`: that field asks whether the ARITHMETIC postcondition holds given
+    #: the operands' values; this one asks whether the operands themselves are still grounded in
+    #: located text. A node can recompute correctly (``derivation_valid=True``) over an operand
+    #: whose page has since gone missing (``operand_supported=False``) -- the two questions do not
+    #: imply each other. Always None on a SOURCE node -- a SOURCE node's own support is
+    #: :attr:`verified`, not this. Computed at mint time in :meth:`EvidenceGraph.add_derived`
+    #: (trivially True then, since only verified SOURCE nodes can exist) and RECOMPUTED by
+    #: :func:`reverify_graph` against the artifact's stored (or supplied) page text, which is
+    #: where this field earns its keep -- an artifact from before this field existed deserializes
+    #: it as None via :meth:`from_dict`, and reverification fills in the real answer rather than
+    #: trusting a value that was never computed.
+    operand_supported: Optional[bool] = None
 
     def as_dict(self) -> Dict[str, Any]:
         """This node as a JSON-serializable dict."""
@@ -1175,11 +1230,18 @@ class EvidenceNode:
             "derivation_detail": self.derivation_detail,
             "value_kind": self.value_kind, "interval_low": self.interval_low,
             "interval_high": self.interval_high,
+            "operand_supported": self.operand_supported,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EvidenceNode":
-        """Rebuild a node from :meth:`as_dict` output."""
+        """Rebuild a node from :meth:`as_dict` output.
+
+        ``operand_supported`` is read with ``.get`` and left ``None`` when absent, exactly like
+        every other optional field here -- an artifact serialized before that field existed
+        deserializes gracefully rather than raising, and :func:`reverify_graph` is what fills the
+        real value back in for such a graph.
+        """
         return cls(
             id=str(data.get("id", "")), kind=str(data.get("kind", KIND_SOURCE)),
             value=str(data.get("value", "")), page_id=str(data.get("page_id", "")),
@@ -1198,6 +1260,7 @@ class EvidenceNode:
             value_kind=str(data.get("value_kind", "point") or "point"),
             interval_low=data.get("interval_low"),
             interval_high=data.get("interval_high"),
+            operand_supported=data.get("operand_supported"),
         )
 
 
@@ -1436,9 +1499,59 @@ class EvidenceGraph:
         node = EvidenceNode(id=node_id, kind=KIND_DERIVED, value=str(value),
                             operation=str(operation), input_ids=inputs, unit=str(unit or ""),
                             derivation_valid=derivation_valid,
-                            derivation_detail=str(derivation_detail or ""))
+                            derivation_detail=str(derivation_detail or ""),
+                            operand_supported=self._operand_supported(
+                                [self._nodes[i] for i in inputs]))
         self._nodes[node_id] = node
         return node
+
+    def _operand_supported(self, inputs: List[EvidenceNode]) -> Optional[bool]:
+        """:attr:`EvidenceNode.operand_supported` for a DERIVED node about to be minted from
+        ``inputs``, as the graph currently knows it.
+
+        A SOURCE input is supported when it is itself verified AND its page is still held in this
+        graph. A DERIVED input contributes its OWN already-computed ``operand_supported`` — this
+        is how the property propagates transitively without re-walking the whole ancestor set on
+        every level (:meth:`sources_of` already does that walk; this stays O(direct inputs)).
+        ``None`` (unknown) does not poison the result, the same convention
+        :meth:`_inputs_valid` uses for ``derivation_valid`` — "never checked" is not "unsupported".
+
+        :param inputs: the resolved input nodes, in argument order.
+        :returns: True iff every input is known-supported, False iff any is known-unsupported,
+            else None.
+        :raises: nothing.
+        """
+        states = [
+            (node.verified is True and self.page(node.page_id) is not None)
+            if node.kind == KIND_SOURCE else node.operand_supported
+            for node in inputs
+        ]
+        if not states:
+            return None
+        if any(state is False for state in states):
+            return False
+        if all(state is True for state in states):
+            return True
+        return None
+
+    def operand_support_rate(self) -> Optional[float]:
+        """Fraction of DERIVED nodes whose operands are known-supported.
+
+        The sibling metric to :meth:`derivation_validity`, on a DELIBERATELY separate axis: that
+        method asks whether an operation's arithmetic postcondition held; this one asks whether
+        the values it operated over are still traceable to located page text. A node whose support
+        was never assessed (``operand_supported is None``) counts against the ratio exactly like
+        an unsupported one, for the same reason ``derivation_validity`` treats an unassessed node
+        that way -- "never checked" is not "passed".
+
+        :returns: ``supported / total`` over DERIVED nodes, or None when the graph has none.
+        :raises: nothing.
+        """
+        derived = [node for node in self._nodes.values() if node.kind == KIND_DERIVED]
+        if not derived:
+            return None
+        supported = sum(1 for node in derived if node.operand_supported is True)
+        return supported / len(derived)
 
     def _require_node(self, node_id: str) -> EvidenceNode:
         """The node with ``node_id``, or a loud ``ValueError`` — never a silent None here."""
@@ -1556,6 +1669,7 @@ class EvidenceGraph:
         numeric = [self._require_numeric(node) for node in inputs]
 
         unit = ""
+        unit_note = ""
         if operation in ("sum", "difference"):
             unit = self._check_common_unit(inputs)
             recomputed = math.fsum(numeric) if operation == "sum" else numeric[0] - numeric[1]
@@ -1569,6 +1683,11 @@ class EvidenceGraph:
             recomputed = numeric[0] / numeric[1]
             if inputs[0].unit and inputs[1].unit:
                 unit = f"{inputs[0].unit}/{inputs[1].unit}"
+            unit_note = self._quotient_unit_note(inputs[0], inputs[1])
+            if unit_note.startswith("same_dimension_ratio"):
+                # Dividing like by like is dimensionless -- "MW/MW" is not a rate, it is a
+                # fraction -- so the composed "A/B" unit above is deliberately overridden here.
+                unit = ""
 
         value_text = _normalize_number(str(round(recomputed, 6)))
         disagreement = ""
@@ -1579,8 +1698,37 @@ class EvidenceGraph:
                                 f"recomputed {value_text!r}")
         inputs_ok, invalid_ids = self._inputs_valid(inputs)
         valid, detail = self._arith_detail(inputs_ok, invalid_ids, disagreement)
+        if unit_note:
+            detail = "; ".join(part for part in (detail, f"unit_note={unit_note}") if part)
         return self.add_derived(value_text, operation, [n.id for n in inputs], unit=unit,
                                 derivation_valid=valid, derivation_detail=detail)
+
+    def _quotient_unit_note(self, numerator: EvidenceNode, denominator: EvidenceNode) -> str:
+        """A machine-readable annotation for a ``quotient`` / ``ratio``'s dimensions.
+
+        This is ANNOTATION, not refusal -- ``quotient`` / ``ratio`` stay exempt from
+        :meth:`_check_common_unit`'s ``UnitMismatch`` (a rate like GBP-per-metre is a legitimate,
+        intentional division of two different dimensions, not a mistake), and nothing here ever
+        changes ``derivation_valid``. It exists so a downstream consumer can tell three shapes
+        apart that used to look identical -- an unassessed division, a genuine cross-dimension
+        rate, and a same-dimension division that is really a dimensionless FRACTION (``500 MW /
+        500 MW`` is not "megawatts per megawatt", it is ``1.0``) -- without having to reparse the
+        node's value itself.
+
+        :param numerator: the dividend's node.
+        :param denominator: the divisor's node.
+        :returns: one of ``"unassessed_units"`` (either side has no recognized dimension),
+            ``"same_dimension_ratio (<unit>/<unit>)"`` (both sides share one), or
+            ``"cross_dimension_quotient (<a>/<b>)"`` (both present and differ).
+        :raises: nothing.
+        """
+        dim_a, dim_b = self._dimension_of(numerator), self._dimension_of(denominator)
+        display = f"{numerator.unit or numerator.value}/{denominator.unit or denominator.value}"
+        if dim_a == ("", "") or dim_b == ("", ""):
+            return "unassessed_units"
+        if dim_a == dim_b:
+            return f"same_dimension_ratio ({display})"
+        return f"cross_dimension_quotient ({display})"
 
     def add_count(self, input_ids: Iterable[str]) -> EvidenceNode:
         """Admit a DERIVED ``count`` node: the number of DISTINCT inputs, after de-duplication.
@@ -1850,8 +1998,11 @@ def reverify_graph(artifact: Dict[str, Any],
         is None``, tallied under ``counts["unchecked"]`` — never a silent ``False`` and never
         dropped from the count.
     :returns: ``{"pages", "nodes": [{node_id, kind, value, page_id, url, verified, fail_reason,
-        drifted}], "counts": {"verified", "failed", "unchecked", "source", "derived",
-        "page_drift"}}``.
+        drifted, operand_supported}], "counts": {"verified", "failed", "unchecked", "source",
+        "derived", "page_drift"}, "operand_support_rate"}``. A DERIVED row's ``operand_supported``
+        is RECOMPUTED here from the re-verification just performed, regardless of what the
+        artifact carried (``None`` for one minted before the field existed, or a stale value from
+        a page that has since drifted) — see :attr:`EvidenceNode.operand_supported`.
     :raises: nothing — an artifact with no nodes reports zeroes.
     """
     graph = EvidenceGraph.from_dict(artifact or {})
@@ -1896,14 +2047,22 @@ def reverify_graph(artifact: Dict[str, Any],
         states = [verdicts.get(source.id) for source in graph.sources_of(node.id)]
         verified: Optional[bool] = True if states and all(s is True for s in states) else (
             False if any(s is False for s in states) else None)
+        # `operand_supported` asks the identical question `verified` above already answers here
+        # (every SOURCE ancestor re-verifies against the page text now in hand) -- reverification
+        # is exactly the point where this field earns its keep, since an artifact minted before it
+        # existed deserializes it as `None` (see `EvidenceNode.from_dict`) and it must be
+        # RECOMPUTED, not merely filled in when absent, so a page that has since drifted or
+        # vanished is reflected even for an artifact that already carried a (now-stale) value.
+        graph._nodes[node.id] = dataclass_replace(node, operand_supported=verified)
         rows.append({
             "node_id": node.id, "kind": node.kind, "value": node.value, "page_id": "",
             "url": "", "verified": verified,
             "fail_reason": None if verified is True else VALUE_FAIL_NO_PAGE if not states
             else VALUE_FAIL_ABSENT if verified is False else VALUE_FAIL_NO_PAGE,
-            "drifted": False,
+            "drifted": False, "operand_supported": verified,
         })
-    return {"pages": len(graph.pages()), "nodes": rows, "counts": counts}
+    return {"pages": len(graph.pages()), "nodes": rows, "counts": counts,
+            "operand_support_rate": graph.operand_support_rate()}
 
 
 def _tally(counts: Dict[str, int], verified: Optional[bool]) -> None:
