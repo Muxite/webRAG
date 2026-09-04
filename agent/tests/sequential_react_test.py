@@ -50,6 +50,42 @@ def test_react_forced_synthesis_when_no_finish():
     assert out == "FORCED SYNTHESIS"
 
 
+def test_react_finish_with_json_null_answer_triggers_forced_synthesis():
+    # Bug 2: `args.get("answer", "")` returns None (not "") when the key is PRESENT with a
+    # JSON null value -- str(None) == "None", which is truthy, so the null must have been
+    # treated as empty and forced synthesis must fire instead of literally answering "None".
+    decisions = [{"thought": "done", "action": "finish", "args": {"answer": None}}]
+    io = _agent_io(decisions, synth="FORCED SYNTHESIS")
+    out = asyncio.run(seq._run_react(io, "task", "m", max_steps=3, max_tokens=512))
+    assert out == "FORCED SYNTHESIS"
+    assert out != "None"
+
+
+def test_react_finish_with_missing_answer_key_triggers_forced_synthesis():
+    # Same defect, missing-key path: args.get("answer", "") already returns "" here, but
+    # covering it locks in the behavior alongside the null-value path above.
+    decisions = [{"thought": "done", "action": "finish", "args": {}}]
+    io = _agent_io(decisions, synth="FORCED SYNTHESIS")
+    out = asyncio.run(seq._run_react(io, "task", "m", max_steps=3, max_tokens=512))
+    assert out == "FORCED SYNTHESIS"
+
+
+def test_react_finish_with_literal_none_string_triggers_forced_synthesis():
+    # A weak model sometimes emits the literal string "None"/"null" as its answer text; that
+    # is never a real answer either, so it is normalized to empty the same way as a JSON null.
+    decisions = [{"thought": "done", "action": "finish", "args": {"answer": "None"}}]
+    io = _agent_io(decisions, synth="FORCED SYNTHESIS")
+    out = asyncio.run(seq._run_react(io, "task", "m", max_steps=3, max_tokens=512))
+    assert out == "FORCED SYNTHESIS"
+
+
+def test_react_finish_with_real_answer_is_not_affected():
+    decisions = [{"thought": "done", "action": "finish", "args": {"answer": "REAL ANSWER"}}]
+    io = _agent_io(decisions, synth="SHOULD NOT BE USED")
+    out = asyncio.run(seq._run_react(io, "task", "m", max_steps=3, max_tokens=512))
+    assert out == "REAL ANSWER"
+
+
 def test_react_dedup_repeated_search_nudges_without_researching():
     # Breadth-loop guard: a repeated query (modulo case/whitespace) must NOT trigger a second
     # web search — the loop nudges toward visit/finish instead. Distinct queries are unaffected.

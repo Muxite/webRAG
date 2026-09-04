@@ -638,3 +638,251 @@ class TestAuditAnswerSmokeRegressions:
         result = kit.audit_answer("the answer is 7391")
         record = next(r for r in result["numbers"] if r["value"] == 7391.0)
         assert record["status"] == "unbacked"
+
+
+# ==================================================================================================
+# shape_derive_check: mechanical, finish-time, MANDATE-SHAPE-DEMANDED matching
+# ==================================================================================================
+#
+# Unlike `audit_answer` (any of four operations explains the number), this asks the narrower
+# question: does the ONE operation the mandate's own cue phrasing demands reproduce a reported
+# number. See `agent/app/answer_numbers.mandate_demanded_operation`'s own tests for the cue
+# taxonomy; these tests target the ledger-side search/minting/isolation contract.
+
+
+def test_shape_derive_absolute_difference_match_mints_a_tagged_derived_node(blank_kit):
+    from agent.app.ledger_tools import SHAPE_DERIVE_TAG
+
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+
+    result = blank_kit.shape_derive_check(
+        "The absolute difference is 38.7 metres.",
+        "Compute the absolute difference between Tower A and Tower B, in m.")
+
+    assert result["demanded_operation"] == "difference"
+    assert result["absolute"] is True
+    assert result["verdict"] is True
+    assert result["matched"] is not None
+    assert result["matched"]["operation"] == "difference"
+    assert len(result["matched"]["operand_node_ids"]) == 2
+
+    derived = next(n for n in blank_kit.artifact()["nodes"]
+                   if n["id"] == result["matched"]["derived_node_id"])
+    assert derived["minted_by"] == SHAPE_DERIVE_TAG
+    assert derived["derivation_valid"] is True
+
+
+def test_shape_derive_no_match_reports_false_not_none(blank_kit):
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+
+    result = blank_kit.shape_derive_check(
+        "The absolute difference is 999.0 metres.",
+        "Compute the absolute difference between Tower A and Tower B, in m.")
+
+    assert result["demanded_operation"] == "difference"
+    assert result["verdict"] is False
+    assert result["matched"] is None
+
+
+def test_shape_derive_no_cue_mandate_reports_none(blank_kit):
+    blank_kit.register_page("https://example.com/a", "Tower A is 419.7 metres tall.")
+
+    result = blank_kit.shape_derive_check("The answer is 419.7 metres.",
+                                          "Describe the tower.")
+
+    assert result["demanded_operation"] is None
+    assert result["verdict"] is None
+    assert result["reason"] == "no_unambiguous_shape"
+
+
+def test_shape_derive_argmax_mandate_reports_none(blank_kit):
+    """An argmax/comparison mandate over more than two entities never resolves to a two-operand
+    operation, even when its prose separately uses a ratio/quotient word per entity."""
+    blank_kit.register_page("https://example.com/a", "River A density 4.0. River B density 9.0.")
+
+    result = blank_kit.shape_derive_check(
+        "River B has the highest density.",
+        "Determine which river has the HIGHEST channel-length density (a ratio per entity).")
+
+    assert result["demanded_operation"] is None
+    assert result["verdict"] is None
+    # The ledger layer collapses every "no operation demanded" case (no cue, ambiguous, argmax)
+    # to the SAME `no_unambiguous_shape` reason -- the finer-grained reason lives on
+    # `mandate_demanded_operation`'s own return, not here (see that function's own tests).
+    assert result["reason"] == "no_unambiguous_shape"
+
+
+def test_shape_derive_empty_index_reports_none(blank_kit):
+    result = blank_kit.shape_derive_check(
+        "The absolute difference is 38.7 metres.",
+        "Compute the absolute difference between Tower A and Tower B, in m.")
+
+    assert result["demanded_operation"] == "difference"
+    assert result["verdict"] is None
+    assert result["reason"] == "no_index_entries"
+    assert result["n_entries"] == 0
+
+
+def test_shape_derive_no_nontrivial_answer_number_reports_none(blank_kit):
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+
+    result = blank_kit.shape_derive_check(
+        "It happened in 1999.",
+        "Compute the absolute difference between Tower A and Tower B, in m.")
+
+    assert result["demanded_operation"] == "difference"
+    assert result["verdict"] is None
+    assert result["reason"] == "no_nontrivial_answer_numbers"
+
+
+def test_shape_derive_candidate_explosion_reports_none(blank_kit):
+    """A run that registered many distinct pages produces more than
+    `SHAPE_DERIVE_MAX_CANDIDATES` distinct quotient candidates -- refuses rather than committing
+    to a search over a set this large."""
+    from agent.app.ledger_tools import SHAPE_DERIVE_MAX_CANDIDATES
+
+    for i in range(12):
+        blank_kit.register_page(f"https://example.com/p{i}", f"Value is {100 + i} MW.")
+
+    result = blank_kit.shape_derive_check(
+        "The ratio is 500.0.",
+        "Compute the ratio of the first value to the second (first value divided by the second).")
+
+    assert result["demanded_operation"] == "quotient"
+    assert result["n_candidates"] > SHAPE_DERIVE_MAX_CANDIDATES
+    assert result["verdict"] is None
+    assert result["reason"] == "candidate_explosion"
+
+
+def test_shape_derive_no_compatible_pairs_reports_none(blank_kit):
+    blank_kit.register_page(
+        "https://example.com/a",
+        "The cost was 200 USD. The distance was 50 km.")
+
+    result = blank_kit.shape_derive_check(
+        "The sum is 250.0.",
+        "Compute the sum of the two values you read, in m.")
+
+    assert result["demanded_operation"] == "sum"
+    assert result["verdict"] is None
+    assert result["reason"] == "no_compatible_pairs"
+
+
+def test_shape_derive_never_raises_on_garbage_input(blank_kit):
+    blank_kit.register_page("https://example.com/a", "Tower A is 419.7 metres tall.")
+    result = blank_kit.shape_derive_check(None, None)
+    assert result["verdict"] is None
+    assert result["demanded_operation"] is None
+
+    result2 = blank_kit.shape_derive_check(12345, {"not": "a string"})
+    assert result2["verdict"] is None
+
+
+def test_shape_derive_is_idempotent_and_mints_no_duplicate_nodes(blank_kit):
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+    answer = "The absolute difference is 38.7 metres."
+    mandate = "Compute the absolute difference between Tower A and Tower B, in m."
+
+    first = blank_kit.shape_derive_check(answer, mandate)
+    node_count_after_first = len(blank_kit.artifact()["nodes"])
+    second = blank_kit.shape_derive_check(answer, mandate)
+    node_count_after_second = len(blank_kit.artifact()["nodes"])
+
+    assert first["matched"]["derived_node_id"] == second["matched"]["derived_node_id"]
+    assert node_count_after_first == node_count_after_second
+
+
+def test_shape_derive_does_not_change_audit_answer_when_run_before_it(blank_kit):
+    """No cross-contamination: `audit_answer`'s output must be byte-identical whether or not
+    `shape_derive_check` already ran on the same toolkit -- its mechanically-minted DERIVED node
+    must not leak into `audit_answer`'s own `op_appropriateness` accounting."""
+    mandate = "Compute the absolute difference between Tower A and Tower B, in m."
+    answer = "The absolute difference is 38.7 metres (419.7 metres - 381 metres)."
+
+    baseline_kit = LedgerToolkit()
+    baseline_kit.register_page(
+        "https://example.com/a", "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+    baseline = baseline_kit.audit_answer(answer, mandate)
+
+    ordered_kit = LedgerToolkit()
+    ordered_kit.register_page(
+        "https://example.com/a", "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+    ordered_kit.shape_derive_check(answer, mandate)
+    after_shape_derive = ordered_kit.audit_answer(answer, mandate)
+
+    assert after_shape_derive == baseline
+
+
+def test_shape_derive_does_not_change_audit_answer_when_run_after_it(blank_kit):
+    mandate = "Compute the absolute difference between Tower A and Tower B, in m."
+    answer = "The absolute difference is 38.7 metres (419.7 metres - 381 metres)."
+
+    baseline_kit = LedgerToolkit()
+    baseline_kit.register_page(
+        "https://example.com/a", "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+    baseline = baseline_kit.audit_answer(answer, mandate)
+
+    ordered_kit = LedgerToolkit()
+    ordered_kit.register_page(
+        "https://example.com/a", "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+    after_audit_answer = ordered_kit.audit_answer(answer, mandate)
+    ordered_kit.shape_derive_check(answer, mandate)
+
+    assert after_audit_answer == baseline
+
+
+# ==================================================================================================
+# Bug 4: _compat_quotient was structurally blind to rate computations (distance/time -> km/h)
+# ==================================================================================================
+#
+# `_compat_quotient` used to have the SAME body as `_compat_diff_sum` (same canonical unit
+# required), so a quotient over two DIFFERENT units -- e.g. km ÷ h -> km/h -- could never be
+# recognized as a derivation explanation, even though `evidence_graph.add_arith` has always
+# composed a compound "A/B" unit for exactly this case. The same-unit dimensionless-ratio case
+# (km ÷ km) must keep working exactly as before.
+
+
+def test_compat_quotient_accepts_two_different_non_empty_units(blank_kit):
+    assert blank_kit._compat_quotient("km", "h") is True
+
+
+def test_compat_quotient_still_accepts_the_same_unit_ratio_case(blank_kit):
+    assert blank_kit._compat_quotient("km", "km") is True
+    assert blank_kit._compat_quotient("m", "metres") is True  # spelling-normalized
+
+
+def test_compat_quotient_refuses_when_exactly_one_side_has_no_unit(blank_kit):
+    # Ambiguity guard: a genuinely unitless operand paired with a unit-bearing one must not be
+    # treated as compatible -- widening quotient must not also widen this existing refusal.
+    # Both-empty is unchanged (it is the pre-existing same-unit case, "" == "").
+    assert blank_kit._compat_quotient("km", "") is False
+    assert blank_kit._compat_quotient("", "h") is False
+    assert blank_kit._compat_quotient("", "") is True
+
+
+def test_a_rate_answer_is_graded_derived_over_a_cross_unit_quotient(blank_kit):
+    """The actual km/h case Bug 4 names: neither operand is a rate, but distance ÷ time
+    mechanically explains the answer's rate figure once cross-unit quotients are recognized."""
+    blank_kit.register_page(
+        "https://example.com/a",
+        "The trip covered 120 km. It took 2 h to complete.")
+
+    result = blank_kit.audit_answer("The average speed was 60 km/h.")
+
+    speed = _numbers_by_text(result, "60")[0]
+    assert speed["status"] == "derived"
+    assert speed["op"] == "quotient"
+    assert len(speed["operand_node_ids"]) == 2
+
+    arith_node = next(n for n in blank_kit.artifact()["nodes"]
+                       if n["kind"] == "derived" and n["operation"] == "quotient")
+    assert arith_node["derivation_valid"] is True
+    assert arith_node["unit"] == "km/h"

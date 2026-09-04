@@ -461,6 +461,12 @@ def _install_fake_ledger_kit(monkeypatch):
             return {"numbers_total": 0, "numbers": [], "answer_supported": False,
                     "op_appropriateness": []}
 
+        def shape_derive_check(self, answer_text, mandate=""):
+            self.calls.append(("shape_derive_check", answer_text, mandate))
+            return {"demanded_operation": None, "absolute": False, "verdict": None,
+                    "reason": "no_unambiguous_shape", "n_entries": 0, "n_pairs_considered": 0,
+                    "n_candidates": 0, "n_match_ambiguity": 0, "matched": None}
+
         def artifact(self):
             self.calls.append(("artifact",))
             return {"pages": [], "nodes": []}
@@ -546,3 +552,149 @@ def test_solve_stores_answer_audit_and_includes_minted_nodes_in_the_same_artifac
     graph_ids = {n["id"] for n in graph["nodes"]}
     assert minted_ids and minted_ids <= graph_ids
     assert any(n.get("minted_by") == "answer_audit" for n in graph["nodes"])
+
+
+# -- `shape_derive` token -- host wiring only (LedgerToolkit.shape_derive_check itself is Lane A's,
+# see agent/tests/ledger_tools_test.py) ------------------------------------------------------------
+
+def test_token_parsing_shape_derive_alone():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=["shape_derive"],
+    )
+    assert solver._ledger_derive_enabled is False
+    assert solver._ledger_answer_audit_enabled is False
+    assert solver._ledger_shape_derive_enabled is True
+
+
+def test_token_parsing_all_three():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini",
+        ledger_host_modules=["derive", "answer_audit", "shape_derive"],
+    )
+    assert solver._ledger_derive_enabled is True
+    assert solver._ledger_answer_audit_enabled is True
+    assert solver._ledger_shape_derive_enabled is True
+
+
+def test_token_parsing_neither_includes_shape_derive():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini",
+    )
+    assert solver._ledger_shape_derive_enabled is False
+
+
+def test_solve_calls_shape_derive_check_before_artifact_with_mandate_and_final_text(monkeypatch):
+    instances = _install_fake_ledger_kit(monkeypatch)
+    result, _llm = _run_solve_with_messages(
+        monkeypatch, _natural_termination_messages(), ledger_host_modules=["shape_derive"])
+
+    kit = instances[-1]
+    assert [c[0] for c in kit.calls] == ["shape_derive_check", "artifact"]  # ordering
+    _, answer_text, mandate = kit.calls[0]
+    assert answer_text == "the final answer text"  # `_natural_termination_messages`' AIMessage
+    assert mandate == "the task"  # `_run_solve_with_messages` calls `solve("the task", ...)`
+    assert result["shape_derive"]["verdict"] is None
+    assert "evidence_graph" in result
+
+
+def test_solve_omits_shape_derive_when_token_absent(monkeypatch):
+    result, _llm = _run_solve_with_messages(monkeypatch, _natural_termination_messages())
+    assert "shape_derive" not in result
+    assert "evidence_graph" not in result
+
+
+def test_solve_omits_shape_derive_when_only_answer_audit_token_set(monkeypatch):
+    """`answer_audit` alone must not turn `shape_derive` on -- the tokens are independent."""
+    instances = _install_fake_ledger_kit(monkeypatch)
+    result, _llm = _run_solve_with_messages(
+        monkeypatch, _natural_termination_messages(), ledger_host_modules=["answer_audit"])
+    assert "shape_derive" not in result
+    kit = instances[-1]
+    assert "shape_derive_check" not in [c[0] for c in kit.calls]
+
+
+def test_solve_stores_shape_derive_and_includes_minted_nodes_in_the_same_artifact(monkeypatch):
+    """Real `LedgerToolkit` (no stub): a zero-derive cell whose final answer restates the
+    mandate-demanded difference computed over two visited-page values. `shape_derive_check` mints
+    the matched operand/derived nodes, and they must show up in the SAME `evidence_graph`
+    artifact `solve()` stores -- proving the ordering (`shape_derive_check` before `artifact()`)
+    actually lands, not just that both keys exist."""
+    from agent.app import langgraph_solver
+
+    class _StubGraphVisiting:
+        async def astream(self, _inputs, config=None, stream_mode=None):
+            kit_ref["kit"].register_page(
+                "https://example.com/a",
+                "Tower A is 419.7 metres tall. Tower B is 380.0 metres tall.")
+            yield {"messages": [
+                HumanMessage(content="Compute the absolute difference between Tower A and "
+                             "Tower B, in m."),
+                AIMessage(content="The absolute difference is 39.7 metres."),
+            ]}
+
+    kit_ref = {}
+    real_ledger_toolkit = LedgerToolkit
+
+    def _capturing_factory(*a, **kw):
+        kit = real_ledger_toolkit(*a, **kw)
+        kit_ref["kit"] = kit
+        return kit
+
+    monkeypatch.setattr(langgraph_solver, "LedgerToolkit", _capturing_factory)
+    monkeypatch.setattr(langgraph_solver, "create_react_agent", lambda *a, **k: _StubGraphVisiting())
+    monkeypatch.setattr(LangGraphSolver, "_build_llm", lambda self: _StubLLM())
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=["shape_derive"],
+    )
+    result = asyncio.run(solver.solve(
+        "Compute the absolute difference between Tower A and Tower B, in m.", max_steps=4))
+
+    shape = result["shape_derive"]
+    assert shape["demanded_operation"] == "difference"
+    assert shape["verdict"] is True
+    assert shape["matched"] is not None
+
+    graph = result["evidence_graph"]
+    graph_ids = {n["id"] for n in graph["nodes"]}
+    assert shape["matched"]["derived_node_id"] in graph_ids
+    assert any(n.get("minted_by") == "shape_derive" for n in graph["nodes"])
+
+
+def test_shape_derive_model_invisibility_prompt_and_tools_are_byte_identical():
+    """Adding `shape_derive` to `LEDGER_HOST_MODULES` alongside `derive,answer_audit` must not
+    change one byte of what the model sees -- `shape_derive_check` runs finish-time, host-side
+    only, with no prompt text and no tool registration of its own."""
+    from agent.app import langgraph_solver
+
+    solver_without = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=["derive", "answer_audit"],
+    )
+    solver_with = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini",
+        ledger_host_modules=["derive", "answer_audit", "shape_derive"],
+    )
+    # The system prompt's only ledger-independent variable is `_require_finish_tool`; confirm the
+    # two solvers agree on it, then confirm the formula itself (unaffected by any ledger token).
+    assert solver_without._require_finish_tool == solver_with._require_finish_tool
+    assert solver_without._ledger_derive_enabled == solver_with._ledger_derive_enabled
+    prompt = (f"{langgraph_solver._SYSTEM}\n{langgraph_solver._FINISH_TOOL_GUIDANCE}"
+             if solver_without._require_finish_tool else langgraph_solver._SYSTEM)
+    prompt_with = (f"{langgraph_solver._SYSTEM}\n{langgraph_solver._FINISH_TOOL_GUIDANCE}"
+                  if solver_with._require_finish_tool else langgraph_solver._SYSTEM)
+    assert prompt == prompt_with
+
+    kit_without = LedgerToolkit()
+    kit_with = LedgerToolkit()
+    tools_without = _make_tools(_FakeAgentIO(), search_k=6, page_chars=6000,
+                                ledger_kit=kit_without,
+                                derive_enabled=solver_without._ledger_derive_enabled)
+    tools_with = _make_tools(_FakeAgentIO(), search_k=6, page_chars=6000, ledger_kit=kit_with,
+                             derive_enabled=solver_with._ledger_derive_enabled)
+    assert [(t.name, t.description) for t in tools_without] == \
+        [(t.name, t.description) for t in tools_with]

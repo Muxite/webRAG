@@ -1318,6 +1318,115 @@ def _drop_tool_messages_and_matching_calls(messages: List[Any], tool_call_ids: s
     return out
 
 
+#: Bug 3 fix — hard cap on tool calls actually DISPATCHED per turn. Live evidence: a single
+#: completion returned 4,925 tool_calls (~493 identical repeats of each of 5 URLs); unbounded,
+#: `create_react_agent`'s built-in ToolNode executed thousands of them (2,461 http requests, 28
+#: min wall clock) for one turn. 16 comfortably covers every legitimate multi-call turn seen in
+#: this codebase's own suites (a handful of distinct search/visit calls) while making a
+#: pathological burst cheap regardless of how large it gets.
+MAX_TOOL_CALLS_PER_TURN = 16
+
+
+def _canonical_tool_call_key(call: Dict[str, Any]) -> Tuple[str, str]:
+    """A tool call's dedup identity: its name plus its JSON-canonicalized args.
+
+    ``sort_keys=True`` and a ``default=str`` fallback so two calls that are semantically the
+    same request (same name, same argument values, arguments possibly emitted in a different
+    key order) collapse to the same key even if the model's JSON formatting varies turn to turn.
+    """
+    args = call.get("args") or {}
+    try:
+        args_key = json.dumps(args, sort_keys=True, default=str)
+    except Exception:  # noqa: BLE001 — a call this weird still needs a key, not a crash
+        args_key = str(args)
+    return (str(call.get("name", "")), args_key)
+
+
+def _make_tool_call_guard_hook(telemetry: Optional["TelemetrySession"]):
+    """Build `create_react_agent`'s `post_model_hook` that dedups + caps a turn's tool calls.
+
+    `post_model_hook` runs after the model produces its `AIMessage` and BEFORE the "tools" node
+    dispatches any of it (see `chat_agent_executor.py`'s `post_model_hook_router`: only
+    `tool_call`s on the AIMessage that have no matching `ToolMessage` yet are sent to "tools").
+    That router check is what makes this safe to build on: appending a synthetic `ToolMessage`
+    for a call here is equivalent to "this call will never reach the tools node."
+
+    Every duplicate (identical name + canonical args) beyond the first occurrence, and every
+    call beyond `MAX_TOOL_CALLS_PER_TURN` distinct survivors, gets ITS OWN synthetic
+    `ToolMessage` (so `create_react_agent`'s own validation -- every `tool_call` needs a
+    matching `ToolMessage` -- is satisfied) instead of being executed; only the first
+    occurrence of each key, up to the cap, is left pending for the real "tools" node. A normal
+    turn (no duplicates, at or under the cap) returns `{}` -- no state update at all -- so the
+    router sees the SAME original `tool_calls` list and behavior is byte-identical to not
+    having this hook.
+
+    :param telemetry: The run's `TelemetrySession`, or None. When dedup/cap actually fires, one
+        `tool_call_guard` event is recorded so live analysis can see it happened; never raises
+        when telemetry is unavailable.
+    :returns: A sync `post_model_hook` callable: `state -> state update dict`.
+    """
+    def hook(state: Dict[str, Any]) -> Dict[str, Any]:
+        messages = list(state.get("messages") or [])
+        if not messages:
+            return {}
+        last = messages[-1]
+        if not isinstance(last, AIMessage):
+            return {}
+        calls = list(getattr(last, "tool_calls", None) or [])
+        if len(calls) <= 1:
+            return {}
+
+        seen_keys: set = set()
+        kept_calls: List[Dict[str, Any]] = []
+        synthetic_messages: List[ToolMessage] = []
+        dropped_duplicate = 0
+        dropped_cap = 0
+        for call in calls:
+            key = _canonical_tool_call_key(call)
+            if key in seen_keys:
+                dropped_duplicate += 1
+                synthetic_messages.append(ToolMessage(
+                    content=(
+                        f"DUPLICATE TOOL CALL skipped (identical to an earlier call this turn): "
+                        f"{call.get('name', '')}"
+                    ),
+                    tool_call_id=call.get("id"),
+                    name=call.get("name", ""),
+                ))
+                continue
+            if len(kept_calls) >= MAX_TOOL_CALLS_PER_TURN:
+                dropped_cap += 1
+                synthetic_messages.append(ToolMessage(
+                    content=(
+                        f"TOOL CALL DROPPED (per-turn cap of {MAX_TOOL_CALLS_PER_TURN} calls "
+                        f"exceeded): {call.get('name', '')}"
+                    ),
+                    tool_call_id=call.get("id"),
+                    name=call.get("name", ""),
+                ))
+                continue
+            seen_keys.add(key)
+            kept_calls.append(call)
+
+        if dropped_duplicate == 0 and dropped_cap == 0:
+            return {}
+
+        new_ai = last.model_copy(update={"tool_calls": kept_calls})
+        if telemetry is not None:
+            try:
+                telemetry.record_event("tool_call_guard", {
+                    "kept": len(kept_calls),
+                    "dropped_duplicate": dropped_duplicate,
+                    "dropped_cap": dropped_cap,
+                    "cap": MAX_TOOL_CALLS_PER_TURN,
+                })
+            except Exception:  # noqa: BLE001 — a telemetry failure must never break dispatch
+                pass
+        return {"messages": [new_ai, *synthetic_messages]}
+
+    return hook
+
+
 class LangGraphSolver:
     """Wraps `langgraph.prebuilt.create_react_agent` in the `Solver` interface."""
 
@@ -1430,6 +1539,10 @@ class LangGraphSolver:
         #: See `_ledger_derive_enabled` just above for why an unrecognized token is ignored rather
         #: than rejected.
         self._ledger_answer_audit_enabled = "answer_audit" in self._ledger_host_modules
+        #: `shape_derive`: a THIRD separate token in the same comma-separated list, same
+        #: never-touches-the-model contract as `answer_audit` just above -- it only gates whether
+        #: `solve()` calls `LedgerToolkit.shape_derive_check` once at its single exit.
+        self._ledger_shape_derive_enabled = "shape_derive" in self._ledger_host_modules
         #: FIX A (`docs/TINY_MODEL_INVESTIGATION.md` §3.1), env-gated by `LEDGER_CONTEXT_FIT`,
         #: default ON: size the context-trim budget to the model's REAL served window instead of
         #: the fixed 32k-shaped globals. Reachable only when `context_trim` is on, and clamped so
@@ -1530,6 +1643,7 @@ class LangGraphSolver:
         if mode == "native" or not self._tool_call_emulation:
             graph = create_react_agent(
                 llm, tools, prompt=system_prompt, pre_model_hook=self._pre_model_hook(),
+                post_model_hook=_make_tool_call_guard_hook(telemetry),
             )
             return _NativeGraphTransport(graph), "native"
 
@@ -1551,6 +1665,7 @@ class LangGraphSolver:
             ), "emulated"
         graph = create_react_agent(
             llm, tools, prompt=system_prompt, pre_model_hook=self._pre_model_hook(),
+            post_model_hook=_make_tool_call_guard_hook(telemetry),
         )
         return _NativeGraphTransport(graph), "native"
 
@@ -1622,7 +1737,8 @@ class LangGraphSolver:
         # kit (page registration -> quantity index) even though it exposes no tool to the model
         # (see `derive_enabled` passed to `_make_tools` below).
         ledger_kit = (LedgerToolkit(max_page_chars=page_chars)
-                     if (self._ledger_derive_enabled or self._ledger_answer_audit_enabled) else None)
+                     if (self._ledger_derive_enabled or self._ledger_answer_audit_enabled
+                         or self._ledger_shape_derive_enabled) else None)
         tools = _make_tools(agent_io, self._search_k, page_chars, retry,
                              require_finish_tool=self._require_finish_tool, ledger_kit=ledger_kit,
                              derive_enabled=self._ledger_derive_enabled)
@@ -1806,6 +1922,11 @@ class LangGraphSolver:
                 # `ANSWER_AUDIT_TAG`) are included in the stored evidence graph. `audit_answer`
                 # never raises (its own contract), so no try/except wrapping here.
                 result_out["answer_audit"] = ledger_kit.audit_answer(final_text, mandate)
+            if self._ledger_shape_derive_enabled:
+                # `shape_derive`: same mechanical, finish-time, host-side contract as
+                # `answer_audit` above. Called BEFORE `artifact()` below for the same reason --
+                # a node it mints must land in the stored evidence graph.
+                result_out["shape_derive"] = ledger_kit.shape_derive_check(final_text, mandate)
             # Same key and shape `execution_evidence_loop` writes to `output.evidence_graph` --
             # `evidence_graph.reverify_graph` and `claim_metrics.derivation_fabrication_rate` read
             # it with no changes. Absent (not this branch) when the module is off, so a

@@ -241,3 +241,101 @@ def operation_appropriateness(mandate_text: str, operation: str, value: Any,
         shape_match = True
 
     return {"sign_plausible": sign_plausible, "operation_shape_match": shape_match}
+
+
+#: :func:`mandate_demanded_operation`'s cue families -- SEPARATE constants from
+#: :data:`_MAGNITUDE_CUES` / :data:`_RATIO_CUES` above (frozen, do not reuse or edit): those two
+#: answer a narrower question ("is this operation's SIGN/SHAPE plausible") than this function does
+#: ("what single operation, if any, does the mandate unambiguously demand"), and sharing a regex
+#: between the two would couple a change meant for one to the other's behavior.
+#:
+#: Anchored to a "compute the X" / "X between the two values" phrasing rather than a bare keyword:
+#: a bare ``\bcombined\b`` or ``\btotal\b`` fires on prose that merely happens to contain the word
+#: without asking for that operation at all -- measured live on task 212's own mandate, which
+#: warns the reader NOT to use "the combined total of all access shafts" as the tunnel's length.
+#: That is a difference-shaped mandate (see ``_SHAPE_DIFFERENCE_CUES`` below) that would have
+#: been forced into "ambiguous" (both families firing) by a looser sum cue -- so the sum cue stays
+#: anchored to the phrasing that actually requests a sum, not to the word appearing anywhere.
+_SHAPE_DIFFERENCE_CUES = re.compile(
+    r"\babsolute\s+difference\b|\bcompute\s+the\s+(?:absolute\s+)?difference\b|"
+    r"\bdifference\s+between\b|\bhow\s+much\s+(?:taller|higher|longer|farther|further|larger|"
+    r"bigger|deeper|older|younger|heavier|shorter|wider)\b|\bgap\s+between\b",
+    re.IGNORECASE,
+)
+
+#: Marks a DIFFERENCE mandate as wanting a non-negative magnitude ("absolute difference", "the
+#: larger minus the smaller") rather than a signed subtraction in a specific stated order.
+_SHAPE_ABSOLUTE_CUES = re.compile(
+    r"\babsolute\b|\b(?:larger|bigger|greater)\s+minus\s+the\s+(?:smaller|lesser)\b",
+    re.IGNORECASE,
+)
+
+#: See the docstring above the difference cues for why this is anchored to a "compute the sum /
+#: total" phrasing rather than a bare ``\bsum\b`` / ``\bcombined\b`` / ``\btotal\b`` keyword.
+_SHAPE_SUM_CUES = re.compile(
+    r"\bcompute\s+the\s+sum\b|\bsum\s+of\s+the\s+(?:two|values)\b|"
+    r"\bcompute\s+the\s+total\b|\btotal\s+of\s+the\s+(?:two|values)\b|\bcombined\s+sum\b",
+    re.IGNORECASE,
+)
+
+#: A quotient/ratio-shaped mandate: an explicit "ratio", a multiplicative "how many times"
+#: comparison, a "per <unit>" rate (e.g. "cost per seat"), or an "average speed" (distance/time).
+_SHAPE_QUOTIENT_CUES = re.compile(
+    r"\bratio\b|\bhow\s+many\s+times\b|\bper\s+\w+\b|\baverage\s+speed\b",
+    re.IGNORECASE,
+)
+
+#: An argmax/comparison mandate ("which of these five rivers has the highest density") asks for a
+#: SELECTION among more than two entities, not a two-operand arithmetic result -- even when its
+#: prose separately uses a quotient- or difference-shaped word (a "ratio" per entity, computed
+#: five times, is not the SAME demanded operation :func:`mandate_demanded_operation` reports for a
+#: two-operand mandate). This cue is checked FIRST and unconditionally overrides any single-family
+#: match below it, per the "never guess" contract.
+_SHAPE_ARGMAX_CUES = re.compile(
+    r"\bwhich\s+of\b|\bwhich\b.{0,60}\b(?:highest|largest|greatest|smallest|lowest)\b|"
+    r"\b(?:highest|largest|greatest|smallest|lowest)\b.{0,30}\bamong\b",
+    re.IGNORECASE,
+)
+
+
+def mandate_demanded_operation(mandate_text: Any) -> Dict[str, Any]:
+    """A conservative read of which single two-operand operation ``mandate_text`` demands, if any.
+
+    Three cue families -- :data:`_SHAPE_DIFFERENCE_CUES`, :data:`_SHAPE_SUM_CUES`,
+    :data:`_SHAPE_QUOTIENT_CUES` -- each independently checked; the reported operation is the
+    name of whichever ONE family fired. Deliberately never guesses:
+
+    * an :data:`_SHAPE_ARGMAX_CUES` match (a "which of these has the highest ..." selection over
+      more than two entities) unconditionally reports ``None``, even when a quotient/difference
+      word also appears in the same mandate's prose -- see that cue's own docstring;
+    * zero families firing reports ``None`` (no cue at all, not a guess);
+    * two or more families firing simultaneously reports ``None`` (an ambiguous mandate, not a
+      coin flip on which cue "wins").
+
+    :param mandate_text: the task mandate / question text.
+    :returns: ``{"operation": "difference"|"sum"|"quotient"|None, "absolute": bool, "reason":
+        str}``. ``absolute`` is only ever ``True`` for ``operation == "difference"``, when
+        :data:`_SHAPE_ABSOLUTE_CUES` also matches ("absolute difference", "the larger minus the
+        smaller"). ``reason`` is one of ``"argmax_phrasing"``, ``"no_cue"``, ``"ambiguous_cue"``,
+        or ``"<operation>_cue"``.
+    :raises: nothing.
+    """
+    mandate = str(mandate_text or "")
+    if _SHAPE_ARGMAX_CUES.search(mandate):
+        return {"operation": None, "absolute": False, "reason": "argmax_phrasing"}
+
+    families: List[str] = []
+    if _SHAPE_DIFFERENCE_CUES.search(mandate):
+        families.append("difference")
+    if _SHAPE_SUM_CUES.search(mandate):
+        families.append("sum")
+    if _SHAPE_QUOTIENT_CUES.search(mandate):
+        families.append("quotient")
+
+    if len(families) != 1:
+        reason = "no_cue" if not families else "ambiguous_cue"
+        return {"operation": None, "absolute": False, "reason": reason}
+
+    operation = families[0]
+    absolute = operation == "difference" and bool(_SHAPE_ABSOLUTE_CUES.search(mandate))
+    return {"operation": operation, "absolute": absolute, "reason": f"{operation}_cue"}

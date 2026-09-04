@@ -208,6 +208,12 @@ async def run_offtheshelf_execution(
     answer_audit = solver_result.get("answer_audit")
     if answer_audit is not None:
         output["answer_audit"] = answer_audit
+    # Same present-only-when-bound passthrough contract as `answer_audit` just above -- see that
+    # passthrough's own comment for the real bug (a missed passthrough here) this mirrors on
+    # purpose.
+    shape_derive = solver_result.get("shape_derive")
+    if shape_derive is not None:
+        output["shape_derive"] = shape_derive
     telemetry.finish(success=output["success"])
     tracer.close()
 

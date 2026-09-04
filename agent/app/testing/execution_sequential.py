@@ -29,6 +29,7 @@ from agent.app.telemetry import TelemetrySession
 from agent.app.trace_recorder import (
     TraceRecorder,
     build_trace_path,
+    llm_io_capture_enabled,
     sanitize_path_component,
     traces_retained,
 )
@@ -86,6 +87,16 @@ def _ledger_answer_audit_enabled() -> bool:
     """True when ``answer_audit`` is present in ``LEDGER_HOST_MODULES``."""
     modules = {m.strip().lower() for m in os.environ.get("LEDGER_HOST_MODULES", "").split(",")}
     return "answer_audit" in modules
+
+
+#: `shape_derive`: a THIRD separate token in the same env var, same tiny-read shape as the two
+#: above and the same never-touches-the-model contract as `answer_audit` -- no prompt text, no
+#: tool registration, no dispatch branch. It only gates whether the host calls
+#: ``LedgerToolkit.shape_derive_check`` once, finish-time, in ``run_sequential_execution``.
+def _ledger_shape_derive_enabled() -> bool:
+    """True when ``shape_derive`` is present in ``LEDGER_HOST_MODULES``."""
+    modules = {m.strip().lower() for m in os.environ.get("LEDGER_HOST_MODULES", "").split(",")}
+    return "shape_derive" in modules
 
 
 #: Prompt text for the ``derive`` action, written for a WEAK model: it names the module's actual
@@ -529,7 +540,18 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
 
         if action == "finish" or step == max_steps - 1:
             is_forced_termination = step == max_steps - 1
-            last_answer = str(args.get("answer", "")) or last_answer
+            # Bug 2 fix: `args.get("answer", "")` only supplies "" when the key is MISSING --
+            # when the key is present with a JSON `null` value, `.get` returns None (the
+            # default is not used), and `str(None) == "None"` is truthy, so a null answer used
+            # to become the literal string "None" (final_deliverable "None", success True,
+            # score 0.0) AND permanently defeated the `if not last_answer:` forced-synthesis
+            # fallback below. A weak model's exact string "None"/"null" is never a real answer
+            # either, so it is normalized to empty the same way.
+            raw_answer = args.get("answer")
+            answer_text = "" if raw_answer is None else str(raw_answer)
+            if answer_text.strip().lower() in ("none", "null"):
+                answer_text = ""
+            last_answer = answer_text or last_answer
             if not last_answer:
                 # forced final synthesis if the model never produced an answer
                 messages = [
@@ -677,6 +699,19 @@ async def run_sequential_execution(
     test_id = test_module.metadata.get("test_id", "unknown")
     correlation_id = f"idea_test_{test_id}_{model_name}_sequential_react_{run_stamp}"
 
+    # Bug 1 fix: this arm used to never call `set_full_capture` at all, so
+    # `IDEA_TEST_CAPTURE_LLM_IO`/verbosity-3 had no effect on sequential_react traces --
+    # connector_io events carried only prompt_chars/completion_chars, never
+    # prompt_text/completion_text. Mirrors the graph arm's ON/OFF pair
+    # (`execution.py` around the `engine.run()` call) across all four shared connectors.
+    report_verbosity = int(os.environ.get("IDEA_TEST_REPORT_VERBOSITY", "1"))
+    full_capture = llm_io_capture_enabled(report_verbosity)
+    if full_capture:
+        connector_llm.set_full_capture(True)
+        connector_search.set_full_capture(True)
+        connector_http.set_full_capture(True)
+        connector_chroma.set_full_capture(True)
+
     results_dir = Path(__file__).resolve().parent.parent.parent / "idea_test_results"
     results_dir.mkdir(parents=True, exist_ok=True)
     trace_path = build_trace_path(results_dir, run_stamp, test_id, model_name, "sequential_react", cell_tag)
@@ -712,7 +747,9 @@ async def run_sequential_execution(
     # against, even though it exposes no tool to the model (see `derive_enabled` below).
     derive_enabled = _ledger_derive_enabled()
     answer_audit_enabled = _ledger_answer_audit_enabled()
-    ledger_kit = LedgerToolkit() if (derive_enabled or answer_audit_enabled) else None
+    shape_derive_enabled = _ledger_shape_derive_enabled()
+    ledger_kit = (LedgerToolkit()
+                 if (derive_enabled or answer_audit_enabled or shape_derive_enabled) else None)
     # W2 §1-2: structural finish gate, opt-in via `final_require_derivation_for_numeric`
     # (default OFF -> `FinishGate(enabled=False)`, byte-identical to before it existed).
     finish_gate = FinishGate.from_settings(idea_settings)
@@ -748,6 +785,13 @@ async def run_sequential_execution(
             # `ANSWER_AUDIT_TAG`) are included in the stored evidence graph. `audit_answer` never
             # raises (its own contract), so no try/except wrapping here.
             output["answer_audit"] = ledger_kit.audit_answer(output["final_deliverable"], mandate)
+        if shape_derive_enabled:
+            # `shape_derive`: same mechanical, finish-time, host-side contract as `answer_audit`
+            # above -- never a model call, never a prompt/tool change. Called BEFORE `artifact()`
+            # below (same reason: a node it mints must land in the stored evidence graph).
+            # `shape_derive_check` never raises (its own contract), so no try/except here either.
+            output["shape_derive"] = ledger_kit.shape_derive_check(
+                output["final_deliverable"], mandate)
         # Same key and shape `execution_evidence_loop` already writes (`ledger.graph.to_dict()`),
         # so `evidence_graph.reverify_graph` and `claim_metrics.derivation_fabrication_rate` read
         # this host's artifact unchanged. Absent (not an empty dict) when the module is off, so a
@@ -769,6 +813,12 @@ async def run_sequential_execution(
             output["finish_gate_reason"] = "unbacked_numeric_answer"
     telemetry.finish(success=output["success"])
     tracer.close()
+
+    if full_capture:
+        connector_llm.set_full_capture(False)
+        connector_search.set_full_capture(False)
+        connector_http.set_full_capture(False)
+        connector_chroma.set_full_capture(False)
 
     observability = summarize_observability_func({"output": output}, telemetry, model_name)
     telemetry_summary = telemetry.summary()

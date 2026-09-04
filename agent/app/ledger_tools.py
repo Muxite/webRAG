@@ -30,7 +30,7 @@ import re
 from typing import Any, Dict, List, Optional, Sequence
 
 from agent.app.answer_numbers import (extract_answer_numbers, is_trivial_number,
-                                      operation_appropriateness)
+                                      mandate_demanded_operation, operation_appropriateness)
 from agent.app.quantity_index import build_index, lookup, render_index
 from agent.app.testing.evidence_graph import (KIND_DERIVED, DerivationError, EvidenceGraph,
                                               _numbers_agree, canonical_unit, extract_unit,
@@ -40,6 +40,24 @@ from agent.app.testing.evidence_graph import (KIND_DERIVED, DerivationError, Evi
 #: consumer (e.g. the risk-coverage certify chain) can include or exclude this mechanical,
 #: finish-time minting path from the model-driven ``derive`` path's own accounting.
 ANSWER_AUDIT_TAG = "answer_audit"
+
+#: Provenance tag stamped on every node minted by :meth:`LedgerToolkit.shape_derive_check`. A
+#: SEPARATE tag from :data:`ANSWER_AUDIT_TAG` even though the two mint the same NODE SHAPES
+#: (SOURCE operands + a DERIVED result) via the same helpers -- a consumer that wants to know
+#: whether the ANSWER itself was mechanically confirmed to match the mandate's DEMANDED operation
+#: (this method) needs to distinguish that from the broader "some arithmetic explains this number"
+#: search :meth:`audit_answer` already performs, which does not know or care what the mandate
+#: asked for.
+SHAPE_DERIVE_TAG = "shape_derive"
+
+#: :meth:`LedgerToolkit.shape_derive_check` refuses to search once the number of distinct
+#: candidate (operation, value) results it would have to compare the answer against exceeds this
+#: -- the same "candidate explosion" guard shape as :meth:`audit_answer`'s ambiguity accounting,
+#: applied BEFORE the search rather than after, since here the search is one single demanded
+#: operation over every pair rather than four operations, so a bound before computing is cheap and
+#: keeps a large index (a model that revisited the same handful of pages many times) from turning
+#: this method into an O(n^2) scan with no shape at all to show for it.
+SHAPE_DERIVE_MAX_CANDIDATES = 40
 
 #: Relative tolerance for matching an ANSWER's number against the run's quantity index / a
 #: mechanical derivation. Separate from ``evidence_graph.ARITH_RELATIVE_TOLERANCE`` (``1e-6``,
@@ -470,7 +488,23 @@ class LedgerToolkit:
         return canonical_unit(unit_a) == canonical_unit(unit_b)
 
     def _compat_quotient(self, unit_a: str, unit_b: str) -> bool:
-        return canonical_unit(unit_a) == canonical_unit(unit_b)
+        """Bug 4 fix: quotient used to require the SAME unit on both sides (this method's body
+        used to be identical to :meth:`_compat_diff_sum`'s), so a rate computation like
+        distance/time (km / h -> km/h) could never be recognized as a derivation explanation --
+        structurally, not just as a missed case -- even though
+        :meth:`~agent.app.testing.evidence_graph.EvidenceGraph.add_arith` has always composed a
+        compound ``"A/B"`` unit for exactly this quotient/ratio shape.
+
+        Now accepts EITHER the pre-existing same-unit case (a dimensionless ratio, e.g. km/km,
+        including both sides unitless) OR two DIFFERENT but both-PRESENT canonical units (a rate,
+        e.g. km/h). A unit present on only one side still refuses -- that asymmetry is not
+        "two units combining into a rate", it is one genuinely unitless operand, which stays
+        refused exactly as before.
+        """
+        canon_a, canon_b = canonical_unit(unit_a), canonical_unit(unit_b)
+        if canon_a == canon_b:
+            return True
+        return bool(canon_a) and bool(canon_b)
 
     def _compat_product(self, unit_a: str, unit_b: str) -> bool:
         return not canonical_unit(unit_a) or not canonical_unit(unit_b)
@@ -663,7 +697,12 @@ class LedgerToolkit:
         op_appropriateness: List[Dict[str, Any]] = []
         try:
             for node in self._graph.nodes():
-                if node.kind != KIND_DERIVED or node.minted_by == ANSWER_AUDIT_TAG:
+                # Excludes both mechanical tags, not just this method's own -- a node minted by
+                # `shape_derive_check` (:data:`SHAPE_DERIVE_TAG`) is just as mechanical (no model
+                # asserted its operation) as one minted here, and including it would make this
+                # method's output depend on whether `shape_derive_check` happened to run first on
+                # the same toolkit -- a cross-contamination this contract must not have.
+                if node.kind != KIND_DERIVED or node.minted_by in (ANSWER_AUDIT_TAG, SHAPE_DERIVE_TAG):
                     continue
                 verdict = operation_appropriateness(mandate, node.operation, node.value, node.unit)
                 op_appropriateness.append({
@@ -678,6 +717,219 @@ class LedgerToolkit:
             "numbers_total": len(numbers_out), "numbers": numbers_out,
             "answer_supported": answer_supported, "op_appropriateness": op_appropriateness,
         }
+
+    def shape_derive_check(self, answer_text: Any, mandate: Any) -> Dict[str, Any]:
+        """Whether ``answer_text`` matches the SINGLE operation ``mandate`` unambiguously demands
+        (:func:`agent.app.answer_numbers.mandate_demanded_operation`), mechanically recomputed
+        over the run's own quantity index -- never a model call, never a prompt/tool change.
+
+        Unlike :meth:`audit_answer` (which asks "is EVERY number in the answer explainable by
+        SOME arithmetic over the index, for ANY of four operations"), this method asks a narrower
+        and stronger question: "does the index contain a pair of entries whose DEMANDED operation
+        -- the one specific op the mandate's own cue phrasing named -- reproduces a number the
+        answer actually reports". A model that reports a plausible-looking number nobody asked
+        for (the wrong operation, or a number pulled from memory that happens to be explainable
+        by an unrelated pair) does not pass this check even when it would pass :meth:`audit_answer`.
+
+        Deliberately silent (``verdict`` ``None``, never a guess) whenever there is nothing
+        unambiguous to check against:
+
+        * the mandate itself has no unambiguous demanded operation (``mandate_demanded_operation``
+          returned ``None`` -- no cue, an ambiguous multi-family mandate, or argmax/comparison
+          phrasing over more than two entities);
+        * this run registered no page (``self._entries`` empty);
+        * the answer carries no non-trivial number to check (:func:`is_trivial_number` excludes a
+          bare year or small bare integer, per the wildcard-suppression lesson applied at minting
+          rather than at matching -- see this module's own docstring);
+        * the candidate search over index-entry pairs would produce more than
+          :data:`SHAPE_DERIVE_MAX_CANDIDATES` distinct results (a run that revisited the same
+          handful of pages many times has nothing meaningfully DEMANDED left to check against).
+
+        Otherwise ``verdict`` is ``True`` iff any non-trivial answer number matches (within
+        :data:`AUDIT_REL_TOL`) one of the candidate results the demanded operation produces over
+        an UNORDERED pair of index entries with compatible units (reusing :meth:`_compat_diff_sum`
+        / :meth:`_compat_quotient`, the same compatibility rules :meth:`audit_answer` uses) --
+        ``False`` otherwise. On a match, the matched pair's operands are minted as SOURCE nodes
+        and the result as a DERIVED node (:meth:`_mint_source_from_entry` /
+        :meth:`~evidence_graph.EvidenceGraph.add_arith`), tagged :data:`SHAPE_DERIVE_TAG` --
+        idempotent under re-call, since both minting calls dedup on content-identical id exactly
+        like :meth:`audit_answer`'s own minting does.
+
+        A candidate is computed ONLY for the demanded operation, never all four
+        :meth:`audit_answer` searches: a ``sum`` mandate only ever computes ``a + b``; a
+        ``difference`` mandate computes ``abs(a - b)`` when the mandate's own ``absolute`` cue
+        fired, or both signed orderings otherwise; a ``quotient`` mandate tries both orderings
+        (``a / b`` and ``b / a``), since "ratio of A to B" and "ratio of B to A" are both
+        legitimate readings absent a stated order. Candidate results are deduped by
+        ``(rounded value, canonical unit pair)`` before the explosion/match checks, so the same
+        underlying operand pair registered on several duplicate page visits counts once.
+
+        :param answer_text: the deliverable / final answer string.
+        :param mandate: the task mandate -- REQUIRED (unlike :meth:`audit_answer`'s optional
+            ``mandate``, this method's entire question is defined by the mandate's demanded
+            shape; an empty mandate simply yields ``verdict=None``, ``reason="no_unambiguous_shape"``,
+            never an error).
+        :returns: ``{"demanded_operation", "absolute", "verdict", "reason", "n_entries",
+            "n_pairs_considered", "n_candidates", "n_match_ambiguity", "matched"}``, where
+            ``matched`` is ``None`` unless ``verdict`` is ``True``, in which case it is
+            ``{"operation", "value", "unit", "operand_node_ids", "derived_node_id"}``.
+        :raises: nothing.
+        """
+        n_entries = len(self._entries)
+        result: Dict[str, Any] = {
+            "demanded_operation": None, "absolute": False, "verdict": None, "reason": "",
+            "n_entries": n_entries, "n_pairs_considered": 0, "n_candidates": 0,
+            "n_match_ambiguity": 0, "matched": None,
+        }
+        try:
+            shape = mandate_demanded_operation(mandate)
+            operation = shape.get("operation")
+            absolute = bool(shape.get("absolute"))
+            result["demanded_operation"] = operation
+            result["absolute"] = absolute
+            if operation is None:
+                result["reason"] = "no_unambiguous_shape"
+                return result
+            if n_entries == 0:
+                result["reason"] = "no_index_entries"
+                return result
+
+            try:
+                extracted = extract_answer_numbers(answer_text)
+            except Exception:
+                extracted = []
+            non_trivial_answers: List[float] = []
+            for item in extracted:
+                try:
+                    if not is_trivial_number(item):
+                        non_trivial_answers.append(float(item["value"]))
+                except Exception:
+                    continue
+            if not non_trivial_answers:
+                result["reason"] = "no_nontrivial_answer_numbers"
+                return result
+
+            numerics: List[Optional[float]] = [self._entry_numeric(entry)
+                                               for _, entry in self._entries]
+            seen_pairs = set()
+            raw_candidates: List[Dict[str, Any]] = []
+            n_pairs_considered = 0
+            for i in range(n_entries):
+                value_i = numerics[i]
+                if value_i is None:
+                    continue
+                unit_i = self._entries[i][1].unit
+                for j in range(i + 1, n_entries):
+                    value_j = numerics[j]
+                    if value_j is None:
+                        continue
+                    unit_j = self._entries[j][1].unit
+
+                    if operation in ("difference", "sum"):
+                        if not self._compat_diff_sum(unit_i, unit_j):
+                            continue
+                    elif operation == "quotient":
+                        if not self._compat_quotient(unit_i, unit_j):
+                            continue
+                    else:
+                        continue
+
+                    # Collapses duplicate page registrations of the SAME operand pair (a model
+                    # that revisits the same page re-registers the same quantities) into one
+                    # attempt, keyed on the operands' own numeric identity rather than their
+                    # index position.
+                    pair_key = frozenset((
+                        (round(value_i, 9), canonical_unit(unit_i)),
+                        (round(value_j, 9), canonical_unit(unit_j)),
+                    ))
+                    if pair_key in seen_pairs:
+                        continue
+                    seen_pairs.add(pair_key)
+                    n_pairs_considered += 1
+
+                    if operation == "sum":
+                        raw_candidates.append({"value": value_i + value_j, "i": i, "j": j,
+                                               "order": (i, j)})
+                    elif operation == "difference":
+                        if absolute:
+                            order = (i, j) if value_i >= value_j else (j, i)
+                            raw_candidates.append({"value": abs(value_i - value_j), "i": i,
+                                                   "j": j, "order": order})
+                        else:
+                            raw_candidates.append({"value": value_i - value_j, "i": i, "j": j,
+                                                   "order": (i, j)})
+                            raw_candidates.append({"value": value_j - value_i, "i": i, "j": j,
+                                                   "order": (j, i)})
+                    elif operation == "quotient":
+                        if value_j != 0:
+                            raw_candidates.append({"value": value_i / value_j, "i": i, "j": j,
+                                                   "order": (i, j)})
+                        if value_i != 0:
+                            raw_candidates.append({"value": value_j / value_i, "i": i, "j": j,
+                                                   "order": (j, i)})
+
+            dedup_map: Dict[Any, Dict[str, Any]] = {}
+            for cand in raw_candidates:
+                unit_pair = frozenset((canonical_unit(self._entries[cand["i"]][1].unit),
+                                       canonical_unit(self._entries[cand["j"]][1].unit)))
+                key = (round(cand["value"], 6), unit_pair)
+                dedup_map.setdefault(key, cand)
+            distinct_candidates = list(dedup_map.values())
+            n_candidates = len(distinct_candidates)
+            result["n_pairs_considered"] = n_pairs_considered
+            result["n_candidates"] = n_candidates
+
+            if n_candidates > SHAPE_DERIVE_MAX_CANDIDATES:
+                result["reason"] = "candidate_explosion"
+                return result
+            if n_candidates == 0:
+                result["reason"] = "no_compatible_pairs"
+                return result
+
+            matched_candidates = [
+                cand for cand in distinct_candidates
+                if any(math.isclose(cand["value"], ans, rel_tol=AUDIT_REL_TOL, abs_tol=1e-9)
+                      for ans in non_trivial_answers)
+            ]
+            if not matched_candidates:
+                result["verdict"] = False
+                result["reason"] = "no_match"
+                return result
+
+            result["n_match_ambiguity"] = len(matched_candidates)
+            # Deterministic pick among tied matches: earliest (i, j) encountered.
+            best = min(matched_candidates, key=lambda cand: (cand["i"], cand["j"]))
+            first_idx, second_idx = best["order"]
+            page_a, entry_a = self._entries[first_idx]
+            page_b, entry_b = self._entries[second_idx]
+            node_a = self._mint_source_from_entry(page_a, entry_a)
+            node_b = self._mint_source_from_entry(page_b, entry_b)
+            derived = None
+            if node_a is not None and node_b is not None:
+                try:
+                    derived = self._graph.add_arith(operation, [node_a.id, node_b.id],
+                                                    minted_by=SHAPE_DERIVE_TAG)
+                except DerivationError:
+                    derived = None
+            if derived is None:
+                result["verdict"] = False
+                result["reason"] = "mint_failed"
+                return result
+
+            result["verdict"] = True
+            result["reason"] = "matched"
+            result["matched"] = {
+                "operation": operation, "value": derived.value, "unit": derived.unit,
+                "operand_node_ids": [node_a.id, node_b.id], "derived_node_id": derived.id,
+            }
+            return result
+        except Exception:
+            # Never raises -- same contract as `audit_answer`. Whatever partial fields were
+            # already set (demanded_operation/absolute/n_entries) are kept; verdict stays honest
+            # (None, not a guessed False) when the failure happened before a real search ran.
+            if not result["reason"]:
+                result["reason"] = "error"
+            return result
 
     def artifact(self) -> Dict[str, Any]:
         """The re-verifiable record of everything this run derived.

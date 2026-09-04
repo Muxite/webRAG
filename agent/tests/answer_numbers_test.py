@@ -7,6 +7,7 @@ from __future__ import annotations
 from agent.app.answer_numbers import (
     extract_answer_numbers,
     is_trivial_number,
+    mandate_demanded_operation,
     operation_appropriateness,
     strip_urls,
 )
@@ -183,3 +184,117 @@ class TestGluedPrefixGuard:
     def test_real_negative_numbers_survive(self):
         values = [n["value"] for n in extract_answer_numbers("delta = -30.55 km exactly")]
         assert values == [-30.55]
+
+
+class TestMandateDemandedOperation:
+    """Fixture tests against the REAL `get_task_statement()` of the 12 tier5 shape-derive tasks
+    (test_210 .. test_221) -- import-safe pure functions, no model/network involved. Each mandate
+    is checked against its expected shape per the corpus's own operation vocabulary: 210/212/213
+    are absolute-difference mandates, 211 is a sum, 214-217 are quotient/ratio mandates, and
+    218-221 are argmax/comparison mandates over five entities -- none of the four should ever
+    resolve to a two-operand operation even though their prose separately uses a quotient- or
+    ratio-shaped word per entity ("per km^2", "aspect ratio", "per floor")."""
+
+    def _mandate(self, module_name: str) -> str:
+        import importlib
+
+        module = importlib.import_module(f"agent.app.idea_tests.{module_name}")
+        return module.get_task_statement()
+
+    def test_210_chimney_height_difference_is_absolute_difference(self):
+        result = mandate_demanded_operation(
+            self._mandate("test_210_tier5_chimney_height_difference"))
+        assert result["operation"] == "difference"
+        assert result["absolute"] is True
+
+    def test_211_lake_depth_sum_is_sum(self):
+        result = mandate_demanded_operation(self._mandate("test_211_tier5_lake_depth_sum"))
+        assert result["operation"] == "sum"
+        assert result["absolute"] is False
+
+    def test_212_tunnel_length_difference_is_absolute_difference(self):
+        """Also the mandate that names the false-positive trap for a bare sum cue: it warns the
+        reader NOT to use "the combined total of all access shafts" as the tunnel's length --
+        a bare `\\bcombined\\b`/`\\btotal\\b` cue would have fired here alongside the difference
+        cue and forced this mandate to "ambiguous" (`None`)."""
+        result = mandate_demanded_operation(
+            self._mandate("test_212_tier5_tunnel_length_difference"))
+        assert result["operation"] == "difference"
+        assert result["absolute"] is True
+
+    def test_213_national_park_area_difference_is_absolute_difference(self):
+        result = mandate_demanded_operation(
+            self._mandate("test_213_tier5_national_park_area_difference"))
+        assert result["operation"] == "difference"
+        assert result["absolute"] is True
+
+    def test_214_dam_capacity_ratio_is_quotient(self):
+        result = mandate_demanded_operation(self._mandate("test_214_tier5_dam_capacity_ratio"))
+        assert result["operation"] == "quotient"
+        assert result["absolute"] is False
+
+    def test_215_stadium_cost_per_seat_is_quotient(self):
+        result = mandate_demanded_operation(self._mandate("test_215_tier5_stadium_cost_per_seat"))
+        assert result["operation"] == "quotient"
+
+    def test_216_rail_average_speed_is_quotient(self):
+        result = mandate_demanded_operation(self._mandate("test_216_tier5_rail_average_speed"))
+        assert result["operation"] == "quotient"
+
+    def test_217_lake_area_ratio_is_quotient(self):
+        result = mandate_demanded_operation(self._mandate("test_217_tier5_lake_area_ratio"))
+        assert result["operation"] == "quotient"
+
+    def test_218_river_length_density_argmax_is_none(self):
+        result = mandate_demanded_operation(
+            self._mandate("test_218_tier5_river_length_density_argmax"))
+        assert result["operation"] is None
+        assert result["reason"] == "argmax_phrasing"
+
+    def test_219_waterfall_aspect_ratio_argmax_is_none(self):
+        """The mandate literally contains "aspect ratio" and "computed ratio value" -- a bare
+        `\\bratio\\b` cue fires, but the argmax phrasing ("determine which waterfall has the
+        HIGHEST ... ratio") must unconditionally override it."""
+        result = mandate_demanded_operation(
+            self._mandate("test_219_tier5_waterfall_aspect_ratio_argmax"))
+        assert result["operation"] is None
+        assert result["reason"] == "argmax_phrasing"
+
+    def test_220_bridge_span_fraction_argmax_is_none(self):
+        result = mandate_demanded_operation(
+            self._mandate("test_220_tier5_bridge_span_fraction_argmax"))
+        assert result["operation"] is None
+        assert result["reason"] == "argmax_phrasing"
+
+    def test_221_skyscraper_floor_height_argmax_is_none(self):
+        """The mandate contains "in metres per floor" -- a `per` quotient cue fires, but the
+        argmax phrasing must still override it to `None`."""
+        result = mandate_demanded_operation(
+            self._mandate("test_221_tier5_skyscraper_floor_height_argmax"))
+        assert result["operation"] is None
+        assert result["reason"] == "argmax_phrasing"
+
+    def test_empty_mandate_is_none(self):
+        result = mandate_demanded_operation("")
+        assert result["operation"] is None
+        assert result["reason"] == "no_cue"
+
+    def test_none_mandate_never_raises(self):
+        result = mandate_demanded_operation(None)
+        assert result["operation"] is None
+
+    def test_two_families_at_once_is_ambiguous(self):
+        result = mandate_demanded_operation(
+            "Compute the absolute difference and the ratio of the two values.")
+        assert result["operation"] is None
+        assert result["reason"] == "ambiguous_cue"
+
+    def test_a_ratio_cue_without_absolute_wording_reports_absolute_false(self):
+        result = mandate_demanded_operation("What is the ratio of A to B?")
+        assert result["operation"] == "quotient"
+        assert result["absolute"] is False
+
+    def test_a_bare_difference_without_absolute_wording_reports_absolute_false(self):
+        result = mandate_demanded_operation("Compute the difference between A and B.")
+        assert result["operation"] == "difference"
+        assert result["absolute"] is False

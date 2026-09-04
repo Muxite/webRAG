@@ -415,3 +415,117 @@ async def test_run_sequential_execution_omits_answer_audit_when_token_absent(mon
     output = result["output"]
     assert "answer_audit" not in output
     assert "evidence_graph" not in output
+
+
+# -- `shape_derive` token -- host wiring only (LedgerToolkit.shape_derive_check itself is Lane A's,
+# see agent/tests/ledger_tools_test.py) ------------------------------------------------------------
+
+def test_token_parsing_shape_derive_alone(monkeypatch):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "shape_derive")
+    assert seq._ledger_derive_enabled() is False
+    assert seq._ledger_answer_audit_enabled() is False
+    assert seq._ledger_shape_derive_enabled() is True
+
+
+def test_token_parsing_all_three(monkeypatch):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "derive,answer_audit,shape_derive")
+    assert seq._ledger_derive_enabled() is True
+    assert seq._ledger_answer_audit_enabled() is True
+    assert seq._ledger_shape_derive_enabled() is True
+
+
+def test_token_parsing_neither_includes_shape_derive(monkeypatch):
+    monkeypatch.delenv("LEDGER_HOST_MODULES", raising=False)
+    assert seq._ledger_shape_derive_enabled() is False
+
+
+def _fake_agent_io_class(decisions, page_text=PAGE):
+    class _FakeAgentIO:
+        def __init__(self, *a, **kw):
+            pass
+        build_llm_payload = MagicMock(return_value={"messages": []})
+        query_llm = AsyncMock(side_effect=[*(json.dumps(d) for d in decisions), "SYNTH"])
+        search = AsyncMock(return_value=[])
+        visit = AsyncMock(return_value=page_text)
+    return _FakeAgentIO
+
+
+async def _run_with_modules(monkeypatch, modules, mandate="What is the absolute difference "
+                            "between the chimneys, in m?"):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", modules)
+    decisions = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "done", "action": "finish",
+         "args": {"answer": "The absolute difference is 39.7 metres."}},
+    ]
+    monkeypatch.setattr(seq, "AgentIO", _fake_agent_io_class(decisions))
+    tm = MagicMock()
+    tm.metadata = {"test_id": "999"}
+    tm.get_task_statement.return_value = mandate
+    result = await seq.run_sequential_execution(
+        test_module=tm, model_name="m",
+        connector_llm=MagicMock(), connector_search=MagicMock(),
+        connector_http=MagicMock(), connector_chroma=MagicMock(),
+        run_stamp="r1",
+        summarize_observability_func=lambda *a, **kw: {},
+    )
+    return result["output"]
+
+
+@pytest.mark.asyncio
+async def test_run_sequential_execution_stores_shape_derive_and_includes_minted_nodes(monkeypatch):
+    """`output["shape_derive"]` is the dict `shape_derive_check` returns, and a matched node is
+    present in the SAME `output["evidence_graph"]` artifact (called BEFORE `artifact()`, same
+    ordering requirement W1's `answer_audit` hook already follows)."""
+    output = await _run_with_modules(monkeypatch, "shape_derive")
+    assert "shape_derive" in output
+    shape = output["shape_derive"]
+    assert shape["demanded_operation"] == "difference"
+    assert shape["verdict"] is True
+    assert shape["matched"] is not None
+
+    graph = output["evidence_graph"]
+    graph_ids = {n["id"] for n in graph["nodes"]}
+    assert shape["matched"]["derived_node_id"] in graph_ids
+    assert any(n.get("minted_by") == "shape_derive" for n in graph["nodes"])
+
+
+@pytest.mark.asyncio
+async def test_run_sequential_execution_omits_shape_derive_when_token_absent(monkeypatch):
+    output = await _run_with_modules(monkeypatch, "answer_audit")
+    assert "shape_derive" not in output
+    assert "answer_audit" in output
+
+
+@pytest.mark.asyncio
+async def test_run_sequential_execution_omits_shape_derive_and_evidence_graph_when_no_module(
+        monkeypatch):
+    output = await _run_with_modules(monkeypatch, "")
+    assert "shape_derive" not in output
+    assert "evidence_graph" not in output
+
+
+@pytest.mark.asyncio
+async def test_shape_derive_model_invisibility_prompt_and_tools_are_byte_identical(monkeypatch):
+    """Adding `shape_derive` to `LEDGER_HOST_MODULES` alongside `derive,answer_audit` must not
+    change one byte of what the model sees: same system prompt, same valid-action list, same
+    per-visit observation text. `shape_derive_check` runs finish-time, host-side only."""
+    decisions_a = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "done", "action": "finish",
+         "args": {"answer": "The absolute difference is 38.7 metres."}},
+    ]
+    decisions_b = [dict(d) for d in decisions_a]
+    io_without = _agent_io(decisions_a)
+    io_with = _agent_io(decisions_b)
+
+    kit_without = LedgerToolkit()
+    kit_with = LedgerToolkit()
+
+    await seq._run_react(io_without, "task", "m", max_steps=6, max_tokens=512,
+                         ledger_kit=kit_without, derive_enabled=True)
+    await seq._run_react(io_with, "task", "m", max_steps=6, max_tokens=512,
+                         ledger_kit=kit_with, derive_enabled=True)
+
+    assert _system_message(io_without, 0) == _system_message(io_with, 0)
+    assert _observation(io_without, 1) == _observation(io_with, 1)
