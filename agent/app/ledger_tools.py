@@ -33,8 +33,8 @@ from agent.app.answer_numbers import (extract_answer_numbers, is_trivial_number,
                                       operation_appropriateness)
 from agent.app.quantity_index import build_index, lookup, render_index
 from agent.app.testing.evidence_graph import (KIND_DERIVED, DerivationError, EvidenceGraph,
-                                              _numbers_agree, extract_unit, numeric_value,
-                                              parse_quantity, verify_value)
+                                              _numbers_agree, canonical_unit, extract_unit,
+                                              numeric_value, parse_quantity, verify_value)
 
 #: Provenance tag stamped on every node minted by :meth:`LedgerToolkit.audit_answer`, so a
 #: consumer (e.g. the risk-coverage certify chain) can include or exclude this mechanical,
@@ -102,33 +102,9 @@ _KNOWN_UNITS = frozenset("""
     percent pct
 """.split())
 
-#: Spelling variants collapsed to one canonical token BEFORE any dimension comparison. This is
-#: orthography, never conversion: no magnitude is ever touched, so the "no unit or currency
-#: conversion, ever" non-goal (`docs/LEDGER_PLAN_2026-09-01.md` section 7) stands untouched.
-_UNIT_CANONICAL = {
-    "metre": "m", "metres": "m", "meter": "m", "meters": "m",
-    "kilometre": "km", "kilometres": "km", "kilometer": "km", "kilometers": "km",
-    "feet": "ft", "foot": "ft", "mile": "mi", "miles": "mi",
-    "inch": "in", "inches": "in", "tonne": "t", "tonnes": "t",
-    "second": "s", "seconds": "s", "sec": "s", "secs": "s",
-    "minute": "min", "minutes": "min", "hour": "h", "hours": "h", "hr": "h", "hrs": "h",
-    "km²": "km2", "m²": "m2", "cm²": "cm2", "ft²": "ft2", "mi²": "mi2",
-    "km³": "km3", "m³": "m3", "percent": "%", "pct": "%",
-}
-
 #: The unit token immediately after a value, plus an optional superscript that Wikipedia's
 #: flattened infoboxes drop onto its own line (``Surface area\n8,372\nkm\n2``).
 _SPAN_UNIT_RE = re.compile(r"\s*([A-Za-z°%µ]{1,10}|°[CF])\s*\n?\s*([23])?\b")
-
-
-def canonical_unit(unit: Any) -> str:
-    """One spelling per unit, lowercased, so `metres` and `m` compare equal.
-
-    SPELLING only. Nothing here rescales a magnitude, so this is not the unit conversion the
-    project forbids -- it is the difference between comparing dimensions and comparing typography.
-    """
-    token = str(unit or "").strip().lower().replace("\n", "")
-    return _UNIT_CANONICAL.get(token, token)
 
 
 def _unit_at_span(page_text: str, start: int, end: int) -> str:
@@ -464,6 +440,31 @@ class LedgerToolkit:
             return page_id, entry, consistent
         return None
 
+    def _find_unit_anchored_page_match(self, item: Dict[str, Any]):
+        """A verbatim page occurrence of ``item``'s number WITH its stated unit adjacent, or
+        ``None``. Exists for values the quantity index does not extract -- a parenthetical
+        conversion like ``419.7 metres (1,377\nft)`` left the answer's honest ``1,377 ft``
+        permanently unbacked on the mint01 smoke. The unit ANCHORS the match (``verify_value``
+        is passed it explicitly), so this is `_locate`'s split number+unit path, never its
+        unit-blind literal fallback -- an answer number that states no unit gets no page scan
+        at all.
+
+        :returns: ``(page_id, start, end)`` or ``None``.
+        """
+        unit = str(item.get("unit") or "")
+        if not unit:
+            return None
+        text = str(item.get("text") or "")
+        for page in self._graph.pages():
+            match = verify_value(str(page.get("text") or ""), text, unit=unit)
+            # `verify_value` falls back to a bare-number hit when the combined value+unit span
+            # is not on the page ("a bare value is reported as bare, never silently refused").
+            # Bare is exactly what this path must refuse: without `unit_bearing` the 1776-ft
+            # answer backs against a metres page and the unit anchor anchors nothing.
+            if match.verified and match.unit_bearing:
+                return page["page_id"], match.start, match.end
+        return None
+
     #: Unit-compatibility rule per derivation op -- see :meth:`audit_answer`'s contract summary.
     def _compat_diff_sum(self, unit_a: str, unit_b: str) -> bool:
         return canonical_unit(unit_a) == canonical_unit(unit_b)
@@ -601,10 +602,33 @@ class LedgerToolkit:
                         numbers_out.append(record)
                         continue
 
+                anchored = self._find_unit_anchored_page_match(item)
+                if anchored is not None:
+                    page_id, start, end = anchored
+                    page = self._graph.page(page_id)
+                    quote = _quote_for_span(str((page or {}).get("text") or ""), start, end)
+                    node = self._graph.add_source(page_id, str(item.get("text") or ""),
+                                                  quote=quote, unit=item.get("unit") or None,
+                                                  minted_by=ANSWER_AUDIT_TAG)
+                    if node is not None:
+                        record.update(status="backed", unit_consistent=True,
+                                     page_id=page_id, node_id=node.id)
+                        numbers_out.append(record)
+                        continue
+
                 explanations = self._find_derivation_explanations(target)
                 if explanations:
-                    record["ambiguity"] = len({(exp["operation"], frozenset((exp["i"], exp["j"])))
-                                               for exp in explanations})
+                    # Ambiguity counts distinct (operation, unordered VALUE pair) explanations,
+                    # per the API contract -- never entry positions. A model that visits the same
+                    # page 15 times re-registers the same quantities 15 times, and counting index
+                    # positions inflated one real explanation to ambiguity 72 on the mint01
+                    # smoke, disqualifying the very answer the search had correctly explained.
+                    record["ambiguity"] = len({
+                        (exp["operation"],
+                         frozenset((self._entry_numeric(self._entries[idx][1]),
+                                    canonical_unit(self._entries[idx][1].unit))
+                                   for idx in (exp["i"], exp["j"])))
+                        for exp in explanations})
                     best = self._best_explanation(explanations)
                     first_idx, second_idx = best["order"]
                     page_a, entry_a = self._entries[first_idx]

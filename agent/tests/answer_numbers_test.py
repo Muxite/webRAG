@@ -166,3 +166,20 @@ class TestOperationAppropriateness:
         result = operation_appropriateness(
             "What is the height difference?", "sum", 30.0, "")
         assert result["operation_shape_match"] is None
+
+
+class TestGluedPrefixGuard:
+    """"GRES-2" is a NAME; extracting -2.0 from it poisoned the smoke cell's predicate
+    (an unbackable non-trivial number in every deliverable that mentions the station)."""
+
+    def test_hyphenated_name_suffix_is_not_a_negative_number(self):
+        values = [n["value"] for n in extract_answer_numbers("GRES-2 Power Station is tall")]
+        assert values == []
+
+    def test_superscript_unit_digit_is_not_extracted(self):
+        values = [n["value"] for n in extract_answer_numbers("area 8,372 km2 and population")]
+        assert values == [8372.0]
+
+    def test_real_negative_numbers_survive(self):
+        values = [n["value"] for n in extract_answer_numbers("delta = -30.55 km exactly")]
+        assert values == [-30.55]

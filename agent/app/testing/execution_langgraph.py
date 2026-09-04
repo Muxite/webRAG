@@ -201,6 +201,13 @@ async def run_offtheshelf_execution(
     evidence_graph = solver_result.get("evidence_graph")
     if evidence_graph is not None:
         output["evidence_graph"] = evidence_graph
+    # Same present-only-when-bound contract as evidence_graph. Without this passthrough the
+    # solver's finish-time audit ran, minted into the artifact above, and then its summary was
+    # silently dropped here -- the mint01 smoke's langgraph cell had minted nodes but no
+    # answer_audit key.
+    answer_audit = solver_result.get("answer_audit")
+    if answer_audit is not None:
+        output["answer_audit"] = answer_audit
     telemetry.finish(success=output["success"])
     tracer.close()
 

@@ -586,3 +586,55 @@ def test_op_appropriateness_excludes_answer_audits_own_derived_nodes(blank_kit):
     assert derived_ids
     reported_ids = {e["node_id"] for e in result["op_appropriateness"]}
     assert derived_ids.isdisjoint(reported_ids)
+
+
+class TestAuditAnswerSmokeRegressions:
+    """Both regressions came off the FIRST real mint01 smoke cell (task 210, llama3.2:3b)."""
+
+    _PAGE_A = "The GRES-2 Power Station chimney stands 419.7 metres (1,377 ft) tall."
+    _PAGE_B = "Height\n381\nm\nThe Inco Superstack is a chimney in Sudbury."
+
+    def test_computed_difference_across_mixed_unit_spellings_is_derived(self):
+        """`metres` on one page, `m` on the other: the derivation search finds the pair, and
+        `add_arith` must accept it -- the smoke showed it refusing on pure spelling, leaving the
+        answer's own computed number permanently unbacked."""
+        kit = LedgerToolkit()
+        kit.register_page("http://a", self._PAGE_A)
+        kit.register_page("http://b", self._PAGE_B)
+        result = kit.audit_answer("The difference is 38.7 metres (419.7 metres - 381 m).")
+        by_value = {record["value"]: record for record in result["numbers"]}
+        assert by_value[38.7]["status"] == "derived"
+        assert by_value[38.7]["op"] == "difference"
+        assert by_value[38.7]["ambiguity"] == 1
+        assert result["answer_supported"] is True
+
+    def test_ambiguity_ignores_duplicate_page_registrations(self):
+        """A model that re-visits the same pages re-registers the same quantities; index
+        positions multiply while the VALUE-pair explanation stays one. The smoke counted 72."""
+        kit = LedgerToolkit()
+        for _ in range(15):
+            kit.register_page("http://a", self._PAGE_A)
+            kit.register_page("http://b", self._PAGE_B)
+        result = kit.audit_answer("The difference is 38.7 metres.")
+        record = next(r for r in result["numbers"] if r["value"] == 38.7)
+        assert record["status"] == "derived"
+        assert record["ambiguity"] == 1
+
+    def test_parenthetical_conversion_is_backed_via_unit_anchored_fallback(self):
+        """The page's own `(1,377\nft)` conversion is not in the quantity index; an answer
+        restating it must still back, anchored by its OWN stated unit."""
+        kit = LedgerToolkit()
+        kit.register_page("http://a", self._PAGE_A.replace("(1,377 ft)", "(1,377\nft)"))
+        result = kit.audit_answer("The chimney is 419.7 metres (1,377 ft) tall.")
+        record = next(r for r in result["numbers"] if r["value"] == 1377.0)
+        assert record["status"] == "backed"
+        assert record["unit_consistent"] is True
+
+    def test_unitless_answer_number_gets_no_page_scan(self):
+        """A number with NO stated unit must never fall through to a page scan -- that path is
+        unit-blind by construction and was the panel's blocking objection."""
+        kit = LedgerToolkit()
+        kit.register_page("http://a", "the code 7391 appears here")
+        result = kit.audit_answer("the answer is 7391")
+        record = next(r for r in result["numbers"] if r["value"] == 7391.0)
+        assert record["status"] == "unbacked"

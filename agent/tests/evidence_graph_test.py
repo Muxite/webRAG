@@ -1574,3 +1574,32 @@ class TestMintedBy:
         rebuilt = EvidenceGraph.from_dict(artifact)
         for node in rebuilt.nodes():
             assert node.minted_by == "answer_audit"
+
+
+class TestArithUnitSpelling:
+    """`_dimension_of` compares canonical spellings, not raw unit strings.
+
+    A mechanically minted `419.7 metres` node refused to combine with a `381 m` node on the
+    mint01 smoke (`UnitMismatch: ['m', 'metres']`) -- pure typography, the exact over-refusal
+    `_locate`'s split-form path was built to avoid. `m` vs `ft` must still refuse: different
+    dimensions, and no conversion is ever applied.
+    """
+
+    def test_metres_and_m_combine(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "http://a", "height 419.7 metres here")
+        graph.add_page("p2", "http://b", "height 381 m here")
+        a = graph.add_source("p1", "419.7", unit="metres")
+        b = graph.add_source("p2", "381", unit="m")
+        node = graph.add_arith("difference", [a.id, b.id])
+        assert node.derivation_valid is True
+        assert float(node.value) == pytest.approx(38.7)
+
+    def test_m_and_ft_still_refuse(self):
+        graph = EvidenceGraph()
+        graph.add_page("p1", "http://a", "height 419.7 m here")
+        graph.add_page("p2", "http://b", "height 381 ft here")
+        a = graph.add_source("p1", "419.7", unit="m")
+        b = graph.add_source("p2", "381", unit="ft")
+        with pytest.raises(eg.UnitMismatch):
+            graph.add_arith("difference", [a.id, b.id])

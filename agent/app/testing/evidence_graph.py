@@ -504,6 +504,34 @@ _NUMBER_UNIT_SPLIT = re.compile(
     rf"^(?P<number>{_NUMBER_PATTERN})\s*(?P<unit>[^\W\d_][\w%°/^·.\-\s]*)$")
 
 
+#: Spelling variants collapsed to one canonical token BEFORE any dimension comparison. This is
+#: orthography, never conversion: no magnitude is ever touched, so the "no unit or currency
+#: conversion, ever" non-goal stands untouched. Lives here (not ledger_tools) because
+#: `_dimension_of`'s arithmetic unit check must see `metres` and `m` as one dimension -- a
+#: mechanically-minted `419.7 metres` node refusing to combine with a `381 m` node was observed
+#: on the mint01 smoke and is over-refusal, not caution.
+_UNIT_CANONICAL = {
+    "metre": "m", "metres": "m", "meter": "m", "meters": "m",
+    "kilometre": "km", "kilometres": "km", "kilometer": "km", "kilometers": "km",
+    "feet": "ft", "foot": "ft", "mile": "mi", "miles": "mi",
+    "inch": "in", "inches": "in", "tonne": "t", "tonnes": "t",
+    "second": "s", "seconds": "s", "sec": "s", "secs": "s",
+    "minute": "min", "minutes": "min", "hour": "h", "hours": "h", "hr": "h", "hrs": "h",
+    "km\u00b2": "km2", "m\u00b2": "m2", "cm\u00b2": "cm2", "ft\u00b2": "ft2", "mi\u00b2": "mi2",
+    "km\u00b3": "km3", "m\u00b3": "m3", "percent": "%", "pct": "%",
+}
+
+
+def canonical_unit(unit: Any) -> str:
+    """One spelling per unit, lowercased, so `metres` and `m` compare equal.
+
+    SPELLING only. Nothing here rescales a magnitude, so this is not the unit conversion the
+    project forbids -- it is the difference between comparing dimensions and comparing typography.
+    """
+    token = str(unit or "").strip().lower().replace("\n", "")
+    return _UNIT_CANONICAL.get(token, token)
+
+
 def extract_unit(value: Any) -> str:
     """The unit suffix of a number-with-unit value (``"330 m"`` -> ``"m"``).
 
@@ -1649,7 +1677,7 @@ class EvidenceGraph:
         unit = parsed.unit if parsed.ok else ""
         if not unit and node.unit and normalize_for_match(node.unit) not in _SCALE_WORDS:
             unit = node.unit
-        return (currency, normalize_for_match(_unit_leading_token(unit)))
+        return (currency, canonical_unit(normalize_for_match(_unit_leading_token(unit))))
 
     def _arith_detail(self, inputs_ok: bool, invalid_ids: List[str],
                       disagreement: str = "") -> Tuple[bool, str]:

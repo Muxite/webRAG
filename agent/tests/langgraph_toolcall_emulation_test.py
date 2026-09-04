@@ -673,3 +673,22 @@ def test_emulation_max_tool_errors_is_actually_wired_through(monkeypatch):
     # Gave up after the FIRST tool-dispatch failure instead of tolerating the usual 3.
     assert len(llm.prompts) == 1
     assert any("oops" in str(getattr(m, "content", "")) for m in state.messages)
+
+
+def test_answer_audit_summary_passes_through_to_output(monkeypatch):
+    """`run_offtheshelf_execution` copies named keys off the solver result; a key it does not
+    know is silently dropped. That is how the mint01 smoke produced a langgraph cell whose
+    evidence graph HELD answer_audit-minted nodes while the summary that explains them was
+    missing -- the solver ran the audit, and this layer threw the result away."""
+    audit = {"numbers_total": 1, "answer_supported": True, "numbers": []}
+    result, _captured = _run_offtheshelf(monkeypatch, {
+        "final_deliverable": "a", "success": True, "observability": {},
+        "answer_audit": audit,
+    })
+    assert result["output"]["answer_audit"] == audit
+
+
+def test_answer_audit_key_is_absent_not_empty_when_the_solver_reported_none(monkeypatch):
+    result, _captured = _run_offtheshelf(monkeypatch, {
+        "final_deliverable": "a", "success": True, "observability": {}})
+    assert "answer_audit" not in result["output"]

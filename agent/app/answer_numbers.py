@@ -52,9 +52,14 @@ from agent.app.testing.evidence_graph import extract_unit as _split_trailing_uni
 #: it"). Order matters: thousands-grouped first, then a bare decimal, then a bare integer, so
 #: ``"1,642.5"`` is read as ONE token rather than fragmenting on the comma.
 _NUM_RE = re.compile(
-    r"-?\d{1,3}(?:,\d{3})+(?:\.\d+)?"  # 1,642 / 1,642.5
-    r"|-?\d+\.\d+"                     # 419.7
-    r"|-?\d+"                          # 381
+    # The guard rejects a match glued to a preceding letter, digit, dot or hyphen: "GRES-2" (a
+    # station NAME) yielded a spurious -2.0 on the mint01 smoke, and "km2" superscripts leaked a
+    # bare 2. This deliberately DIVERGES from scripts/ledger_risk_coverage.py's _NUM_RE, which
+    # is prereg-frozen for clause 5 and must not change mid-corpus.
+    r"(?<![A-Za-z\d.-])"
+    r"(?:-?\d{1,3}(?:,\d{3})+(?:\.\d+)?"  # 1,642 / 1,642.5
+    r"|-?\d+\.\d+"                       # 419.7
+    r"|-?\d+)"                            # 381
 )
 
 #: Same URL grammar as ``scripts/ledger_risk_coverage.py``'s ``_URL_RE`` -- a citation URL
