@@ -312,7 +312,7 @@ async def test_run_sequential_execution_threads_the_retry_flag_from_settings(mon
     captured = {}
 
     async def _fake_run_react(agent_io, mandate, model_name, max_steps, max_tokens, retry=None,
-                              context_cap=None):
+                              context_cap=None, **_kwargs):
         captured["retry"] = retry
         captured["context_cap"] = context_cap
         return "answer"
@@ -341,7 +341,7 @@ async def test_run_sequential_execution_threads_the_context_cap_from_settings(mo
     captured = {}
 
     async def _fake_run_react(agent_io, mandate, model_name, max_steps, max_tokens, retry=None,
-                              context_cap=None):
+                              context_cap=None, **_kwargs):
         captured["context_cap"] = context_cap
         return "answer"
 

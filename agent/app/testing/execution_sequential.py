@@ -17,7 +17,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Dict, Any, List, NamedTuple, Optional
+from typing import Dict, Any, List, NamedTuple, Optional, Tuple
 
 from agent.app.ledger_tools import LedgerToolkit
 from agent.app.connector_llm import ConnectorLLM
@@ -33,7 +33,7 @@ from agent.app.trace_recorder import (
     traces_retained,
 )
 from agent.app.idea_policies.action_constants import is_transient_tool_error
-from agent.app.idea_policies.config import ActionConfig, ExpansionConfig, RunPolicy
+from agent.app.idea_policies.config import ActionConfig, ExpansionConfig, FinalConfig, RunPolicy
 from agent.app.testing.test_module import IdeaTestModule
 from agent.app.testing.utils import summarize_observability
 from agent.app.sandbox_tool_surface import PARITY_ACTIONS, run_sandbox_action, sandbox_menu
@@ -155,6 +155,121 @@ class ToolRetry(NamedTuple):
             max_attempts=max(0, int(cfg.connector_retry_max_attempts)),
             backoff_seconds=max(0.0, float(cfg.connector_retry_backoff_seconds)),
         )
+
+
+#: W2 §1-2: structural finish gate -- refuse a `finish(answer)` whose committed answer carries a
+#: number the evidence ledger cannot back, up to `max_retries` corrective retries, then abstain.
+#: Opt-in (`final_require_derivation_for_numeric`, default OFF) and only ever active while a
+#: ledger module is bound (see `_run_react`'s call sites below) -- a run with no ledger has
+#: nothing to check backing against, so the gate is inert there regardless of this flag.
+class FinishGate(NamedTuple):
+    enabled: bool = False
+    max_retries: int = 2
+
+    @classmethod
+    def from_settings(cls, settings: Optional[Dict[str, Any]]) -> "FinishGate":
+        cfg = FinalConfig.from_settings(settings or {})
+        return cls(enabled=bool(cfg.require_derivation_for_numeric))
+
+
+#: Matches a URL for stripping before number extraction -- a citation like
+#: ".../wiki/Article_2024" must never contribute a spurious "unbacked" digit.
+_URL_TOKEN_RE = re.compile(r"https?://\S+")
+
+#: Numeric tokens, thousands-separator aware. The comma-grouped alternative is tried FIRST so a
+#: value like "1,642" is captured as one token rather than "1" (the plain-integer alternative
+#: would otherwise claim it first, since "," is not \d and stops a bare \d+ match right there).
+_NUMBER_TOKEN_RE = re.compile(r"-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?")
+
+#: Relative tolerance for "this answer number matches this ledger value" (W2 §1-2 spec).
+_GATE_RELATIVE_TOLERANCE = 0.005
+
+_GATE_CORRECTIVE_OBSERVATION = (
+    "Your answer contains a number not backed by the evidence ledger. Call derive (or cite a "
+    "registered page value) before finishing."
+)
+
+#: Prefixed onto the answer when the gate abstains (retries exhausted, or the budget forced
+#: termination before a retry could run) -- mirrors `idea_finalize._UNGROUNDED_BANNER`'s
+#: convention of keeping the model's own text visible rather than replacing it.
+_GATE_ABSTENTION_BANNER = (
+    "[ABSTAINED -- one or more numbers in this answer could not be verified against the "
+    "evidence ledger.] "
+)
+
+
+def _extract_number_tokens(text: str) -> List[Tuple[str, float]]:
+    """Every numeric token in ``text`` as ``(raw_token, parsed_float)``, in order.
+
+    Not a general free-text scan when called on a finish answer -- the caller strips URLs first
+    (:data:`_URL_TOKEN_RE`) so a citation's digits never count as a committed answer number.
+    """
+    out: List[Tuple[str, float]] = []
+    for match in _NUMBER_TOKEN_RE.finditer(text or ""):
+        raw = match.group(0)
+        try:
+            out.append((raw, float(raw.replace(",", ""))))
+        except ValueError:
+            continue
+    return out
+
+
+def _numbers_within_tolerance(a: float, b: float, rel: float = _GATE_RELATIVE_TOLERANCE) -> bool:
+    if a == b:
+        return True
+    denom = max(abs(a), abs(b))
+    if denom == 0:
+        return True
+    return abs(a - b) / denom <= rel
+
+
+def _finish_gate_predicate(
+    answer: str, ledger_kit: Optional[LedgerToolkit], derive_attempts: int,
+) -> Tuple[bool, List[str]]:
+    """Whether the gate refuses ``answer``, and which of its numbers are unbacked.
+
+    Pure predicate -- the caller (:func:`_run_react`) is responsible for fail-open behavior on
+    any internal exception, exactly like :func:`agent.app.idea_finalize.grounding_gate_would_refuse`.
+
+    :param answer: the model's committed ``finish(answer)`` argument (already the narrow
+        "argument the model passes to finish", never the whole transcript -- W2 §1 refinement 1).
+    :param ledger_kit: the run's bound ledger, or ``None`` when the module isn't active.
+    :param derive_attempts: how many ``derive`` calls this run has made (successful or refused) --
+        used only to decide whether there is a ledger to check against at all.
+    :returns: ``(refuse, unbacked_tokens)``. ``unbacked_tokens`` is empty both when the answer
+        passes AND when it is refused for having zero extractable numbers (there is nothing to
+        NAME as unbacked in that case -- the whole answer is the problem).
+    """
+    stripped = _URL_TOKEN_RE.sub(" ", answer or "")
+    answer_numbers = _extract_number_tokens(stripped)
+    if not answer_numbers:
+        # W2 §1 refinement 2: zero extractable numbers in a numeric-task answer is itself the
+        # near-perfect wrongness signal the pre-check found (113/113 stored cells scored <0.5) --
+        # never fall through to "pass" for lack of anything to check.
+        return True, []
+
+    nodes = []
+    if ledger_kit is not None:
+        try:
+            nodes = ledger_kit.artifact().get("nodes") or []
+        except Exception:  # noqa: BLE001 -- caller's fail-open wraps this too, but be defensive
+            nodes = []
+    has_ledger_context = ledger_kit is not None and (bool(nodes) or derive_attempts > 0)
+    if not has_ledger_context:
+        # W2 §1 refinement 4 preamble: nothing to check backing against -> don't fire on
+        # backed-number grounds. (The zero-number case above is handled before this point.)
+        return False, []
+
+    node_values: List[float] = []
+    for node in nodes:
+        for _, value in _extract_number_tokens(str(node.get("value", ""))):
+            node_values.append(value)
+
+    unbacked = [
+        raw for raw, value in answer_numbers
+        if not any(_numbers_within_tolerance(value, nv) for nv in node_values)
+    ]
+    return bool(unbacked), unbacked
 
 
 #: Scratchpad window this arm has always shown the model (most recent N steps).
@@ -333,10 +448,23 @@ async def _verify_claim(agent_io: AgentIO, claim: str, evidence: str, model_name
 async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps: int,
                      max_tokens: int, retry: Optional[ToolRetry] = None,
                      context_cap: Optional[SequentialContextCap] = None,
-                     ledger_kit: Optional[LedgerToolkit] = None) -> str:
+                     ledger_kit: Optional[LedgerToolkit] = None,
+                     finish_gate: Optional[FinishGate] = None,
+                     gate_telemetry: Optional[Dict[str, Any]] = None) -> str:
+    """
+    :param finish_gate: W2 §1-2 structural finish gate. ``None`` or disabled -> the ``finish``
+        branch below is byte-identical to before the gate existed.
+    :param gate_telemetry: mutated in place with the gate's per-run counters, when supplied --
+        keys ``evaluations``/``refusals``/``retries_used``/``final_state``/``unbacked_numbers``
+        (see ``run_sequential_execution``, which is the only real caller). Never read, only
+        written -- a caller that omits it (every existing test) gets no extra behavior.
+    """
     retry = retry or ToolRetry()  # default: retry OFF -> unchanged behavior
     context_cap = context_cap or SequentialContextCap()  # default: uncapped -> unchanged prompt
     has_derive = ledger_kit is not None  # default: no bound module -> unchanged prompt/dispatch
+    finish_gate = finish_gate or FinishGate()  # default: gate OFF -> unchanged finish behavior
+    gate_retries_used = 0
+    derive_attempts = 0
     page_chars = int(os.environ.get("IDEA_TEST_SEQ_PAGE_CHARS", "6000"))
     search_k = int(os.environ.get("IDEA_TEST_SEQ_SEARCH_K", "6"))
     dedup_search = os.environ.get("IDEA_TEST_SEQ_DEDUP_SEARCH", "1") not in ("0", "false", "False")
@@ -380,21 +508,58 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
         thought = str(decision.get("thought", ""))[:300]
 
         if action == "finish" or step == max_steps - 1:
+            is_forced_termination = step == max_steps - 1
             last_answer = str(args.get("answer", "")) or last_answer
-            if last_answer:
+            if not last_answer:
+                # forced final synthesis if the model never produced an answer
+                messages = [
+                    {"role": "system", "content": (
+                        "Synthesize the FINAL answer using ONLY the gathered evidence. Address every part "
+                        "the task asks for; for each fact quote the exact value from the page and cite the "
+                        "source URL it came from. Do not add facts that are not in the evidence — if a "
+                        "required fact is missing, say so explicitly rather than guessing."
+                    )},
+                    {"role": "user", "content": f"TASK:\n{mandate}\n\nEVIDENCE:\n{chr(10).join(evidence)[:12000] or '(none)'}"},
+                ]
+                payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.3, max_tokens=max_tokens)
+                last_answer = (await agent_io.query_llm(payload, model_name=model_name)) or ""
+
+            if not last_answer or not finish_gate.enabled:
                 return last_answer
-            # forced final synthesis if the model never produced an answer
-            messages = [
-                {"role": "system", "content": (
-                    "Synthesize the FINAL answer using ONLY the gathered evidence. Address every part "
-                    "the task asks for; for each fact quote the exact value from the page and cite the "
-                    "source URL it came from. Do not add facts that are not in the evidence — if a "
-                    "required fact is missing, say so explicitly rather than guessing."
-                )},
-                {"role": "user", "content": f"TASK:\n{mandate}\n\nEVIDENCE:\n{chr(10).join(evidence)[:12000] or '(none)'}"},
-            ]
-            payload = agent_io.build_llm_payload(messages=messages, json_mode=False, model_name=model_name, temperature=0.3, max_tokens=max_tokens)
-            return (await agent_io.query_llm(payload, model_name=model_name)) or ""
+
+            try:
+                refuse, unbacked = _finish_gate_predicate(last_answer, ledger_kit, derive_attempts)
+            except Exception as exc:  # noqa: BLE001 -- the gate must never crash the run
+                _logger.warning(f"[FINISH-GATE] check failed, failing open: {exc}")
+                refuse, unbacked = False, []
+
+            if gate_telemetry is not None:
+                gate_telemetry["evaluations"] = gate_telemetry.get("evaluations", 0) + 1
+
+            if not refuse:
+                if gate_telemetry is not None:
+                    gate_telemetry["final_state"] = "passed"
+                return last_answer
+
+            if gate_telemetry is not None:
+                gate_telemetry["refusals"] = gate_telemetry.get("refusals", 0) + 1
+                if unbacked:
+                    gate_telemetry["unbacked_numbers"] = unbacked
+
+            if not is_forced_termination and gate_retries_used < finish_gate.max_retries:
+                gate_retries_used += 1
+                if gate_telemetry is not None:
+                    gate_telemetry["retries_used"] = gate_retries_used
+                scratchpad.append(
+                    f"STEP {step+1}: thought={thought}\n"
+                    f"action=finish args={json.dumps(args)[:200]}\n"
+                    f"observation={_GATE_CORRECTIVE_OBSERVATION}"
+                )
+                continue
+
+            if gate_telemetry is not None:
+                gate_telemetry["final_state"] = "forced_by_budget" if is_forced_termination else "abstained"
+            return _GATE_ABSTENTION_BANNER + last_answer
 
         if action == "search":
             query = str(args.get("query", ""))
@@ -442,6 +607,7 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
             verdict = await _verify_claim(agent_io, claim, "\n\n".join(evidence), model_name)
             obs = f"VERIFY '{claim[:80]}': {verdict}"
         elif action == "derive" and ledger_kit is not None:
+            derive_attempts += 1
             operation = str(args.get("operation", ""))
             operands = args.get("operands")
             if not isinstance(operands, list):
@@ -522,7 +688,17 @@ async def run_sequential_execution(
     # behavior is unchanged byte-for-byte -- it is the BASELINE half of the host-vs-host+module
     # comparison and must stay inert with no module bound.
     ledger_kit = LedgerToolkit() if _ledger_derive_enabled() else None
-    react_kwargs: Dict[str, Any] = {"retry": retry, "context_cap": context_cap}
+    # W2 §1-2: structural finish gate, opt-in via `final_require_derivation_for_numeric`
+    # (default OFF -> `FinishGate(enabled=False)`, byte-identical to before it existed).
+    finish_gate = FinishGate.from_settings(idea_settings)
+    gate_telemetry: Dict[str, Any] = {
+        "evaluations": 0, "refusals": 0, "retries_used": 0,
+        "final_state": "not_evaluated", "unbacked_numbers": [],
+    }
+    react_kwargs: Dict[str, Any] = {
+        "retry": retry, "context_cap": context_cap,
+        "finish_gate": finish_gate, "gate_telemetry": gate_telemetry,
+    }
     if ledger_kit is not None:
         react_kwargs["ledger_kit"] = ledger_kit
     started = time.perf_counter()
@@ -545,6 +721,20 @@ async def run_sequential_execution(
         # this host's artifact unchanged. Absent (not an empty dict) when the module is off, so a
         # fabricated-arithmetic rate over a module-off cell reads UNKNOWN, never 0.0.
         output["evidence_graph"] = ledger_kit.artifact()
+    if finish_gate.enabled:
+        # W2 §1-2 telemetry: absent entirely when the gate is off (byte-identical output for
+        # every arm that hasn't opted in), present unconditionally whenever it has -- even a
+        # cell where the gate never actually fired still reports "not_evaluated" rather than
+        # silently omitting the keys, so a later audit can tell "gate off" from "gate on but
+        # the run never reached a finish/forced-termination step" apart.
+        output["gate_evaluations"] = gate_telemetry["evaluations"]
+        output["gate_refusals"] = gate_telemetry["refusals"]
+        output["gate_final_state"] = gate_telemetry["final_state"]
+        output["gate_unbacked_numbers"] = gate_telemetry["unbacked_numbers"]
+        output["gate_retries_used"] = gate_telemetry["retries_used"]
+        if gate_telemetry["final_state"] in ("abstained", "forced_by_budget"):
+            output["finish_gate"] = "refused-unbacked"
+            output["finish_gate_reason"] = "unbacked_numeric_answer"
     telemetry.finish(success=output["success"])
     tracer.close()
 

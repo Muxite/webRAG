@@ -257,6 +257,20 @@ def test_final_reconcile_chain_flags_default_off():
     assert list(on.final_recompute_shapes) == ["count", "argmax"]
 
 
+def test_require_derivation_for_numeric_defaults_off_and_maps_its_settings_key():
+    # W2 §1-2: sequential_react's structural finish gate. Default OFF from an empty load AND
+    # from the shipped JSON (no benchmark arm default changes), coerces from the mapped
+    # ``final_require_derivation_for_numeric`` settings key exactly like ``require_grounding``
+    # maps to ``final_require_grounding``.
+    from agent.app.idea_policies.config import FinalConfig
+    assert FinalConfig.from_settings({}).require_derivation_for_numeric is False
+    assert FinalConfig.from_settings(
+        load_idea_dag_settings()
+    ).require_derivation_for_numeric is False
+    on = FinalConfig.from_settings({"final_require_derivation_for_numeric": 1})
+    assert on.require_derivation_for_numeric is True
+
+
 def test_plan_library_flags_default_off_and_carry_no_threshold():
     # Retrieval-augmented planning: both switches OFF from an empty load and from the shipped
     # JSON, so the expansion path stays byte-identical until an operator arms them.

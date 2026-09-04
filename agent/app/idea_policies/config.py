@@ -422,6 +422,16 @@ class FinalConfig:
     # A/B before flipping the default, since some currently-passing runs could newly fail if
     # subject-token extraction is noisy on certain task phrasings.
     require_grounding_page_identity: bool = False
+    # W2 §1-2: structural finish gate for the ``sequential_react`` host (opt-in, default OFF).
+    # An offline precision pre-check (docs/analysis/GATE_PRECISION_PRECHECK_2026-09-04.md) found
+    # "refuse a finish() whose committed answer number isn't backed by the evidence ledger" is not
+    # inverted (1.4-2.7x precision lift over base wrong-rate) but must be scoped to the number(s)
+    # the model actually commits to as its answer, not every digit in free text, or it false-fires
+    # on correct answers that merely restate a source page's own parenthetical unit conversion.
+    # When on, ``execution_sequential.py`` refuses an unbacked numeric ``finish(answer)`` (<=2
+    # retries, then a deterministic abstention banner) -- this host reads the flag; nothing else
+    # does, and it is a no-op wherever the run has no bound ledger to check against.
+    require_derivation_for_numeric: bool = False
     # DAG v3 plan §4A: the final-answer contract. The grounding gate above only covers a run
     # with ZERO opened pages; a run that opened one and then wrote "insufficient evidence to
     # determine X" *and* "X is 511" in the same deliverable passes every existing check. When
@@ -519,6 +529,7 @@ class FinalConfig:
         "allow_partial_success": "final_allow_partial_success",
         "require_grounding": "final_require_grounding",
         "require_grounding_page_identity": "final_require_grounding_page_identity",
+        "require_derivation_for_numeric": "final_require_derivation_for_numeric",
         "answer_contract_enabled": "final_answer_contract_enabled",
         "answer_slot_enabled": "final_answer_slot_enabled",
         "citation_echo_enforcement_enabled": "final_citation_echo_enforcement_enabled",
