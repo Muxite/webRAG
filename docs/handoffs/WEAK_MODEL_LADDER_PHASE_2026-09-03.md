@@ -170,6 +170,55 @@ Consequence for reading the ladder: a low fabrication rate is NOT evidence of co
 and must always be read beside the accuracy guard. n=1, so this is a demonstrated mechanism gap,
 not a rate — but one clean example is enough to show the gap exists.
 
+### First real ladder result: adoption is a CLIFF, not a gradient
+
+`langgraph_react`, module off vs `+derive`, dev split (holdout excluded), 9 tasks per model:
+
+| model | adoption | derived values | invalid | fabrication rate |
+|---|---|---|---|---|
+| qwen2.5:0.5b | 0/9 | 0 | 0 | UNKNOWN |
+| qwen2.5:1.5b | 0/9 | 0 | 0 | UNKNOWN |
+| gemma2:2b | 1/9 | 1 | 0 | 0.000 |
+| llama3.2:3b | 0/9 | 0 | 0 | UNKNOWN |
+| phi3:mini | 0/7 | 0 | 0 | UNKNOWN |
+| **qwen2.5:7b** | **9/9** | **11** | 0 | 0.000 |
+
+Everything below 7b essentially never calls the tool; 7b calls it in every cell. That is a step,
+not a slope, and it is the central problem for "structure makes weak models trustworthy": **the
+module cannot help a model that will not invoke it, and the models that need it most invoke it
+least.** It is the strongest case yet for the structural finish policy — a finish that refuses a
+computed number unless it came from `derive` — because that converts adoption from a model choice
+into a property of the host.
+
+### A fabrication rate of 0.000 that means much less than it looks
+
+All 11 of 7b's derivations are `valid=True`, so the headline KPI reads a perfect 0.000. Reading
+them beside the accuracy guard shows two populations:
+
+- Tasks **210, 211, 212, 214** — one derivation each, semantically right (`difference = 38.7
+  metres` IS task 210's answer; `sum = 3112 m` IS task 211's), cells score **1.0**.
+- Tasks **215, 219, 220** — **two or three** derivations per cell, every one arithmetically valid,
+  units like `billion/million` and `ft/ft`, cells score **0.2-0.24**.
+
+So 5 of 11 "verified" derivations sit in cells that scored ~0.2. Combined with the gemma case
+(§ above, `381 - 25 million = 356 m`, valid=True), the rule is: **`derivation_valid` is a
+statement about the arithmetic, never about whether the operands were the right ones.** Multiple
+valid derivations in one cell looks like a model casting about, not a model working.
+
+### The score guard shows no resolvable effect — and must not be reported as a mean
+
+qwen2.5:7b, off -> `+derive`, per task: `210 0.00, 211 0.00, 212 +0.25, 214 0.00, 215 -0.50,
+216 -0.40, 218 +0.48, 219 0.00, 220 -0.72`.
+
+**5 of 9 moved; magnitudes [0.25, 0.40, 0.48, 0.50, 0.72], both directions.** The bare mean
+(-0.099) is an average of two large gains and three large losses — exactly the bimodal
+distribution `LEDGER_METHODOLOGY.md:132` says must never be reduced to a ranking, at exactly the
+documented ~0.6 swing size. **No accuracy claim, in either direction, is available here.**
+
+Note also that tasks 216 and 218 moved by -0.40 and +0.48 while using the module ZERO times —
+prompt perturbation alone, reproducing the module experiment's earlier finding that used and
+unused cells move alike.
+
 ---
 
 ## 5. EXTRA THINGS TO LOOK FOR — open and unverified
