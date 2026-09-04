@@ -457,7 +457,12 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
     host = raw.get("execution_variant", "?")
     run_config = raw.get("run_config") or {}
     campaign = run_config.get("IDEA_TEST_RUN_ID", "?")
-    arm = "derive" if str(run_config.get("LEDGER_HOST_MODULES", "")).strip() == "derive" else "off"
+    # Token membership, not string equality: mint01 runs LEDGER_HOST_MODULES=derive,answer_audit
+    # and exact comparison silently classified every one of its 144 derive-ON cells as "off",
+    # emptying the headline stratum. answer_audit alone does NOT make a cell derive-ON.
+    host_modules = {tok.strip() for tok in
+                    str(run_config.get("LEDGER_HOST_MODULES", "")).split(",") if tok.strip()}
+    arm = "derive" if "derive" in host_modules else "off"
     infra_failed = bool(raw.get("infra_failed"))
     score = ((raw.get("validation") or {}).get("overall_score"))
     output = ((raw.get("execution") or {}).get("output")) or {}

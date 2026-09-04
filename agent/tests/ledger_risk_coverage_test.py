@@ -682,3 +682,20 @@ class TestAnswerAuditSweep:
         rows = {r["predicate"]: r for r in lrc.answer_audit_sweep(cells)}
         # "backed_only" is strictly stricter than "backed_or_derived" for a status=="derived" cell
         assert rows["backed_only"]["coverage"] <= rows["backed_or_derived"]["coverage"]
+
+
+def test_derive_arm_detection_is_token_membership_not_string_equality():
+    """mint01 sets LEDGER_HOST_MODULES=derive,answer_audit; exact-string comparison classified
+    all 144 of its derive-ON cells as "off" and emptied the headline stratum."""
+    from scripts.ledger_risk_coverage import classify_cell
+    from pathlib import Path
+    base = {
+        "execution": {"output": {"final_deliverable": "x is 5"}},
+        "validation": {"score": 1.0},
+        "test_metadata": {"test_id": "210"},
+    }
+    for modules, expected in (("derive,answer_audit", "derive"), ("derive", "derive"),
+                              ("answer_audit", "off"), ("", "off")):
+        raw = dict(base, run_config={"LEDGER_HOST_MODULES": modules})
+        cell = classify_cell(Path("fake_210_m_sequential_react_r1.json"), raw)
+        assert cell["arm"] == expected, (modules, cell["arm"])
