@@ -296,3 +296,105 @@ aren't). Before wiring this into an actual retry/abstain loop:
 
 This is a "worth building, but not as literally specified" result, which is
 itself the useful $0 outcome the pre-check was for.
+
+---
+
+## Addendum (2026-09-04, same-day re-run): real `sequential_react` derive corpus
+
+`ladder03`'s sequential+derive sweep finished: 84 `ladder03_*_derive_sq_*` cells
+(7 models x 12 tasks, `test_id` 210-221) now exist under
+`agent/idea_test_results/`, replacing the earlier "not from ladder03 yet"
+caveat. Re-ran the exact same script unmodified
+(`gate_precheck.py`, glob over `agent/idea_test_results/*.json`) — no code
+changes were needed; the script already filters by `test_id` and
+`execution_variant`, so the new files fell straight into the existing
+`sequential_react` stratum. Total analyzable numeric-suite rows grew
+822 -> 956. `langgraph_react` numbers are byte-identical to the original run
+(dev n=40, holdout n=14, precision/lift unchanged) — sanity check that the
+new files only touched the sequential side.
+
+### Real `sequential_react` sample size
+
+The `graph_key_present_with_nodes` stratum (the only one this predicate is
+tested against) is now **n=35** (dev 27, holdout 8) when pooling `ladder03`
+with the earlier ad-hoc `mod_sequential_react_on*`/`mod2_sequential_react_on*`
+cells, or **n=24** (dev 18, holdout 6) on `ladder03` alone — up from the
+original n=11 (all one model, `qwen2.5:7b`). `ladder03`'s with-nodes rows
+span 6 models (`qwen2.5:7b`, `qwen2.5:14b`, `qwen2.5:1.5b`, `llama3.2:3b`,
+`gemma2:2b` all present; `phi3:mini`, `qwen2.5:0.5b`, and `tinyllama` never
+produced a single node — every one of their rows lands in
+`graph_key_present_zero_nodes` instead, consistent with "the derive/ledger
+pathway needs a threshold of model capability to produce anything, not just
+correctness" already noted in the tier-list memory).
+
+### Precision / lift, `sequential_react`, `graph_key_present_with_nodes`
+
+| pool | split | n | wrong@0.5 precision | base | lift | wrong@0.9 precision | base | lift |
+|---|---|---|---|---|---|---|---|---|
+| ladder03 only | dev | 18 | 0.364 (4/11 fires) | 0.278 | **1.31x** | 0.818 (9/11) | 0.611 | **1.34x** |
+| ladder03 only | holdout | 6 | 0.333 (1/3 fires) | 0.333 | **1.00x** | 0.667 (2/3) | 0.667 | **1.00x** |
+| ladder03 + mod/mod2 (all sequential data) | dev | 27 | 0.412 (7/17) | 0.296 | 1.39x | 0.824 (14/17) | 0.667 | 1.24x |
+| ladder03 + mod/mod2 (all sequential data) | holdout | 8 | 0.333 (1/3) | 0.250 | 1.33x | 0.667 (2/3) | 0.500 | 1.33x |
+
+Re-computed pooled **core target population** (`langgraph_react` +
+`sequential_react` combined, the number the original TL;DR's "1.4-2.7x"
+figure was drawn from) with the real sequential data substituted in:
+
+| split | n | wrong@0.5 precision | base | lift | wrong@0.9 precision | base | lift |
+|---|---|---|---|---|---|---|---|
+| dev | 67 | 0.357 | 0.254 | 1.41x | 0.762 | 0.552 | 1.38x |
+| holdout | 22 | 0.444 | 0.227 | 1.96x | 0.889 | 0.455 | 1.96x |
+
+### Inversion checks, `sequential_react` with-nodes stratum (n=35 pooled)
+
+- **Gate fires AND score >= 0.9** (false positive): **4 cells** — 3 from
+  `ladder03` (`llama3_2_3b_derive_sq_214`, `qwen2_5_14b_derive_sq_210`,
+  `qwen2_5_14b_derive_sq_217`, all score 1.0) + 1 from the earlier
+  `mod_sequential_react_on_211` cell. All four fit the already-identified
+  false-positive mechanism (correct grounded answer, extra unbacked digits
+  restated in the free-text explanation) — no new failure mode found.
+- **Gate passes AND score <= 0.2** (false negative / would let a bad
+  answer through with real signal available): **0 cells**, same as before —
+  every "pass but bad" case anywhere in the corpus is still the
+  zero-extractable-numbers fall-through gap, not a precision miss on the
+  backing check itself.
+
+### Verdict: does the earlier conclusion hold?
+
+**Direction: yes, still not inverted.** Every `sequential_react` stratum,
+`ladder03`-only or pooled, dev or holdout, shows precision >= base rate
+(never below) — no roster_gate-style inversion appears on the real,
+7-model corpus. Zero false-negative cases, same as the provisional check.
+
+**Magnitude: partially revised down.** The original "1.4-2.7x" range was
+reported from the pooled `langgraph_react`+`sequential_react` core
+population; substituting the real sequential data barely changes the
+pooled number (dev 1.41x vs 1.45x before, holdout 1.96x vs 2.67x before —
+the 2.67x figure specifically doesn't survive, it was an n=16-holdout
+artifact from a stratum where `sequential_react` contributed only 2
+cells and 0 fires). Looking at `sequential_react` **in isolation** rather
+than pooled with `langgraph_react` (the more honest read, since this is the
+host the gate is actually being proposed for): lift is **weaker and, on
+holdout, flat** — `ladder03`-only holdout lift is exactly 1.00x at both
+thresholds (n=6, 1 TP/2 FP either way), meaning the gate carries **no
+measured differentiation between right and wrong answers on the
+sequential_react holdout set** once real data replaces the n=2 stub. Dev
+lift (1.31-1.39x) is real but modest, consistent with the langgraph_react
+numbers and the original "not dramatic" framing.
+
+**Net judgment**: the qualitative recommendation from the original
+pre-check stands unchanged — do not ship the literal predicate as-is;
+narrow "final-answer numbers" to the model's committed answer, treat
+zero-numbers as auto-refuse, and don't float()-cast `node.value` — and now
+with a real, adequately-sized `sequential_react` sample (n=24-35 vs the
+prior n=11) that recommendation is on firmer footing. But the specific
+"1.4-2.7x lift" number quoted in the original TL;DR should be retired: the
+real sequential_react-only evidence is closer to **1.0-1.4x**, i.e. weaker
+than what was reported, and holdout shows no measured lift at all. This is
+a genuine downward revision, not a re-confirmation, and should be reflected
+if this analysis is cited elsewhere.
+
+Re-run artifacts: raw rows re-dumped to the same
+`gate_precheck_rows.json` path (overwritten in place, scratchpad-only);
+full stdout saved at
+`/tmp/claude-1000/-home-muk-projects-webRAG/4ff2fd66-1b4b-4f4a-9019-17a6138e76d3/scratchpad/gate_precheck_rerun.txt`.
