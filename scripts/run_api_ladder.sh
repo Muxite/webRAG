@@ -12,6 +12,12 @@ BUDGET_STOP="${2:-4.50}"      # hard stop across all paid campaigns, in USD
 # keys.env wraps values in double quotes. ConnectorConfig._clean_secret strips those for SEARCH
 # keys, but _resolve_llm_api_key only .strip()s whitespace — a quoted LLM key reaches the provider
 # verbatim and 401s. Strip here so the campaign env carries a bare key regardless.
+# IDEA_TEST_VALIDATION_MODEL must be a VALID OPENROUTER SLUG, not a local one: LLM_PROVIDER is
+# global, so the runner pre-flights the validation model against OpenRouter too and aborts the
+# whole campaign on "qwen2.5:7b is not a valid model ID". Costing nothing is what makes this safe
+# rather than a paid-grader trap: all 22 numeric tasks return None from
+# get_llm_validation_function(), and validation.llm_validation is null in 144/144 stored ladder
+# cells, so overall_score is deterministic grep either way and stays comparable to the local run.
 KEY=$(grep '^OPENROUTER_API_KEY=' services/keys.env | cut -d= -f2- | tr -d '\r' | sed -e 's/^"//' -e 's/"$//')
 case "$KEY" in sk-or-v1-*) ;; *) echo "!!! key does not look like an OpenRouter key"; exit 1;; esac
 [ -n "$KEY" ] || { echo "!!! no OPENROUTER_API_KEY"; exit 1; }
@@ -33,6 +39,10 @@ print(f"{tot:.4f}")
 PY
 }
 
+# Wait for the LOCAL LADDER DRIVER to exit, not merely for the lock to be free. The local driver
+# releases the lock between its 28 campaigns; grabbing it in that gap makes the local driver's
+# next run_campaign.sh call fail and abort the whole sweep. Observed once, at 144/336.
+while pgrep -f "run_ladder03.sh" >/dev/null 2>&1; do sleep 30; done
 while :; do
   held=$(cat "$CAMP/campaign.lock" 2>/dev/null || true)
   [ -n "$held" ] && kill -0 "$held" 2>/dev/null || break
@@ -73,7 +83,7 @@ LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=$KEY
 LLM_API_KEY=$KEY
 IDEA_TEST_MODELS=$model
-IDEA_TEST_VALIDATION_MODEL=qwen2.5:7b
+IDEA_TEST_VALIDATION_MODEL=openai/gpt-4.1-nano
 MODEL_API_URL=
 IDEA_TEST_IDS=$tasks
 IDEA_TEST_EXECUTION_VARIANTS=$host
