@@ -307,18 +307,18 @@ def _default_results_dir() -> Path:
     return _REPO_ROOT / "agent" / "idea_test_results"
 
 
-_CELL_FILE_RE = re.compile(r"^ladder03_.+_r\d+\.json$")
-
-
-def discover_cell_files(results_dir: Path) -> List[Path]:
-    """Every ``ladder03_*.json`` CELL file in ``results_dir`` -- excludes ``*_summary.json``,
-    ``*_report_v3.json`` and ``*.jsonl`` siblings."""
+def discover_cell_files(results_dir: Path, prefix: str = "ladder03") -> List[Path]:
+    """Every ``<prefix>_*.json`` CELL file in ``results_dir`` -- excludes ``*_summary.json``,
+    ``*_report_v3.json`` and ``*.jsonl`` siblings. The prereg'd corpus is ``ladder03`` (the
+    default); other prefixes exist so a probe campaign can be read without silently matching
+    zero files."""
+    cell_re = re.compile(rf"^{re.escape(prefix)}_.+_r\d+\.json$")
     out = []
-    for path in sorted(results_dir.glob("ladder03_*.json")):
+    for path in sorted(results_dir.glob(f"{prefix}_*.json")):
         name = path.name
         if name.endswith("_summary.json") or "_report_v3" in name:
             continue
-        if not _CELL_FILE_RE.match(name):
+        if not cell_re.match(name):
             continue
         out.append(path)
     return out
@@ -641,6 +641,9 @@ def main() -> int:
                      help="path to write the JSON summary")
     ap.add_argument("--provisional", action="store_true",
                      help="label output as provisional (mid-sweep corpus)")
+    ap.add_argument("--prefix", default="ladder03",
+                     help="campaign filename prefix to read (default ladder03, the prereg'd "
+                          "corpus; anything else is off-prereg and should be labeled as such)")
     args = ap.parse_args()
 
     results_dir = Path(args.results_dir) if args.results_dir else _default_results_dir()
@@ -648,7 +651,11 @@ def main() -> int:
         print(f"no such results dir: {results_dir}", file=sys.stderr)
         return 1
 
-    files = discover_cell_files(results_dir)
+    files = discover_cell_files(results_dir, prefix=args.prefix)
+    if not files:
+        print(f"no {args.prefix}_*_rN.json cell files in {results_dir} -- wrong --prefix or dir?",
+              file=sys.stderr)
+        return 1
     print(f"discovered {len(files)} ladder03 cell files in {results_dir}")
 
     cells: List[Dict[str, Any]] = []
